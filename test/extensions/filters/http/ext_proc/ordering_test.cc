@@ -11,7 +11,6 @@
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/test_runtime.h"
 
@@ -64,7 +63,8 @@ protected:
     EXPECT_CALL(*client_, start(_, _, _, _)).WillRepeatedly(Invoke(this, &OrderingTest::doStart));
     EXPECT_CALL(encoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
-    EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(route_));
+    EXPECT_CALL(decoder_callbacks_, route())
+        .WillRepeatedly(Return(makeOptRefFromPtr<const Router::Route>(route_.get())));
     EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
 
     ExternalProcessor proto_config;
@@ -208,8 +208,6 @@ protected:
   MockStream stream_delegate_;
   ExternalProcessorCallbacks* stream_callbacks_ = nullptr;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
-  FilterConfigSharedPtr config_;
-  std::unique_ptr<Filter> filter_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Router::RouteConstSharedPtr route_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -221,6 +219,8 @@ protected:
   Http::TestRequestTrailerMapImpl request_trailers_;
   Http::TestResponseTrailerMapImpl response_trailers_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
+  FilterConfigSharedPtr config_;
+  std::unique_ptr<Filter> filter_;
 };
 
 // A base class for tests that will check that gRPC streams fail while being created

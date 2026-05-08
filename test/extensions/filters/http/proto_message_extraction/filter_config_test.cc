@@ -4,6 +4,7 @@
 #include "source/extensions/filters/http/proto_message_extraction/filter_config.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/proto/apikeys.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
@@ -485,6 +486,36 @@ TEST_F(FilterConfigTestException, MultipleResponseExtractRepeatedCardinality) {
 TEST(FilterFactoryCreatorTest, Constructor) {
   FilterFactoryCreator factory;
   EXPECT_EQ(factory.name(), "envoy.filters.http.proto_message_extraction");
+}
+
+TEST(FilterFactoryCreatorTest, CreateFilterFactoryFromProtoWithServerContext) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  FilterFactoryCreator factory;
+
+  ProtoMessageExtractionConfig config;
+  ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(R"pb(
+    mode: FIRST_AND_LAST
+    extraction_by_method: {
+      key: "apikeys.ApiKeys.CreateApiKey"
+      value: {
+        request_extraction_by_field: { key: "parent" value: EXTRACT }
+        request_extraction_by_field: { key: "key.name" value: EXTRACT }
+        response_extraction_by_field: { key: "name" value: EXTRACT }
+      }
+    })pb",
+                                                    &config));
+
+  auto api = Api::createApiForTest();
+  *config.mutable_data_source()->mutable_inline_bytes() =
+      api->fileSystem()
+          .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
+          .value();
+
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProtoWithServerContext(config, "stats", context);
+  testing::NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(testing::_));
+  cb(filter_callback);
 }
 
 } // namespace

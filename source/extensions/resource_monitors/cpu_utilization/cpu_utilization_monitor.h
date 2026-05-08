@@ -22,7 +22,6 @@ public:
 
 private:
   double utilization_ = 0.0;
-  CpuTimes previous_cpu_times_;
   std::unique_ptr<CpuStatsReader> cpu_stats_reader_;
 };
 

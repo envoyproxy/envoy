@@ -19,6 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.bootstrap.reverse_tunnel.upstream_socket_interface]
 
 // Configuration for the upstream reverse connection socket interface.
+// [#next-free-field: 6]
 message UpstreamReverseConnectionSocketInterface {
   // Stat prefix for upstream reverse connection socket interface stats.
   string stat_prefix = 1;
@@ -36,4 +37,11 @@ message UpstreamReverseConnectionSocketInterface {
   // the socket interface instantiates a reporter via the configured factory.
   // If unset, no reporting is done.
   config.core.v3.TypedExtensionConfig reporter_config = 4;
+
+  // Enables tenant-aware isolation for reverse connections. When set to ``true``, the socket
+  // interface requires tenant identifiers in addition to node and cluster identifiers and derives
+  // composite ``tenant:node`` and ``tenant:cluster`` keys for socket tracking. Identifiers
+  // containing the ``:`` delimiter are rejected to avoid ambiguity.
+  // Defaults to ``false`` for backwards compatibility.
+  google.protobuf.BoolValue enable_tenant_isolation = 5;
 }

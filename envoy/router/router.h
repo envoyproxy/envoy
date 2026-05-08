@@ -22,6 +22,7 @@
 #include "envoy/router/internal_redirect.h"
 #include "envoy/router/path_matcher.h"
 #include "envoy/router/path_rewriter.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/tracing/tracer.h"
 #include "envoy/type/v3/percent.pb.h"
@@ -113,6 +114,12 @@ public:
                                        const Http::ResponseHeaderMap& response_headers,
                                        const StreamInfo::StreamInfo& stream_info,
                                        std::string& body_out) const PURE;
+
+  /**
+   * @return the content type to use for the direct response body, or empty string if not
+   * configured (in which case the default "text/plain" will be used).
+   */
+  virtual absl::string_view responseContentType() const PURE;
 
   /**
    * Do potentially destructive header transforms on Path header prior to redirection. For
@@ -330,7 +337,13 @@ public:
 /**
  * RetryStatus whether request should be retried or not.
  */
-enum class RetryStatus { No, NoOverflow, NoRetryLimitExceeded, Yes };
+enum class RetryStatus {
+  No,
+  NoOverflow,
+  NoRetryLimitExceeded,
+  Yes,
+  NoRuntime,
+};
 
 /**
  * InternalRedirectPolicy from the route configuration.
@@ -393,6 +406,15 @@ public:
     Unknown,
     Yes,
     No,
+  };
+
+  enum class DoRetryType {
+    // Retry the request immediately.
+    Immediately,
+    // Retry the request with ratelimited backoff delay.
+    Ratelimited,
+    // Retry the request with exponential backoff delay.
+    Exponential,
   };
 
   using DoRetryCallback = std::function<void()>;
@@ -500,19 +522,27 @@ public:
 
   /**
    * Returns a reference to the PriorityLoad that should be used for the next retry.
+   * @param stream_info request stream information.
    * @param priority_set current priority set.
    * @param original_priority_load original priority load.
    * @param priority_mapping_func see @Upstream::RetryPriority::PriorityMappingFunc.
    * @return HealthyAndDegradedLoad that should be used to select a priority for the next retry.
    */
   virtual const Upstream::HealthyAndDegradedLoad& priorityLoadForRetry(
-      const Upstream::PrioritySet& priority_set,
+      StreamInfo::StreamInfo* stream_info, const Upstream::PrioritySet& priority_set,
       const Upstream::HealthyAndDegradedLoad& original_priority_load,
       const Upstream::RetryPriority::PriorityMappingFunc& priority_mapping_func) PURE;
   /**
    * return how many times host selection should be reattempted during host selection.
    */
   virtual uint32_t hostSelectionMaxAttempts() const PURE;
+
+  /**
+   * @return the type of retry to perform when a retry is triggered.
+   * This is used to determine whether to apply a backoff delay or not, and if so, what type of
+   * backoff to apply.
+   */
+  virtual DoRetryType doRetryType() const PURE;
 };
 
 using RetryStatePtr = std::unique_ptr<RetryState>;
@@ -1315,11 +1345,15 @@ public:
   virtual const std::string& routeName() const PURE;
 
   /**
-   * @return const VirtualHostConstSharedPtr& the virtual host that owns the route.
-   *
-   * NOTE: This MUST not be null.
+   * @return const VirtualHost& the virtual host that owns the route.
    */
-  virtual const VirtualHostConstSharedPtr& virtualHost() const PURE;
+  virtual const VirtualHost& virtualHost() const PURE;
+
+  /**
+   * @return VirtualHostConstSharedPtr the virtual host that owns the route, extended to allow a
+   * caller to extend or transfer ownership.
+   */
+  virtual VirtualHostConstSharedPtr virtualHostSharedPtr() const PURE;
 };
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;

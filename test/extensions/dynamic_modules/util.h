@@ -24,6 +24,17 @@ public:
  */
 std::string testSharedObjectPath(std::string name, std::string language);
 
+/**
+ * Helper class to set up the dynamic modules test environment.
+ */
+class DynamicModulesTestEnvironment {
+public:
+  /**
+   * Sets the ENVOY_DYNAMIC_MODULES_SEARCH_PATH environment variable to the test data directory.
+   */
+  static void setModulesSearchPath();
+};
+
 } // namespace DynamicModules
 } // namespace Extensions
 } // namespace Envoy

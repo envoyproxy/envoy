@@ -1,0 +1,47 @@
+node:
+  # set <cluster identifier>
+  cluster: envoy_cluster
+  # set <node identifier>
+  id: envoy_node
+
+dynamic_resources:
+  ads_config:
+    api_type: GRPC
+    grpc_services:
+    - envoy_grpc:
+        cluster_name: ads_cluster
+  cds_config:
+    ads: {}
+  lds_config:
+    ads: {}
+
+static_resources:
+  clusters:
+  - name: ads_cluster
+    type: STRICT_DNS
+    load_assignment:
+      cluster_name: ads_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                # set <ADS management server address>
+                address: my-control-plane
+                # set <ADS management server port>
+                port_value: 777
+    # It is recommended to configure either HTTP/2 or TCP keepalives in order to detect
+    # connection issues, and allow Envoy to reconnect. TCP keepalive is less expensive, but
+    # may be inadequate if there is a TCP proxy between Envoy and the management server.
+    # HTTP/2 keepalive is slightly more expensive, but may detect issues through more types
+    # of intermediate proxies.
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options:
+            connection_keepalive:
+              interval: 30s
+              timeout: 5s
+    upstream_connection_options:
+      tcp_keepalive: {}

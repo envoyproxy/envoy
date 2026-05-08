@@ -39,7 +39,6 @@ envoy_extension_cc_test(
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/server:tracer_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
-        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -58,7 +57,7 @@ envoy_extension_cc_test(
         "//source/common/common:base64_lib",
         "//source/common/common:hex_lib",
         "//test/test_common:utility_lib",
-        "@com_github_skyapm_cpp2sky//source:cpp2sky_data_lib",
+        "@cpp2sky//source:cpp2sky_data_lib",
     ],
 )
 
@@ -76,7 +75,6 @@ envoy_extension_cc_test(
         "//test/mocks/server:tracer_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
-        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
 )

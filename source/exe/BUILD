@@ -66,7 +66,7 @@ envoy_cc_library(
         ":platform_impl_lib",
         ":scm_impl_lib",
         "//source/server:options_lib",
-        "@com_google_absl//absl/debugging:symbolize",
+        "@abseil-cpp//absl/debugging:symbolize",
     ],
 )
 
@@ -169,6 +169,7 @@ envoy_cc_library(
         "//source/common/listener_manager:listener_manager_lib",
         "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
         "//source/common/version:version_linkstamp",
+        "//source/common/version:version_string_lib",
         "//source/common/formatter:formatter_extension_lib",
         "//source/server:options_lib",
         # TODO(wbpcode) make this a proper extension
@@ -185,6 +186,7 @@ envoy_cc_library(
     deps = [
         ":stripped_main_base_lib",
         "//source/common/version:version_linkstamp",
+        "//source/common/version:version_string_lib",
     ],
 )
 

@@ -237,6 +237,122 @@ TEST_F(InputsIntegrationTest, DynamicMetadataInput) {
             (*stored_metadata[metadata_key].mutable_fields())[label_key].string_value());
 }
 
+// Helper filter state object that supports field access, for testing FilterStateInput with field.
+class TestFieldFilterStateObject : public StreamInfo::FilterState::Object {
+public:
+  TestFieldFilterStateObject(const absl::flat_hash_map<std::string, std::string>& fields)
+      : fields_(fields) {}
+
+  bool hasFieldSupport() const override { return true; }
+
+  FieldType getField(absl::string_view field_name) const override {
+    auto it = fields_.find(std::string(field_name));
+    if (it != fields_.end()) {
+      return absl::string_view(it->second);
+    }
+    return absl::monostate{};
+  }
+
+  absl::optional<std::string> serializeAsString() const override {
+    return "serialized_whole_object";
+  }
+
+private:
+  absl::flat_hash_map<std::string, std::string> fields_;
+};
+
+constexpr absl::string_view yaml_filter_state_with_field = R"EOF(
+matcher_tree:
+  input:
+    name: input
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.FilterStateInput
+      key: {}
+      field: {}
+  exact_match_map:
+    map:
+      "{}":
+        action:
+          name: test_action
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.StringValue
+            value: foo
+)EOF";
+
+TEST_F(InputsIntegrationTest, FilterStateInputWithField) {
+  std::string key = "composite_state";
+  std::string field = "my_field";
+  std::string value = "field_value";
+
+  xds::type::matcher::v3::Matcher matcher;
+  MessageUtil::loadFromYaml(fmt::format(yaml_filter_state_with_field, key, field, value), matcher,
+                            ProtobufMessage::getStrictValidationVisitor());
+  match_tree_ = matcher_factory_.create(matcher);
+
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state.setData(
+      key,
+      std::make_shared<TestFieldFilterStateObject>(absl::flat_hash_map<std::string, std::string>{
+          {"my_field", "field_value"}, {"other_field", "other_value"}}),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  Network::MockConnectionSocket socket;
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
+
+  EXPECT_THAT(match_tree_()->match(data), HasStringAction("foo"));
+}
+
+TEST_F(InputsIntegrationTest, FilterStateInputWithFieldNoMatch) {
+  std::string key = "composite_state";
+  std::string field = "my_field";
+  std::string value = "wrong_value";
+
+  xds::type::matcher::v3::Matcher matcher;
+  MessageUtil::loadFromYaml(fmt::format(yaml_filter_state_with_field, key, field, value), matcher,
+                            ProtobufMessage::getStrictValidationVisitor());
+  match_tree_ = matcher_factory_.create(matcher);
+
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state.setData(
+      key,
+      std::make_shared<TestFieldFilterStateObject>(
+          absl::flat_hash_map<std::string, std::string>{{"my_field", "field_value"}}),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  Network::MockConnectionSocket socket;
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
+
+  // Field value is "field_value" but matcher expects "wrong_value" — no match.
+  EXPECT_THAT(match_tree_()->match(data), HasNoMatch());
+}
+
+TEST_F(InputsIntegrationTest, FilterStateInputWithFieldMissing) {
+  std::string key = "composite_state";
+  std::string field = "nonexistent_field";
+  std::string value = "any_value";
+
+  xds::type::matcher::v3::Matcher matcher;
+  MessageUtil::loadFromYaml(fmt::format(yaml_filter_state_with_field, key, field, value), matcher,
+                            ProtobufMessage::getStrictValidationVisitor());
+  match_tree_ = matcher_factory_.create(matcher);
+
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state.setData(
+      key,
+      std::make_shared<TestFieldFilterStateObject>(
+          absl::flat_hash_map<std::string, std::string>{{"my_field", "field_value"}}),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  Network::MockConnectionSocket socket;
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
+
+  // Field "nonexistent_field" doesn't exist in the object — no match.
+  EXPECT_THAT(match_tree_()->match(data), HasNoMatch());
+}
+
 TEST_F(InputsIntegrationTest, FilterStateInputFailure) {
   std::string key = "filter_state_key";
   std::string value = "filter_state_value";

@@ -92,7 +92,7 @@ def _envoy_linkopts():
         ],
     }) + select({
         "@envoy//bazel:apple": [],
-        "@envoy//bazel:boringssl_fips": [],
+        "@envoy//bazel:fips_build": [],
         "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": ["-pie"],
     }) + envoy_select_exported_symbols(["-Wl,-E"])

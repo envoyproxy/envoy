@@ -23,7 +23,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         ":ratelimit_config_test_proto_cc_proto",
-        "//source/common/formatter:http_speicific_formatter_extension_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:header_map_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:config_lib",

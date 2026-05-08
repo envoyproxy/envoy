@@ -6,10 +6,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/mocks/thread_local/mocks.h"
-#include "test/mocks/tracing/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"
@@ -94,9 +91,7 @@ protected:
   FinalizerImplTest() {
     Upstream::HostDescriptionConstSharedPtr shared_host(host_);
     stream_info.upstreamInfo()->setUpstreamHost(shared_host);
-    ON_CALL(stream_info, upstreamClusterInfo())
-        .WillByDefault(
-            Return(absl::make_optional<Upstream::ClusterInfoConstSharedPtr>(cluster_info_)));
+    stream_info.upstream_cluster_info_ = cluster_info_;
   }
   struct CustomTagCase {
     std::string custom_tag;
@@ -368,6 +363,9 @@ TEST(NullTracerTest, BasicFunctionality) {
   span_ptr->log(SystemTime(), "fake_event");
   span_ptr->useLocalDecision();
 
+  // NullSpan is never exported
+  EXPECT_FALSE(span_ptr->exportedSpan());
+
   EXPECT_NE(nullptr, span_ptr->spawnChild(config, "foo", SystemTime()));
 }
 
@@ -380,9 +378,7 @@ public:
     Upstream::HostDescriptionConstSharedPtr shared_host(host_);
     stream_info_.upstreamInfo()->setUpstreamHost(shared_host);
 
-    ON_CALL(stream_info_, upstreamClusterInfo())
-        .WillByDefault(
-            Return(absl::make_optional<Upstream::ClusterInfoConstSharedPtr>(cluster_info_)));
+    stream_info_.upstream_cluster_info_ = cluster_info_;
   }
 
   Http::TestRequestHeaderMapImpl request_headers_{

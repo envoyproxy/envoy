@@ -2,6 +2,7 @@
 #include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
+#include "source/common/ssl/ssl.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/tls/ssl_handshaker.h"
@@ -19,6 +20,7 @@
 namespace Envoy {
 namespace {
 
+using testing::Ge;
 using testing::HasSubstr;
 
 class ExtAuthzNetworkIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
@@ -156,7 +158,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ExtAuthzNetworkIntegrationTest, GRPC_CLIENT
 
 // Test that when ext_authz denies with TLS and send_tls_alert_on_denial is true,
 // the connection is closed with a TLS alert.
-TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithTlsAlertEnabled) {
+BORINGSSL_TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithTlsAlertEnabled) {
   initializeTest(true /* send_tls_alert_on_denial */, true /* with_tls */);
 
   setupSslConnection();
@@ -176,8 +178,8 @@ TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithTlsAlertEnabled) {
 
   sendExtAuthzResponse(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
 
-  test_server_->waitForCounterGe("ext_authz.ext_authz.denied", 1);
-  test_server_->waitForCounterGe("ext_authz.ext_authz.cx_closed", 1);
+  test_server_->waitForCounter("ext_authz.ext_authz.denied", Ge(1));
+  test_server_->waitForCounter("ext_authz.ext_authz.cx_closed", Ge(1));
 
   // Wait for the connection to close and ensure all events are processed.
   while (!connect_callbacks_.closed()) {
@@ -243,8 +245,8 @@ TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithTlsAlertDisabled) {
 
   sendExtAuthzResponse(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
 
-  test_server_->waitForCounterGe("ext_authz.ext_authz.denied", 1);
-  test_server_->waitForCounterGe("ext_authz.ext_authz.cx_closed", 1);
+  test_server_->waitForCounter("ext_authz.ext_authz.denied", Ge(1));
+  test_server_->waitForCounter("ext_authz.ext_authz.cx_closed", Ge(1));
 
   while (!connect_callbacks_.closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -302,7 +304,7 @@ TEST_P(ExtAuthzNetworkIntegrationTest, AllowedConnection) {
 
   sendExtAuthzResponse(Grpc::Status::WellKnownGrpcStatus::Ok);
 
-  test_server_->waitForCounterGe("ext_authz.ext_authz.ok", 1);
+  test_server_->waitForCounter("ext_authz.ext_authz.ok", Ge(1));
 
   FakeRawConnectionPtr fake_upstream_connection;
   result = fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection);
@@ -352,8 +354,8 @@ TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithoutTls) {
   sendExtAuthzResponse(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
 
   // Wait for denial to be processed.
-  test_server_->waitForCounterGe("ext_authz.ext_authz.denied", 1);
-  test_server_->waitForCounterGe("ext_authz.ext_authz.cx_closed", 1);
+  test_server_->waitForCounter("ext_authz.ext_authz.denied", Ge(1));
+  test_server_->waitForCounter("ext_authz.ext_authz.cx_closed", Ge(1));
 
   // For non-TLS connections, ext_authz closes immediately without sending an alert.
   // Close the client connection to clean up the test.

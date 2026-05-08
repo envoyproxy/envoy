@@ -199,6 +199,12 @@ public:
    *         the number of detailed buckets.
    */
   virtual std::vector<Bucket> detailedIntervalBuckets() const PURE;
+
+  /**
+   * Returns the approximate cumulative count of samples less than or equal to the given value
+   * in the cumulative histogram.
+   */
+  virtual uint64_t cumulativeCountLessThanOrEqualToValue(double value) const PURE;
 };
 
 using ParentHistogramSharedPtr = RefcountPtr<ParentHistogram>;

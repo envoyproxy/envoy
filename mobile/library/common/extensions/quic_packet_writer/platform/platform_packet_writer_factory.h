@@ -9,10 +9,15 @@ namespace Quic {
 // On Android M+, the handle is associated with Network.getNetworkHandle().
 class QuicPlatformPacketWriterFactory : public QuicClientPacketWriterFactory {
 public:
+  QuicPlatformPacketWriterFactory(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
+
   CreationResult createSocketAndQuicPacketWriter(
       Network::Address::InstanceConstSharedPtr server_addr, quic::QuicNetworkHandle network,
       Network::Address::InstanceConstSharedPtr& local_addr,
       const Network::ConnectionSocket::OptionsSharedPtr& options) override;
+
+private:
+  Event::Dispatcher& dispatcher_;
 };
 
 } // namespace Quic

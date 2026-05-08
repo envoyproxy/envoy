@@ -32,11 +32,10 @@ envoy_extension_cc_test(
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//source/extensions/filters/http/ext_authz",
         "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
+        "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_factory_context_mocks",
-        "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/proto:helloworld_proto_cc_proto",
         "//test/test_common:test_runtime_lib",
@@ -69,13 +68,11 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "ext_authz_integration_test",
-    size = "large",
     srcs = ["ext_authz_integration_test.cc"],
-    data = [
-        "ext_authz.yaml",
-    ],
+    data = ["ext_authz.yaml"],
     extension_names = ["envoy.filters.http.ext_authz"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
+    shard_count = 4,
     deps = [
         ":ext_authz_fuzz_proto_cc_proto",
         ":logging_test_filter_lib",

@@ -7,8 +7,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # User/group IDs
-USER_UID="$(id -u)"
-USER_GID="$(id -g)"
+USER_UID="${USER_UID:-$(id -u)}"
+USER_GID="${USER_GID:-$(id -g)}"
 export USER_UID
 export USER_GID
 

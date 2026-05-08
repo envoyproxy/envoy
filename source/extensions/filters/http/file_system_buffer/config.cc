@@ -34,6 +34,22 @@ Http::FilterFactoryCb FileSystemBufferFilterFactory::createFilterFactoryFromProt
   };
 }
 
+Http::FilterFactoryCb
+FileSystemBufferFilterFactory::createFilterFactoryFromProtoWithServerContextTyped(
+    const ProtoFileSystemBufferFilterConfig& config,
+    const std::string& stats_prefix ABSL_ATTRIBUTE_UNUSED,
+    Server::Configuration::ServerFactoryContext& context) {
+  auto factory = AsyncFileManagerFactory::singleton(&context.singletonManager());
+  auto manager = config.has_manager_config() ? factory->getAsyncFileManager(config.manager_config())
+                                             : std::shared_ptr<AsyncFileManager>();
+  auto filter_config = std::make_shared<FileSystemBufferFilterConfig>(std::move(factory),
+                                                                      std::move(manager), config);
+  return [filter_config =
+              std::move(filter_config)](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<FileSystemBufferFilter>(filter_config));
+  };
+}
+
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 FileSystemBufferFilterFactory::createRouteSpecificFilterConfigTyped(
     const ProtoFileSystemBufferFilterConfig& config,

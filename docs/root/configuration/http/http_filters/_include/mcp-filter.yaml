@@ -90,7 +90,7 @@ static_resources:
           #       envoy_grpc:
           #         cluster_name: ext-authz
           #     metadata_context_namespaces:
-          #     - mcp_proxy
+          #       - envoy.filters.http.mcp
           - name: envoy.filters.http.router
             typed_config:
               '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -124,7 +124,7 @@ static_resources:
                                       rules:
                                       - sourced_metadata:
                                           metadata_matcher:
-                                            filter: mcp_proxy
+                                            filter: envoy.filters.http.mcp
                                             path:
                                             - key: method
                                             value:
@@ -144,7 +144,7 @@ static_resources:
                                       rules:
                                       - sourced_metadata:
                                           metadata_matcher:
-                                            filter: mcp_proxy
+                                            filter: envoy.filters.http.mcp
                                             path:
                                             - key: method
                                             value:
@@ -161,7 +161,7 @@ static_resources:
                                       rules:
                                       - sourced_metadata:
                                           metadata_matcher:
-                                            filter: mcp_proxy
+                                            filter: envoy.filters.http.mcp
                                             path:
                                             - key: method
                                             value:
@@ -169,7 +169,7 @@ static_resources:
                                                 exact: tools/call
                                       - sourced_metadata:
                                           metadata_matcher:
-                                            filter: mcp_proxy
+                                            filter: envoy.filters.http.mcp
                                             path:
                                             - key: params
                                             - key: name
@@ -200,7 +200,7 @@ static_resources:
                                       rules:
                                       - sourced_metadata:
                                           metadata_matcher:
-                                            filter: mcp_proxy
+                                            filter: envoy.filters.http.mcp
                                             path:
                                             - key: method
                                             value:
@@ -220,7 +220,7 @@ static_resources:
                                       rules:
                                       - sourced_metadata:
                                           metadata_matcher:
-                                            filter: mcp_proxy
+                                            filter: envoy.filters.http.mcp
                                             path:
                                             - key: method
                                             value:
@@ -237,7 +237,7 @@ static_resources:
                                       rules:
                                       - sourced_metadata:
                                           metadata_matcher:
-                                            filter: mcp_proxy
+                                            filter: envoy.filters.http.mcp
                                             path:
                                             - key: method
                                             value:
@@ -245,7 +245,7 @@ static_resources:
                                                 exact: tools/call
                                       - sourced_metadata:
                                           metadata_matcher:
-                                            filter: mcp_proxy
+                                            filter: envoy.filters.http.mcp
                                             path:
                                             - key: params
                                             - key: name

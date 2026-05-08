@@ -94,6 +94,7 @@ Http::Code ServerInfoHandler::handlerServerInfo(Http::ResponseHeaderMap& headers
   server_info.set_hot_restart_version(server_.hotRestart().version());
   server_info.set_state(
       Utility::serverState(server_.initManager().state(), server_.healthCheckFailed()));
+  server_info.set_hot_restart_initializing(server_.hotRestart().isInitializing());
 
   server_info.mutable_uptime_current_epoch()->set_seconds(uptime_current_epoch);
   server_info.mutable_uptime_all_epochs()->set_seconds(uptime_all_epochs);

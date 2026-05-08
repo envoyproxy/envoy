@@ -190,9 +190,10 @@ TEST_F(GeoipFilterTest, AllHeadersPropagatedCorrectly) {
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
   std::map<std::string, std::string> geo_headers = {
-      {"x-geo-region", "dummy-region"},   {"x-geo-city", "dummy-city"},
-      {"x-geo-country", "dummy-country"}, {"x-geo-asn", "dummy-asn"},
-      {"x-geo-isp", "dummy-isp"},         {"x-geo-apple-private-relay", "true"}};
+      {"x-geo-region", "dummy-region"},     {"x-geo-city", "dummy-city"},
+      {"x-geo-country", "dummy-country"},   {"x-geo-asn", "dummy-asn"},
+      {"x-geo-asn-org", "dummy-asn-org"},   {"x-geo-isp", "dummy-isp"},
+      {"x-geo-apple-private-relay", "true"}};
   std::map<std::string, std::string> geo_anon_headers = {{"x-geo-anon", "true"},
                                                          {"x-geo-anon-vpn", "false"},
                                                          {"x-geo-anon-hosting", "true"},
@@ -210,6 +211,7 @@ TEST_F(GeoipFilterTest, AllHeadersPropagatedCorrectly) {
                                                             {"x-geo-region", "dummy-region"},
                                                             {"x-geo-country", "dummy-country"},
                                                             {"x-geo-asn", "dummy-asn"},
+                                                            {"x-geo-asn-org", "dummy-asn-org"},
                                                             {"x-geo-isp", "dummy-isp"},
                                                             {"x-geo-apple-private-relay", "true"},
                                                             {"x-geo-anon", "true"},
@@ -223,7 +225,7 @@ TEST_F(GeoipFilterTest, AllHeadersPropagatedCorrectly) {
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_EQ("1.2.3.4:0", captured_rq_.remoteAddress()->asString());
-  EXPECT_EQ(11, request_headers.size());
+  EXPECT_EQ(12, request_headers.size());
   for (auto& geo_header : geo_headers) {
     auto& header = geo_header.first;
     auto& value = geo_header.second;

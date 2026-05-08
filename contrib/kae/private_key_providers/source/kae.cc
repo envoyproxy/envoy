@@ -1,18 +1,17 @@
 #include "contrib/kae/private_key_providers/source/kae.h"
-#include "kae.h"
 
 #include <openssl/bn.h>
 #include <openssl/crypto.h>
+#include <openssl/rsa.h>
+#include <openssl/ssl.h>
 
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <thread>
 
-#include "libuadk.h"
-#include "libuadk_impl.h"
-#include "openssl/rsa.h"
-#include "openssl/ssl.h"
+#include "contrib/kae/private_key_providers/source/libuadk.h"
+#include "contrib/kae/private_key_providers/source/libuadk_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -211,12 +210,16 @@ bool KaeHandle::isDone() { return done_; }
 // KAE Section
 KaeSection::KaeSection(LibUadkCryptoSharedPtr libuadk) : libuadk_(libuadk) {};
 
-bool KaeSection::startSection(Api::Api& api, std::chrono::milliseconds poll_delay) {
+bool KaeSection::startSection(Api::Api& api, std::chrono::milliseconds poll_delay,
+                              uint32_t max_instances) {
   int ret = libuadk_->kaeGetNumInstances(&num_instances_);
   ENVOY_LOG(info, "found {} KAE instances", num_instances_);
   if (ret != WD_SUCCESS) {
     return false;
   }
+
+  num_instances_ = std::min(num_instances_, max_instances);
+  ENVOY_LOG(info, "use {} KAE instances", num_instances_);
 
   kae_handles_ = std::vector<KaeHandle>(num_instances_);
 

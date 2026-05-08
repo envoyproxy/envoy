@@ -161,8 +161,11 @@ public:
   /**
    * Closes the transport socket.
    * @param event supplies the connection event that is closing the socket.
+   * @param abort_reset if true, the connection is being torn down with a TCP RST and the
+   *        transport socket should skip any graceful shutdown (e.g. TLS close_notify) so the
+   *        peer reliably observes the reset rather than racing it against a clean close.
    */
-  virtual void closeSocket(Network::ConnectionEvent event) PURE;
+  virtual void closeSocket(Network::ConnectionEvent event, bool abort_reset = false) PURE;
 
   /**
    * @param buffer supplies the buffer to read to.
@@ -313,6 +316,13 @@ public:
   virtual TransportSocketPtr
   createTransportSocket(TransportSocketOptionsConstSharedPtr options,
                         std::shared_ptr<const Upstream::HostDescription> host) const PURE;
+
+  /**
+   * @return the default Http11ProxyInfo if configured, or nullopt.
+   */
+  virtual OptRef<const TransportSocketOptions::Http11ProxyInfo> defaultHttp11ProxyInfo() const {
+    return {};
+  }
 
   /**
    * Returns true if the transport socket created by this factory supports some form of ALPN

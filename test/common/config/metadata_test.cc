@@ -49,6 +49,83 @@ TEST(MetadataTest, MetadataValuePath) {
             Protobuf::Value::KindCase::KIND_NOT_SET);
 }
 
+TEST(MetadataTest, MetadataLabelMatch) {
+  envoy::config::core::v3::Metadata metadata;
+  const std::string filter = "com.test";
+  Protobuf::Struct& filter_struct = (*metadata.mutable_filter_metadata())[filter];
+
+  // Set up metadata fields
+  (*filter_struct.mutable_fields())["key1"] = ValueUtil::stringValue("val1");
+
+  Protobuf::Value list_val;
+  auto* list = list_val.mutable_list_value();
+  *list->add_values() = ValueUtil::stringValue("v1");
+  *list->add_values() = ValueUtil::stringValue("v2");
+  (*filter_struct.mutable_fields())["key2"] = list_val;
+
+  // Case 1: Simple match
+  {
+    Metadata::LabelSet labels;
+    labels.push_back({"key1", ValueUtil::stringValue("val1")});
+    EXPECT_TRUE(Metadata::metadataLabelMatch(labels, &metadata, filter, false));
+  }
+
+  // Case 2: No match (wrong value)
+  {
+    Metadata::LabelSet labels;
+    labels.push_back({"key1", ValueUtil::stringValue("val2")});
+    EXPECT_FALSE(Metadata::metadataLabelMatch(labels, &metadata, filter, false));
+  }
+
+  // Case 3: No match (missing key)
+  {
+    Metadata::LabelSet labels;
+    labels.push_back({"missing_key", ValueUtil::stringValue("val1")});
+    EXPECT_FALSE(Metadata::metadataLabelMatch(labels, &metadata, filter, false));
+  }
+
+  // Case 4: List match with list_as_any = true
+  {
+    Metadata::LabelSet labels;
+    labels.push_back({"key2", ValueUtil::stringValue("v1")});
+    EXPECT_TRUE(Metadata::metadataLabelMatch(labels, &metadata, filter, true));
+
+    labels.clear();
+    labels.push_back({"key2", ValueUtil::stringValue("v2")});
+    EXPECT_TRUE(Metadata::metadataLabelMatch(labels, &metadata, filter, true));
+  }
+
+  // Case 5: List no match with list_as_any = true
+  {
+    Metadata::LabelSet labels;
+    labels.push_back({"key2", ValueUtil::stringValue("v3")});
+    EXPECT_FALSE(Metadata::metadataLabelMatch(labels, &metadata, filter, true));
+  }
+
+  // Case 6: List no match with list_as_any = false
+  {
+    Metadata::LabelSet labels;
+    labels.push_back({"key2", ValueUtil::stringValue("v1")});
+    EXPECT_FALSE(Metadata::metadataLabelMatch(labels, &metadata, filter, false));
+  }
+
+  // Case 7: null metadata
+  {
+    Metadata::LabelSet labels;
+    EXPECT_TRUE(Metadata::metadataLabelMatch(labels, nullptr, filter, false));
+    labels.push_back({"key1", ValueUtil::stringValue("val1")});
+    EXPECT_FALSE(Metadata::metadataLabelMatch(labels, nullptr, filter, false));
+  }
+
+  // Case 8: filter not found
+  {
+    Metadata::LabelSet labels;
+    EXPECT_TRUE(Metadata::metadataLabelMatch(labels, &metadata, "non_existent", false));
+    labels.push_back({"key1", ValueUtil::stringValue("val1")});
+    EXPECT_FALSE(Metadata::metadataLabelMatch(labels, &metadata, "non_existent", false));
+  }
+}
+
 class TypedMetadataTest : public testing::Test {
 public:
   TypedMetadataTest()

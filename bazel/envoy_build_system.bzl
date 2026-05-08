@@ -32,7 +32,6 @@ load(
     _envoy_select_admin_functionality = "envoy_select_admin_functionality",
     _envoy_select_admin_html = "envoy_select_admin_html",
     _envoy_select_admin_no_html = "envoy_select_admin_no_html",
-    _envoy_select_boringssl = "envoy_select_boringssl",
     _envoy_select_disable_exceptions = "envoy_select_disable_exceptions",
     _envoy_select_disable_logging = "envoy_select_disable_logging",
     _envoy_select_enable_exceptions = "envoy_select_enable_exceptions",
@@ -87,30 +86,6 @@ def envoy_mobile_package(default_visibility = ["//visibility:public"]):
 
 def envoy_contrib_package():
     envoy_extension_package(default_visibility = CONTRIB_EXTENSION_PACKAGE_VISIBILITY)
-
-# A genrule variant that can output a directory. This is useful when doing things like
-# generating a fuzz corpus mechanically.
-def _envoy_directory_genrule_impl(ctx):
-    tree = ctx.actions.declare_directory(ctx.attr.name + ".outputs")
-    ctx.actions.run_shell(
-        inputs = ctx.files.srcs,
-        tools = ctx.files.tools,
-        outputs = [tree],
-        command = "mkdir -p " + tree.path + " && " + ctx.expand_location(ctx.attr.cmd),
-        env = {"GENRULE_OUTPUT_DIR": tree.path},
-        use_default_shell_env = True,
-        toolchain = None,
-    )
-    return [DefaultInfo(files = depset([tree]))]
-
-envoy_directory_genrule = rule(
-    implementation = _envoy_directory_genrule_impl,
-    attrs = {
-        "srcs": attr.label_list(),
-        "cmd": attr.string(),
-        "tools": attr.label_list(),
-    },
-)
 
 # External CMake C++ library targets should be specified with this function. This defaults
 # to building the dependencies with ninja
@@ -244,7 +219,6 @@ envoy_select_admin_functionality = _envoy_select_admin_functionality
 envoy_select_static_extension_registration = _envoy_select_static_extension_registration
 envoy_select_envoy_mobile_listener = _envoy_select_envoy_mobile_listener
 envoy_select_envoy_mobile_xds = _envoy_select_envoy_mobile_xds
-envoy_select_boringssl = _envoy_select_boringssl
 envoy_select_disable_logging = _envoy_select_disable_logging
 envoy_select_google_grpc = _envoy_select_google_grpc
 envoy_select_enable_http3 = _envoy_select_enable_http3

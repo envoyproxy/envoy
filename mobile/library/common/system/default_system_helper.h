@@ -19,6 +19,8 @@ public:
   void cleanupAfterCertificateValidation() override;
   int64_t getDefaultNetworkHandle() override;
   std::vector<std::pair<int64_t, ConnectionType>> getAllConnectedNetworks() override;
+  std::unique_ptr<Platform::NetworkChangeMonitor>
+  initializeNetworkChangeMonitor(Platform::NetworkChangeListener& network_change_listener) override;
   void bindSocketToNetwork(Network::ConnectionSocket& socket, int64_t network_handle) override;
 };
 

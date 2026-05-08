@@ -35,6 +35,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/upstream/load_stats_reporter_impl.h"
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
@@ -229,10 +230,18 @@ XdsManagerImpl::initializeAdsConnections(const envoy::config::bootstrap::v3::Boo
                                          /*xdstp_config_source*/ false, primary_client,
                                          failover_client));
 
-      ads_mux_ = factory->create(
-          std::move(primary_client), std::move(failover_client), main_thread_dispatcher_, random_,
-          *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
-          std::move(custom_config_validators), std::move(backoff_strategy), xds_config_tracker, {});
+      std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> lrs_factory =
+          [&, primary_client]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
+        auto reporter = std::make_unique<Upstream::LoadStatsReporterImpl>(
+            local_info_, *cm_, *stats_.rootScope(), primary_client, main_thread_dispatcher_);
+        return reporter;
+      };
+
+      ads_mux_ = factory->create(std::move(primary_client), std::move(failover_client),
+                                 main_thread_dispatcher_, random_, *stats_.rootScope(),
+                                 dyn_resources.ads_config(), local_info_,
+                                 std::move(custom_config_validators), std::move(backoff_strategy),
+                                 xds_config_tracker, {}, lrs_factory);
     } else {
       absl::Status status = Config::Utility::checkTransportVersion(dyn_resources.ads_config());
       RETURN_IF_NOT_OK(status);
@@ -253,13 +262,21 @@ XdsManagerImpl::initializeAdsConnections(const envoy::config::bootstrap::v3::Boo
                                          *stats_.rootScope(), /*skip_cluster_check*/ false,
                                          /*xdstp_config_source*/ false, primary_client,
                                          failover_client));
+
+      std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> lrs_factory =
+          [&, primary_client]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
+        auto reporter = std::make_unique<Upstream::LoadStatsReporterImpl>(
+            local_info_, *cm_, *stats_.rootScope(), primary_client, main_thread_dispatcher_);
+        return reporter;
+      };
+
       OptRef<XdsResourcesDelegate> xds_resources_delegate =
           makeOptRefFromPtr<XdsResourcesDelegate>(xds_resources_delegate_.get());
       ads_mux_ = factory->create(std::move(primary_client), std::move(failover_client),
                                  main_thread_dispatcher_, random_, *stats_.rootScope(),
                                  dyn_resources.ads_config(), local_info_,
                                  std::move(custom_config_validators), std::move(backoff_strategy),
-                                 xds_config_tracker, xds_resources_delegate);
+                                 xds_config_tracker, xds_resources_delegate, lrs_factory);
     }
   } else {
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();
@@ -449,10 +466,17 @@ XdsManagerImpl::createAuthority(const envoy::config::core::v3::ConfigSource& con
                                        *stats_.rootScope(), /*skip_cluster_check*/ false,
                                        /*xdstp_config_source*/ true, primary_client,
                                        failover_client));
+    std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> lrs_factory =
+        [&, primary_client]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
+      auto reporter = std::make_unique<Upstream::LoadStatsReporterImpl>(
+          local_info_, *cm_, *stats_.rootScope(), primary_client, main_thread_dispatcher_);
+      return reporter;
+    };
+
     authority_mux = factory->create(
         std::move(primary_client), std::move(failover_client), main_thread_dispatcher_, random_,
         *stats_.rootScope(), api_config_source, local_info_, std::move(custom_config_validators),
-        std::move(backoff_strategy), xds_config_tracker, {});
+        std::move(backoff_strategy), xds_config_tracker, {}, lrs_factory);
   } else {
     ASSERT(api_config_source.api_type() ==
            envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC);
@@ -477,10 +501,18 @@ XdsManagerImpl::createAuthority(const envoy::config::core::v3::ConfigSource& con
                                        failover_client));
     OptRef<XdsResourcesDelegate> xds_resources_delegate =
         makeOptRefFromPtr<XdsResourcesDelegate>(xds_resources_delegate_.get());
+
+    std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> lrs_factory =
+        [&, primary_client]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
+      auto reporter = std::make_unique<Upstream::LoadStatsReporterImpl>(
+          local_info_, *cm_, *stats_.rootScope(), primary_client, main_thread_dispatcher_);
+      return reporter;
+    };
+
     authority_mux = factory->create(
         std::move(primary_client), std::move(failover_client), main_thread_dispatcher_, random_,
         *stats_.rootScope(), api_config_source, local_info_, std::move(custom_config_validators),
-        std::move(backoff_strategy), xds_config_tracker, xds_resources_delegate);
+        std::move(backoff_strategy), xds_config_tracker, xds_resources_delegate, lrs_factory);
   }
   ASSERT(authority_mux != nullptr);
 

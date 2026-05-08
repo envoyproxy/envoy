@@ -1,13 +1,22 @@
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 #include <dlfcn.h>
+#include <unistd.h>
 
+#include <cerrno>
+#include <fstream>
 #include <string>
 
 #include "envoy/common/exception.h"
 
-#include "source/extensions/dynamic_modules/abi.h"
-#include "source/extensions/dynamic_modules/abi_version.h"
+#include "source/common/common/hex.h"
+#include "source/common/common/utility.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
+
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_cat.h"
+#include "openssl/evp.h"
+#include "openssl/sha.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -64,10 +73,16 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
     return absl::InvalidArgumentError(
         absl::StrCat("Failed to initialize dynamic module: ", object_file_absolute_path.c_str()));
   }
-  // Checks the kAbiVersion and the version of the dynamic module.
-  if (absl::string_view(abi_version) != absl::string_view(kAbiVersion)) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("ABI version mismatch: got ", abi_version, ", but expected ", kAbiVersion));
+  // We log a warning if the ABI version does not match exactly.
+  if (absl::string_view(abi_version) != absl::string_view(ENVOY_DYNAMIC_MODULES_ABI_VERSION)) {
+    ENVOY_LOG_TO_LOGGER(
+        Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), warn,
+        "Dynamic module ABI version {} is deprecated. Please recompile the module against the "
+        "SDK with the exact Envoy version used by the main program.",
+        abi_version);
+  } else {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), info,
+                        "Dynamic module ABI version {} matched.", abi_version);
   }
   return dynamic_module;
 }
@@ -75,6 +90,13 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
 absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view module_name,
                                                         const bool do_not_close,
                                                         const bool load_globally) {
+  // Probe for the module's init symbol with the module name as a prefix. If the symbol is found
+  // in the process binary (via dlsym(RTLD_DEFAULT)), treat this as a statically linked module.
+  const std::string static_init_symbol =
+      absl::StrCat(module_name, "_envoy_dynamic_module_on_program_init");
+  if (dlsym(RTLD_DEFAULT, static_init_symbol.c_str()) != nullptr) {
+    return newStaticModule(module_name);
+  }
   // First, try ENVOY_DYNAMIC_MODULES_SEARCH_PATH which falls back to the current directory.
   const char* module_search_path = getenv(DYNAMIC_MODULES_SEARCH_PATH);
   if (!module_search_path) {
@@ -114,13 +136,155 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view 
                    dynamic_module.status().message()));
 }
 
-DynamicModule::~DynamicModule() { dlclose(handle_); }
+DynamicModule::~DynamicModule() {
+  if (!static_module_name_.empty()) {
+    // Static modules have no dlopen handle to close.
+    return;
+  }
+  dlclose(handle_);
+}
 
 void* DynamicModule::getSymbol(const absl::string_view symbol_ref) const {
+  if (!static_module_name_.empty()) {
+    // For statically linked modules, look up the prefixed symbol in the process binary.
+    const std::string prefixed = absl::StrCat(static_module_name_, "_", symbol_ref);
+    return dlsym(RTLD_DEFAULT, prefixed.c_str());
+  }
   // TODO(mathetake): maybe we should accept null-terminated const char* instead of string_view to
   // avoid unnecessary copy because it is likely that this is only called for a constant string,
   // though this is not a performance critical path.
   return dlsym(handle_, std::string(symbol_ref).c_str());
+}
+
+std::filesystem::path moduleTempPath(const absl::string_view sha256) {
+  return std::filesystem::temp_directory_path() / fmt::format("envoy_dynamic_module_{}.so", sha256);
+}
+
+absl::Status verifyFileSha256(const std::filesystem::path& path,
+                              absl::string_view expected_sha256_hex) {
+  std::ifstream file(path, std::ios::binary);
+  if (!file.is_open()) {
+    return absl::InternalError(absl::StrCat(
+        "Failed to open file for SHA256 verification: ", path.string(), ": ", errorDetails(errno)));
+  }
+  bssl::ScopedEVP_MD_CTX ctx;
+  if (EVP_DigestInit(ctx.get(), EVP_sha256()) != 1) {
+    return absl::InternalError("Failed to initialize SHA256 digest context");
+  }
+  // 64 KiB chunks: large enough to keep syscall overhead low, small enough to keep stack clean.
+  std::array<char, 65536> buf;
+  while (file) {
+    file.read(buf.data(), buf.size());
+    const std::streamsize got = file.gcount();
+    if (got > 0 && EVP_DigestUpdate(ctx.get(), buf.data(), static_cast<size_t>(got)) != 1) {
+      return absl::InternalError("Failed to update SHA256 digest");
+    }
+    if (file.bad()) {
+      return absl::InternalError(
+          absl::StrCat("I/O error reading file for SHA256 verification: ", path.string()));
+    }
+  }
+  std::array<uint8_t, SHA256_DIGEST_LENGTH> digest;
+  if (EVP_DigestFinal(ctx.get(), digest.data(), nullptr) != 1) {
+    return absl::InternalError("Failed to finalize SHA256 digest");
+  }
+  std::string actual_hex = Hex::encode(digest.data(), digest.size());
+  // The expected hash is operator-supplied (proto config, not user input) and the actual digest
+  // is computed from a file the attacker may control; the only information leaked by an
+  // early-exit comparison is "wrong remote module", which carries no secret. A constant-time
+  // compare is therefore not warranted here.
+  std::string expected_normalised{expected_sha256_hex};
+  absl::AsciiStrToLower(&expected_normalised);
+  if (actual_hex != expected_normalised) {
+    return absl::FailedPreconditionError(
+        absl::StrCat("SHA256 mismatch for cached dynamic module at ", path.string(), ": expected ",
+                     expected_normalised, " got ", actual_hex));
+  }
+  return absl::OkStatus();
+}
+
+absl::Status writeDynamicModuleBytesToDisk(const absl::string_view module_bytes,
+                                           const absl::string_view sha256) {
+  std::filesystem::path temp_file_path = moduleTempPath(sha256);
+
+  // Write the (already SHA256-verified) bytes to a staging file, then atomically rename.
+  std::string staging_template = temp_file_path.string() + ".XXXXXX";
+  int fd = mkstemp(staging_template.data());
+  if (fd == -1) {
+    return absl::InternalError(absl::StrCat(
+        "Failed to create temporary staging file for dynamic module: ", staging_template, ": ",
+        errorDetails(errno)));
+  }
+
+  size_t total_written = 0;
+  while (total_written < module_bytes.size()) {
+    ssize_t written =
+        write(fd, module_bytes.data() + total_written, module_bytes.size() - total_written);
+    if (written < 0) {
+      if (errno == EINTR) {
+        continue;
+      }
+      close(fd);
+      std::filesystem::remove(staging_template);
+      return absl::InternalError(
+          absl::StrCat("Failed to write to staging file for dynamic module: ", staging_template));
+    }
+    total_written += written;
+  }
+  close(fd);
+
+  std::filesystem::path staging_path(staging_template);
+  std::filesystem::permissions(staging_path, std::filesystem::perms::owner_all,
+                               std::filesystem::perm_options::replace);
+  std::filesystem::rename(staging_path, temp_file_path);
+  return absl::OkStatus();
+}
+
+absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(const absl::string_view module_bytes,
+                                                           const absl::string_view sha256,
+                                                           const bool do_not_close,
+                                                           const bool load_globally) {
+  auto status = writeDynamicModuleBytesToDisk(module_bytes, sha256);
+  if (!status.ok()) {
+    return status;
+  }
+  auto temp_file_path = moduleTempPath(sha256);
+  // If the module was already loaded at this path, newDynamicModule's RTLD_NOLOAD check
+  // returns the existing handle without re-init.
+  auto result = newDynamicModule(temp_file_path, do_not_close, load_globally);
+  if (!result.ok()) {
+    // Clean up the invalid file.
+    std::filesystem::remove(temp_file_path);
+  }
+  return result;
+}
+
+absl::StatusOr<DynamicModulePtr> newStaticModule(const absl::string_view module_name) {
+  auto dynamic_module = std::make_unique<DynamicModule>(module_name);
+
+  const auto init_function =
+      dynamic_module->getFunctionPointer<decltype(&envoy_dynamic_module_on_program_init)>(
+          "envoy_dynamic_module_on_program_init");
+  if (!init_function.ok()) {
+    return init_function.status();
+  }
+
+  const char* abi_version = (*init_function.value())();
+  if (abi_version == nullptr) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to initialize static module: ", module_name));
+  }
+  if (absl::string_view(abi_version) != absl::string_view(ENVOY_DYNAMIC_MODULES_ABI_VERSION)) {
+    ENVOY_LOG_TO_LOGGER(
+        Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), warn,
+        "Static module ABI version {} is deprecated. Please recompile the module against the "
+        "SDK with the exact Envoy version used by the main program.",
+        abi_version);
+  } else {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), info,
+                        "Static module ABI version {} matched.", abi_version);
+  }
+  return dynamic_module;
 }
 
 } // namespace DynamicModules

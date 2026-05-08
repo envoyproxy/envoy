@@ -12,6 +12,7 @@ builtin:
 - envoy.matching.inputs.response_headers
 - envoy.matching.inputs.response_trailers
 - envoy.matching.inputs.query_params
+- envoy.matching.inputs.local_reply
 - envoy.matching.inputs.cel_data_input
 - envoy.matching.inputs.destination_ip
 - envoy.matching.inputs.destination_port
@@ -127,6 +128,7 @@ categories:
 - envoy.wasm.runtime
 - envoy.xds_delegates
 - envoy.common.key_value
+- envoy.content_parsers
 - envoy.network.dns_resolver
 - envoy.network.connection_balance
 - envoy.resolvers

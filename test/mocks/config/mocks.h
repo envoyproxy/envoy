@@ -136,6 +136,9 @@ public:
 
   MOCK_METHOD(EdsResourcesCacheOptRef, edsResourcesCache, ());
 
+  MOCK_METHOD(Upstream::LoadStatsReporter*, loadStatsReporter, (), (const, override));
+  MOCK_METHOD(Upstream::LoadStatsReporter*, maybeCreateLoadStatsReporter, (), (override));
+
   MOCK_METHOD(absl::Status, updateMuxSource,
               (Grpc::RawAsyncClientSharedPtr && primary_async_client,
                Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope& scope,

@@ -12,15 +12,33 @@ def envoy_mobile_repositories():
     swift_repos()
     kotlin_repos()
     android_repos()
+    python_repos()
+
+def python_repos():
+    http_archive(
+        name = "pybind11_bazel",
+        sha256 = "a58c25c5fe063a70057fa20cb8e15f3bda19b1030305bcb533af1e45f36a4a55",
+        strip_prefix = "pybind11_bazel-2.12.0",
+        urls = ["https://github.com/pybind/pybind11_bazel/releases/download/v2.12.0/pybind11_bazel-2.12.0.zip"],
+    )
+
+    http_archive(
+        name = "pybind11",
+        build_file = "@pybind11_bazel//:pybind11-BUILD.bazel",
+        sha256 = "d475978da0cdc2d43b73f30910786759d593a9d8ee05b1b6846d1eb16c6d2e0c",
+        strip_prefix = "pybind11-2.11.1",
+        urls = ["https://github.com/pybind/pybind11/archive/refs/tags/v2.11.1.tar.gz"],
+    )
+
 
 def upstream_envoy_overrides():
     # Workaround old NDK version breakages https://github.com/envoyproxy/envoy-mobile/issues/934
     http_archive(
-        name = "com_github_libevent_libevent",
+        name = "libevent",
         urls = ["https://github.com/libevent/libevent/archive/0d7d85c2083f7a4c9efe01c061486f332b576d28.tar.gz"],
         strip_prefix = "libevent-0d7d85c2083f7a4c9efe01c061486f332b576d28",
         sha256 = "549d34065eb2485dfad6c8de638caaa6616ed130eec36dd978f73b6bdd5af113",
-        build_file_content = """filegroup(name = "all", srcs = glob(["**"]), visibility = ["//visibility:public"])""",
+        build_file_content = """filegroup(name = "libevent", srcs = glob(["**"]), visibility = ["//visibility:public"])""",
     )
 
 def swift_repos():

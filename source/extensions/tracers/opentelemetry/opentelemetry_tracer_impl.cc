@@ -8,6 +8,7 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/utility.h"
+#include "source/common/http/http_service_headers.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/tracers/opentelemetry/grpc_trace_exporter.h"
 #include "source/extensions/tracers/opentelemetry/http_trace_exporter.h"
@@ -75,10 +76,17 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
           POOL_COUNTER_PREFIX(context.serverFactoryContext().scope(), "tracing.opentelemetry"))} {
   auto& factory_context = context.serverFactoryContext();
 
+  bool set_telemetry_sdk_resource_attributes = true;
+  if (opentelemetry_config.has_set_telemetry_sdk_resource_attributes()) {
+    set_telemetry_sdk_resource_attributes =
+        opentelemetry_config.set_telemetry_sdk_resource_attributes().value();
+  }
+
   Resource resource = resource_provider.getResource(
       opentelemetry_config.resource_detectors(), context.serverFactoryContext(),
       opentelemetry_config.service_name().empty() ? kDefaultServiceName
-                                                  : opentelemetry_config.service_name());
+                                                  : opentelemetry_config.service_name(),
+      set_telemetry_sdk_resource_attributes);
   ResourceConstSharedPtr resource_ptr = std::make_shared<Resource>(std::move(resource));
 
   if (opentelemetry_config.has_grpc_service() && opentelemetry_config.has_http_service()) {
@@ -90,9 +98,16 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
   // Create the sampler if configured
   SamplerSharedPtr sampler = tryCreateSamper(opentelemetry_config, context);
 
+  // Create the headers applicator on the main thread if HTTP export is configured.
+  std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator;
+  if (opentelemetry_config.has_http_service()) {
+    headers_applicator = Http::HttpServiceHeadersApplicator::createOrThrow(
+        opentelemetry_config.http_service(), factory_context);
+  }
+
   // Create the tracer in Thread Local Storage.
-  tls_slot_ptr_->set([opentelemetry_config, &factory_context, this, resource_ptr,
-                      sampler](Event::Dispatcher& dispatcher) {
+  tls_slot_ptr_->set([opentelemetry_config, &factory_context, this, resource_ptr, sampler,
+                      headers_applicator](Event::Dispatcher& dispatcher) {
     OpenTelemetryTraceExporterPtr exporter;
     if (opentelemetry_config.has_grpc_service()) {
       auto factory_or_error =
@@ -104,8 +119,10 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
           THROW_OR_RETURN_VALUE(factory->createUncachedRawAsyncClient(), Grpc::RawAsyncClientPtr);
       exporter = std::make_unique<OpenTelemetryGrpcTraceExporter>(async_client_shared_ptr);
     } else if (opentelemetry_config.has_http_service()) {
+      ASSERT(headers_applicator != nullptr);
       exporter = std::make_unique<OpenTelemetryHttpTraceExporter>(
-          factory_context.clusterManager(), opentelemetry_config.http_service());
+          factory_context.clusterManager(), opentelemetry_config.http_service(),
+          headers_applicator);
     }
     // Get the max cache size from config
     uint64_t max_cache_size = PROTOBUF_GET_WRAPPED_OR_DEFAULT(opentelemetry_config, max_cache_size,

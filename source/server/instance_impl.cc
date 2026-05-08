@@ -15,16 +15,17 @@ void InstanceImpl::maybeCreateHeapShrinker() {
 absl::StatusOr<std::unique_ptr<OverloadManager>> InstanceImpl::createOverloadManager() {
   return OverloadManagerImpl::create(
       dispatcher(), *stats().rootScope(), threadLocal(), bootstrap().overload_manager(),
-      messageValidationContext().staticValidationVisitor(), api(), options());
+      messageValidationContext().staticValidationVisitor(), api(), options(), runtime());
 }
 
 std::unique_ptr<OverloadManager> InstanceImpl::createNullOverloadManager() {
   return std::make_unique<NullOverloadManager>(threadLocal(), false);
 }
 
-std::unique_ptr<Server::GuardDog> InstanceImpl::maybeCreateGuardDog(absl::string_view name) {
-  return std::make_unique<Server::GuardDogImpl>(*stats().rootScope(),
-                                                config().mainThreadWatchdogConfig(), api(), name);
+std::unique_ptr<Server::GuardDog>
+InstanceImpl::maybeCreateGuardDog(absl::string_view name,
+                                  const Server::Configuration::Watchdog& config) {
+  return std::make_unique<Server::GuardDogImpl>(*stats().rootScope(), config, api(), name);
 }
 
 std::unique_ptr<HdsDelegateApi>

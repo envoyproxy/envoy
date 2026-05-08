@@ -7,6 +7,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -63,7 +64,7 @@ TEST_P(GeoipFilterIntegrationTest, GeoipFilterProcessesConnection) {
   ASSERT_TRUE(tcp_client->connected());
 
   // Verify stats were incremented indicating the filter processed the connection.
-  test_server_->waitForCounterEq("geoip.total", 1);
+  test_server_->waitForCounter("geoip.total", Eq(1));
 
   tcp_client->close();
 }
@@ -83,20 +84,20 @@ TEST_P(GeoipFilterIntegrationTest, GeoipFilterNoCrashOnLdsUpdate) {
           listener->mutable_listener_filters_timeout()->set_seconds(10);
         });
     new_config_helper.setLds("1");
-    test_server_->waitForGaugeEq("listener_manager.total_listeners_active", 1);
-    test_server_->waitForCounterEq("listener_manager.lds.update_success", 2);
-    test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", 0);
+    test_server_->waitForGauge("listener_manager.total_listeners_active", Eq(1));
+    test_server_->waitForCounter("listener_manager.lds.update_success", Eq(2));
+    test_server_->waitForGauge("listener_manager.total_listeners_draining", Eq(0));
   }
 
   // Connection after LDS update to verify filter still works and no crash occurs.
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp"));
   ASSERT_TRUE(tcp_client->connected());
-  test_server_->waitForCounterEq("geoip.total", 1);
+  test_server_->waitForCounter("geoip.total", Eq(1));
 
   // Second connection to verify continued operation.
   IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("tcp"));
   ASSERT_TRUE(tcp_client2->connected());
-  test_server_->waitForCounterEq("geoip.total", 2);
+  test_server_->waitForCounter("geoip.total", Eq(2));
 
   tcp_client->close();
   tcp_client2->close();
@@ -149,7 +150,7 @@ typed_config:
   ASSERT_TRUE(tcp_client->connected());
 
   // Wait for geoip lookup to complete before closing connection.
-  test_server_->waitForCounterEq("geoip.total", 1);
+  test_server_->waitForCounter("geoip.total", Eq(1));
 
   tcp_client->close();
   test_server_.reset();
@@ -193,7 +194,7 @@ typed_config:
   ASSERT_TRUE(tcp_client->connected());
 
   // Wait for geoip lookup to complete before closing connection.
-  test_server_->waitForCounterEq("geoip.total", 1);
+  test_server_->waitForCounter("geoip.total", Eq(1));
 
   tcp_client->close();
   test_server_.reset();
@@ -237,9 +238,114 @@ typed_config:
 
   // Verify stats were incremented indicating the filter processed the connection.
   // The filter should fall back to connection remote address when formatter returns empty.
-  test_server_->waitForCounterEq("geoip.total", 1);
+  test_server_->waitForCounter("geoip.total", Eq(1));
 
   tcp_client->close();
+}
+
+// Tests that ASN DB takes precedence over ISP DB for asn_org lookups when both are configured.
+TEST_P(GeoipFilterIntegrationTest, AsnDbTakesPrecedenceOverIspDbForAsnOrg) {
+  const std::string set_filter_state_config = R"EOF(
+name: envoy.filters.network.set_filter_state
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config
+  on_new_connection:
+  - object_key: test.geoip.client_ip
+    format_string:
+      text_format_source:
+        inline_string: "89.160.20.112"
+)EOF";
+
+  // Configure with both ASN and ISP databases, requesting asn_org.
+  const std::string geoip_config = R"EOF(
+name: envoy.filters.network.geoip
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.geoip.v3.Geoip
+  stat_prefix: ""
+  client_ip: "%FILTER_STATE(test.geoip.client_ip:PLAIN)%"
+  provider:
+    name: envoy.geoip_providers.maxmind
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
+      common_provider_config:
+        geo_field_keys:
+          asn: "asn"
+          asn_org: "asn_org"
+      asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
+      isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
+)EOF";
+
+  useListenerAccessLog("%FILTER_STATE(envoy.geoip:PLAIN)%");
+  config_helper_.renameListener("tcp");
+  config_helper_.addNetworkFilter(TestEnvironment::substitute(geoip_config));
+  config_helper_.addNetworkFilter(set_filter_state_config);
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp"));
+  ASSERT_TRUE(tcp_client->connected());
+
+  test_server_->waitForCounter("geoip.total", Eq(1));
+
+  tcp_client->close();
+  test_server_.reset();
+
+  // Verify filter state contains correct geolocation data from ASN DB (not ISP DB).
+  std::string access_log = waitForAccessLog(listener_access_log_name_);
+  EXPECT_THAT(access_log, testing::HasSubstr("\"asn\":\"29518\""));
+  EXPECT_THAT(access_log, testing::HasSubstr("\"asn_org\":\"Bredband2 AB\""));
+}
+
+// Tests that asn_org falls back to ISP DB when ASN DB is not configured.
+TEST_P(GeoipFilterIntegrationTest, AsnOrgFallsBackToIspDbWhenAsnDbNotConfigured) {
+  const std::string set_filter_state_config = R"EOF(
+name: envoy.filters.network.set_filter_state
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config
+  on_new_connection:
+  - object_key: test.geoip.client_ip
+    format_string:
+      text_format_source:
+        inline_string: "::1.128.0.1"
+)EOF";
+
+  // Configure with only ISP database (no ASN DB), requesting asn_org.
+  const std::string geoip_config = R"EOF(
+name: envoy.filters.network.geoip
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.geoip.v3.Geoip
+  stat_prefix: ""
+  client_ip: "%FILTER_STATE(test.geoip.client_ip:PLAIN)%"
+  provider:
+    name: envoy.geoip_providers.maxmind
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
+      common_provider_config:
+        geo_field_keys:
+          asn: "asn"
+          asn_org: "asn_org"
+          isp: "isp"
+      isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
+)EOF";
+
+  useListenerAccessLog("%FILTER_STATE(envoy.geoip:PLAIN)%");
+  config_helper_.renameListener("tcp");
+  config_helper_.addNetworkFilter(TestEnvironment::substitute(geoip_config));
+  config_helper_.addNetworkFilter(set_filter_state_config);
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp"));
+  ASSERT_TRUE(tcp_client->connected());
+
+  test_server_->waitForCounter("geoip.total", Eq(1));
+
+  tcp_client->close();
+  test_server_.reset();
+
+  // Verify filter state contains correct geolocation data from ISP DB (fallback).
+  std::string access_log = waitForAccessLog(listener_access_log_name_);
+  EXPECT_THAT(access_log, testing::HasSubstr("\"asn\":\"1221\""));
+  EXPECT_THAT(access_log, testing::HasSubstr("\"asn_org\":\"Telstra Internet\""));
+  EXPECT_THAT(access_log, testing::HasSubstr("\"isp\":\"Telstra Internet\""));
 }
 
 } // namespace

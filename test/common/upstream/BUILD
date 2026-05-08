@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
     "envoy_cc_benchmark_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
@@ -93,9 +94,8 @@ envoy_cc_test(
         "//source/extensions/load_balancing_policies/ring_hash:config",
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//test/mocks/config:config_mocks",
-        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/base",
+        "@abseil-cpp//absl/base",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -121,7 +121,6 @@ envoy_cc_test_library(
         "//source/common/grpc:context_lib",
         "//source/common/http:context_lib",
         "//source/common/router:context_lib",
-        "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/config:xds_manager_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:admin_mocks",
@@ -168,7 +167,8 @@ envoy_cc_test(
         "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:thread_aware_load_balancer_mocks",
         "//test/test_common:status_utility_lib",
-        "@com_google_absl//absl/types:optional",
+        "//test/test_common:test_runtime_lib",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -405,7 +405,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "load_stats_reporter_test",
-    srcs = ["load_stats_reporter_test.cc"],
+    srcs = ["load_stats_reporter_impl_test.cc"],
     rbe_pool = "6gig",
     deps = [
         "//source/common/network:address_lib",
@@ -437,7 +437,6 @@ envoy_cc_test(
         "//source/extensions/health_checkers/http:health_checker_lib",
         "//source/extensions/health_checkers/tcp:health_checker_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
-        "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/local_info:local_info_mocks",
@@ -480,7 +479,7 @@ envoy_cc_test(
         "//test/mocks/upstream:host_set_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/cluster/v3:pkg_cc_proto",
     ],
@@ -554,9 +553,25 @@ envoy_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
-        "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@xds//xds/type/matcher/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "prod_cluster_info_factory_test",
+    srcs = ["prod_cluster_info_factory_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        ":utility_lib",
+        "//source/common/upstream:prod_cluster_info_factory_lib",
+        "//source/extensions/transport_sockets/raw_buffer:config",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
     ],
 )
 
@@ -656,21 +671,16 @@ envoy_cc_test_library(
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/common/stats:stat_test_utility_lib",
         "//test/integration/clusters:custom_static_cluster",
-        "//test/mocks/access_log:access_log_mocks",
-        "//test/mocks/api:api_mocks",
         "//test/mocks/config:xds_manager_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:admin_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/tcp:tcp_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
-        "//test/test_common:registry_lib",
-        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -755,8 +765,19 @@ envoy_cc_benchmark_binary(
     deps = [
         "//source/common/common:random_generator_lib",
         "//source/common/upstream:scheduler_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "metadata_comparison_benchmark",
+    srcs = ["metadata_comparison_benchmark.cc"],
+    deps = ["//source/common/protobuf:utility_lib"],
+)
+
+envoy_benchmark_test(
+    name = "metadata_comparison_benchmark_test",
+    benchmark_binary = "metadata_comparison_benchmark",
 )
 
 envoy_cc_test(
@@ -800,7 +821,7 @@ envoy_cc_test_library(
     ],
     deps = [
         "//envoy/upstream:upstream_interface",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 

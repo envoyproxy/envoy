@@ -8,8 +8,11 @@ assignees: ''
 ---
 
 **If you are reporting *any* crash or *any* potential security issue, *do not*
-open an issue in this repo. Please report the issue via emailing
-envoy-security@googlegroups.com where the issue will be triaged appropriately.**
+open an issue in this repo. Instead, please
+[open a GitHub Security Advisory](https://github.com/envoyproxy/envoy/security/advisories/new)
+(preferred).
+
+Alternatively, you may email envoy-security@googlegroups.com.**
 
 *Title*: *One line description*
 

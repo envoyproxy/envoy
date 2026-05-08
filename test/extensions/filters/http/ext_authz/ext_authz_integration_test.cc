@@ -27,6 +27,8 @@
 
 using test::integration::filters::LoggingTestFilterConfig;
 using testing::AssertionResult;
+using testing::Eq;
+using testing::Ge;
 using testing::Not;
 using testing::TestWithParam;
 using testing::ValuesIn;
@@ -53,6 +55,7 @@ struct GrpcInitializeConfigOpts {
   bool stats_expect_response_bytes = true;
   bool enforce_response_header_limits = false;
   uint32_t status_on_error_code = 0;
+  bool shadow_mode = false;
 };
 
 struct WaitForSuccessfulUpstreamResponseOpts {
@@ -152,6 +155,10 @@ public:
 
       if (opts.enforce_response_header_limits) {
         proto_config_.set_enforce_response_header_limits(true);
+      }
+
+      if (opts.shadow_mode) {
+        proto_config_.set_shadow_mode(true);
       }
 
       if (opts.status_on_error_code > 0) {
@@ -849,8 +856,9 @@ public:
   }
 
   void initializeConfig(bool legacy_allowed_headers = true, bool failure_mode_allow = true,
-                        uint64_t timeout_ms = 300) {
-    config_helper_.addConfigModifier([this, legacy_allowed_headers, failure_mode_allow, timeout_ms](
+                        uint64_t timeout_ms = 300, uint32_t status_on_error_code = 0) {
+    config_helper_.addConfigModifier([this, legacy_allowed_headers, failure_mode_allow, timeout_ms,
+                                      status_on_error_code](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
@@ -866,6 +874,11 @@ public:
       proto_config_.mutable_http_service()->mutable_server_uri()->mutable_timeout()->CopyFrom(
           Protobuf::util::TimeUtil::MillisecondsToDuration(timeout_ms));
       proto_config_.set_encode_raw_headers(encodeRawHeaders());
+
+      if (status_on_error_code > 0) {
+        proto_config_.mutable_status_on_error()->set_code(
+            static_cast<envoy::type::v3::StatusCode>(status_on_error_code));
+      }
 
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
       ext_authz_filter.set_name("envoy.filters.http.ext_authz");
@@ -1357,8 +1370,8 @@ TEST_P(ExtAuthzGrpcIntegrationTest, Retry) {
   waitForSuccessfulUpstreamResponse("200");
 
   // Verify retry stats are incremented correctly.
-  test_server_->waitForCounterGe("cluster.ext_authz_cluster.upstream_rq_retry", 1);
-  test_server_->waitForCounterGe("cluster.ext_authz_cluster.upstream_rq_total", 2);
+  test_server_->waitForCounter("cluster.ext_authz_cluster.upstream_rq_retry", Ge(1));
+  test_server_->waitForCounter("cluster.ext_authz_cluster.upstream_rq_total", Ge(2));
 
   cleanup();
 }
@@ -1383,7 +1396,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ValidateMutations) {
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ("500", response_->headers().getStatusValue());
-  test_server_->waitForCounterEq("cluster.cluster_0.ext_authz.invalid", 1);
+  test_server_->waitForCounter("cluster.cluster_0.ext_authz.invalid", Eq(1));
 
   cleanup();
 }
@@ -1406,7 +1419,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ValidateMutationsSentinelAppendAction) {
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ("500", response_->headers().getStatusValue());
-  test_server_->waitForCounterEq("cluster.cluster_0.ext_authz.invalid", 1);
+  test_server_->waitForCounter("cluster.cluster_0.ext_authz.invalid", Eq(1));
 
   cleanup();
 }
@@ -1718,6 +1731,40 @@ TEST_P(ExtAuthzHttpIntegrationTest, TimeoutFailOpen) {
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ("200", response_->headers().getStatusValue());
+
+  cleanup();
+}
+
+// Test that HTTP ext_authz call failure respects status_on_error configuration.
+TEST_P(ExtAuthzHttpIntegrationTest, HttpCallFailureUsesStatusOnError) {
+  initializeConfig(false, /*failure_mode_allow=*/false, /*timeout_ms=*/1,
+                   /*status_on_error_code=*/503);
+  HttpIntegrationTest::initialize();
+  initiateClientConnection();
+
+  // Do not sendExtAuthzResponse(). Envoy should reject with configured status_on_error.
+  ASSERT_TRUE(response_->waitForEndStream(Envoy::Seconds(10)));
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("503", response_->headers().getStatusValue());
+
+  cleanup();
+}
+
+// Test that HTTP ext_authz 5xx response respects status_on_error configuration.
+TEST_P(ExtAuthzHttpIntegrationTest, Http5xxResponseUsesStatusOnError) {
+  initializeConfig(false, /*failure_mode_allow=*/false, /*timeout_ms=*/300000,
+                   /*status_on_error_code=*/503);
+  HttpIntegrationTest::initialize();
+  initiateClientConnection();
+  waitForExtAuthzRequest();
+
+  // Send a 5xx response from ext_authz server.
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "500"}};
+  ext_authz_request_->encodeHeaders(response_headers, true);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("503", response_->headers().getStatusValue());
 
   cleanup();
 }
@@ -3424,6 +3471,43 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ExtensionWithMatcherDynamicMetadata) {
     EXPECT_EQ("403", response->headers().getStatusValue());
     cleanup();
   }
+}
+
+// Verify that in shadow mode a denied response does not terminate the request — the request
+// reaches the upstream and the client gets a 200 — and that the ShadowDecision is readable
+// via %FILTER_STATE(<filter name>)% in access logs.
+TEST_P(ExtAuthzGrpcIntegrationTest, ShadowModeDeniedReachesUpstream) {
+  GrpcInitializeConfigOpts opts;
+  opts.shadow_mode = true;
+  ext_authz_grpc_status_ = LoggingTestFilterConfig::PERMISSION_DENIED;
+  initializeConfig(opts);
+
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  useAccessLog("%FILTER_STATE(envoy.filters.http.ext_authz.shadow:PLAIN)%");
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection(0);
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+
+  // Auth server denies the request.
+  ext_authz_request_->startGrpcStream();
+  envoy::service::auth::v3::CheckResponse check_response;
+  check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
+  check_response.mutable_denied_response()->mutable_status()->set_code(
+      envoy::type::v3::StatusCode::Forbidden);
+  check_response.mutable_denied_response()->set_body("you shall not pass");
+  ext_authz_request_->sendGrpcMessage(check_response);
+  ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);
+
+  // In shadow mode the request should reach the upstream despite the deny.
+  waitForSuccessfulUpstreamResponse("200");
+
+  // The shadow decision is exposed in the access log via FilterState.
+  const std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, testing::HasSubstr("DENIED"));
+  EXPECT_THAT(log, testing::HasSubstr("403"));
+
+  cleanup();
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/17344

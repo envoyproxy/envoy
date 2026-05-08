@@ -254,8 +254,7 @@ public:
   DestinationIPInput(const std::string&) {} // Constructor that takes a string for the tests
 
   Matcher::DataInputGetResult get(const Envoy::Network::MatchingData&) const override {
-    return Matcher::DataInputGetResult{
-        Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, "127.0.0.1"};
+    return Matcher::DataInputGetResult::CreateString("127.0.0.1");
   }
 };
 
@@ -318,8 +317,7 @@ TEST(DelegatingNetworkFilter, DelegateToFilters) {
     NoMatchInput(const std::string&) {} // Constructor that takes a string for the tests
 
     Matcher::DataInputGetResult get(const Envoy::Network::MatchingData&) const override {
-      return Matcher::DataInputGetResult{
-          Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, "no_match"};
+      return Matcher::DataInputGetResult::CreateString("no_match");
     }
   };
 

@@ -81,6 +81,8 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, connectTimeout()).WillByDefault(Return(std::chrono::milliseconds(5001)));
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(absl::optional<std::chrono::milliseconds>()));
   ON_CALL(*this, perUpstreamPreconnectRatio()).WillByDefault(Return(1.0));
+  ON_CALL(*this, perConnectionBufferHighWatermarkTimeout())
+      .WillByDefault(Return(std::chrono::milliseconds(0)));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, observabilityName()).WillByDefault(ReturnRef(observability_name_));
   ON_CALL(*this, edsServiceName()).WillByDefault(Invoke([this]() -> const std::string& {

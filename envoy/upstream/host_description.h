@@ -33,7 +33,9 @@ using MetadataConstSharedPtr = std::shared_ptr<const envoy::config::core::v3::Me
  *
  * {rq_success, rq_error} have specific semantics driven by the needs of EDS load reporting. See
  * envoy.api.v2.endpoint.UpstreamLocalityStats for the definitions of success/error. These are
- * latched by LoadStatsReporter, independent of the normal stats sink flushing.
+ * latched by LoadStatsReporter interface implementations, independent of the normal stats sink
+ * flushing.
+
  */
 #define ALL_HOST_STATS(COUNTER, GAUGE)                                                             \
   COUNTER(cx_connect_fail)                                                                         \
@@ -100,6 +102,11 @@ public:
   virtual ~HostLbPolicyData() = default;
 
   /**
+   * @return true if this host data wants router ORCA callbacks.
+   */
+  virtual bool receivesOrcaLoadReport() const PURE;
+
+  /**
    * Invoked when a new orca report is received for this upstream host to
    * update the host lb policy data.
    * NOTE: this method may be called concurrently from multiple threads.
@@ -142,6 +149,11 @@ public:
    * @return the metadata associated with this host
    */
   virtual MetadataConstSharedPtr metadata() const PURE;
+
+  /**
+   * @return the cached hash of the metadata associated with this host, or 0 if no metadata.
+   */
+  virtual std::size_t metadataHash() const PURE;
 
   /**
    * Set the current metadata.
@@ -287,27 +299,39 @@ public:
       Network::TransportSocketOptionsConstSharedPtr transport_socket_options = nullptr) const PURE;
 
   /**
-   * Set load balancing policy related data to the host.
+   * Add load balancing policy related data to the host.
    * NOTE: this method should only be called at main thread before the host is used
    * across worker threads.
    */
-  virtual void setLbPolicyData(HostLbPolicyDataPtr lb_policy_data) PURE;
+  virtual void addLbPolicyData(HostLbPolicyDataPtr lb_policy_data) PURE;
 
   /**
-   * Get the load balancing policy related data of the host.
-   * @return the optional reference to the load balancing policy related data of the host.
+   * @return the number of load balancing policy data entries on the host.
+   */
+  virtual size_t lbPolicyDataCount() const PURE;
+
+  /**
+   * Get a load balancing policy related data entry by index.
+   * @return the optional reference to the indexed load balancing policy related data.
    * Non-const reference is returned to allow the caller to modify the data if needed.
    * NOTE: the update to the data may be done at multiple threads concurrently and the caller
    * should ensure the thread safety of the data.
    */
-  virtual OptRef<HostLbPolicyData> lbPolicyData() const PURE;
+  virtual OptRef<HostLbPolicyData> lbPolicyDataAt(size_t index) const PURE;
 
   /**
    * Get the typed load balancing policy related data of the host.
    * @return the optional reference to the typed load balancing policy related data of the host.
    */
   template <class HostLbPolicyDataType> OptRef<HostLbPolicyDataType> typedLbPolicyData() const {
-    return makeOptRefFromPtr(dynamic_cast<HostLbPolicyDataType*>(lbPolicyData().ptr()));
+    for (size_t i = 0; i < lbPolicyDataCount(); ++i) {
+      auto data = lbPolicyDataAt(i);
+      if (auto* typed_data = dynamic_cast<HostLbPolicyDataType*>(data.ptr());
+          typed_data != nullptr) {
+        return makeOptRefFromPtr(typed_data);
+      }
+    }
+    return {};
   }
 };
 

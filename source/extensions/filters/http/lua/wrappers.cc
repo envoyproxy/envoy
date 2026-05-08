@@ -1,10 +1,13 @@
 #include "source/extensions/filters/http/lua/wrappers.h"
 
+#include "envoy/registry/registry.h"
+
 #include "source/common/common/logger.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/stats/utility.h"
 #include "source/extensions/filters/common/lua/protobuf_converter.h"
 #include "source/extensions/filters/common/lua/wrappers.h"
 #include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
@@ -451,9 +454,34 @@ int FilterStateWrapper::luaGet(lua_State* state) {
   return 0;
 }
 
+int FilterStateWrapper::luaSet(lua_State* state) {
+  const char* object_key = luaL_checkstring(state, 2);
+  const char* factory_key = luaL_checkstring(state, 3);
+  const char* payload = luaL_checkstring(state, 4);
+
+  const auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(factory_key);
+  if (factory == nullptr) {
+    luaL_error(state, "'%s' does not have an object factory", factory_key);
+    return 0;
+  }
+
+  auto object = factory->createFromBytes(payload);
+  if (object == nullptr) {
+    luaL_error(state, "failed to create an object '%s' from value '%s'", object_key, payload);
+    return 0;
+  }
+
+  streamInfo().filterState()->setData(object_key, std::move(object),
+                                      StreamInfo::FilterState::StateType::ReadOnly,
+                                      StreamInfo::FilterState::LifeSpan::FilterChain,
+                                      StreamInfo::StreamSharingMayImpactPooling::None);
+  return 0;
+}
+
 const Protobuf::Struct& VirtualHostWrapper::getMetadata() const {
-  const auto& virtual_host = stream_info_.virtualHost();
-  if (virtual_host == nullptr) {
+  const auto virtual_host = stream_info_.virtualHost();
+  if (!virtual_host) {
     return Protobuf::Struct::default_instance();
   }
 
@@ -478,8 +506,8 @@ int VirtualHostWrapper::luaMetadata(lua_State* state) {
 }
 
 const Protobuf::Struct& RouteWrapper::getMetadata() const {
-  const auto& route = stream_info_.route();
-  if (route == nullptr) {
+  const auto route = stream_info_.route();
+  if (!route) {
     return Protobuf::Struct::default_instance();
   }
 
@@ -500,6 +528,115 @@ int RouteWrapper::luaMetadata(lua_State* state) {
     metadata_wrapper_.reset(Filters::Common::Lua::MetadataMapWrapper::create(state, getMetadata()),
                             true);
   }
+  return 1;
+}
+
+int CounterWrapper::luaInc(lua_State*) {
+  counter().inc();
+  return 0;
+}
+
+int CounterWrapper::luaAdd(lua_State* state) {
+  const lua_Integer amount = luaL_checkinteger(state, 2);
+  if (amount < 0) {
+    luaL_error(state, "counter add amount must be non-negative");
+  }
+  counter().add(static_cast<uint64_t>(amount));
+  return 0;
+}
+
+int CounterWrapper::luaValue(lua_State* state) {
+  lua_pushnumber(state, static_cast<lua_Number>(counter().value()));
+  return 1;
+}
+
+int GaugeWrapper::luaInc(lua_State*) {
+  gauge().inc();
+  return 0;
+}
+
+int GaugeWrapper::luaDec(lua_State*) {
+  gauge().dec();
+  return 0;
+}
+
+int GaugeWrapper::luaAdd(lua_State* state) {
+  const lua_Integer amount = luaL_checkinteger(state, 2);
+  if (amount < 0) {
+    luaL_error(state, "gauge add amount must be non-negative");
+  }
+  gauge().add(static_cast<uint64_t>(amount));
+  return 0;
+}
+
+int GaugeWrapper::luaSub(lua_State* state) {
+  const lua_Integer amount = luaL_checkinteger(state, 2);
+  if (amount < 0) {
+    luaL_error(state, "gauge sub amount must be non-negative");
+  }
+  gauge().sub(static_cast<uint64_t>(amount));
+  return 0;
+}
+
+int GaugeWrapper::luaSet(lua_State* state) {
+  const lua_Integer value = luaL_checkinteger(state, 2);
+  if (value < 0) {
+    luaL_error(state, "gauge set value must be non-negative");
+  }
+  gauge().set(static_cast<uint64_t>(value));
+  return 0;
+}
+
+int GaugeWrapper::luaValue(lua_State* state) {
+  lua_pushnumber(state, static_cast<lua_Number>(gauge().value()));
+  return 1;
+}
+
+int HistogramWrapper::luaRecordValue(lua_State* state) {
+  const lua_Integer value = luaL_checkinteger(state, 2);
+  if (value < 0) {
+    luaL_error(state, "histogram value must be non-negative");
+  }
+  histogram().recordValue(static_cast<uint64_t>(value));
+  return 0;
+}
+
+int StatsScopeWrapper::luaCounter(lua_State* state) {
+  const char* name = luaL_checkstring(state, 2);
+  CounterWrapper::create(state, scope_, std::string(name));
+  return 1;
+}
+
+int StatsScopeWrapper::luaGauge(lua_State* state) {
+  const char* name = luaL_checkstring(state, 2);
+  GaugeWrapper::create(state, scope_, std::string(name));
+  return 1;
+}
+
+int StatsScopeWrapper::luaHistogram(lua_State* state) {
+  const char* name = luaL_checkstring(state, 2);
+
+  // Parse optional unit parameter (default: Unspecified).
+  Stats::Histogram::Unit unit = Stats::Histogram::Unit::Unspecified;
+  if (lua_gettop(state) >= 3 && !lua_isnil(state, 3)) {
+    const absl::string_view unit_str = luaL_checkstring(state, 3);
+    if (unit_str == "ms" || unit_str == "milliseconds") {
+      unit = Stats::Histogram::Unit::Milliseconds;
+    } else if (unit_str == "bytes") {
+      unit = Stats::Histogram::Unit::Bytes;
+    } else if (unit_str == "microseconds") {
+      unit = Stats::Histogram::Unit::Microseconds;
+    } else if (unit_str == "unspecified") {
+      unit = Stats::Histogram::Unit::Unspecified;
+    } else {
+      luaL_error(state,
+                 "invalid histogram unit '%s', expected 'ms', 'milliseconds', 'microseconds', "
+                 "'bytes', or 'unspecified'",
+                 std::string(unit_str).c_str());
+    }
+  }
+
+  HistogramWrapper::create(state, scope_, std::string(name), unit);
   return 1;
 }
 

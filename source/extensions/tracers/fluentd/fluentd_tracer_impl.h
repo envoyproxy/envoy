@@ -172,6 +172,9 @@ public:
   void setSampled(bool sampled) override { span_context_.setSampled(sampled); }
   bool sampled() const { return span_context_.sampled(); }
   bool useLocalDecision() const override { return use_local_decision_; }
+  // Fluentd's finishSpan exports unconditionally; the `sampled` flag is only
+  // propagated in the W3C traceparent header, not consulted locally.
+  bool exportedSpan() const override { return true; }
 
   std::string getBaggage(absl::string_view key) override;
   void setBaggage(absl::string_view key, absl::string_view value) override;

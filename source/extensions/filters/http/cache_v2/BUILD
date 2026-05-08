@@ -19,7 +19,7 @@ envoy_cc_library(
         ":range_utils_lib",
         "//envoy/buffer:buffer_interface",
         "//envoy/http:header_map_interface",
-        "@com_google_absl//absl/functional:any_invocable",
+        "@abseil-cpp//absl/functional:any_invocable",
     ],
 )
 
@@ -37,7 +37,7 @@ envoy_cc_library(
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:cancel_wrapper_lib",
         "//source/common/common:logger_lib",
-        "@com_google_absl//absl/types:variant",
+        "@abseil-cpp//absl/types:variant",
     ],
 )
 
@@ -188,7 +188,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/http:headers_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/extensions/filters/http/cache_v2/v3:pkg_cc_proto",
     ],
 )
@@ -207,8 +207,8 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf",
-        "@com_google_absl//absl/container:btree",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/container:btree",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/extensions/filters/http/cache_v2/v3:pkg_cc_proto",
     ],
 )

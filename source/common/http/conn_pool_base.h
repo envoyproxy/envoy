@@ -98,6 +98,13 @@ public:
   virtual absl::optional<HttpServerPropertiesCache::Origin>& origin() { return origin_; }
   virtual Http::HttpServerPropertiesCacheSharedPtr cache() { return nullptr; }
 
+  void setLifetimeCallbacks(OptRef<ConnectionPool::ConnectionLifetimeCallbacks> callbacks,
+                            std::vector<uint8_t> hash_key) override;
+
+  void onConnectionOpen(const Network::Connection& connection);
+
+  void onConnectionDraining(const Network::Connection& connection);
+
 protected:
   friend class ActiveClient;
 
@@ -107,6 +114,8 @@ protected:
 
 private:
   absl::optional<HttpServerPropertiesCache::Origin> origin_;
+  OptRef<ConnectionPool::ConnectionLifetimeCallbacks> callbacks_;
+  std::vector<uint8_t> hash_key_;
 };
 
 // An implementation of Envoy::ConnectionPool::ActiveClient for HTTP/1.1 and HTTP/2
@@ -144,7 +153,9 @@ public:
 
   void initializeReadFilters() override { codec_client_->initializeReadFilters(); }
   absl::optional<Http::Protocol> protocol() const override { return codec_client_->protocol(); }
-  void close() override { codec_client_->close(); }
+  void close(Network::ConnectionCloseType type, absl::string_view details) override {
+    codec_client_->close(type, details);
+  }
   virtual Http::RequestEncoder& newStreamEncoder(Http::ResponseDecoder& response_decoder) PURE;
   virtual Http::RequestEncoder&
   newStreamEncoder(Http::ResponseDecoderHandlePtr response_decoder_handle) PURE;
@@ -239,6 +250,9 @@ public:
   // Http::ConnectionCallbacks
   void onGoAway(Http::GoAwayErrorCode error_code) override;
   void onSettings(ReceivedSettings& settings) override;
+
+  // Override to provide the lifetimeCallbacks.
+  void onEvent(Network::ConnectionEvent event) override;
 
 private:
   bool closed_with_active_rq_{};

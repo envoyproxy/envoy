@@ -70,8 +70,8 @@ envoy_extension_cc_test_library(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )
@@ -112,7 +112,6 @@ envoy_extension_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:stream_encoder_mock",
         "//test/mocks/http:stream_mock",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:overload_manager_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/proto:helloworld_proto_cc_proto",
@@ -180,8 +179,8 @@ envoy_extension_cc_test(
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )
@@ -208,7 +207,7 @@ envoy_extension_cc_test(
         "//test/common/http:common_lib",
         "//test/mocks/event:event_mocks",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )
@@ -224,6 +223,7 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         ":filter_test_common_lib",
@@ -236,7 +236,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ext_proc",
         "//test/common/http:common_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )
@@ -299,7 +299,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ext_proc",
         "//test/common/http:common_lib",
         "//test/mocks/event:event_mocks",
-        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -340,7 +339,6 @@ envoy_extension_cc_test(
     deps = [
         ":utils_lib",
         "//source/extensions/filters/http/ext_proc:matching_utils_lib",
-        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
@@ -357,8 +355,8 @@ envoy_extension_cc_test(
     deps = [
         ":utils_lib",
         "//source/extensions/filters/common/mutation_rules:mutation_rules_lib",
+        "//source/extensions/filters/common/processing_effect:processing_effect_lib",
         "//source/extensions/filters/http/ext_proc:mutation_utils_lib",
-        "//source/extensions/filters/http/ext_proc:processing_effect_lib",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:status_utility_lib",
@@ -386,7 +384,7 @@ envoy_extension_cc_test_library(
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
@@ -451,7 +449,7 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
-        "@ocp//ocpdiag/core/testing:status_matchers",
+        "@ocp-diag-core//ocpdiag/core/testing:status_matchers",
     ],
 )
 
@@ -471,7 +469,7 @@ envoy_extension_cc_test(
         "envoy.filters.http.set_metadata",
     ],
     rbe_pool = "4core",
-    shard_count = 8,
+    shard_count = 4,
     tags = [
         "cpu:3",
         "skip_on_windows",
@@ -501,7 +499,7 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
-        "@ocp//ocpdiag/core/testing:status_matchers",
+        "@ocp-diag-core//ocpdiag/core/testing:status_matchers",
     ],
 )
 
@@ -551,7 +549,7 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
-        "@ocp//ocpdiag/core/testing:status_matchers",
+        "@ocp-diag-core//ocpdiag/core/testing:status_matchers",
     ],
 )
 
@@ -582,9 +580,8 @@ envoy_extension_cc_test(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
-        "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
@@ -667,7 +664,7 @@ envoy_extension_cc_test(
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/strings:str_format",
+        "@abseil-cpp//absl/strings:str_format",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
@@ -682,8 +679,8 @@ envoy_extension_cc_test_library(
     deps = [
         "//envoy/network:address_interface",
         "//test/test_common:network_utility_lib",
+        "@abseil-cpp//absl/strings:str_format",
         "@com_github_grpc_grpc//:grpc++",
-        "@com_google_absl//absl/strings:str_format",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_grpc",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
@@ -714,9 +711,9 @@ envoy_extension_cc_test_library(
         "//source/common/protobuf",
         "//source/extensions/filters/http/ext_proc:on_processing_response_interface",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/container:flat_hash_set",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/strings:str_format",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings:str_format",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -800,7 +797,7 @@ envoy_extension_cc_test(
         "//test/integration:http_integration_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],

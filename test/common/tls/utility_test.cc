@@ -8,6 +8,7 @@
 #include "source/common/tls/utility.h"
 
 #include "test/common/tls/ssl_test_utility.h"
+#include "test/common/tls/test_data/intermediate_ca_cert_info.h"
 #include "test/common/tls/test_data/long_validity_cert_info.h"
 #include "test/common/tls/test_data/san_dns_cert_info.h"
 #include "test/test_common/environment.h"
@@ -181,6 +182,30 @@ TEST(UtilityTest, TestGetSerialNumber) {
   EXPECT_EQ(TEST_SAN_DNS_CERT_SERIAL, Utility::getSerialNumberFromCertificate(*cert));
 }
 
+TEST(UtilityTest, TestGetSha256DigestFromCertificate) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  EXPECT_EQ(TEST_SAN_DNS_CERT_256_HASH, Utility::getSha256DigestFromCertificate(*cert));
+}
+
+TEST(UtilityTest, TestGetSha1DigestFromCertificate) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  EXPECT_EQ(TEST_SAN_DNS_CERT_1_HASH, Utility::getSha1DigestFromCertificate(*cert));
+}
+
+TEST(UtilityTest, TestGetSha256DigestFromIntermediateCertificate) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert.pem"));
+  EXPECT_EQ(TEST_INTERMEDIATE_CA_CERT_256_HASH, Utility::getSha256DigestFromCertificate(*cert));
+}
+
+TEST(UtilityTest, TestGetSha1DigestFromIntermediateCertificate) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert.pem"));
+  EXPECT_EQ(TEST_INTERMEDIATE_CA_CERT_1_HASH, Utility::getSha1DigestFromCertificate(*cert));
+}
+
 TEST(UtilityTest, TestExpirationWithUnixTimeWithExpiredCert) {
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
@@ -300,7 +325,9 @@ TEST(UtilityTest, SslErrorDescriptionTest) {
       {SSL_ERROR_SSL, "SSL"},
       {SSL_ERROR_WANT_READ, "WANT_READ"},
       {SSL_ERROR_WANT_WRITE, "WANT_WRITE"},
+#ifdef SSL_ERROR_WANT_PRIVATE_KEY_OPERATION
       {SSL_ERROR_WANT_PRIVATE_KEY_OPERATION, "WANT_PRIVATE_KEY_OPERATION"},
+#endif
   };
 
   for (const auto& test_data : test_set) {
@@ -321,6 +348,46 @@ TEST(UtilityTest, TestGetX509ErrorInfo) {
   EXPECT_EQ(Utility::getX509VerificationErrorInfo(store_ctx.get()),
             "X509_verify_cert: certificate verification error at depth 0: unknown certificate "
             "verification error");
+}
+
+TEST(UtilityTest, TestGetX509ErrorInfoWithCrlError) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert_with_multiple_crl_dps_cert.pem"));
+  bssl::UniquePtr<X509> ca_cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+  // Not using X509_STORE_CTX_set_error as later calls to X509_STORE_CTX_get_current_cert will not
+  // return the violating cert
+  X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
+  X509StorePtr ssl_ctx = X509_STORE_new();
+  X509_STORE_add_cert(ssl_ctx.get(), ca_cert.get());
+  X509_STORE_set_flags(ssl_ctx.get(), X509_V_FLAG_CRL_CHECK);
+  EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), ssl_ctx.get(), cert.get(), nullptr));
+  int result = X509_verify_cert(store_ctx.get());
+  EXPECT_EQ(result, 0); // Verification should fail
+  EXPECT_EQ(X509_STORE_CTX_get_error(store_ctx.get()), X509_V_ERR_UNABLE_TO_GET_CRL);
+
+  EXPECT_EQ(Utility::getX509VerificationErrorInfo(store_ctx.get()),
+            "X509_verify_cert: certificate verification error at depth 0: certificate revocation "
+            "check against provided CRLs failed: unable to get certificate CRL, "
+            "certificate CRL distribution points: [http://crl.example.com/ca.crl, "
+            "http://backup-crl.example.com/ca.crl]");
+}
+
+TEST(UtilityTest, TestGetCertificateCrlDpsForLogging) {
+  bssl::UniquePtr<X509> cert_no_crldp = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  EXPECT_TRUE(Utility::getCertificateCrlDpsForLogging(cert_no_crldp.get()).empty());
+
+  bssl::UniquePtr<X509> cert_single_crldp = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert_with_single_crl_dp_cert.pem"));
+  std::vector<std::string> expected_crldp = {"http://crl.example.com/ca.crl"};
+  EXPECT_EQ(Utility::getCertificateCrlDpsForLogging(cert_single_crldp.get()), expected_crldp);
+
+  bssl::UniquePtr<X509> cert_multiple_crldps = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert_with_multiple_crl_dps_cert.pem"));
+  std::vector<std::string> expected_crldps = {"http://crl.example.com/ca.crl",
+                                              "http://backup-crl.example.com/ca.crl"};
+  EXPECT_EQ(Utility::getCertificateCrlDpsForLogging(cert_multiple_crldps.get()), expected_crldps);
 }
 
 TEST(UtilityTest, TestMapX509Stack) {

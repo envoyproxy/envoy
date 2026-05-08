@@ -121,7 +121,7 @@ envoy_proto_library(
             "//test/mocks/network:network_mocks",
             "//test/mocks/server:overload_manager_mocks",
             "//test/test_common:test_runtime_lib",
-            "@com_github_google_quiche//:quiche_common_platform_test",
+            "@quiche//:quiche_common_platform_test",
         ],
     )
     for http_protocol in [
@@ -190,7 +190,7 @@ envoy_cc_benchmark_binary(
         "//source/common/http:codes_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 
@@ -336,6 +336,7 @@ envoy_cc_test(
         "//source/common/http:headers_lib",
         "//source/common/http/matching:data_impl_lib",
         "//source/common/http/matching:inputs_lib",
+        "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",
@@ -386,7 +387,7 @@ envoy_cc_benchmark_binary(
     rbe_pool = "6gig",
     deps = [
         "//source/common/http:header_map_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 
@@ -434,6 +435,18 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "http_service_headers_test",
+    srcs = ["http_service_headers_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/formatter:formatter_extension_lib",
+        "//source/common/http:http_service_headers_lib",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -729,7 +742,17 @@ envoy_cc_test(
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/status",
-        "@ocp//ocpdiag/core/testing:status_matchers",
+        "@abseil-cpp//absl/status",
+        "@ocp-diag-core//ocpdiag/core/testing:status_matchers",
+    ],
+)
+
+envoy_cc_test(
+    name = "session_idle_list_test",
+    srcs = ["session_idle_list_test.cc"],
+    deps = [
+        "//source/common/http:session_idle_list_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )

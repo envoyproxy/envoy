@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/http/custom_response/local_response_policy/v3/local_response_policy.pb.h"
 #include "envoy/extensions/http/custom_response/local_response_policy/v3/local_response_policy.pb.validate.h"
+#include "envoy/tracing/trace_driver.h"
 
 #include "source/common/router/header_parser.h"
 #include "source/extensions/filters/http/custom_response/policy.h"
@@ -36,7 +37,8 @@ private:
   // Rewrite the response body for locally specified bodies.
   void formatBody(const Envoy::Http::RequestHeaderMap& request_headers,
                   const Envoy::Http::ResponseHeaderMap& response_headers,
-                  const StreamInfo::StreamInfo& stream_info, std::string& body) const;
+                  const StreamInfo::StreamInfo& stream_info, const Tracing::Span& active_span,
+                  std::string& body) const;
 
   // Body read from local data source.
   const absl::optional<std::string> local_body_;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -9,6 +10,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
+#include "source/common/matcher/regex_replace.h"
 
 #include "absl/strings/string_view.h"
 
@@ -110,16 +112,14 @@ class Rule {
 public:
   static absl::StatusOr<Rule> create(const ProtoRule& rule, Regex::Engine& regex_engine);
   const ProtoRule& rule() const { return rule_; }
-  const Regex::CompiledMatcherPtr& regexRewrite() const { return regex_rewrite_; }
-  const std::string& regexSubstitution() const { return regex_rewrite_substitution_; }
-  std::shared_ptr<const ValueSelector> selector_;
+  const absl::optional<Matcher::RegexReplace>& regexReplace() const { return regex_replace_; }
+  std::unique_ptr<const ValueSelector> selector_;
 
 private:
   Rule(const ProtoRule& rule, Regex::Engine& regex_engine, absl::Status& creation_status);
 
   const ProtoRule rule_;
-  Regex::CompiledMatcherPtr regex_rewrite_{};
-  std::string regex_rewrite_substitution_{};
+  absl::optional<Matcher::RegexReplace> regex_replace_;
 };
 
 using HeaderToMetadataRules = std::vector<Rule>;

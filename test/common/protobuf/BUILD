@@ -47,8 +47,8 @@ envoy_proto_library(
         "utility_test_message_field_wip.proto",
     ],
     deps = [
-        "@com_github_cncf_xds//udpa/annotations:pkg",
-        "@com_github_cncf_xds//xds/annotations/v3:pkg",
+        "@xds//udpa/annotations:pkg",
+        "@xds//xds/annotations/v3:pkg",
     ],
 )
 
@@ -61,9 +61,6 @@ envoy_cc_test(
         "//source/common/config:api_version_lib",
         "//source/common/protobuf:utility_lib",
         "//test/common/stats:stat_test_utility_lib",
-        "//test/mocks/init:init_mocks",
-        "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/proto:deprecated_proto_cc_proto",
         "//test/proto:sensitive_proto_cc_proto",
@@ -112,7 +109,7 @@ envoy_cc_benchmark_binary(
         ":deterministic_hash_test_proto_cc_proto",
         "//source/common/protobuf:utility_lib",
         "//test/test_common:test_runtime_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 

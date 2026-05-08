@@ -125,7 +125,7 @@ public:
     connect_unary_ = Grpc::Common::isConnectRequestHeaders(headers);
     connect_streaming_request_ = Grpc::Common::isConnectStreamingRequestHeaders(headers);
     if (grpc_request_ || connect_streaming_request_ || connect_unary_) {
-      cluster_ = decoder_callbacks_->clusterInfo();
+      cluster_ = decoder_callbacks_->clusterInfoSharedPtr();
       if (cluster_) {
         if (config_->stats_for_all_methods_) {
           // Get dynamically-allocated Context::RequestStatNames from the context.

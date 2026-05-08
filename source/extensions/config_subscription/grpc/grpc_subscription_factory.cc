@@ -2,6 +2,7 @@
 
 #include "source/common/config/custom_config_validators_impl.h"
 #include "source/common/config/type_to_endpoint.h"
+#include "source/common/upstream/load_stats_reporter_impl.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_context.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
 #include "source/extensions/config_subscription/grpc/grpc_subscription_impl.h"
@@ -32,10 +33,21 @@ GrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::SubscriptionDat
   absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
       Utility::parseRateLimitSettings(api_config_source);
   THROW_IF_NOT_OK_REF(rate_limit_settings_or_error.status());
+
+  absl::StatusOr<Grpc::RawAsyncClientSharedPtr> primary_client_or_error =
+      factory_primary_or_error.value()->createUncachedRawAsyncClient();
+  THROW_IF_NOT_OK_REF(primary_client_or_error.status());
+  Grpc::RawAsyncClientSharedPtr primary_client = std::move(*primary_client_or_error);
+
+  std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> lrs_factory =
+      [&, data, primary_client]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
+    auto reporter = std::make_unique<Upstream::LoadStatsReporterImpl>(
+        data.local_info_, data.cm_, data.scope_, primary_client, data.dispatcher_);
+    return reporter;
+  };
+
   GrpcMuxContext grpc_mux_context{
-      /*async_client_=*/THROW_OR_RETURN_VALUE(
-          factory_primary_or_error.value()->createUncachedRawAsyncClient(),
-          Grpc::RawAsyncClientSharedPtr),
+      /*async_client_=*/std::move(primary_client),
       /*failover_async_client_=*/nullptr, // Failover is only supported for ADS.
       /*dispatcher_=*/data.dispatcher_,
       /*service_method_=*/sotwGrpcMethod(data.type_url_),
@@ -48,7 +60,8 @@ GrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::SubscriptionDat
       /*backoff_strategy_=*/std::move(backoff_strategy),
       /*target_xds_authority_=*/control_plane_id,
       /*eds_resources_cache_=*/nullptr, // EDS cache is only used for ADS.
-      /*skip_subsequent_node_=*/api_config_source.set_node_on_first_message_only()};
+      /*skip_subsequent_node_=*/api_config_source.set_node_on_first_message_only(),
+      /*load_stats_reporter_factory_=*/lrs_factory};
 
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
     mux = std::make_shared<Config::XdsMux::GrpcMuxSotw>(grpc_mux_context);
@@ -81,10 +94,21 @@ DeltaGrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::Subscripti
   absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
       Utility::parseRateLimitSettings(api_config_source);
   THROW_IF_NOT_OK_REF(rate_limit_settings_or_error.status());
+
+  absl::StatusOr<Grpc::RawAsyncClientSharedPtr> primary_client_or_error =
+      factory_primary_or_error.value()->createUncachedRawAsyncClient();
+  THROW_IF_NOT_OK_REF(primary_client_or_error.status());
+  Grpc::RawAsyncClientSharedPtr primary_client = std::move(*primary_client_or_error);
+
+  std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> lrs_factory =
+      [&, data, primary_client]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
+    auto reporter = std::make_unique<Upstream::LoadStatsReporterImpl>(
+        data.local_info_, data.cm_, data.scope_, primary_client, data.dispatcher_);
+    return reporter;
+  };
+
   GrpcMuxContext grpc_mux_context{
-      /*async_client_=*/THROW_OR_RETURN_VALUE(
-          factory_primary_or_error.value()->createUncachedRawAsyncClient(),
-          Grpc::RawAsyncClientSharedPtr),
+      /*async_client_=*/std::move(primary_client),
       /*failover_async_client_=*/nullptr, // Failover is only supported for ADS.
       /*dispatcher_=*/data.dispatcher_,
       /*service_method_=*/deltaGrpcMethod(data.type_url_),
@@ -97,7 +121,8 @@ DeltaGrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::Subscripti
       /*backoff_strategy_=*/std::move(backoff_strategy),
       /*target_xds_authority_=*/"",
       /*eds_resources_cache_=*/nullptr, // EDS cache is only used for ADS.
-      /*skip_subsequent_node_=*/api_config_source.set_node_on_first_message_only()};
+      /*skip_subsequent_node_=*/api_config_source.set_node_on_first_message_only(),
+      /*load_stats_reporter_factory_=*/lrs_factory};
 
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
     mux = std::make_shared<Config::XdsMux::GrpcMuxDelta>(grpc_mux_context);

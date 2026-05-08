@@ -56,10 +56,10 @@ AwsLambdaFilterFactory::getCredentialsProvider(
       server_context, region);
 }
 
-absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactoryFromProtoHelper(
     const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
-    const std::string& stats_prefix, DualInfo dual_info,
-    Server::Configuration::ServerFactoryContext& server_context) {
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context,
+    Stats::Scope& scope, bool is_upstream) const {
 
   const auto arn = parseArn(proto_config.arn());
   if (!arn) {
@@ -81,11 +81,19 @@ absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactor
       *arn, getInvocationMode(proto_config), proto_config.payload_passthrough(),
       proto_config.host_rewrite(), std::move(signer));
 
-  FilterStats stats = generateStats(stats_prefix, dual_info.scope);
-  return [stats, filter_settings, dual_info](Http::FilterChainFactoryCallbacks& cb) -> void {
-    auto filter = std::make_shared<Filter>(filter_settings, stats, dual_info.is_upstream);
+  FilterStats stats = generateStats(stats_prefix, scope);
+  return [stats, filter_settings, is_upstream](Http::FilterChainFactoryCallbacks& cb) -> void {
+    auto filter = std::make_shared<Filter>(filter_settings, stats, is_upstream);
     cb.addStreamFilter(filter);
   };
+}
+
+absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
+    const std::string& stats_prefix, DualInfo dual_info,
+    Server::Configuration::ServerFactoryContext& server_context) {
+  return createFilterFactoryFromProtoHelper(proto_config, stats_prefix, server_context,
+                                            dual_info.scope, dual_info.is_upstream);
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
@@ -116,6 +124,17 @@ AwsLambdaFilterFactory::createRouteSpecificFilterConfigTyped(
       per_route_config.invoke_config().host_rewrite(), std::move(signer));
 
   return filter_settings;
+}
+
+Http::FilterFactoryCb AwsLambdaFilterFactory::createFilterFactoryFromProtoWithServerContextTyped(
+    const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context) {
+  auto result = createFilterFactoryFromProtoHelper(proto_config, stats_prefix, server_context,
+                                                   server_context.scope(), false);
+  if (!result.ok()) {
+    ExceptionUtil::throwEnvoyException(std::string(result.status().message()));
+  }
+  return std::move(result.value());
 }
 
 /*

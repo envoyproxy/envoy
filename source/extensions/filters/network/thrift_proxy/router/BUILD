@@ -36,7 +36,7 @@ envoy_cc_library(
         "//source/extensions/filters/network/thrift_proxy:metadata_lib",
         "//source/extensions/filters/network/thrift_proxy:protocol_converter_lib",
         "//source/extensions/filters/network/thrift_proxy:protocol_options_config_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 

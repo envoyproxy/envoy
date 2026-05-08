@@ -71,6 +71,16 @@ envoy_cc_mock(
 )
 
 envoy_cc_mock(
+    name = "load_stats_reporter_mocks",
+    srcs = ["load_stats_reporter.cc"],
+    hdrs = ["load_stats_reporter.h"],
+    deps = [
+        "//envoy/upstream:load_stats_reporter_interface",
+        "//source/common/stats:isolated_store_lib",
+    ],
+)
+
+envoy_cc_mock(
     name = "upstream_mocks",
     hdrs = ["mocks.h"],
     deps = [
@@ -90,6 +100,7 @@ envoy_cc_mock(
         ":host_set_mocks",
         ":load_balancer_context_mock",
         ":load_balancer_mocks",
+        ":load_stats_reporter_mocks",
         ":missing_cluster_notifier_mocks",
         ":od_cds_api_handle_mocks",
         ":od_cds_api_mocks",
@@ -116,7 +127,6 @@ envoy_cc_mock(
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/secret:secret_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/tcp:tcp_mocks",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -152,6 +162,7 @@ envoy_cc_mock(
     srcs = ["retry_priority.cc"],
     hdrs = ["retry_priority.h"],
     deps = [
+        "//envoy/stream_info:stream_info_interface",
         "//envoy/upstream:retry_interface",
     ],
 )
@@ -247,7 +258,6 @@ envoy_cc_mock(
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/quic:envoy_quic_network_observer_registry_factory_lib",
         "//source/common/singleton:manager_impl_lib",
-        "//test/mocks/secret:secret_mocks",
         "//test/test_common:thread_factory_for_test_lib",
     ],
 )

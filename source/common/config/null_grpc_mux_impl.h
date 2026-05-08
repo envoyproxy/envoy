@@ -35,6 +35,9 @@ public:
 
   EdsResourcesCacheOptRef edsResourcesCache() override { return absl::nullopt; }
 
+  Upstream::LoadStatsReporter* loadStatsReporter() const override { return nullptr; }
+  Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() override { return nullptr; }
+
   void onWriteable() override {}
   void onStreamEstablished() override {}
   void onEstablishmentFailure(bool) override {}

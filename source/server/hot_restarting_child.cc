@@ -125,7 +125,8 @@ void HotRestartingChild::onForwardedUdpPacket(uint32_t worker_index, Network::Ud
 }
 
 int HotRestartingChild::duplicateParentListenSocket(const std::string& address,
-                                                    uint32_t worker_index) {
+                                                    uint32_t worker_index,
+                                                    absl::string_view network_namespace) {
   if (parent_terminated_) {
     return -1;
   }
@@ -133,6 +134,8 @@ int HotRestartingChild::duplicateParentListenSocket(const std::string& address,
   HotRestartMessage wrapped_request;
   wrapped_request.mutable_request()->mutable_pass_listen_socket()->set_address(address);
   wrapped_request.mutable_request()->mutable_pass_listen_socket()->set_worker_index(worker_index);
+  wrapped_request.mutable_request()->mutable_pass_listen_socket()->set_network_namespace(
+      network_namespace);
   main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
 
   std::unique_ptr<HotRestartMessage> wrapped_reply =

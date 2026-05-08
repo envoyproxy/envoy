@@ -6,9 +6,7 @@
 
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/gcp_authn/mocks.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/init/mocks.h"
 #include "test/mocks/server/mocks.h"
 
 #include "gmock/gmock.h"
@@ -215,7 +213,7 @@ TEST_F(GcpAuthnFilterTest, NoRoute) {
   setupFilterAndCallback();
 
   // route() call return nullptr
-  EXPECT_CALL(decoder_callbacks_, route()).WillOnce(Return(nullptr));
+  EXPECT_CALL(decoder_callbacks_, route()).WillOnce(Return(OptRef<const Router::Route>()));
   // decodeHeaders() is expected to return `Continue` because nothing can really be done without
   // route.
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true), Http::FilterHeadersStatus::Continue);

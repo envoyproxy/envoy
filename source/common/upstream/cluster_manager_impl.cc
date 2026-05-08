@@ -41,8 +41,10 @@
 #include "source/common/upstream/cds_api_impl.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/load_balancer_context_base.h"
+#include "source/common/upstream/load_stats_reporter_impl.h"
 #include "source/common/upstream/priority_conn_pool_map_impl.h"
 
+#include "absl/hash/hash.h"
 #include "absl/status/status.h"
 
 #ifdef ENVOY_ENABLE_QUIC
@@ -526,7 +528,7 @@ absl::Status ClusterManagerImpl::initializeSecondaryClusters(
       client_or_error = factory_or_error.value()->createUncachedRawAsyncClient();
     }
     RETURN_IF_NOT_OK_REF(client_or_error.status());
-    load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
+    load_stats_reporter_ = std::make_unique<LoadStatsReporterImpl>(
         local_info_, *this, *stats_.rootScope(), std::move(client_or_error.value()), dispatcher_);
   }
   return absl::OkStatus();
@@ -1551,18 +1553,31 @@ ClusterManagerImpl::allocateOdCdsApi(OdCdsCreationFunction creation_function,
                                      const envoy::config::core::v3::ConfigSource& odcds_config,
                                      OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
-  // TODO(krnowak): Instead of creating a new handle every time, store the handles internally and
-  // return an already existing one if the config or locator matches. Note that this may need a
-  // way to clean up the unused handles, so we can close the unnecessary connections.
+  // Generate a unique key based on config and locator. This enables reuse of subscriptions
+  // with the same configuration. Note that timeout is intentionally not part of the hash,
+  // so different timeout values will share the same subscription.
+  // Subscriptions persist for the lifetime of ClusterManagerImpl and are cleaned up when
+  // it is destroyed.
+  uint64_t config_hash = MessageUtil::hash(odcds_config);
+  if (odcds_resources_locator.has_value()) {
+    config_hash = absl::HashOf(config_hash, MessageUtil::hash(*odcds_resources_locator));
+  }
+
+  auto it = odcds_subscriptions_.find(config_hash);
+  if (it != odcds_subscriptions_.end()) {
+    return OdCdsApiHandleImpl::create(*this, config_hash);
+  }
+
   auto odcds_or_error =
       creation_function(odcds_config, odcds_resources_locator, xds_manager_, *this, *this,
                         *stats_.rootScope(), validation_visitor, context_);
   RETURN_IF_NOT_OK_REF(odcds_or_error.status());
-  return OdCdsApiHandleImpl::create(*this, std::move(*odcds_or_error));
+  odcds_subscriptions_.emplace(config_hash, std::move(*odcds_or_error));
+  return OdCdsApiHandleImpl::create(*this, config_hash);
 }
 
 ClusterDiscoveryCallbackHandlePtr
-ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, std::string name,
+ClusterManagerImpl::requestOnDemandClusterDiscovery(uint64_t config_source_key, std::string name,
                                                     ClusterDiscoveryCallbackPtr callback,
                                                     std::chrono::milliseconds timeout) {
   ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
@@ -1591,23 +1606,25 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, std
       name);
   // This seems to be the first request for discovery of this cluster in this worker thread. Rest
   // of the process may only happen in the main thread.
-  dispatcher_.post([this, odcds = std::move(odcds), timeout, name = std::move(name),
-                    invoker = std::move(invoker),
-                    &thread_local_dispatcher = cluster_manager.thread_local_dispatcher_] {
+  Event::Dispatcher& worker_dispatcher = cluster_manager.thread_local_dispatcher_;
+  dispatcher_.post([this, config_source_key, timeout, name = std::move(name),
+                    invoker = std::move(invoker), &worker_dispatcher] {
+    OdCdsApiSharedPtr odcds = odcds_subscriptions_.at(config_source_key);
+
     // Check for the cluster here too. It might have been added between the time when this closure
     // was posted and when it is being executed.
     if (getThreadLocalCluster(name) != nullptr) {
       ENVOY_LOG(
           debug,
           "cm odcds: the requested cluster {} is already known, posting the callback back to {}",
-          name, thread_local_dispatcher.name());
-      thread_local_dispatcher.post([invoker = std::move(invoker)] {
+          name, worker_dispatcher.name());
+      worker_dispatcher.post([invoker = std::move(invoker)] {
         invoker.invokeCallback(ClusterDiscoveryStatus::Available);
       });
       return;
     }
 
-    if (auto it = pending_cluster_creations_.find(name); it != pending_cluster_creations_.end()) {
+    if (pending_cluster_creations_.contains(name)) {
       ENVOY_LOG(debug, "cm odcds: on-demand discovery for cluster {} is already in progress", name);
       // We already began the discovery process for this cluster, nothing to do. If we got here,
       // it means that it was other worker thread that requested the discovery.
@@ -2006,6 +2023,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
           parent.httpConnPoolIsIdle(host, priority, hash_key);
         });
 
+        pool->setLifetimeCallbacks(lb_->lifetimeCallbacks(), hash_key);
+
         return pool;
       });
 
@@ -2047,13 +2066,13 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
 HostSelectionResponse ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::chooseHost(
     LoadBalancerContext* context) {
   auto cross_priority_host_map = priority_set_.crossPriorityHostMap();
-  auto host_and_strict_mode = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
-                                                              override_host_statuses_, context);
-  if (host_and_strict_mode.first != nullptr) {
-    return {std::move(host_and_strict_mode.first)};
+  auto override_result = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
+                                                         override_host_statuses_, context);
+  if (override_result.host != nullptr) {
+    return {std::move(override_result.host)};
   }
 
-  if (!host_and_strict_mode.second) {
+  if (!override_result.strict) {
     Upstream::HostSelectionResponse host_selection = lb_->chooseHost(context);
     if (host_selection.host || host_selection.cancelable) {
       return host_selection;
@@ -2065,16 +2084,26 @@ HostSelectionResponse ClusterManagerImpl::ThreadLocalClusterManagerImpl::Cluster
 
   cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
   ENVOY_LOG(debug, "no healthy host");
-  return {nullptr};
+  HostSelectionResponse response{nullptr};
+  // Only apply the custom failure status when the destination is missing from
+  // available endpoints, not when it exists but is unhealthy.
+  if (override_result.status == HostUtility::OverrideHostSelectionStatus::NotFound) {
+    if (context != nullptr) {
+      if (auto override_host = context->overrideHostToSelect(); override_host.has_value()) {
+        response.failure_status = override_host->status_on_strict_destination_not_found;
+      }
+    }
+  }
+  return response;
 }
 
 HostConstSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::peekAnotherHost(
     LoadBalancerContext* context) {
   auto cross_priority_host_map = priority_set_.crossPriorityHostMap();
-  auto host_and_strict_mode = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
-                                                              override_host_statuses_, context);
-  if (host_and_strict_mode.first != nullptr) {
-    return std::move(host_and_strict_mode.first);
+  auto override_result = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
+                                                         override_host_statuses_, context);
+  if (override_result.host != nullptr) {
+    return std::move(override_result.host);
   }
   // TODO(wbpcode): should we do strict mode check of override host here?
   return lb_->peekAnotherHost(context);

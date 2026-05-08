@@ -14,7 +14,7 @@
 
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
-#include "library/cc/engine_builder.h"
+#include "test/cc/engine_builder_test_shim.h"
 #include "library/common/api/external.h"
 #include "library/common/bridge//utility.h"
 #include "library/common/http/header_utility.h"
@@ -155,7 +155,7 @@ TEST_F(InternalEngineTest, AccessEngineAfterInitialization) {
 
   absl::Notification getClusterManagerInvoked;
   // Running engine functions should work because the engine is running
-  EXPECT_THAT(engine_->engine_->dumpStats(), testing::HasSubstr("runtime.load_success: 1\n"));
+  EXPECT_THAT(engine_->engine_->dumpStats(), testing::HasSubstr("runtime.load_success: 2\n"));
 
   engine_->terminate();
   ASSERT_TRUE(engine_->isTerminated());
@@ -445,9 +445,9 @@ TEST_F(InternalEngineTest, ThreadCreationFailed) {
   EngineTestContext test_context{};
   auto thread_factory = std::make_unique<Thread::MockPosixThreadFactory>();
   EXPECT_CALL(*thread_factory, createThread(_, _, false)).WillOnce(Return(ByMove(nullptr)));
-  std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, {}, {}, {}, false,
-                         std::move(thread_factory)));
+  std::unique_ptr<InternalEngine> engine(new InternalEngine(
+      createDefaultEngineCallbacks(test_context), {}, {}, {}, {}, std::move(thread_factory)));
+  engine->disableDnsRefreshOnNetworkChange(false);
   Platform::EngineBuilder builder;
   envoy_status_t status = runEngine(engine, builder, LOG_LEVEL);
   EXPECT_EQ(status, ENVOY_FAILURE);

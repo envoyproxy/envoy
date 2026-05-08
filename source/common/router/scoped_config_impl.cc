@@ -129,8 +129,10 @@ void ScopedConfigImpl::addOrUpdateRoutingScopes(
     if (iter != scoped_route_info_by_name_.end()) {
       ASSERT(scoped_route_info_by_key_.contains(iter->second->scopeKey().hash()));
       scoped_route_info_by_key_.erase(iter->second->scopeKey().hash());
+      // Explicitly erase from _name_ map to avoid dangling string_view on overwrite.
+      scoped_route_info_by_name_.erase(iter);
     }
-    scoped_route_info_by_name_[scoped_route_info->scopeName()] = scoped_route_info;
+    scoped_route_info_by_name_.emplace(scoped_route_info->scopeName(), scoped_route_info);
     scoped_route_info_by_key_[scoped_route_info->scopeKey().hash()] = scoped_route_info;
   }
 }

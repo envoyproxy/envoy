@@ -28,6 +28,22 @@ Http::FilterFactoryCb AlternateProtocolsCacheFilterFactory::createFilterFactoryF
   };
 }
 
+Http::FilterFactoryCb
+AlternateProtocolsCacheFilterFactory::createFilterFactoryFromProtoWithServerContextTyped(
+    const envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig&
+        proto_config,
+    const std::string&, Server::Configuration::ServerFactoryContext& context) {
+
+  FilterConfigSharedPtr filter_config(
+      std::make_shared<FilterConfig>(proto_config, context.httpServerPropertiesCacheManager(),
+                                     context.mainThreadDispatcher().timeSource()));
+
+  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamEncoderFilter(
+        std::make_shared<Filter>(filter_config, callbacks.dispatcher()));
+  };
+}
+
 /**
  * Static registration for the alternate protocols cache filter. @see RegisterFactory.
  */

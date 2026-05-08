@@ -5,13 +5,9 @@
 #include "source/common/router/upstream_codec_filter.h"
 
 #include "test/common/http/common.h"
-#include "test/mocks/access_log/mocks.h"
-#include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -36,8 +32,7 @@ public:
 
   // Filter
   RetryStatePtr createRetryState(const RetryPolicy&, Http::RequestHeaderMap&,
-                                 const Upstream::ClusterInfo&, const VirtualCluster*,
-                                 RouteStatsContextOptRef,
+                                 const Upstream::ClusterInfo&,
                                  Server::Configuration::CommonFactoryContext&, Event::Dispatcher&,
                                  Upstream::ResourcePriority) override {
     EXPECT_EQ(nullptr, retry_state_);
@@ -62,7 +57,7 @@ public:
     cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
     ON_CALL(*cluster_info_, name()).WillByDefault(ReturnRef(cluster_name));
     ON_CALL(*cluster_info_, observabilityName()).WillByDefault(ReturnRef(cluster_name));
-    ON_CALL(callbacks_.stream_info_, upstreamClusterInfo()).WillByDefault(Return(cluster_info_));
+    callbacks_.stream_info_.upstream_cluster_info_ = cluster_info_;
     EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_).Times(testing::AnyNumber());
     for (const auto& filter : upstream_filters) {
       *router_proto.add_upstream_http_filters() = filter;

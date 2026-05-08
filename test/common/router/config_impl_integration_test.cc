@@ -250,6 +250,7 @@ TEST_P(WeightedClusterHashPolicyIntegrationTest, SameUserIdGoesToSameUpstream) {
 
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_TRUE(response->complete());
+    ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
     EXPECT_EQ("200", response->headers().getStatusValue());
 
     // Verify consistency - same user should always go to same upstream
@@ -315,6 +316,7 @@ TEST_P(WeightedClusterHashPolicyIntegrationTest, DifferentUserIdsCanGoToDifferen
 
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_TRUE(response->complete());
+    ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
     EXPECT_EQ("200", response->headers().getStatusValue());
 
     user_to_upstream[user_id] = current_upstream;
@@ -380,6 +382,7 @@ TEST_P(WeightedClusterHashPolicyIntegrationTest, WeightedDistributionTest) {
 
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_TRUE(response->complete());
+    ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
     EXPECT_EQ("200", response->headers().getStatusValue());
 
     upstream_counts[current_upstream]++;

@@ -32,8 +32,12 @@ TEST(Evaluator, Print) {
   std::string node_yaml = "id: test";
   TestUtility::loadFromYaml(node_yaml, node);
   EXPECT_EQ(print(CelValue::CreateNull()), "NULL");
-  EXPECT_THAT(print(google::api::expr::runtime::CelProtoWrapper::CreateMessage(&node, &arena)),
-              MatchesRegex(".*id:\\s+\"test\""));
+  const std::string node_textproto =
+      print(google::api::expr::runtime::CelProtoWrapper::CreateMessage(&node, &arena));
+  EXPECT_THAT(node_textproto, ::testing::HasSubstr("id: \"test\""));
+  envoy::config::core::v3::Node parsed;
+  EXPECT_TRUE(Protobuf::TextFormat::ParseFromString(node_textproto, &parsed));
+  EXPECT_EQ(parsed.id(), "test");
 
   EXPECT_EQ(print(CelValue::CreateDuration(absl::Minutes(1))), "1m");
   absl::Time time = TestUtility::parseTime("Dec 22 01:50:34 2020 GMT", "%b %e %H:%M:%S %Y GMT");

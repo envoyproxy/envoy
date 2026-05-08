@@ -1,3 +1,5 @@
+#include <openssl/ssl.h>
+
 #include <memory>
 #include <string>
 #include <vector>
@@ -193,10 +195,16 @@ public:
     EXPECT_CALL(filter_chain_, transportSocketFactory())
         .WillRepeatedly(ReturnRef(*transport_socket_factory_));
 
+    loadCertsIntoFactory(cert, expect_private_key);
+  }
+
+  // Sets up mock config expectations and triggers cert loading into the transport
+  // socket factory. Does NOT set proof-source-level expectations (ioHandle,
+  // findFilterChain, transportSocketFactory) — callers add those as needed.
+  void loadCertsIntoFactory(const std::string& cert, bool with_private_key) {
     auto factory = Extensions::TransportSockets::Tls::TlsCertificateSelectorConfigFactoryImpl::
         getDefaultTlsCertificateSelectorConfigFactory();
     ASSERT_TRUE(factory);
-    ASSERT_EQ("envoy.tls.certificate_selectors.default", factory->name());
     const Protobuf::Any any;
 
     Server::Configuration::MockGenericFactoryContext ctx;
@@ -221,7 +229,7 @@ public:
     EXPECT_CALL(tls_cert_config_, certificateChain())
         .Times(testing::AtLeast(1))
         .WillRepeatedly(ReturnRef(cert));
-    if (expect_private_key) {
+    if (with_private_key) {
       EXPECT_CALL(tls_cert_config_, privateKey())
           .Times(testing::AtLeast(1))
           .WillRepeatedly(ReturnRef(pkey_));
@@ -346,6 +354,46 @@ TEST_F(EnvoyQuicProofSourceTest, ComputeSignatureFailNoFilterChain) {
   proof_source_.ComputeTlsSignature(
       server_address_, client_address_, hostname_, SSL_SIGN_RSA_PSS_RSAE_SHA256, "payload",
       std::make_unique<TestSignatureCallback>(false, filter_chain_, signature));
+}
+
+TEST_F(EnvoyQuicProofSourceTest, ComputeSignatureFailAlgorithmMismatch) {
+  EXPECT_CALL(listen_socket_, ioHandle()).Times(testing::AnyNumber());
+  EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
+      .WillRepeatedly(Invoke([&](const Network::ConnectionSocket&, const StreamInfo::StreamInfo&) {
+        return &filter_chain_;
+      }));
+  EXPECT_CALL(filter_chain_, transportSocketFactory())
+      .WillRepeatedly(ReturnRef(*transport_socket_factory_));
+
+  loadCertsIntoFactory(expected_certs_, true);
+
+  std::string signature;
+  // Use ECDSA algorithm with an RSA key — triggers algorithm mismatch error path.
+  proof_source_.ComputeTlsSignature(
+      server_address_, client_address_, hostname_, SSL_SIGN_ECDSA_SECP256R1_SHA256, "payload",
+      std::make_unique<TestSignatureCallback>(false, filter_chain_, signature));
+}
+
+// Smoke test: verify OnNewSslCtx installs the ticket key callback when the
+// runtime guard is enabled. We cannot directly inspect the callback, but we
+// verify the call completes without error.
+TEST_F(EnvoyQuicProofSourceTest, OnNewSslCtxWithSessionTicketSupport) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.quic_session_ticket_support", "true"}});
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ssl_ctx, nullptr);
+  proof_source_.OnNewSslCtx(ssl_ctx.get());
+}
+
+// Smoke test: verify OnNewSslCtx is a no-op when the runtime guard is disabled.
+TEST_F(EnvoyQuicProofSourceTest, OnNewSslCtxWithSessionTicketSupportDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.quic_session_ticket_support", "false"}});
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ssl_ctx, nullptr);
+  proof_source_.OnNewSslCtx(ssl_ctx.get());
 }
 
 } // namespace Quic

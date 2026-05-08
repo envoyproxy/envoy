@@ -32,7 +32,6 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
@@ -266,6 +265,74 @@ TEST_P(TcpProxyTest, HalfCloseProxy) {
   upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+TEST_P(TcpProxyTest, DrainCloseIgnoredWhenFlagDisabled) {
+  setup(1);
+
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All)).Times(0);
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _)).Times(0);
+
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), false));
+  filter_->onData(buffer, false);
+}
+
+TEST_P(TcpProxyTest, DrainCloseAfterDownstreamRead) {
+  auto config = defaultConfig();
+  config.mutable_check_drain_close()->set_value(true);
+  setup(1, config);
+
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
+      .WillOnce(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWrite,
+                    StreamInfo::LocalCloseReasons::get().TcpProxyDrainClose));
+
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), false));
+  filter_->onData(buffer, false);
+}
+
+TEST_P(TcpProxyTest, DrainCloseUsesInboundOnlyScopeForInboundListeners) {
+  auto config = defaultConfig();
+  config.mutable_check_drain_close()->set_value(true);
+  EXPECT_CALL(factory_context_.listener_info_, direction())
+      .WillRepeatedly(Return(envoy::config::core::v3::TrafficDirection::INBOUND));
+  setup(1, config);
+
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::InboundOnly))
+      .WillOnce(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWrite,
+                    StreamInfo::LocalCloseReasons::get().TcpProxyDrainClose));
+
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), false));
+  filter_->onData(buffer, false);
+}
+
+TEST_P(TcpProxyTest, DrainCloseAfterDownstreamWrite) {
+  auto config = defaultConfig();
+  config.mutable_check_drain_close()->set_value(true);
+  setup(1, config);
+
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("world");
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
+      .WillOnce(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&buffer), false));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWrite,
+                    StreamInfo::LocalCloseReasons::get().TcpProxyDrainClose));
+  upstream_callbacks_->onUpstreamData(buffer, false);
+}
+
 // Test with an explicitly configured upstream.
 TEST_P(TcpProxyTest, ExplicitFactory) {
   // Explicitly configure an HTTP upstream, to test factory creation.
@@ -365,6 +432,58 @@ TEST_P(TcpProxyTest, UpstreamRemoteDisconnect) {
   Buffer::OwnedImpl response("world");
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
   upstream_callbacks_->onUpstreamData(response, false);
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// Test that upstream RemoteClose propagates AbortReset (default behavior)
+// when upstream detected close type is RemoteReset.
+TEST_P(TcpProxyTest, UpstreamRemoteCloseWithRstPropagation) {
+  setup(1);
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), false));
+  filter_->onData(buffer, false);
+
+  auto upstream_info = upstream_connections_.at(0)->stream_info_.upstreamInfo();
+  EXPECT_CALL(*dynamic_cast<StreamInfo::MockUpstreamInfo*>(upstream_info.get()),
+              upstreamDetectedCloseType())
+      .WillRepeatedly(testing::Return(StreamInfo::DetectedCloseType::RemoteReset));
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::AbortReset));
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_TRUE(
+      filter_->getStreamInfo().hasResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRemoteReset));
+}
+
+// Test that upstream LocalClose still uses FlushWrite (FIN).
+TEST_P(TcpProxyTest, UpstreamLocalCloseStillUsesFin) {
+  setup(1);
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
+}
+
+// Test that upstream RemoteClose uses FlushWrite (FIN) when runtime guard is disabled.
+TEST_P(TcpProxyTest, UpstreamRemoteCloseUsesFinWhenRstGuardDisabled) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.propagate_upstream_rst_through_tunneled_tcp_proxy", "false"}});
+
+  setup(1);
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// Test that upstream RemoteClose with Normal close type uses FlushWrite.
+TEST_P(TcpProxyTest, UpstreamRemoteCloseNormalCloseTypeUsesFin) {
+  setup(1);
+  raiseEventUpstreamConnected(0);
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
   upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
@@ -805,7 +924,7 @@ TEST_P(TcpProxyTest, ReceiveBeforeConnectBuffersOnEarlyData) {
   filter_->onData(early_data_buffer, /*end_stream=*/false);
 
   // Now when upstream connection is established, early buffer will be sent.
-  EXPECT_CALL(*upstream_connections_.at(0), write(BufferStringEqual(early_data), false));
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferString(early_data), false));
   raiseEventUpstreamConnected(/*conn_index=*/0);
 
   // Any further communications between client and server can resume normally.
@@ -829,8 +948,7 @@ TEST_P(TcpProxyTest, ReceiveBeforeConnectEarlyDataWithEndStream) {
   filter_->onData(early_data_buffer, /*end_stream=*/true);
 
   // Now when upstream connection is established, early buffer will be sent.
-  EXPECT_CALL(*upstream_connections_.at(0),
-              write(BufferStringEqual(early_data), /*end_stream*/ true));
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferString(early_data), /*end_stream*/ true));
   raiseEventUpstreamConnected(/*conn_index=*/0);
 
   // Any further communications between client and server can resume normally.
@@ -852,7 +970,7 @@ TEST_P(TcpProxyTest, ReceiveBeforeConnectDownstreamClosesWithoutData) {
 
   // When upstream connection is established, the end_stream signal should be sent even though
   // the buffer is empty. This ensures the upstream connection is properly closed.
-  EXPECT_CALL(*upstream_connections_.at(0), write(BufferStringEqual(""), /*end_stream*/ true));
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferString(""), /*end_stream*/ true));
   raiseEventUpstreamConnected(/*conn_index=*/0);
 }
 
@@ -867,7 +985,7 @@ TEST_P(TcpProxyTest, ReceiveBeforeConnectEmptyBufferWithEndStream) {
   filter_->onData(empty_buffer, /*end_stream=*/true);
 
   // When upstream connection is established, end_stream should be propagated.
-  EXPECT_CALL(*upstream_connections_.at(0), write(BufferStringEqual(""), /*end_stream*/ true));
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferString(""), /*end_stream*/ true));
   raiseEventUpstreamConnected(/*conn_index=*/0);
 
   // Upstream can still send data back.
@@ -1011,7 +1129,7 @@ TEST_P(TcpProxyTest, StreamDecoderFilterCallbacks) {
   EXPECT_NO_THROW(stream_decoder_callbacks.mostSpecificPerFilterConfig());
   EXPECT_NO_THROW(stream_decoder_callbacks.account());
   EXPECT_NO_THROW(stream_decoder_callbacks.setUpstreamOverrideHost(
-      Upstream::LoadBalancerContext::OverrideHost(std::make_pair("foo", true))));
+      Upstream::LoadBalancerContext::OverrideHost{"foo", true}));
   EXPECT_NO_THROW(stream_decoder_callbacks.http1StreamEncoderOptions());
   EXPECT_NO_THROW(stream_decoder_callbacks.downstreamCallbacks());
   EXPECT_NO_THROW(stream_decoder_callbacks.upstreamCallbacks());
@@ -3282,6 +3400,264 @@ TEST_P(TcpProxyTest, LegacyFilterStateWithNewApi) {
   // the base setup() will have already established a connection, so we can just verify
   // the filter was created successfully.
   EXPECT_NE(nullptr, filter_.get());
+}
+
+// Test that merge config option merges tcp_proxy TLV entries with existing downstream ones.
+TEST_P(TcpProxyTest, MergeWithDownstreamTlvsWithDownstreamState) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  auto* tlv = config.add_proxy_protocol_tlvs();
+  tlv->set_type(0xF1);
+  tlv->set_value("tcp_proxy_value");
+  config.set_proxy_protocol_tlv_merge_policy(
+      envoy::extensions::filters::network::tcp_proxy::v3::OVERWRITE_BY_TYPE_IF_EXISTS_OR_ADD);
+
+  // Set up existing downstream proxy protocol state (simulating proxy_protocol listener filter).
+  Network::ProxyProtocolTLVVector downstream_tlvs;
+  downstream_tlvs.push_back({0xE1, {'d', 'o', 'w', 'n', 's', 't', 'r', 'e', 'a', 'm'}});
+  downstream_tlvs.push_back({0xE2, {'o', 't', 'h', 'e', 'r'}});
+
+  auto downstream_src_addr = *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  auto downstream_dst_addr = *Network::Utility::resolveUrl("tcp://10.0.0.2:5678");
+
+  filter_callbacks_.connection_.stream_info_.filter_state_->setData(
+      Envoy::Network::ProxyProtocolFilterState::key(),
+      std::make_shared<Envoy::Network::ProxyProtocolFilterState>(
+          Network::ProxyProtocolDataWithVersion{
+              {downstream_src_addr, downstream_dst_addr, downstream_tlvs},
+              Network::ProxyProtocolVersion::V2}),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+
+  // Verify the merged TLVs are set.
+  auto& downstream_info = filter_callbacks_.connection_.streamInfo();
+  auto header =
+      downstream_info.filterState()->getDataReadOnly<Envoy::Network::ProxyProtocolFilterState>(
+          Envoy::Network::ProxyProtocolFilterState::key());
+  ASSERT_TRUE(header != nullptr);
+  auto& tlvs = header->value().tlv_vector_;
+
+  // Should have 3 TLVs: 1 from tcp_proxy + 2 from downstream.
+  ASSERT_EQ(3, tlvs.size());
+
+  // tcp_proxy TLV is first (takes precedence).
+  EXPECT_EQ(0xF1, tlvs[0].type);
+  EXPECT_EQ("tcp_proxy_value", std::string(tlvs[0].value.begin(), tlvs[0].value.end()));
+
+  // Downstream TLVs follow.
+  EXPECT_EQ(0xE1, tlvs[1].type);
+  EXPECT_EQ("downstream", std::string(tlvs[1].value.begin(), tlvs[1].value.end()));
+
+  EXPECT_EQ(0xE2, tlvs[2].type);
+  EXPECT_EQ("other", std::string(tlvs[2].value.begin(), tlvs[2].value.end()));
+
+  // Verify addresses are preserved from downstream.
+  EXPECT_EQ(downstream_src_addr->asString(), header->value().src_addr_->asString());
+  EXPECT_EQ(downstream_dst_addr->asString(), header->value().dst_addr_->asString());
+}
+
+// Test that tcp_proxy TLVs override downstream TLVs with the same type when merging.
+TEST_P(TcpProxyTest, MergeWithDownstreamTlvsPrecedence) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  auto* tlv = config.add_proxy_protocol_tlvs();
+  tlv->set_type(0xE1); // Same type as downstream TLV
+  tlv->set_value("overridden");
+  config.set_proxy_protocol_tlv_merge_policy(
+      envoy::extensions::filters::network::tcp_proxy::v3::OVERWRITE_BY_TYPE_IF_EXISTS_OR_ADD);
+
+  // Set up existing downstream proxy protocol state with a conflicting TLV type.
+  Network::ProxyProtocolTLVVector downstream_tlvs;
+  downstream_tlvs.push_back({0xE1, {'o', 'r', 'i', 'g', 'i', 'n', 'a', 'l'}});
+  downstream_tlvs.push_back({0xE2, {'k', 'e', 'e', 'p'}});
+
+  auto downstream_src_addr = *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  auto downstream_dst_addr = *Network::Utility::resolveUrl("tcp://10.0.0.2:5678");
+
+  filter_callbacks_.connection_.stream_info_.filter_state_->setData(
+      Envoy::Network::ProxyProtocolFilterState::key(),
+      std::make_shared<Envoy::Network::ProxyProtocolFilterState>(
+          Network::ProxyProtocolDataWithVersion{
+              {downstream_src_addr, downstream_dst_addr, downstream_tlvs},
+              Network::ProxyProtocolVersion::V2}),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+
+  // Verify the merged TLVs.
+  auto& downstream_info = filter_callbacks_.connection_.streamInfo();
+  auto header =
+      downstream_info.filterState()->getDataReadOnly<Envoy::Network::ProxyProtocolFilterState>(
+          Envoy::Network::ProxyProtocolFilterState::key());
+  ASSERT_TRUE(header != nullptr);
+  auto& tlvs = header->value().tlv_vector_;
+
+  // Should have 2 TLVs: 0xE1 overridden by tcp_proxy, 0xE2 kept from downstream.
+  ASSERT_EQ(2, tlvs.size());
+
+  // tcp_proxy TLV overrides downstream TLV with same type.
+  EXPECT_EQ(0xE1, tlvs[0].type);
+  EXPECT_EQ("overridden", std::string(tlvs[0].value.begin(), tlvs[0].value.end()));
+
+  // Non-conflicting downstream TLV is preserved.
+  EXPECT_EQ(0xE2, tlvs[1].type);
+  EXPECT_EQ("keep", std::string(tlvs[1].value.begin(), tlvs[1].value.end()));
+}
+
+// Test that tcp_proxy TLVs are ignored when downstream state exists and merge is disabled.
+TEST_P(TcpProxyTest, NoMergeWithDownstreamTlvsWhenDisabled) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  auto* tlv = config.add_proxy_protocol_tlvs();
+  tlv->set_type(0xF1);
+  tlv->set_value("should_be_ignored");
+  // The merge config option defaults to false.
+
+  // Set up existing downstream proxy protocol state.
+  Network::ProxyProtocolTLVVector downstream_tlvs;
+  downstream_tlvs.push_back({0xE1, {'d', 'o', 'w', 'n', 's', 't', 'r', 'e', 'a', 'm'}});
+
+  auto downstream_src_addr = *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  auto downstream_dst_addr = *Network::Utility::resolveUrl("tcp://10.0.0.2:5678");
+
+  filter_callbacks_.connection_.stream_info_.filter_state_->setData(
+      Envoy::Network::ProxyProtocolFilterState::key(),
+      std::make_shared<Envoy::Network::ProxyProtocolFilterState>(
+          Network::ProxyProtocolDataWithVersion{
+              {downstream_src_addr, downstream_dst_addr, downstream_tlvs},
+              Network::ProxyProtocolVersion::V2}),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+
+  // Verify only downstream TLVs are present (tcp_proxy TLVs were ignored).
+  auto& downstream_info = filter_callbacks_.connection_.streamInfo();
+  auto header =
+      downstream_info.filterState()->getDataReadOnly<Envoy::Network::ProxyProtocolFilterState>(
+          Envoy::Network::ProxyProtocolFilterState::key());
+  ASSERT_TRUE(header != nullptr);
+  auto& tlvs = header->value().tlv_vector_;
+
+  // Should only have the downstream TLV.
+  ASSERT_EQ(1, tlvs.size());
+  EXPECT_EQ(0xE1, tlvs[0].type);
+  EXPECT_EQ("downstream", std::string(tlvs[0].value.begin(), tlvs[0].value.end()));
+}
+
+// Test that merge with dynamic TLVs works correctly.
+TEST_P(TcpProxyTest, MergeWithDownstreamTlvsWithDynamicTlv) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  auto* tlv = config.add_proxy_protocol_tlvs();
+  tlv->set_type(0xF2);
+  tlv->mutable_format_string()->mutable_text_format_source()->set_inline_string(
+      "%DYNAMIC_METADATA(envoy.test:key)%");
+  config.set_proxy_protocol_tlv_merge_policy(
+      envoy::extensions::filters::network::tcp_proxy::v3::OVERWRITE_BY_TYPE_IF_EXISTS_OR_ADD);
+
+  // Set dynamic metadata.
+  filter_callbacks_.connection_.stream_info_.metadata_.mutable_filter_metadata()->insert(
+      {"envoy.test", Protobuf::Struct()});
+  auto& test_struct = (*filter_callbacks_.connection_.stream_info_.metadata_
+                            .mutable_filter_metadata())["envoy.test"];
+  (*test_struct.mutable_fields())["key"].set_string_value("dynamic_value");
+
+  // Set up existing downstream proxy protocol state.
+  Network::ProxyProtocolTLVVector downstream_tlvs;
+  downstream_tlvs.push_back({0xE1, {'d', 'o', 'w', 'n', 's', 't', 'r', 'e', 'a', 'm'}});
+
+  auto downstream_src_addr = *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  auto downstream_dst_addr = *Network::Utility::resolveUrl("tcp://10.0.0.2:5678");
+
+  filter_callbacks_.connection_.stream_info_.filter_state_->setData(
+      Envoy::Network::ProxyProtocolFilterState::key(),
+      std::make_shared<Envoy::Network::ProxyProtocolFilterState>(
+          Network::ProxyProtocolDataWithVersion{
+              {downstream_src_addr, downstream_dst_addr, downstream_tlvs},
+              Network::ProxyProtocolVersion::V2}),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+
+  // Verify the merged TLVs.
+  auto& downstream_info = filter_callbacks_.connection_.streamInfo();
+  auto header =
+      downstream_info.filterState()->getDataReadOnly<Envoy::Network::ProxyProtocolFilterState>(
+          Envoy::Network::ProxyProtocolFilterState::key());
+  ASSERT_TRUE(header != nullptr);
+  auto& tlvs = header->value().tlv_vector_;
+
+  // Should have 2 TLVs: dynamic from tcp_proxy + 1 from downstream.
+  ASSERT_EQ(2, tlvs.size());
+
+  // Dynamic TLV from tcp_proxy.
+  EXPECT_EQ(0xF2, tlvs[0].type);
+  EXPECT_EQ("dynamic_value", std::string(tlvs[0].value.begin(), tlvs[0].value.end()));
+
+  // Downstream TLV.
+  EXPECT_EQ(0xE1, tlvs[1].type);
+  EXPECT_EQ("downstream", std::string(tlvs[1].value.begin(), tlvs[1].value.end()));
+}
+
+// Test that APPEND mode preserves all TLVs including duplicates.
+TEST_P(TcpProxyTest, AppendToDownstreamTlvsPreservesDuplicates) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  auto* tlv1 = config.add_proxy_protocol_tlvs();
+  tlv1->set_type(0xE1); // Same type as one downstream TLV
+  tlv1->set_value("tcp_proxy_e1");
+  auto* tlv2 = config.add_proxy_protocol_tlvs();
+  tlv2->set_type(0xF0); // Different type
+  tlv2->set_value("tcp_proxy_f0");
+  config.set_proxy_protocol_tlv_merge_policy(
+      envoy::extensions::filters::network::tcp_proxy::v3::APPEND_IF_EXISTS_OR_ADD);
+
+  // Set up existing downstream proxy protocol state with duplicate types.
+  Network::ProxyProtocolTLVVector downstream_tlvs;
+  downstream_tlvs.push_back({0xE1, {'d', 'o', 'w', 'n', '1'}});
+  downstream_tlvs.push_back({0xE1, {'d', 'o', 'w', 'n', '2'}}); // Duplicate type
+  downstream_tlvs.push_back({0xE2, {'d', 'o', 'w', 'n', '3'}});
+
+  auto downstream_src_addr = *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  auto downstream_dst_addr = *Network::Utility::resolveUrl("tcp://10.0.0.2:5678");
+
+  filter_callbacks_.connection_.stream_info_.filter_state_->setData(
+      Envoy::Network::ProxyProtocolFilterState::key(),
+      std::make_shared<Envoy::Network::ProxyProtocolFilterState>(
+          Network::ProxyProtocolDataWithVersion{
+              {downstream_src_addr, downstream_dst_addr, downstream_tlvs},
+              Network::ProxyProtocolVersion::V2}),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+
+  // Verify all TLVs are preserved (3 downstream + 2 tcp_proxy = 5 total).
+  auto& downstream_info = filter_callbacks_.connection_.streamInfo();
+  auto header =
+      downstream_info.filterState()->getDataReadOnly<Envoy::Network::ProxyProtocolFilterState>(
+          Envoy::Network::ProxyProtocolFilterState::key());
+  ASSERT_TRUE(header != nullptr);
+  auto& tlvs = header->value().tlv_vector_;
+
+  ASSERT_EQ(5, tlvs.size());
+
+  // Downstream TLVs come first.
+  EXPECT_EQ(0xE1, tlvs[0].type);
+  EXPECT_EQ("down1", std::string(tlvs[0].value.begin(), tlvs[0].value.end()));
+
+  EXPECT_EQ(0xE1, tlvs[1].type); // Duplicate type preserved
+  EXPECT_EQ("down2", std::string(tlvs[1].value.begin(), tlvs[1].value.end()));
+
+  EXPECT_EQ(0xE2, tlvs[2].type);
+  EXPECT_EQ("down3", std::string(tlvs[2].value.begin(), tlvs[2].value.end()));
+
+  // tcp_proxy TLVs appended.
+  EXPECT_EQ(0xE1, tlvs[3].type); // Same type as downstream, but both preserved
+  EXPECT_EQ("tcp_proxy_e1", std::string(tlvs[3].value.begin(), tlvs[3].value.end()));
+
+  EXPECT_EQ(0xF0, tlvs[4].type);
+  EXPECT_EQ("tcp_proxy_f0", std::string(tlvs[4].value.begin(), tlvs[4].value.end()));
 }
 
 } // namespace

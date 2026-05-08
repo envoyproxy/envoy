@@ -43,12 +43,19 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
         .expect("failed to define histogram vec"),
     })),
     "header_callbacks" => Some(Box::new(HeaderCallbacksFilterConfig {})),
+    "local_reply_callbacks" => Some(Box::new(LocalReplyCallbacksFilterConfig {})),
+    "reset_stream" => Some(Box::new(ResetStreamFilterConfig {})),
+    "send_go_away_and_close" => Some(Box::new(SendGoAwayAndCloseFilterConfig {})),
+    "recreate_stream" => Some(Box::new(RecreateStreamFilterConfig {})),
+    "socket_option_callbacks" => Some(Box::new(SocketOptionCallbacksFilterConfig {})),
+    "span_callbacks" => Some(Box::new(SpanCallbacksFilterConfig {})),
+    "cluster_callbacks" => Some(Box::new(ClusterCallbacksFilterConfig {})),
     "send_response" => Some(Box::new(SendResponseFilterConfig {})),
     "dynamic_metadata_callbacks" => Some(Box::new(DynamicMetadataCallbacksFilterConfig {})),
     "filter_state_callbacks" => Some(Box::new(FilterStateCallbacksFilterConfig {})),
     "body_callbacks" => Some(Box::new(BodyCallbacksFilterConfig {})),
     "config_init_failure" => None,
-    _ => panic!("Unknown filter name: {}", name),
+    _ => panic!("Unknown filter name: {name}"),
   }
 }
 
@@ -180,6 +187,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
     envoy_filter.clear_route_cache();
+    envoy_filter.clear_route_cluster_cache();
 
     // Test single getter API.
     let single_value = envoy_filter
@@ -237,6 +245,11 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     );
     let worker_index = envoy_filter.get_worker_index();
     assert_eq!(worker_index, 0);
+
+    // ConnectionMtls is a bool attribute; without TLS it should return None.
+    let mtls =
+      envoy_filter.get_attribute_bool(abi::envoy_dynamic_module_type_attribute_id::ConnectionMtls);
+    assert!(mtls.is_none());
 
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
@@ -435,7 +448,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseFilter {
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
     envoy_filter.send_response(
       200,
-      vec![
+      &[
         ("header1", "value1".as_bytes()),
         ("header2", "value2".as_bytes()),
       ],
@@ -443,6 +456,216 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseFilter {
       None,
     );
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+  }
+}
+
+struct LocalReplyCallbacksFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for LocalReplyCallbacksFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(LocalReplyCallbacksFilter {})
+  }
+}
+
+struct LocalReplyCallbacksFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for LocalReplyCallbacksFilter {
+  fn on_local_reply(
+    &mut self,
+    _envoy_filter: &mut EHF,
+    _response_code: u32,
+    _details: EnvoyBuffer,
+    _reset_imminent: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_local_reply_status {
+    abi::envoy_dynamic_module_type_on_http_filter_local_reply_status::ContinueAndResetStream
+  }
+}
+
+struct ResetStreamFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for ResetStreamFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(ResetStreamFilter {})
+  }
+}
+
+struct ResetStreamFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ResetStreamFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    let _unused_reason =
+      abi::envoy_dynamic_module_type_http_filter_stream_reset_reason::LocalRefusedStreamReset;
+    envoy_filter.reset_stream(
+      abi::envoy_dynamic_module_type_http_filter_stream_reset_reason::LocalReset,
+      "details",
+    );
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+}
+
+struct SendGoAwayAndCloseFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for SendGoAwayAndCloseFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(SendGoAwayAndCloseFilter {})
+  }
+}
+
+struct SendGoAwayAndCloseFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendGoAwayAndCloseFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    envoy_filter.send_go_away_and_close(true);
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+}
+
+struct RecreateStreamFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for RecreateStreamFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(RecreateStreamFilter {})
+  }
+}
+
+struct RecreateStreamFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for RecreateStreamFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    assert!(
+      envoy_filter.recreate_stream(Some(&[(":status", b"302"), ("location", b"/recreated"),]))
+    );
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+}
+
+struct SocketOptionCallbacksFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for SocketOptionCallbacksFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(SocketOptionCallbacksFilter {})
+  }
+}
+
+struct SocketOptionCallbacksFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SocketOptionCallbacksFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    assert!(envoy_filter.set_socket_option_int(
+      1,
+      2,
+      abi::envoy_dynamic_module_type_socket_option_state::Prebind,
+      abi::envoy_dynamic_module_type_socket_direction::Upstream,
+      123,
+    ));
+    assert!(envoy_filter.set_socket_option_bytes(
+      3,
+      4,
+      abi::envoy_dynamic_module_type_socket_option_state::Bound,
+      abi::envoy_dynamic_module_type_socket_direction::Upstream,
+      b"socket-bytes",
+    ));
+    assert_eq!(
+      envoy_filter.get_socket_option_int(
+        1,
+        2,
+        abi::envoy_dynamic_module_type_socket_option_state::Prebind,
+        abi::envoy_dynamic_module_type_socket_direction::Upstream,
+      ),
+      Some(123)
+    );
+    let bytes = envoy_filter.get_socket_option_bytes(
+      3,
+      4,
+      abi::envoy_dynamic_module_type_socket_option_state::Bound,
+      abi::envoy_dynamic_module_type_socket_direction::Upstream,
+    );
+    assert!(bytes.is_some());
+    assert_eq!(bytes.unwrap().as_slice(), b"socket-bytes");
+    envoy_filter.set_request_header("x-socket-option-callbacks", b"true");
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+}
+
+struct SpanCallbacksFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for SpanCallbacksFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(SpanCallbacksFilter {})
+  }
+}
+
+struct SpanCallbacksFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SpanCallbacksFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    if let Some(span) = envoy_filter.get_active_span() {
+      span.set_tag("key", "value");
+      span.set_operation("operation");
+      span.log("event");
+      span.set_sampled(true);
+      let _ = span.get_baggage("key");
+      span.set_baggage("key", "value");
+      let _ = span.get_trace_id();
+      let _ = span.get_span_id();
+      if let Some(mut child) = span.spawn_child("child") {
+        child.set_tag("child-key", "child-value");
+        child.finish();
+      }
+    }
+    envoy_filter.set_request_header("x-span-callbacks", b"true");
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+}
+
+struct ClusterCallbacksFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for ClusterCallbacksFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(ClusterCallbacksFilter {})
+  }
+}
+
+struct ClusterCallbacksFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ClusterCallbacksFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    let cluster_name = envoy_filter.get_cluster_name();
+    assert!(cluster_name.is_some());
+    assert_eq!(cluster_name.unwrap().as_slice(), b"fake_cluster");
+    let counts = envoy_filter.get_cluster_host_count(0);
+    assert!(counts.is_some());
+    let counts = counts.unwrap();
+    assert_eq!(counts.total, 3);
+    assert_eq!(counts.healthy, 2);
+    assert_eq!(counts.degraded, 1);
+    assert!(envoy_filter.set_upstream_override_host("127.0.0.1:1", false));
+    envoy_filter.set_request_header("x-cluster-callbacks", b"true");
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
 }
 
@@ -520,7 +743,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     // No namespace.
     let no_namespace = envoy_filter.get_metadata_string(
       abi::envoy_dynamic_module_type_metadata_source::Dynamic,
-      "no_namespace",
+      "ns_req_body",
       "key",
     );
     assert!(no_namespace.is_none());
@@ -551,7 +774,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     // No namespace.
     let no_namespace = envoy_filter.get_metadata_string(
       abi::envoy_dynamic_module_type_metadata_source::Dynamic,
-      "no_namespace",
+      "ns_res_header",
       "key",
     );
     assert!(no_namespace.is_none());
@@ -581,7 +804,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     // No namespace.
     let no_namespace = envoy_filter.get_metadata_string(
       abi::envoy_dynamic_module_type_metadata_source::Dynamic,
-      "no_namespace",
+      "ns_res_body",
       "key",
     );
     assert!(no_namespace.is_none());
@@ -600,6 +823,170 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
       "key",
     );
     assert!(ns_res_body.is_none());
+
+    // Test bool metadata.
+    envoy_filter.set_dynamic_metadata_bool("ns_res_body_bool", "bool_key", true);
+    let bool_val = envoy_filter.get_metadata_bool(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_res_body_bool",
+      "bool_key",
+    );
+    assert_eq!(bool_val, Some(true));
+    // Set false.
+    envoy_filter.set_dynamic_metadata_bool("ns_res_body_bool", "bool_key", false);
+    let bool_val = envoy_filter.get_metadata_bool(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_res_body_bool",
+      "bool_key",
+    );
+    assert_eq!(bool_val, Some(false));
+    // Try getting bool as string (should fail).
+    let bool_as_string = envoy_filter.get_metadata_string(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_res_body_bool",
+      "bool_key",
+    );
+    assert!(bool_as_string.is_none());
+    // Try getting bool as number (should fail).
+    let bool_as_number = envoy_filter.get_metadata_number(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_res_body_bool",
+      "bool_key",
+    );
+    assert!(bool_as_number.is_none());
+
+    // Test get_metadata_keys.
+    envoy_filter.set_dynamic_metadata_string("ns_keys_test", "k1", "v1");
+    envoy_filter.set_dynamic_metadata_number("ns_keys_test", "k2", 2.0);
+    envoy_filter.set_dynamic_metadata_bool("ns_keys_test", "k3", true);
+    let keys = envoy_filter.get_metadata_keys(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_keys_test",
+    );
+    assert!(keys.is_some());
+    let keys = keys.unwrap();
+    assert_eq!(keys.len(), 3);
+    let key_strs: Vec<&str> = keys
+      .iter()
+      .map(|k| std::str::from_utf8(k.as_slice()).unwrap())
+      .collect();
+    assert!(key_strs.contains(&"k1"));
+    assert!(key_strs.contains(&"k2"));
+    assert!(key_strs.contains(&"k3"));
+
+    // Non-existing namespace returns None.
+    let no_keys = envoy_filter.get_metadata_keys(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "non_existing_ns",
+    );
+    assert!(no_keys.is_none());
+
+    // Test get_metadata_namespaces.
+    let namespaces =
+      envoy_filter.get_metadata_namespaces(abi::envoy_dynamic_module_type_metadata_source::Dynamic);
+    assert!(namespaces.is_some());
+    let namespaces = namespaces.unwrap();
+    assert!(!namespaces.is_empty());
+    let ns_strs: Vec<&str> = namespaces
+      .iter()
+      .map(|ns| std::str::from_utf8(ns.as_slice()).unwrap())
+      .collect();
+    assert!(ns_strs.contains(&"ns_keys_test"));
+    assert!(ns_strs.contains(&"ns_res_body_bool"));
+
+    // Test list metadata: add numbers, strings, and bools to a list.
+    assert!(envoy_filter.add_dynamic_metadata_list_number("ns_list", "list_key", 1.0));
+    assert!(envoy_filter.add_dynamic_metadata_list_number("ns_list", "list_key", 2.0));
+    assert!(envoy_filter.add_dynamic_metadata_list_number("ns_list", "list_key", 3.0));
+    let size = envoy_filter.get_metadata_list_size(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_list",
+      "list_key",
+    );
+    assert_eq!(size, Some(3));
+    assert_eq!(
+      envoy_filter.get_metadata_list_number(
+        abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+        "ns_list",
+        "list_key",
+        0,
+      ),
+      Some(1.0)
+    );
+    assert_eq!(
+      envoy_filter.get_metadata_list_number(
+        abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+        "ns_list",
+        "list_key",
+        2,
+      ),
+      Some(3.0)
+    );
+    // Out of range index returns None.
+    assert!(envoy_filter
+      .get_metadata_list_number(
+        abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+        "ns_list",
+        "list_key",
+        3,
+      )
+      .is_none());
+
+    // Test string list.
+    assert!(envoy_filter.add_dynamic_metadata_list_string("ns_list", "str_list_key", "hello"));
+    assert!(envoy_filter.add_dynamic_metadata_list_string("ns_list", "str_list_key", "world"));
+    let str_val = envoy_filter.get_metadata_list_string(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_list",
+      "str_list_key",
+      0,
+    );
+    assert!(str_val.is_some());
+    assert_eq!(str_val.unwrap().as_slice(), b"hello");
+    let str_val = envoy_filter.get_metadata_list_string(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_list",
+      "str_list_key",
+      1,
+    );
+    assert!(str_val.is_some());
+    assert_eq!(str_val.unwrap().as_slice(), b"world");
+
+    // Test bool list.
+    assert!(envoy_filter.add_dynamic_metadata_list_bool("ns_list", "bool_list_key", true));
+    assert!(envoy_filter.add_dynamic_metadata_list_bool("ns_list", "bool_list_key", false));
+    assert_eq!(
+      envoy_filter.get_metadata_list_bool(
+        abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+        "ns_list",
+        "bool_list_key",
+        0,
+      ),
+      Some(true)
+    );
+    assert_eq!(
+      envoy_filter.get_metadata_list_bool(
+        abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+        "ns_list",
+        "bool_list_key",
+        1,
+      ),
+      Some(false)
+    );
+
+    // Adding to an existing non-list key returns false.
+    envoy_filter.set_dynamic_metadata_number("ns_list", "not_a_list", 42.0);
+    assert!(!envoy_filter.add_dynamic_metadata_list_number("ns_list", "not_a_list", 1.0));
+
+    // Getting list size for a non-list key returns None.
+    assert!(envoy_filter
+      .get_metadata_list_size(
+        abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+        "ns_list",
+        "not_a_list",
+      )
+      .is_none());
+
     abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
   }
 }
@@ -624,6 +1011,18 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FilterStateCallbacksFilter {
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    let typed_before =
+      envoy_filter.get_filter_state_typed(b"envoy.test.http_typed_object_for_rust");
+    assert!(typed_before.is_none());
+    let ok =
+      envoy_filter.set_filter_state_typed(b"envoy.test.http_typed_object_for_rust", b"typed_value");
+    assert!(ok);
+    let result = envoy_filter.get_filter_state_typed(b"envoy.test.http_typed_object_for_rust");
+    assert!(result.is_some());
+    assert_eq!(result.unwrap().as_slice(), b"typed_value");
+    let ok = envoy_filter.set_filter_state_typed(b"no.such.factory", b"value");
+    assert!(!ok);
+
     envoy_filter.set_filter_state_bytes(b"req_header_key", b"req_header_value");
     let filter_state = envoy_filter.get_filter_state_bytes(b"req_header_key");
     assert!(filter_state.is_some());
@@ -770,7 +1169,7 @@ impl std::io::Read for BodyReader<'_> {
       let slice = self.data[self.vec_idx].as_slice();
       let remaining = slice.len() - self.buf_idx;
       let to_copy = std::cmp::min(remaining, buf.len() - n);
-      buf[n .. n + to_copy].copy_from_slice(&slice[self.buf_idx .. self.buf_idx + to_copy]);
+      buf[n..n + to_copy].copy_from_slice(&slice[self.buf_idx..self.buf_idx + to_copy]);
       n += to_copy;
       self.buf_idx += to_copy;
       if self.buf_idx >= slice.len() {
@@ -851,29 +1250,17 @@ impl<EHF: EnvoyHttpFilter> std::io::Write for BodyWriter<'_, EHF> {
     if self.request {
       if self.received {
         if !self.envoy_filter.append_received_request_body(buf) {
-          return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "Buffer is not available",
-          ));
+          return Err(std::io::Error::other("Buffer is not available"));
         }
       } else if !self.envoy_filter.append_buffered_request_body(buf) {
-        return Err(std::io::Error::new(
-          std::io::ErrorKind::Other,
-          "Buffer is not available",
-        ));
+        return Err(std::io::Error::other("Buffer is not available"));
       }
     } else if self.received {
       if !self.envoy_filter.append_received_response_body(buf) {
-        return Err(std::io::Error::new(
-          std::io::ErrorKind::Other,
-          "Buffer is not available",
-        ));
+        return Err(std::io::Error::other("Buffer is not available"));
       }
     } else if !self.envoy_filter.append_buffered_response_body(buf) {
-      return Err(std::io::Error::new(
-        std::io::ErrorKind::Other,
-        "Buffer is not available",
-      ));
+      return Err(std::io::Error::other("Buffer is not available"));
     }
 
     Ok(buf.len())
@@ -897,7 +1284,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
         let mut reader = BodyReader::new(body.unwrap());
         let mut buf = vec![0; 1024];
         let n = std::io::Read::read(&mut reader, &mut buf).unwrap();
-        self.request_body.extend_from_slice(&buf[.. n]);
+        self.request_body.extend_from_slice(&buf[..n]);
         // Drop the reader and try writing to the writer.
         drop(reader);
 
@@ -916,7 +1303,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
         let mut reader = BodyReader::new(body.unwrap());
         let mut buf = vec![0; 1024];
         let n = std::io::Read::read(&mut reader, &mut buf).unwrap();
-        self.request_body.extend_from_slice(&buf[.. n]);
+        self.request_body.extend_from_slice(&buf[..n]);
         // Drop the reader and try writing to the writer.
         drop(reader);
 

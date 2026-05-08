@@ -28,6 +28,7 @@
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
+#include "source/extensions/filters/common/processing_effect/processing_effect.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -49,13 +50,62 @@ namespace ExtAuthz {
   COUNTER(filter_state_name_collision)                                                             \
   COUNTER(omitted_response_headers)                                                                \
   COUNTER(request_header_limits_reached)                                                           \
-  COUNTER(response_header_limits_reached)
+  COUNTER(response_header_limits_reached)                                                          \
+  COUNTER(shadow_denied)                                                                           \
+  COUNTER(shadow_error)
 
 /**
  * Wrapper struct for ext_authz filter stats. @see stats_macros.h
  */
 struct ExtAuthzFilterStats {
   ALL_EXT_AUTHZ_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
+ * Shadow-mode authorization decision carried in FilterState when
+ * ``shadow_mode`` is enabled. A downstream filter reads this object and
+ * decides whether to enforce the decision.
+ */
+class ShadowDecisionObject : public Envoy::StreamInfo::FilterState::Object {
+public:
+  using ShadowDecisionProto = envoy::extensions::filters::http::ext_authz::v3::ShadowDecision;
+
+  ShadowDecisionObject(ShadowDecisionProto::CheckResult check_result, Http::Code status_code,
+                       Filters::Common::ExtAuthz::UnsafeHeaderVector response_headers)
+      : check_result_(check_result), status_code_(status_code),
+        response_headers_(std::move(response_headers)) {}
+
+  ShadowDecisionProto::CheckResult checkResult() const { return check_result_; }
+  Http::Code statusCode() const { return status_code_; }
+  const Filters::Common::ExtAuthz::UnsafeHeaderVector& responseHeaders() const {
+    return response_headers_;
+  }
+
+  ProtobufTypes::MessagePtr serializeAsProto() const override;
+
+  absl::optional<std::string> serializeAsString() const override;
+
+  // Expose check_result and status_code as individual fields so access-log formatters
+  // and CEL expressions can read them without paying the cost of serializing the full
+  // ShadowDecision to JSON.
+  bool hasFieldSupport() const override { return true; }
+  Envoy::StreamInfo::FilterState::Object::FieldType
+  getField(absl::string_view field_name) const override {
+    if (field_name == "check_result") {
+      return absl::string_view(ShadowDecisionProto::CheckResult_Name(check_result_));
+    }
+    if (field_name == "status_code" && status_code_ != static_cast<Http::Code>(0)) {
+      return int64_t(static_cast<uint32_t>(status_code_));
+    }
+    return {};
+  }
+
+private:
+  void populateProto(ShadowDecisionProto& msg) const;
+
+  const ShadowDecisionProto::CheckResult check_result_;
+  const Http::Code status_code_;
+  const Filters::Common::ExtAuthz::UnsafeHeaderVector response_headers_;
 };
 
 class ExtAuthzLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
@@ -71,6 +121,11 @@ public:
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const { return upstream_host_; }
   // Gets the gRPC status returned by the authorization server when it is making a gRPC call.
   const absl::optional<Grpc::Status::GrpcStatus>& grpcStatus() const { return grpc_status_; }
+  // Returns true if the ext_authz stream failed open.
+  bool failedOpen() const { return failed_open_; }
+  const Filters::Common::ProcessingEffect::Effect& requestProcessingEffect() const {
+    return last_req_processing_effect_;
+  }
 
   void setLatency(std::chrono::microseconds ms) { latency_ = ms; };
   void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
@@ -80,6 +135,10 @@ public:
   }
   void setUpstreamHost(Upstream::HostDescriptionConstSharedPtr upstream_host) {
     upstream_host_ = std::move(upstream_host);
+  }
+  void setFailedOpen() { failed_open_ = true; }
+  void setReqProcessingEffect(const Filters::Common::ProcessingEffect::Effect effect) {
+    last_req_processing_effect_ = effect;
   }
   // Sets the gRPC status returned by the authorization server when it is making a gRPC call.
   void setGrpcStatus(const Grpc::Status::GrpcStatus& grpc_status) { grpc_status_ = grpc_status; }
@@ -107,6 +166,8 @@ public:
 private:
   const absl::optional<Envoy::Protobuf::Struct> filter_metadata_;
   absl::optional<std::chrono::microseconds> latency_;
+  // The last processing effect applied to the request by the ext_authz filter.
+  Filters::Common::ProcessingEffect::Effect last_req_processing_effect_{};
   // The following stats are populated for ext_authz filters using Envoy gRPC only.
   absl::optional<uint64_t> bytes_sent_;
   absl::optional<uint64_t> bytes_received_;
@@ -114,6 +175,8 @@ private:
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   // The gRPC status returned by the authorization server when it is making a gRPC call.
   absl::optional<Grpc::Status::GrpcStatus> grpc_status_;
+  // True if the call failed open.
+  bool failed_open_{false};
 };
 
 /**
@@ -132,6 +195,8 @@ public:
   bool withRequestBody() const { return max_request_bytes_ > 0; }
 
   bool failureModeAllow() const { return failure_mode_allow_; }
+
+  bool shadowMode() const { return shadow_mode_; }
 
   bool failureModeAllowHeaderAdd() const { return failure_mode_allow_header_add_; }
 
@@ -250,6 +315,7 @@ private:
   const bool allow_partial_message_;
   const bool failure_mode_allow_;
   const bool failure_mode_allow_header_add_;
+  const bool shadow_mode_;
   const bool clear_route_cache_;
   const uint32_t max_request_bytes_;
   const uint32_t max_denied_response_body_bytes_;
@@ -461,15 +527,21 @@ private:
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
   void initiateCall(const Http::RequestHeaderMap& headers);
   void continueDecoding();
+  // In shadow mode, writes the authorization decision and response attributes into
+  // FilterState and increments the appropriate shadow stat counter. Takes the response
+  // by non-const reference so we can std::move ``headers_to_set`` into the object instead
+  // of copying.
+  void setShadowFilterState(Filters::Common::ExtAuthz::Response& response);
   bool isBufferFull(uint64_t num_bytes_processing) const;
   void updateLoggingInfo(const absl::optional<Grpc::Status::GrpcStatus>& grpc_status);
+  void updateEffect(const Filters::Common::ProcessingEffect::Effect effect);
 
   // This holds a set of flags defined in per-route configuration.
   struct PerRouteFlags {
     const bool skip_check_;
     const envoy::extensions::filters::http::ext_authz::v3::CheckSettings& check_settings_;
   };
-  PerRouteFlags getPerRouteFlags(const Router::RouteConstSharedPtr& route) const;
+  PerRouteFlags getPerRouteFlags(OptRef<const Router::Route> route) const;
 
   // State of this filter's communication with the external authorization service.
   // The filter has either not started calling the external service, in the middle of calling

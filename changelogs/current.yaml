@@ -2,78 +2,174 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-- area: tcp_proxy
-  change: |
-    The TCP proxy filter now requires :ref:`max_early_data_bytes
-    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_early_data_bytes>` to be
-    explicitly set when using :ref:`upstream_connect_mode
-    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_mode>` modes
-    other than ``IMMEDIATE`` (i.e., ``ON_DOWNSTREAM_DATA`` or ``ON_DOWNSTREAM_TLS_HANDSHAKE``). The field
-    can be set to zero to disable early data buffering while still using delayed connection modes.
-    Configurations using these modes without ``max_early_data_bytes`` will now fail validation at startup.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
-- area: histograms
+- area: router
   change: |
-    Update of libcircllhist to 0.3.2 has changed how bucket bounds are interpreted. This should not have an impact on
-    production monitoring if the number of samples in the histograms is high. Affected tests were adjusted to account for
-    histogram changes.
+    The upstream transport failure reason (e.g. TLS certificate validation errors) is no longer included
+    in the HTTP response body sent to downstream clients. It remains available in access logs via
+    ``%UPSTREAM_TRANSPORT_FAILURE_REASON%``. This behavioral change can be temporarily reverted by setting
+    runtime guard ``envoy.reloadable_features.hide_transport_failure_reason_in_response_body`` to ``false``.
+    This is being changed because in many cases the upstream failure details are inappropriate to send to
+    the downstream client as it discloses too many internal details.
+- area: golang
+  change: |
+    Reduced the per-cgo-call mutex acquisition on the Golang HTTP filter by making the
+    ``has_destroyed_`` flag a ``std::atomic<bool>``. CAPI methods whose only Envoy-side work is
+    Filter-owned or runs on the worker thread (``setHeader``, ``removeHeader``, ``setTrailer``,
+    ``removeTrailer``, ``addData``, ``injectData``, ``continueStatus``, ``sendLocalReply``,
+    ``setBufferHelper``, ``copyBuffer``, ``drainBuffer``, ``setUpstreamOverrideHost``,
+    ``clearRouteCache``, ``setDynamicMetadata``, ``setStringFilterState``) no longer take the
+    mutex, eliminating an uncontended atomic compare-and-swap pair on every such call. The
+    mutex is retained on the CAPI methods that inline-dereference Envoy-stream-owned objects
+    from off-thread (``getHeader``, ``copyHeaders``, ``copyTrailers``, ``getIntegerValue``,
+    ``setDrainConnectionUponCompletion``) where it serialises against ``onDestroy`` to prevent
+    the worker thread from freeing the underlying header map or ``StreamInfo`` mid-access, and
+    on the five methods that write to the per-request ``strValue`` scratch buffer
+    (``getStringValue``, ``getDynamicMetadata``, ``getStringFilterState``, ``getStringProperty``,
+    ``getSecret``).
+- area: stats
+  change: |
+    Optimized prometheus stats endpoint. Users should see a roughly 30-40% latency improvement in calls to the endpoint
+    for cases where the scrape results in lots of cluster stats.
+    There should be no visible changes to users, or incompatibilities.
+- area: tls
+  change: |
+    ``SslSocket`` now reports ``ECONNRESET`` as ``ConnectionReset`` by reading the system error
+    code from BoringSSL's error queue, matching ``RawBufferSocket`` behavior. When a connection
+    is closed with ``ConnectionCloseType::AbortReset``, ``SslSocket`` also skips the TLS
+    ``close_notify`` shutdown so the peer reliably observes a TCP RST instead of racing a
+    graceful close against the reset.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.ssl_socket_report_connection_reset`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
-- area: http
+- area: load_report
   change: |
-    Fixed a potential file descriptor leak where HTTP/1.1 connections with zombie streams (waiting for codec completion)
-    would not be properly closed when in draining state. This could occur when a response was sent before the request
-    was fully received, causing connections to remain open indefinitely. This behavior change can be temporarily reverted
-    by setting the runtime guard ``envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete`` to ``false``.
-- area: drop_overload
+    Fixed a bug in load stats reporting where reports were dropped if only custom metrics or completed
+    requests were present in a reporting interval. This behavioral change can be reverted by setting
+    the runtime guard ``envoy.reloadable_features.report_load_for_non_zero_stats`` to ``false``.
+- area: build
   change: |
-    Fixed a bug that drop_overload failed to use cached EDS resources.
-- area: http
+    Fixed ``Illegal ambiguous match`` error when building contrib targets with ``--config=aws-lc-fips``
+    on aarch64 by restricting the ``using_aws_lc`` branch of ``SELECTED_CONTRIB_EXTENSIONS`` to
+    ``linux_x86_64``. Mirrors the approach taken by #32382 for ``boringssl_fips``.
+- area: dynamic_modules
   change: |
-    Fixed upstream client to not close connection when idle timeout fires before the connection is established.
-    This behavior can be reverted by setting the runtime guard
-    ``envoy.reloadable_features.codec_client_enable_idle_timer_only_when_connected`` to ``false``.
-- area: ext_authz
+    Fixed a crashing bug in the HTTP filter when a stream was already above the downstream write-buffer
+    high watermark at filter-chain construction time. Downstream watermark callback registration is
+    now deferred until the in-module filter has been constructed.
+- area: dynamic_modules
   change: |
-    Fixed a bug where headers from a denied authorization response (non-200s) were not properly propagated to the client.
+    Fixed a bug where the HTTP filter per-route configuration and the upstream HTTP TCP bridge
+    configuration did not handle the ``google.protobuf.Struct`` configuration message as the API
+    definition requires. Both factories now serialize the ``Struct`` to a JSON string and pass the
+    string to the dynamic module side as the configuration, matching the behavior already in place
+    for every other dynamic module extension factory.
+- area: oauth2
+  change: |
+    Fixed a crash in the OAuth2 filter where AES-CBC decryption of token cookies could spuriously
+    succeed (~1/256) when the configured HMAC secret did not match the secret used to encrypt the
+    cookie (for example after secret rotation, or when receiving legacy unencrypted tokens). The
+    resulting binary "plaintext" was written back into the ``Cookie:`` request header and tripped a
+    ``HeaderString`` validation assert. Such plaintexts are now rejected and the original cookie value
+    is preserved, matching the behavior already documented for the explicit decryption-failure case.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
-- area: stats
+- area: tcp_proxy
   change: |
-    Added support to limit the number of stats stored in each stats scope in the stats libarary.
+    Added :ref:`check_drain_close
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.check_drain_close>` to the TCP proxy
+    filter to close downstream connections with ``FlushWrite`` when the drain manager requests drain close during
+    downstream read or write handling.
+- area: stat_sinks
+  change: |
+    Added :ref:`max_data_points_per_request
+    <envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.max_data_points_per_request>`
+    configuration to the OpenTelemetry stat sink to chunk metric export requests.
+- area: set_metadata_filter
+  change: |
+    Added :ref:`per-route configuration support <envoy_v3_api_msg_extensions.filters.http.set_metadata.v3.Config>`
+    to the ``set_metadata`` HTTP filter.
+- area: logging
+  change: |
+    Added ``%N`` as a custom spdlog pattern flag that emits the Envoy version string. It can be
+    used in the ``--log-format`` CLI flag or the bootstrap ``application_log_config.log_format``
+    to include the running version in every log line, e.g. ``--log-format "[%N][%l] %v"``.
+- area: dynamic_modules
+  change: |
+    Added ``envoy_dynamic_module_callback_is_validation_mode`` ABI callback that allows dynamic
+    modules to check if the server is running in config validation mode.
+- area: access_log
+  change: |
+    Supported the singleton stats scope in the :ref:`stats access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>`.
+- area: stat_sinks
+  change: |
+    Added a new :ref:`WASM stats filter <config_stat_sinks_wasm_filter>` contrib extension
+    (``envoy.stat_sinks.wasm_filter``) that acts as programmable middleware between
+    the metrics snapshot and any inner stats sink. A user-supplied WASM plugin can:
+    filter metrics by index, inject global tags from node metadata
+    (``stats_filter_set_global_tags``), rename metrics (``stats_filter_set_name_overrides``),
+    inject synthetic counters/gauges (``stats_filter_inject_metrics``), and filter
+    histograms (``stats_filter_get_histograms``). This enables moving centralized
+    metric processing logic (tag enrichment, name rewriting, custom metric injection)
+    into the proxy itself. Configured via
+    :ref:`WasmFilterStatsSinkConfig <envoy_v3_api_msg_extensions.stat_sinks.wasm_filter.v3.WasmFilterStatsSinkConfig>`.
+- area: mysql_proxy
+  change: |
+    Added SSL termination support to the MySQL proxy filter with RSA-mediated ``caching_sha2_password``
+    authentication. The filter can now terminate downstream TLS connections using the
+    :ref:`starttls transport socket <envoy_v3_api_msg_extensions.transport_sockets.starttls.v3.StartTlsConfig>`
+    and transparently mediate MySQL 8.0+ ``caching_sha2_password`` full authentication by performing
+    RSA public key exchange on behalf of the client. Added a new
+    :ref:`downstream_ssl <envoy_v3_api_field_extensions.filters.network.mysql_proxy.v3.MySQLProxy.downstream_ssl>`
+    config option with ``DISABLE``, ``REQUIRE``, and ``ALLOW`` modes.
+- area: quic
+  change: |
+    Added support for TLS session ticket resumption in QUIC using configured session ticket keys from
+    :ref:`session_ticket_keys <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.session_ticket_keys>`.
+    This enables faster reconnection across server instances by allowing clients to resume TLS sessions
+    without full handshakes. The feature is disabled by default and can be enabled by setting runtime guard
+    ``envoy.reloadable_features.quic_session_ticket_support`` to ``true``.
+- area: composite
+  change: |
+    Added support for the
+    :ref:`inline matcher <envoy_v3_api_field_extensions.filters.http.composite.v3.Composite.matcher>`
+    in the composite HTTP filter. Now users could specify the matcher inline in the filter configuration
+    instead of using the :ref:`ExtensionWithMatcher
+    <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` filter.
+- area: resource_monitors
+  change: |
+    Overload manager fixed heap resource monitor now supports :ref:`max_heap_size_bytes_runtime
+    <envoy_v3_api_field_extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig.max_heap_size_bytes_runtime>`
+    for runtime-overridable max heap size (e.g. RTDS or ``/runtime_modify``).
+- area: jwt_authn
+  change: |
+    Added :ref:`verification_status_header
+    <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.ExtractOnlyWithoutValidation.verification_status_header>`
+    to the ``ExtractOnlyWithoutValidation`` requirement. When a JWT is present in the request but fails
+    signature verification, the named request header (default ``x-jwt-signature-verified``) is set to
+    ``false`` so downstream filters (RBAC, ext_authz) can distinguish forwarded-but-unverified claims
+    from validated ones. The header is not set on a successfully verified JWT or when no JWT is present.
+    This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.jwt_authn_add_verification_status_header`` to ``false``.
+- area: access_log
+  change: |
+    Added ``%UPSTREAM_SERVER_NAME%`` access log formatter returning the SNI from the established upstream
+    TLS connection.
+- area: attributes
+  change: |
+    Added ``upstream.server_name`` CEL attribute returning the SNI from the established upstream
+    TLS connection.
+
 - area: tls
   change: |
-    Added support for fetching certificates on-demand via SDS in the upstream TLS transport socket
-    using the extension :ref:`on-demand certificate selector
-    <extension_envoy.tls.certificate_selectors.on_demand_secret>`.
-- area: mcp_router
-  change: |
-    Added support for MCP resource methods ``resources/list``, ``resources/read``,
-    ``resources/subscribe``, and ``resources/unsubscribe``.
-- area: mcp_router
-  change: |
-    Added support for MCP prompt methods ``prompts/list`` and ``prompts/get``.
-- area: mcp_router
-  change: |
-    Added support for MCP client-to-server notification methods ``notifications/cancelled``
-    and ``notifications/roots/list_changed``.
-- area: formatter
-  change: |
-    Extended ``*_WITHOUT_PORT`` address formatters to accept an optional ``MASK_PREFIX_LEN`` parameter that masks IP addresses
-    and returns them in CIDR notation (e.g., ``%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(16)%`` returns ``10.1.0.0/16`` for
-    client IP ``10.1.10.23``).
-- area: formatter
-  change: |
-    Added the new access log formatter support of ``DOWNSTREAM_LOCAL_CLOSE_REASON``.
-- area: formatter
-  change: |
-    Added ``%DOWNSTREAM_DETECTED_CLOSE_TYPE%`` to expose the detected close type
-    of downstream and connections. The possible values are ``Normal``, ``LocalReset``, and ``RemoteReset``.
+    Added substitution commands ``%DOWNSTREAM_TLS_GROUP%`` and ``%UPSTREAM_TLS_GROUP%``. The TLS group may be used
+    to discern if a TLS connection used a post quantum safe key exchange (e.g. X25519MLKEM768).
 
 deprecated:

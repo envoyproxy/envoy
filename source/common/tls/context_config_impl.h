@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -30,11 +31,12 @@ struct CertificateValidationContextConfigProviderSharedPtrWithName {
   Secret::CertificateValidationContextConfigProviderSharedPtr provider_;
 };
 
-class ContextConfigImpl : public virtual Ssl::ContextConfig {
+class ContextConfigImpl : public virtual Ssl::ContextConfig,
+                          public Logger::Loggable<Logger::Id::misc> {
 public:
   // Ssl::ContextConfig
   const std::string& alpnProtocols() const override { return alpn_protocols_; }
-  const std::string& cipherSuites() const override { return cipher_suites_; }
+  const std::string& cipherSuites() const override { return *cipher_suites_; }
   const std::string& ecdhCurves() const override { return ecdh_curves_; }
   const std::string& signatureAlgorithms() const override { return signature_algorithms_; }
   absl::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
@@ -103,7 +105,7 @@ private:
       unsigned default_version);
 
   const std::string alpn_protocols_;
-  const std::string cipher_suites_;
+  const std::shared_ptr<const std::string> cipher_suites_;
   const std::string ecdh_curves_;
   const std::string signature_algorithms_;
 

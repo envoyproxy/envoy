@@ -72,6 +72,32 @@ TEST(ConfigTest, FlushAccessLogOnConnected) {
   }
 }
 
+TEST(ConfigTest, FlushAccessLogOnStart) {
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+
+  {
+    const std::string yaml = R"EOF(
+      stat_prefix: name
+      cluster: foo
+    )EOF";
+
+    Config config_obj(constructConfigFromYaml(yaml, factory_context));
+    EXPECT_FALSE(config_obj.sharedConfig()->flushAccessLogOnStart());
+  }
+
+  {
+    const std::string yaml = R"EOF(
+      stat_prefix: name
+      cluster: foo
+      access_log_options:
+        flush_access_log_on_start: true
+    )EOF";
+
+    Config config_obj(constructConfigFromYaml(yaml, factory_context));
+    EXPECT_TRUE(config_obj.sharedConfig()->flushAccessLogOnStart());
+  }
+}
+
 TEST(ConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedFlushAccessLogOnConnected)) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
@@ -838,18 +864,20 @@ TEST_F(TcpProxyNonDeprecatedConfigRoutingTest, ClusterNameSet) {
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
               tcpConnPool(_, _, _))
       .WillOnce(Return(absl::nullopt));
-  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info;
+  Upstream::ClusterInfoConstSharedPtr cluster_info;
   EXPECT_CALL(connection_.stream_info_, setUpstreamClusterInfo(_))
       .WillOnce(
           Invoke([&cluster_info](const Upstream::ClusterInfoConstSharedPtr& upstream_cluster_info) {
             cluster_info = upstream_cluster_info;
           }));
   EXPECT_CALL(connection_.stream_info_, upstreamClusterInfo())
-      .WillOnce(ReturnPointee(&cluster_info));
+      .WillOnce([&cluster_info]() -> OptRef<const Upstream::ClusterInfo> {
+        return makeOptRefFromPtr<const Upstream::ClusterInfo>(cluster_info.get());
+      });
 
   filter_->onNewConnection();
 
-  EXPECT_EQ(connection_.stream_info_.upstreamClusterInfo().value()->name(), "fake_cluster");
+  EXPECT_EQ(connection_.stream_info_.upstreamClusterInfo()->name(), "fake_cluster");
 }
 
 class TcpProxyHashingTest : public testing::Test {

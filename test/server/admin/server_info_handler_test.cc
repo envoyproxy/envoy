@@ -139,6 +139,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
     TestUtility::loadFromJson(body, server_info_proto);
     EXPECT_EQ(server_info_proto.state(), envoy::admin::v3::ServerInfo::LIVE);
     EXPECT_EQ(server_info_proto.hot_restart_version(), "foo_version");
+    EXPECT_FALSE(server_info_proto.hot_restart_initializing());
     EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
     EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), local_info.clusterName());
     EXPECT_EQ(server_info_proto.command_line_options().service_cluster(),
@@ -192,6 +193,55 @@ TEST_P(AdminInstanceTest, GetRequest) {
   EXPECT_EQ(server_info_proto.command_line_options().service_zone(), "");
   EXPECT_EQ(server_info_proto.node().id(), local_info.nodeName());
   EXPECT_EQ(server_info_proto.node().locality().zone(), local_info.zoneName());
+}
+
+TEST_P(AdminInstanceTest, ServerInfoHotRestartInitializing) {
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  EXPECT_CALL(server_, localInfo()).WillRepeatedly(ReturnRef(local_info));
+  EXPECT_CALL(server_.options_, toCommandLineOptions()).WillRepeatedly(Invoke([&local_info] {
+    Server::CommandLineOptionsPtr command_line_options =
+        std::make_unique<envoy::admin::v3::CommandLineOptions>();
+    command_line_options->set_restart_epoch(2);
+    command_line_options->set_service_cluster(local_info.clusterName());
+    return command_line_options;
+  }));
+  NiceMock<Init::MockManager> initManager;
+  ON_CALL(server_, initManager()).WillByDefault(ReturnRef(initManager));
+  ON_CALL(server_.hot_restart_, version()).WillByDefault(Return("foo_version"));
+
+  {
+    // Test when hot restart is initializing
+    Http::TestResponseHeaderMapImpl response_headers;
+    std::string body;
+
+    ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initializing));
+    ON_CALL(server_.hot_restart_, isInitializing()).WillByDefault(Return(true));
+    EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
+    envoy::admin::v3::ServerInfo server_info_proto;
+    EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("application/json"));
+
+    TestUtility::loadFromJson(body, server_info_proto);
+    EXPECT_EQ(server_info_proto.state(), envoy::admin::v3::ServerInfo::INITIALIZING);
+    EXPECT_TRUE(server_info_proto.hot_restart_initializing());
+    EXPECT_EQ(server_info_proto.hot_restart_version(), "foo_version");
+  }
+
+  {
+    // Test when hot restart is not initializing
+    Http::TestResponseHeaderMapImpl response_headers;
+    std::string body;
+
+    ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initialized));
+    ON_CALL(server_.hot_restart_, isInitializing()).WillByDefault(Return(false));
+    EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
+    envoy::admin::v3::ServerInfo server_info_proto;
+    EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("application/json"));
+
+    TestUtility::loadFromJson(body, server_info_proto);
+    EXPECT_EQ(server_info_proto.state(), envoy::admin::v3::ServerInfo::LIVE);
+    EXPECT_FALSE(server_info_proto.hot_restart_initializing());
+    EXPECT_EQ(server_info_proto.hot_restart_version(), "foo_version");
+  }
 }
 
 TEST_P(AdminInstanceTest, PostRequest) {

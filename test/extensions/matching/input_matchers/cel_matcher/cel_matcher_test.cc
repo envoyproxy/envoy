@@ -19,8 +19,10 @@
 #include "test/mocks/matcher/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "xds/type/matcher/v3/matcher.pb.validate.h"
 
@@ -34,6 +36,7 @@ using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::TestResponseHeaderMapImpl;
 using ::Envoy::Http::TestResponseTrailerMapImpl;
+using ::Envoy::Matcher::HasInsufficientData;
 using ::Envoy::Matcher::HasNoMatch;
 using ::Envoy::Matcher::HasStringAction;
 
@@ -147,7 +150,7 @@ public:
     Envoy::Config::Metadata::mutableMetadataValue(metadata_, namespace_str, metadata_key)
         .set_string_value(metadata_value);
     EXPECT_CALL(*route_, metadata()).WillRepeatedly(testing::ReturnPointee(&metadata_));
-    EXPECT_CALL(stream_info_, route()).WillRepeatedly(testing::ReturnPointee(&route_));
+    stream_info_.route_ = route_;
   }
 
   void setDynamicMetadata(const std::string& namespace_str, const std::string& metadata_key,
@@ -205,8 +208,6 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderNotMatched) {
 TEST_F(CelMatcherTest, CelMatcherClusterMetadataMatched) {
   setUpstreamClusterMetadata(std::string(kFilterNamespace), std::string(kMetadataKey),
                              std::string(kMetadataValue));
-  Envoy::Http::Matching::HttpMatchingDataImpl data =
-      Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree(absl::StrFormat(
       UpstreamClusterMetadataCelString, kFilterNamespace, kMetadataKey, kMetadataValue));
   EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
@@ -215,8 +216,6 @@ TEST_F(CelMatcherTest, CelMatcherClusterMetadataMatched) {
 TEST_F(CelMatcherTest, CelMatcherClusterMetadataNotMatched) {
   setUpstreamClusterMetadata(std::string(kFilterNamespace), std::string(kMetadataKey),
                              "wrong_service");
-  Envoy::Http::Matching::HttpMatchingDataImpl data =
-      Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree(absl::StrFormat(
       UpstreamClusterMetadataCelString, kFilterNamespace, kMetadataKey, kMetadataValue));
 
@@ -226,8 +225,6 @@ TEST_F(CelMatcherTest, CelMatcherClusterMetadataNotMatched) {
 TEST_F(CelMatcherTest, CelMatcherRouteMetadataMatched) {
   setUpstreamRouteMetadata(std::string(kFilterNamespace), std::string(kMetadataKey),
                            std::string(kMetadataValue));
-  Envoy::Http::Matching::HttpMatchingDataImpl data =
-      Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree(absl::StrFormat(
       UpstreamRouteMetadataCelString, kFilterNamespace, kMetadataKey, kMetadataValue));
   EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
@@ -236,8 +233,6 @@ TEST_F(CelMatcherTest, CelMatcherRouteMetadataMatched) {
 TEST_F(CelMatcherTest, CelMatcherRouteMetadataNotMatched) {
   setUpstreamRouteMetadata(std::string(kFilterNamespace), std::string(kMetadataKey),
                            "wrong_service");
-  Envoy::Http::Matching::HttpMatchingDataImpl data =
-      Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree(absl::StrFormat(
       UpstreamClusterMetadataCelString, kFilterNamespace, kMetadataKey, kMetadataValue));
 
@@ -247,8 +242,6 @@ TEST_F(CelMatcherTest, CelMatcherRouteMetadataNotMatched) {
 TEST_F(CelMatcherTest, CelMatcherDynamicMetadataMatched) {
   setDynamicMetadata(std::string(kFilterNamespace), std::string(kMetadataKey),
                      std::string(kMetadataValue));
-  Envoy::Http::Matching::HttpMatchingDataImpl data =
-      Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree(
       absl::StrFormat(DynamicMetadataCelString, kFilterNamespace, kMetadataKey, kMetadataValue));
   EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
@@ -256,8 +249,6 @@ TEST_F(CelMatcherTest, CelMatcherDynamicMetadataMatched) {
 
 TEST_F(CelMatcherTest, CelMatcherDynamicMetadataNotMatched) {
   setDynamicMetadata(std::string(kFilterNamespace), std::string(kMetadataKey), "wrong_service");
-  Envoy::Http::Matching::HttpMatchingDataImpl data =
-      Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree(
       absl::StrFormat(DynamicMetadataCelString, kFilterNamespace, kMetadataKey, kMetadataValue));
 
@@ -271,8 +262,6 @@ TEST_F(CelMatcherTest, CelMatcherTypedDynamicMetadataMatched) {
   typed_metadata.PackFrom(pipe);
   stream_info_.metadata_.mutable_typed_filter_metadata()->insert(
       {std::string(kFilterNamespace), typed_metadata});
-  Envoy::Http::Matching::HttpMatchingDataImpl data =
-      Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree(absl::StrFormat(
       TypedDynamicMetadataCelString, kFilterNamespace, "path", "/foo/bar/baz.fads"));
   EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
@@ -310,8 +299,95 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderPathNotMatched) {
   EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
 }
 
+TEST_F(CelMatcherTest, CelMatcherRequestInsufficientDataResponseHeaderMatched) {
+  auto matcher_tree = buildMatcherTree(ResponseHeaderAndPathCelExprString);
+
+  TestRequestHeaderMapImpl request_headers;
+  buildCustomHeader({{":path", "/foo"}}, request_headers);
+  data_.onRequestHeaders(request_headers);
+
+  EXPECT_THAT(matcher_tree->match(data_), HasInsufficientData());
+
+  TestResponseHeaderMapImpl response_headers;
+  response_headers.addCopy(LowerCaseString(":status"), "200");
+  response_headers.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers.addCopy(LowerCaseString("content-length"), "3");
+  data_.onResponseHeaders(response_headers);
+
+  EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
+}
+
+TEST_F(CelMatcherTest, CelMatcherRequestNoInsufficientDataIfRuntimeGuardFalse) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_cel_response_path_matching", "false"}});
+  auto matcher_tree = buildMatcherTree(ResponseHeaderAndPathCelExprString);
+
+  TestRequestHeaderMapImpl request_headers;
+  buildCustomHeader({{":path", "/foo"}}, request_headers);
+  data_.onRequestHeaders(request_headers);
+
+  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
+}
+
+TEST_F(CelMatcherTest, CelMatcherRequestInsufficientDataResponseHeaderNotMatched) {
+  auto matcher_tree = buildMatcherTree(ResponseHeaderAndPathCelExprString);
+
+  TestRequestHeaderMapImpl request_headers;
+  buildCustomHeader({{":path", "/foo"}}, request_headers);
+  data_.onRequestHeaders(request_headers);
+
+  EXPECT_THAT(matcher_tree->match(data_), HasInsufficientData());
+
+  TestResponseHeaderMapImpl response_headers;
+  response_headers.addCopy(LowerCaseString(":status"), "200");
+  response_headers.addCopy(LowerCaseString("content-type"), "text/html");
+  response_headers.addCopy(LowerCaseString("content-length"), "3");
+  data_.onResponseHeaders(response_headers);
+
+  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
+}
+
+TEST_F(CelMatcherTest, CelMatcherWithResponseShortCircuitedWithMatchingRequest) {
+  auto matcher_tree = buildMatcherTree(ResponseHeaderOrPathCelExprString);
+
+  TestRequestHeaderMapImpl request_headers;
+  buildCustomHeader({{":path", "/foo"}}, request_headers);
+  data_.onRequestHeaders(request_headers);
+
+  EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
+}
+
+TEST_F(CelMatcherTest, CelMatcherNoMatchRequestButOrResponseMatches) {
+  auto matcher_tree = buildMatcherTree(ResponseHeaderOrPathCelExprString);
+
+  TestRequestHeaderMapImpl request_headers;
+  buildCustomHeader({{":path", "/bar"}}, request_headers);
+  data_.onRequestHeaders(request_headers);
+
+  EXPECT_THAT(matcher_tree->match(data_), HasInsufficientData());
+
+  TestResponseHeaderMapImpl response_headers;
+  response_headers.addCopy(LowerCaseString(":status"), "200");
+  response_headers.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers.addCopy(LowerCaseString("content-length"), "3");
+  data_.onResponseHeaders(response_headers);
+
+  EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
+}
+
+TEST_F(CelMatcherTest, CelMatcherWithResponseShortCircuitedWithNonMatchingRequest) {
+  auto matcher_tree = buildMatcherTree(ResponseHeaderAndPathCelExprString);
+
+  TestRequestHeaderMapImpl request_headers;
+  buildCustomHeader({{":path", "/bar"}}, request_headers);
+  data_.onRequestHeaders(request_headers);
+
+  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
+}
+
 TEST_F(CelMatcherTest, CelMatcherResponseHeaderMatched) {
-  auto matcher_tree = buildMatcherTree(ReponseHeaderCelExprString);
+  auto matcher_tree = buildMatcherTree(ResponseHeaderCelExprString);
 
   TestResponseHeaderMapImpl response_headers;
   response_headers.addCopy(LowerCaseString(":status"), "200");
@@ -323,7 +399,7 @@ TEST_F(CelMatcherTest, CelMatcherResponseHeaderMatched) {
 }
 
 TEST_F(CelMatcherTest, CelMatcherResponseHeaderNotMatched) {
-  auto matcher_tree = buildMatcherTree(ReponseHeaderCelExprString);
+  auto matcher_tree = buildMatcherTree(ResponseHeaderCelExprString);
 
   TestResponseHeaderMapImpl response_headers = {{"content-type", "text/html"}};
   data_.onResponseHeaders(response_headers);
@@ -332,7 +408,7 @@ TEST_F(CelMatcherTest, CelMatcherResponseHeaderNotMatched) {
 }
 
 TEST_F(CelMatcherTest, CelMatcherResponseTrailerMatched) {
-  auto matcher_tree = buildMatcherTree(ReponseTrailerCelExprString);
+  auto matcher_tree = buildMatcherTree(ResponseTrailerCelExprString);
 
   TestResponseTrailerMapImpl response_trailers = {{"transfer-encoding", "chunked"}};
   data_.onResponseTrailers(response_trailers);
@@ -341,7 +417,7 @@ TEST_F(CelMatcherTest, CelMatcherResponseTrailerMatched) {
 }
 
 TEST_F(CelMatcherTest, CelMatcherResponseTrailerNotMatched) {
-  auto matcher_tree = buildMatcherTree(ReponseTrailerCelExprString);
+  auto matcher_tree = buildMatcherTree(ResponseTrailerCelExprString);
 
   TestResponseTrailerMapImpl response_trailers = {{"transfer-encoding", "chunked_not_matched"}};
   data_.onResponseTrailers(response_trailers);

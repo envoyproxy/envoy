@@ -53,6 +53,7 @@ envoy_cc_test_library(
         "//source/common/common:hash_lib",
         "//source/common/config:api_version_lib",
         "//source/extensions/config_subscription/grpc:grpc_subscription_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/config:custom_config_validators_mocks",
         "//test/mocks/event:event_mocks",
@@ -147,14 +148,14 @@ envoy_cc_test(
         "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
-        "@com_github_cncf_xds//udpa/type/v1:pkg_cc_proto",
-        "@com_github_cncf_xds//xds/type/v3:pkg_cc_proto",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/cors/v3:pkg_cc_proto",
+        "@xds//udpa/type/v1:pkg_cc_proto",
+        "@xds//xds/type/v3:pkg_cc_proto",
     ],
 )
 
@@ -212,9 +213,9 @@ envoy_cc_test(
         "//source/common/protobuf:utility_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/init:init_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -287,5 +288,16 @@ envoy_cc_test(
         "//test/test_common:registry_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "resource_type_helper_test",
+    srcs = ["resource_type_helper_test.cc"],
+    deps = [
+        "//source/common/config:resource_type_helper_lib",
+        "//source/common/protobuf:message_validator_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )

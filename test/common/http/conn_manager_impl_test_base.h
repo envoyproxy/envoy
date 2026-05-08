@@ -172,6 +172,7 @@ public:
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
   }
+  Http::ClientCertFormat clientCertFormat() const override { return client_cert_format_; }
   const Matcher::MatchTreePtr<Http::HttpMatchingData>& forwardClientCertMatcher() const override {
     return forward_client_cert_matcher_;
   }
@@ -218,6 +219,12 @@ public:
   bool appendXForwardedPort() const override { return false; }
   bool addProxyProtocolConnectionState() const override {
     return add_proxy_protocol_connection_state_;
+  }
+  const absl::flat_hash_set<uint32_t>& httpsDestinationPorts() const override {
+    return https_destination_ports_;
+  }
+  const absl::flat_hash_set<uint32_t>& httpDestinationPorts() const override {
+    return http_destination_ports_;
   }
 
   // Simple helper to wrapper filter to the factory function.
@@ -283,6 +290,7 @@ public:
   Http::DefaultInternalAddressConfig internal_address_config_;
   Http::ForwardClientCertType forward_client_cert_{Http::ForwardClientCertType::Sanitize};
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
+  Http::ClientCertFormat client_cert_format_{Http::ClientCertFormat::Text};
   Matcher::MatchTreePtr<Http::HttpMatchingData> forward_client_cert_matcher_;
   absl::optional<std::string> user_agent_;
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
@@ -347,6 +355,8 @@ public:
       header_validator_config_;
   Extensions::Http::HeaderValidators::EnvoyDefault::ConfigOverrides
       header_validator_config_overrides_;
+  absl::flat_hash_set<uint32_t> https_destination_ports_;
+  absl::flat_hash_set<uint32_t> http_destination_ports_;
 };
 
 class HttpConnectionManagerImplTest : public HttpConnectionManagerImplMixin,

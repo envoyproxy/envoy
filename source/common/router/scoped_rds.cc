@@ -138,19 +138,19 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     ScopedRoutesConfigProviderManager& config_provider_manager)
     : DeltaConfigSubscriptionInstance("SRDS", manager_identifier, config_provider_manager,
                                       factory_context),
-      Envoy::Config::SubscriptionBase<envoy::config::route::v3::ScopedRouteConfiguration>(
-          factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
       factory_context_(factory_context), name_(name),
       scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
       stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))}),
+      resource_type_helper_(factory_context.messageValidationContext().dynamicValidationVisitor(),
+                            "name"),
       rds_config_source_(std::move(rds_config_source)), stat_prefix_(stat_prefix),
       route_config_provider_manager_(route_config_provider_manager) {
-  const auto resource_name = getResourceName();
+  const auto resource_name = resource_type_helper_.getResourceName();
   if (scoped_rds.srds_resources_locator().empty()) {
     subscription_ = THROW_OR_RETURN_VALUE(
         factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
             scoped_rds.scoped_rds_config_source(), Grpc::Common::typeUrl(resource_name), *scope_,
-            *this, resource_decoder_, {}),
+            *this, resource_type_helper_.resourceDecoder(), {}),
         Envoy::Config::SubscriptionPtr);
   } else {
     const auto srds_resources_locator = THROW_OR_RETURN_VALUE(
@@ -159,7 +159,7 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     subscription_ = THROW_OR_RETURN_VALUE(
         factory_context.clusterManager().subscriptionFactory().collectionSubscriptionFromUrl(
             srds_resources_locator, scoped_rds.scoped_rds_config_source(), resource_name, *scope_,
-            *this, resource_decoder_),
+            *this, resource_type_helper_.resourceDecoder()),
         Envoy::Config::SubscriptionPtr);
   }
 
@@ -577,8 +577,20 @@ void ScopedRdsConfigSubscription::onDemandRdsUpdate(
       thread_local_dispatcher.post([route_config_updated_cb] { route_config_updated_cb(true); });
     };
     std::string scope_name = iter->second;
+    // Guard against scopes with inline route_configuration (e.g. default_routes)
+    // which have an entry in scope_name_by_hash_ but not in route_provider_by_scope_.
+    // Using find() instead of operator[] to avoid inserting a null unique_ptr.
+    auto provider_iter = route_provider_by_scope_.find(scope_name);
+    if (provider_iter == route_provider_by_scope_.end() || provider_iter->second == nullptr) {
+      ENVOY_LOG(debug,
+                "srds: scope '{}' has no RDS provider (inline config), "
+                "returning false to on-demand callback",
+                scope_name);
+      thread_local_dispatcher.post([route_config_updated_cb] { route_config_updated_cb(false); });
+      return;
+    }
     // On demand initialization inside main thread.
-    route_provider_by_scope_[scope_name]->addOnDemandUpdateCallback(thread_local_updated_callback);
+    provider_iter->second->addOnDemandUpdateCallback(thread_local_updated_callback);
   });
 }
 

@@ -223,7 +223,9 @@ using FilterConfigPerRouteSharedPtr = std::shared_ptr<FilterConfigPerRoute>;
  * HTTP rate limit filter. Depending on the route configuration, this filter calls the global
  * rate limiting service before allowing further filter iteration.
  */
-class Filter : public Http::StreamFilter, public Filters::Common::RateLimit::RequestCallbacks {
+class Filter : public Http::StreamFilter,
+               public Filters::Common::RateLimit::RequestCallbacks,
+               public Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(FilterConfigSharedPtr config, Filters::Common::RateLimit::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
@@ -284,13 +286,15 @@ private:
   bool initiating_call_{};
   Http::ResponseHeaderMapPtr response_headers_to_add_;
   Http::RequestHeaderMap* request_headers_{};
+  std::vector<Envoy::RateLimit::Descriptor> descriptors_;
 };
 
 /**
  * This implements the rate limit callback that outlives the filter holding the client.
- * On completion, it deletes itself.
+ * On completion, it breaks the circular reference to itself and gets deleted.
  */
-class OnStreamDoneCallBack : public Filters::Common::RateLimit::RequestCallbacks {
+class OnStreamDoneCallBack : public Filters::Common::RateLimit::RequestCallbacks,
+                             public std::enable_shared_from_this<OnStreamDoneCallBack> {
 public:
   OnStreamDoneCallBack(std::shared_ptr<Filters::Common::RateLimit::Client> client)
       : client_(std::move(client)) {}
@@ -304,8 +308,13 @@ public:
 
   Filters::Common::RateLimit::Client& client() { return *client_; }
 
+  // Initialize self_ to keep the callback alive until complete() is called.
+  void keepAlive() { self_ = shared_from_this(); }
+
 private:
   std::shared_ptr<Filters::Common::RateLimit::Client> client_;
+  // This is used to keep the callback alive until complete() is called.
+  std::shared_ptr<OnStreamDoneCallBack> self_;
 };
 
 } // namespace RateLimitFilter

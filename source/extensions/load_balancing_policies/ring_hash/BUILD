@@ -17,7 +17,7 @@ envoy_cc_library(
         "//envoy/upstream:load_balancer_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/extensions/load_balancing_policies/common:thread_aware_lb_lib",
-        "@com_google_absl//absl/container:inlined_vector",
+        "@abseil-cpp//absl/container:inlined_vector",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/load_balancing_policies/ring_hash/v3:pkg_cc_proto",
     ],

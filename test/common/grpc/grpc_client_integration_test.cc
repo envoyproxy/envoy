@@ -5,8 +5,8 @@
 
 #endif
 
-#include "test/test_common/test_runtime.h"
 #include "test/common/grpc/grpc_client_integration_test_harness.h"
+#include "test/test_common/test_runtime.h"
 
 using testing::Eq;
 

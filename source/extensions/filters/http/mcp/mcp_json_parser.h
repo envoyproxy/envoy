@@ -12,92 +12,29 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/common/mcp/constants.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Mcp {
 
-/**
- * MCP protocol constants
- */
-namespace McpConstants {
-// JSON-RPC constants
-constexpr absl::string_view JSONRPC_VERSION = "2.0";
-constexpr absl::string_view JSONRPC_FIELD = "jsonrpc";
-constexpr absl::string_view METHOD_FIELD = "method";
-constexpr absl::string_view ID_FIELD = "id";
-
-// Method names
-namespace Methods {
-// Tools
-constexpr absl::string_view TOOLS_CALL = "tools/call";
-constexpr absl::string_view TOOLS_LIST = "tools/list";
-
-// Resources
-constexpr absl::string_view RESOURCES_READ = "resources/read";
-constexpr absl::string_view RESOURCES_LIST = "resources/list";
-constexpr absl::string_view RESOURCES_SUBSCRIBE = "resources/subscribe";
-constexpr absl::string_view RESOURCES_UNSUBSCRIBE = "resources/unsubscribe";
-constexpr absl::string_view RESOURCES_TEMPLATES_LIST = "resources/templates/list";
-
-// Prompts
-constexpr absl::string_view PROMPTS_GET = "prompts/get";
-constexpr absl::string_view PROMPTS_LIST = "prompts/list";
-
-// Completion
-constexpr absl::string_view COMPLETION_COMPLETE = "completion/complete";
-
-// Logging
-constexpr absl::string_view LOGGING_SET_LEVEL = "logging/setLevel";
-
-// Lifecycle
-constexpr absl::string_view INITIALIZE = "initialize";
-
-// Sampling
-constexpr absl::string_view SAMPLING_CREATE_MESSAGE = "sampling/createMessage";
-
-// Utility
-constexpr absl::string_view PING = "ping";
-
-// Notification prefix
-constexpr absl::string_view NOTIFICATION_PREFIX = "notifications/";
-
-// Specific notifications.
-constexpr absl::string_view NOTIFICATION_INITIALIZED = "notifications/initialized";
-constexpr absl::string_view NOTIFICATION_CANCELLED = "notifications/cancelled";
-constexpr absl::string_view NOTIFICATION_PROGRESS = "notifications/progress";
-constexpr absl::string_view NOTIFICATION_MESSAGE = "notifications/message";
-constexpr absl::string_view NOTIFICATION_ROOTS_LIST_CHANGED = "notifications/roots/list_changed";
-constexpr absl::string_view NOTIFICATION_RESOURCES_LIST_CHANGED =
-    "notifications/resources/list_changed";
-constexpr absl::string_view NOTIFICATION_RESOURCES_UPDATED = "notifications/resources/updated";
-constexpr absl::string_view NOTIFICATION_TOOLS_LIST_CHANGED = "notifications/tools/list_changed";
-constexpr absl::string_view NOTIFICATION_PROMPTS_LIST_CHANGED =
-    "notifications/prompts/list_changed";
-} // namespace Methods
-
-// Method group names for classification
-namespace MethodGroups {
-constexpr absl::string_view LIFECYCLE = "lifecycle";
-constexpr absl::string_view TOOL = "tool";
-constexpr absl::string_view RESOURCE = "resource";
-constexpr absl::string_view PROMPT = "prompt";
-constexpr absl::string_view NOTIFICATION = "notification";
-constexpr absl::string_view LOGGING = "logging";
-constexpr absl::string_view SAMPLING = "sampling";
-constexpr absl::string_view COMPLETION = "completion";
-constexpr absl::string_view UNKNOWN = "unknown";
-} // namespace MethodGroups
-} // namespace McpConstants
+using namespace Filters::Common::Mcp::McpConstants;
 
 /**
  * Configuration for MCP field extraction
  */
 class McpParserConfig {
 public:
+  struct FieldRequirements {
+    std::vector<std::string> required;
+    std::vector<std::string> optional;
+  };
+
+  // Rule for extracting a specific attribute from the JSON payload.
   struct AttributeExtractionRule {
-    std::string path; // JSON path (e.g., "params.name")
+    // JSON path to extract (e.g., "params.name", "params.uri").
+    std::string path;
 
     AttributeExtractionRule(const std::string& p) : path(p) {}
   };
@@ -115,6 +52,9 @@ public:
 
   // Get extraction policy for a specific method
   const std::vector<AttributeExtractionRule>& getFieldsForMethod(const std::string& method) const;
+
+  // Get merged requirements for a specific method (global + method-specific).
+  const FieldRequirements& getFieldRequirementsForMethod(const std::string& method) const;
 
   // Add method configuration
   void addMethodConfig(absl::string_view method, std::vector<AttributeExtractionRule> fields);
@@ -135,6 +75,9 @@ public:
 private:
   void initializeDefaults();
   std::string getBuiltInMethodGroup(const std::string& method) const;
+  void buildFieldRequirements();
+  void buildMethodRequirements(const std::vector<AttributeExtractionRule>& method_fields,
+                               FieldRequirements& requirements) const;
 
   // Per-method field policies
   absl::flat_hash_map<std::string, std::vector<AttributeExtractionRule>> method_fields_;
@@ -147,6 +90,9 @@ private:
 
   // Global fields to always extract
   absl::flat_hash_set<std::string> always_extract_;
+
+  FieldRequirements default_requirements_;
+  absl::flat_hash_map<std::string, FieldRequirements> method_requirements_;
 };
 
 /**
@@ -179,6 +125,12 @@ public:
   // Finalize extraction after parsing complete
   void finalizeExtraction();
 
+  // Check if optional fields are configured for the current method
+  bool hasOptionalFields();
+
+  // Check if all required fields have been collected
+  bool hasAllRequiredFields();
+
   // MCP validation getters
   bool isValidMcp() const { return is_valid_mcp_; }
   const std::string& getMethod() const { return method_; }
@@ -186,6 +138,12 @@ public:
 private:
   // Check if we have all fields we need for early stop
   void checkEarlyStop();
+
+  // Update required/optional field lists once method is known
+  void updateFieldRequirements();
+
+  // Verify required fields are present
+  bool requiredFieldsCollected() const;
 
   // Store field in temp storage
   void storeField(const std::string& path, const Protobuf::Value& value);
@@ -236,9 +194,15 @@ private:
   // Performance optimization caches
   std::string current_path_cache_;
   size_t fields_needed_{0};
+  size_t required_fields_needed_{0};
   size_t fields_collected_count_{0};
   bool fields_needed_updated_{false};
   bool is_notification_{false};
+  bool has_optional_fields_{false};
+  int params_depth_{0}; // Depth when we entered "params" object (0 = not in params)
+
+  std::vector<std::string> required_fields_;
+  std::vector<std::string> optional_fields_;
 };
 
 /**
@@ -259,6 +223,12 @@ public:
   bool isValidMcpRequest() const;
 
   bool isAllFieldsCollected() const { return all_fields_collected_; }
+
+  // Check if optional fields are configured for the current method
+  bool hasOptionalFields();
+
+  // Check if all required fields have been collected
+  bool hasAllRequiredFields();
 
   // Get the method string
   const std::string& getMethod() const;

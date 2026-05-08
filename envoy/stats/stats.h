@@ -295,9 +295,18 @@ public:
   virtual ~StatMatchingData() = default;
 };
 
+class StatTagMatchingData {
+public:
+  static absl::string_view name() { return "stat_tag_matching_data"; }
+
+  virtual absl::string_view value() const PURE;
+
+  virtual ~StatTagMatchingData() = default;
+};
+
 template <class StatType> class StatMatchingDataImpl : public StatMatchingData {
 public:
-  StatMatchingDataImpl(const StatType& metric) : metric_(metric) {}
+  explicit StatMatchingDataImpl(const StatType& metric) : metric_(metric) {}
 
   static std::string name() { return "stat_matching_data_impl"; }
 

@@ -58,6 +58,14 @@ public interface EnvoyEngine {
   String dumpStats();
 
   /**
+   * Returns a handle to the underlying InternalEngine pointer.
+   *
+   * <p>This value is an opaque pointer handle encoded as a {@code long} and originates from a
+   * native {@code reinterpret_cast<jlong>(InternalEngine*)}.
+   */
+  long getEngineHandle();
+
+  /**
    * Refresh DNS, and drain connections owned by this Engine.
    */
   void resetConnectivityState();

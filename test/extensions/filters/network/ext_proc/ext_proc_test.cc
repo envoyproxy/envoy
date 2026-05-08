@@ -1053,6 +1053,59 @@ TEST_F(NetworkExtProcFilterTest, TimerStopsOnResponse) {
   EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.read_data_injected"));
 }
 
+// Test that write timer stops when write response is received
+TEST_F(NetworkExtProcFilterTest, WriteTimerStopsOnWriteResponse) {
+  auto config = createConfig(false);
+  config.mutable_message_timeout()->set_nanos(100000000); // 100ms
+  auto filter_config = std::make_shared<Config>(config, scope_);
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+
+  auto* read_timer = new NiceMock<Event::MockTimer>();
+  auto* write_timer = new NiceMock<Event::MockTimer>();
+
+  EXPECT_CALL(connection_.dispatcher_, createTimer_(_))
+      .WillOnce(Return(read_timer))
+      .WillOnce(Return(write_timer));
+
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false));
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  // Expect write timer to be enabled when sending write data
+  EXPECT_CALL(*write_timer, enableTimer(_, _));
+  EXPECT_CALL(write_callbacks_, disableClose(true));
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data, false));
+
+  envoy::service::network_ext_proc::v3::ProcessingResponse response;
+  auto* write_data = response.mutable_write_data();
+  write_data->set_data("modified");
+  write_data->set_end_of_stream(false);
+
+  EXPECT_CALL(*write_timer, disableTimer());
+  EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, false));
+  EXPECT_CALL(write_callbacks_, disableClose(false));
+
+  filter_->onReceiveMessage(
+      std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>(response));
+
+  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.message_timeouts"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.write_data_injected"));
+}
+
 // Test timeout cleanup on stream errors
 TEST_F(NetworkExtProcFilterTest, TimeoutCleanupOnGrpcError) {
   auto config = createConfig(false);

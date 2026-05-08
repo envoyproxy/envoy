@@ -83,6 +83,16 @@ bool MultiConnectionBaseImpl::initializeReadFilters() {
   return true;
 }
 
+void MultiConnectionBaseImpl::addAccessLogHandler(AccessLog::InstanceSharedPtr handler) {
+  if (connect_finished_) {
+    connections_[0]->addAccessLogHandler(handler);
+    return;
+  }
+  // Access log handlers should only be notified of events on the final connection, so defer adding
+  // access log handlers until the final connection has been determined.
+  post_connect_state_.access_log_handlers_.push_back(handler);
+}
+
 void MultiConnectionBaseImpl::addBytesSentCallback(Connection::BytesSentCb cb) {
   if (connect_finished_) {
     connections_[0]->addBytesSentCallback(cb);
@@ -246,6 +256,15 @@ void MultiConnectionBaseImpl::setBufferLimits(uint32_t limit) {
   }
   for (auto& connection : connections_) {
     connection->setBufferLimits(limit);
+  }
+}
+
+void MultiConnectionBaseImpl::setBufferHighWatermarkTimeout(std::chrono::milliseconds timeout) {
+  if (!connect_finished_) {
+    per_connection_state_.buffer_high_watermark_timeout_ = timeout;
+  }
+  for (auto& connection : connections_) {
+    connection->setBufferHighWatermarkTimeout(timeout);
   }
 }
 
@@ -435,6 +454,10 @@ ClientConnectionPtr MultiConnectionBaseImpl::createNextConnection() {
   if (per_connection_state_.buffer_limits_.has_value()) {
     connection->setBufferLimits(per_connection_state_.buffer_limits_.value());
   }
+  if (per_connection_state_.buffer_high_watermark_timeout_.has_value()) {
+    connection->setBufferHighWatermarkTimeout(
+        per_connection_state_.buffer_high_watermark_timeout_.value());
+  }
   if (per_connection_state_.enable_half_close_.has_value()) {
     connection->enableHalfClose(per_connection_state_.enable_half_close_.value());
   }
@@ -545,6 +568,9 @@ void MultiConnectionBaseImpl::setUpFinalConnection(ConnectionEvent event,
     }
     for (auto& filter : post_connect_state_.read_filters_) {
       connections_[0]->addReadFilter(filter);
+    }
+    for (auto& handler : post_connect_state_.access_log_handlers_) {
+      connections_[0]->addAccessLogHandler(handler);
     }
     if (post_connect_state_.initialize_read_filters_.has_value() &&
         post_connect_state_.initialize_read_filters_.value()) {

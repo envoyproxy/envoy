@@ -10,6 +10,7 @@
 #include "source/common/quic/quic_network_connectivity_observer.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/scone_state.h"
 
 #include "quiche/quic/core/http/quic_spdy_client_session.h"
 
@@ -79,6 +80,7 @@ public:
   quic::HttpDatagramSupport LocalHttpDatagramSupport() override { return http_datagram_support_; }
   std::vector<std::string> GetAlpnsToOffer() const override;
   void OnConfigNegotiated() override;
+  void OnSconePacket(quic::QuicBandwidth bandwidth) override;
 
   // quic::QuicSpdyClientSessionBase
   bool ShouldKeepConnectionAlive() const override;
@@ -106,6 +108,12 @@ public:
   const quic::TransportParameters::ParameterMap& received_custom_transport_parameters() {
     return received_custom_transport_parameters_;
   }
+  const absl::optional<quic::QuicSocketAddress>& received_ipv6_alternate_server_address() {
+    return received_ipv6_alternate_server_address_;
+  }
+  const absl::optional<quic::QuicSocketAddress>& received_ipv4_alternate_server_address() {
+    return received_ipv4_alternate_server_address_;
+  }
 
   using quic::QuicSpdyClientSession::PerformActionOnActiveStreams;
 
@@ -114,12 +122,12 @@ protected:
   std::unique_ptr<quic::QuicSpdyClientStream> CreateClientStream() override;
   // quic::QuicSpdySession
   quic::QuicSpdyStream* CreateIncomingStream(quic::QuicStreamId id) override;
-  quic::QuicSpdyStream* CreateIncomingStream(quic::PendingStream* pending) override;
   std::unique_ptr<quic::QuicCryptoClientStreamBase> CreateQuicCryptoStream() override;
   bool ShouldCreateOutgoingBidirectionalStream() override {
-    ASSERT(quic::QuicSpdyClientSession::ShouldCreateOutgoingBidirectionalStream());
-    // Prefer creating an "invalid" stream outside of current stream bounds to
-    // crashing when dereferencing a nullptr in QuicHttpClientConnectionImpl::newStream
+    // quic::QuicSpdyClientSession::ShouldCreateOutgoingBidirectionalStream()
+    // might return false, but we want to create the stream anyway
+    // because otherwise we crash dereferencing a nullptr, so we
+    // don't even ask it, and just return true.
     return true;
   }
   // QuicFilterManagerConnectionImpl
@@ -146,6 +154,8 @@ private:
   QuicNetworkConnectivityObserverPtr network_connectivity_observer_;
   OptRef<EnvoyQuicNetworkObserverRegistry> registry_;
   quic::TransportParameters::ParameterMap received_custom_transport_parameters_;
+  absl::optional<quic::QuicSocketAddress> received_ipv6_alternate_server_address_;
+  absl::optional<quic::QuicSocketAddress> received_ipv4_alternate_server_address_;
 };
 
 } // namespace Quic

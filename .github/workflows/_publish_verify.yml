@@ -5,6 +5,8 @@ permissions:
 
 on:
   workflow_call:
+    secrets:
+      dockerhub-token:
     inputs:
       request:
         type: string
@@ -24,6 +26,8 @@ concurrency:
 
 jobs:
   examples:
+    secrets:
+      dockerhub-token: ${{ secrets.dockerhub-token }}
     permissions:
       actions: read
       contents: read
@@ -31,6 +35,7 @@ jobs:
     name: ${{ matrix.name || matrix.target }}
     uses: ./.github/workflows/_run.yml
     with:
+      bazel-cache: false
       bazel-extra: ${{ matrix.bazel-extra || '--config=rbe' }}
       cache-build-image: ${{ matrix.cache-build-image }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
@@ -67,19 +72,16 @@ jobs:
                     envoy:dev
                     envoy-contrib:contrib-dev
                     envoy-google-vrp:google-vrp-dev)
-                for image in "${IMAGES[@]}"; do
-                    src_name="$(echo ${image} | cut -d: -f1)"
-                    dest_name="$(echo ${image} | cut -d: -f2)"
-                    src="oci-archive:%{{ runner.temp }}/container/build_images/${src_name}.amd64.tar"
-                    dest="docker-daemon:envoyproxy/envoy:${dest_name}"
-                    echo "Copy image: ${src} ${dest}"
-                    skopeo copy -q "${src}" "${dest}"
-                done
+                RUNNER_TEMP="%{{ runner.temp }}"
+                . ./.github/workflows/docker_utils.sh
+                skopeo_copy "${IMAGES[*]}"
               shell: bash
             - run: docker images | grep envoy
               shell: bash
 
   distroless:
+    secrets:
+      dockerhub-token: ${{ secrets.dockerhub-token }}
     permissions:
       actions: read
       contents: read
@@ -111,22 +113,35 @@ jobs:
           source: |
             export NO_BUILD_SETUP=1
           steps-pre: |
-            - run: |
-                IMAGES=(
-                    envoy-distroless:distroless-dev)
-                for image in "${IMAGES[@]}"; do
-                    src_name="$(echo ${image} | cut -d: -f1)"
-                    dest_name="$(echo ${image} | cut -d: -f2)"
-                    src="oci-archive:%{{ runner.temp }}/container/build_images/${src_name}.amd64.tar"
-                    dest="docker-daemon:envoyproxy/envoy:${dest_name}"
-                    echo "Copy image: ${src} ${dest}"
-                    skopeo copy -q "${src}" "${dest}"
-                done
+            - id: version-support
+              uses: envoyproxy/toolshed/actions/jq@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
+              with:
+                input: |
+                  version_major: ${{ fromJSON(inputs.request).request.version.major }}
+                  version_minor: ${{ fromJSON(inputs.request).request.version.minor }}
+                input-format: yaml
+                filter: |
+                  .
+                  | {contrib_distroless: (
+                       .version_major > 1 or (.version_major == 1 and .version_minor >= 37))}
+            - env:
+                CONTRIB_DISTROLESS: %{{ fromJSON(steps.version-support.outputs.value).contrib_distroless }}
+              run: |
+                IMAGES=()
+                IMAGES+=(envoy-distroless:distroless-dev)
+                if [[ "$CONTRIB_DISTROLESS" == "true" ]]; then
+                    IMAGES+=(envoy-contrib-distroless:contrib-distroless-dev)
+                fi
+                RUNNER_TEMP="%{{ runner.temp }}"
+                . ./.github/workflows/docker_utils.sh
+                skopeo_copy "${IMAGES[*]}"
               shell: bash
             - run: docker images | grep envoy
               shell: bash
 
   distro:
+    secrets:
+      dockerhub-token: ${{ secrets.dockerhub-token }}
     permissions:
       actions: read
       contents: read

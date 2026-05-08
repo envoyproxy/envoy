@@ -69,7 +69,8 @@ public:
   std::unique_ptr<Envoy::Server::OverloadManager> createNullOverloadManager() override {
     return std::make_unique<Envoy::Server::NullOverloadManager>(threadLocal(), true);
   }
-  std::unique_ptr<Server::GuardDog> maybeCreateGuardDog(absl::string_view) override {
+  std::unique_ptr<Server::GuardDog>
+  maybeCreateGuardDog(absl::string_view, const Server::Configuration::Watchdog&) override {
     return nullptr;
   }
   std::unique_ptr<Server::HdsDelegateApi>
@@ -80,7 +81,9 @@ public:
   }
 };
 
-EngineCommon::EngineCommon(std::shared_ptr<Envoy::OptionsImplBase> options) : options_(options) {
+EngineCommon::EngineCommon(std::shared_ptr<Envoy::OptionsImplBase> options,
+                           std::function<void()> on_workers_started)
+    : options_(options), mobile_listener_hooks_(on_workers_started) {
 
 #if !defined(ENVOY_ENABLE_FULL_PROTOS)
   registerMobileProtoDescriptors();
@@ -105,7 +108,7 @@ EngineCommon::EngineCommon(std::shared_ptr<Envoy::OptionsImplBase> options) : op
   auto random_generator = std::make_unique<Random::RandomGeneratorImpl>();
   base_ = std::make_unique<StrippedMainBase>(*options_, prod_component_factory_,
                                              std::make_unique<PlatformImpl>(), *random_generator);
-  base_->init(real_time_system_, default_listener_hooks_, std::move(random_generator), nullptr,
+  base_->init(real_time_system_, mobile_listener_hooks_, std::move(random_generator), nullptr,
               create_instance);
   // Disabling signal handling in the options makes it so that the server's event dispatcher _does
   // not_ listen for termination signals such as SIGTERM, SIGINT, etc

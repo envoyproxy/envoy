@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/extension_config_provider.h"
 #include "envoy/config/typed_metadata.h"
@@ -115,6 +116,18 @@ public:
    *              marking the filter as close ready.
    */
   virtual void disableClose(bool disabled) PURE;
+
+  /**
+   * Called by a write filter to signal that its internal buffer is above its high watermark.
+   * This propagates backpressure to the connection, which may notify ConnectionCallbacks.
+   */
+  virtual void onAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called by a write filter to signal that its internal buffer has drained below its low
+   * watermark. Must be paired with a prior onAboveWriteBufferHighWatermark() call.
+   */
+  virtual void onBelowWriteBufferLowWatermark() PURE;
 };
 
 /**
@@ -325,6 +338,13 @@ public:
    * @return true if read filters were initialized successfully, otherwise false.
    */
   virtual bool initializeReadFilters() PURE;
+
+  /**
+   * Add a network access log handler to the connection. The added log handlers will be called on
+   * during connections' destruction.
+   * @param handler supplies the access log handler to add.
+   */
+  virtual void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) PURE;
 };
 
 /**

@@ -1,10 +1,19 @@
+#include "envoy/access_log/access_log.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/extensions/upstreams/tcp/v3/tcp_protocol_options.pb.h"
+#include "envoy/server/filter_config.h"
+
+#include "source/common/formatter/substitution_formatter.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
+using testing::Ge;
 using testing::HasSubstr;
 
 namespace Envoy {
@@ -117,7 +126,7 @@ public:
   }
 
   static constexpr uint64_t IdleTimeoutMs = 300 * TIMEOUT_FACTOR;
-  static constexpr uint64_t RequestTimeoutMs = 200;
+  static constexpr uint64_t RequestTimeoutMs = 200 * TIMEOUT_FACTOR;
   bool enable_global_idle_timeout_{false};
   bool enable_per_stream_idle_timeout_{false};
   bool enable_request_timeout_{false};
@@ -155,12 +164,12 @@ TEST_P(IdleTimeoutIntegrationTest, TimeoutBasic) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_200", Ge(1));
 
   // Do not send any requests and validate if idle time out kicks in.
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_idle_timeout", Ge(1));
 }
 
 // Tests idle timeout behaviour with multiple requests and validates that idle timer kicks in
@@ -191,8 +200,8 @@ TEST_P(IdleTimeoutIntegrationTest, IdleTimeoutWithTwoRequests) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_200", Ge(1));
 
   // Request 2.
   response = codec_client_->makeRequestWithBody(default_request_headers_, 512);
@@ -203,12 +212,12 @@ TEST_P(IdleTimeoutIntegrationTest, IdleTimeoutWithTwoRequests) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 2);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_200", Ge(2));
 
   // Do not send any requests and validate if idle time out kicks in.
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_idle_timeout", Ge(1));
 }
 
 // Max connection duration reached after a connection is created.
@@ -233,12 +242,12 @@ TEST_P(IdleTimeoutIntegrationTest, MaxConnectionDurationBasic) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_200", Ge(1));
 
   // Do not send any requests and validate that the max connection duration is reached.
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_max_duration_reached", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_max_duration_reached", Ge(1));
 }
 
 // Per-stream idle timeout after having sent downstream headers.
@@ -410,7 +419,7 @@ TEST_P(IdleTimeoutIntegrationTest, PerTryIdleTimeoutAfterUpstreamHeaders) {
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
 
   waitForTimeout(*response);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_per_try_idle_timeout", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_per_try_idle_timeout", Ge(1));
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
@@ -586,6 +595,136 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutResetFromFilter) {
 
 // TODO(auni53) create a test filter that hangs and does not send data upstream, which would
 // trigger a configured request_timer
+
+class UpstreamIdleTimeoutVerifierFilter : public Network::ReadFilter,
+                                          public Network::ConnectionCallbacks,
+                                          public AccessLog::Instance {
+public:
+  UpstreamIdleTimeoutVerifierFilter(Stats::Scope& scope) : scope_(scope) {}
+
+  // Network::ReadFilter
+  Network::FilterStatus onData(Buffer::Instance&, bool) override {
+    return Network::FilterStatus::Continue;
+  }
+  Network::FilterStatus onNewConnection() override {
+    if (!callbacks_->connection().streamInfo().upstreamInfo()) {
+      callbacks_->connection().streamInfo().setUpstreamInfo(
+          std::make_shared<StreamInfo::UpstreamInfoImpl>());
+    }
+    return Network::FilterStatus::Continue;
+  }
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
+    callbacks_ = &callbacks;
+    callbacks.connection().addConnectionCallbacks(*this);
+  }
+
+  // Network::ConnectionCallbacks
+  void onEvent(Network::ConnectionEvent event) override {
+    if (event == Network::ConnectionEvent::LocalClose ||
+        event == Network::ConnectionEvent::RemoteClose) {
+      Formatter::Context context(nullptr, nullptr, nullptr, {},
+                                 Envoy::Formatter::AccessLogType::NotSet, nullptr);
+      log(context, callbacks_->connection().streamInfo());
+    }
+  }
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
+
+  // AccessLog::Instance
+  void log(const AccessLog::LogContext& context,
+           const StreamInfo::StreamInfo& stream_info) override {
+    auto formatter_or_error = Formatter::FormatterImpl::create("%UPSTREAM_LOCAL_CLOSE_REASON%");
+    auto formatter = std::move(*formatter_or_error);
+    std::string reason = formatter->format(context, stream_info);
+    if (reason == "on_idle_timeout" || reason == "tcp_session_idle_timeout") {
+      scope_.counterFromString("upstream_idle_timeout_verifier.on_idle_timeout").inc();
+    }
+  }
+
+  Stats::Scope& scope_;
+  Network::ReadFilterCallbacks* callbacks_{};
+};
+
+class UpstreamIdleTimeoutVerifierFilterFactory
+    : public Server::Configuration::NamedUpstreamNetworkFilterConfigFactory {
+public:
+  Network::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::UpstreamFactoryContext& context) override {
+    Stats::Scope& scope = context.scope();
+    return [&scope](Network::FilterManager& filter_manager) {
+      auto filter = std::make_shared<UpstreamIdleTimeoutVerifierFilter>(scope);
+      filter_manager.addReadFilter(filter);
+      filter_manager.addAccessLogHandler(filter);
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+
+  std::string name() const override { return "envoy.test.upstream_idle_timeout_verifier"; }
+};
+
+class UpstreamHttpIdleTimeoutTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                    public HttpIntegrationTest {
+public:
+  UpstreamHttpIdleTimeoutTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()), register_factory_(factory_) {}
+
+  void initialize() override {
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+
+      // Add custom upstream filter
+      auto* filter = cluster->add_filters();
+      filter->set_name("envoy.test.upstream_idle_timeout_verifier");
+      filter->mutable_typed_config()->PackFrom(Protobuf::Struct());
+
+      // Set idle timeout
+      ConfigHelper::HttpProtocolOptions protocol_options;
+      protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
+      auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
+      auto* idle_time_out = http_protocol_options->mutable_idle_timeout();
+      idle_time_out->set_seconds(1);
+      ConfigHelper::setProtocolOptions(*cluster, protocol_options);
+    });
+    HttpIntegrationTest::initialize();
+  }
+
+  UpstreamIdleTimeoutVerifierFilterFactory factory_;
+  Registry::InjectFactory<Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>
+      register_factory_;
+};
+
+INSTANTIATE_TEST_SUITE_P(Params, UpstreamHttpIdleTimeoutTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(UpstreamHttpIdleTimeoutTest, UpstreamConnectionIdleTimeout) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(512, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+
+  // Close downstream connection
+  codec_client_->close();
+
+  // Wait for upstream idle timeout
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+
+  // Wait for stat
+  test_server_->waitForCounter("cluster.cluster_0.upstream_idle_timeout_verifier.on_idle_timeout",
+                               Ge(1));
+}
 
 } // namespace
 } // namespace Envoy

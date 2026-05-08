@@ -552,6 +552,7 @@ public:
 protected:
   static std::string finalizeConfigWithPorts(ConfigHelper& helper, std::vector<uint32_t>& ports,
                                              bool use_lds);
+  static envoy::config::bootstrap::v3::Bootstrap configToBootstrap(const std::string& config);
 
   void setUdpFakeUpstream(absl::optional<FakeUpstreamConfig::UdpConfig> config) {
     upstream_config_.udp_fake_upstream_ = config;

@@ -12,10 +12,8 @@ namespace Envoy {
 namespace Matcher {
 
 TEST(PrefixMapMatcherTest, NoMatch) {
-  std::unique_ptr<PrefixMapMatcher<TestData>> matcher = *PrefixMapMatcher<TestData>::create(
-      std::make_unique<TestInput>(
-          DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "match"}),
-      absl::nullopt);
+  std::unique_ptr<PrefixMapMatcher<TestData>> matcher =
+      *PrefixMapMatcher<TestData>::create(std::make_unique<TestInput>("match"), absl::nullopt);
 
   TestData data;
   const auto result = matcher->match(data);
@@ -24,9 +22,7 @@ TEST(PrefixMapMatcherTest, NoMatch) {
 
 TEST(PrefixMapMatcherTest, NoMatchDueToNoData) {
   std::unique_ptr<PrefixMapMatcher<TestData>> matcher = *PrefixMapMatcher<TestData>::create(
-      std::make_unique<TestInput>(DataInputGetResult{
-          DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()}),
-      absl::nullopt);
+      std::make_unique<TestInput>(absl::nullopt), absl::nullopt);
 
   TestData data;
   const auto result = matcher->match(data);
@@ -35,9 +31,7 @@ TEST(PrefixMapMatcherTest, NoMatchDueToNoData) {
 
 TEST(PrefixMapMatcherTest, NoMatchWithFallback) {
   std::unique_ptr<PrefixMapMatcher<TestData>> matcher = *PrefixMapMatcher<TestData>::create(
-      std::make_unique<TestInput>(
-          DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "match"}),
-      stringOnMatch<TestData>("no_match"));
+      std::make_unique<TestInput>("match"), stringOnMatch<TestData>("no_match"));
 
   TestData data;
   const auto result = matcher->match(data);
@@ -46,9 +40,7 @@ TEST(PrefixMapMatcherTest, NoMatchWithFallback) {
 
 TEST(PrefixMapMatcherTest, Match) {
   std::unique_ptr<PrefixMapMatcher<TestData>> matcher = *PrefixMapMatcher<TestData>::create(
-      std::make_unique<TestInput>(
-          DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "match"}),
-      stringOnMatch<TestData>("no_match"));
+      std::make_unique<TestInput>("match"), stringOnMatch<TestData>("no_match"));
 
   matcher->addChild("match", stringOnMatch<TestData>("match"));
 
@@ -59,9 +51,7 @@ TEST(PrefixMapMatcherTest, Match) {
 
 TEST(PrefixMapMatcherTest, PrefixMatch) {
   std::unique_ptr<PrefixMapMatcher<TestData>> matcher = *PrefixMapMatcher<TestData>::create(
-      std::make_unique<TestInput>(
-          DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "match"}),
-      stringOnMatch<TestData>("no_match"));
+      std::make_unique<TestInput>("match"), stringOnMatch<TestData>("no_match"));
 
   matcher->addChild("mat", stringOnMatch<TestData>("mat"));
 
@@ -72,9 +62,7 @@ TEST(PrefixMapMatcherTest, PrefixMatch) {
 
 TEST(PrefixMapMatcherTest, LongestPrefixMatch) {
   std::unique_ptr<PrefixMapMatcher<TestData>> matcher = *PrefixMapMatcher<TestData>::create(
-      std::make_unique<TestInput>(
-          DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "match"}),
-      stringOnMatch<TestData>("no_match"));
+      std::make_unique<TestInput>("match"), stringOnMatch<TestData>("no_match"));
 
   matcher->addChild("mat", stringOnMatch<TestData>("mat"));
   matcher->addChild("match", stringOnMatch<TestData>("match"));
@@ -87,8 +75,7 @@ TEST(PrefixMapMatcherTest, LongestPrefixMatch) {
 
 TEST(PrefixMapMatcherTest, DataNotAvailable) {
   std::unique_ptr<PrefixMapMatcher<TestData>> matcher = *PrefixMapMatcher<TestData>::create(
-      std::make_unique<TestInput>(
-          DataInputGetResult{DataInputGetResult::DataAvailability::NotAvailable, {}}),
+      std::make_unique<TestInput>(absl::nullopt, DataAvailability::NotAvailable),
       stringOnMatch<TestData>("no_match"));
 
   matcher->addChild("match", stringOnMatch<TestData>("match"));
@@ -100,8 +87,7 @@ TEST(PrefixMapMatcherTest, DataNotAvailable) {
 
 TEST(PrefixMapMatcherTest, MoreDataMightBeAvailableNoMatch) {
   std::unique_ptr<PrefixMapMatcher<TestData>> matcher = *PrefixMapMatcher<TestData>::create(
-      std::make_unique<TestInput>(DataInputGetResult{
-          DataInputGetResult::DataAvailability::MoreDataMightBeAvailable, "no match"}),
+      std::make_unique<TestInput>("no match", DataAvailability::MoreDataMightBeAvailable),
       stringOnMatch<TestData>("no_match"));
 
   matcher->addChild("match", stringOnMatch<TestData>("match"));
@@ -113,8 +99,7 @@ TEST(PrefixMapMatcherTest, MoreDataMightBeAvailableNoMatch) {
 
 TEST(PrefixMapMatcherTest, MoreDataMightBeAvailableMatch) {
   std::unique_ptr<PrefixMapMatcher<TestData>> matcher = *PrefixMapMatcher<TestData>::create(
-      std::make_unique<TestInput>(DataInputGetResult{
-          DataInputGetResult::DataAvailability::MoreDataMightBeAvailable, "match"}),
+      std::make_unique<TestInput>("match", DataAvailability::MoreDataMightBeAvailable),
       stringOnMatch<TestData>("no_match"));
 
   matcher->addChild("match", stringOnMatch<TestData>("match"));
@@ -126,12 +111,10 @@ TEST(PrefixMapMatcherTest, MoreDataMightBeAvailableMatch) {
 
 TEST(PrefixMapMatcherTest, MoreDataMightBeAvailableNoMatchThenMatchDoesNotPerformSecondMatch) {
   std::unique_ptr<PrefixMapMatcher<TestData>> matcher = *PrefixMapMatcher<TestData>::create(
-      std::make_unique<TestInput>(DataInputGetResult{
-          DataInputGetResult::DataAvailability::MoreDataMightBeAvailable, "match"}),
+      std::make_unique<TestInput>("match", DataAvailability::MoreDataMightBeAvailable),
       stringOnMatch<TestData>("no_match"));
   std::unique_ptr<PrefixMapMatcher<TestData>> child_matcher = *PrefixMapMatcher<TestData>::create(
-      std::make_unique<TestInput>(DataInputGetResult{
-          DataInputGetResult::DataAvailability::MoreDataMightBeAvailable, "match"}),
+      std::make_unique<TestInput>("match", DataAvailability::MoreDataMightBeAvailable),
       absl::nullopt);
 
   matcher->addChild("match", {nullptr, std::move(child_matcher)});

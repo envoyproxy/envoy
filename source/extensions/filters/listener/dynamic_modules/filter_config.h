@@ -4,10 +4,11 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/statusor.h"
 #include "source/common/stats/utility.h"
-#include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 namespace Envoy {
@@ -24,12 +25,16 @@ using OnListenerFilterOnCloseType = decltype(&envoy_dynamic_module_on_listener_f
 using OnListenerFilterGetMaxReadBytesType =
     decltype(&envoy_dynamic_module_on_listener_filter_get_max_read_bytes);
 using OnListenerFilterDestroyType = decltype(&envoy_dynamic_module_on_listener_filter_destroy);
+using OnListenerFilterHttpCalloutDoneType =
+    decltype(&envoy_dynamic_module_on_listener_filter_http_callout_done);
 using OnListenerFilterScheduledType = decltype(&envoy_dynamic_module_on_listener_filter_scheduled);
 using OnListenerFilterConfigScheduledType =
     decltype(&envoy_dynamic_module_on_listener_filter_config_scheduled);
 
-// Custom namespace prefix for listener filter stats.
-constexpr char ListenerFilterStatsNamespace[] = "dynamic_module_listener_filter";
+// The default custom stat namespace which prepends all user-defined metrics.
+// Note that the prefix is removed from the final output of ``/stats`` endpoints.
+// This can be overridden via the ``metrics_namespace`` field in ``DynamicModuleConfig``.
+constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
 
 class DynamicModuleListenerFilterConfig;
 using DynamicModuleListenerFilterConfigSharedPtr =
@@ -52,13 +57,18 @@ public:
    * newDynamicModuleListenerFilterConfig().
    * @param filter_name the name of the filter.
    * @param filter_config the configuration for the module.
+   * @param metrics_namespace the namespace prefix for metrics.
    * @param dynamic_module the dynamic module to use.
+   * @param cluster_manager the cluster manager for async HTTP callouts.
    * @param stats_scope the stats scope for metrics.
    * @param main_thread_dispatcher the main thread dispatcher for scheduling events.
    */
   DynamicModuleListenerFilterConfig(const absl::string_view filter_name,
                                     const absl::string_view filter_config,
-                                    DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
+                                    const absl::string_view metrics_namespace,
+                                    DynamicModulePtr dynamic_module,
+                                    Envoy::Upstream::ClusterManager& cluster_manager,
+                                    Stats::Scope& stats_scope,
                                     Event::Dispatcher& main_thread_dispatcher);
 
   ~DynamicModuleListenerFilterConfig();
@@ -81,9 +91,13 @@ public:
   OnListenerFilterOnCloseType on_listener_filter_on_close_ = nullptr;
   OnListenerFilterGetMaxReadBytesType on_listener_filter_get_max_read_bytes_ = nullptr;
   OnListenerFilterDestroyType on_listener_filter_destroy_ = nullptr;
+  // Optional: modules that don't need HTTP callout don't need to implement this.
+  OnListenerFilterHttpCalloutDoneType on_listener_filter_http_callout_done_ = nullptr;
   // Optional: modules that don't need config-level scheduling don't need to implement this.
   OnListenerFilterScheduledType on_listener_filter_scheduled_ = nullptr;
   OnListenerFilterConfigScheduledType on_listener_filter_config_scheduled_ = nullptr;
+
+  Envoy::Upstream::ClusterManager& cluster_manager_;
 
   // The main thread dispatcher for scheduling config-level events.
   Event::Dispatcher& main_thread_dispatcher_;
@@ -120,57 +134,66 @@ public:
     Stats::Histogram& histogram_;
   };
 
+// We use 1-based IDs for the metrics in the ABI, so we need to convert them to 0-based indices
+// for our internal storage. These helper functions do that conversion.
+#define ID_TO_INDEX(id) ((id) - 1)
+
   // Methods for adding metrics during configuration.
   size_t addCounter(ModuleCounterHandle&& counter) {
-    size_t id = counters_.size();
     counters_.push_back(std::move(counter));
-    return id;
+    return counters_.size();
   }
 
   size_t addGauge(ModuleGaugeHandle&& gauge) {
-    size_t id = gauges_.size();
     gauges_.push_back(std::move(gauge));
-    return id;
+    return gauges_.size();
   }
 
   size_t addHistogram(ModuleHistogramHandle&& histogram) {
-    size_t id = histograms_.size();
     histograms_.push_back(std::move(histogram));
-    return id;
+    return histograms_.size();
   }
 
   // Methods for getting metrics by ID.
   OptRef<const ModuleCounterHandle> getCounterById(size_t id) const {
-    if (id >= counters_.size()) {
+    if (id == 0 || id > counters_.size()) {
       return {};
     }
-    return counters_[id];
+    return counters_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleGaugeHandle> getGaugeById(size_t id) const {
-    if (id >= gauges_.size()) {
+    if (id == 0 || id > gauges_.size()) {
       return {};
     }
-    return gauges_[id];
+    return gauges_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleHistogramHandle> getHistogramById(size_t id) const {
-    if (id >= histograms_.size()) {
+    if (id == 0 || id > histograms_.size()) {
       return {};
     }
-    return histograms_[id];
+    return histograms_[ID_TO_INDEX(id)];
   }
+
+#undef ID_TO_INDEX
 
   // Stats scope for metric creation.
   const Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNamePool stat_name_pool_;
+  // We only allow the module to create stats during the in-module config_new, and not later from
+  // worker threads, so that we don't have to wrap stat_name_pool_ in a lock.
+  bool stat_creation_frozen_ = false;
 
 private:
   // Allow the factory function to access private members for initialization.
   friend absl::StatusOr<std::shared_ptr<DynamicModuleListenerFilterConfig>>
   newDynamicModuleListenerFilterConfig(const absl::string_view filter_name,
                                        const absl::string_view filter_config,
-                                       DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
+                                       const absl::string_view metrics_namespace,
+                                       DynamicModulePtr dynamic_module,
+                                       Envoy::Upstream::ClusterManager& cluster_manager,
+                                       Stats::Scope& stats_scope,
                                        Event::Dispatcher& main_thread_dispatcher);
 
   // The name of the filter passed in the constructor.
@@ -196,35 +219,43 @@ private:
  */
 class DynamicModuleListenerFilterConfigScheduler {
 public:
-  DynamicModuleListenerFilterConfigScheduler(
-      std::weak_ptr<DynamicModuleListenerFilterConfig> config, Event::Dispatcher& dispatcher)
-      : config_(std::move(config)), dispatcher_(dispatcher) {}
+  explicit DynamicModuleListenerFilterConfigScheduler(
+      std::weak_ptr<DynamicModuleListenerFilterConfig> config)
+      : config_(std::move(config)) {}
 
   void commit(uint64_t event_id) {
-    dispatcher_.post([config = config_, event_id]() {
-      if (std::shared_ptr<DynamicModuleListenerFilterConfig> config_shared = config.lock()) {
-        config_shared->onScheduled(event_id);
+    // Lock the config so its dispatcher member stays valid across `post`.
+    auto config_shared = config_.lock();
+    if (!config_shared) {
+      return;
+    }
+    config_shared->main_thread_dispatcher_.post([config = config_, event_id]() {
+      if (std::shared_ptr<DynamicModuleListenerFilterConfig> cs = config.lock()) {
+        cs->onScheduled(event_id);
       }
     });
   }
 
 private:
   std::weak_ptr<DynamicModuleListenerFilterConfig> config_;
-  Event::Dispatcher& dispatcher_;
 };
 
 /**
  * Creates a new DynamicModuleListenerFilterConfig for given configuration.
  * @param filter_name the name of the filter.
  * @param filter_config the configuration for the module.
+ * @param metrics_namespace the namespace prefix for metrics emitted by this module.
  * @param dynamic_module the dynamic module to use.
+ * @param cluster_manager the cluster manager for async HTTP callouts.
  * @param stats_scope the stats scope for metrics.
  * @param main_thread_dispatcher the main thread dispatcher for scheduling events.
  * @return a shared pointer to the new config object or an error if the module could not be loaded.
  */
 absl::StatusOr<DynamicModuleListenerFilterConfigSharedPtr> newDynamicModuleListenerFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
-    Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
+    const absl::string_view metrics_namespace,
+    Extensions::DynamicModules::DynamicModulePtr dynamic_module,
+    Envoy::Upstream::ClusterManager& cluster_manager, Stats::Scope& stats_scope,
     Event::Dispatcher& main_thread_dispatcher);
 
 } // namespace ListenerFilters

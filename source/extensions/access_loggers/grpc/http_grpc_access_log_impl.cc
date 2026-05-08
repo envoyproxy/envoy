@@ -28,11 +28,12 @@ HttpGrpcAccessLog::ThreadLocalLogger::ThreadLocalLogger(
 HttpGrpcAccessLog::HttpGrpcAccessLog(AccessLog::FilterPtr&& filter,
                                      const HttpGrpcAccessLogConfig config,
                                      ThreadLocal::SlotAllocator& tls,
-                                     GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache)
+                                     GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
+                                     const Formatter::CommandParserPtrVector& command_parsers)
     : Common::ImplBase(std::move(filter)),
       config_(std::make_shared<const HttpGrpcAccessLogConfig>(std::move(config))),
       tls_slot_(tls.allocateSlot()), access_logger_cache_(std::move(access_logger_cache)),
-      common_properties_config_(config.common_config()) {
+      common_properties_config_(config.common_config(), command_parsers) {
   for (const auto& header : config_->additional_request_headers_to_log()) {
     request_headers_to_log_.emplace_back(header);
   }

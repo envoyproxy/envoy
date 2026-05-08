@@ -97,7 +97,7 @@ void JwksAsyncFetcher::handleFetchDone() {
   }
 }
 
-void JwksAsyncFetcher::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
+void JwksAsyncFetcher::onJwksSuccess(Envoy::JwtVerify::JwksPtr&& jwks) {
   done_fn_(std::move(jwks));
   handleFetchDone();
   refetch_timer_->enableTimer(good_refetch_duration_);

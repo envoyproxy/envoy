@@ -39,6 +39,14 @@ wasm_rust_binary(
 )
 
 wasm_rust_binary(
+    name = "deferred_data_rust.wasm",
+    srcs = ["deferred_data_rust.rs"],
+    deps = [
+        "@proxy_wasm_rust_sdk//:proxy_wasm",
+    ],
+)
+
+wasm_rust_binary(
     name = "grpc_call_rust.wasm",
     srcs = ["grpc_call_rust.rs"],
     deps = [
@@ -136,7 +144,7 @@ envoy_cc_test_library(
         "//source/extensions/common/wasm:wasm_lib",
         "//source/extensions/common/wasm/ext:envoy_null_plugin",
         "//source/extensions/common/wasm/ext:sign_cc_proto",
-        "@com_google_absl//absl/container:node_hash_map",
+        "@abseil-cpp//absl/container:node_hash_map",
         "@proxy_wasm_cpp_sdk//contrib:contrib_lib",
     ],
 )

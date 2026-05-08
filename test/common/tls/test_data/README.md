@@ -42,6 +42,14 @@ There are 15 identities:
   *san_multiple_othername_string_type_cert.pem*, which is signed by the **CA** using the config
   *san_multiple_othername_string_type_key.cfg*. The certificate has two SANfields, one DNS and one
   OtherName(UPN) type. *san_multiple_othername_string_type_key.pem* is its private key.
+- **SAN With Single CRL Distribution Point**: It has the certificate
+  *san_dns_cert_with_single_crl_dp_cert.pem*, which is signed by the **CA** using the config
+  *san_dns_cert_with_single_crl_dp_cert.cfg*. The certificate has one CRLDP.
+  *san_dns_cert_with_single_crl_dp_key.pem* is its private key.
+- **SAN With Multiple CRL Distribution Point**: It has the certificate
+  *san_dns_cert_with_multiple_crl_dps_cert.pem*, which is signed by the **CA** using the config
+  *san_dns_cert_with_multiple_crl_dps_cert.cfg*. The certificate has two CRLDPs.
+  *san_dns_cert_with_multiple_crl_dps_key.pem* is its private key.
 - **Password-protected**: The password-protected certificate *password_protected_cert.pem*,
   using the config *san_uri_cert.cfg*. *password_protected_key.pem* is
   its private key encrypted using the password supplied in *password_protected_password.txt*.

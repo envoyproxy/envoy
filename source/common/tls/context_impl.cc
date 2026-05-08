@@ -26,6 +26,8 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/utility.h"
+#include "source/common/tls/aws_lc_compat.h"
+#include "source/common/tls/cert_compression.h"
 #include "source/common/tls/cert_validator/factory.h"
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
@@ -161,6 +163,14 @@ ContextImpl::ContextImpl(
             "Failed to initialize TLS signature algorithms ", config.signatureAlgorithms()));
         return;
       }
+    }
+
+    // Register certificate compression algorithms to reduce TLS handshake size (RFC 8879).
+    // Priority: brotli > zlib (brotli generally provides best compression for certs).
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.tls_certificate_compression_brotli")) {
+      CertCompression::registerBrotli(ctx.ssl_ctx_.get());
+      CertCompression::registerZlib(ctx.ssl_ctx_.get());
     }
   }
 
@@ -522,6 +532,7 @@ ValidationResults ContextImpl::customVerifyCertChain(
       absl::NullSafeStringView(host_name));
   if (result.status != ValidationResults::ValidationStatus::Pending) {
     extended_socket_info->setCertificateValidationStatus(result.detailed_status);
+    extended_socket_info->setValidatedCertChain(std::move(result.validated_chain));
     extended_socket_info->onCertificateValidationCompleted(
         result.status == ValidationResults::ValidationStatus::Successful, false);
   }

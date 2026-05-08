@@ -13,7 +13,7 @@ envoy_cc_library(
     name = "crc16_lib",
     srcs = ["crc16.cc"],
     hdrs = ["crc16.h"],
-    deps = ["@com_google_absl//absl/strings"],
+    deps = ["@abseil-cpp//absl/strings"],
 )
 
 envoy_cc_library(

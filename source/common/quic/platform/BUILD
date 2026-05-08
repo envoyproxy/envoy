@@ -17,7 +17,7 @@ envoy_package()
 # used in 2 different ways:
 #
 # Most of them are not to be consumed or referenced directly by other Envoy code.
-# Their only consumers should be build rules under @com_github_google_quiche//...,
+# Their only consumers should be build rules under @quiche//...,
 # and tests. In a monorepo, this would be enforced via visibility attribute, but
 # Bazel does not support limiting visibility to specific external dependencies.
 #
@@ -29,8 +29,8 @@ envoy_package()
 
 # These implementations are tested through their APIs with tests mostly brought in from
 # QUICHE, thus new unit tests for them are deliberately omitted in Envoy tree. These
-# tests are added to @com_github_google_quiche//:quic_platform_api_test. And all tests
-# under @com_github_google_quiche// are configured in test/coverage/gen_build.sh to run in
+# tests are added to @quiche//:quic_platform_api_test. And all tests
+# under @quiche// are configured in test/coverage/gen_build.sh to run in
 # CI.
 # For some APIs which are not covered in QUICHE tests, their tests is added into
 # //test/common/quic/platform/.
@@ -42,7 +42,7 @@ envoy_cc_library(
     hdrs = ["quiche_flags_constants.h"],
     deps = [
         "//source/common/http:http_option_limits_lib",
-        "@com_google_absl//absl/base",
+        "@abseil-cpp//absl/base",
     ],
 )
 
@@ -53,11 +53,11 @@ envoy_quiche_platform_impl_cc_library(
     deps = [
         ":quiche_flags_constants",
         "//source/common/common:assert_lib",
-        "@com_github_google_quiche//:quiche_feature_flags_list_lib",
-        "@com_github_google_quiche//:quiche_protocol_flags_list_lib",
-        "@com_google_absl//absl/base",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/synchronization",
+        "@abseil-cpp//absl/base",
+        "@abseil-cpp//absl/flags:flag",
+        "@abseil-cpp//absl/synchronization",
+        "@quiche//:quiche_feature_flags_list_lib",
+        "@quiche//:quiche_protocol_flags_list_lib",
     ],
 )
 
@@ -66,9 +66,9 @@ envoy_quiche_platform_impl_cc_library(
     srcs = ["quiche_time_utils_impl.cc"],
     hdrs = ["quiche_time_utils_impl.h"],
     deps = [
-        "@com_google_absl//absl/base",
-        "@com_google_absl//absl/time",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/base",
+        "@abseil-cpp//absl/time",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -93,14 +93,14 @@ envoy_quiche_platform_impl_cc_library(
     deps = [
         ":quiche_flags_impl_lib",
         "//source/common/common:assert_lib",
-        "@com_github_google_quiche//:quic_platform_export",
-        "@com_google_absl//absl/base",
-        "@com_google_absl//absl/container:btree",
-        "@com_google_absl//absl/container:inlined_vector",
-        "@com_google_absl//absl/container:node_hash_map",
-        "@com_google_absl//absl/container:node_hash_set",
-        "@com_google_absl//absl/hash",
-        "@com_google_absl//absl/memory",
+        "@abseil-cpp//absl/base",
+        "@abseil-cpp//absl/container:btree",
+        "@abseil-cpp//absl/container:inlined_vector",
+        "@abseil-cpp//absl/container:node_hash_map",
+        "@abseil-cpp//absl/container:node_hash_set",
+        "@abseil-cpp//absl/hash",
+        "@abseil-cpp//absl/memory",
+        "@quiche//:quic_platform_export",
     ],
 )
 
@@ -121,7 +121,7 @@ envoy_quiche_platform_impl_cc_library(
     ],
     deps = [
         "//source/server:backtrace_lib",
-        "@com_github_google_quiche//:quiche_common_platform_export",
+        "@quiche//:quiche_common_platform_export",
     ],
 )
 
@@ -137,10 +137,10 @@ envoy_quiche_platform_impl_cc_library(
         ":quiche_flags_impl_lib",
         ":quiche_logging_impl_lib",
         "//source/common/buffer:buffer_lib",
-        "@com_github_google_quiche//:quiche_common_buffer_allocator_lib",
-        "@com_github_google_quiche//:quiche_common_callbacks",
-        "@com_google_absl//absl/container:node_hash_map",
-        "@com_google_absl//absl/hash",
+        "@abseil-cpp//absl/container:node_hash_map",
+        "@abseil-cpp//absl/hash",
+        "@quiche//:quiche_common_buffer_allocator_lib",
+        "@quiche//:quiche_common_callbacks",
     ],
 )
 
@@ -153,5 +153,5 @@ envoy_quiche_platform_impl_cc_library(
 envoy_quiche_platform_impl_cc_library(
     name = "quiche_export_impl_lib",
     hdrs = ["quiche_export_impl.h"],
-    deps = ["@com_google_absl//absl/base"],
+    deps = ["@abseil-cpp//absl/base"],
 )

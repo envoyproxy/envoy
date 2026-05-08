@@ -28,8 +28,12 @@ absl::StatusOr<Http::FilterFactoryCb> RateLimitFilterConfig::createFilterFactory
                                                        context.scope(), server_context.runtime(),
                                                        server_context, status));
   RETURN_IF_NOT_OK_REF(status);
-  const std::chrono::milliseconds timeout =
-      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20));
+  // A timeout of 0 means infinite (no timeout). Convert to nullopt in that case.
+  const uint64_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20);
+  const absl::optional<std::chrono::milliseconds> timeout =
+      timeout_ms == 0
+          ? absl::nullopt
+          : absl::optional<std::chrono::milliseconds>(std::chrono::milliseconds(timeout_ms));
 
   RETURN_IF_NOT_OK(Config::Utility::checkTransportVersion(proto_config.rate_limit_service()));
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =

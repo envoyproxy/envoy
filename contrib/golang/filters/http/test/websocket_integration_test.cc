@@ -1,3 +1,5 @@
+#include "test/integration/websocket_integration_test.h"
+
 #include <string>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -7,7 +9,6 @@
 #include "source/common/protobuf/utility.h"
 
 #include "test/integration/utility.h"
-#include "test/integration/websocket_integration_test.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"

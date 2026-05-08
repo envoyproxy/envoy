@@ -21,9 +21,9 @@ envoy_extension_cc_test(
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
-        "@com_github_msgpack_cpp//:msgpack",
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/fluentd/v3:pkg_cc_proto",
+        "@msgpack-cxx//:msgpack",
     ],
 )
 
@@ -52,7 +52,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/formatter/cel:config",
         "//test/integration:integration_lib",
-        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/fluentd/v3:pkg_cc_proto",

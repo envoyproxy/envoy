@@ -10,6 +10,20 @@ load(
 
 licenses(["notice"])  # Apache 2
 
+CODE_CHECKS = [
+    "changelog",
+    "extensions_fuzzed",
+    "extensions_metadata",
+    "extensions_owners",
+    "extensions_registered",
+    "glint",
+    "gofmt",
+    "python_flake8",
+    "runtime_guards",
+    "shellcheck",
+    "yamllint",
+]
+
 FUZZ_FILTER_COUNT = (
     len(READFILTER_FUZZ_FILTERS) +
     len(READFILTER_NOFUZZ_FILTERS)
@@ -34,7 +48,8 @@ py_console_script_binary(
         "--extensions_build_config=$(location :extensions_build_config)",
         "--extensions_fuzzed_count=%s" % FUZZ_FILTER_COUNT,
         "--path=%s" % PATH,
-        "-b shellcheck:$(location @com_github_aignas_rules_shellcheck//:shellcheck)",
+        "-c %s" % " ".join(CODE_CHECKS),
+        "-b shellcheck:$(location @shellcheck)",
         "-b gofmt:$(location @go_sdk//:bin/gofmt)",
         "-x bazel/repo.bzl",
     ],
@@ -42,8 +57,8 @@ py_console_script_binary(
         ":extensions_build_config",
         "//:CODEOWNERS",
         "//:OWNERS.md",
-        "@com_github_aignas_rules_shellcheck//:shellcheck",
         "@go_sdk//:bin/gofmt",
+        "@shellcheck",
     ],
     pkg = "@base_pip3//envoy_code_check",
     script = "envoy.code.check",
@@ -64,12 +79,14 @@ genrule(
         --extensions_build_config=$(location :extensions_build_config) \
         --extensions_fuzzed_count=%s \
         --path=%s \
-        -b shellcheck:$(location @com_github_aignas_rules_shellcheck//:shellcheck) \
+        -c %s \
+        -b shellcheck:$(location @shellcheck) \
         -b gofmt:$(location @go_sdk//:bin/gofmt) \
       > $@ 2>&1 || :
     """ % (
         FUZZ_FILTER_COUNT,
         PATH,
+        " ".join(CODE_CHECKS),
     ),
     tags = ["no-remote-exec"],
     tools = [
@@ -78,8 +95,8 @@ genrule(
         "//:CODEOWNERS",
         "//:OWNERS.md",
         "//bazel:volatile-scm-hash",
-        "@com_github_aignas_rules_shellcheck//:shellcheck",
         "@go_sdk//:bin/gofmt",
+        "@shellcheck",
     ],
 )
 

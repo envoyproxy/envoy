@@ -22,6 +22,21 @@ HeaderMutationFactoryConfig::createFilterFactoryFromProtoTyped(
   };
 }
 
+Http::FilterFactoryCb
+HeaderMutationFactoryConfig::createFilterFactoryFromProtoWithServerContextTyped(
+    const ProtoConfig& config, const std::string&,
+    Server::Configuration::ServerFactoryContext& context) {
+  absl::Status creation_status = absl::OkStatus();
+  auto filter_config = std::make_shared<HeaderMutationConfig>(config, context, creation_status);
+  if (!creation_status.ok()) {
+    ExceptionUtil::throwEnvoyException(std::string(creation_status.message()));
+  }
+
+  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<HeaderMutation>(filter_config));
+  };
+}
+
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 HeaderMutationFactoryConfig::createRouteSpecificFilterConfigTyped(
     const PerRouteProtoConfig& proto_config, Server::Configuration::ServerFactoryContext& context,

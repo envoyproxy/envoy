@@ -12,10 +12,12 @@ Extensions
   accesslog/accesslog
   certificate_mappers/certificate_mappers
   certificate_selectors/certificate_selectors
+  certificate_validators/certificate_validators
   cluster/cluster
   common/common
   compression/compression
   config_validators/config_validators
+  content_parsers/content_parsers
   contrib/contrib
   dns_resolver/dns_resolver
   endpoint/endpoint

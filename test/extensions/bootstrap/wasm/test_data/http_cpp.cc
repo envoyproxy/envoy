@@ -38,7 +38,8 @@ WASM_EXPORT(void, proxy_on_tick, (uint32_t)) {
   }
 }
 
-WASM_EXPORT(void, proxy_on_http_call_response, (uint32_t, uint32_t, uint32_t headers, uint32_t, uint32_t)) {
+WASM_EXPORT(void, proxy_on_http_call_response,
+            (uint32_t, uint32_t, uint32_t headers, uint32_t, uint32_t)) {
   logTrace("KEY: " + std::string(std::getenv("KEY")));
   if (headers != 0) {
     auto status = getHeaderMapValue(WasmHeaderMapType::HttpCallResponseHeaders, "status");

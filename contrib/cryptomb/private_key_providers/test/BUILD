@@ -93,6 +93,6 @@ envoy_cc_benchmark_binary(
         "//contrib/cryptomb/private_key_providers/source:ipp_crypto_wrapper_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )

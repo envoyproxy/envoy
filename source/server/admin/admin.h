@@ -195,6 +195,7 @@ public:
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
   }
+  Http::ClientCertFormat clientCertFormat() const override { return Http::ClientCertFormat::Text; }
   const Network::Address::Instance& localAddress() override;
   const absl::optional<std::string>& userAgent() override { return user_agent_; }
   Tracing::TracerSharedPtr tracer() override { return nullptr; }
@@ -249,6 +250,12 @@ public:
   bool appendLocalOverload() const override { return false; }
   bool appendXForwardedPort() const override { return false; }
   bool addProxyProtocolConnectionState() const override { return true; }
+  const absl::flat_hash_set<uint32_t>& httpsDestinationPorts() const override {
+    return https_destination_ports_;
+  }
+  const absl::flat_hash_set<uint32_t>& httpDestinationPorts() const override {
+    return http_destination_ports_;
+  }
 
 private:
   friend class AdminTestingPeer;
@@ -391,6 +398,9 @@ private:
     bool bindToPort() const override { return true; }
     bool handOffRestoredDestinationConnections() const override { return false; }
     uint32_t perConnectionBufferLimitBytes() const override { return 0; }
+    std::chrono::milliseconds perConnectionBufferHighWatermarkTimeout() const override {
+      return std::chrono::milliseconds::zero();
+    }
     std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
     bool continueOnListenerFiltersTimeout() const override { return false; }
     Stats::Scope& listenerScope() override { return scope_; }
@@ -519,6 +529,8 @@ private:
   const bool ignore_global_conn_limit_;
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
   const Http::HeaderValidatorFactoryPtr header_validator_factory_;
+  const absl::flat_hash_set<uint32_t> https_destination_ports_;
+  const absl::flat_hash_set<uint32_t> http_destination_ports_;
 };
 
 } // namespace Server

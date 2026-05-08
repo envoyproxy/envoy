@@ -123,8 +123,8 @@ public:
 
     ON_CALL(*virtual_host, metadata()).WillByDefault(ReturnRef(virtual_host_metadata_));
 
-    ON_CALL(decoder_callbacks_.stream_info_, virtualHost()).WillByDefault(ReturnRef(virtual_host));
-    ON_CALL(encoder_callbacks_.stream_info_, virtualHost()).WillByDefault(ReturnRef(virtual_host));
+    decoder_callbacks_.stream_info_.virtual_host_ = virtual_host;
+    encoder_callbacks_.stream_info_.virtual_host_ = virtual_host;
 
     EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
     EXPECT_CALL(encoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
@@ -140,7 +140,7 @@ public:
     auto route = std::make_shared<NiceMock<Router::MockRoute>>();
     TestUtility::loadFromYaml(yaml, route->metadata_);
 
-    ON_CALL(stream_info_, route()).WillByDefault(Return(route));
+    stream_info_.route_ = route;
 
     EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
     EXPECT_CALL(encoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
@@ -152,6 +152,9 @@ public:
     EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
   }
 
+  // stats_store_ must be declared before config_ so that the sub-scope held by
+  // FilterConfig (lua_stats_scope_) is destroyed before the store itself.
+  Stats::TestUtil::TestStore stats_store_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Api::MockApi> api_;
@@ -167,7 +170,6 @@ public:
   NiceMock<Envoy::Network::MockConnection> connection_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
   Tracing::MockSpan child_span_;
-  Stats::TestUtil::TestStore stats_store_;
 
   const std::string HEADER_ONLY_SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
@@ -2309,7 +2311,7 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandleNoRoute) {
   )EOF"};
 
   InSequence s;
-  ON_CALL(decoder_callbacks_, route()).WillByDefault(Return(nullptr));
+  ON_CALL(decoder_callbacks_, route()).WillByDefault(Return(OptRef<const Router::Route>()));
   setup(SCRIPT);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
@@ -2831,6 +2833,8 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():sha256PeerCertificateDigest())
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():serialNumberPeerCertificate())
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():issuerPeerCertificate())
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():serialNumberPeerCertificateIssuer())
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():sha256PeerCertificateIssuerDigest())
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():subjectPeerCertificate())
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():parsedSubjectPeerCertificate():commonName())
         request_handle:logTrace(table.concat(request_handle:streamInfo():downstreamSslConnection():parsedSubjectPeerCertificate():organizationName(), ","))
@@ -2897,6 +2901,14 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
   const std::string peer_cert_issuer = "peer-cert-issuer";
   EXPECT_CALL(*connection_info, issuerPeerCertificate()).WillOnce(ReturnRef(peer_cert_issuer));
 
+  const std::string peer_cert_issuer_serial = "peer-cert-issuer-serial";
+  EXPECT_CALL(*connection_info, serialNumberPeerCertificateIssuer())
+      .WillOnce(ReturnRef(peer_cert_issuer_serial));
+
+  const std::string peer_cert_issuer_hash = "peer-cert-issuer-hash";
+  EXPECT_CALL(*connection_info, sha256PeerCertificateIssuerDigest())
+      .WillOnce(ReturnRef(peer_cert_issuer_hash));
+
   const std::string peer_cert_subject = "peer-cert-subject";
   EXPECT_CALL(*connection_info, subjectPeerCertificate()).WillOnce(ReturnRef(peer_cert_subject));
 
@@ -2941,6 +2953,8 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
                                  {"trace", peer_cert_digest},
                                  {"trace", peer_cert_serial_number},
                                  {"trace", peer_cert_issuer},
+                                 {"trace", peer_cert_issuer_serial},
+                                 {"trace", peer_cert_issuer_hash},
                                  {"trace", peer_cert_subject},
                                  {"trace", "Test CN"},
                                  {"trace", "Test O1,Test O2"},
@@ -3709,8 +3723,11 @@ TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHost) {
   setup(SCRIPT);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_CALL(decoder_callbacks_,
-              setUpstreamOverrideHost(testing::Pair(testing::Eq("192.168.21.11"), false)));
+  EXPECT_CALL(
+      decoder_callbacks_,
+      setUpstreamOverrideHost(testing::AllOf(
+          testing::Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
+          testing::Field(&Upstream::LoadBalancerContext::OverrideHost::strict, false))));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
@@ -3726,8 +3743,11 @@ TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHostStrict) {
   setup(SCRIPT);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_CALL(decoder_callbacks_,
-              setUpstreamOverrideHost(testing::Pair(testing::Eq("192.168.21.11"), true)));
+  EXPECT_CALL(
+      decoder_callbacks_,
+      setUpstreamOverrideHost(testing::AllOf(
+          testing::Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
+          testing::Field(&Upstream::LoadBalancerContext::OverrideHost::strict, true))));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
@@ -3790,8 +3810,11 @@ TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHostDifferentPaths) {
 
   {
     Http::TestRequestHeaderMapImpl request_headers{{":path", "/path1"}};
-    EXPECT_CALL(decoder_callbacks_,
-                setUpstreamOverrideHost(testing::Pair(testing::Eq("192.168.21.11"), true)));
+    EXPECT_CALL(
+        decoder_callbacks_,
+        setUpstreamOverrideHost(testing::AllOf(
+            testing::Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
+            testing::Field(&Upstream::LoadBalancerContext::OverrideHost::strict, true))));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   }
 
@@ -3799,8 +3822,11 @@ TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHostDifferentPaths) {
 
   {
     Http::TestRequestHeaderMapImpl request_headers{{":path", "/path2"}};
-    EXPECT_CALL(decoder_callbacks_,
-                setUpstreamOverrideHost(testing::Pair(testing::Eq("192.168.21.11"), true)));
+    EXPECT_CALL(
+        decoder_callbacks_,
+        setUpstreamOverrideHost(testing::AllOf(
+            testing::Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
+            testing::Field(&Upstream::LoadBalancerContext::OverrideHost::strict, true))));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   }
 }
@@ -4306,7 +4332,7 @@ TEST_F(LuaHttpFilterTest, GetVirtualHostMetadataFromHandleNoRoute) {
   setupVirtualHostMetadata(METADATA);
 
   // Request path
-  ON_CALL(decoder_callbacks_, route()).WillByDefault(Return(nullptr));
+  ON_CALL(decoder_callbacks_, route()).WillByDefault(Return(OptRef<const Router::Route>()));
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
@@ -4319,7 +4345,7 @@ TEST_F(LuaHttpFilterTest, GetVirtualHostMetadataFromHandleNoRoute) {
                              });
 
   // Response path
-  ON_CALL(encoder_callbacks_, route()).WillByDefault(Return(nullptr));
+  ON_CALL(encoder_callbacks_, route()).WillByDefault(Return(OptRef<const Router::Route>()));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
@@ -4473,6 +4499,74 @@ TEST_F(LuaHttpFilterTest, GetRouteFromHandleNoRoute) {
 
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
   EXPECT_EQ(2, stats_store_.counter("test.lua.executions").value());
+}
+
+// Test stats() API from Lua script.
+TEST_F(LuaHttpFilterTest, StatsApi) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local stats = request_handle:stats()
+
+      -- Test counter.
+      local counter = stats:counter("my_counter")
+      counter:inc()
+      counter:add(5)
+
+      -- Test gauge.
+      local gauge = stats:gauge("my_gauge")
+      gauge:set(100)
+      gauge:inc()
+      gauge:dec()
+      gauge:add(10)
+      gauge:sub(5)
+
+      -- Test histogram.
+      local histogram = stats:histogram("my_histogram", "ms")
+      histogram:recordValue(42)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  // Verify stats were created with the correct prefix.
+  EXPECT_EQ(6, stats_store_.counter("test.lua.my_counter").value());
+
+  auto gauge = stats_store_.findGaugeByString("test.lua.my_gauge");
+  ASSERT_TRUE(gauge.has_value());
+  EXPECT_EQ(105, gauge->get().value());
+
+  auto histogram = stats_store_.findHistogramByString("test.lua.my_histogram");
+  ASSERT_TRUE(histogram.has_value());
+  EXPECT_EQ(Stats::Histogram::Unit::Milliseconds, histogram->get().unit());
+}
+
+// Test stats() API with custom stat_prefix.
+TEST_F(LuaHttpFilterTest, StatsApiWithPrefix) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local stats = request_handle:stats()
+      local counter = stats:counter("requests")
+      counter:inc()
+    end
+  )EOF"};
+
+  InSequence s;
+  envoy::extensions::filters::http::lua::v3::Lua lua_config;
+  lua_config.mutable_default_source_code()->set_inline_string(SCRIPT);
+  lua_config.set_stat_prefix("custom_prefix");
+  envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_config;
+  setupConfig(lua_config, per_route_config);
+  setupFilter();
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  // Verify the counter was created with the custom prefix.
+  EXPECT_EQ(1, stats_store_.counter("test.lua.custom_prefix.requests").value());
 }
 
 } // namespace

@@ -16,6 +16,7 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/options.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/registry.h"
@@ -177,9 +178,10 @@ public:
                       ThreadLocal::SlotAllocator& slot_allocator,
                       const envoy::config::overload::v3::OverloadManager& config,
                       ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-                      const Server::MockOptions& options, absl::Status& creation_status)
+                      const Server::MockOptions& options, Runtime::Loader& runtime,
+                      absl::Status& creation_status)
       : OverloadManagerImpl(dispatcher, stats_scope, slot_allocator, config, validation_visitor,
-                            api, options, creation_status) {
+                            api, options, runtime, creation_status) {
     THROW_IF_NOT_OK_REF(creation_status);
     EXPECT_CALL(*this, createScaledRangeTimerManager)
         .Times(AnyNumber())
@@ -228,7 +230,7 @@ protected:
     absl::Status creation_status = absl::OkStatus();
     return std::make_unique<TestOverloadManager>(dispatcher_, *stats_.rootScope(), thread_local_,
                                                  parseConfig(config), validation_visitor_, *api_,
-                                                 options_, creation_status);
+                                                 options_, runtime_, creation_status);
   }
 
   FakeResourceMonitorFactory<Envoy::Protobuf::Struct> factory1_;
@@ -249,6 +251,7 @@ protected:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
   Server::MockOptions options_;
+  NiceMock<Runtime::MockLoader> runtime_;
 };
 
 constexpr char kRegularStateConfig[] = R"YAML(
@@ -758,13 +761,69 @@ TEST_F(OverloadManagerImplTest, DuplicateOverloadAction) {
 TEST_F(OverloadManagerImplTest, ActionWithUnexpectedTypedConfig) {
   const std::string config = R"EOF(
     actions:
-      - name: "envoy.overload_actions.shrink_heap"
+      - name: "envoy.overload_actions.stop_accepting_requests"
         typed_config:
           "@type": type.googleapis.com/google.protobuf.Empty
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
                           ".* unexpected .* typed_config .*");
+}
+
+TEST_F(OverloadManagerImplTest, ShrinkHeapWithTypedConfig) {
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: "envoy.resource_monitors.fake_resource1"
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+    actions:
+      - name: "envoy.overload_actions.shrink_heap"
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.overload.v3.ShrinkHeapConfig
+          timer_interval: 5s
+          max_unfreed_memory_bytes: 52428800
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            threshold:
+              value: 0.9
+  )EOF";
+
+  auto manager(createOverloadManager(config));
+  auto config_opt = manager->getShrinkHeapConfig();
+  ASSERT_TRUE(config_opt.has_value());
+  EXPECT_EQ(config_opt->timer_interval().seconds(), 5);
+  EXPECT_EQ(config_opt->max_unfreed_memory_bytes().value(), 52428800);
+}
+
+TEST_F(OverloadManagerImplTest, ShrinkHeapWithWrongTypedConfig) {
+  const std::string config = R"EOF(
+    actions:
+      - name: "envoy.overload_actions.shrink_heap"
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
+                          "Unable to unpack as .*ShrinkHeapConfig");
+}
+
+TEST_F(OverloadManagerImplTest, ShrinkHeapWithoutTypedConfig) {
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: "envoy.resource_monitors.fake_resource1"
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+    actions:
+      - name: "envoy.overload_actions.shrink_heap"
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            threshold:
+              value: 0.9
+  )EOF";
+
+  auto manager(createOverloadManager(config));
+  auto config_opt = manager->getShrinkHeapConfig();
+  EXPECT_FALSE(config_opt.has_value());
 }
 
 TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithoutAction) {

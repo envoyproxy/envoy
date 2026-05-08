@@ -34,6 +34,7 @@ const static bool should_log = true;
 
 // TODO: find a way for extensions to register new logger IDs
 #define ALL_LOGGER_IDS(FUNCTION)                                                                   \
+  FUNCTION(a2a)                                                                                    \
   FUNCTION(admin)                                                                                  \
   FUNCTION(alternate_protocols_cache)                                                              \
   FUNCTION(aws)                                                                                    \
@@ -68,6 +69,7 @@ const static bool should_log = true;
   FUNCTION(init)                                                                                   \
   FUNCTION(io)                                                                                     \
   FUNCTION(jwt)                                                                                    \
+  FUNCTION(json_rpc)                                                                               \
   FUNCTION(kafka)                                                                                  \
   FUNCTION(key_value_store)                                                                        \
   FUNCTION(lua)                                                                                    \
@@ -91,6 +93,7 @@ const static bool should_log = true;
   FUNCTION(runtime)                                                                                \
   FUNCTION(stats)                                                                                  \
   FUNCTION(secret)                                                                                 \
+  FUNCTION(sse)                                                                                    \
   FUNCTION(tap)                                                                                    \
   FUNCTION(testing)                                                                                \
   FUNCTION(thrift)                                                                                 \
@@ -475,6 +478,24 @@ public:
   }
 
   constexpr static char Placeholder = '+';
+};
+
+/**
+ * When added to a formatter, this adds 'N' as a user defined flag in the log pattern that emits
+ * the Envoy version string set via setVersion(). Use %N in --log-format to include the running
+ * version in every log line. Call setVersion() once at server start-up (before any logs are
+ * written) with the result of VersionInfo::version().
+ */
+class EnvoyVersion : public spdlog::custom_flag_formatter {
+public:
+  void format(const spdlog::details::log_msg& msg, const std::tm& tm,
+              spdlog::memory_buf_t& dest) override;
+
+  std::unique_ptr<custom_flag_formatter> clone() const override {
+    return spdlog::details::make_unique<EnvoyVersion>();
+  }
+
+  constexpr static char Placeholder = 'N';
 };
 
 } // namespace CustomFlagFormatter

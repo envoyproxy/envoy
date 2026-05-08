@@ -8,7 +8,7 @@ cc_library(
     hdrs = ["file_descriptor_info.h"],
     visibility = ["//visibility:public"],
     deps = [
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -24,9 +24,9 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":file_descriptor_info",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
+        "@abseil-cpp//absl/memory",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
         "@com_google_protobuf//:protobuf",
     ],
 )
@@ -36,8 +36,8 @@ cc_library(
     srcs = ["file_descriptor_generator.cc"],
     hdrs = ["file_descriptor_generator.h"],
     deps = [
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
         "@com_google_protobuf//:protobuf",
         "@com_google_protobuf//src/google/protobuf/compiler:code_generator",
     ],
@@ -62,9 +62,9 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":text_format_transcoder",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
+        "@abseil-cpp//absl/memory",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
         "@com_google_protobuf//:protobuf",
     ],
 )

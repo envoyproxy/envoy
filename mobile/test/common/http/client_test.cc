@@ -1,16 +1,22 @@
-#include <atomic>
+#include <cstdint>
+#include <memory>
 
+#include "envoy/http/header_map.h"
+#include "envoy/stream_info/filter_state.h"
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/quic/scone_state.h"
 #include "source/common/stats/isolated_store_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/common/mocks/common/mocks.h"
 #include "test/common/mocks/event/mocks.h"
 #include "test/mocks/buffer/mocks.h"
+#include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/api_listener.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -25,10 +31,7 @@ using testing::ContainsRegex;
 using testing::Eq;
 using testing::NiceMock;
 using testing::Return;
-using testing::ReturnPointee;
 using testing::ReturnRef;
-using testing::SaveArg;
-using testing::WithArg;
 
 namespace Envoy {
 namespace Http {
@@ -80,6 +83,8 @@ protected:
       return ENVOY_SUCCESS;
     });
   }
+
+  void TearDown() override { http_client_.shutdownApiListener(); }
 
   struct StreamCallbacksCalled {
     uint32_t on_headers_calls_{0};
@@ -149,6 +154,10 @@ protected:
           return std::make_unique<TestHandle>(*request_decoder_);
         }));
     http_client_.startStream(stream_, std::move(stream_callbacks), explicit_flow_control_ != OFF);
+  }
+
+  Client::DirectStreamSharedPtr getDirectStream(envoy_stream_t stream_handle) {
+    return http_client_.getStream(stream_handle, Client::GetStreamFilters::AllowOnlyForOpenStreams);
   }
 
   void resumeDataIfEarlyResume(int32_t bytes) {
@@ -264,7 +273,7 @@ TEST_P(ClientTest, BasicStreamData) {
   // test data functionality.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(*request_decoder_, decodeData(BufferStringEqual("request body"), true));
+  EXPECT_CALL(*request_decoder_, decodeData(BufferString("request body"), true));
   resumeDataIfEarlyResume(20); // Resume before data arrives.
   http_client_.sendData(stream_, std::move(request_data), true);
   resumeDataIfLateResume(20); // Resume after data arrives.
@@ -349,7 +358,7 @@ TEST_P(ClientTest, MultipleDataStream) {
   // Send request data.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(*request_decoder_, decodeData(BufferStringEqual("request body1"), false));
+  EXPECT_CALL(*request_decoder_, decodeData(BufferString("request body1"), false));
   http_client_.sendData(stream_, std::move(request_data1), false);
   EXPECT_EQ(callbacks_called.on_send_window_available_calls_, 0);
   if (explicit_flow_control_) {
@@ -362,7 +371,7 @@ TEST_P(ClientTest, MultipleDataStream) {
   // Send second request data.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(*request_decoder_, decodeData(BufferStringEqual("request body2"), true));
+  EXPECT_CALL(*request_decoder_, decodeData(BufferString("request body2"), true));
   http_client_.sendData(stream_, std::move(request_data2), true);
   // The stream is done: no further on_send_window_available calls should happen.
   EXPECT_EQ(callbacks_called.on_send_window_available_calls_, explicit_flow_control_ ? 1 : 0);
@@ -997,6 +1006,84 @@ TEST_P(ExplicitFlowControlTest, CancelWithStreamComplete) {
   ASSERT_EQ(callbacks_called.on_cancel_calls_, 1);
   ASSERT_EQ(callbacks_called.on_error_calls_, 0);
   ASSERT_EQ(callbacks_called.on_complete_calls_, 0);
+}
+
+TEST_P(ClientTest, SaveLatestStreamIntelPopulatesScone) {
+  StreamCallbacksCalled callbacks_called;
+  createStream(createDefaultStreamCallbacks(callbacks_called));
+
+  auto scone_state = std::make_shared<Quic::SconeState>();
+  scone_state->scone_max_kbps = 100;
+  scone_state->timestamp_ms = 12345;
+  stream_info_.filter_state_->setData(Quic::SconeStateKey, scone_state,
+                                      StreamInfo::FilterState::StateType::Mutable,
+                                      StreamInfo::FilterState::LifeSpan::Connection);
+
+  auto stream_ptr = getDirectStream(stream_);
+  ASSERT_NE(stream_ptr, nullptr);
+
+  stream_ptr->saveLatestStreamIntel();
+
+  EXPECT_EQ(stream_ptr->stream_intel_.scone_max_kbps, 100);
+  EXPECT_EQ(stream_ptr->stream_intel_.scone_timestamp_ms, 12345);
+  EXPECT_TRUE(scone_state->scone_max_kbps.has_value());
+  EXPECT_TRUE(scone_state->timestamp_ms.has_value());
+}
+
+TEST_P(ClientTest, SaveLatestStreamIntelPersistsScone) {
+  StreamCallbacksCalled callbacks_called;
+  createStream(createDefaultStreamCallbacks(callbacks_called));
+
+  auto scone_state = std::make_shared<Quic::SconeState>();
+  scone_state->scone_max_kbps = 100;
+  scone_state->timestamp_ms = 12345;
+  stream_info_.filter_state_->setData(Quic::SconeStateKey, scone_state,
+                                      StreamInfo::FilterState::StateType::Mutable,
+                                      StreamInfo::FilterState::LifeSpan::Connection);
+
+  auto stream_ptr = getDirectStream(stream_);
+  ASSERT_NE(stream_ptr, nullptr);
+
+  stream_ptr->saveLatestStreamIntel();
+  EXPECT_EQ(stream_ptr->stream_intel_.scone_max_kbps, 100);
+  EXPECT_EQ(stream_ptr->stream_intel_.scone_timestamp_ms, 12345);
+
+  stream_ptr->saveLatestStreamIntel();
+  EXPECT_EQ(stream_ptr->stream_intel_.scone_max_kbps, 100);
+  EXPECT_EQ(stream_ptr->stream_intel_.scone_timestamp_ms, 12345);
+}
+
+TEST_P(ClientTest, SaveLatestStreamIntelWithNoSconeData) {
+  StreamCallbacksCalled callbacks_called;
+  createStream(createDefaultStreamCallbacks(callbacks_called));
+
+  auto stream_ptr = getDirectStream(stream_);
+  ASSERT_NE(stream_ptr, nullptr);
+
+  stream_ptr->saveLatestStreamIntel();
+  EXPECT_EQ(stream_ptr->stream_intel_.scone_max_kbps, -1);
+  EXPECT_EQ(stream_ptr->stream_intel_.scone_timestamp_ms, -1);
+}
+
+TEST_P(ClientTest, SaveLatestStreamIntelWithZeroSconeValue) {
+  StreamCallbacksCalled callbacks_called;
+  createStream(createDefaultStreamCallbacks(callbacks_called));
+
+  auto scone_state = std::make_shared<Quic::SconeState>();
+  scone_state->scone_max_kbps = 0;
+  scone_state->timestamp_ms = 12345;
+  stream_info_.filter_state_->setData(Quic::SconeStateKey, scone_state,
+                                      StreamInfo::FilterState::StateType::Mutable,
+                                      StreamInfo::FilterState::LifeSpan::Connection);
+
+  auto stream_ptr = getDirectStream(stream_);
+  ASSERT_NE(stream_ptr, nullptr);
+
+  stream_ptr->saveLatestStreamIntel();
+  EXPECT_EQ(stream_ptr->stream_intel_.scone_max_kbps, 0);
+  EXPECT_EQ(stream_ptr->stream_intel_.scone_timestamp_ms, 12345);
+  EXPECT_TRUE(scone_state->scone_max_kbps.has_value());
+  EXPECT_TRUE(scone_state->timestamp_ms.has_value());
 }
 
 } // namespace Http

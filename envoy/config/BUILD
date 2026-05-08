@@ -15,7 +15,7 @@ envoy_cc_library(
         "//envoy/common:time_interface",
         "//source/common/common:assert_lib",
         "//source/common/protobuf",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -43,7 +43,7 @@ envoy_cc_library(
     hdrs = ["context_provider.h"],
     deps = [
         "//envoy/common:callback",
-        "@com_github_cncf_xds//xds/core/v3:pkg_cc_proto",
+        "@xds//xds/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -69,6 +69,7 @@ envoy_cc_library(
         ":eds_resources_cache_interface",
         ":subscription_interface",
         "//envoy/stats:stats_macros",
+        "//envoy/upstream:load_stats_reporter_interface",
         "//source/common/common:cleanup_lib",
         "//source/common/protobuf",
     ],
@@ -89,8 +90,9 @@ envoy_cc_library(
         ":custom_config_validators_interface",
         ":subscription_interface",
         "//envoy/common:backoff_strategy_interface",
-        "@com_github_cncf_xds//xds/core/v3:pkg_cc_proto",
+        "//envoy/upstream:load_stats_reporter_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@xds//xds/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -130,7 +132,7 @@ envoy_cc_library(
         ":typed_config_interface",
         "//envoy/api:api_interface",
         "//envoy/protobuf:message_validator_interface",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )

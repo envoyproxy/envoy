@@ -27,6 +27,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/quic/quic_io_handle_wrapper.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/tls/cert_compression.h"
 
 #include "absl/numeric/int128.h"
 #include "absl/strings/str_cat.h"
@@ -409,6 +410,9 @@ void convertQuicConfig(const envoy::config::core::v3::QuicProtocolOptions& confi
     quic_config.SetIdleNetworkTimeout(quic::QuicTimeDelta::FromSeconds(
         DurationUtil::durationToSeconds(config.idle_network_timeout())));
   }
+  if (config.has_enable_scone()) {
+    quic_config.set_parse_scone_packets(config.enable_scone().value());
+  }
 }
 
 void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,
@@ -442,6 +446,14 @@ quic::QuicEcnCodepoint getQuicEcnCodepointFromTosByte(uint8_t tos_byte) {
   // bits of the TOS byte of the IP header.
   constexpr uint8_t kEcnMask = 0b00000011;
   return static_cast<quic::QuicEcnCodepoint>(tos_byte & kEcnMask);
+}
+
+void registerCertCompression(SSL_CTX* ssl_ctx) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.tls_certificate_compression_brotli")) {
+    Extensions::TransportSockets::Tls::CertCompression::registerBrotli(ssl_ctx);
+  }
+  Extensions::TransportSockets::Tls::CertCompression::registerZlib(ssl_ctx);
 }
 
 } // namespace Quic

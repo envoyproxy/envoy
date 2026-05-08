@@ -107,8 +107,8 @@ bool base64Decode(const std::basic_string<char>& input, std::vector<uint8_t>* ou
         temp |= *cursor + 0x04;
       } else if (*cursor == 0x2B) {
         temp |= 0x3E; // change to 0x2D for URL alphabet
-      }  else if (*cursor == 0x2F) {
-        temp |= 0x3F;                     // change to 0x5F for URL alphabet
+      } else if (*cursor == 0x2F) {
+        temp |= 0x3F;                       // change to 0x5F for URL alphabet
       } else if (*cursor == padCharacter) { // pad
         switch (input.end() - cursor) {
         case 1: // One pad character
@@ -128,7 +128,7 @@ bool base64Decode(const std::basic_string<char>& input, std::vector<uint8_t>* ou
     }
     decodedBytes.push_back((temp >> 16) & 0x000000FF);
     decodedBytes.push_back((temp >> 8) & 0x000000FF);
-    decodedBytes.push_back((temp)&0x000000FF);
+    decodedBytes.push_back((temp) & 0x000000FF);
   }
 Ldone:
   *output = std::move(decodedBytes);

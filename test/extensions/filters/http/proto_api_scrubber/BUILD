@@ -47,15 +47,14 @@ envoy_cc_test(
         "//source/extensions/matching/input_matchers/cel_matcher:config",
         "//test/common/matcher:test_utility_lib",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/proto:apikeys_proto_cc_proto",
         "//test/test_common:environment_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
-        "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
-        "@com_google_absl//absl/status",
+        "@abseil-cpp//absl/status",
         "@envoy_api//envoy/extensions/filters/http/proto_api_scrubber/v3:pkg_cc_proto",
+        "@xds//xds/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
@@ -87,8 +86,8 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/log",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/log",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -116,9 +115,8 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/grpc_field_extraction/message_converter:message_converter_test_lib",
         "//test/integration:http_protocol_integration_lib",
         "//test/proto:apikeys_proto_cc_proto",
-        "//test/test_common:registry_lib",
-        "@com_google_absl//absl/strings:str_format",
-        "@com_google_cel_cpp//parser",
+        "@abseil-cpp//absl/strings:str_format",
+        "@cel-cpp//parser",
         "@envoy_api//envoy/extensions/filters/http/proto_api_scrubber/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/matching/common_inputs/network/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
@@ -145,9 +143,9 @@ envoy_cc_benchmark_binary(
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
-        "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
-        "@com_google_cel_cpp//parser",
+        "@cel-cpp//parser",
         "@envoy_api//envoy/extensions/filters/http/proto_api_scrubber/v3:pkg_cc_proto",
+        "@xds//xds/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
@@ -170,6 +168,6 @@ envoy_cc_fuzz_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:utility_lib",
-        "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
+        "@xds//xds/type/matcher/v3:pkg_cc_proto",
     ],
 )

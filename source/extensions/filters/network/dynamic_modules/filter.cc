@@ -58,12 +58,16 @@ void DynamicModuleNetworkFilter::destroy() {
     config_->on_network_filter_destroy_(in_module_filter_);
     in_module_filter_ = nullptr;
   }
+  // Clear the cached dispatcher so any concurrent foreign-thread `commit()` short-circuits.
+  cached_dispatcher_.store(nullptr, std::memory_order_release);
   destroyed_ = true;
 }
 
 void DynamicModuleNetworkFilter::initializeReadFilterCallbacks(
     Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
+  // Publish the worker dispatcher for cross-thread `commit()`; see `dispatcher()`.
+  cached_dispatcher_.store(&callbacks.connection().dispatcher(), std::memory_order_release);
 
   const std::string& worker_name = callbacks.connection().dispatcher().name();
   auto pos = worker_name.find_first_of('_');
@@ -100,11 +104,13 @@ Network::FilterStatus DynamicModuleNetworkFilter::onData(Buffer::Instance& data,
   if (in_module_filter_ == nullptr) {
     return Network::FilterStatus::Continue;
   }
-  // Set the current read buffer for ABI callbacks.
+  // Set the current read buffer for ABI callbacks. The buffer pointer is kept after the callback
+  // returns so that modules can access buffered data outside of on_read (e.g., in on_scheduled or
+  // on_http_callout_done). The buffer is the connection's persistent read buffer and remains valid
+  // for the lifetime of the connection.
   current_read_buffer_ = &data;
   auto status = config_->on_network_filter_read_(thisAsVoidPtr(), in_module_filter_, data.length(),
                                                  end_stream);
-  current_read_buffer_ = nullptr;
   return toEnvoyFilterStatus(status);
 }
 
@@ -112,11 +118,13 @@ Network::FilterStatus DynamicModuleNetworkFilter::onWrite(Buffer::Instance& data
   if (in_module_filter_ == nullptr) {
     return Network::FilterStatus::Continue;
   }
-  // Set the current write buffer for ABI callbacks.
+  // Set the current write buffer for ABI callbacks. The buffer pointer is kept after the callback
+  // returns so that modules can access buffered data outside of on_write (e.g., in on_scheduled).
+  // The buffer is the connection's persistent write buffer and remains valid for the lifetime of
+  // the connection.
   current_write_buffer_ = &data;
   auto status = config_->on_network_filter_write_(thisAsVoidPtr(), in_module_filter_, data.length(),
                                                   end_stream);
-  current_write_buffer_ = nullptr;
   return toEnvoyFilterStatus(status);
 }
 

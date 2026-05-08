@@ -92,6 +92,7 @@ def envoy_copts(repository, test = False):
                _repo("//bazel:disable_tcmalloc"): ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],
                _repo("//bazel:debug_tcmalloc"): ["-DENVOY_MEMORY_DEBUG_ENABLED=1", "-DGPERFTOOLS_TCMALLOC"],
                _repo("//bazel:gperftools_tcmalloc"): ["-DGPERFTOOLS_TCMALLOC"],
+               _repo("//bazel:jemalloc_enabled"): ["-DJEMALLOC"],
                (
                    "@platforms//cpu:x86_64",
                    "@platforms//cpu:aarch64",
@@ -136,7 +137,7 @@ def envoy_copts(repository, test = False):
 # This replaces the need for native.bind() calls and //external: references.
 EXTERNAL_DEPS_MAP = {
     # Abseil
-    "abseil_strings": "@com_google_absl//absl/strings",
+    "abseil_strings": "@abseil-cpp//absl/strings",
     # gRPC transcoding
     "grpc_transcoding": "@grpc_httpjson_transcoding//src:transcoding",
     "path_matcher": "@grpc_httpjson_transcoding//src:path_matcher",
@@ -149,8 +150,8 @@ EXTERNAL_DEPS_MAP = {
     "grpc": "@com_github_grpc_grpc//:grpc++",
     "grpc_health_proto": "@com_github_grpc_grpc//src/proto/grpc/health/v1:health_cc_proto",
     # SSL/Crypto (aliases defined in @envoy//bazel)
-    "ssl": "@envoy//bazel:boringssl",
-    "crypto": "@envoy//bazel:boringcrypto",
+    "ssl": "@envoy//bazel:ssl",
+    "crypto": "@envoy//bazel:crypto",
     # Bazel tools
     "bazel_runfiles": "@bazel_tools//tools/cpp/runfiles",
 }
@@ -197,6 +198,7 @@ def tcmalloc_external_dep(repository):
             _repo("//bazel:debug_tcmalloc"),
             _repo("//bazel:gperftools_tcmalloc"),
         ): _repo("//bazel/external:gperftools"),
+        (_repo("//bazel:jemalloc_enabled"),): _repo("//bazel/foreign_cc:jemalloc"),
         "//conditions:default": _repo("//bazel:tcmalloc_lib"),
     })
 

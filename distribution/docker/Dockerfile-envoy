@@ -1,6 +1,6 @@
 ARG BUILD_OS=ubuntu
 ARG BUILD_TAG=22.04
-ARG BUILD_SHA=104ae83764a5119017b8e8d6218fa0832b09df65aae7d5a6de29a85d813da2fb
+ARG BUILD_SHA=962f6cadeae0ea6284001009daa4cc9a8c37e75d1f5191cf0eb83fe565b63dd7
 ARG ENVOY_VRP_BASE_IMAGE=envoy-base
 
 
@@ -59,7 +59,7 @@ COPY --chown=0:0 --chmod=755 \
 
 
 # STAGE: envoy-distroless
-FROM gcr.io/distroless/base-nossl-debian12:nonroot@sha256:16b3bc268fe2aafecdb36fd896afd1f0b7578fecbd2d9e53894cf30ad70f465d AS envoy-distroless
+FROM gcr.io/distroless/base-nossl-debian12:nonroot@sha256:177f4df07b055157cc1114033c1e531b251c8f7ef5ef17e1248dc3a52ec4de60 AS envoy-distroless
 EXPOSE 10000
 ENTRYPOINT ["/usr/local/bin/envoy"]
 CMD ["-c", "/etc/envoy/envoy.yaml"]
@@ -67,8 +67,10 @@ COPY --from=binary --chown=0:0 --chmod=755 \
     /etc/envoy /etc/envoy
 COPY --from=binary --chown=0:0 --chmod=644 \
     /etc/envoy/envoy.yaml /etc/envoy/envoy.yaml
+ARG ENVOY_BINARY=envoy
+ARG ENVOY_BINARY_PREFIX=
 COPY --from=binary --chown=0:0 --chmod=755 \
-    /usr/local/bin/envoy /usr/local/bin/
+    "/usr/local/bin/${ENVOY_BINARY_PREFIX}${ENVOY_BINARY}" /usr/local/bin/envoy
 
 
 # STAGE: envoy-google-vrp-base

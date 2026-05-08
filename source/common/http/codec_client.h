@@ -81,7 +81,8 @@ public:
    * Close the underlying network connection. This is immediate and will not attempt to flush any
    * pending write data.
    */
-  void close(Network::ConnectionCloseType type = Network::ConnectionCloseType::NoFlush);
+  void close(Network::ConnectionCloseType type = Network::ConnectionCloseType::NoFlush,
+             absl::string_view details = "");
 
   /**
    * Send a codec level go away indication to the peer.
@@ -154,6 +155,9 @@ public:
 
   bool connectCalled() const { return connect_called_; }
 
+  // Get the underlying connection of the codec client for lifetimeCallbacks.
+  const Network::Connection& connection() const { return *connection_; }
+
 protected:
   /**
    * Create a codec client and connect to a remote host/port.
@@ -183,7 +187,8 @@ protected:
 
   void onIdleTimeout() {
     host_->cluster().trafficStats()->upstream_cx_idle_timeout_.inc();
-    close();
+    close(Network::ConnectionCloseType::NoFlush,
+          StreamInfo::LocalCloseReasons::get().IdleTimeoutOnConnection);
   }
 
   void disableIdleTimer() {

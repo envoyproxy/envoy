@@ -15,6 +15,7 @@ envoy_cc_library(
     hdrs = ["filter_config.h"],
     deps = [
         "//envoy/stats:stats_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/config:utility_lib",
         "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
@@ -30,10 +31,13 @@ envoy_cc_library(
     hdrs = ["filter.h"],
     deps = [
         ":filter_config_lib",
+        "//envoy/http:async_client_interface",
         "//envoy/network:filter_interface",
         "//envoy/network:listen_socket_interface",
         "//envoy/network:listener_filter_buffer_interface",
+        "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
+        "//source/common/http:message_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/router:string_accessor_lib",

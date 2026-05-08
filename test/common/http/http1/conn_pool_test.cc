@@ -16,7 +16,6 @@
 
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
-#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -1025,7 +1024,7 @@ TEST_F(Http1ConnPoolImplTest, DrainWhileConnecting) {
   conn_pool_->addIdleCallback([&]() -> void { drained.ready(); });
   conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
   EXPECT_CALL(*conn_pool_->test_clients_[0].connection_,
-              close(Network::ConnectionCloseType::NoFlush));
+              close(Network::ConnectionCloseType::NoFlush, _));
   EXPECT_CALL(drained, ready()).Times(AtLeast(1));
   handle->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
 
@@ -1070,7 +1069,7 @@ TEST_F(Http1ConnPoolImplTest, RemoteCloseToCompleteResponse) {
       }));
 
   EXPECT_CALL(*conn_pool_->test_clients_[0].connection_,
-              close(Network::ConnectionCloseType::NoFlush));
+              close(Network::ConnectionCloseType::NoFlush, _));
   EXPECT_CALL(*conn_pool_, onClientDestroy());
   conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();

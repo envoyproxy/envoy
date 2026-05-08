@@ -14,6 +14,8 @@
 #include "gtest/gtest.h"
 
 using testing::AssertionResult;
+using testing::Eq;
+using testing::Ge;
 
 namespace Envoy {
 namespace {
@@ -178,10 +180,10 @@ TEST_P(MetricsServiceIntegrationTest, BasicFlow) {
 
   switch (clientType()) {
   case Grpc::ClientType::EnvoyGrpc:
-    test_server_->waitForGaugeEq("cluster.metrics_service.upstream_rq_active", 0);
+    test_server_->waitForGauge("cluster.metrics_service.upstream_rq_active", Eq(0));
     break;
   case Grpc::ClientType::GoogleGrpc:
-    test_server_->waitForCounterGe("grpc.metrics_service.streams_closed_0", 1);
+    test_server_->waitForCounter("grpc.metrics_service.streams_closed_0", Ge(1));
     break;
   default:
     PANIC("reached unexpected code");

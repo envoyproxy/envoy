@@ -103,6 +103,7 @@ public:
   const std::vector<ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return parent_.setCurrentClientCertDetails();
   }
+  ClientCertFormat clientCertFormat() const override { return parent_.clientCertFormat(); }
   const Matcher::MatchTreePtr<HttpMatchingData>& forwardClientCertMatcher() const override {
     return parent_.forwardClientCertMatcher();
   }
@@ -147,6 +148,12 @@ public:
   bool appendLocalOverload() const override { return parent_.appendLocalOverload(); }
   bool addProxyProtocolConnectionState() const override {
     return parent_.addProxyProtocolConnectionState();
+  }
+  const absl::flat_hash_set<uint32_t>& httpsDestinationPorts() const override {
+    return parent_.httpsDestinationPorts();
+  }
+  const absl::flat_hash_set<uint32_t>& httpDestinationPorts() const override {
+    return parent_.httpDestinationPorts();
   }
 
 private:

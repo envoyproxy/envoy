@@ -6,6 +6,7 @@
 #include "envoy/network/socket.h"
 
 #include "source/common/network/io_socket_handle_impl.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/rping_interceptor.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,7 +18,7 @@ namespace ReverseConnection {
  * This class implements RAII principles to ensure proper socket cleanup and provides
  * reverse connection semantics where the connection is already established.
  */
-class UpstreamReverseConnectionIOHandle : public Network::IoSocketHandleImpl {
+class UpstreamReverseConnectionIOHandle : public RpingInterceptor {
 public:
   /**
    * Constructs an UpstreamReverseConnectionIOHandle that takes ownership of a socket.
@@ -70,6 +71,10 @@ public:
    * This allows testing of defensive code paths where owned_socket_ is nullptr.
    */
   void releaseSocketForTest() { owned_socket_.reset(); }
+
+  // Ignore all ping messages.
+  // The connection is passed on to the http2 codec.
+  void onPingMessage() override {}
 
 private:
   // The name of the cluster this reverse connection belongs to.

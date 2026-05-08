@@ -16,7 +16,7 @@
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
-#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/allocator.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/stats/null_counter.h"
 #include "source/common/stats/null_gauge.h"
@@ -78,17 +78,20 @@ public:
       : lock_(lock), wrapped_scope_(wrapped_scope), store_(store) {}
 
   ScopeSharedPtr createScope(const std::string& name, bool evictable,
-                             const ScopeStatsLimitSettings& limits) override {
+                             const ScopeStatsLimitSettings& limits,
+                             StatsMatcherSharedPtr matcher = nullptr) override {
     Thread::LockGuard lock(lock_);
     return std::make_shared<TestScopeWrapper>(
-        lock_, wrapped_scope_->createScope(name, evictable, limits), store_);
+        lock_, wrapped_scope_->createScope(name, evictable, limits, std::move(matcher)), store_);
   }
 
   ScopeSharedPtr scopeFromStatName(StatName name, bool evictable,
-                                   const ScopeStatsLimitSettings& limits) override {
+                                   const ScopeStatsLimitSettings& limits,
+                                   StatsMatcherSharedPtr matcher = nullptr) override {
     Thread::LockGuard lock(lock_);
     return std::make_shared<TestScopeWrapper>(
-        lock_, wrapped_scope_->scopeFromStatName(name, evictable, limits), store_);
+        lock_, wrapped_scope_->scopeFromStatName(name, evictable, limits, std::move(matcher)),
+        store_);
   }
 
   Counter& counterFromStatNameWithTags(const StatName& name,
@@ -166,6 +169,11 @@ public:
   Store& store() override { return store_; }
   const Store& constStore() const override { return store_; }
 
+  void setCleanupCallback(std::function<void()> callback) override {
+    Thread::LockGuard lock(lock_);
+    wrapped_scope_->setCleanupCallback(callback);
+  }
+
 private:
   Thread::MutexBasicLockable& lock_;
   ScopeSharedPtr wrapped_scope_;
@@ -211,10 +219,9 @@ private:
 };
 
 // A stats allocator which creates NotifyingCounters rather than regular CounterImpls.
-class NotifyingAllocatorImpl : public Stats::AllocatorImpl {
+class NotifyingAllocator : public Stats::Allocator {
 public:
-  using Stats::AllocatorImpl::AllocatorImpl;
-
+  NotifyingAllocator(Stats::SymbolTable& symbol_table) : Stats::Allocator(symbol_table) {}
   void waitForCounterFromStringEq(const std::string& name, uint64_t value) {
     absl::MutexLock l(mutex_);
     ENVOY_LOG_MISC(trace, "waiting for {} to be {}", name, value);
@@ -244,9 +251,9 @@ public:
 
 protected:
   Stats::Counter* makeCounterInternal(StatName name, StatName tag_extracted_name,
-                                      const StatNameTagVector& stat_name_tags) override {
+                                      StatNameTagSpan stat_name_tags) override {
     Stats::Counter* counter = new NotifyingCounter(
-        Stats::AllocatorImpl::makeCounterInternal(name, tag_extracted_name, stat_name_tags), mutex_,
+        Stats::Allocator::makeCounterInternal(name, tag_extracted_name, stat_name_tags), mutex_,
         condvar_);
     {
       absl::MutexLock l(mutex_);
@@ -460,26 +467,40 @@ public:
              Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_bootstrap_node_metadata,
              bool use_admin_server);
 
-  void waitForCounterEq(const std::string& name, uint64_t value,
-                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
-                        Event::Dispatcher* dispatcher = nullptr) override {
-    ASSERT_TRUE(
-        TestUtility::waitForCounterEq(statStore(), name, value, time_system_, timeout, dispatcher));
+  void waitForCounter(const std::string& name, testing::Matcher<uint64_t> value_matcher,
+                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
+                      Event::Dispatcher* dispatcher = nullptr) override {
+    ASSERT_TRUE(TestUtility::waitForCounter(statStore(), name, value_matcher, time_system_, timeout,
+                                            dispatcher));
   }
 
-  void waitForCounterGe(const std::string& name, uint64_t value,
-                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) override {
-    ASSERT_TRUE(TestUtility::waitForCounterGe(statStore(), name, value, time_system_, timeout));
+  template <class... Args> void waitForCounterEq(Args&&...) {
+    static_assert(DeprecatedStatWaitHelpers::always_false<Args...>,
+                  "IntegrationTestServer::waitForCounterEq was removed; use "
+                  "IntegrationTestServer::waitForCounter(name, testing::Eq(value), ...) instead.");
   }
 
-  void waitForGaugeEq(const std::string& name, uint64_t value,
-                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) override {
-    ASSERT_TRUE(TestUtility::waitForGaugeEq(statStore(), name, value, time_system_, timeout));
+  template <class... Args> void waitForCounterGe(Args&&...) {
+    static_assert(DeprecatedStatWaitHelpers::always_false<Args...>,
+                  "IntegrationTestServer::waitForCounterGe was removed; use "
+                  "IntegrationTestServer::waitForCounter(name, testing::Ge(value), ...) instead.");
   }
 
-  void waitForGaugeGe(const std::string& name, uint64_t value,
-                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) override {
-    ASSERT_TRUE(TestUtility::waitForGaugeGe(statStore(), name, value, time_system_, timeout));
+  void waitForGauge(const std::string& name, testing::Matcher<uint64_t> value_matcher,
+                    std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) override {
+    ASSERT_TRUE(TestUtility::waitForGauge(statStore(), name, value_matcher, time_system_, timeout));
+  }
+
+  template <class... Args> void waitForGaugeEq(Args&&...) {
+    static_assert(DeprecatedStatWaitHelpers::always_false<Args...>,
+                  "IntegrationTestServer::waitForGaugeEq was removed; use "
+                  "IntegrationTestServer::waitForGauge(name, testing::Eq(value), ...) instead.");
+  }
+
+  template <class... Args> void waitForGaugeGe(Args&&...) {
+    static_assert(DeprecatedStatWaitHelpers::always_false<Args...>,
+                  "IntegrationTestServer::waitForGaugeGe was removed; use "
+                  "IntegrationTestServer::waitForGauge(name, testing::Ge(value), ...) instead.");
   }
 
   void waitForCounterExists(const std::string& name) override {
@@ -566,7 +587,7 @@ public:
   virtual Stats::Store& statStore() PURE;
   virtual Server::ThreadLocalOverloadState& overloadState() PURE;
   virtual Network::Address::InstanceConstSharedPtr adminAddress() PURE;
-  virtual Stats::NotifyingAllocatorImpl& notifyingStatsAllocator() PURE;
+  virtual Stats::NotifyingAllocator& notifyingStatsAllocator() PURE;
   void useAdminInterfaceToQuit(bool use) { use_admin_interface_to_quit_ = use; }
   bool useAdminInterfaceToQuit() { return use_admin_interface_to_quit_; }
 
@@ -649,8 +670,8 @@ public:
 
   Network::Address::InstanceConstSharedPtr adminAddress() override { return admin_address_; }
 
-  Stats::NotifyingAllocatorImpl& notifyingStatsAllocator() override {
-    auto* ret = dynamic_cast<Stats::NotifyingAllocatorImpl*>(stats_allocator_.get());
+  Stats::NotifyingAllocator& notifyingStatsAllocator() override {
+    auto* ret = dynamic_cast<Stats::NotifyingAllocator*>(stats_allocator_.get());
     RELEASE_ASSERT(ret != nullptr,
                    "notifyingStatsAllocator() is not created when real_stats is true");
     return *ret;
@@ -673,7 +694,7 @@ private:
   Network::Address::InstanceConstSharedPtr admin_address_;
   absl::Notification server_gone_;
   Stats::SymbolTableImpl symbol_table_;
-  std::unique_ptr<Stats::AllocatorImpl> stats_allocator_;
+  std::unique_ptr<Stats::Allocator> stats_allocator_;
 };
 
 } // namespace Envoy

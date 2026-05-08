@@ -35,7 +35,7 @@ private:
   void setExtractedData(const Protobuf::Struct& extracted_data) override;
   void clearRouteCache() override;
   // It will be called when its verify() call is completed.
-  void onComplete(const ::google::jwt_verify::Status& status) override;
+  void onComplete(const JwtVerify::Status& status) override;
 
   // The callback function.
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_;

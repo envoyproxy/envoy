@@ -72,7 +72,9 @@ public:
   virtual void initializeReadFilters() PURE;
 
   // Closes the underlying connection.
-  virtual void close() PURE;
+  virtual void
+  close(Envoy::Network::ConnectionCloseType type = Envoy::Network::ConnectionCloseType::NoFlush,
+        absl::string_view details = "") PURE;
   // Returns the ID of the underlying connection.
   virtual uint64_t id() const PURE;
   // Returns true if this closed with an incomplete stream, for stats tracking/ purposes.
@@ -419,6 +421,9 @@ private:
   Event::SchedulableCallbackPtr upstream_ready_cb_;
   Common::DebugRecursionChecker recursion_checker_;
   Server::LoadShedPoint* create_new_connection_load_shed_{nullptr};
+
+protected:
+  bool skip_pending_overflow_on_active_rq_;
 };
 
 } // namespace ConnectionPool

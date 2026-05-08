@@ -214,7 +214,12 @@ void Filter::handleExtractionResult(const ExtractionResult& result) {
   Protobuf::Struct dest_metadata;
   for (const auto& req_field : result) {
     RELEASE_ASSERT(!req_field.path.empty(), "`req_field.path` shouldn't be empty");
-    (*dest_metadata.mutable_fields())[req_field.path] = req_field.value;
+    if (req_field.value.kind_case() == ::google::protobuf::Value::KindCase::KIND_NOT_SET) {
+      // Initialize an empty ListValue for any unset field.
+      (*dest_metadata.mutable_fields())[req_field.path].mutable_list_value();
+    } else {
+      (*dest_metadata.mutable_fields())[req_field.path] = req_field.value;
+    }
   }
   if (dest_metadata.fields_size() > 0) {
     ENVOY_STREAM_LOG(debug, "injected dynamic metadata `{}` with `{}`", *decoder_callbacks_,

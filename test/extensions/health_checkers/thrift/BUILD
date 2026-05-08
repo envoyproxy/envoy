@@ -40,7 +40,6 @@ envoy_extension_cc_test(
         "//source/extensions/health_checkers/thrift",
         "//source/extensions/health_checkers/thrift:client_lib",
         "//source/extensions/health_checkers/thrift:utility",
-        "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:simulated_time_system_lib",
     ],
 )

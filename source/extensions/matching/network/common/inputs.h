@@ -40,10 +40,10 @@ public:
     const auto& address = data.localAddress();
 
     if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+      return Matcher::DataInputGetResult::NoData();
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            address.ip()->addressAsString()};
+    const std::string& address_string = address.ip()->addressAsString();
+    return Matcher::DataInputGetResult::CreateStringView(absl::string_view(address_string));
   }
 };
 
@@ -74,10 +74,9 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& address = data.localAddress();
     if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+      return Matcher::DataInputGetResult::NoData();
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            absl::StrCat(address.ip()->port())};
+    return Matcher::DataInputGetResult::CreateString(absl::StrCat(address.ip()->port()));
   }
 };
 
@@ -104,10 +103,10 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& address = data.remoteAddress();
     if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+      return Matcher::DataInputGetResult::NoData();
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            address.ip()->addressAsString()};
+    const std::string& address_string = address.ip()->addressAsString();
+    return Matcher::DataInputGetResult::CreateStringView(absl::string_view(address_string));
   }
 };
 
@@ -133,10 +132,9 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& address = data.remoteAddress();
     if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+      return Matcher::DataInputGetResult::NoData();
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            absl::StrCat(address.ip()->port())};
+    return Matcher::DataInputGetResult::CreateString(absl::StrCat(address.ip()->port()));
   }
 };
 
@@ -162,10 +160,10 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& address = data.connectionInfoProvider().directRemoteAddress();
     if (address->type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+      return Matcher::DataInputGetResult::NoData();
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            address->ip()->addressAsString()};
+    const std::string& address_string = address->ip()->addressAsString();
+    return Matcher::DataInputGetResult::CreateStringView(absl::string_view(address_string));
   }
 };
 
@@ -185,6 +183,8 @@ public:
 DECLARE_FACTORY(DirectSourceIPInputFactory);
 DECLARE_FACTORY(HttpDirectSourceIPInputFactory);
 
+inline constexpr absl::string_view Local = "local";
+
 template <class MatchingDataType>
 class SourceTypeInput : public Matcher::DataInput<MatchingDataType> {
 public:
@@ -192,9 +192,9 @@ public:
     const bool is_local_connection =
         Network::Utility::isSameIpOrLoopback(data.connectionInfoProvider());
     if (is_local_connection) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, "local"};
+      return Matcher::DataInputGetResult::CreateStringView(Local);
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+    return Matcher::DataInputGetResult::NoData();
   }
 };
 
@@ -217,12 +217,11 @@ template <class MatchingDataType>
 class ServerNameInput : public Matcher::DataInput<MatchingDataType> {
 public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
-    const auto server_name = data.connectionInfoProvider().requestedServerName();
+    absl::string_view server_name = data.connectionInfoProvider().requestedServerName();
     if (!server_name.empty()) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-              std::string(server_name)};
+      return Matcher::DataInputGetResult::CreateStringView(server_name);
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+    return Matcher::DataInputGetResult::NoData();
   }
 };
 
@@ -260,7 +259,8 @@ DECLARE_FACTORY(TransportProtocolInputFactory);
 template <class MatchingDataType>
 class FilterStateInput : public Matcher::DataInput<MatchingDataType> {
 public:
-  FilterStateInput(const std::string& filter_state_key) : filter_state_key_(filter_state_key) {}
+  FilterStateInput(const std::string& filter_state_key, const std::string& field = "")
+      : filter_state_key_(filter_state_key), field_(field) {}
 
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto* filter_state_object =
@@ -268,19 +268,34 @@ public:
             filter_state_key_);
 
     if (filter_state_object != nullptr) {
+      // If a field is specified and the object supports field access, use getField().
+      if (!field_.empty() && filter_state_object->hasFieldSupport()) {
+        const auto field_value = filter_state_object->getField(field_);
+        if (absl::holds_alternative<absl::string_view>(field_value)) {
+          return Matcher::DataInputGetResult::CreateStringView(
+              absl::get<absl::string_view>(field_value));
+        } else if (absl::holds_alternative<int64_t>(field_value)) {
+          return Matcher::DataInputGetResult::CreateString(
+              absl::StrCat(absl::get<int64_t>(field_value)));
+        }
+        return Matcher::DataInputGetResult::NoData();
+      }
+
+      // Default: return the serialized string representation of the whole object.
       auto str = filter_state_object->serializeAsString();
       if (str.has_value()) {
-        return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, str.value()};
+        return Matcher::DataInputGetResult::CreateString(std::move(str).value());
       } else {
-        return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+        return Matcher::DataInputGetResult::NoData();
       }
     }
 
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+    return Matcher::DataInputGetResult::NoData();
   }
 
 private:
   const std::string filter_state_key_;
+  const std::string field_;
 };
 
 template <class MatchingDataType>
@@ -295,8 +310,8 @@ public:
         const envoy::extensions::matching::common_inputs::network::v3::FilterStateInput&>(
         message, validation_visitor);
 
-    return [filter_state_key = typed_config.key()] {
-      return std::make_unique<FilterStateInput<MatchingDataType>>(filter_state_key);
+    return [filter_state_key = typed_config.key(), field = typed_config.field()] {
+      return std::make_unique<FilterStateInput<MatchingDataType>>(filter_state_key, field);
     };
   };
 
@@ -315,18 +330,17 @@ class NetworkNamespaceInput : public Matcher::DataInput<MatchingDataType>,
 public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& address = data.localAddress();
-    const auto network_namespace = address.networkNamespace();
+    auto network_namespace = address.networkNamespace();
 
     if (network_namespace.has_value() && !network_namespace->empty()) {
       ENVOY_LOG(debug, "NetworkNamespaceInput: local_address={} network_namespace='{}'",
                 address.asString(), network_namespace.value());
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-              network_namespace.value()};
+      return Matcher::DataInputGetResult::CreateString(std::move(network_namespace).value());
     }
 
     ENVOY_LOG(debug, "NetworkNamespaceInput: no network namespace for local_address={}",
               address.asString());
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+    return Matcher::DataInputGetResult::NoData();
   }
 };
 

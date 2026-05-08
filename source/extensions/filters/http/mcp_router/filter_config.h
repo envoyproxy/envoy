@@ -5,8 +5,11 @@
 #include <string>
 #include <vector>
 
+#include "envoy/extensions/clusters/mcp_multicluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/http/mcp_router/v3/mcp_router.pb.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "absl/types/variant.h"
 
@@ -52,12 +55,59 @@ struct SessionIdentityConfig {
 };
 
 /**
+ * All MCP router filter stats. @see stats_macros.h
+ */
+// clang-format off
+#define MCP_ROUTER_STATS(COUNTER)                                                                  \
+  COUNTER(rq_total)                                                                                \
+  COUNTER(rq_fanout)                                                                               \
+  COUNTER(rq_direct_response)                                                                      \
+  COUNTER(rq_body_rewrite)                                                                         \
+  COUNTER(rq_invalid)                                                                              \
+  COUNTER(rq_unknown_backend)                                                                      \
+  COUNTER(rq_backend_failure)                                                                      \
+  COUNTER(rq_fanout_failure)                                                                       \
+  COUNTER(rq_session_invalid)                                                                      \
+  COUNTER(rq_auth_failure)
+// clang-format on
+
+/**
+ * Struct definition for MCP router filter stats. @see stats_macros.h
+ */
+struct McpRouterStats {
+  MCP_ROUTER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
  * Configuration for the MCP router filter, containing backend server definitions.
  */
 class McpRouterConfig {
 public:
-  McpRouterConfig(const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
-                  Server::Configuration::FactoryContext& context);
+  virtual ~McpRouterConfig() = default;
+
+  virtual const std::vector<McpBackendConfig>& backends() const = 0;
+  virtual bool isMultiplexing() const = 0;
+  virtual const std::string& defaultBackendName() const = 0;
+  virtual Server::Configuration::FactoryContext& factoryContext() const = 0;
+  virtual const McpBackendConfig* findBackend(const std::string& name) const = 0;
+
+  virtual bool hasSessionIdentity() const = 0;
+  virtual const SubjectSource& subjectSource() const = 0;
+  virtual ValidationMode validationMode() const = 0;
+  virtual bool shouldEnforceValidation() const = 0;
+  virtual const std::string& metadataNamespace() const = 0;
+
+  virtual McpRouterStats& stats() = 0;
+};
+
+using McpRouterConfigSharedPtr = std::shared_ptr<McpRouterConfig>;
+
+class McpRouterConfigImpl : public McpRouterConfig {
+public:
+  McpRouterConfigImpl(
+      const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
+      const std::string& stats_prefix, Stats::Scope& scope,
+      Server::Configuration::FactoryContext& context);
 
   const std::vector<McpBackendConfig>& backends() const { return backends_; }
   bool isMultiplexing() const { return backends_.size() > 1; }
@@ -73,15 +123,52 @@ public:
   bool shouldEnforceValidation() const {
     return session_identity_.validation_mode == ValidationMode::Enforce;
   }
+  const std::string& metadataNamespace() const { return metadata_namespace_; }
+
+  McpRouterStats& stats() { return stats_; }
 
 private:
   std::vector<McpBackendConfig> backends_;
   std::string default_backend_name_;
   Server::Configuration::FactoryContext& factory_context_;
   SessionIdentityConfig session_identity_;
+  std::string metadata_namespace_;
+  McpRouterStats stats_;
 };
 
-using McpRouterConfigSharedPtr = std::shared_ptr<McpRouterConfig>;
+// This class overrides configuration of the MCP filter with the list of MCP servers based on
+// cluster configuration.
+// TODO(yanavlasov): use only cluster config for MCP servers once list of servers is removed from
+// the filter config.
+class McpRouterClusterConfigImpl : public McpRouterConfig {
+public:
+  McpRouterClusterConfigImpl(
+      const envoy::extensions::clusters::mcp_multicluster::v3::ClusterConfig& proto_config,
+      McpRouterConfigSharedPtr base_config);
+
+  const std::vector<McpBackendConfig>& backends() const override { return backends_; }
+  bool isMultiplexing() const override { return backends_.size() > 1; }
+  const std::string& defaultBackendName() const override { return default_backend_name_; }
+  Server::Configuration::FactoryContext& factoryContext() const override {
+    return base_config_->factoryContext();
+  }
+  const McpBackendConfig* findBackend(const std::string& name) const override;
+
+  bool hasSessionIdentity() const override { return base_config_->hasSessionIdentity(); }
+  const SubjectSource& subjectSource() const override { return base_config_->subjectSource(); }
+  ValidationMode validationMode() const override { return base_config_->validationMode(); }
+  bool shouldEnforceValidation() const override { return base_config_->shouldEnforceValidation(); }
+  const std::string& metadataNamespace() const override {
+    return base_config_->metadataNamespace();
+  }
+
+  McpRouterStats& stats() override { return base_config_->stats(); }
+
+private:
+  const McpRouterConfigSharedPtr base_config_;
+  const std::vector<McpBackendConfig> backends_;
+  const std::string default_backend_name_;
+};
 
 } // namespace McpRouter
 } // namespace HttpFilters

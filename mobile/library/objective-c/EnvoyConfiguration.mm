@@ -1,8 +1,10 @@
 #import "library/objective-c/EnvoyEngine.h"
 
-#import "library/cc/engine_builder.h"
+#import "library/cc/mobile_engine_builder.h"
 #import "library/cc/direct_response_testing.h"
 #include "source/common/protobuf/utility.h"
+
+using Envoy::Platform::MobileEngineBuilder;
 
 @implementation NSString (CXX)
 - (std::string)toCXXString {
@@ -78,6 +80,7 @@
                       dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
                                     dnsNumRetries:(NSInteger)dnsNumRetries
                                       enableHttp3:(BOOL)enableHttp3
+                                  enableEarlyData:(BOOL)enableEarlyData
                                         quicHints:(NSDictionary<NSString *, NSNumber *> *)quicHints
                             quicCanonicalSuffixes:(NSArray<NSString *> *)quicCanonicalSuffixes
                           enableGzipDecompression:(BOOL)enableGzipDecompression
@@ -124,6 +127,7 @@
   self.dnsCacheSaveIntervalSeconds = dnsCacheSaveIntervalSeconds;
   self.dnsNumRetries = dnsNumRetries;
   self.enableHttp3 = enableHttp3;
+  self.enableEarlyData = enableEarlyData;
   self.quicHints = quicHints;
   self.quicCanonicalSuffixes = quicCanonicalSuffixes;
   self.enableGzipDecompression = enableGzipDecompression;
@@ -152,8 +156,8 @@
   return self;
 }
 
-- (Envoy::Platform::EngineBuilder)applyToCXXBuilder {
-  Envoy::Platform::EngineBuilder builder;
+- (MobileEngineBuilder)applyToCXXBuilder {
+  MobileEngineBuilder builder;
 
   for (EnvoyNativeFilterConfig *nativeFilterConfig in
        [self.nativeFilterChain reverseObjectEnumerator]) {
@@ -167,6 +171,7 @@
   }
 
   builder.enableHttp3(self.enableHttp3);
+  builder.enableEarlyData(self.enableEarlyData);
   for (NSString *host in self.quicHints) {
     builder.addQuicHint([host toCXXString], [[self.quicHints objectForKey:host] intValue]);
   }
@@ -225,8 +230,8 @@
 
 - (std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>)generateBootstrap {
   try {
-    Envoy::Platform::EngineBuilder builder = [self applyToCXXBuilder];
-    return builder.generateBootstrap();
+    MobileEngineBuilder builder = [self applyToCXXBuilder];
+    return std::move(builder.generateBootstrap().value());
   } catch (const std::exception &e) {
     NSLog(@"[Envoy] error generating bootstrap: %@", @(e.what()));
     return nullptr;

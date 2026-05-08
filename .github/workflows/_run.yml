@@ -8,11 +8,10 @@ on:
     secrets:
       app-id:
       app-key:
-      dockerhub-password:
-      gcp-key:
+      dockerhub-token:
       gpg-key:
       gpg-key-password:
-      rbe-key:
+      slack-bot-token:
       ssh-key:
       ssh-key-extra:
     inputs:
@@ -23,6 +22,9 @@ on:
       bazel-cache:
         type: boolean
         default: false
+      bazel-cache-output-base:
+        type: string
+        default: base
       bazel-extra:
         type: string
       bazel-rbe-jobs:
@@ -81,9 +83,6 @@ on:
       docker-ipv6:
         default: true
         type: boolean
-      dockerhub-username:
-        default: envoyproxy
-        type: string
       downloads:
         type: string
       entrypoint:
@@ -138,12 +137,16 @@ on:
       skip:
         type: boolean
         default: false
+      slack-channel:
+        type: string
+        default: ''
+        description: Slack channel for failure notifications (opt-in, e.g. '#envoy-ci'). Leave empty to disable.
       source:
         type: string
       summary-post:
         type: string
         default: |
-          - uses: envoyproxy/toolshed/actions/envoy/run/summary@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+          - uses: envoyproxy/toolshed/actions/envoy/run/summary@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
             with:
               context: %{{ inputs.context }}
       steps-pre:
@@ -163,6 +166,12 @@ on:
         type: string
       temp-dir:
         type: string
+      template-docker-configure:
+        type: string
+        default: |
+          sudo mkdir -p /etc/docker
+          echo '\(tojson)' | sudo tee /etc/docker/daemon.json
+          sudo systemctl restart docker
       timeout-minutes:
         type: number
         default: 60
@@ -206,7 +215,7 @@ jobs:
     name: ${{ inputs.target-suffix && format('[{0}] ', inputs.target-suffix) || '' }}${{ inputs.command }} ${{ inputs.target }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     steps:
-    - uses: envoyproxy/toolshed/actions/jq@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+    - uses: envoyproxy/toolshed/actions/jq@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
       id: started
       name: Create timestamp
       with:
@@ -214,7 +223,7 @@ jobs:
         filter: |
           now
     # This controls which input vars are exposed to the run action (and related steps)
-    - uses: envoyproxy/toolshed/actions/jq@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+    - uses: envoyproxy/toolshed/actions/jq@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
       name: Context
       id: context
       with:
@@ -235,79 +244,96 @@ jobs:
           | . * {$config, $check}
 
     - run: |
-        mkdir ${{ runner.temp }}/container
+        mkdir "${RUNNER_TEMP}/container"
+        MNT_AVAILABLE=false
         if mountpoint -q /mnt; then
+            MNT_AVAILABLE=true
             USAGE="$(df --output=pcent /mnt | tail -n 1 | tr -d ' %')"
             if [[ "$USAGE" -ge 100 ]]; then
                 echo "should-remnt=true" >> "$GITHUB_OUTPUT"
                 echo "::warning::Disk usage for /mnt is at 100% ... remounting"
             fi
         fi
+        echo "mnt-available=$MNT_AVAILABLE" >> "$GITHUB_OUTPUT"
       id: disk
-    - uses: envoyproxy/toolshed/actions/github/remnt@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+    - uses: envoyproxy/toolshed/actions/github/remnt@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
       if: steps.disk.outputs.should-remnt == 'true'
-    - uses: envoyproxy/toolshed/actions/bind-mounts@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
-      if: inputs.bind-mount && ! github.event.repository.private
+    - uses: envoyproxy/toolshed/actions/bind-mounts@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
+      if: inputs.bind-mount && steps.disk.outputs.mnt-available == 'true'
       with:
         mounts: ${{ inputs.bind-mounts }}
     - name: Free diskspace
-      uses: envoyproxy/toolshed/actions/diskspace@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
-      if: inputs.diskspace-hack || github.event.repository.private
+      uses: envoyproxy/toolshed/actions/diskspace@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
+      if: inputs.diskspace-hack || steps.disk.outputs.mnt-available != 'true'
       with:
         to_remove: ${{ inputs.diskspace-hack-paths }}
     - run: |
         mount
         df -h
 
-    - run: |
-        sudo mkdir -p /etc/docker
-        echo '{
-          "ipv6": true,
-          "fixed-cidr-v6": "2001:db8:1::/64"
-          }' | sudo tee /etc/docker/daemon.json
-      name: Configure Docker ipv6
-      if: ${{ inputs.docker-ipv6 }}
-    - if: >-
-        inputs.docker-ipv6
-        && inputs.cache-build-image
-        && steps.cache-lookup.outputs.cache-hit == 'true'
-      run: |
-        sudo systemctl restart docker
+    - uses: envoyproxy/toolshed/actions/bson@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
+      name: Configure Docker
+      if: runner.os == 'Linux'
+      with:
+        input-format: yaml
+        input: |
+          docker-ipv6: ${{ inputs.docker-ipv6 }}
+        filter: |
+          .["docker-ipv6"] as $ipv6
+          | {"features": {"containerd-snapshotter": false}}
+          | if $ipv6 then
+              . + {"ipv6": true, "fixed-cidr-v6": "2001:db8:1::/64"}
+            else . end
+          | "${{ inputs.template-docker-configure }}"
 
     # Caches
-    - uses: envoyproxy/toolshed/actions/cache/restore@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+    - uses: envoyproxy/toolshed/actions/cache/restore@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
       if: >-
-        inputs.bazel-cache
+        fromJSON(inputs.bazel-cache)
       name: >-
         Restore Bazel cache
         (${{ fromJSON(inputs.request).config.ci.cache.bazel.hash }})
       with:
         artifact-id: >-
-          ${{ inputs.arch == 'arm64'
-              && fromJSON(inputs.request).config.ci.cache.bazel.arm64
-              || fromJSON(inputs.request).config.ci.cache.bazel.x64 }}
-        artifact-name: ${{ fromJSON(inputs.request).config.ci.cache.bazel.hash }}-${{ inputs.arch || 'x64' }}
+          ${{ inputs.bazel-cache-output-base == 'docs'
+              && fromJSON(inputs.request).config.ci.cache.bazel['docs-x64']
+              || (inputs.bazel-cache-output-base == 'external'
+                  && fromJSON(inputs.request).config.ci.cache.bazel['external-x64']
+                  || (inputs.arch == 'arm64'
+                      && fromJSON(inputs.request).config.ci.cache.bazel.arm64
+                      || fromJSON(inputs.request).config.ci.cache.bazel.x64)) }}
+        artifact-name: >-
+          ${{ fromJSON(inputs.request).config.ci.cache.bazel.hash }}-${{
+            inputs.bazel-cache-output-base != 'base'
+            && format('{0}-', inputs.bazel-cache-output-base)
+            || ''
+          }}${{ inputs.arch || 'x64' }}
         artifact-wf-path: .github/workflows/request.yml
         cache-type: artifact
-        key: ${{ fromJSON(inputs.request).config.ci.cache.bazel.hash }}-${{ inputs.arch || 'x64' }}
+        key: >-
+          ${{ fromJSON(inputs.request).config.ci.cache.bazel.hash }}-${{
+            inputs.bazel-cache-output-base != 'base'
+            && format('{0}-', inputs.bazel-cache-output-base)
+            || ''
+          }}${{ inputs.arch || 'x64' }}
         path: ${{ runner.temp }}/container/bazel_root
 
     # HACK/WORKAROUND for cache scope issue (https://github.com/envoyproxy/envoy/issues/37603)
     - if: ${{ inputs.cache-build-image }}
       id: cache-lookup
-      uses: actions/cache/restore@9255dc7a253b0ccc959486e2bca901246202afeb  # v5.0.1
+      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
       with:
         lookup-only: true
         path: /tmp/cache
         key: ${{ inputs.cache-build-image }}${{ inputs.cache-build-image-key-suffix }}
     - if: ${{ inputs.cache-build-image && steps.cache-lookup.outputs.cache-hit == 'true' }}
       name: Restore Docker cache ${{ inputs.cache-build-image && format('({0})', inputs.cache-build-image) || '' }}
-      uses: envoyproxy/toolshed/actions/docker/cache/restore@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+      uses: envoyproxy/toolshed/actions/docker/cache/restore@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
       with:
         image-tag: ${{ inputs.cache-build-image }}
         key-suffix: ${{ inputs.cache-build-image-key-suffix }}
 
-    - uses: envoyproxy/toolshed/actions/appauth@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+    - uses: envoyproxy/toolshed/actions/appauth@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
       id: appauth
       name: Appauth
       if: ${{ inputs.trusted }}
@@ -318,7 +344,7 @@ jobs:
         # - the workaround is to allow the token to be passed through.
         token: ${{ github.token }}
         token-ok: true
-    - uses: envoyproxy/toolshed/actions/github/checkout@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+    - uses: envoyproxy/toolshed/actions/github/checkout@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
       id: checkout
       name: Checkout Envoy repository
       with:
@@ -334,7 +360,7 @@ jobs:
         token: ${{ inputs.trusted && steps.appauth.outputs.token || github.token }}
 
     # This is currently only use by mobile-docs and can be removed once they are updated to the newer website
-    - uses: envoyproxy/toolshed/actions/github/checkout@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+    - uses: envoyproxy/toolshed/actions/github/checkout@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
       id: checkout-extra
       name: Checkout extra repository (for publishing)
       if: ${{ inputs.checkout-extra }}
@@ -343,7 +369,7 @@ jobs:
         ssh-key: ${{ inputs.trusted && inputs.ssh-key-extra || '' }}
 
     - name: Import GPG key
-      uses: envoyproxy/toolshed/actions/gpg/import@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+      uses: envoyproxy/toolshed/actions/gpg/import@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
       if: ${{ inputs.import-gpg }}
       with:
         key: ${{ secrets.gpg-key }}
@@ -356,20 +382,32 @@ jobs:
       name: Configure PR Bazel settings
       if: >-
         ${{ fromJSON(inputs.request).request.pr != '' }}
-    - uses: envoyproxy/toolshed/actions/gcp/setup@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
-      name: Setup GCP (artefacts)
-      id: gcp
-      with:
-        key: ${{ secrets.gcp-key }}
-        key-copy: ${{ inputs.rbe-google && runner.temp || '' }}
     - run: |
-        echo "${{ vars.ENVOY_CI_BAZELRC }}" > repo.bazelrc
+        echo "${BAZELRC_CONTENT}" > repo.bazelrc
       if: ${{ vars.ENVOY_CI_BAZELRC }}
       name: Configure repo Bazel settings
+      env:
+        BAZELRC_CONTENT: ${{ vars.ENVOY_CI_BAZELRC }}
+
+    - id: dockerhub
+      if: inputs.container-command != ''
+      run: |
+        if [[ -n "$DOCKERHUB_TOKEN" ]]; then
+          echo "login=true" >> "$GITHUB_OUTPUT"
+        fi
+      env:
+        DOCKERHUB_TOKEN: ${{ secrets.dockerhub-token }}
+    - name: Login to Docker Hub (read-only)
+      if: inputs.container-command != '' && steps.dockerhub.outputs.login == 'true'
+      uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v4.1.0
+      with:
+        username: ${{ vars.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.dockerhub-token }}
 
     # NOTE: This is where untrusted code can be run!!!
-    #  It MUST be the last step in the workflow
-    - uses: envoyproxy/toolshed/actions/github/run@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+    #  Only post-failure notification steps (which don't use any repo code) should follow this step.
+    - uses: envoyproxy/toolshed/actions/github/run@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
+      id: ci-run
       name: Run CI ${{ inputs.command }} ${{ inputs.target }}
       with:
         args: ${{ inputs.args != '--' && inputs.args || inputs.target }}
@@ -403,11 +441,8 @@ jobs:
         working-directory: ${{ inputs.working-directory }}
       env:
         GITHUB_TOKEN: ${{ inputs.trusted && steps.appauth.outputs.token || github.token }}
-        DOCKERHUB_USERNAME: ${{ inputs.dockerhub-username }}
-        DOCKERHUB_PASSWORD: ${{ secrets.dockerhub-password }}
         ENVOY_DOCKER_BUILD_DIR: ${{ runner.temp }}/container
         ENVOY_RBE: ${{ inputs.rbe == true && 1 || '' }}
-        RBE_KEY: ${{ secrets.rbe-key }}
         BAZEL_BUILD_EXTRA_OPTIONS: >-
           ${{ env.BAZEL_BUILD_EXTRA_OPTIONS }}
           --config=remote-ci
@@ -424,3 +459,23 @@ jobs:
         MOUNT_GPG_HOME: ${{ inputs.import-gpg && 1 || '' }}
         ENVOY_DOCKER_CPUS: ${{ inputs.docker-cpus }}
         ENVOY_DOCKER_CI: ${{ inputs.docker-ci && 'true' || '' }}
+        ENVOY_COMMIT: ${{ fromJSON(inputs.request).request.sha }}
+        ENVOY_REPO: ${{ github.repository }}
+        ENVOY_PUBLISH_DRY_RUN: ${{ (fromJSON(inputs.request).request.version.dev || ! inputs.trusted) && 1 || '' }}
+
+    - name: Notify Slack on failure
+      if: ${{ steps.ci-run.outputs.exit-code != 0 && inputs.slack-channel != '' && github.event.workflow_run.event == 'push' }}
+      uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c  # v3.0.3
+      env:
+        JOB_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      with:
+        method: chat.postMessage
+        token: ${{ secrets.slack-bot-token }}
+        payload: |
+          channel: "${{ inputs.slack-channel }}"
+          text: "CI job failed: ${{ inputs.target }}"
+          blocks:
+          - type: section
+            text:
+              type: mrkdwn
+              text: ":x: *CI job failed:* `${{ inputs.target }}`\n<${{ env.JOB_URL }}|View workflow run>"

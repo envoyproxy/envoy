@@ -5,6 +5,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/common/rbac/matcher_extension.h"
 #include "source/extensions/filters/common/rbac/principal_extension.h"
 
@@ -187,9 +188,18 @@ bool NotMatcher::matches(const Network::Connection& connection,
   return !matcher_->matches(connection, headers, info);
 }
 
+HeaderMatcher::HeaderMatcher(const envoy::config::route::v3::HeaderMatcher& matcher,
+                             Server::Configuration::CommonFactoryContext& context)
+    : header_(Http::HeaderUtility::createHeaderData(matcher, context)),
+      match_headers_individually_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.rbac_match_headers_individually")) {}
+
 bool HeaderMatcher::matches(const Network::Connection&,
                             const Envoy::Http::RequestHeaderMap& headers,
                             const StreamInfo::StreamInfo&) const {
+  if (match_headers_individually_) {
+    return header_->matchesHeadersIndividually(headers);
+  }
   return header_->matchesHeaders(headers);
 }
 
@@ -346,7 +356,8 @@ bool MetadataMatcher::matches(const Network::Connection&, const Envoy::Http::Req
                               const StreamInfo::StreamInfo& info) const {
   if (metadata_source_ == envoy::config::rbac::v3::MetadataSource::ROUTE) {
     // Return false if there's no route since we can't match its metadata
-    return info.route() ? matcher_.match(info.route()->metadata()) : false;
+    const auto route = info.route();
+    return route ? matcher_.match(route->metadata()) : false;
   }
   return matcher_.match(info.dynamicMetadata());
 }

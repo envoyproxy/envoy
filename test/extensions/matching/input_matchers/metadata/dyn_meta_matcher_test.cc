@@ -31,6 +31,7 @@ constexpr absl::string_view kFilterNamespace = "meta_matcher";
 constexpr absl::string_view kMetadataKey = "service_name";
 constexpr absl::string_view kMetadataValue = "test_service";
 
+using ::Envoy::Matcher::DataInputGetResult;
 using ::Envoy::Matcher::HasNoMatch;
 using ::Envoy::Matcher::HasStringAction;
 
@@ -107,8 +108,6 @@ public:
 TEST_F(MetadataMatcherTest, DynamicMetadataMatched) {
   setDynamicMetadata(std::string(kFilterNamespace), std::string(kMetadataKey),
                      std::string(kMetadataValue));
-  Envoy::Http::Matching::HttpMatchingDataImpl data =
-      Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree();
 
   EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
@@ -116,8 +115,6 @@ TEST_F(MetadataMatcherTest, DynamicMetadataMatched) {
 
 TEST_F(MetadataMatcherTest, DynamicMetadataNotMatched) {
   setDynamicMetadata(std::string(kFilterNamespace), std::string(kMetadataKey), "wrong_service");
-  Envoy::Http::Matching::HttpMatchingDataImpl data =
-      Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree();
 
   EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
@@ -125,8 +122,6 @@ TEST_F(MetadataMatcherTest, DynamicMetadataNotMatched) {
 
 TEST_F(MetadataMatcherTest, DynamicMetadataNotMatchedWithInvert) {
   setDynamicMetadata(std::string(kFilterNamespace), std::string(kMetadataKey), "wrong_service");
-  Envoy::Http::Matching::HttpMatchingDataImpl data =
-      Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree(true);
 
   // The match was completed, no match found but the invert flag was set.
@@ -142,11 +137,8 @@ TEST_F(MetadataMatcherTest, BadData) {
   const auto& v = matcher_config.value();
   auto value_matcher = Envoy::Matchers::ValueMatcher::create(v, factory_context_);
 
-  ::Envoy::Matcher::MatchingDataType data = absl::monostate();
-  EXPECT_NO_THROW(Matcher(value_matcher, false).match(data));
-
-  ::Envoy::Matcher::MatchingDataType data2 = std::string("test");
-  EXPECT_NO_THROW(Matcher(value_matcher, false).match(data2));
+  EXPECT_NO_THROW(Matcher(value_matcher, false).match(DataInputGetResult::NoData()));
+  EXPECT_NO_THROW(Matcher(value_matcher, false).match(DataInputGetResult::CreateString("test")));
 }
 
 } // namespace Metadata

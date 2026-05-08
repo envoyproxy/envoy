@@ -24,19 +24,6 @@ final class EngineBuilderTests: XCTestCase {
     )
   }
 
-  func testMonitoringModeDefaultsToPathMonitor() {
-    let builder = EngineBuilder()
-    XCTAssertEqual(builder.monitoringMode, .pathMonitor)
-  }
-
-  func testMonitoringModeSetsToValue() {
-    let builder = EngineBuilder()
-      .setNetworkMonitoringMode(.disabled)
-    XCTAssertEqual(builder.monitoringMode, .disabled)
-    builder.setNetworkMonitoringMode(.reachability)
-    XCTAssertEqual(builder.monitoringMode, .reachability)
-  }
-
   func testAddingLogLevelAddsLogLevelWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { _, logLevel in

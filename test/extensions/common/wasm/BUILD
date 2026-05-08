@@ -63,7 +63,7 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:wasm_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -90,8 +90,8 @@ envoy_cc_test_binary(
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
-        "@com_github_google_benchmark//:benchmark",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
+        "@benchmark",
     ],
 )
 
@@ -180,7 +180,6 @@ envoy_cc_test(
         "//source/extensions/common/wasm:remote_async_datasource_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/init:init_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

@@ -26,10 +26,8 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
-#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/upstream/host.h"
@@ -69,7 +67,9 @@ public:
           upstream_cluster_ = cluster_info;
         }));
     ON_CALL(filter_callbacks_.connection_.stream_info_, upstreamClusterInfo())
-        .WillByDefault(ReturnPointee(&upstream_cluster_));
+        .WillByDefault([this]() -> OptRef<const Upstream::ClusterInfo> {
+          return makeOptRefFromPtr<const Upstream::ClusterInfo>(upstream_cluster_.get());
+        });
     factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
         {"fake_cluster"});
   }

@@ -17,9 +17,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/matcher/mocks.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/mocks/tracing/mocks.h"
 #include "test/proto/apikeys.pb.h"
 #include "test/proto/bookstore.pb.h"
 #include "test/test_common/environment.h"
@@ -139,7 +137,7 @@ public:
 // Mock class for `Matcher::MatchTree`
 class MockMatchTree : public Matcher::MatchTree<HttpMatchingData> {
 public:
-  MOCK_METHOD(Matcher::MatchResult, match,
+  MOCK_METHOD(Matcher::ActionMatchResult, match,
               (const HttpMatchingData& matching_data, Matcher::SkippedMatchCb skipped_match_cb),
               (override));
 };
@@ -1317,7 +1315,8 @@ TEST_F(MethodLevelRestrictionTest, MethodBlockedByMatcher) {
 
   EXPECT_CALL(*mock_filter_config_, getMethodMatcher(method_name))
       .WillOnce(Return(mock_match_tree));
-  EXPECT_CALL(*mock_match_tree, match(_, _)).WillOnce(Return(Matcher::MatchResult(mock_action)));
+  EXPECT_CALL(*mock_match_tree, match(_, _))
+      .WillOnce(Return(Matcher::ActionMatchResult(mock_action)));
 
   auto req_headers = TestRequestHeaderMapImpl{
       {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
@@ -1346,7 +1345,8 @@ TEST_F(MethodLevelRestrictionTest, MethodAllowedByMatcher) {
       .WillOnce(Return(mock_match_tree));
 
   // Explicitly return NoMatch state from the matcher.
-  EXPECT_CALL(*mock_match_tree, match(_, _)).WillOnce(Return(Matcher::MatchResult::noMatch()));
+  EXPECT_CALL(*mock_match_tree, match(_, _))
+      .WillOnce(Return(Matcher::ActionMatchResult::noMatch()));
 
   auto req_headers = TestRequestHeaderMapImpl{
       {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
@@ -1384,7 +1384,7 @@ TEST_F(MethodLevelRestrictionTest, MethodAllowedMatcherInsufficientData) {
   EXPECT_CALL(*mock_filter_config_, getMethodMatcher(method_name))
       .WillOnce(Return(mock_match_tree));
   EXPECT_CALL(*mock_match_tree, match(_, _))
-      .WillOnce(Return(Matcher::MatchResult::insufficientData()));
+      .WillOnce(Return(Matcher::ActionMatchResult::insufficientData()));
 
   auto req_headers = TestRequestHeaderMapImpl{
       {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
@@ -1408,7 +1408,8 @@ TEST_F(MethodLevelRestrictionTest, MethodAllowedWithFieldRestrictions) {
   EXPECT_CALL(*mock_filter_config_, getMethodMatcher(method_name))
       .WillOnce(Return(mock_match_tree));
 
-  EXPECT_CALL(*mock_match_tree, match(_, _)).WillOnce(Return(Matcher::MatchResult::noMatch()));
+  EXPECT_CALL(*mock_match_tree, match(_, _))
+      .WillOnce(Return(Matcher::ActionMatchResult::noMatch()));
 
   // Setup field restriction on the real config
   ProtoApiScrubberConfig field_config_proto;
@@ -1549,7 +1550,8 @@ TEST_F(ObservabilityTest, MethodLevelBlockingUpdatesStatsAndTrace) {
       .WillOnce(Return(mock_match_tree));
 
   // Return Match to simulate block.
-  EXPECT_CALL(*mock_match_tree, match(_, _)).WillOnce(Return(Matcher::MatchResult(mock_action)));
+  EXPECT_CALL(*mock_match_tree, match(_, _))
+      .WillOnce(Return(Matcher::ActionMatchResult(mock_action)));
 
   TestRequestHeaderMapImpl headers{
       {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};

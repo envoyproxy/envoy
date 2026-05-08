@@ -586,6 +586,55 @@ ok_response:
                      span_);
 }
 
+TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkUpstreamHeaderMutations) {
+  initialize();
+
+  envoy::service::auth::v3::CheckResponse check_response;
+  TestUtility::loadFromYaml(R"EOF(
+status:
+  code: 0
+ok_response:
+  headers:
+  - header:
+      key: overwrite-header
+      value: overwrite-value
+  - header:
+      key: append-header
+      value: append-value
+    append:
+      value: true
+  - header:
+      key: explicit-no-append
+      value: explicit-no-append-value
+    append:
+      value: false
+)EOF",
+                            check_response);
+
+  // overwrite-header: append not set, defaults to false -> headers_to_set
+  auto expected_authz_response = Response{
+      .status = CheckStatus::OK,
+      .headers_to_append = UnsafeHeaderVector{{"append-header", "append-value"}},
+      .headers_to_set = UnsafeHeaderVector{{"overwrite-header", "overwrite-value"},
+                                           {"explicit-no-append", "explicit-no-append-value"}},
+      .status_code = Http::Code::OK,
+      .grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok,
+  };
+
+  envoy::service::auth::v3::CheckRequest request;
+  expectCallSend(request);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+  Http::TestRequestHeaderMapImpl headers;
+  client_->onCreateInitialMetadata(headers);
+
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                      AuthzOkResponse(expected_authz_response))));
+  client_->onSuccess(std::make_unique<envoy::service::auth::v3::CheckResponse>(check_response),
+                     span_);
+}
+
 } // namespace ExtAuthz
 } // namespace Common
 } // namespace Filters

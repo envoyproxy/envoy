@@ -143,7 +143,6 @@ build:gcc --cxxopt=-Wno-nonnull-compare
 build:gcc --cxxopt=-Wno-trigraphs
 build:gcc --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
 build:gcc --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_gcc_platform
-build:gcc --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
 build:gcc --action_env=BAZEL_LINKOPTS=-lm:-fuse-ld=gold
 
 # libc++ - default for clang
@@ -204,18 +203,45 @@ build:compile-time-options --define=admin_html=disabled
 build:compile-time-options --define=signal_trace=disabled
 build:compile-time-options --define=hot_restart=disabled
 build:compile-time-options --define=google_grpc=disabled
-build:compile-time-options --define=boringssl=fips
+build:compile-time-options --config=boringssl-fips
 build:compile-time-options --define=log_debug_assert_in_release=enabled
 build:compile-time-options --define=path_normalization_by_default=true
 build:compile-time-options --define=deprecated_features=disabled
-build:compile-time-options --define=tcmalloc=gperftools
-build:compile-time-options --define=zlib=ng
 build:compile-time-options --define=uhv=enabled
 # gRPC has a lot of deprecated-enum-enum-conversion warnings with C++20
 build:compile-time-options --copt=-Wno-error=deprecated-enum-enum-conversion
 build:compile-time-options --test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true
 build:compile-time-options --@envoy//bazel:http3=False
 build:compile-time-options --@envoy//source/extensions/filters/http/kill_request:enabled
+
+
+#############################################################################
+# SSL
+#############################################################################
+
+common:fips-common --test_tag_filters=-nofips
+common:fips-common --build_tag_filters=-nofips
+common:fips-common --@envoy//bazel:fips=True
+
+# BoringSSL FIPS
+common:boringssl-fips --config=fips-common
+common:boringssl-fips --@envoy//bazel:ssl=@boringssl_fips//:ssl
+common:boringssl-fips --@envoy//bazel:crypto=@boringssl_fips//:crypto
+
+# AWS-LC FIPS
+common:aws-lc-fips --config=fips-common
+common:aws-lc-fips --@envoy//bazel:ssl=@aws_lc//:ssl
+common:aws-lc-fips --@envoy//bazel:crypto=@aws_lc//:crypto
+common:aws-lc-fips --@envoy//bazel:http3=False
+
+# OpenSSL
+common:openssl --//bazel:ssl=//compat/openssl:ssl
+common:openssl --//bazel:crypto=//compat/openssl:crypto
+common:openssl --copt=-DENVOY_SSL_OPENSSL
+common:openssl --host_copt=-DENVOY_SSL_OPENSSL
+common:openssl --@envoy//bazel:http3=False
+common:openssl --test_tag_filters=-nofips
+common:openssl --build_tag_filters=-nofips
 
 
 #############################################################################
@@ -247,7 +273,7 @@ build:asan-common --build_tag_filters=-no_san
 build:asan-common --test_tag_filters=-no_san
 build:asan-common --copt -fsanitize=address,undefined
 build:asan-common --linkopt -fsanitize=address,undefined
-# vptr and function sanitizer are enabled in asan if it is set up via bazel/setup_clang.sh.
+# vptr and function sanitizer are enabled in asan when using --config=clang.
 build:asan-common --copt -fno-sanitize=vptr,function
 build:asan-common --linkopt -fno-sanitize=vptr,function
 build:asan-common --copt -DADDRESS_SANITIZER=1
@@ -367,7 +393,7 @@ build:clang-pch --define=ENVOY_CLANG_PCH=1
 
 # Clang-tidy
 build:clang-tidy --@envoy_toolshed//format/clang_tidy:executable=@envoy//tools/clang-tidy
-build:clang-tidy --@envoy_toolshed//format/clang_tidy:config=//:clang_tidy_config
+build:clang-tidy --@envoy_toolshed//format/clang_tidy:config=@envoy//:clang_tidy_config
 build:clang-tidy --aspects @envoy_toolshed//format/clang_tidy:clang_tidy.bzl%clang_tidy_aspect
 build:clang-tidy --output_groups=report
 build:clang-tidy --build_tag_filters=-notidy
@@ -410,6 +436,11 @@ common:engflow-common --credential_helper=*.engflow.com=%workspace%/bazel/engflo
 common:engflow-common --grpc_keepalive_time=60s
 common:engflow-common --grpc_keepalive_timeout=30s
 common:engflow-common --remote_cache_compression
+# Recover from transient gRPC failures (e.g. UNAVAILABLE: io exception) talking to engflow.
+common:engflow-common --remote_retries=10
+common:engflow-common --remote_retry_max_delay=60s
+# Recover when blobs are evicted from the CAS mid-build (common during patch releases).
+common:engflow-common --experimental_remote_cache_eviction_retries=5
 
 # this provides access to RBE+cache
 common:rbe --config=remote-cache
@@ -418,6 +449,7 @@ common:rbe --config=remote-exec
 # this provides access to just cache
 common:remote-cache --config=engflow-common
 common:remote-cache --remote_cache=grpcs://mordenite.cluster.engflow.com
+common:remote-cache --experimental_remote_downloader=grpcs://mordenite.cluster.engflow.com
 common:remote-cache --remote_timeout=3600s
 
 common:remote-exec --remote_executor=grpcs://mordenite.cluster.engflow.com

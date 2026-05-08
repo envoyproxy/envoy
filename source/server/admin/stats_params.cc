@@ -27,6 +27,16 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
     return Http::Code::BadRequest;
   }
 
+  auto max_buckets_val = query_.getFirstValue("native_histogram_max_buckets");
+  if (max_buckets_val.has_value() && !max_buckets_val.value().empty()) {
+    uint32_t max_buckets;
+    if (!absl::SimpleAtoi(max_buckets_val.value(), &max_buckets) || max_buckets < 1) {
+      response.add("invalid native_histogram_max_buckets value: must be a positive integer");
+      return Http::Code::BadRequest;
+    }
+    native_histogram_max_buckets_ = max_buckets;
+  }
+
   auto parse_type = [](absl::string_view str, StatsType& type) {
     if (str == StatLabels::Gauges) {
       type = StatsType::Gauges;

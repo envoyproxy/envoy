@@ -1,11 +1,13 @@
 #include "envoy/extensions/filters/listener/dynamic_modules/v3/dynamic_modules.pb.h"
 
+#include "source/common/stats/custom_stat_namespaces_impl.h"
 #include "source/extensions/filters/listener/dynamic_modules/factory.h"
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/listener_factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_runtime.h"
 
 namespace Envoy {
 namespace Server {
@@ -124,6 +126,30 @@ TEST_F(DynamicModuleListenerFilterFactoryTest, InvalidFilterConfigUnpackFailure)
 
   EXPECT_THROW_WITH_REGEX(factory_.createListenerFilterFactoryFromProto(config, nullptr, context_),
                           EnvoyException, "Failed to parse filter config");
+}
+
+// Test that the legacy behavior registers the custom stat namespace when the runtime guard is
+// enabled.
+TEST_F(DynamicModuleListenerFilterFactoryTest, LegacyBehaviorWithRuntimeGuard) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix", "true"}});
+
+  // Set up mock to expect the registerStatNamespace call.
+  Stats::CustomStatNamespacesImpl custom_stat_namespaces;
+  ON_CALL(context_.server_factory_context_.api_, customStatNamespaces())
+      .WillByDefault(testing::ReturnRef(custom_stat_namespaces));
+
+  envoy::extensions::filters::listener::dynamic_modules::v3::DynamicModuleListenerFilter config;
+  config.mutable_dynamic_module_config()->set_name("listener_no_op");
+  config.mutable_dynamic_module_config()->set_metrics_namespace("custom_namespace");
+  config.set_filter_name("test_filter");
+
+  auto result = factory_.createListenerFilterFactoryFromProto(config, nullptr, context_);
+  EXPECT_NE(nullptr, result);
+
+  // Verify the custom namespace was registered.
+  EXPECT_TRUE(custom_stat_namespaces.registered("custom_namespace"));
 }
 
 } // namespace Configuration

@@ -57,12 +57,12 @@ envoy_cc_library(
         "//source/common/http:status_lib",
         "//source/common/http:utility_lib",
         "//source/common/runtime:runtime_features_lib",
-        "@com_github_google_quiche//:http2_adapter",
-        "@com_google_absl//absl/algorithm",
-        "@com_google_absl//absl/cleanup",
-        "@com_google_absl//absl/container:inlined_vector",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/algorithm",
+        "@abseil-cpp//absl/cleanup",
+        "@abseil-cpp//absl/container:inlined_vector",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@quiche//:http2_adapter",
     ] + envoy_select_nghttp2([envoy_external_dep_path("nghttp2")]),
 )
 
@@ -99,7 +99,7 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
-        "@com_github_google_quiche//:http2_adapter",
+        "@quiche//:http2_adapter",
     ],
 )
 
@@ -113,7 +113,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/runtime:runtime_features_lib",
-        "@com_github_google_quiche//:http2_hpack_decoder_hpack_decoder_lib",
+        "@quiche//:http2_hpack_decoder_hpack_decoder_lib",
     ] + envoy_select_nghttp2([envoy_external_dep_path("nghttp2")]),
 )
 

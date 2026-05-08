@@ -52,6 +52,19 @@ TEST_F(McpFilterConfigTest, CreateRouteSpecificConfig) {
   EXPECT_NE(nullptr, config_or.value());
 }
 
+// Test creating filter with server context
+TEST_F(McpFilterConfigTest, CreateFilterWithServerContext) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+
+  Http::FilterFactoryCb cb = factory_->createFilterFactoryFromProtoWithServerContext(
+      proto_config, "stats", server_context);
+
+  NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamFilter(_));
+  cb(filter_callbacks);
+}
+
 } // namespace
 } // namespace Mcp
 } // namespace HttpFilters

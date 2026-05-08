@@ -224,7 +224,7 @@ typed_config:
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   makeRequest(request_headers_udp_tap_, {}, nullptr, response_headers_udp_tap_, {}, nullptr);
   codec_client_->close();
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", testing::Ge(1));
 
   // Verify whether get the expect message
   tap_server.checkRcvedUDPMsg();

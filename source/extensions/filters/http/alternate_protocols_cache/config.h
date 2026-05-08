@@ -26,6 +26,12 @@ private:
       const envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig&
           proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+
+  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+      const envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig&
+          proto_config,
+      const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& context) override;
 };
 
 DECLARE_FACTORY(AlternateProtocolsCacheFilterFactory);

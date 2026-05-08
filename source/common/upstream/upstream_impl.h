@@ -67,6 +67,7 @@
 #include "source/extensions/upstreams/tcp/config.h"
 #include "source/server/transport_socket_config_impl.h"
 
+#include "absl/container/inlined_vector.h"
 #include "absl/container/node_hash_set.h"
 #include "absl/synchronization/mutex.h"
 
@@ -81,6 +82,10 @@ using ClusterProto = envoy::config::cluster::v3::Cluster;
 using UpstreamNetworkFilterConfigProviderManager =
     Filter::FilterConfigProviderManager<Network::FilterFactoryCb,
                                         Server::Configuration::UpstreamFactoryContext>;
+
+Stats::ScopeSharedPtr
+generateStatsScope(const envoy::config::cluster::v3::Cluster& config,
+                   Server::Configuration::ServerFactoryContext& server_context);
 
 class LegacyLbPolicyConfigHelper {
 public:
@@ -156,7 +161,7 @@ class HostDescriptionImplBase : virtual public HostDescription,
                                 protected Logger::Loggable<Logger::Id::upstream> {
 public:
   Network::UpstreamTransportSocketFactory& transportSocketFactory() const override {
-    absl::ReaderMutexLock lock(&metadata_mutex_);
+    absl::ReaderMutexLock lock(metadata_mutex_);
     return socket_factory_;
   }
 
@@ -170,14 +175,19 @@ public:
   // would be to use TLS and post metadata updates from the main thread. This model would
   // possibly benefit other related and expensive computations too (e.g.: updating subsets).
   MetadataConstSharedPtr metadata() const override {
-    absl::ReaderMutexLock lock(&metadata_mutex_);
+    absl::ReaderMutexLock lock(metadata_mutex_);
     return endpoint_metadata_;
+  }
+  std::size_t metadataHash() const override {
+    absl::ReaderMutexLock lock(metadata_mutex_);
+    return endpoint_metadata_hash_;
   }
   void metadata(MetadataConstSharedPtr new_metadata) override {
     auto& new_socket_factory = resolveTransportSocketFactory(address(), new_metadata.get());
     {
-      absl::WriterMutexLock lock(&metadata_mutex_);
+      absl::WriterMutexLock lock(metadata_mutex_);
       endpoint_metadata_ = new_metadata;
+      endpoint_metadata_hash_ = new_metadata ? MessageUtil::hash(*new_metadata) : 0;
       // Update data members dependent on metadata.
       socket_factory_ = new_socket_factory;
     }
@@ -239,11 +249,17 @@ public:
     last_hc_pass_time_.emplace(std::move(last_hc_pass_time));
   }
 
-  void setLbPolicyData(HostLbPolicyDataPtr lb_policy_data) override {
-    lb_policy_data_ = std::move(lb_policy_data);
+  void addLbPolicyData(HostLbPolicyDataPtr lb_policy_data) override {
+    if (lb_policy_data != nullptr) {
+      lb_policy_datas_.push_back(std::move(lb_policy_data));
+    }
   }
-  OptRef<HostLbPolicyData> lbPolicyData() const override {
-    return makeOptRefFromPtr(lb_policy_data_.get());
+  size_t lbPolicyDataCount() const override { return lb_policy_datas_.size(); }
+  OptRef<HostLbPolicyData> lbPolicyDataAt(size_t index) const override {
+    if (index >= lb_policy_datas_.size()) {
+      return {};
+    }
+    return makeOptRefFromPtr(lb_policy_datas_[index].get());
   }
 
 protected:
@@ -269,6 +285,7 @@ private:
   std::atomic<bool> canary_;
   mutable absl::Mutex metadata_mutex_;
   MetadataConstSharedPtr endpoint_metadata_ ABSL_GUARDED_BY(metadata_mutex_);
+  std::size_t endpoint_metadata_hash_ ABSL_GUARDED_BY(metadata_mutex_){0};
   const MetadataConstSharedPtr locality_metadata_;
   const std::shared_ptr<const envoy::config::core::v3::Locality> locality_;
   Stats::StatNameDynamicStorage locality_zone_stat_name_;
@@ -280,7 +297,8 @@ private:
   std::reference_wrapper<Network::UpstreamTransportSocketFactory>
       socket_factory_ ABSL_GUARDED_BY(metadata_mutex_);
   absl::optional<MonotonicTime> last_hc_pass_time_;
-  HostLbPolicyDataPtr lb_policy_data_;
+  // Inline capacity of 2 covers the typical case of 1-2 LB policies per host.
+  absl::InlinedVector<HostLbPolicyDataPtr, 2> lb_policy_datas_;
 };
 
 /**
@@ -372,6 +390,14 @@ public:
   uint32_t healthFlagsGetAll() const override { return health_flags_; }
   void healthFlagsSetAll(uint32_t bits) override { health_flags_ |= bits; }
 
+  void setLastHealthCheckHttpStatus(uint64_t status) override {
+    last_hc_http_status_.store(status, std::memory_order_relaxed);
+  }
+  absl::optional<uint64_t> lastHealthCheckHttpStatus() const override {
+    const uint64_t status = last_hc_http_status_.load(std::memory_order_relaxed);
+    return status == 0 ? absl::nullopt : absl::make_optional(status);
+  }
+
   Host::HealthStatus healthStatus() const override {
     // Evaluate active health status first.
 
@@ -408,6 +434,7 @@ public:
 
     // If any of the degraded flags are set, host is degraded.
     if (healthFlagsGet(enumToInt(HealthFlag::DEGRADED_ACTIVE_HC) |
+                       enumToInt(HealthFlag::DEGRADED_OUTLIER_DETECTION) |
                        enumToInt(HealthFlag::DEGRADED_EDS_HEALTH))) {
       return Host::Health::Degraded;
     }
@@ -443,7 +470,8 @@ protected:
                    HostDescriptionConstSharedPtr host);
   static absl::optional<Network::Address::InstanceConstSharedPtr> maybeGetProxyRedirectAddress(
       const Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-      HostDescriptionConstSharedPtr host);
+      HostDescriptionConstSharedPtr host,
+      const Network::UpstreamTransportSocketFactory& socket_factory);
 
 private:
   // Helper function to check multiple health flags at once.
@@ -458,6 +486,8 @@ private:
   // flag access? May be we could refactor HealthFlag to contain all these statuses and flags in the
   // future.
   std::atomic<Host::HealthStatus> eds_health_status_{};
+  // 0 indicates no status has been set.
+  std::atomic<uint64_t> last_hc_http_status_{0};
 
   struct HostHandleImpl : HostHandle {
     HostHandleImpl(const std::shared_ptr<const HostImplBase>& parent) : parent_(parent) {
@@ -848,6 +878,9 @@ public:
   uint32_t perConnectionBufferLimitBytes() const override {
     return per_connection_buffer_limit_bytes_;
   }
+  std::chrono::milliseconds perConnectionBufferHighWatermarkTimeout() const override {
+    return buffer_high_watermark_timeout_;
+  }
   uint64_t features() const override { return features_; }
   const HttpProtocolOptionsConfig& httpProtocolOptions() const override {
     return *http_protocol_options_;
@@ -1090,6 +1123,7 @@ private:
   // Keep small values like bools and enums at the end of the class to reduce
   // overhead via alignment
   const uint32_t per_connection_buffer_limit_bytes_;
+  const std::chrono::milliseconds buffer_high_watermark_timeout_;
   const uint32_t max_response_headers_count_;
   const absl::optional<uint16_t> max_response_headers_kb_;
   const envoy::config::cluster::v3::Cluster::DiscoveryType type_;

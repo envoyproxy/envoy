@@ -293,7 +293,7 @@ void DnsCacheImpl::onReResolveAlarm(const std::string& host) {
   auto last_used_time = primary_host.host_info_->lastUsedTime();
   ENVOY_LOG(debug, "host='{}' TTL check: now={} last_used={} TTL {}", host, now_duration.count(),
             last_used_time.count(), host_ttl_.count());
-  if ((now_duration - last_used_time) > host_ttl_) {
+  if ((now_duration - last_used_time) >= host_ttl_) {
     ENVOY_LOG(debug, "host='{}' TTL expired, removing", host);
     removeHost(host, primary_host, true);
   } else {
@@ -562,11 +562,32 @@ void DnsCacheImpl::finishResolve(const std::string& host,
               dns_ttl.count() * 1000);
   } else {
     if (!config_.disable_dns_refresh_on_failure()) {
-      const uint64_t refresh_interval =
-          primary_host_info->failure_backoff_strategy_->nextBackOffMs();
-      primary_host_info->refresh_timer_->enableTimer(std::chrono::milliseconds(refresh_interval));
-      ENVOY_LOG(debug, "DNS refresh rate reset for host '{}', (failure) refresh rate {} ms", host,
-                refresh_interval);
+      // Cap the failure backoff so the next re-resolve alarm fires no later than when the host
+      // becomes eligible for eviction. Without this cap, a touch() that lands just before
+      // onReResolveAlarm leaves the host active and schedules the next check at the full backoff,
+      // which can exceed host_ttl by a large margin.
+      const auto now = main_thread_dispatcher_.timeSource().monotonicTime().time_since_epoch();
+      const auto elapsed = now - primary_host_info->host_info_->lastUsedTime();
+      const std::chrono::milliseconds raw_backoff_ms(
+          primary_host_info->failure_backoff_strategy_->nextBackOffMs());
+      std::chrono::milliseconds refresh_interval(raw_backoff_ms);
+      if (elapsed >= host_ttl_) {
+        refresh_interval = std::chrono::milliseconds(0);
+      } else {
+        const auto until_eviction =
+            std::chrono::duration_cast<std::chrono::milliseconds>(host_ttl_ - elapsed);
+        refresh_interval = std::min(refresh_interval, until_eviction);
+      }
+      // Floor the result at min_refresh_interval_ (dns_min_refresh_rate) to prevent arming
+      // a ms-scale alarm that can kick rapid-fire resolves and race with dispatcher/resolver
+      // teardown in integration tests (observed as a LeakSanitizer leak in
+      // proxy_filter_integration_test DoubleResolution).
+      refresh_interval =
+          std::max(refresh_interval,
+                   std::chrono::duration_cast<std::chrono::milliseconds>(min_refresh_interval_));
+      primary_host_info->refresh_timer_->enableTimer(refresh_interval);
+      ENVOY_LOG(debug, "DNS refresh rate reset for host '{}', (failure) raw={} ms armed={} ms",
+                host, raw_backoff_ms.count(), refresh_interval.count());
     }
   }
 }

@@ -2,6 +2,7 @@
 
 #include "envoy/matcher/matcher.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/type/matcher/v3/status_code_input.pb.h"
 #include "envoy/type/matcher/v3/status_code_input.pb.validate.h"
 
@@ -21,18 +22,23 @@ public:
     const auto maybe_headers = data.responseHeaders();
 
     if (!maybe_headers) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
+      return Matcher::DataInputGetResult::NoData(Matcher::DataAvailability::NotAvailable);
     }
     const auto maybe_status = Http::Utility::getResponseStatusOrNullopt(*maybe_headers);
 
     if (maybe_status.has_value()) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-              absl::StrCat(*maybe_status)};
+      return Matcher::DataInputGetResult::CreateString(absl::StrCat(*maybe_status));
     }
 
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+    return Matcher::DataInputGetResult::NoData();
   }
 };
+
+inline constexpr absl::string_view Code1xx = "1xx";
+inline constexpr absl::string_view Code2xx = "2xx";
+inline constexpr absl::string_view Code3xx = "3xx";
+inline constexpr absl::string_view Code4xx = "4xx";
+inline constexpr absl::string_view Code5xx = "5xx";
 
 class HttpResponseStatusCodeClassInput : public Matcher::DataInput<HttpMatchingData> {
 public:
@@ -42,28 +48,28 @@ public:
   Matcher::DataInputGetResult get(const HttpMatchingData& data) const override {
     const auto maybe_headers = data.responseHeaders();
     if (!maybe_headers) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
+      return Matcher::DataInputGetResult::NoData(Matcher::DataAvailability::NotAvailable);
     }
 
     const auto maybe_status = Http::Utility::getResponseStatusOrNullopt(*maybe_headers);
     if (maybe_status.has_value()) {
       if (*maybe_status >= 100 && *maybe_status < 200) {
-        return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, "1xx"};
+        return Matcher::DataInputGetResult::CreateStringView(Code1xx);
       }
       if (*maybe_status >= 200 && *maybe_status < 300) {
-        return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, "2xx"};
+        return Matcher::DataInputGetResult::CreateStringView(Code2xx);
       }
       if (*maybe_status >= 300 && *maybe_status < 400) {
-        return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, "3xx"};
+        return Matcher::DataInputGetResult::CreateStringView(Code3xx);
       }
       if (*maybe_status >= 400 && *maybe_status < 500) {
-        return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, "4xx"};
+        return Matcher::DataInputGetResult::CreateStringView(Code4xx);
       }
       if (*maybe_status >= 500 && *maybe_status < 600) {
-        return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, "5xx"};
+        return Matcher::DataInputGetResult::CreateStringView(Code5xx);
       }
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+    return Matcher::DataInputGetResult::NoData();
   }
 };
 
@@ -103,6 +109,34 @@ class HttpResponseStatusCodeClassInputFactory
 public:
   explicit HttpResponseStatusCodeClassInputFactory()
       : HttpResponseStatusCodeInputFactoryBase("status_code_class_input") {}
+};
+
+inline constexpr absl::string_view LocalReplyTrue = "true";
+inline constexpr absl::string_view LocalReplyFalse = "false";
+
+class HttpResponseLocalReplyInput : public Matcher::DataInput<HttpMatchingData> {
+public:
+  HttpResponseLocalReplyInput() = default;
+  ~HttpResponseLocalReplyInput() override = default;
+
+  Matcher::DataInputGetResult get(const HttpMatchingData& data) const override {
+    const auto& details = data.streamInfo().responseCodeDetails();
+    if (!details.has_value()) {
+      return Matcher::DataInputGetResult::NoData(Matcher::DataAvailability::NotAvailable);
+    }
+    if (details.value() == StreamInfo::ResponseCodeDetails::get().ViaUpstream) {
+      return Matcher::DataInputGetResult::CreateStringView(LocalReplyFalse);
+    }
+    return Matcher::DataInputGetResult::CreateStringView(LocalReplyTrue);
+  }
+};
+
+class HttpResponseLocalReplyInputFactory
+    : public HttpResponseStatusCodeInputFactoryBase<
+          HttpResponseLocalReplyInput, envoy::type::matcher::v3::HttpResponseLocalReplyMatchInput> {
+public:
+  explicit HttpResponseLocalReplyInputFactory()
+      : HttpResponseStatusCodeInputFactoryBase("local_reply") {}
 };
 
 } // namespace Matching

@@ -103,9 +103,7 @@ public:
 class AsyncClientImplTracingTest : public AsyncClientImplTest {
 public:
   AsyncClientImplTracingTest() {
-    ON_CALL(stream_info_, upstreamClusterInfo())
-        .WillByDefault(Return(absl::make_optional<Upstream::ClusterInfoConstSharedPtr>(
-            cm_.thread_local_cluster_.cluster_.info_)));
+    stream_info_.upstream_cluster_info_ = cm_.thread_local_cluster_.cluster_.info_;
   }
 
   Tracing::MockSpan parent_span_;
@@ -523,7 +521,7 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarking) {
   EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark());
   request->setWatermarkCallbacks(watermark_callbacks);
 
-  EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(""), true));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferString(""), true));
   Buffer::OwnedImpl empty;
   request->sendData(empty, true);
 
@@ -1163,7 +1161,7 @@ TEST_F(AsyncClientImplTest, RetryWithStream) {
   TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
-  EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual("test body"), true));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferString("test body"), true));
 
   headers.setReferenceEnvoyRetryOn(Headers::get().EnvoyRetryOnValues._5xx);
   AsyncClient::Stream* stream = client_.start(stream_callbacks_, {});
@@ -1187,7 +1185,7 @@ TEST_F(AsyncClientImplTest, RetryWithStream) {
           }));
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
-  EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual("test body"), true));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferString("test body"), true));
   timer_->invokeCallback();
 
   // Normal response.
@@ -1222,7 +1220,7 @@ TEST_F(AsyncClientImplTest, DataBufferForRetryOverflow) {
   const std::string body_str((1 << 16) + 1, 'a');
   Buffer::InstancePtr large_body{new Buffer::OwnedImpl(body_str)};
 
-  EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(body_str), true));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferString(body_str), true));
 
   headers.setReferenceEnvoyRetryOn(Headers::get().EnvoyRetryOnValues._5xx);
   AsyncClient::Stream* stream = client_.start(stream_callbacks_, {});
@@ -1268,7 +1266,7 @@ TEST_F(AsyncClientImplTest, DataBufferForRetryWithLargerBufferLimit) {
   const std::string body_str((1 << 16) + 1, 'a');
   Buffer::InstancePtr large_body{new Buffer::OwnedImpl(body_str)};
 
-  EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(body_str), true));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferString(body_str), true));
 
   headers.setReferenceEnvoyRetryOn(Headers::get().EnvoyRetryOnValues._5xx);
   // Set buffer limit to larger than body size.
@@ -1294,7 +1292,7 @@ TEST_F(AsyncClientImplTest, DataBufferForRetryWithLargerBufferLimit) {
           }));
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
-  EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(body_str), true));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferString(body_str), true));
   timer_->invokeCallback();
 
   // Normal response.
@@ -2369,18 +2367,18 @@ TEST_F(AsyncClientImplTest, RdsGettersTest) {
   Http::StreamDecoderFilterCallbacks* filter_callbacks =
       dynamic_cast<Http::AsyncStreamImpl*>(stream);
   auto route = filter_callbacks->route();
-  ASSERT_NE(nullptr, route);
+  ASSERT_TRUE(route.has_value());
   auto route_entry = route->routeEntry();
   ASSERT_NE(nullptr, route_entry);
   auto& path_match_criterion = route_entry->pathMatchCriterion();
   EXPECT_EQ("", path_match_criterion.matcher());
   EXPECT_EQ(Router::PathMatchType::None, path_match_criterion.matchType());
-  const auto& route_config = route->virtualHost()->routeConfig();
+  const auto& route_config = route->virtualHost().routeConfig();
   EXPECT_EQ("", route_config.name());
   EXPECT_EQ(0, route_config.internalOnlyHeaders().size());
   auto cluster_info = filter_callbacks->clusterInfo();
-  ASSERT_NE(nullptr, cluster_info);
-  EXPECT_EQ(cm_.thread_local_cluster_.cluster_.info_, cluster_info);
+  ASSERT_TRUE(cluster_info.has_value());
+  EXPECT_EQ(cm_.thread_local_cluster_.cluster_.info_.get(), cluster_info.ptr());
   EXPECT_CALL(stream_callbacks_, onReset());
 }
 
@@ -2411,7 +2409,6 @@ TEST_F(AsyncClientImplTest, ParentStreamInfo) {
 
 TEST_F(AsyncClientImplTest, MetadataMatchCriteriaWithNullRoute) {
   NiceMock<StreamInfo::MockStreamInfo> parent_stream_info;
-  EXPECT_CALL(parent_stream_info, route()).WillRepeatedly(Return(nullptr));
 
   auto options = AsyncClient::StreamOptions();
   options.parent_context.stream_info = &parent_stream_info;
@@ -2430,7 +2427,7 @@ TEST_F(AsyncClientImplTest, MetadataMatchCriteriaWithNullRoute) {
 TEST_F(AsyncClientImplTest, MetadataMatchCriteriaWithNullRouteEntry) {
   NiceMock<StreamInfo::MockStreamInfo> parent_stream_info;
   const auto route = std::make_shared<NiceMock<Router::MockRoute>>();
-  EXPECT_CALL(parent_stream_info, route()).WillRepeatedly(Return(route));
+  parent_stream_info.route_ = route;
 
   EXPECT_CALL(*route, routeEntry()).WillRepeatedly(Return(nullptr));
 
@@ -2451,7 +2448,7 @@ TEST_F(AsyncClientImplTest, MetadataMatchCriteriaWithNullRouteEntry) {
 TEST_F(AsyncClientImplTest, MetadataMatchCriteriaWithValidRouteEntry) {
   NiceMock<StreamInfo::MockStreamInfo> parent_stream_info;
   const auto route = std::make_shared<NiceMock<Router::MockRoute>>();
-  EXPECT_CALL(parent_stream_info, route()).WillRepeatedly(Return(route));
+  parent_stream_info.route_ = route;
 
   NiceMock<Router::MockRouteEntry> route_entry;
   const auto metadata_criteria =
@@ -2556,11 +2553,11 @@ TEST_F(AsyncClientImplUnitTest, NullRouteImplInitTest) {
   EXPECT_TRUE(route_entry.upgradeMap().empty());
   EXPECT_EQ(false, route_entry.internalRedirectPolicy().enabled());
   EXPECT_TRUE(route_entry.shadowPolicies().empty());
-  EXPECT_TRUE(route_impl_->virtualHost()->rateLimitPolicy().empty());
-  EXPECT_EQ(nullptr, route_impl_->virtualHost()->corsPolicy());
-  EXPECT_FALSE(route_impl_->virtualHost()->includeAttemptCountInRequest());
-  EXPECT_FALSE(route_impl_->virtualHost()->includeAttemptCountInResponse());
-  EXPECT_FALSE(route_impl_->virtualHost()->routeConfig().usesVhds());
+  EXPECT_TRUE(route_impl_->virtualHost().rateLimitPolicy().empty());
+  EXPECT_EQ(nullptr, route_impl_->virtualHost().corsPolicy());
+  EXPECT_FALSE(route_impl_->virtualHost().includeAttemptCountInRequest());
+  EXPECT_FALSE(route_impl_->virtualHost().includeAttemptCountInResponse());
+  EXPECT_FALSE(route_impl_->virtualHost().routeConfig().usesVhds());
   EXPECT_EQ(nullptr, route_entry.tlsContextMatchCriteria());
 }
 
@@ -2644,8 +2641,8 @@ TEST_F(AsyncClientImplTest, UpstreamOverrideHost) {
         // Verify that the upstream override host is passed through the load balancer context
         auto retrieved_override = context->overrideHostToSelect();
         EXPECT_TRUE(retrieved_override.has_value());
-        EXPECT_EQ(retrieved_override->first, "192.168.1.100:8080");
-        EXPECT_EQ(retrieved_override->second, true);
+        EXPECT_EQ(retrieved_override->host, "192.168.1.100:8080");
+        EXPECT_EQ(retrieved_override->strict, true);
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
 
@@ -2655,8 +2652,8 @@ TEST_F(AsyncClientImplTest, UpstreamOverrideHost) {
         // The load balancer should call overrideHostToSelect() to get the override
         auto retrieved_override = context->overrideHostToSelect();
         EXPECT_TRUE(retrieved_override.has_value());
-        EXPECT_EQ(retrieved_override->first, "192.168.1.100:8080");
-        EXPECT_EQ(retrieved_override->second, true);
+        EXPECT_EQ(retrieved_override->host, "192.168.1.100:8080");
+        EXPECT_EQ(retrieved_override->strict, true);
         return Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_};
       }));
 
@@ -2700,8 +2697,8 @@ TEST_F(AsyncClientImplTest, UpstreamOverrideHostNotStrict) {
         // Verify that the non-strict upstream override host is passed correctly
         auto retrieved_override = context->overrideHostToSelect();
         EXPECT_TRUE(retrieved_override.has_value());
-        EXPECT_EQ(retrieved_override->first, "example.com:8080");
-        EXPECT_EQ(retrieved_override->second, false);
+        EXPECT_EQ(retrieved_override->host, "example.com:8080");
+        EXPECT_EQ(retrieved_override->strict, false);
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
 
@@ -2711,8 +2708,8 @@ TEST_F(AsyncClientImplTest, UpstreamOverrideHostNotStrict) {
         // The load balancer should call overrideHostToSelect() to get the override
         auto retrieved_override = context->overrideHostToSelect();
         EXPECT_TRUE(retrieved_override.has_value());
-        EXPECT_EQ(retrieved_override->first, "example.com:8080");
-        EXPECT_EQ(retrieved_override->second, false);
+        EXPECT_EQ(retrieved_override->host, "example.com:8080");
+        EXPECT_EQ(retrieved_override->strict, false);
         return Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_};
       }));
 

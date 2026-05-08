@@ -18,7 +18,7 @@ envoy_cc_test_library(
         "//test/test_common:environment_lib",
         "//test/test_common:printers_lib",
         "//test/test_common:test_runtime_lib",
-        "@com_github_google_benchmark//:benchmark",
-        "@com_github_mirror_tclap//:tclap",
+        "@benchmark",
+        "@tclap",
     ],
 )

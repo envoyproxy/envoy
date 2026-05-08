@@ -15,7 +15,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/config/config_provider_impl.h"
-#include "source/common/config/subscription_base.h"
+#include "source/common/config/resource_type_helper.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/router/rds_impl.h"
 #include "source/common/router/scoped_config_impl.h"
@@ -106,9 +106,8 @@ struct ScopedRdsStats {
 };
 
 // A scoped RDS subscription to be used with the dynamic scoped RDS ConfigProvider.
-class ScopedRdsConfigSubscription
-    : public Envoy::Config::DeltaConfigSubscriptionInstance,
-      public Envoy::Config::SubscriptionBase<envoy::config::route::v3::ScopedRouteConfiguration> {
+class ScopedRdsConfigSubscription : public Envoy::Config::DeltaConfigSubscriptionInstance,
+                                    public Envoy::Config::SubscriptionCallbacks {
 public:
   using ScopedRouteConfigurationMap =
       std::map<std::string, envoy::config::route::v3::ScopedRouteConfiguration>;
@@ -232,6 +231,8 @@ private:
   Stats::ScopeSharedPtr scope_;
   ScopedRdsStats stats_;
   Envoy::Config::SubscriptionPtr subscription_;
+  const Envoy::Config::ResourceTypeHelper<envoy::config::route::v3::ScopedRouteConfiguration>
+      resource_type_helper_;
   const envoy::config::core::v3::ConfigSource rds_config_source_;
   const std::string stat_prefix_;
   RouteConfigProviderManager& route_config_provider_manager_;
@@ -328,11 +329,11 @@ public:
   Envoy::Config::ConfigProviderPtr createConfigProvider(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           config,
-      Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
+      Server::Configuration::ServerFactoryContext& factory_context, Init::Manager& init_manager,
+      const std::string& stat_prefix,
       Envoy::Config::ConfigProviderManager& scoped_routes_config_provider_manager) override {
     return Router::ScopedRoutesConfigProviderUtil::create(
-        config, factory_context, factory_context.initManager(), stat_prefix,
-        scoped_routes_config_provider_manager);
+        config, factory_context, init_manager, stat_prefix, scoped_routes_config_provider_manager);
   }
 
   // If enabled in the HttpConnectionManager config, returns a ConfigProvider for scoped routing

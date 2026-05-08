@@ -22,13 +22,13 @@
 
 #if defined(__linux__)
 #include <sched.h>
-#include "source/server/options_impl_platform_linux.h"
+
 #include "source/server/cgroup_cpu_util.h"
+#include "source/server/options_impl_platform_linux.h"
 #endif
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
-#include "test/test_common/registry.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 

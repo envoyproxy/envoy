@@ -5,7 +5,7 @@
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "jwt_verify_lib/jwks.h"
+#include "source/common/jwt/jwks.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -37,7 +37,7 @@ public:
      * of the returned JWKS object.
      * @param jwks the JWKS object retrieved.
      */
-    virtual void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) PURE;
+    virtual void onJwksSuccess(Envoy::JwtVerify::JwksPtr&& jwks) PURE;
     /*
      * Retrieval error callback.
      * * @param reason the failure reason.

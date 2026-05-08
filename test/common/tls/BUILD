@@ -43,6 +43,7 @@ envoy_cc_test(
         "//source/common/network:listen_socket_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/network:utility_lib",
+        "//source/common/ssl:ssl_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/common/stream_info:stream_info_lib",
@@ -63,7 +64,6 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
-        "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:network_utility_lib",
@@ -104,6 +104,7 @@ envoy_cc_test(
         "//source/common/network:listen_socket_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/network:utility_lib",
+        "//source/common/ssl:ssl_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/common/stream_info:stream_info_lib",
@@ -124,7 +125,6 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
-        "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:network_utility_lib",
@@ -152,6 +152,7 @@ envoy_cc_test(
         ":ssl_test_utils",
         "//source/common/common:base64_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/ssl:ssl_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/common/tls:context_config_lib",
@@ -166,7 +167,6 @@ envoy_cc_test(
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:environment_lib",
-        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
@@ -218,6 +218,14 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "mock_ssl_handshaker_lib",
+    hdrs = ["mock_ssl_handshaker.h"],
+    deps = [
+        "//source/common/tls:ssl_handshaker_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "test_private_key_method_provider_test_lib",
     srcs = [
         "test_private_key_method_provider.cc",
@@ -257,7 +265,6 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
-        "//test/mocks/stats:stats_mocks",
     ],
 )
 
@@ -279,7 +286,6 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
-        "//test/mocks/stats:stats_mocks",
         "//test/test_common:registry_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
@@ -290,6 +296,16 @@ envoy_cc_test(
     srcs = ["server_context_impl_test.cc"],
     deps = [
         "//source/common/tls:server_context_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "cert_compression_test",
+    srcs = ["cert_compression_test.cc"],
+    external_deps = ["ssl"],
+    deps = [
+        "//source/common/tls:cert_compression_lib",
+        "//test/test_common:logging_lib",
     ],
 )
 
@@ -305,7 +321,7 @@ envoy_cc_benchmark_binary(
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/buffer:buffer_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 

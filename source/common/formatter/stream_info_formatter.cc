@@ -20,6 +20,35 @@ namespace {
 
 static const std::string DefaultUnspecifiedValueString = "-";
 
+// Helper function to format a list of attempted upstream hosts.
+// The extractor function converts each host to a string representation.
+using HostStringExtractor =
+    std::function<absl::optional<std::string>(const Upstream::HostDescriptionConstSharedPtr&)>;
+
+absl::optional<std::string> formatUpstreamHostsAttempted(const StreamInfo::StreamInfo& stream_info,
+                                                         const HostStringExtractor& extractor) {
+  const auto opt_ref = stream_info.upstreamInfo();
+  if (!opt_ref.has_value()) {
+    return absl::nullopt;
+  }
+  const auto& attempted_hosts = opt_ref->upstreamHostsAttempted();
+  if (attempted_hosts.empty()) {
+    return absl::nullopt;
+  }
+  std::vector<std::string> results;
+  results.reserve(attempted_hosts.size());
+  for (const auto& host : attempted_hosts) {
+    auto result = extractor(host);
+    if (result.has_value() && !result->empty()) {
+      results.push_back(std::move(*result));
+    }
+  }
+  if (results.empty()) {
+    return absl::nullopt;
+  }
+  return absl::StrJoin(results, ",");
+}
+
 const re2::RE2& getSystemTimeFormatNewlinePattern() {
   CONSTRUCT_ON_FIRST_USE(re2::RE2, "%[-_0^#]*[1-9]*(E|O)?n");
 }
@@ -139,11 +168,11 @@ ClusterMetadataFormatter::ClusterMetadataFormatter(absl::string_view filter_name
     : MetadataFormatter(filter_namespace, path, max_length,
                         [](const StreamInfo::StreamInfo& stream_info)
                             -> const envoy::config::core::v3::Metadata* {
-                          auto cluster_info = stream_info.upstreamClusterInfo();
-                          if (!cluster_info.has_value() || cluster_info.value() == nullptr) {
+                          const auto cluster_info = stream_info.upstreamClusterInfo();
+                          if (!cluster_info) {
                             return nullptr;
                           }
-                          return &cluster_info.value()->metadata();
+                          return &cluster_info->metadata();
                         }) {}
 
 UpstreamHostMetadataFormatter::UpstreamHostMetadataFormatter(
@@ -1353,6 +1382,85 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                        return host->address();
                                      });
                                }}},
+                             {"UPSTREAM_HOSTS_ATTEMPTED",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       return formatUpstreamHostsAttempted(
+                                           stream_info,
+                                           [](const Upstream::HostDescriptionConstSharedPtr& host)
+                                               -> absl::optional<std::string> {
+                                             if (host == nullptr || host->address() == nullptr) {
+                                               return absl::nullopt;
+                                             }
+                                             return host->address()->asString();
+                                           });
+                                     });
+                               }}},
+                             {"UPSTREAM_HOSTS_ATTEMPTED_WITHOUT_PORT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       return formatUpstreamHostsAttempted(
+                                           stream_info,
+                                           [](const Upstream::HostDescriptionConstSharedPtr& host)
+                                               -> absl::optional<std::string> {
+                                             if (host == nullptr || host->address() == nullptr) {
+                                               return absl::nullopt;
+                                             }
+                                             return StreamInfo::Utility::
+                                                 formatDownstreamAddressNoPort(*host->address());
+                                           });
+                                     });
+                               }}},
+                             {"UPSTREAM_HOST_NAMES_ATTEMPTED",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       return formatUpstreamHostsAttempted(
+                                           stream_info,
+                                           [](const Upstream::HostDescriptionConstSharedPtr& host)
+                                               -> absl::optional<std::string> {
+                                             if (host == nullptr) {
+                                               return absl::nullopt;
+                                             }
+                                             std::string host_name = host->hostname();
+                                             if (host_name.empty() && host->address() != nullptr) {
+                                               host_name = host->address()->asString();
+                                             }
+                                             return host_name.empty()
+                                                        ? absl::nullopt
+                                                        : absl::make_optional(host_name);
+                                           });
+                                     });
+                               }}},
+                             {"UPSTREAM_HOST_NAMES_ATTEMPTED_WITHOUT_PORT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       return formatUpstreamHostsAttempted(
+                                           stream_info,
+                                           [](const Upstream::HostDescriptionConstSharedPtr& host)
+                                               -> absl::optional<std::string> {
+                                             if (host == nullptr) {
+                                               return absl::nullopt;
+                                             }
+                                             std::string host_name = host->hostname();
+                                             if (host_name.empty() && host->address() != nullptr) {
+                                               host_name = host->address()->asString();
+                                             }
+                                             Envoy::Http::HeaderUtility::stripPortFromHost(
+                                                 host_name);
+                                             return host_name.empty()
+                                                        ? absl::nullopt
+                                                        : absl::make_optional(host_name);
+                                           });
+                                     });
+                               }}},
                              {"UPSTREAM_CONNECTION_ID",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, absl::optional<size_t>) {
@@ -1367,17 +1475,38 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                        return upstream_connection_id;
                                      });
                                }}},
+                             {"UPSTREAM_CONNECTION_IDS_ATTEMPTED",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> absl::optional<std::string> {
+                                       const auto opt_ref = stream_info.upstreamInfo();
+                                       if (!opt_ref.has_value()) {
+                                         return absl::nullopt;
+                                       }
+                                       const auto& attempted_ids =
+                                           opt_ref->upstreamConnectionIdsAttempted();
+                                       if (attempted_ids.empty()) {
+                                         return absl::nullopt;
+                                       }
+                                       std::vector<std::string> ids;
+                                       ids.reserve(attempted_ids.size());
+                                       for (const auto& id : attempted_ids) {
+                                         ids.push_back(std::to_string(id));
+                                       }
+                                       return absl::StrJoin(ids, ",");
+                                     });
+                               }}},
                              {"UPSTREAM_CLUSTER",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, absl::optional<size_t>) {
                                  return std::make_unique<StreamInfoStringFormatterProvider>(
                                      [](const StreamInfo::StreamInfo& stream_info) {
                                        std::string upstream_cluster_name;
-                                       if (stream_info.upstreamClusterInfo().has_value() &&
-                                           stream_info.upstreamClusterInfo().value() != nullptr) {
-                                         upstream_cluster_name = stream_info.upstreamClusterInfo()
-                                                                     .value()
-                                                                     ->observabilityName();
+                                       if (const auto cluster_info =
+                                               stream_info.upstreamClusterInfo()) {
+                                         upstream_cluster_name = cluster_info->observabilityName();
                                        }
 
                                        return upstream_cluster_name.empty()
@@ -1392,10 +1521,9 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                  return std::make_unique<StreamInfoStringFormatterProvider>(
                                      [](const StreamInfo::StreamInfo& stream_info) {
                                        std::string upstream_cluster_name;
-                                       if (stream_info.upstreamClusterInfo().has_value() &&
-                                           stream_info.upstreamClusterInfo().value() != nullptr) {
-                                         upstream_cluster_name =
-                                             stream_info.upstreamClusterInfo().value()->name();
+                                       if (const auto cluster_info =
+                                               stream_info.upstreamClusterInfo()) {
+                                         upstream_cluster_name = cluster_info->name();
                                        }
 
                                        return upstream_cluster_name.empty()
@@ -1518,6 +1646,16 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                        return connection_info.ciphersuiteString();
                                      });
                                }}},
+                             {"UPSTREAM_TLS_GROUP",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return absl::make_optional<std::string>(
+                                           connection_info.tlsGroupString());
+                                     });
+                               }}},
                              {"UPSTREAM_TLS_VERSION",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, absl::optional<size_t>) {
@@ -1534,6 +1672,25 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                      StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
                                      [](const Ssl::ConnectionInfo& connection_info) {
                                        return connection_info.sessionId();
+                                     });
+                               }}},
+                             {"UPSTREAM_SERVER_NAME",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> absl::optional<std::string> {
+                                       if (stream_info.upstreamInfo() &&
+                                           stream_info.upstreamInfo()->upstreamSslConnection() !=
+                                               nullptr) {
+                                         auto sni = stream_info.upstreamInfo()
+                                                        ->upstreamSslConnection()
+                                                        ->sni();
+                                         if (!sni.empty()) {
+                                           return std::string(sni);
+                                         }
+                                       }
+                                       return absl::nullopt;
                                      });
                                }}},
                              {"UPSTREAM_PEER_ISSUER",
@@ -1960,6 +2117,16 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                        return connection_info.ciphersuiteString();
                                      });
                                }}},
+                             {"DOWNSTREAM_TLS_GROUP",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return absl::make_optional<std::string>(
+                                           connection_info.tlsGroupString());
+                                     });
+                               }}},
                              {"DOWNSTREAM_TLS_VERSION",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, absl::optional<size_t>) {
@@ -2036,6 +2203,24 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                        return connection_info.issuerPeerCertificate();
                                      });
                                }}},
+                             {"DOWNSTREAM_PEER_ISSUER_FINGERPRINT_256",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return connection_info.sha256PeerCertificateIssuerDigest();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_PEER_ISSUER_SERIAL",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return connection_info.serialNumberPeerCertificateIssuer();
+                                     });
+                               }}},
                              {"DOWNSTREAM_PEER_CERT",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, absl::optional<size_t>) {
@@ -2090,6 +2275,43 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                                       .value()
                                                       .get()
                                                       .upstreamTransportFailureReason();
+                                       }
+                                       if (result) {
+                                         std::replace(result->begin(), result->end(), ' ', '_');
+                                       }
+                                       return result;
+                                     });
+                               }}},
+                             {"UPSTREAM_DETECTED_CLOSE_TYPE",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> absl::optional<std::string> {
+                                       if (stream_info.upstreamInfo().has_value()) {
+                                         return detectedCloseTypeToString(
+                                             stream_info.upstreamInfo()
+                                                 ->upstreamDetectedCloseType());
+                                       }
+                                       return absl::nullopt;
+                                     });
+                               }}},
+                             {"UPSTREAM_LOCAL_CLOSE_REASON",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       absl::optional<std::string> result;
+                                       if (stream_info.upstreamInfo().has_value() &&
+                                           !stream_info.upstreamInfo()
+                                                .value()
+                                                .get()
+                                                .upstreamLocalCloseReason()
+                                                .empty()) {
+                                         result = std::string(stream_info.upstreamInfo()
+                                                                  .value()
+                                                                  .get()
+                                                                  .upstreamLocalCloseReason());
                                        }
                                        if (result) {
                                          std::replace(result->begin(), result->end(), ' ', '_');

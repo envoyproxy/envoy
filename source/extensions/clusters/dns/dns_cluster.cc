@@ -2,9 +2,6 @@
 
 // The purpose of these two headers is purely for backward compatibility.
 // Never create new dependencies to symbols declared in these headers!
-#include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
-#include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
-
 #include <chrono>
 
 #include "envoy/common/exception.h"
@@ -17,6 +14,8 @@
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/extensions/clusters/common/dns_cluster_backcompat.h"
 #include "source/extensions/clusters/common/logical_host.h"
+#include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
+#include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
 
 namespace Envoy {
 namespace Upstream {

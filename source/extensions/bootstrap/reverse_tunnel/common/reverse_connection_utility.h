@@ -24,6 +24,17 @@ public:
   static constexpr absl::string_view PROXY_MESSAGE = "PROXY";
   static constexpr absl::string_view DEFAULT_REVERSE_TUNNEL_REQUEST_PATH =
       "/reverse_connections/request";
+  static constexpr absl::string_view TENANT_SCOPE_DELIMITER = ":";
+
+  // Upgrade token advertised when the handshake is negotiated as an HTTP/1.1 Upgrade.
+  // Used by both the initiator (request `Upgrade:` header) and responder (`101` response).
+  static constexpr absl::string_view REVERSE_TUNNEL_UPGRADE_PROTOCOL = "reverse-tunnel";
+
+  struct TenantScopedIdentifierView {
+    absl::string_view tenant;
+    absl::string_view identifier;
+    bool hasTenant() const { return !tenant.empty(); }
+  };
 
   static bool isPingMessage(absl::string_view data);
 
@@ -36,6 +47,13 @@ public:
   static bool handlePingMessage(absl::string_view data, Network::Connection& connection);
 
   static bool extractPingFromHttpData(absl::string_view http_data);
+
+  static TenantScopedIdentifierView splitTenantScopedIdentifier(absl::string_view value);
+
+  static std::string buildTenantScopedIdentifier(absl::string_view tenant,
+                                                 absl::string_view identifier);
+
+  static void applySslQuietClose(Network::Connection& conn);
 
 private:
   ReverseConnectionUtility() = delete;

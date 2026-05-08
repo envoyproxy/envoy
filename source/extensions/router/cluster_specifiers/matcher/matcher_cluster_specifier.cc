@@ -35,7 +35,7 @@ public:
     Http::Matching::HttpMatchingDataImpl data(stream_info);
     data.onRequestHeaders(headers);
 
-    Envoy::Matcher::MatchResult match_result =
+    Envoy::Matcher::ActionMatchResult match_result =
         Envoy::Matcher::evaluateMatch<Http::HttpMatchingData>(*match_tree_, data);
 
     if (!match_result.isMatch()) {

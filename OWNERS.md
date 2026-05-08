@@ -41,15 +41,15 @@ routing PRs, questions, etc. to the right place.
 * Raven Black ([ravenblackx](https://github.com/ravenblackx)) (ravenblack@dropbox.com)
   * Caches, file filters, and file I/O.
 * Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (kateryna.nezdolii@gmail.com)
-  * Load balancing, GeoIP, overload manager, security.
+  * Load balancing, data plane, overload manager.
 * Tianyu Xia ([tyxia](https://github.com/tyxia)) (tyxia@google.com)
   * ext_proc, data plane, flow control, CEL.
 * Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
   * Load balancing, data plane.
-* Takeshi Yoneda ([mathetake](https://github.com/mathetake)) (takeshi@tetrate.io)
+* Takeshi Yoneda ([mathetake](https://github.com/mathetake)) (t.y.mathetake@gmail.com)
   * Dynamic modules, API gateway, WASM, Istio.
 * Rohit Agrawal ([agrawroh](https://github.com/agrawroh)) (rohit.agrawal@databricks.com)
-  * Lua, ExtAuthZ, Matchers, CI, Dependencies, Docs.
+  * Dynamic Modules, Reverse Tunnels, Lua, ExtAuthZ, Matchers, CI, Dependencies, Docs.
 * Paul Ogilby ([paul-r-gall](https://github.com/paul-r-gall)) (pgal@google.com)
   * Request mirroring, data plane
 * Mike Krinkin ([krinkinmu](https://github.com/krinkinmu)) (krinkin.m.u@gmail.com)
@@ -65,10 +65,10 @@ The following Envoy maintainers have final say over any changes only affecting /
 
 * Ali Beyad ([abeyad](https://github.com/abeyad)) (abeyad@google.com)
   * xDS, C++ integration tests.
-* Fredy Wijaya ([fredyw](https://github.com/fredyw)) (fredyw@google.com)
-  * Android, Java, Kotlin, JNI.
 * Dan Zhang ([danzh2010](https://github.com/danzh2010)) (danzh@google.com)
   * Envoy Mobile, QUIC, HTTP/3.
+* Paul Ogilby ([paul-r-gall](https://github.com/paul-r-gall)) (pgal@google.com)
+  * Language APIs, xDS.
 
 # Senior extension maintainers
 
@@ -90,7 +90,6 @@ without further review.
 * All senior maintainers
 * Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
 * Tim Walsh ([twghu](https://github.com/twghu)) (twalsh@redhat.com)
-* Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao)) (pcrao@google.com)
 * Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (kateryna.nezdolii@gmail.com)
 * Boteng Yao ([botengyao](https://github.com/botengyao)) (boteng@google.com)
 * Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (envoy@kevinbaichoo.com)
@@ -100,6 +99,12 @@ without further review.
 * Raven Black ([ravenblackx](https://github.com/ravenblackx)) (ravenblack@dropbox.com)
 * Kuo-Chung Hsu ([juniorhsu](https://github.com/juniorhsu)) (kuochunghsu@pinterest.com)
 * Rohit Agrawal ([agrawroh](https://github.com/agrawroh)) (rohit.agrawal@databricks.com)
+* Antonio Leonti ([antoniovleonti](https://github.com/antoniovleonti)) (leonti@google.com)
+* Takeshi Yoneda ([mathetake](https://github.com/mathetake)) (tyoneda@netflix.com)
+* Reuben Tanner ([reubent-goog](https://github.com/reubent-goog)) (reubent@google.com)
+* Paul Ogilby ([paul-r-gall](https://github.com/paul-r-gall)) (pgal@google.com)
+* Peng Gao ([penguingao](https://github.com/penguingao)) (pengg@google.com)
+* Jonh Wendell ([jwendell](https://github.com/jwendell)) (jwendell@redhat.com)
 
 # Emeritus maintainers
 

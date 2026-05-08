@@ -18,7 +18,6 @@
 
 #include "test/integration/utility.h"
 #include "test/mocks/common.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/test_common/environment.h"
 
 #include "absl/strings/str_replace.h"
@@ -246,9 +245,8 @@ IntegrationTestServerImpl::IntegrationTestServerImpl(
     Event::TestTimeSystem& time_system, Api::Api& api, const std::string& config_path,
     bool use_real_stats, std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto)
     : IntegrationTestServer(time_system, api, config_path, std::move(config_proto)) {
-  stats_allocator_ =
-      (use_real_stats ? std::make_unique<Stats::AllocatorImpl>(symbol_table_)
-                      : std::make_unique<Stats::NotifyingAllocatorImpl>(symbol_table_));
+  stats_allocator_ = (use_real_stats ? std::make_unique<Stats::Allocator>(symbol_table_)
+                                     : std::make_unique<Stats::NotifyingAllocator>(symbol_table_));
 }
 
 void IntegrationTestServerImpl::createAndRunEnvoyServer(

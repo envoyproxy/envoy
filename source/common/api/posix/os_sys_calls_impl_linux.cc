@@ -2,11 +2,11 @@
 #error "Linux platform file is part of non-Linux build."
 #endif
 
+#include "source/common/api/os_sys_calls_impl_linux.h"
+
 #include <sched.h>
 
 #include <cerrno>
-
-#include "source/common/api/os_sys_calls_impl_linux.h"
 
 namespace Envoy {
 namespace Api {

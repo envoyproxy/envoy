@@ -11,33 +11,44 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}
-  cancel-in-progress: true
+
 
 jobs:
   sync:
     runs-on: ubuntu-24.04
     if: >-
-      ${{
-          github.repository == 'envoyproxy/envoy'
-          && (github.ref_name == 'main')
-          && (github.event.push
-              || !contains(github.actor, '[bot]'))
-      }}
+      github.repository == 'envoyproxy/envoy'
+      && (github.ref_name == 'main')
+      && (github.event.push
+          || !contains(github.actor, '[bot]'))
     strategy:
       fail-fast: false
       matrix:
         downstream:
         - go-control-plane
-        - envoy-filter-example
         - data-plane-api
         - mobile-website
     steps:
-    - uses: envoyproxy/toolshed/actions/appauth@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+    - name: Skip if superseded by a newer commit on main
+      id: tip
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        TIP=$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq .sha)
+        echo "Tip of main: ${TIP}"
+        echo "This commit:  ${GITHUB_SHA}"
+        if [ "${TIP}" != "${GITHUB_SHA}" ]; then
+            echo "Superseded by ${TIP} - skipping sync of ${{ matrix.downstream }}."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+        fi
+    - if: steps.tip.outputs.skip != 'true'
+      uses: envoyproxy/toolshed/actions/appauth@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
       id: appauth
       with:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
-    - uses: envoyproxy/toolshed/actions/dispatch@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+    - if: steps.tip.outputs.skip != 'true'
+      uses: envoyproxy/toolshed/actions/dispatch@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
       with:
         repository: "envoyproxy/${{ matrix.downstream }}"
         ref: main

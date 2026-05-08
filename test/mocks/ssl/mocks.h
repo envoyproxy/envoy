@@ -14,8 +14,6 @@
 
 #include "source/common/tls/cert_validator/san_matcher.h"
 
-#include "test/mocks/secret/mocks.h"
-
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -52,11 +50,15 @@ public:
   MOCK_METHOD(const std::string&, serialNumberPeerCertificate, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, serialNumbersPeerCertificates, (), (const));
   MOCK_METHOD(const std::string&, issuerPeerCertificate, (), (const));
+  MOCK_METHOD(const std::string&, sha256PeerCertificateIssuerDigest, (), (const));
+  MOCK_METHOD(const std::string&, serialNumberPeerCertificateIssuer, (), (const));
   MOCK_METHOD(const std::string&, subjectPeerCertificate, (), (const));
   MOCK_METHOD(ParsedX509NameOptConstRef, parsedSubjectPeerCertificate, (), (const));
   MOCK_METHOD(const std::string&, subjectLocalCertificate, (), (const));
   MOCK_METHOD(const std::string&, urlEncodedPemEncodedPeerCertificate, (), (const));
+  MOCK_METHOD(const std::string&, pemEncodedPeerCertificate, (), (const));
   MOCK_METHOD(const std::string&, urlEncodedPemEncodedPeerCertificateChain, (), (const));
+  MOCK_METHOD(absl::Span<const std::string>, pemEncodedPeerCertificateChain, (), (const));
   MOCK_METHOD(bool, peerCertificateSanMatches, (const Ssl::SanMatcher&), (const));
   MOCK_METHOD(absl::Span<const std::string>, uriSanPeerCertificate, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, uriSanLocalCertificate, (), (const));
@@ -75,6 +77,8 @@ public:
   MOCK_METHOD(const std::string&, sessionId, (), (const));
   MOCK_METHOD(uint16_t, ciphersuiteId, (), (const));
   MOCK_METHOD(std::string, ciphersuiteString, (), (const));
+  MOCK_METHOD(uint16_t, tlsGroupId, (), (const));
+  MOCK_METHOD(absl::string_view, tlsGroupString, (), (const));
   MOCK_METHOD(const std::string&, tlsVersion, (), (const));
   MOCK_METHOD(const std::string&, alpn, (), (const));
   MOCK_METHOD(const std::string&, sni, (), (const));

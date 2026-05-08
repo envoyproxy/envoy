@@ -20,7 +20,7 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/extensions/compression/brotli/common:brotli_base_lib",
-        "@org_brotli//:brotlidec",
+        "@brotli//:brotlidec",
     ],
 )
 

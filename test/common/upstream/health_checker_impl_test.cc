@@ -31,7 +31,6 @@
 #include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/health_checker_factory_context.h"
@@ -897,6 +896,42 @@ TEST_F(HttpHealthCheckerImplTest, Success) {
   respond(0, "200", false, false, true);
   EXPECT_EQ(Host::Health::Healthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
+}
+
+// Verify that lastHealthCheckHttpStatus is recorded for a 200 response and
+// updated on a subsequent 503.
+TEST_F(HttpHealthCheckerImplTest, LastHealthCheckHttpStatusRecorded) {
+  setupNoServiceValidationHC();
+  EXPECT_CALL(*this, onHostStatus(_, _)).Times(2);
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillRepeatedly(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, true);
+  EXPECT_EQ(200U,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->lastHealthCheckHttpStatus());
+
+  // A second check with a 503 should overwrite the stored status.
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->invokeCallback();
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
+  respond(0, "503", false, false, true);
+  EXPECT_EQ(503U,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->lastHealthCheckHttpStatus());
 }
 
 TEST_F(HttpHealthCheckerImplTest, Degraded) {
@@ -2456,7 +2491,8 @@ TEST_F(HttpHealthCheckerImplTest, Timeout) {
   health_checker_->start();
 
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
-  EXPECT_CALL(*test_sessions_[0]->client_connection_, close(Network::ConnectionCloseType::Abort));
+  EXPECT_CALL(*test_sessions_[0]->client_connection_,
+              close(Network::ConnectionCloseType::Abort, _));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
@@ -2486,7 +2522,8 @@ TEST_F(HttpHealthCheckerImplTest, TimeoutThenSuccess) {
 
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending));
   EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
-  EXPECT_CALL(*test_sessions_[0]->client_connection_, close(Network::ConnectionCloseType::Abort));
+  EXPECT_CALL(*test_sessions_[0]->client_connection_,
+              close(Network::ConnectionCloseType::Abort, _));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   test_sessions_[0]->timeout_timer_->invokeCallback();
@@ -2517,7 +2554,8 @@ TEST_F(HttpHealthCheckerImplTest, TimeoutThenRemoteClose) {
   health_checker_->start();
 
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending));
-  EXPECT_CALL(*test_sessions_[0]->client_connection_, close(Network::ConnectionCloseType::Abort));
+  EXPECT_CALL(*test_sessions_[0]->client_connection_,
+              close(Network::ConnectionCloseType::Abort, _));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   test_sessions_[0]->timeout_timer_->invokeCallback();
@@ -2583,7 +2621,8 @@ TEST_F(HttpHealthCheckerImplTest, DynamicAddAndRemove) {
 
   HostVector removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
   cluster_->prioritySet().getMockHostSet(0)->hosts_.clear();
-  EXPECT_CALL(*test_sessions_[0]->client_connection_, close(Network::ConnectionCloseType::Abort));
+  EXPECT_CALL(*test_sessions_[0]->client_connection_,
+              close(Network::ConnectionCloseType::Abort, _));
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, removed);
 }
@@ -2612,7 +2651,8 @@ TEST_F(HttpHealthCheckerImplTest, DynamicRemoveDisableHC) {
       nullptr, 1, std::make_shared<const envoy::config::core::v3::Locality>(), health_check_config,
       0, envoy::config::core::v3::UNKNOWN));
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {disable_host};
-  EXPECT_CALL(*test_sessions_[0]->client_connection_, close(Network::ConnectionCloseType::Abort));
+  EXPECT_CALL(*test_sessions_[0]->client_connection_,
+              close(Network::ConnectionCloseType::Abort, _));
   cluster_->prioritySet().runUpdateCallbacks(0, {disable_host}, {enable_host});
 }
 
@@ -5790,7 +5830,8 @@ TEST_F(GrpcHealthCheckerImplTest, DynamicAddAndRemove) {
 
   HostVector removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
   cluster_->prioritySet().getMockHostSet(0)->hosts_.clear();
-  EXPECT_CALL(*test_sessions_[0]->client_connection_, close(Network::ConnectionCloseType::Abort));
+  EXPECT_CALL(*test_sessions_[0]->client_connection_,
+              close(Network::ConnectionCloseType::Abort, _));
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, removed);
 }

@@ -84,6 +84,30 @@ metadata:
   cb(filter_callbacks);
 }
 
+TEST(SetMetadataFilterConfigTest, CreateRouteSpecificConfig) {
+  const std::string yaml = R"EOF(
+metadata:
+- metadata_namespace: thenamespace
+  value:
+    mynumber: 20
+    mylist: ["b"]
+    tags:
+      mytag1: 1
+  allow_overwrite: true
+  )EOF";
+
+  SetMetadataProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  SetMetadataConfig factory;
+
+  auto& validation_visitor = ProtobufMessage::getNullValidationVisitor();
+  const auto result =
+      factory.createRouteSpecificFilterConfig(proto_config, context, validation_visitor);
+  EXPECT_TRUE(result.ok());
+}
+
 } // namespace SetMetadataFilter
 } // namespace HttpFilters
 } // namespace Extensions

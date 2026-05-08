@@ -283,6 +283,14 @@ public:
   buildRouteConfig(const std::string& name, const std::string& cluster,
                    bool header_mutations = false);
 
+  static envoy::config::route::v3::RouteConfiguration
+  buildRouteConfigWithVhdsOverAds(const std::string& name);
+
+  static envoy::config::route::v3::VirtualHost buildVirtualHost(const std::string& name,
+                                                                const std::string& domain,
+                                                                const std::string& prefix,
+                                                                const std::string& cluster);
+
   // Builds a standard Endpoint suitable for population by finalize().
   static envoy::config::endpoint::v3::Endpoint buildEndpoint(const std::string& address);
 

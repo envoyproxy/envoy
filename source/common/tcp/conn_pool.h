@@ -111,7 +111,9 @@ public:
 
   void initializeReadFilters() override { connection_->initializeReadFilters(); }
   absl::optional<Http::Protocol> protocol() const override { return {}; }
-  void close() override;
+  void
+  close(Envoy::Network::ConnectionCloseType type = Envoy::Network::ConnectionCloseType::NoFlush,
+        absl::string_view details = "") override;
   uint32_t numActiveStreams() const override { return callbacks_ ? 1 : 0; }
   bool closingWithIncompleteStream() const override { return false; }
   uint64_t id() const override { return connection_->id(); }

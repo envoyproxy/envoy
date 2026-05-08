@@ -6,10 +6,10 @@
 #endif
 
 #include "test/common/listener_manager/listener_manager_impl_test.h"
+#include "test/integration/filters/test_listener_filter.h"
+#include "test/mocks/network/mocks.h"
 #include "test/server/utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
-#include "test/mocks/network/mocks.h"
-#include "test/integration/filters/test_listener_filter.h"
 
 namespace Envoy {
 namespace Server {
