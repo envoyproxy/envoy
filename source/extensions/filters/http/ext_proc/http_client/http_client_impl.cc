@@ -61,7 +61,7 @@ void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequ
       active_request_ =
           thread_local_cluster->httpAsyncClient().startRequest(std::move(headers), *this, options);
       if (active_request_ != nullptr) {
-        Buffer::OwnedImpl body(std::move(req_in_json.value()));
+        Buffer::OwnedImpl body(req_in_json.value());
         active_request_->sendData(body, true);
       }
     } else {
