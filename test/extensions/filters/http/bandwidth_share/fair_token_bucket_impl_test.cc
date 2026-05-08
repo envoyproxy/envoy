@@ -1,6 +1,6 @@
-#include "source/extensions/filters/http/bandwidth_share/fair_token_bucket_impl.h"
-
 #include <limits>
+
+#include "source/extensions/filters/http/bandwidth_share/fair_token_bucket_impl.h"
 
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
