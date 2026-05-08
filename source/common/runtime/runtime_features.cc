@@ -244,6 +244,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_strict_chunk_parsing);
 // Delay route selection in tcp_proxy until just before the upstream connection is established
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_delay_route_selection);
 
+// When enabled, WatchedDirectory subscribes to Modified (IN_MODIFY) events
+// in addition to MovedTo, allowing in-place file writes to trigger reload.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_watched_directory_modified_events);
+
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
 ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT
