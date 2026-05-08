@@ -5,6 +5,8 @@
 
 #include "envoy/api/api.h"
 #include "envoy/common/callback.h"
+#include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/secret.pb.h"
 #include "envoy/init/target.h"
 #include "envoy/secret/secret_provider.h"
 
@@ -15,8 +17,6 @@
 #include "test/test_common/utility.h"
 
 #include "absl/status/status.h"
-#include "api/envoy/extensions/transport_sockets/tls/v3/common.pb.h"
-#include "api/envoy/extensions/transport_sockets/tls/v3/secret.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

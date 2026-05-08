@@ -1,5 +1,14 @@
 #include "source/extensions/filters/http/gcp_authn/crypto_utils.h"
 
+#include <openssl/asn1.h>
+#include <openssl/bio.h>
+#include <openssl/mem.h>
+#include <openssl/nid.h>
+#include <openssl/pem.h>
+#include <openssl/sha2.h>
+#include <openssl/stack.h>
+#include <openssl/x509.h>
+
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -17,15 +26,7 @@
 #include "source/common/http/utility.h"
 
 #include "absl/strings/string_view.h"
-#include "third_party/openssl/boringssl/src/include/openssl/asn1.h"
-#include "third_party/openssl/boringssl/src/include/openssl/bio.h"
-#include "third_party/openssl/boringssl/src/include/openssl/mem.h"
-#include "third_party/openssl/boringssl/src/include/openssl/nid.h"
-#include "third_party/openssl/boringssl/src/include/openssl/pem.h"
-#include "third_party/openssl/boringssl/src/include/openssl/sha2.h"
-#include "third_party/openssl/boringssl/src/include/openssl/stack.h"
-#include "third_party/openssl/boringssl/src/include/openssl/x509.h"
-#include "third_party/re2/re2.h"
+#include "re2/re2.h"
 
 namespace Envoy {
 namespace Extensions {
