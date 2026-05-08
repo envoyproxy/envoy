@@ -251,7 +251,7 @@ to ensure reproducible builds.
      - :dockerhub_envoy:`build-mobile`
 
 Additional variants (`worker`, `devtools`, `docker`, `gcc`, `test`) are available for CI workflows in
-`envoyproxy/toolshed/docker/build <https://github.com/envoyproxy/toolshed/tree/main/docker/build>`__.
+`envoyproxy/toolshed/docker/build <https://github.com/envoyproxy/toolshed/tree/main/docker/build>`_.
 
 .. note::
    The ``envoy-build`` image does not contain a working Envoy server, but can be used for

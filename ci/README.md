@@ -38,10 +38,9 @@ running tests that reflects the latest built Windows 2019 Envoy image.
 
 # Build image base and compiler versions
 
-* `envoyproxy/envoy-build:ci-<tag>` &mdash; based on Debian trixie-slim with GCC 13 and Clang 18.
+* `envoyproxy/envoy-build:ci-<tag>` &mdash; based on Debian trixie-slim with GCC 13 and Clang 18 compiler.
 
-The source for these images is located in [envoyproxy/toolshed/docker/build](https://github.com/envoyproxy/toolshed/tree/main/docker/build)
-repository.
+The source for these images is located in [envoyproxy/toolshed/docker/build](https://github.com/envoyproxy/toolshed/tree/main/docker/build) repository.
 
 The default toolchain uses the Clang compiler with libc++ for all Linux CI runs with tests. This is configured with `--config=clang`. We have an additional Linux CI run with GCC which builds binary only, configured with `--config=gcc`.
 
