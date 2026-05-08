@@ -318,6 +318,86 @@ BENCHMARK(bmRouteTableSizeWithRegexMatch)->RangeMultiplier(2)->Ranges({{1, 2 << 
 BENCHMARK(bmRouteTableSizeWithExactMatcherTree)->RangeMultiplier(2)->Ranges({{1, 2 << 13}});
 BENCHMARK(bmRouteTableSizeWithPrefixMatcherTree)->RangeMultiplier(2)->Ranges({{1, 2 << 13}});
 
+// N plain prefix routes. Route i matches only /api/v{i}/. Last route matches.
+static RouteConfiguration genPlainRouteConfig(int n) {
+  RouteConfiguration route_config;
+  VirtualHost* v_host = route_config.add_virtual_hosts();
+  v_host->set_name("default");
+  v_host->add_domains("*");
+  for (int i = 0; i < n; ++i) {
+    Route* route = v_host->add_routes();
+    route->mutable_direct_response()->set_status(200);
+    route->mutable_match()->set_prefix(absl::StrCat("/api/v", i, "/"));
+  }
+  return route_config;
+}
+
+// N routes: first n/2 share prefix "/api/" with a non-matching query param;
+// last route is a plain prefix match.
+static RouteConfiguration genMixedRouteConfig(int n) {
+  RouteConfiguration route_config;
+  VirtualHost* v_host = route_config.add_virtual_hosts();
+  v_host->set_name("default");
+  v_host->add_domains("*");
+  const int n_query = n / 2;
+  for (int i = 0; i < n; ++i) {
+    Route* route = v_host->add_routes();
+    route->mutable_direct_response()->set_status(200);
+    RouteMatch* match = route->mutable_match();
+    if (i < n_query) {
+      match->set_prefix("/api/");
+      auto* qp = match->add_query_parameters();
+      qp->set_name("id");
+      qp->mutable_string_match()->set_exact(absl::StrCat("nomatch_", i));
+    } else if (i < n - 1) {
+      match->set_prefix(absl::StrCat("/other/v", i, "/"));
+    } else {
+      match->set_prefix("/api/");
+    }
+  }
+  return route_config;
+}
+
+// N plain prefix routes, no query/cookie matching. Request matches the last route.
+static void bmPlainRoutes(benchmark::State& state) {
+  const int n = state.range(0);
+  Api::ApiPtr api = Api::createApiForTest();
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
+  std::shared_ptr<ConfigImpl> config = *ConfigImpl::create(
+      genPlainRouteConfig(n), factory_context, ProtobufMessage::getNullValidationVisitor(), true);
+  const std::string path = absl::StrCat("/api/v", n - 1, "/foo");
+  Http::TestRequestHeaderMapImpl headers{{":authority", "www.example.com"},
+                                         {":method", "GET"},
+                                         {":path", path},
+                                         {"x-forwarded-proto", "http"}};
+  for (auto _ : state) { // NOLINT
+    config->route(headers, stream_info, 0);
+  }
+}
+
+// N routes, first half with non-matching query params. Request matches the last route.
+static void bmMixedRoutes(benchmark::State& state) {
+  const int n = state.range(0);
+  Api::ApiPtr api = Api::createApiForTest();
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
+  std::shared_ptr<ConfigImpl> config = *ConfigImpl::create(
+      genMixedRouteConfig(n), factory_context, ProtobufMessage::getNullValidationVisitor(), true);
+  Http::TestRequestHeaderMapImpl headers{{":authority", "www.example.com"},
+                                         {":method", "GET"},
+                                         {":path", "/api/foo?id=target"},
+                                         {"x-forwarded-proto", "http"}};
+  for (auto _ : state) { // NOLINT
+    config->route(headers, stream_info, 0);
+  }
+}
+
+BENCHMARK(bmPlainRoutes)->RangeMultiplier(2)->Ranges({{64, 2 << 10}});
+BENCHMARK(bmMixedRoutes)->RangeMultiplier(2)->Ranges({{64, 2 << 10}});
+
 } // namespace
 } // namespace Router
 } // namespace Envoy
