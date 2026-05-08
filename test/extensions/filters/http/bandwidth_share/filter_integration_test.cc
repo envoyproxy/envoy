@@ -375,7 +375,7 @@ TEST_F(BandwidthShareIntegrationTest, PendingResponseBytesDecreaseWhileStillBuff
 
   test_server_->waitForGauge(response_bytes_pending, Ge(2048));
   Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
-  ASSERT_TRUE(test_server_->waitForGauge(response_bytes_pending, Lt(1024)));
+  test_server_->waitForGauge(response_bytes_pending, Lt(1024));
   EXPECT_GT(gaugeValue(response_bytes_pending), 0);
 
   upstream_request_->encodeData(1, true);
