@@ -43,7 +43,7 @@ public:
    */
   ReverseTunnelAcceptor(Server::Configuration::ServerFactoryContext& context);
 
-  ReverseTunnelAcceptor() : extension_(nullptr), context_(nullptr) {}
+  ReverseTunnelAcceptor() = default;
 
   // SocketInterface overrides
   /**

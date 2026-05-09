@@ -164,7 +164,7 @@ private:
   // Client is stored as the bare object since GrpcAsyncClient already takes ownership of the given
   // raw AsyncClientPtr.
   GrpcAsyncClient async_client_;
-  Grpc::AsyncStream<RateLimitQuotaUsageReports> stream_{};
+  Grpc::AsyncStream<RateLimitQuotaUsageReports> stream_;
 
   // Reference to TLS slot for the global quota bucket cache. It outlives
   // the filter.

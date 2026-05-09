@@ -681,11 +681,11 @@ private:
   DecodingProcessorState decoding_state_;
   EncodingProcessorState encoding_state_;
 
-  std::vector<std::string> untyped_forwarding_namespaces_{};
-  std::vector<std::string> typed_forwarding_namespaces_{};
-  std::vector<std::string> untyped_receiving_namespaces_{};
-  std::vector<std::string> untyped_cluster_metadata_forwarding_namespaces_{};
-  std::vector<std::string> typed_cluster_metadata_forwarding_namespaces_{};
+  std::vector<std::string> untyped_forwarding_namespaces_;
+  std::vector<std::string> typed_forwarding_namespaces_;
+  std::vector<std::string> untyped_receiving_namespaces_;
+  std::vector<std::string> untyped_cluster_metadata_forwarding_namespaces_;
+  std::vector<std::string> typed_cluster_metadata_forwarding_namespaces_;
   Http::StreamFilterCallbacks* filter_callbacks_;
   Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_;
 

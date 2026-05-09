@@ -190,17 +190,19 @@ template <typename Key, typename Value> const int64_t SimpleLRUCacheElem<Key, Va
 // behavior for that single call.
 class SimpleLRUCacheOptions {
 public:
-  SimpleLRUCacheOptions() : update_eviction_order_(true) {}
+  SimpleLRUCacheOptions() = default;
 
   // If false neither the last modified time (for based age eviction) nor
   // the element ordering (for LRU eviction) will be updated.
   // This value must be the same for both lookup and release.
   // The default is true.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   bool update_eviction_order() const { return update_eviction_order_; }
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void set_update_eviction_order(bool v) { update_eviction_order_ = v; }
 
 private:
-  bool update_eviction_order_;
+  bool update_eviction_order_ = true;
 };
 
 // The MapType's value_type must be pair<const Key, Elem*>

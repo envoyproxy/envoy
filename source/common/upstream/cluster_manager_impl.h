@@ -816,7 +816,7 @@ private:
     // Keep smaller fields near the end to reduce padding
     const bool added_via_api_ : 1;
     const bool avoid_cds_removal_ : 1;
-    bool added_or_updated_ : 1;
+    bool added_or_updated_ : 1 = false;
     const bool required_for_ads_ : 1;
   };
 

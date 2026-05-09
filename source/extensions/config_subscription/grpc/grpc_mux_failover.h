@@ -70,8 +70,7 @@ public:
                   Event::Dispatcher& dispatcher)
       : grpc_mux_callbacks_(grpc_mux_callbacks), primary_callbacks_(*this),
         primary_grpc_stream_(std::move(primary_stream_creator(&primary_callbacks_))),
-        connection_state_(ConnectionState::None), ever_connected_to_primary_(false),
-        previously_connected_to_(ConnectedTo::None) {
+        connection_state_(ConnectionState::None), previously_connected_to_(ConnectedTo::None) {
     ASSERT(primary_grpc_stream_ != nullptr);
     if (failover_stream_creator.has_value()) {
       ENVOY_LOG(warn, "Using xDS-Failover. Note that the implementation is currently considered "

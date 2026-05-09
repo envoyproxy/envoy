@@ -107,7 +107,7 @@ FieldChecker::FieldChecker(const ScrubberContext scrubber_context,
                            const std::string& method_name,
                            const ProtoApiScrubberFilterConfig* filter_config)
     : scrubber_context_(scrubber_context), matching_data_(*stream_info), method_name_(method_name),
-      filter_config_ptr_(filter_config), root_descriptor_(nullptr) {
+      filter_config_ptr_(filter_config) {
 
   if (request_headers.has_value()) {
     matching_data_.onRequestHeaders(request_headers.ref());

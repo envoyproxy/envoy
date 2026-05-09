@@ -224,7 +224,7 @@ private:
   PluginSharedPtr plugin_;
   RemoteAsyncDataProviderPtr remote_data_provider_;
   const bool is_singleton_handle_{};
-  WasmHandleSharedPtr base_wasm_{};
+  WasmHandleSharedPtr base_wasm_;
   absl::variant<absl::monostate, SinglePluginHandle, ThreadLocalPluginHandle> plugin_handle_;
 };
 

@@ -444,7 +444,7 @@ public:
                    StreamInfo::StreamInfo& upstream_info, absl::optional<Http::Protocol>) override;
 
 private:
-  absl::optional<Upstream::HttpPoolData> conn_pool_data_{};
+  absl::optional<Upstream::HttpPoolData> conn_pool_data_;
   HttpStreamCallbacks* callbacks_{};
   UpstreamTunnelCallbacks& upstream_callbacks_;
   std::unique_ptr<HttpUpstreamImpl> upstream_;

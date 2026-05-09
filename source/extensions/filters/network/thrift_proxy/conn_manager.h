@@ -135,9 +135,9 @@ private:
     MessageMetadataSharedPtr metadata_;
     ProtocolConverterSharedPtr protocol_converter_;
     absl::optional<bool> success_;
-    bool complete_ : 1;
-    bool passthrough_ : 1;
-    bool pending_transport_end_ : 1;
+    bool complete_ : 1 = false;
+    bool passthrough_ : 1 = false;
+    bool pending_transport_end_ : 1 = false;
   };
   using ResponseDecoderPtr = std::unique_ptr<ResponseDecoder>;
 
@@ -370,10 +370,10 @@ private:
     int32_t original_sequence_id_{0};
     MessageType original_msg_type_{MessageType::Call};
     std::function<FilterStatus(DecoderEventHandler*)> filter_action_;
-    bool local_response_sent_ : 1;
-    bool pending_transport_end_ : 1;
-    bool passthrough_ : 1;
-    bool under_on_local_reply_ : 1;
+    bool local_response_sent_ : 1 = false;
+    bool pending_transport_end_ : 1 = false;
+    bool passthrough_ : 1 = false;
+    bool under_on_local_reply_ : 1 = false;
   };
 
   using ActiveRpcPtr = std::unique_ptr<ActiveRpc>;
