@@ -16,7 +16,8 @@ Upstream::ThreadAwareLoadBalancerPtr Factory::create(OptRef<const Upstream::Load
 absl::StatusOr<Upstream::LoadBalancerConfigPtr>
 Factory::loadConfig(Server::Configuration::ServerFactoryContext&, const Protobuf::Message&) {
   // TODO(jukie): Implement load-aware locality config loading.
-  return nullptr;
+  return absl::UnimplementedError(
+      "envoy.load_balancing_policies.load_aware_locality is not yet implemented");
 }
 
 REGISTER_FACTORY(Factory, Upstream::TypedLoadBalancerFactory);
