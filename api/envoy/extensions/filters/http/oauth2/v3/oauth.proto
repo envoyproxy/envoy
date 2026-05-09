@@ -306,9 +306,9 @@ message OAuth2Config {
   repeated config.route.v3.HeaderMatcher allow_failed_matcher = 27;
 
   // If set to true, the expiration time for the ID token cookie will always be derived from the
-  // access token's ``expires_in`` value rather than from the ``exp`` claim in the ID token JWT.
-  // This is useful when the access token has a longer lifetime than the ID token and you want the
-  // ID token cookie to remain valid for the full access token lifetime.
+  // ``expires_in`` field of the access token response rather than from the ``exp`` claim in the
+  // ID token JWT. This is useful when the access token response advertises a longer lifetime than
+  // the ID token and you want the ID token cookie to remain valid for that full duration.
   // Default is false (use the ID token's own ``exp`` claim when available).
   bool use_access_token_expiry_for_id_token_cookie = 28;
 }
