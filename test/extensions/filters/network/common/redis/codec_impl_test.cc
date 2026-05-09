@@ -508,7 +508,7 @@ TEST_F(RedisEncoderDecoderImplTest, ToStringResp3Types) {
 }
 
 // Exercise the unbalanced-quote rejection paths in inline-command parsing — both single and
-// double-quoted forms. These are the throw sites at codec_impl.cc:703 and 737 (per coverage).
+// double-quoted forms.
 TEST_F(RedisEncoderDecoderImplTest, InlineCommandUnbalancedDoubleQuote) {
   buffer_.add("\"hello\r\n");
   EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);

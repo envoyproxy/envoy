@@ -2113,7 +2113,7 @@ TEST_F(RedisClientImplTest, Resp2AwsIamAuthRedirectionTreatedAsFailure) {
 // HeldUserRequest::onRedirection forwarding: after init completes and the held request is
 // replayed, the live PendingRequest's callback IS the HeldUserRequest wrapper. When upstream
 // answers with MOVED, the wrapper's onRedirection forwards to the original ClientCallbacks the
-// user supplied at makeRequest time. Covers the L672-677 forwarding path.
+// user supplied at makeRequest time.
 TEST_F(RedisClientImplTest, Resp3HeldUserRequestUpstreamRedirectionForwarded) {
   InSequence s;
   enableResp3();
@@ -2157,9 +2157,8 @@ TEST_F(RedisClientImplTest, Resp3HeldUserRequestUpstreamRedirectionForwarded) {
 
 // HeldUserRequest::onFailure forwarding: after replay, an upstream connection close fails the
 // live PendingRequest, whose callback is the HeldUserRequest wrapper. The wrapper forwards
-// onFailure to the original ClientCallbacks. Covers the L664-669 forwarding path. Distinct
-// from failHeldUserRequests, which fires onFailure on entries that NEVER got replayed (i.e.,
-// init itself failed).
+// onFailure to the original ClientCallbacks. Distinct from failHeldUserRequests, which fires
+// onFailure on entries that NEVER got replayed (i.e., init itself failed).
 TEST_F(RedisClientImplTest, Resp3HeldUserRequestUpstreamFailureForwarded) {
   InSequence s;
   enableResp3();
@@ -2199,8 +2198,8 @@ TEST_F(RedisClientImplTest, Resp3HeldUserRequestUpstreamFailureForwarded) {
 }
 
 // Connection close during AwaitingReadonly: the READONLY PendingRequest fails via
-// ReadOnlyInitCallbacks::onFailure → onInitFailure. Covers the L726-729 path. Distinct from
-// the error-reply path covered by Resp3ReadonlyErrorReplyFailsInit above.
+// ReadOnlyInitCallbacks::onFailure → onInitFailure. Distinct from the error-reply path
+// exercised by Resp3ReadonlyErrorReplyFailsInit above.
 TEST_F(RedisClientImplTest, Resp3ConnectionCloseDuringAwaitingReadonlyFailsInit) {
   InSequence s;
   enableResp3();
