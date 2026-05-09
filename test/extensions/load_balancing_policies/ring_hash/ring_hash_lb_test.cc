@@ -1251,6 +1251,35 @@ TEST(RingHashMidBatchInitializeCrashTest, NoOobOnNewPriority) {
   EXPECT_NE(nullptr, worker_lb);
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/44349.
+// Non-contiguous EDS priorities leave null entries in the PriorityState vector.
+// validateEndpoints must skip them instead of crashing.
+TEST_P(RingHashLoadBalancerTest, ValidateEndpointsWithNonContiguousPriorities) {
+  // Build a PriorityState with a null entry at index 1 (simulates gap between
+  // priority 0 and priority 2).
+  PriorityState priorities;
+
+  // Priority 0: one host.
+  auto hosts_p0 = std::make_unique<HostVector>();
+  hosts_p0->push_back(makeTestHost(info_, "tcp://127.0.0.1:80"));
+  priorities.emplace_back(std::move(hosts_p0), LocalityWeightsMap{});
+
+  // Priority 1: null (gap).
+  priorities.emplace_back(nullptr, LocalityWeightsMap{});
+
+  // Priority 2: one host.
+  auto hosts_p2 = std::make_unique<HostVector>();
+  hosts_p2->push_back(makeTestHost(info_, "tcp://127.0.0.1:81"));
+  priorities.emplace_back(std::move(hosts_p2), LocalityWeightsMap{});
+
+  absl::Status creation_status;
+  TypedRingHashLbConfig typed_config(config_, context_.regex_engine_, creation_status);
+  ASSERT_TRUE(creation_status.ok());
+
+  // This must not crash (was a segfault before the fix).
+  EXPECT_TRUE(typed_config.validateEndpoints(priorities).ok());
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
