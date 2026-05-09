@@ -1080,6 +1080,56 @@ TEST_F(OAuth2Test, RequestSignout) {
             filter_->decodeHeaders(request_headers, false));
 }
 
+TEST_F(OAuth2Test, RequestSignoutWithTokenCookieChunkingDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.oauth2_chunk_large_token_cookies", "false"}});
+
+  std::string long_token(5000, 'x');
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/_signout"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Cookie.get(), "OauthNonce=csrf_token"},
+      {Http::Headers::get().Cookie.get(), "CodeVerifier=code_verifier"},
+      {Http::Headers::get().Cookie.get(), "OauthNonce.1=csrf_token_1"},
+      {Http::Headers::get().Cookie.get(), "CodeVerifier.1=code_verifier_1"},
+      {Http::Headers::get().Cookie.get(), "OauthNonce.2=csrf_token_2"},
+      {Http::Headers::get().Cookie.get(), "CodeVerifier.2=code_verifier_2"},
+      {Http::Headers::get().Cookie.get(),
+       absl::StrCat("BearerToken_0=", long_token.substr(0, 3955))},
+      {Http::Headers::get().Cookie.get(),
+       absl::StrCat("BearerToken_1=", long_token.substr(3955, 5000))},
+      {Http::Headers::get().Cookie.get(), "BearerToken_chunks=2"},
+  };
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ(headers.Status()->value(), "302");
+        EXPECT_EQ(headers.get(Http::Headers::get().SetCookie).size(), 13);
+        EXPECT_EQ(headers.get(Http::Headers::get().Location)[0]->value().getStringView(),
+                  "https://traffic.example.com/");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "OauthHMAC"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken_0"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken_1"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken_chunks"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "IdToken"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "RefreshToken"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "OauthExpires"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "OauthNonce"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "CodeVerifier"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "OauthNonce.1"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "CodeVerifier.1"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "OauthNonce.2"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "CodeVerifier.2"), "deleted");
+      }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+}
+
 /**
  * Scenario: The OAuth filter receives a sign out request when end session endpoint is configured.
  *
@@ -1118,23 +1168,19 @@ TEST_F(OAuth2Test, RequestSignoutWhenEndSessionEndpointIsConfigured) {
       {Http::Headers::get().Cookie.get(), "IdToken=xyztoken"},
   };
 
-  Http::TestResponseHeaderMapImpl response_headers{
-      {Http::Headers::get().Status.get(), "302"},
-      {Http::Headers::get().SetCookie.get(),
-       "OauthHMAC=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
-      {Http::Headers::get().SetCookie.get(),
-       "BearerToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
-      {Http::Headers::get().SetCookie.get(),
-       "IdToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
-      {Http::Headers::get().SetCookie.get(),
-       "RefreshToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
-      {Http::Headers::get().SetCookie.get(),
-       "OauthExpires=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
-      {Http::Headers::get().Location.get(), "https://auth.example.com/oauth/"
-                                            "logout?id_token_hint=xyztoken&client_id=1&post_logout_"
-                                            "redirect_uri=https%3A%2F%2Ftraffic.example.com%2F"},
-  };
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ(headers.Status()->value(), "302");
+        EXPECT_EQ(headers.get(Http::Headers::get().Location)[0]->value().getStringView(),
+                  "https://auth.example.com/oauth/logout?id_token_hint=xyztoken&client_id=1&post_"
+                  "logout_redirect_uri=https%3A%2F%2Ftraffic.example.com%2F");
+        EXPECT_EQ(headers.get(Http::Headers::get().SetCookie).size(), 5);
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "OauthHMAC"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "IdToken"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "RefreshToken"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "OauthExpires"), "deleted");
+      }));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
@@ -2092,6 +2138,63 @@ TEST_F(OAuth2Test, CookieValidator) {
                      "");
 }
 
+TEST_F(OAuth2Test, CookieValidatorWithTokenCookieChunkingDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.oauth2_chunk_large_token_cookies", "false"}});
+
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+  auto cookie_names = CookieNames{"BearerToken",  "OauthHMAC",  "OauthExpires", "IdToken",
+                                  "RefreshToken", "OauthNonce", "CodeVerifier"};
+  const auto expires_at_s = DateUtil::nowToSeconds(test_time_.timeSystem()) + 10;
+  std::string long_token(5000, 'x');
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Cookie.get(),
+       fmt::format("{}={}", cookie_names.oauth_expires_, expires_at_s)},
+      {Http::Headers::get().Cookie.get(),
+       absl::StrCat(cookie_names.bearer_token_, "=", TEST_ENCRYPTED_ACCESS_TOKEN)},
+      {Http::Headers::get().Cookie.get(),
+       absl::StrCat(cookie_names.refresh_token_, "_0=", long_token.substr(0, 3989))},
+      {Http::Headers::get().Cookie.get(),
+       absl::StrCat(cookie_names.refresh_token_, "_1=", long_token.substr(3989, 5000))},
+      {Http::Headers::get().Cookie.get(), absl::StrCat(cookie_names.refresh_token_, "_chunks=2")},
+  };
+
+  auto cookie_validator = std::make_shared<OAuth2CookieValidator>(test_time_, cookie_names, "");
+  cookie_validator->setParams(request_headers, TEST_HMAC_SECRET);
+
+  EXPECT_EQ(cookie_validator->token(), TEST_ENCRYPTED_ACCESS_TOKEN);
+  EXPECT_EQ(cookie_validator->refreshToken(), long_token);
+  EXPECT_TRUE(cookie_validator->canUpdateTokenByRefreshToken());
+}
+
+TEST_F(OAuth2Test, CookieValidatorFallsBackToNonChunkedTokenWhenChunkCountMalformed) {
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+  auto cookie_names = CookieNames{"BearerToken",  "OauthHMAC",  "OauthExpires", "IdToken",
+                                  "RefreshToken", "OauthNonce", "CodeVerifier"};
+  const auto expires_at_s = DateUtil::nowToSeconds(test_time_.timeSystem()) + 10;
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Cookie.get(),
+       fmt::format("{}={}", cookie_names.oauth_expires_, expires_at_s)},
+      {Http::Headers::get().Cookie.get(),
+       absl::StrCat(cookie_names.bearer_token_, "=", TEST_ENCRYPTED_ACCESS_TOKEN)},
+      {Http::Headers::get().Cookie.get(), absl::StrCat(cookie_names.bearer_token_, "_chunks=abc")},
+  };
+
+  auto cookie_validator = std::make_shared<OAuth2CookieValidator>(test_time_, cookie_names, "");
+  cookie_validator->setParams(request_headers, TEST_HMAC_SECRET);
+
+  EXPECT_EQ(cookie_validator->token(), TEST_ENCRYPTED_ACCESS_TOKEN);
+}
+
 // Validates the behavior of the cookie validator with custom cookie names.
 TEST_F(OAuth2Test, CookieValidatorWithCustomNames) {
   expectValidCookies(CookieNames{"CustomBearerToken", "CustomOauthHMAC", "CustomOauthExpires",
@@ -3006,6 +3109,51 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithChunkedToken) {
                     ";path=/;Max-Age=600;secure;HttpOnly")},
       {Http::Headers::get().SetCookie.get(),
        "BearerToken_chunks=2;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "IdToken=" + TEST_ENCRYPTED_ID_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce.00000000075bcd15=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "CodeVerifier.00000000075bcd15=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "CodeVerifier=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().Location.get(), ""},
+  };
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
+
+  filter_->onGetAccessTokenSuccess(long_token, "some-id-token", "some-refresh-token",
+                                   std::chrono::seconds(600));
+}
+
+//  Token Cookies already chunk still successful even when the chunking feature is disabled.
+TEST_F(OAuth2Test, OAuthAccessTokenSucessWithChunkedTokenDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.oauth2_chunk_large_token_cookies", "false"}});
+
+  std::string long_token(5000, 'x');
+  oauthHMAC = "70RVEPVYna4P+pWr7p9ILsA9RobsKbFUiuMp5FGpAm4=;";
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/_signout"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+  filter_->decodeHeaders(request_headers, false);
+
+  Http::TestRequestHeaderMapImpl expected_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthHMAC=" + oauthHMAC + "path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthExpires=1600;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       absl::StrCat("BearerToken=", TEST_ENCRYPTED_ACCESS_TOKEN_CHUNK_1,
+                    TEST_ENCRYPTED_ACCESS_TOKEN_CHUNK_2, ";path=/;Max-Age=600;secure;HttpOnly")},
       {Http::Headers::get().SetCookie.get(),
        "IdToken=" + TEST_ENCRYPTED_ID_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
@@ -5184,6 +5332,40 @@ TEST_F(OAuth2Test, SetTokenCookie) {
     EXPECT_EQ(id_token_chunks_count, 1) << "Expected exactly 1 IdToken_chunks cookie";
     EXPECT_EQ(refresh_token_count, 0) << "Expected no RefreshToken cookies (token too large)";
   }
+}
+
+TEST_F(OAuth2Test, RequestSignoutWithMalformedChunkCount) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/_signout"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Cookie.get(), "BearerToken_chunks=invalid"},
+  };
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken_0"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken_1"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken_2"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken_3"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken_4"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken_5"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken_6"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken_7"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken_8"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken_9"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken_10"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken_11"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken_12"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken_13"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken_14"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken_chunks"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken"), "deleted");
+      }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
 }
 
 /**

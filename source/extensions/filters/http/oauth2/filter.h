@@ -45,6 +45,8 @@ public:
   const Http::LowerCaseString OAuthFailureReason{absl::StrCat(prefix(), "-oauth-failure-reason")};
 };
 
+const size_t MaxCookieSize = 4096;
+
 using OAuth2Headers = ConstSingleton<OAuth2HeaderValues>;
 
 class OAuth2Client;
@@ -439,7 +441,7 @@ private:
                            size_t chunk_size) const;
   void setTokenCookie(Http::ResponseHeaderMap& headers, const std::string& key,
                       const std::string& data, const std::string& cookie_tail,
-                      const size_t max_cookie_size = 4096) const;
+                      const size_t max_cookie_size = MaxCookieSize) const;
   void deleteTokenCookie(const Http::RequestHeaderMap& headers,
                          Http::ResponseHeaderMap& response_headers, const std::string& cookie_name,
                          absl::string_view cookie_path, absl::string_view cookie_domain,
