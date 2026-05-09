@@ -3225,13 +3225,13 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensIdTokenExpiresInFromJwt) {
 }
 
 /**
- * Scenario: The Oauth filter saves cookies with tokens after successful receipt of the tokens,
+ * Scenario: The OAuth filter saves cookies with tokens after successful receipt of the tokens,
  * with use_access_token_expiry_for_id_token_cookie enabled.
  *
- * Expected behavior: The lifetime of the id token cookie is taken from the access token's
- * expires_in value even though the id token JWT contains a valid exp claim.
+ * Expected behavior: The lifetime of the ID token cookie is taken from the ``expires_in`` field
+ * of the access token response even though the ID token JWT contains a valid exp claim.
  */
-TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensIdTokenUsesAccessTokenExpiry) {
+TEST_F(OAuth2Test, OAuthAccessTokenSuccessWithTokensIdTokenUsesAccessTokenExpiry) {
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */,
