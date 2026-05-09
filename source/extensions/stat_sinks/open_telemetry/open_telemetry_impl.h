@@ -227,6 +227,7 @@ public:
   bool useTagExtractedName() { return use_tag_extracted_name_; }
   absl::string_view statPrefix() { return stat_prefix_; }
   const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>&
+  // NOLINTNEXTLINE(readability-identifier-naming)
   resource_attributes() const {
     return resource_attributes_;
   }

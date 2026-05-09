@@ -83,6 +83,7 @@ enum class MatchResult {
 };
 
 // Prints a human-readable string representing the MatchResult.
+// NOLINTNEXTLINE(readability-identifier-naming)
 inline static std::string MatchResultToString(MatchResult match_result) {
   switch (match_result) {
   case MatchResult::Matched:

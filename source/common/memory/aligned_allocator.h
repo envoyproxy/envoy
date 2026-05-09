@@ -47,6 +47,7 @@ public:
     return static_cast<T*>(ptr);
 #else
     // Ensure bytes is a multiple of Alignment, which is required by std::aligned_alloc.
+    // NOLINTBEGIN(readability-identifier-naming)
     bytes = round_up_to_alignment(bytes);
     return static_cast<T*>(std::aligned_alloc(Alignment, bytes));
 #endif

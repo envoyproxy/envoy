@@ -122,10 +122,12 @@ public:
 
   // For LRU mode, last_use_time() returns elements last use time.
   // See getLastUseTime() description for more information.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   int64_t last_use_time() const { return last_use_; }
 
   // For age-based mode, insertion_time() returns elements insertion time.
   // See getInsertionTime() description for more information.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   int64_t insertion_time() const { return last_use_; }
 
   friend bool operator==(const SimpleLRUCacheConstIterator& a,

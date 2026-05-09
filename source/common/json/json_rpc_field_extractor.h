@@ -82,6 +82,7 @@ protected:
   virtual absl::string_view jsonRpcVersion() const = 0;
   virtual absl::string_view jsonRpcField() const = 0;
   virtual absl::string_view methodField() const = 0;
+  // NOLINTNEXTLINE(readability-identifier-naming)
   virtual bool lists_supported() const = 0;
 
   Protobuf::Struct temp_storage_;   // Store all fields temporarily
