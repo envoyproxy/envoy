@@ -106,8 +106,8 @@ envoy_cc_fuzz_test(
     # Fuzzer is stable, no bugs, simple test target; avoid emitting CO2.
     tags = ["no_fuzz"],
     deps = [
-        "//source/common/common:base64_lib",
         ":base64_legacy_lib",
+        "//source/common/common:base64_lib",
         "//test/fuzz:utility_lib",
     ],
 )
@@ -452,7 +452,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
-    ]
+    ],
 )
 
 envoy_cc_benchmark_binary(
@@ -460,9 +460,9 @@ envoy_cc_benchmark_binary(
     srcs = ["base64_speed_test.cc"],
     rbe_pool = "6gig",
     deps = [
-        "@benchmark",
-        "//source/common/common:base64_lib",
         ":base64_legacy_lib",
+        "//source/common/common:base64_lib",
+        "@benchmark",
     ],
 )
 

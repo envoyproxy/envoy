@@ -6,6 +6,8 @@
 #include "base64_legacy.h"
 #include "benchmark/benchmark.h"
 
+// NOLINT(namespace-envoy)
+
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_AbslBase64Encode(benchmark::State& state) {
   const std::string input(state.range(0), 'x');

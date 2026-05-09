@@ -1,6 +1,6 @@
 #include "source/common/common/base64.h"
-#include "test/common/common/base64_legacy.h"
 
+#include "test/common/common/base64_legacy.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
 

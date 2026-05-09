@@ -13,7 +13,7 @@
 
 namespace Envoy {
 namespace {
-// clang-format off
+
 constexpr unsigned char REVERSE_LOOKUP_TABLE[256] = {
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 62, 64, 64, 64, 63,
@@ -27,12 +27,6 @@ constexpr unsigned char REVERSE_LOOKUP_TABLE[256] = {
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64};
 
-// Conversion table is taken from
-// https://opensource.apple.com/source/QuickTimeStreamingServer/QuickTimeStreamingServer-452/CommonUtilitiesLib/base64.c
-
-// The base64url tables are copied from above and modified based on table in
-// https://tools.ietf.org/html/rfc4648#section-5
-
 constexpr unsigned char URL_REVERSE_LOOKUP_TABLE[256] = {
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 62, 64, 64,
@@ -45,35 +39,16 @@ constexpr unsigned char URL_REVERSE_LOOKUP_TABLE[256] = {
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64};
-// clang-format on
 
-} // namespace
-
-std::string Base64::decode(absl::string_view input) {
-  if (input.length() % 4) {
-    return EMPTY_STRING;
-  }
-  return decodeWithoutPadding(input);
-}
-
-std::string Base64::decodeWithoutPadding(absl::string_view input) {
+std::string decodeHelper(absl::string_view input, const unsigned char* lookup_table,
+                         bool (*unescape_fn)(absl::string_view, std::string*)) {
   if (input.empty()) {
     return EMPTY_STRING;
   }
 
   // Strip up to two trailing '=' characters.
   size_t n = input.length();
-  size_t count = 0;
-  if (input[n - 1] == '=') {
-    count++;
-    if (n >= 2 && input[n - 2] == '=') {
-      count++;
-      if (n >= 3 && input[n - 3] == '=') {
-        return EMPTY_STRING;
-      }
-    }
-  }
-
+  size_t count = (input[n - 1] == '=') + (n >= 2 && input[n - 2] == '=');
   size_t real_chars = n - count;
 
   // A base64 string with length % 4 == 1 is structurally invalid
@@ -83,10 +58,13 @@ std::string Base64::decodeWithoutPadding(absl::string_view input) {
 
   // Validate the trailing bits of the last real character.
   if (real_chars > 0) {
-    uint8_t last_value = REVERSE_LOOKUP_TABLE[static_cast<uint8_t>(input[real_chars - 1])];
+    uint8_t last_value = lookup_table[static_cast<uint8_t>(input[real_chars - 1])];
     if (last_value == 64) {
       return EMPTY_STRING;
     }
+    // Base64 groups input into 4 character blocks. Each character represents 6 bits.
+    // A valid encoded string can have trailing characters where the unused lower bits must be 0.
+    // This code checks whether the unused bits are 0. If they are not, the input is invalid.
     if (real_chars % 4 == 2 && (last_value & 0x0F) != 0) {
       return EMPTY_STRING;
     }
@@ -96,7 +74,7 @@ std::string Base64::decodeWithoutPadding(absl::string_view input) {
   }
 
   std::string ret;
-  if (!absl::Base64Unescape(input.substr(0, real_chars), &ret)) {
+  if (!unescape_fn(input.substr(0, real_chars), &ret)) {
     return EMPTY_STRING;
   }
 
@@ -107,6 +85,18 @@ std::string Base64::decodeWithoutPadding(absl::string_view input) {
   }
 
   return ret;
+}
+} // namespace
+
+std::string Base64::decode(absl::string_view input) {
+  if (input.length() % 4) {
+    return EMPTY_STRING;
+  }
+  return decodeWithoutPadding(input);
+}
+
+std::string Base64::decodeWithoutPadding(absl::string_view input) {
+  return decodeHelper(input, REVERSE_LOOKUP_TABLE, absl::Base64Unescape);
 }
 
 std::string Base64::encode(const Buffer::Instance& buffer, uint64_t length) {
@@ -146,56 +136,7 @@ void Base64::completePadding(std::string& encoded) {
 }
 
 std::string Base64Url::decode(absl::string_view input) {
-  if (input.empty()) {
-    return EMPTY_STRING;
-  }
-
-  // Strip up to two trailing '=' characters.
-  size_t n = input.length();
-  size_t count = 0;
-  if (input[n - 1] == '=') {
-    count++;
-    if (n >= 2 && input[n - 2] == '=') {
-      count++;
-      if (n >= 3 && input[n - 3] == '=') {
-        return EMPTY_STRING;
-      }
-    }
-  }
-
-  size_t real_chars = n - count;
-
-  // A base64 string with length % 4 == 1 is structurally invalid
-  if (real_chars % 4 == 1) {
-    return EMPTY_STRING;
-  }
-
-  // Validate the trailing bits of the last real character.
-  if (real_chars > 0) {
-    uint8_t last_value = URL_REVERSE_LOOKUP_TABLE[static_cast<uint8_t>(input[real_chars - 1])];
-    if (last_value == 64) {
-      return EMPTY_STRING;
-    }
-    if (real_chars % 4 == 2 && (last_value & 0x0F) != 0) {
-      return EMPTY_STRING;
-    }
-    if (real_chars % 4 == 3 && (last_value & 0x03) != 0) {
-      return EMPTY_STRING;
-    }
-  }
-
-  std::string ret;
-  if (!absl::WebSafeBase64Unescape(input.substr(0, real_chars), &ret)) {
-    return EMPTY_STRING;
-  }
-
-  // If abseil decoded fewer bytes than expected, we must reject the entire input.
-  size_t expected_length = real_chars * 3 / 4;
-  if (ret.length() != expected_length) {
-    return EMPTY_STRING;
-  }
-
-  return ret;
+  return decodeHelper(input, URL_REVERSE_LOOKUP_TABLE, absl::WebSafeBase64Unescape);
 }
 
 std::string Base64Url::encode(const char* input, uint64_t length) {
