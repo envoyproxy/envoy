@@ -424,6 +424,123 @@ TEST_F(RedisEncoderDecoderImplTest, InvalidIntegerExpectLF) {
 // ``:-\r\n``, ``*\r\n``, ``$\r\n``, ``%-\r\n`` etc. would all be silently accepted as zero
 // (indistinguishable on the wire from ``:0`` / ``*0`` / ``$0``), letting an attacker inject
 // ambiguous frames the rest of the parser cannot tell apart from a legitimate zero-valued one.
+// Cover the RespValue::toString branches for RESP3-only types (Set, Push, Double,
+// BigNumber, BlobError, VerbatimString, Boolean) plus the Map two-pair pretty-print path.
+// These branches are only reachable through encoder down-conversion or RESP3 client output;
+// pinning toString() exercises the type-dispatch table itself.
+TEST_F(RedisEncoderDecoderImplTest, ToStringResp3Types) {
+  // Set
+  {
+    RespValue v;
+    v.type(RespType::Set);
+    RespValue elem;
+    elem.type(RespType::BulkString);
+    elem.asString() = "a";
+    v.asArray().push_back(elem);
+    elem.asString() = "b";
+    v.asArray().push_back(elem);
+    EXPECT_EQ("~[\"a\", \"b\"]", v.toString());
+  }
+  // Push
+  {
+    RespValue v;
+    v.type(RespType::Push);
+    RespValue elem;
+    elem.type(RespType::BulkString);
+    elem.asString() = "x";
+    v.asArray().push_back(elem);
+    EXPECT_EQ(">[\"x\"]", v.toString());
+  }
+  // Map (flat 2N storage)
+  {
+    RespValue v;
+    v.type(RespType::Map);
+    RespValue k1, v1, k2, v2;
+    k1.type(RespType::BulkString);
+    k1.asString() = "k1";
+    v1.type(RespType::Integer);
+    v1.asInteger() = 1;
+    k2.type(RespType::BulkString);
+    k2.asString() = "k2";
+    v2.type(RespType::Integer);
+    v2.asInteger() = 2;
+    v.asArray() = {k1, v1, k2, v2};
+    EXPECT_EQ("{\"k1\": 1, \"k2\": 2}", v.toString());
+  }
+  // Double — use an exact-representable value (0.5 = 2^-1) so fmt::format("{}", 0.5) is
+  // deterministically "0.5". Using 3.14 here would be fragile across fmt library versions.
+  {
+    RespValue v;
+    v.type(RespType::Double);
+    v.asDouble() = 0.5;
+    EXPECT_EQ("0.5", v.toString());
+  }
+  // BigNumber
+  {
+    RespValue v;
+    v.type(RespType::BigNumber);
+    v.asString() = "123456789012345678901234567890";
+    EXPECT_EQ("(big)123456789012345678901234567890", v.toString());
+  }
+  // BlobError
+  {
+    RespValue v;
+    v.type(RespType::BlobError);
+    v.asString() = "ERR something";
+    EXPECT_EQ("!(ERR something)", v.toString());
+  }
+  // VerbatimString
+  {
+    RespValue v;
+    v.type(RespType::VerbatimString);
+    v.asString() = "txt:hello";
+    EXPECT_EQ("=txt:hello", v.toString());
+  }
+  // Boolean (true / false)
+  {
+    RespValue v;
+    v.type(RespType::Boolean);
+    v.asInteger() = 1;
+    EXPECT_EQ("true", v.toString());
+    v.asInteger() = 0;
+    EXPECT_EQ("false", v.toString());
+  }
+}
+
+// Exercise the unbalanced-quote rejection paths in inline-command parsing — both single and
+// double-quoted forms. These are the throw sites at codec_impl.cc:703 and 737 (per coverage).
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandUnbalancedDoubleQuote) {
+  buffer_.add("\"hello\r\n");
+  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandUnbalancedSingleQuote) {
+  buffer_.add("'hello\r\n");
+  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+}
+
+// Cumulative-element budget on Map: a single Map declaring N pairs counts as 2*N elements
+// against kMaxTotalElements. With kMaxTotalElements=4M and a Map count > 2M, the post-multiply
+// 2N exceeds the cap and the parser must reject.
+TEST_F(RedisEncoderDecoderImplTest, MapTotalElementBudgetExceeded) {
+  // 2_500_000 pairs → 5M elements > 4M cap.
+  buffer_.add("%2500000\r\n");
+  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+}
+
+// Map nesting depth: an outer Map containing nested Maps that push past kMaxNestingDepth
+// (32) is rejected at the pre-push check.
+TEST_F(RedisEncoderDecoderImplTest, MapNestingDepthExceeded) {
+  // Build a chain of "%1\r\n$1\r\nk\r\n" — each opens a Map of one pair where the value will
+  // be the next Map. Need 33 levels to exceed the 32 cap.
+  std::string nested;
+  for (int i = 0; i < 33; ++i) {
+    nested += "%1\r\n$1\r\nk\r\n";
+  }
+  buffer_.add(nested);
+  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+}
+
 TEST_F(RedisEncoderDecoderImplTest, IntegerWithNoDigitsRejected) {
   buffer_.add(":\r\n");
   EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);

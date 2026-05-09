@@ -751,6 +751,60 @@ TEST_F(RedisSingleServerRequestTest, HelloWithSetnameOptionAccepted) {
   EXPECT_EQ(Common::Redis::RespType::Map, captured->type());
 }
 
+// HELLO with the AUTH option but missing username and/or password tokens emits a
+// ``-ERR Syntax error: HELLO AUTH requires <username> <password>`` reply. The HELLO
+// dispatcher returns at the option-parser error site BEFORE the connection-allowed gate,
+// so connectionAllowed() is NOT consulted on this path.
+TEST_F(RedisSingleServerRequestTest, HelloWithAuthOptionMissingArgsEmitsSyntaxError) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"hello", "2", "AUTH", "alice"});
+
+  Common::Redis::RespValue expected_err;
+  expected_err.type(Common::Redis::RespType::Error);
+  expected_err.asString() = "ERR Syntax error: HELLO AUTH requires <username> <password>";
+
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_err)));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+}
+
+// HELLO with the SETNAME option but no following ``<clientname>`` token emits a
+// ``-ERR Syntax error: HELLO SETNAME requires a <clientname>`` reply. Same early-return
+// rationale as the AUTH-missing-args case above — connectionAllowed() is not consulted.
+TEST_F(RedisSingleServerRequestTest, HelloWithSetnameOptionMissingArgEmitsSyntaxError) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"hello", "2", "SETNAME"});
+
+  Common::Redis::RespValue expected_err;
+  expected_err.type(Common::Redis::RespType::Error);
+  expected_err.asString() = "ERR Syntax error: HELLO SETNAME requires a <clientname>";
+
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_err)));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+}
+
+// HELLO with an unknown option keyword (not AUTH or SETNAME) emits a
+// ``-ERR Syntax error: unknown HELLO option`` reply, returning before the auth gate.
+TEST_F(RedisSingleServerRequestTest, HelloWithUnknownOptionEmitsSyntaxError) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"hello", "2", "UNKNOWN"});
+
+  Common::Redis::RespValue expected_err;
+  expected_err.type(Common::Redis::RespType::Error);
+  expected_err.asString() = "ERR Syntax error: unknown HELLO option 'UNKNOWN'";
+
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_err)));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+}
+
 // Non-numeric protocol version: -NOPROTO. The protocol-version parse runs before the
 // connection-allowed gate, so an invalid protover returns ``NOPROTO`` directly without consulting
 // the gate.

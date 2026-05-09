@@ -1952,6 +1952,291 @@ TEST_F(RedisClientImplTest, ConnectionCloseDuringAwaitingHelloFailsHeld) {
   EXPECT_EQ(1UL, hello3_failure_counter_->value());
 }
 
+// READONLY error reply during AwaitingReadonly: the init pipeline must fail; held user
+// requests get onFailure via failHeldUserRequests; connection closes; HELLO failure counter
+// stays at 0 (READONLY error is a separate stat not tied to HELLO).
+TEST_F(RedisClientImplTest, Resp3ReadonlyErrorReplyFailsInit) {
+  InSequence s;
+  enableResp3();
+  setup(std::make_shared<ConfigImpl>(
+      createConnPoolSettings(20, true, true, 100,
+                             envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::
+                                 ConnPoolSettings::REPLICA)));
+
+  EXPECT_CALL(*encoder_, encode(Eq(makeBareHello3Request()), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  client_->initialize("", "");
+
+  Common::Redis::RespValue user_request;
+  MockClientCallbacks user_callbacks;
+  client_->makeRequest(user_request, user_callbacks);
+
+  onConnected();
+
+  EXPECT_CALL(*encoder_, encode(Eq(Utility::ReadOnlyRequest::instance()), _));
+  EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
+  EXPECT_CALL(host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+  respondWith(makeHelloMapReply(3));
+
+  Common::Redis::RespValuePtr err{new Common::Redis::RespValue()};
+  err->type(Common::Redis::RespType::Error);
+  err->asString() = "ERR READONLY not supported on this server";
+
+  EXPECT_CALL(user_callbacks, onFailure());
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  EXPECT_CALL(host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+  respondWith(std::move(err));
+  EXPECT_EQ(0UL, hello3_failure_counter_->value());
+}
+
+// READONLY MOVED redirection during AwaitingReadonly: redirection is treated as failure (per
+// the same rationale as HELLO MOVED — READONLY is a non-keyed init command, redirection is
+// unspec'd here). Init fails; held user requests fail; connection closes.
+TEST_F(RedisClientImplTest, Resp3ReadonlyRedirectionTreatedAsFailure) {
+  InSequence s;
+  enableResp3();
+  setup(std::make_shared<ConfigImpl>(
+      createConnPoolSettings(20, true, true, 100,
+                             envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::
+                                 ConnPoolSettings::REPLICA)));
+
+  EXPECT_CALL(*encoder_, encode(Eq(makeBareHello3Request()), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  client_->initialize("", "");
+
+  Common::Redis::RespValue user_request;
+  MockClientCallbacks user_callbacks;
+  client_->makeRequest(user_request, user_callbacks);
+
+  onConnected();
+
+  EXPECT_CALL(*encoder_, encode(Eq(Utility::ReadOnlyRequest::instance()), _));
+  EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
+  EXPECT_CALL(host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+  respondWith(makeHelloMapReply(3));
+
+  Common::Redis::RespValuePtr moved{new Common::Redis::RespValue()};
+  moved->type(Common::Redis::RespType::Error);
+  moved->asString() = "MOVED 1234 10.0.0.1:6379";
+
+  EXPECT_CALL(user_callbacks, onFailure());
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  EXPECT_CALL(host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+  respondWith(std::move(moved));
+}
+
+// AWS IAM AUTH error reply during AwaitingAuth: the init pipeline must fail; held user
+// requests fail; connection closes.
+TEST_F(RedisClientImplTest, Resp2AwsIamAuthErrorReplyFailsInit) {
+  InSequence s;
+  enableAwsIam();
+  setup();
+
+  EXPECT_CALL(
+      *mock_aws_iam_authenticator_,
+      addCallbackIfCredentialsPending(An<Extensions::Common::Aws::CredentialsPendingCallback&&>()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*mock_aws_iam_authenticator_, getAuthToken("alice", _)).WillOnce(Return("iam_token"));
+
+  EXPECT_CALL(*encoder_, encode(Eq(Utility::AuthRequest("alice", "iam_token")), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  client_->initialize("alice", "");
+
+  Common::Redis::RespValue user_request;
+  MockClientCallbacks user_callbacks;
+  client_->makeRequest(user_request, user_callbacks);
+
+  onConnected();
+
+  Common::Redis::RespValuePtr err{new Common::Redis::RespValue()};
+  err->type(Common::Redis::RespType::Error);
+  err->asString() = "WRONGPASS invalid IAM credentials";
+
+  EXPECT_CALL(user_callbacks, onFailure());
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  EXPECT_CALL(host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+  respondWith(std::move(err));
+}
+
+// AWS IAM AUTH MOVED redirection during AwaitingAuth: treated as failure for the same reason
+// HELLO MOVED is — AUTH/READONLY/HELLO are non-keyed init commands and redirection on them
+// has no defined semantics.
+TEST_F(RedisClientImplTest, Resp2AwsIamAuthRedirectionTreatedAsFailure) {
+  InSequence s;
+  enableAwsIam();
+  setup();
+
+  EXPECT_CALL(
+      *mock_aws_iam_authenticator_,
+      addCallbackIfCredentialsPending(An<Extensions::Common::Aws::CredentialsPendingCallback&&>()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*mock_aws_iam_authenticator_, getAuthToken("alice", _)).WillOnce(Return("iam_token"));
+
+  EXPECT_CALL(*encoder_, encode(Eq(Utility::AuthRequest("alice", "iam_token")), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  client_->initialize("alice", "");
+
+  Common::Redis::RespValue user_request;
+  MockClientCallbacks user_callbacks;
+  client_->makeRequest(user_request, user_callbacks);
+
+  onConnected();
+
+  Common::Redis::RespValuePtr moved{new Common::Redis::RespValue()};
+  moved->type(Common::Redis::RespType::Error);
+  moved->asString() = "MOVED 1234 10.0.0.1:6379";
+
+  EXPECT_CALL(user_callbacks, onFailure());
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  EXPECT_CALL(host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+  respondWith(std::move(moved));
+}
+
+// HeldUserRequest::onRedirection forwarding: after init completes and the held request is
+// replayed, the live PendingRequest's callback IS the HeldUserRequest wrapper. When upstream
+// answers with MOVED, the wrapper's onRedirection forwards to the original ClientCallbacks the
+// user supplied at makeRequest time. Covers the L672-677 forwarding path.
+TEST_F(RedisClientImplTest, Resp3HeldUserRequestUpstreamRedirectionForwarded) {
+  InSequence s;
+  enableResp3();
+  setup();
+
+  EXPECT_CALL(*encoder_, encode(Eq(makeBareHello3Request()), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  client_->initialize("", "");
+
+  Common::Redis::RespValue user_request;
+  MockClientCallbacks user_callbacks;
+  PoolRequest* held = client_->makeRequest(user_request, user_callbacks);
+  ASSERT_NE(nullptr, held);
+
+  onConnected();
+
+  // HELLO success → replay the held request upstream.
+  EXPECT_CALL(*encoder_, encode(Eq(user_request), _));
+  EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
+  EXPECT_CALL(host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+  respondWith(makeHelloMapReply(3));
+
+  // Upstream replies MOVED to the live (replayed) request. The wrapper forwards to user.
+  Common::Redis::RespValuePtr moved{new Common::Redis::RespValue()};
+  moved->type(Common::Redis::RespType::Error);
+  moved->asString() = "MOVED 1234 10.0.0.1:6379";
+
+  EXPECT_CALL(user_callbacks, onRedirection_(_, "10.0.0.1:6379", false));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  EXPECT_CALL(host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+  respondWith(std::move(moved));
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
+// HeldUserRequest::onFailure forwarding: after replay, an upstream connection close fails the
+// live PendingRequest, whose callback is the HeldUserRequest wrapper. The wrapper forwards
+// onFailure to the original ClientCallbacks. Covers the L664-669 forwarding path. Distinct
+// from failHeldUserRequests, which fires onFailure on entries that NEVER got replayed (i.e.,
+// init itself failed).
+TEST_F(RedisClientImplTest, Resp3HeldUserRequestUpstreamFailureForwarded) {
+  InSequence s;
+  enableResp3();
+  setup();
+
+  NiceMock<Network::MockConnectionCallbacks> connection_callbacks;
+  client_->addConnectionCallbacks(connection_callbacks);
+
+  EXPECT_CALL(*encoder_, encode(Eq(makeBareHello3Request()), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  client_->initialize("", "");
+
+  Common::Redis::RespValue user_request;
+  MockClientCallbacks user_callbacks;
+  PoolRequest* held = client_->makeRequest(user_request, user_callbacks);
+  ASSERT_NE(nullptr, held);
+
+  onConnected();
+
+  // HELLO success → replay → live request issued upstream.
+  EXPECT_CALL(*encoder_, encode(Eq(user_request), _));
+  EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
+  EXPECT_CALL(host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+  respondWith(makeHelloMapReply(3));
+
+  // Upstream RemoteClose with an active live request. ClientImpl fails all pending → wrapper's
+  // onFailure → user.onFailure.
+  EXPECT_CALL(host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+  EXPECT_CALL(user_callbacks, onFailure());
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
+  upstream_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// Connection close during AwaitingReadonly: the READONLY PendingRequest fails via
+// ReadOnlyInitCallbacks::onFailure → onInitFailure. Covers the L726-729 path. Distinct from
+// the error-reply path covered by Resp3ReadonlyErrorReplyFailsInit above.
+TEST_F(RedisClientImplTest, Resp3ConnectionCloseDuringAwaitingReadonlyFailsInit) {
+  InSequence s;
+  enableResp3();
+  setup(std::make_shared<ConfigImpl>(
+      createConnPoolSettings(20, true, true, 100,
+                             envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::
+                                 ConnPoolSettings::REPLICA)));
+
+  EXPECT_CALL(*encoder_, encode(Eq(makeBareHello3Request()), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  client_->initialize("", "");
+
+  Common::Redis::RespValue user_request;
+  MockClientCallbacks user_callbacks;
+  client_->makeRequest(user_request, user_callbacks);
+
+  onConnected();
+
+  EXPECT_CALL(*encoder_, encode(Eq(Utility::ReadOnlyRequest::instance()), _));
+  EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
+  EXPECT_CALL(host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+  respondWith(makeHelloMapReply(3));
+
+  // Upstream RemoteClose while READONLY is still in flight. Held user request gets onFailure
+  // via failHeldUserRequests; ReadOnlyInitCallbacks::onFailure routes through onInitFailure.
+  EXPECT_CALL(user_callbacks, onFailure());
+  EXPECT_CALL(host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  upstream_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(0UL, hello3_failure_counter_->value());
+}
+
 TEST(RedisClientFactoryImplTest, Basic) {
   ClientFactoryImpl factory;
   Upstream::MockHost::MockCreateConnectionData conn_info;
