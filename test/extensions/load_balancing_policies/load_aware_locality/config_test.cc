@@ -25,9 +25,10 @@ TEST(LoadAwareLocalityConfigTest, CreateFactory) {
   auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
   EXPECT_EQ("envoy.load_balancing_policies.load_aware_locality", factory.name());
 
-  // loadConfig is stubbed to return nullptr for now.
+  // loadConfig returns UnimplementedError until the policy is functional.
   auto lb_config = factory.loadConfig(context, *factory.createEmptyConfigProto());
-  EXPECT_TRUE(lb_config.ok());
+  EXPECT_FALSE(lb_config.ok());
+  EXPECT_EQ(lb_config.status().code(), absl::StatusCode::kUnimplemented);
 
   // create is stubbed to return nullptr for now.
   auto thread_aware_lb =
