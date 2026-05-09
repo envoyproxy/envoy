@@ -213,7 +213,7 @@ using OnHeaderResult = http2::adapter::Http2VisitorInterface::OnHeaderResult;
 enum Settings {
   // SETTINGS_HEADER_TABLE_SIZE = 0x01,
   // SETTINGS_ENABLE_PUSH = 0x02,
-  SETTINGS_MAX_CONCURRENT_STREAMS = 0x03,
+  SETTINGS_MAX_CONCURRENT_STREAMS = 0x03, // NOLINT(readability-identifier-naming)
   // SETTINGS_INITIAL_WINDOW_SIZE = 0x04,
   // SETTINGS_MAX_FRAME_SIZE = 0x05,
   // SETTINGS_MAX_HEADER_LIST_SIZE = 0x06,
@@ -223,9 +223,9 @@ enum Settings {
 
 enum Flags {
   // FLAG_NONE = 0,
-  FLAG_END_STREAM = 0x01,
+  FLAG_END_STREAM = 0x01, // NOLINT(readability-identifier-naming)
   // FLAG_END_HEADERS = 0x04,
-  FLAG_ACK = 0x01,
+  FLAG_ACK = 0x01, // NOLINT(readability-identifier-naming)
   // FLAG_PADDED = 0x08,
   // FLAG_PRIORITY = 0x20
 };
