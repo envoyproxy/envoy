@@ -48,7 +48,7 @@ struct NetworkExtProcStats {
  */
 class NetworkExtProcLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
 public:
-  explicit NetworkExtProcLoggingInfo() {}
+  explicit NetworkExtProcLoggingInfo() = default;
 
   // Direction-specific aggregated statistics.
   struct DirectionalStats {

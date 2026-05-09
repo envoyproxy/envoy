@@ -37,8 +37,6 @@
 
 #pragma once
 
-#include <stddef.h>
-
 #include <cassert>
 #include <chrono>
 #include <cmath>
@@ -106,14 +104,16 @@ template <class Key, class Value, class MapType>
 class SimpleLRUCacheConstIterator
     : public std::iterator<std::input_iterator_tag, const std::pair<Key, Value*>> {
 public:
-  typedef typename MapType::const_iterator HashMapConstIterator;
+  using HashMapConstIterator = typename MapType::const_iterator;
   // Allow parent template's types to be referenced without qualification.
-  typedef typename SimpleLRUCacheConstIterator::reference reference;
-  typedef typename SimpleLRUCacheConstIterator::pointer pointer;
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  using reference = typename SimpleLRUCacheConstIterator::reference;
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  using pointer = typename SimpleLRUCacheConstIterator::pointer;
 
   // This default constructed Iterator can only be assigned to or destroyed.
   // All other operations give undefined behaviour.
-  SimpleLRUCacheConstIterator() {}
+  SimpleLRUCacheConstIterator() = default;
   SimpleLRUCacheConstIterator(HashMapConstIterator it, HashMapConstIterator end);
   SimpleLRUCacheConstIterator& operator++();
 
@@ -449,7 +449,8 @@ public:
   }
 
   // STL style const_iterator support
-  typedef SimpleLRUCacheConstIterator<Key, Value, MapType> const_iterator;
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  using const_iterator = SimpleLRUCacheConstIterator<Key, Value, MapType>;
   friend class SimpleLRUCacheConstIterator<Key, Value, MapType>;
   const_iterator begin() const { return const_iterator(table_.begin(), table_.end()); }
   const_iterator end() const { return const_iterator(table_.end(), table_.end()); }
@@ -490,13 +491,13 @@ protected:
   virtual bool isOverfull() const { return units_ > max_units_; }
 
 private:
-  typedef SimpleLRUCacheElem<Key, Value> Elem;
-  typedef MapType Table;
-  typedef typename Table::iterator TableIterator;
-  typedef typename Table::const_iterator TableConstIterator;
-  typedef MapType DeferredTable;
-  typedef typename DeferredTable::iterator DeferredTableIterator;
-  typedef typename DeferredTable::const_iterator DeferredTableConstIterator;
+  using Elem = SimpleLRUCacheElem<Key, Value>;
+  using Table = MapType;
+  using TableIterator = typename Table::iterator;
+  using TableConstIterator = typename Table::const_iterator;
+  using DeferredTable = MapType;
+  using DeferredTableIterator = typename DeferredTable::iterator;
+  using DeferredTableConstIterator = typename DeferredTable::const_iterator;
 
   Table table_; // Main table
   // Pinned entries awaiting to be released before they can be discarded.
@@ -1018,7 +1019,7 @@ public:
             total_units) {}
 
 protected:
-  virtual void removeElement(Value* value) { delete value; }
+  void removeElement(Value* value) override { delete value; }
 
 private:
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(SimpleLRUCache);
@@ -1028,8 +1029,8 @@ template <class Key, class Value, class Deleter, class H, class EQ>
 class SimpleLRUCacheWithDeleter
     : public SimpleLRUCacheBase<
           Key, Value, absl::flat_hash_map<Key, SimpleLRUCacheElem<Key, Value>*, H, EQ>, EQ> {
-  typedef absl::flat_hash_map<Key, SimpleLRUCacheElem<Key, Value>*, H, EQ> HashMap;
-  typedef SimpleLRUCacheBase<Key, Value, HashMap, EQ> Base;
+  using HashMap = absl::flat_hash_map<Key, SimpleLRUCacheElem<Key, Value>*, H, EQ>;
+  using Base = SimpleLRUCacheBase<Key, Value, HashMap, EQ>;
 
 public:
   explicit SimpleLRUCacheWithDeleter(int64_t total_units) : Base(total_units), deleter_() {}
@@ -1038,7 +1039,7 @@ public:
       : Base(total_units), deleter_(deleter) {}
 
 protected:
-  virtual void removeElement(Value* value) { deleter_(value); }
+  void removeElement(Value* value) override { deleter_(value); }
 
 private:
   Deleter deleter_;

@@ -225,7 +225,7 @@ std::string getStatusString(Status status);
  */
 class WithStatus {
 public:
-  WithStatus() : status_(Status::Ok) {}
+  WithStatus() = default;
 
   /**
    * Get the current status.

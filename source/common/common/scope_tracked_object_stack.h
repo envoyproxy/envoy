@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <ranges>
 #include <vector>
 
 #include "envoy/common/execution_context.h"
@@ -24,8 +25,8 @@ public:
   void add(const ScopeTrackedObject& object) { tracked_objects_.push_back(object); }
 
   OptRef<const StreamInfo::StreamInfo> trackedStream() const override {
-    for (auto iter = tracked_objects_.rbegin(); iter != tracked_objects_.rend(); ++iter) {
-      OptRef<const StreamInfo::StreamInfo> stream = iter->get().trackedStream();
+    for (const auto& tracked_object : std::ranges::reverse_view(tracked_objects_)) {
+      OptRef<const StreamInfo::StreamInfo> stream = tracked_object.get().trackedStream();
       if (stream.has_value()) {
         return stream;
       }
@@ -34,8 +35,8 @@ public:
   }
 
   void dumpState(std::ostream& os, int indent_level) const override {
-    for (auto iter = tracked_objects_.rbegin(); iter != tracked_objects_.rend(); ++iter) {
-      iter->get().dumpState(os, indent_level);
+    for (const auto& tracked_object : std::ranges::reverse_view(tracked_objects_)) {
+      tracked_object.get().dumpState(os, indent_level);
     }
   }
 

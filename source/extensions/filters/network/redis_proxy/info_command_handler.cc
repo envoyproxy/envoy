@@ -444,7 +444,7 @@ std::string InfoCmdAggregateResponseHandler::bytesToHuman(uint64_t bytes) {
     snprintf(buffer, sizeof(buffer), "%" PRIu64 "B", bytes);
   }
 
-  return std::string(buffer);
+  return {buffer};
 }
 
 bool InfoCmdAggregateResponseHandler::shouldIncludeSection(absl::string_view section) const {

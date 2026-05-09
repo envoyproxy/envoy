@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <ranges>
 #include <string>
 #include <vector>
 
@@ -386,8 +387,8 @@ void DispatcherImpl::onFatalError(std::ostream& os) const {
   // Dump the state of the tracked objects in the dispatcher if thread safe. This generally
   // results in dumping the active state only for the thread which caused the fatal error.
   if (isThreadSafe()) {
-    for (auto iter = tracked_object_stack_.rbegin(); iter != tracked_object_stack_.rend(); ++iter) {
-      (*iter)->dumpState(os);
+    for (auto iter : std::ranges::reverse_view(tracked_object_stack_)) {
+      iter->dumpState(os);
     }
   }
 }

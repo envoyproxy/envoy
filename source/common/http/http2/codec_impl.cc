@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <ostream>
+#include <ranges>
 #include <vector>
 
 #include "envoy/event/dispatcher.h"
@@ -1818,8 +1819,8 @@ void ConnectionImpl::onProtocolConstraintViolation() {
 
 void ConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
   // Notify the streams based on least recently encoding to the connection.
-  for (auto it = active_streams_.rbegin(); it != active_streams_.rend(); ++it) {
-    (*it)->runLowWatermarkCallbacks();
+  for (auto& active_stream : std::ranges::reverse_view(active_streams_)) {
+    active_stream->runLowWatermarkCallbacks();
   }
 }
 

@@ -176,7 +176,7 @@ std::string JA4Fingerprinter::getJA4CipherHash(const SSL_CLIENT_HELLO* ssl_clien
   }
 
   if (ciphers.empty()) {
-    return std::string(JA4_HASH_LENGTH, '0');
+    return {JA4_HASH_LENGTH, '0'};
   }
 
   std::sort(ciphers.begin(), ciphers.end());
@@ -239,7 +239,7 @@ std::string JA4Fingerprinter::getJA4ExtensionHash(const SSL_CLIENT_HELLO* ssl_cl
   }
 
   if (extensions.empty()) {
-    return std::string(JA4_HASH_LENGTH, '0');
+    return {JA4_HASH_LENGTH, '0'};
   }
 
   std::sort(extensions.begin(), extensions.end());
