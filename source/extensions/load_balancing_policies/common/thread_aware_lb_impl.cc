@@ -394,18 +394,18 @@ absl::Status TypedHashLbConfigBase::validateEndpoints(const PriorityState& prior
 
   for (const auto& [hosts, locality_weights_map] : priorities) {
     // Non-contiguous priorities can leave null entries in the priority vector.
-    if (hosts == nullptr) {
-      continue;
-    }
-    // Sum should be at most uint32_t max value, so we can validate it by accumulating into uint64_t
-    // and making sure there was no overflow.
-    uint64_t host_sum = 0;
-    for (const auto& host : *hosts) {
-      host_sum += host->weight();
-      if (host_sum > std::numeric_limits<uint32_t>::max()) {
-        return absl::InvalidArgumentError(
-            fmt::format("The sum of weights of all upstream hosts in a locality exceeds {}",
-                        std::numeric_limits<uint32_t>::max()));
+    // Only skip the host-weight check; locality weights are still validated.
+    if (hosts != nullptr) {
+      // Sum should be at most uint32_t max value, so we can validate it by accumulating into
+      // uint64_t and making sure there was no overflow.
+      uint64_t host_sum = 0;
+      for (const auto& host : *hosts) {
+        host_sum += host->weight();
+        if (host_sum > std::numeric_limits<uint32_t>::max()) {
+          return absl::InvalidArgumentError(
+              fmt::format("The sum of weights of all upstream hosts in a locality exceeds {}",
+                          std::numeric_limits<uint32_t>::max()));
+        }
       }
     }
 
