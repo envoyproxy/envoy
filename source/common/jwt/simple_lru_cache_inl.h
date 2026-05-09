@@ -1018,7 +1018,7 @@ public:
             total_units) {}
 
 protected:
-  virtual void removeElement(Value* value) { delete value; }
+  void removeElement(Value* value) override { delete value; }
 
 private:
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(SimpleLRUCache);
@@ -1038,7 +1038,7 @@ public:
       : Base(total_units), deleter_(deleter) {}
 
 protected:
-  virtual void removeElement(Value* value) { deleter_(value); }
+  void removeElement(Value* value) override { deleter_(value); }
 
 private:
   Deleter deleter_;
