@@ -803,6 +803,132 @@ TEST_F(RedisProxyFilterWithAuthPasswordTest, AuthPasswordIncorrect) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
 
+// ``AUTH default <password>`` succeeds against a ``downstream_auth_password``-only listener.
+// Exercises the ``default`` username synonym branch in ``onAuth(username, password)``: Redis 6
+// ACLs treat an empty configured username + the literal ``default`` supplied by the client as
+// a match.
+TEST_F(RedisProxyFilterWithAuthPasswordTest, AuthCommandWithDefaultUsernameAcceptsCorrectPassword) {
+  InSequence s;
+
+  Buffer::OwnedImpl fake_data;
+  Common::Redis::RespValuePtr request(new Common::Redis::RespValue());
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    decoder_callbacks_->onRespValue(std::move(request));
+  }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_FALSE(callbacks.connectionAllowed());
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::SimpleString);
+        reply->asString() = "OK";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onAuth("default", "somepassword");
+        EXPECT_TRUE(filter_->connectionAllowed());
+        return nullptr;
+      }));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+}
+
+// ``HELLO N AUTH default <password>`` against a ``downstream_auth_password``-only listener
+// reaches the local-credentials match path of ``attemptDownstreamAuthInline`` and returns
+// ``Allowed`` after flipping ``connection_allowed_`` to true. The trailing onResponse call
+// mimics what the production splitter does after the Allowed return (emit the HELLO Map),
+// which drains the in-flight PendingRequest so the filter dtor's empty-queue ASSERT holds.
+TEST_F(RedisProxyFilterWithAuthPasswordTest, AttemptInlineAuthAllowedWithLocalPassword) {
+  InSequence s;
+
+  Buffer::OwnedImpl fake_data;
+  Common::Redis::RespValuePtr request(new Common::Redis::RespValue());
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    decoder_callbacks_->onRespValue(std::move(request));
+  }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_FALSE(callbacks.connectionAllowed());
+        // ``default`` is the Redis 6 ACL synonym for the empty configured username.
+        EXPECT_EQ(CommandSplitter::SplitCallbacks::AuthAttempt::Allowed,
+                  callbacks.attemptDownstreamAuthInline("default", "somepassword", 3));
+        EXPECT_TRUE(filter_->connectionAllowed());
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::SimpleString);
+        reply->asString() = "OK";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onResponse(std::move(reply));
+        return nullptr;
+      }));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+}
+
+// ``HELLO N AUTH user wrong`` against a ``downstream_auth_password``-only listener reaches
+// the local-credentials no-match arm of ``attemptDownstreamAuthInline`` and returns
+// ``Denied`` while leaving ``connection_allowed_`` false. Same code region as the test
+// above; the trailing onResponse mimics the splitter emitting WRONGPASS after a Denied
+// return, which drains the PendingRequest.
+TEST_F(RedisProxyFilterWithAuthPasswordTest, AttemptInlineAuthDeniedWithWrongLocalPassword) {
+  InSequence s;
+
+  Buffer::OwnedImpl fake_data;
+  Common::Redis::RespValuePtr request(new Common::Redis::RespValue());
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    decoder_callbacks_->onRespValue(std::move(request));
+  }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_FALSE(callbacks.connectionAllowed());
+        EXPECT_EQ(CommandSplitter::SplitCallbacks::AuthAttempt::Denied,
+                  callbacks.attemptDownstreamAuthInline("default", "wrong", 3));
+        EXPECT_FALSE(filter_->connectionAllowed());
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::Error);
+        reply->asString() = "WRONGPASS invalid username-password pair";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onResponse(std::move(reply));
+        return nullptr;
+      }));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+}
+
+// ``HELLO N AUTH ...`` against a listener with NO downstream credentials configured returns
+// ``Denied`` immediately at the early-out in ``attemptDownstreamAuthInline``. Uses the default
+// test fixture (no auth_password configured) rather than the auth-password subclass.
+TEST_F(RedisProxyFilterTest, AttemptInlineAuthDeniedWithoutAnyConfiguredCreds) {
+  InSequence s;
+
+  Buffer::OwnedImpl fake_data;
+  Common::Redis::RespValuePtr request(new Common::Redis::RespValue());
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    decoder_callbacks_->onRespValue(std::move(request));
+  }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_EQ(CommandSplitter::SplitCallbacks::AuthAttempt::Denied,
+                  callbacks.attemptDownstreamAuthInline("alice", "secret", 3));
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::Error);
+        reply->asString() = "WRONGPASS invalid username-password pair";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onResponse(std::move(reply));
+        return nullptr;
+      }));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+}
+
 const std::string downstream_multiple_auth_passwords_config = R"EOF(
 prefix_routes:
   catch_all_route:
