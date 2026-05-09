@@ -474,7 +474,7 @@ size_t DynamicModuleCluster::removeHosts(const std::vector<Upstream::HostSharedP
   }
 
   // Build the remaining host list and update the priority set once.
-  ASSERT(priority_set_.hostSetsPerPriority().size() >= 1);
+  ASSERT(!priority_set_.hostSetsPerPriority().empty());
   const auto& first_host_set = priority_set_.getOrCreateHostSet(0);
 
   // Build a set of removed host pointers for O(1) lookup.

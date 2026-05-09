@@ -16,9 +16,9 @@ namespace ProtoMessageExtraction {
 
 // All valid field extraction directives.
 enum class ExtractedMessageDirective {
-  EXTRACT_REDACT,
+  EXTRACT_REDACT, // NOLINT(readability-identifier-naming)
   EXTRACT,
-  EXTRACT_REPEATED_CARDINALITY,
+  EXTRACT_REPEATED_CARDINALITY, // NOLINT(readability-identifier-naming)
 };
 
 using FieldPathToExtractType =

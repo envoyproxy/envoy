@@ -85,50 +85,72 @@ using UnsafeHeaderVector = std::vector<UnsafeHeader>;
  * client before packing them into this struct (hence they are "unsafe").
  */
 struct Response {
+  Response() = default;
+  Response(CheckStatus status, UnsafeHeaderVector headers_to_append,
+           UnsafeHeaderVector headers_to_set, UnsafeHeaderVector headers_to_add,
+           UnsafeHeaderVector response_headers_to_add, UnsafeHeaderVector response_headers_to_set,
+           UnsafeHeaderVector response_headers_to_add_if_absent,
+           UnsafeHeaderVector response_headers_to_overwrite_if_exists,
+           bool saw_invalid_append_actions, std::vector<std::string> headers_to_remove,
+           Http::Utility::QueryParamsVector query_parameters_to_set,
+           std::vector<std::string> query_parameters_to_remove, std::string body,
+           Http::Code status_code, Protobuf::Struct dynamic_metadata)
+      : status(status), headers_to_append(std::move(headers_to_append)),
+        headers_to_set(std::move(headers_to_set)), headers_to_add(std::move(headers_to_add)),
+        response_headers_to_add(std::move(response_headers_to_add)),
+        response_headers_to_set(std::move(response_headers_to_set)),
+        response_headers_to_add_if_absent(std::move(response_headers_to_add_if_absent)),
+        response_headers_to_overwrite_if_exists(std::move(response_headers_to_overwrite_if_exists)),
+        saw_invalid_append_actions(saw_invalid_append_actions),
+        headers_to_remove(std::move(headers_to_remove)),
+        query_parameters_to_set(std::move(query_parameters_to_set)),
+        query_parameters_to_remove(std::move(query_parameters_to_remove)), body(std::move(body)),
+        status_code(status_code), dynamic_metadata(std::move(dynamic_metadata)) {}
+
   // Call status.
-  CheckStatus status;
+  CheckStatus status = CheckStatus::OK;
   // A set of HTTP headers returned by the authorization server, that will be optionally appended
   // to the request to the upstream server.
-  UnsafeHeaderVector headers_to_append{};
+  UnsafeHeaderVector headers_to_append;
   // A set of HTTP headers returned by the authorization server, will be optionally set
   // (using "setCopy") to the request to the upstream server.
-  UnsafeHeaderVector headers_to_set{};
+  UnsafeHeaderVector headers_to_set;
   // A set of HTTP headers returned by the authorization server, will be optionally added
   // (using "addCopy") to the request to the upstream server.
-  UnsafeHeaderVector headers_to_add{};
+  UnsafeHeaderVector headers_to_add;
   // A set of HTTP headers returned by the authorization server, will be optionally added
   // (using "addCopy") to the response sent back to the downstream client on OK auth
   // responses.
-  UnsafeHeaderVector response_headers_to_add{};
+  UnsafeHeaderVector response_headers_to_add;
   // A set of HTTP headers returned by the authorization server, will be optionally set (using
   // "setCopy") to the response sent back to the downstream client on OK auth responses.
-  UnsafeHeaderVector response_headers_to_set{};
+  UnsafeHeaderVector response_headers_to_set;
   // A set of HTTP headers returned by the authorization server, will be optionally added
   // (using "addCopy") to the response sent back to the downstream client on OK auth
   // responses only if the headers were not returned from the authz server.
-  UnsafeHeaderVector response_headers_to_add_if_absent{};
+  UnsafeHeaderVector response_headers_to_add_if_absent;
   // A set of HTTP headers returned by the authorization server, will be optionally set (using
   // "setCopy") to the response sent back to the downstream client on OK auth responses
   // only if the headers were returned from the authz server.
-  UnsafeHeaderVector response_headers_to_overwrite_if_exists{};
+  UnsafeHeaderVector response_headers_to_overwrite_if_exists;
   // Whether the authorization server returned any headers with an invalid append action type.
-  bool saw_invalid_append_actions{false};
+  bool saw_invalid_append_actions = false;
   // A set of HTTP headers consumed by the authorization server, will be removed
   // from the request to the upstream server.
-  std::vector<std::string> headers_to_remove{};
+  std::vector<std::string> headers_to_remove;
   // A set of query string parameters to be set (possibly overwritten) on the
   // request to the upstream server.
-  Http::Utility::QueryParamsVector query_parameters_to_set{};
+  Http::Utility::QueryParamsVector query_parameters_to_set;
   // A set of query string parameters to remove from the request to the upstream server.
-  std::vector<std::string> query_parameters_to_remove{};
+  std::vector<std::string> query_parameters_to_remove;
   // Optional http body used only on denied response.
-  std::string body{};
+  std::string body;
   // Optional http status used only on denied response.
   Http::Code status_code{};
 
   // A set of metadata returned by the authorization server, that will be emitted as filter's
   // dynamic metadata that other filters can leverage.
-  Protobuf::Struct dynamic_metadata{};
+  Protobuf::Struct dynamic_metadata;
 
   // The gRPC status returned by the authorization server when it is making a
   // gRPC call.

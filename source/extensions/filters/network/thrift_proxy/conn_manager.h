@@ -88,8 +88,7 @@ private:
   struct ResponseDecoder : public DecoderCallbacks, public DecoderEventHandler {
     ResponseDecoder(ActiveRpc& parent, Transport& transport, Protocol& protocol)
         : parent_(parent), decoder_(std::make_unique<Decoder>(transport, protocol, *this)),
-          protocol_converter_(std::make_shared<ProtocolConverter>()), complete_{false},
-          passthrough_{false}, pending_transport_end_{false} {
+          protocol_converter_(std::make_shared<ProtocolConverter>()) {
       protocol_converter_->initProtocolConverter(*parent_.parent_.protocol_,
                                                  parent_.response_buffer_);
     }
@@ -218,9 +217,7 @@ private:
           stream_id_(parent_.random_generator_.random()),
           stream_info_(parent_.time_source_,
                        parent_.read_callbacks_->connection().connectionInfoProviderSharedPtr(),
-                       StreamInfo::FilterState::LifeSpan::FilterChain),
-          local_response_sent_{false}, pending_transport_end_{false}, passthrough_{false},
-          under_on_local_reply_{false} {
+                       StreamInfo::FilterState::LifeSpan::FilterChain) {
       parent_.stats_.request_active_.inc();
     }
     ~ActiveRpc() override {

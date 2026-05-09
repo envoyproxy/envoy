@@ -92,7 +92,8 @@ protected:
   struct NestedContext {
     Protobuf::Struct* struct_ptr{nullptr};
     Protobuf::ListValue* list_ptr{nullptr};
-    std::string field_name{};
+    std::string field_name;
+    // NOLINTNEXTLINE(readability-identifier-naming)
     bool is_list() const { return list_ptr != nullptr; }
   };
   std::stack<NestedContext> context_stack_;

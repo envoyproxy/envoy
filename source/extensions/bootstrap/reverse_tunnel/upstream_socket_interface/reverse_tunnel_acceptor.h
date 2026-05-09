@@ -113,7 +113,7 @@ public:
   ReverseTunnelAcceptorExtension* extension_{nullptr};
 
 private:
-  Server::Configuration::ServerFactoryContext* context_;
+  Server::Configuration::ServerFactoryContext* context_{nullptr};
 };
 
 DECLARE_FACTORY(ReverseTunnelAcceptor);

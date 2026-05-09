@@ -781,8 +781,7 @@ private:
         : cluster_config_(cluster_config), config_hash_(cluster_config_hash),
           version_info_(version_info), cluster_(std::move(cluster)),
           last_updated_(time_source.systemTime()), added_via_api_(added_via_api),
-          avoid_cds_removal_(avoid_cds_removal), added_or_updated_{},
-          required_for_ads_(required_for_ads) {}
+          avoid_cds_removal_(avoid_cds_removal), required_for_ads_(required_for_ads) {}
 
     bool blockUpdate(uint64_t hash) { return !added_via_api_ || config_hash_ == hash; }
 

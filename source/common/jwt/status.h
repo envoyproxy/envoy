@@ -245,7 +245,7 @@ protected:
 
 private:
   // The internal status.
-  Status status_;
+  Status status_{Status::Ok};
 };
 
 } // namespace JwtVerify
