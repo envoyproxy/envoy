@@ -216,7 +216,6 @@ void UdpTapSink::UdpTapSinkHandle::handleSocketStreamedTraceForMultiEvents(
     }
     doSubmitTrace(std::move(trace), format);
     trace = nullptr;
-    new_streamed_trace = nullptr;
   };
 
   // Consume events from the head until no events remain in the original trace.

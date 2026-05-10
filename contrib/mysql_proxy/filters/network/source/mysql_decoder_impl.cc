@@ -182,7 +182,7 @@ bool DecoderImpl::decode(Buffer::Instance& data, bool is_upstream) {
   bool return_without_parse = false;
   bool result = true;
 
-  auto current_state = session_.getState();
+  const auto current_state = session_.getState();
 
   // ignore ssl message
   if (current_state == MySQLSession::State::SslPt) {
