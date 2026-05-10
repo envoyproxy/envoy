@@ -136,6 +136,13 @@ void Base64::completePadding(std::string& encoded) {
 }
 
 std::string Base64Url::decode(absl::string_view input) {
+  // URL decoding does not accept any padding
+  if (!input.empty()) {
+    uint8_t last_value = URL_REVERSE_LOOKUP_TABLE[static_cast<uint8_t>(input[input.size() - 1])];
+    if (last_value == 64) {
+      return EMPTY_STRING;
+    }
+  }
   return decodeHelper(input, URL_REVERSE_LOOKUP_TABLE, absl::WebSafeBase64Unescape);
 }
 

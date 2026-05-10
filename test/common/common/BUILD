@@ -107,6 +107,7 @@ envoy_cc_fuzz_test(
     tags = ["no_fuzz"],
     deps = [
         ":base64_legacy_lib",
+        "//source/common/buffer:buffer_lib",
         "//source/common/common:base64_lib",
         "//test/fuzz:utility_lib",
     ],
@@ -461,6 +462,7 @@ envoy_cc_benchmark_binary(
     rbe_pool = "6gig",
     deps = [
         ":base64_legacy_lib",
+        "//source/common/buffer:buffer_lib",
         "//source/common/common:base64_lib",
         "@benchmark",
     ],

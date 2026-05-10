@@ -1,6 +1,7 @@
 // Note: this should be run with --compilation_mode=opt, and would benefit from
 // a quiescent system with disabled cstate power management.
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/base64.h"
 
 #include "base64_legacy.h"
@@ -55,6 +56,32 @@ static void BM_LegacyBase64Decode(benchmark::State& state) {
   state.SetBytesProcessed(state.iterations() * encoded.size());
 }
 BENCHMARK(BM_LegacyBase64Decode)->Range(8, 1 << 20);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_AbslBase64BufferInstanceEncode(benchmark::State& state) {
+  const std::string input(state.range(0), 'x');
+  Envoy::Buffer::OwnedImpl buffer(input);
+
+  for (auto _ : state) {
+    std::string res = Envoy::Base64::encode(buffer, input.size());
+    benchmark::DoNotOptimize(res);
+  }
+  state.SetBytesProcessed(state.iterations() * state.range(0));
+}
+BENCHMARK(BM_AbslBase64BufferInstanceEncode)->Range(8, 1 << 20);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_LegacyBase64BufferInstanceEncode(benchmark::State& state) {
+  const std::string input(state.range(0), 'x');
+  Envoy::Buffer::OwnedImpl buffer(input);
+
+  for (auto _ : state) {
+    std::string res = Envoy::Base64Legacy::encode(buffer, input.size());
+    benchmark::DoNotOptimize(res);
+  }
+  state.SetBytesProcessed(state.iterations() * state.range(0));
+}
+BENCHMARK(BM_LegacyBase64BufferInstanceEncode)->Range(8, 1 << 20);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_AbslBase64UrlEncode(benchmark::State& state) {

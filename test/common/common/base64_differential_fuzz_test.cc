@@ -9,9 +9,11 @@ namespace Fuzz {
 
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   const std::string input(reinterpret_cast<const char*>(buf), len);
+  Envoy::Buffer::OwnedImpl buffer(input);
 
   // Encode: both must produce identical output for any input
   FUZZ_ASSERT(Base64::encode(input) == Base64Legacy::encode(input));
+  FUZZ_ASSERT(Base64::encode(buffer, input.size()) == Base64Legacy::encode(buffer, input.size()));
   FUZZ_ASSERT(Base64Url::encode(input.data(), input.size()) ==
               Base64UrlLegacy::encode(input.data(), input.size()));
 
