@@ -1711,3 +1711,4 @@ bitrate
 kbps
 dataset
 datasets
+smartptr
