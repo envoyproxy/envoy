@@ -84,6 +84,40 @@ static void BM_LegacyBase64BufferInstanceEncode(benchmark::State& state) {
 BENCHMARK(BM_LegacyBase64BufferInstanceEncode)->Range(8, 1 << 20);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_AbslBase64BufferInstanceEncodeMultiSlice(benchmark::State& state) {
+  const uint64_t total_size = state.range(0);
+  const uint64_t slice_size = 1024;
+  Envoy::Buffer::OwnedImpl buffer;
+  for (uint64_t off = 0; off < total_size; off += slice_size) {
+    const uint64_t n = std::min(slice_size, total_size - off);
+    buffer.appendSliceForTest(std::string(n, 'x'));
+  }
+  for (auto _ : state) {
+    std::string res = Envoy::Base64::encode(buffer, total_size);
+    benchmark::DoNotOptimize(res);
+  }
+  state.SetBytesProcessed(state.iterations() * state.range(0));
+}
+BENCHMARK(BM_AbslBase64BufferInstanceEncodeMultiSlice)->Range(4096, 1 << 20);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_LegacyBase64BufferInstanceEncodeMultiSlice(benchmark::State& state) {
+  const uint64_t total_size = state.range(0);
+  const uint64_t slice_size = 1024;
+  Envoy::Buffer::OwnedImpl buffer;
+  for (uint64_t off = 0; off < total_size; off += slice_size) {
+    const uint64_t n = std::min(slice_size, total_size - off);
+    buffer.appendSliceForTest(std::string(n, 'x'));
+  }
+  for (auto _ : state) {
+    std::string res = Envoy::Base64Legacy::encode(buffer, total_size);
+    benchmark::DoNotOptimize(res);
+  }
+  state.SetBytesProcessed(state.iterations() * state.range(0));
+}
+BENCHMARK(BM_LegacyBase64BufferInstanceEncodeMultiSlice)->Range(4096, 1 << 20);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_AbslBase64UrlEncode(benchmark::State& state) {
   const std::string input(state.range(0), 'x');
   for (auto _ : state) {

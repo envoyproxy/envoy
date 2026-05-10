@@ -97,15 +97,22 @@ std::string Base64::decodeWithoutPadding(absl::string_view input) {
   return decodeHelper(input, REVERSE_LOOKUP_TABLE, absl::Base64Unescape);
 }
 
-// TODO: Remove this overload. Callers should use the char* or string_view alternatives to avoid the
-// intermediate copy.
 std::string Base64::encode(const Buffer::Instance& buffer, uint64_t length) {
-  size_t encode_length = std::min(length, buffer.length());
+  const uint64_t encode_length = std::min(length, buffer.length());
+  if (encode_length == 0) {
+    return EMPTY_STRING;
+  }
   std::string ret;
-  std::string tmp;
-  tmp.resize(encode_length);
-  buffer.copyOut(0, encode_length, tmp.data());
-  absl::Base64Escape(tmp, &ret);
+  const auto slices = buffer.getRawSlices();
+  if (slices.size() == 1 && slices[0].len_ >= encode_length) {
+    absl::Base64Escape(absl::string_view(static_cast<const char*>(slices[0].mem_), encode_length),
+                       &ret);
+  } else {
+    std::string tmp;
+    tmp.resize(encode_length);
+    buffer.copyOut(0, encode_length, tmp.data());
+    absl::Base64Escape(tmp, &ret);
+  }
   return ret;
 }
 
