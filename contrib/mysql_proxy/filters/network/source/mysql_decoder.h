@@ -66,7 +66,7 @@ public:
 protected:
   // Decoder attributes.
   Extensions::Common::SQLUtils::SQLUtils::DecoderAttributes attributes_;
-  std::vector<PayloadMetadata> payload_metadata_list_{};
+  std::vector<PayloadMetadata> payload_metadata_list_;
 };
 
 using DecoderPtr = std::unique_ptr<Decoder>;

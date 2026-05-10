@@ -208,7 +208,6 @@ bool DecoderImpl::decode(Buffer::Instance& data, bool is_upstream) {
     if (session_.getState() == MySQLSession::State::ReqResp && seq == MYSQL_REQUEST_PKT_NUM) {
       session_.resetSeq();
       session_.setState(MySQLSession::State::Req);
-      current_state = session_.getState();
     } else {
       ENVOY_LOG(info, "mysql_proxy: ignoring out-of-sync packet");
       callbacks_.onProtocolError();

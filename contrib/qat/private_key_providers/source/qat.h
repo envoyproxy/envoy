@@ -47,14 +47,14 @@ public:
   int getNodeAffinity();
   int isDone();
 
-  Thread::ThreadPtr polling_thread_{};
+  Thread::ThreadPtr polling_thread_;
   Thread::MutexBasicLockable poll_lock_{};
   Thread::CondVar qat_thread_cond_{};
 
 private:
   CpaInstanceHandle handle_;
   CpaInstanceInfo2 info_;
-  LibQatCryptoSharedPtr libqat_{};
+  LibQatCryptoSharedPtr libqat_;
   int users_{};
   bool done_{};
 };
@@ -75,7 +75,7 @@ private:
   Cpa16U num_instances_{};
   std::vector<QatHandle> qat_handles_;
   int next_handle_{};
-  LibQatCryptoSharedPtr libqat_{};
+  LibQatCryptoSharedPtr libqat_;
 };
 
 /**
@@ -96,7 +96,7 @@ public:
   bool checkQatDevice();
 
 private:
-  LibQatCryptoSharedPtr libqat_{};
+  LibQatCryptoSharedPtr libqat_;
   bool qat_is_supported_{true};
 };
 

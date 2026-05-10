@@ -25,7 +25,7 @@ public:
   GolangFilterConfig() : FactoryBase(CanonicalName) {}
 
 private:
-  Server::ServerLifecycleNotifier::HandlePtr handler_{};
+  Server::ServerLifecycleNotifier::HandlePtr handler_;
 
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
