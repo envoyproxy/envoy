@@ -72,66 +72,54 @@ pub fn read_whole_response_body<EHF: EnvoyHttpFilter>(envoy_filter: &mut EHF) ->
   get_body_content(envoy_filter, false)
 }
 
-pub(crate) struct HeaderPairSlice(
-  pub(crate) *const crate::abi::envoy_dynamic_module_type_module_http_header,
-  pub(crate) usize,
-);
+/// Owned C-ABI array of HTTP header pairs materialised from a borrowed `&[(&str, &[u8])]`
+/// for hand-off across the dynamic-modules FFI boundary.
+///
+/// Rust's `&str` and `&[u8]` fat-pointer layouts and tuple field order are formally
+/// unspecified (see the Rust reference, "Type layout"). An earlier version of this type
+/// pun-cast `&[(&str, &[u8])].as_ptr()` to `*const envoy_dynamic_module_type_module_http_header`
+/// and relied on the in-practice `(ptr, len)` layout, with a `debug_assert!`-only transmute
+/// check. A future rustc that rearranges those layouts would silently corrupt header data
+/// in release builds. This implementation instead builds the FFI array field by field over
+/// the `#[repr(C)]` C struct, which is sound by construction.
+pub(crate) struct HeaderPairSlice<'a> {
+  storage: Vec<crate::abi::envoy_dynamic_module_type_module_http_header>,
+  _marker: std::marker::PhantomData<&'a [(&'a str, &'a [u8])]>,
+}
 
-const _: () = {
-  type HeaderPair<'a> = (&'a str, &'a [u8]);
-  assert!(
-    std::mem::size_of::<HeaderPair>()
-      == std::mem::size_of::<crate::abi::envoy_dynamic_module_type_module_http_header>()
-  );
-  assert!(
-    std::mem::align_of::<HeaderPair>()
-      == std::mem::align_of::<crate::abi::envoy_dynamic_module_type_module_http_header>()
-  );
+impl HeaderPairSlice<'_> {
+  pub(crate) fn as_ptr(&self) -> *const crate::abi::envoy_dynamic_module_type_module_http_header {
+    self.storage.as_ptr()
+  }
 
-  assert!(
-    std::mem::offset_of!(HeaderPair, 0)
-      == std::mem::offset_of!(
-        crate::abi::envoy_dynamic_module_type_module_http_header,
-        key_ptr
-      )
-  );
-  assert!(
-    std::mem::offset_of!(HeaderPair, 1)
-      == std::mem::offset_of!(
-        crate::abi::envoy_dynamic_module_type_module_http_header,
-        value_ptr
-      )
-  );
-};
+  pub(crate) fn len(&self) -> usize {
+    self.storage.len()
+  }
 
-impl<'a> From<&[(&'a str, &'a [u8])]> for HeaderPairSlice {
+  // Companion to `len`; satisfies `clippy::len_without_is_empty`. The crate-level
+  // `#![allow(dead_code)]` already covers the lack of internal callers.
+  pub(crate) fn is_empty(&self) -> bool {
+    self.storage.is_empty()
+  }
+}
+
+impl<'a> From<&[(&'a str, &'a [u8])]> for HeaderPairSlice<'a> {
   fn from(headers: &[(&'a str, &'a [u8])]) -> Self {
-    // Note: Casting a (&str, &[u8]) to an abi::envoy_dynamic_module_type_module_http_header works
-    // not because of any formal layout guarantees but because:
-    // 1) tuples _in practice_ are laid out packed and in order
-    // 2) &str and &[u8] are fat pointers (pointers to DSTs), whose layouts _in practice_ are a
-    //    pointer and length
-    // If these assumptions change, this will break, so we assert on them here in debug builds.
-    type HeaderPair<'a> = (&'a str, &'a [u8]);
-
-    debug_assert!({
-      let pair: HeaderPair<'_> = ("test", b"value");
-      let constructed = crate::abi::envoy_dynamic_module_type_module_http_header {
-        key_ptr: pair.0.as_ptr() as *const _,
-        key_length: pair.0.len(),
-        value_ptr: pair.1.as_ptr() as *const _,
-        value_length: pair.1.len(),
-      };
-      let punned = unsafe {
-        std::mem::transmute::<HeaderPair, crate::abi::envoy_dynamic_module_type_module_http_header>(
-          pair,
-        )
-      };
-      constructed == punned
-    });
-
-    let ptr = headers.as_ptr() as *const crate::abi::envoy_dynamic_module_type_module_http_header;
-    HeaderPairSlice(ptr, headers.len())
+    let storage = headers
+      .iter()
+      .map(
+        |(k, v)| crate::abi::envoy_dynamic_module_type_module_http_header {
+          key_ptr: k.as_ptr() as *const _,
+          key_length: k.len(),
+          value_ptr: v.as_ptr() as *const _,
+          value_length: v.len(),
+        },
+      )
+      .collect();
+    Self {
+      storage,
+      _marker: std::marker::PhantomData,
+    }
   }
 }
 
@@ -140,6 +128,38 @@ impl<'a> From<&[(&'a str, &'a [u8])]> for HeaderPairSlice {
 mod tests {
   use super::*;
   use crate::{EnvoyMutBuffer, MockEnvoyHttpFilter};
+
+  #[test]
+  fn test_header_pair_slice_populates_repr_c_struct_per_entry() {
+    // Verifies that every (&str, &[u8]) entry produces a C struct whose four named fields
+    // hold exactly the source pointers and lengths. Reads the storage through the C struct's
+    // own field accessors (not by punning), so the test would fail if the conversion ever
+    // got the field order wrong — which is the regression class the previous transmute-based
+    // debug_assert was trying to detect at runtime in debug builds only.
+    let pairs: &[(&str, &[u8])] = &[
+      ("content-type", b"application/json"),
+      (":status", b"200"),
+      ("x-custom", b""),
+    ];
+    let slice = HeaderPairSlice::from(pairs);
+    assert_eq!(slice.len(), 3);
+
+    let materialised: &[crate::abi::envoy_dynamic_module_type_module_http_header] =
+      unsafe { std::slice::from_raw_parts(slice.as_ptr(), slice.len()) };
+    for (i, (k, v)) in pairs.iter().enumerate() {
+      assert_eq!(materialised[i].key_ptr as *const u8, k.as_ptr());
+      assert_eq!(materialised[i].key_length, k.len());
+      assert_eq!(materialised[i].value_ptr as *const u8, v.as_ptr());
+      assert_eq!(materialised[i].value_length, v.len());
+    }
+  }
+
+  #[test]
+  fn test_header_pair_slice_empty_input_produces_empty_storage() {
+    let pairs: &[(&str, &[u8])] = &[];
+    let slice = HeaderPairSlice::from(pairs);
+    assert_eq!(slice.len(), 0);
+  }
 
   #[test]
   fn test_read_whole_request_body_received_is_buffered() {

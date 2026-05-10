@@ -577,7 +577,7 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
   ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64) {
     let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
     let body_length = body.map(|s| s.len()).unwrap_or(0);
-    let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
+    let header_pairs = HeaderPairSlice::from(headers);
     let mut callout_id: u64 = 0;
 
     let result = unsafe {
@@ -585,8 +585,8 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
         self.raw_ptr,
         &mut callout_id as *mut _ as *mut _,
         str_to_module_buffer(cluster_name),
-        headers_ptr as *const _ as *mut _,
-        headers_len,
+        header_pairs.as_ptr() as *mut _,
+        header_pairs.len(),
         abi::envoy_dynamic_module_type_module_buffer {
           ptr: body_ptr as *mut _,
           length: body_length,
@@ -608,7 +608,7 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
   ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64) {
     let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
     let body_length = body.map(|s| s.len()).unwrap_or(0);
-    let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
+    let header_pairs = HeaderPairSlice::from(headers);
     let mut stream_id: u64 = 0;
 
     let result = unsafe {
@@ -616,8 +616,8 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
         self.raw_ptr,
         &mut stream_id as *mut _ as *mut _,
         str_to_module_buffer(cluster_name),
-        headers_ptr as *const _ as *mut _,
-        headers_len,
+        header_pairs.as_ptr() as *mut _,
+        header_pairs.len(),
         abi::envoy_dynamic_module_type_module_buffer {
           ptr: body_ptr as *mut _,
           length: body_length,
@@ -651,13 +651,13 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
     stream_handle: u64,
     trailers: &'a [(&'a str, &'a [u8])],
   ) -> bool {
-    let HeaderPairSlice(trailers_ptr, trailers_len) = trailers.into();
+    let trailer_pairs = HeaderPairSlice::from(trailers);
     unsafe {
       abi::envoy_dynamic_module_callback_http_filter_config_stream_send_trailers(
         self.raw_ptr,
         stream_handle,
-        trailers_ptr as *const _ as *mut _,
-        trailers_len,
+        trailer_pairs.as_ptr() as *mut _,
+        trailer_pairs.len(),
       )
     }
   }
@@ -2201,14 +2201,14 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     let details_ptr = details.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
     let details_length = details.map(|s| s.len()).unwrap_or(0);
 
-    let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
+    let header_pairs = HeaderPairSlice::from(headers);
 
     unsafe {
       abi::envoy_dynamic_module_callback_http_send_response(
         self.raw_ptr,
         status_code,
-        headers_ptr as *mut _,
-        headers_len,
+        header_pairs.as_ptr() as *mut _,
+        header_pairs.len(),
         abi::envoy_dynamic_module_type_module_buffer {
           ptr: body_ptr as *mut _,
           length: body_length,
@@ -2222,13 +2222,13 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   }
 
   fn send_response_headers(&mut self, headers: &[(&str, &[u8])], end_stream: bool) {
-    let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
+    let header_pairs = HeaderPairSlice::from(headers);
 
     unsafe {
       abi::envoy_dynamic_module_callback_http_send_response_headers(
         self.raw_ptr,
-        headers_ptr as *mut _,
-        headers_len,
+        header_pairs.as_ptr() as *mut _,
+        header_pairs.len(),
         end_stream,
       )
     }
@@ -2245,13 +2245,13 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   }
 
   fn send_response_trailers(&mut self, trailers: &[(&str, &[u8])]) {
-    let HeaderPairSlice(trailers_ptr, trailers_len) = trailers.into();
+    let trailer_pairs = HeaderPairSlice::from(trailers);
 
     unsafe {
       abi::envoy_dynamic_module_callback_http_send_response_trailers(
         self.raw_ptr,
-        trailers_ptr as *mut _,
-        trailers_len,
+        trailer_pairs.as_ptr() as *mut _,
+        trailer_pairs.len(),
       )
     }
   }
@@ -2997,7 +2997,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64) {
     let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
     let body_length = body.map(|s| s.len()).unwrap_or(0);
-    let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
+    let header_pairs = HeaderPairSlice::from(headers);
     let mut callout_id: u64 = 0;
 
     let result = unsafe {
@@ -3005,8 +3005,8 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
         self.raw_ptr,
         &mut callout_id as *mut _ as *mut _,
         str_to_module_buffer(cluster_name),
-        headers_ptr as *const _ as *mut _,
-        headers_len,
+        header_pairs.as_ptr() as *mut _,
+        header_pairs.len(),
         abi::envoy_dynamic_module_type_module_buffer {
           ptr: body_ptr as *mut _,
           length: body_length,
@@ -3028,7 +3028,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64) {
     let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
     let body_length = body.map(|s| s.len()).unwrap_or(0);
-    let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
+    let header_pairs = HeaderPairSlice::from(headers);
     let mut stream_id: u64 = 0;
 
     let result = unsafe {
@@ -3036,8 +3036,8 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
         self.raw_ptr,
         &mut stream_id as *mut _ as *mut _,
         str_to_module_buffer(cluster_name),
-        headers_ptr as *const _ as *mut _,
-        headers_len,
+        header_pairs.as_ptr() as *mut _,
+        header_pairs.len(),
         abi::envoy_dynamic_module_type_module_buffer {
           ptr: body_ptr as *mut _,
           length: body_length,
@@ -3071,13 +3071,13 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     stream_handle: u64,
     trailers: &'a [(&'a str, &'a [u8])],
   ) -> bool {
-    let HeaderPairSlice(trailers_ptr, trailers_len) = trailers.into();
+    let trailer_pairs = HeaderPairSlice::from(trailers);
     unsafe {
       abi::envoy_dynamic_module_callback_http_stream_send_trailers(
         self.raw_ptr,
         stream_handle,
-        trailers_ptr as *const _ as *mut _,
-        trailers_len,
+        trailer_pairs.as_ptr() as *mut _,
+        trailer_pairs.len(),
       )
     }
   }
@@ -3557,12 +3557,12 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   fn recreate_stream<'a>(&mut self, headers: Option<&'a [(&'a str, &'a [u8])]>) -> bool {
     match headers {
       Some(headers) => {
-        let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
+        let header_pairs = HeaderPairSlice::from(headers);
         unsafe {
           abi::envoy_dynamic_module_callback_http_filter_recreate_stream(
             self.raw_ptr,
-            headers_ptr as *mut _,
-            headers_len,
+            header_pairs.as_ptr() as *mut _,
+            header_pairs.len(),
           )
         }
       },
