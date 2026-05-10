@@ -177,8 +177,9 @@ TEST_F(CodecClientTest, DisconnectBeforeHeaders) {
   request_encoder.getStream().addCallbacks(callbacks);
 
   // When we get a remote close with an active request we should try to send zero bytes through
-  // the codec.
-  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectionTermination, _));
+  // the codec. The reason is RemoteConnectionTermination because the close was remote-initiated
+  // on an established connection.
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::RemoteConnectionTermination, _));
   EXPECT_CALL(*codec_, dispatch(_));
   connection_cb_->onEvent(Network::ConnectionEvent::Connected);
   connection_cb_->onEvent(Network::ConnectionEvent::RemoteClose);
@@ -239,7 +240,7 @@ TEST_F(CodecClientTest, IdleTimerClientRemoteCloseWithActiveRequests) {
 
   // When we get a remote close with an active request validate idleTimer is reset after client
   // close
-  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectionTermination, _));
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::RemoteConnectionTermination, _));
   EXPECT_CALL(*codec_, dispatch(_));
   EXPECT_NE(client_->numActiveRequests(), 0);
   connection_cb_->onEvent(Network::ConnectionEvent::Connected);

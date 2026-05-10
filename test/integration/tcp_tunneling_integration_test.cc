@@ -2384,6 +2384,31 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamDisconnectBeforeResponseReceived) {
   tcp_client_->close();
 }
 
+// Verify that when the upstream resets an established CONNECT tunnel (as opposed to a graceful
+// FIN), the reset propagates to the downstream TCP client. This exercises the
+// CodecClient -> HttpUpstream path where the underlying upstream HTTP connection observes a
+// RemoteClose with `connected_` already true; that case maps to `RemoteConnectionTermination`
+// and is in turn mapped by HttpUpstream to RemoteClose + DetectedCloseType::RemoteReset, so the
+// downstream tcp_proxy tears down the client connection rather than just emitting a half-close.
+TEST_P(TcpTunnelingIntegrationTest, UpstreamRstPropagatesAsRemoteReset) {
+  // HTTP/1 upstreams cannot signal connection-level reset distinct from FIN in our test harness.
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    return;
+  }
+  initialize();
+
+  setUpConnection(fake_upstream_connection_);
+  sendBidiData(fake_upstream_connection_);
+
+  // Force a hard reset of the upstream HTTP connection. On platforms that do not support sending
+  // a TCP RST (no SO_LINGER=0 path), this still results in a RemoteClose event with the new
+  // RemoteConnectionTermination reason at the codec level.
+  ASSERT_TRUE(fake_upstream_connection_->close(Network::ConnectionCloseType::AbortReset));
+
+  // The TCP downstream observes the remote-originated termination and disconnects.
+  tcp_client_->waitForDisconnect();
+}
+
 TEST_P(
     TcpTunnelingIntegrationTest,
     ConnectionAttemptRetryOnUpstreamConnectionCloseBeforeResponseHeadersNoBackoffOptionsRetryOnDifferentEventLoop) {

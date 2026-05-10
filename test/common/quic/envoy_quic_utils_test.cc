@@ -311,6 +311,8 @@ TEST(EnvoyQuicUtilsTest, EnvoyResetReasonToQuicResetErrorCode) {
             quic::QUIC_STREAM_CONNECTION_ERROR);
   EXPECT_EQ(envoyResetReasonToQuicRstError(Http::StreamResetReason::ConnectionTermination),
             quic::QUIC_STREAM_CONNECTION_ERROR);
+  EXPECT_EQ(envoyResetReasonToQuicRstError(Http::StreamResetReason::RemoteConnectionTermination),
+            quic::QUIC_STREAM_CONNECTION_ERROR);
   EXPECT_EQ(envoyResetReasonToQuicRstError(Http::StreamResetReason::ConnectError),
             quic::QUIC_STREAM_CONNECT_ERROR);
   EXPECT_EQ(envoyResetReasonToQuicRstError(Http::StreamResetReason::LocalReset),

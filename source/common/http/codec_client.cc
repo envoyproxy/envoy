@@ -130,7 +130,9 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
                                    ? StreamResetReason::RemoteConnectionFailure
                                    : StreamResetReason::LocalConnectionFailure;
     if (connected_) {
-      reason = StreamResetReason::ConnectionTermination;
+      reason = event == Network::ConnectionEvent::RemoteClose
+                   ? StreamResetReason::RemoteConnectionTermination
+                   : StreamResetReason::ConnectionTermination;
       if (protocol_error_) {
         reason = StreamResetReason::ProtocolError;
         connection_->streamInfo().setResponseFlag(

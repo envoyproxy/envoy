@@ -2442,7 +2442,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
     test_server_->waitForCounter("http.config_test.downstream_rq_4xx", Ge(1));
   } else {
     ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
+    EXPECT_EQ(Http::StreamResetReason::RemoteConnectionTermination, response->resetReason());
   }
 }
 
@@ -2495,7 +2495,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
     ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
+    EXPECT_EQ(Http::StreamResetReason::RemoteConnectionTermination, response->resetReason());
   }
 }
 
@@ -5258,7 +5258,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderName) {
     test_server_->waitForCounter("http.config_test.downstream_rq_4xx", Ge(1));
   } else {
     // H/2 codec does not send 400 on protocol errors
-    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
+    EXPECT_EQ(Http::StreamResetReason::RemoteConnectionTermination, response->resetReason());
   }
 }
 
@@ -5780,7 +5780,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidTrailer) {
     ASSERT_TRUE(response->waitForReset());
     codec_client_->close();
     ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
+    EXPECT_EQ(Http::StreamResetReason::RemoteConnectionTermination, response->resetReason());
   }
 
   if (!use_universal_header_validator_) {

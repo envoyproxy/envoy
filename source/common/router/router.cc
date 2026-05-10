@@ -1686,6 +1686,7 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
   case Http::StreamResetReason::ConnectionTimeout:
     return StreamInfo::CoreResponseFlag::UpstreamConnectionFailure;
   case Http::StreamResetReason::ConnectionTermination:
+  case Http::StreamResetReason::RemoteConnectionTermination:
     return StreamInfo::CoreResponseFlag::UpstreamConnectionTermination;
   case Http::StreamResetReason::LocalReset:
   case Http::StreamResetReason::LocalRefusedStreamReset:

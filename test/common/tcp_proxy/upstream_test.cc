@@ -159,6 +159,7 @@ TEST_P(HttpUpstreamTest, UpstreamRemoteResetProducesRemoteClose) {
       Http::StreamResetReason::RemoteReset,
       Http::StreamResetReason::RemoteRefusedStreamReset,
       Http::StreamResetReason::RemoteConnectionFailure,
+      Http::StreamResetReason::RemoteConnectionTermination,
   };
 
   for (const auto reason : remote_reasons) {

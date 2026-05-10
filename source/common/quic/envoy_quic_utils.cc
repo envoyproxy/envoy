@@ -128,6 +128,7 @@ quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetRea
   case Http::StreamResetReason::RemoteConnectionFailure:
   case Http::StreamResetReason::ConnectionTimeout:
   case Http::StreamResetReason::ConnectionTermination:
+  case Http::StreamResetReason::RemoteConnectionTermination:
     return quic::QUIC_STREAM_CONNECTION_ERROR;
   case Http::StreamResetReason::ConnectError:
     return quic::QUIC_STREAM_CONNECT_ERROR;

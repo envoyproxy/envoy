@@ -1334,6 +1334,8 @@ TEST(HttpUtility, ResetReasonToString) {
             Utility::resetReasonToString(Http::StreamResetReason::ConnectionTimeout));
   EXPECT_EQ("connection termination",
             Utility::resetReasonToString(Http::StreamResetReason::ConnectionTermination));
+  EXPECT_EQ("remote connection termination",
+            Utility::resetReasonToString(Http::StreamResetReason::RemoteConnectionTermination));
   EXPECT_EQ("local reset", Utility::resetReasonToString(Http::StreamResetReason::LocalReset));
   EXPECT_EQ("local refused stream reset",
             Utility::resetReasonToString(Http::StreamResetReason::LocalRefusedStreamReset));
