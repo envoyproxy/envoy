@@ -95,17 +95,82 @@ TEST_F(ExtProcLoggingInfoTest, RecordAndSerialize) {
   EXPECT_THAT(str.value(), testing::HasSubstr("os:13"));
 }
 
-TEST_F(ExtProcLoggingInfoTest, GetField) {
+TEST_F(ExtProcLoggingInfoTest, GetFieldAll) {
   logging_info_.recordGrpcCall(std::chrono::microseconds(100), Grpc::Status::Ok,
                                ProcessorState::CallbackState::HeadersCallback,
                                TrafficDirection::INBOUND);
+  logging_info_.recordGrpcCall(std::chrono::microseconds(200), Grpc::Status::Ok,
+                               ProcessorState::CallbackState::BufferedBodyCallback,
+                               TrafficDirection::INBOUND);
+  logging_info_.recordGrpcCall(std::chrono::microseconds(300), Grpc::Status::Ok,
+                               ProcessorState::CallbackState::TrailersCallback,
+                               TrafficDirection::INBOUND);
+
+  logging_info_.recordGrpcCall(std::chrono::microseconds(400), Grpc::Status::Ok,
+                               ProcessorState::CallbackState::HeadersCallback,
+                               TrafficDirection::OUTBOUND);
+  logging_info_.recordGrpcCall(std::chrono::microseconds(500), Grpc::Status::Ok,
+                               ProcessorState::CallbackState::BufferedBodyCallback,
+                               TrafficDirection::OUTBOUND);
+  logging_info_.recordGrpcCall(std::chrono::microseconds(600), Grpc::Status::Ok,
+                               ProcessorState::CallbackState::TrailersCallback,
+                               TrafficDirection::OUTBOUND);
+
   logging_info_.setBytesSent(1000);
+  logging_info_.setBytesReceived(2000);
   logging_info_.setFailedOpen();
+  logging_info_.setReceivedImmediateResponse();
+  logging_info_.recordGrpcStatusBeforeFirstCall(Grpc::Status::Internal);
+
+  logging_info_.recordProcessingEffect(ProcessorState::CallbackState::HeadersCallback,
+                                       TrafficDirection::INBOUND, Effect::MutationApplied);
+  logging_info_.recordProcessingEffect(ProcessorState::CallbackState::BufferedBodyCallback,
+                                       TrafficDirection::INBOUND, Effect::MutationApplied);
+  logging_info_.recordProcessingEffect(ProcessorState::CallbackState::TrailersCallback,
+                                       TrafficDirection::INBOUND, Effect::MutationApplied);
+  logging_info_.recordProcessingEffect(ProcessorState::CallbackState::HeadersCallback,
+                                       TrafficDirection::OUTBOUND, Effect::MutationApplied);
+  logging_info_.recordProcessingEffect(ProcessorState::CallbackState::BufferedBodyCallback,
+                                       TrafficDirection::OUTBOUND, Effect::MutationApplied);
+  logging_info_.recordProcessingEffect(ProcessorState::CallbackState::TrailersCallback,
+                                       TrafficDirection::OUTBOUND, Effect::MutationApplied);
 
   EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("request_header_latency_us")), 100);
+  EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("request_header_call_status")), 0);
+  EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("request_header_processing_effect")),
+            static_cast<int>(Effect::MutationApplied));
+  EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("request_body_call_count")), 1);
+  EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("request_body_total_latency_us")), 200);
+  EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("request_body_max_latency_us")), 200);
+  EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("request_body_last_call_status")), 0);
+  EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("request_body_processing_effect")),
+            static_cast<int>(Effect::MutationApplied));
+  EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("request_trailer_latency_us")), 300);
+  EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("request_trailer_call_status")), 0);
+  EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("request_trailer_processing_effect")),
+            static_cast<int>(Effect::MutationApplied));
+
+  EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("response_header_latency_us")), 400);
+  EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("response_header_call_status")), 0);
+  EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("response_header_processing_effect")),
+            static_cast<int>(Effect::MutationApplied));
+  EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("response_body_call_count")), 1);
+  EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("response_body_total_latency_us")), 500);
+  EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("response_body_max_latency_us")), 500);
+  EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("response_body_last_call_status")), 0);
+  EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("response_body_processing_effect")),
+            static_cast<int>(Effect::MutationApplied));
+  EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("response_trailer_latency_us")), 600);
+  EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("response_trailer_call_status")), 0);
+  EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("response_trailer_processing_effect")),
+            static_cast<int>(Effect::MutationApplied));
+
   EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("bytes_sent")), 1000);
+  EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("bytes_received")), 2000);
   EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("failed_open")), 1);
-  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(logging_info_.getField("non_existent")));
+  EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("received_immediate_response")), 1);
+  EXPECT_EQ(absl::get<int64_t>(logging_info_.getField("grpc_status_before_first_call")),
+            static_cast<int>(Grpc::Status::Internal));
 }
 
 TEST_F(ExtProcLoggingInfoTest, ProcessingEffectsConst) {

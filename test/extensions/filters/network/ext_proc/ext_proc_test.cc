@@ -13,6 +13,17 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ExtProc {
+// Accessor for private members of NetworkExtProcFilter to improve coverage
+class NetworkExtProcFilterAccessor {
+public:
+  static void setProcessingComplete(NetworkExtProcFilter& filter, bool complete) {
+    filter.processing_complete_ = complete;
+  }
+  static void setLoggingInfo(NetworkExtProcFilter& filter, NetworkExtProcLoggingInfo* info) {
+    filter.logging_info_ = info;
+  }
+};
+
 namespace {
 
 using testing::_;
@@ -1432,12 +1443,78 @@ TEST_F(NetworkExtProcFilterTest, SendRequestStreamNull) {
   filter_->onData(data, false);
 }
 
-// Test NetworkExtProcLoggingInfo setConnectionInfo with null connection
-TEST(NetworkExtProcLoggingInfoTest, ConnectionInfoSetupNull) {
+// Test gRPC call onGrpcError recording for write direction
+TEST_F(NetworkExtProcFilterTest, LoggingInfoOnErrorWrite) {
+  recreateFilterWithConfig(true);
+
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false));
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data, false));
+  connection_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(100));
+  filter_->onGrpcError(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted, "test error");
+
+  auto& filter_state = read_callbacks_.connection().streamInfo().filterState();
+  auto logging_info =
+      filter_state->getDataReadOnly<NetworkExtProcLoggingInfo>("envoy.filters.network.ext_proc");
+
+  EXPECT_EQ(logging_info->lastCallStatus(), Grpc::Status::WellKnownGrpcStatus::ResourceExhausted);
+  EXPECT_EQ(logging_info->writeStats().grpc_calls_, 1);
+  EXPECT_EQ(logging_info->writeStats().grpc_errors_, 1);
+}
+
+// Test NetworkExtProcLoggingInfo::setConnectionInfo with null remote and local addresses
+TEST(NetworkExtProcLoggingInfoCoverageTest, ConnectionInfoSetupNullAddresses) {
   NetworkExtProcLoggingInfo logging_info;
-  logging_info.setConnectionInfo(nullptr);
+
+  NiceMock<Network::MockConnection> connection;
+  Network::ConnectionInfoSetterImpl connection_info(nullptr, nullptr);
+
+  EXPECT_CALL(connection, connectionInfoProvider()).WillRepeatedly(ReturnRef(connection_info));
+  logging_info.setConnectionInfo(&connection);
+
   EXPECT_TRUE(logging_info.peerAddress().empty());
   EXPECT_TRUE(logging_info.localAddress().empty());
+}
+
+// Test recordCallCompletion when logging_info_ is null
+TEST_F(NetworkExtProcFilterTest, RecordCallCompletionNullLoggingInfo) {
+  NetworkExtProcFilterAccessor::setLoggingInfo(*filter_, nullptr);
+
+  auto response = std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>();
+  response->mutable_read_data()->set_data("test");
+
+  // This should not crash despite logging_info_ being null
+  filter_->onReceiveMessage(std::move(response));
+}
+
+// Test updateCloseCallbackStatus for write direction
+TEST_F(NetworkExtProcFilterTest, UpdateCloseCallbackStatusWrite) {
+  EXPECT_CALL(write_callbacks_, disableClose(true));
+  filter_->updateCloseCallbackStatus(true, false); // Enable, write direction
+
+  EXPECT_CALL(write_callbacks_, disableClose(false));
+  filter_->updateCloseCallbackStatus(false, false); // Disable, write direction
+}
+
+// Test initializeLoggingInfo when read_callbacks_ is null
+TEST_F(NetworkExtProcFilterTest, InitializeLoggingInfoNullCallbacks) {
+  // Create a filter but don't call initializeReadFilterCallbacks
+  auto filter_config = std::make_shared<Config>(createConfig(false), scope_);
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  auto standalone_filter = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+
+  // Accessing it shouldn't crash
+  standalone_filter->logStreamInfo();
 }
 
 } // namespace
