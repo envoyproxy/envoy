@@ -32,12 +32,10 @@ class IoUringWorkerImpl : public IoUringWorker, private Logger::Loggable<Logger:
 public:
   IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
                     uint32_t read_buffer_size, uint32_t write_timeout_ms,
-                    Event::Dispatcher& dispatcher,
-                    bool enable_multishot_recv = false,
+                    Event::Dispatcher& dispatcher, bool enable_multishot_recv = false,
                     uint32_t multishot_recv_buffer_count = 256);
   IoUringWorkerImpl(IoUringPtr&& io_uring, uint32_t read_buffer_size, uint32_t write_timeout_ms,
-                    Event::Dispatcher& dispatcher,
-                    bool enable_multishot_recv = false,
+                    Event::Dispatcher& dispatcher, bool enable_multishot_recv = false,
                     uint32_t multishot_recv_buffer_count = 256);
   ~IoUringWorkerImpl() override;
 
@@ -45,6 +43,7 @@ public:
   // Sockets created by this worker consult this to choose between the readv path and
   // ``prepareRecvMultishot``.
   bool multishotRecvEnabled() const { return multishot_recv_enabled_; }
+  void disableMultishotRecv() { multishot_recv_enabled_ = false; }
   uint16_t multishotRecvBufGroupId() const { return kMultishotBufGroupId; }
 
   // Wrap a kernel-selected buf-ring buffer in a ``BufferFragmentImpl`` whose release callback
@@ -226,6 +225,9 @@ public:
   Buffer::OwnedImpl& getReadBuffer() { return read_buf_; }
 
 protected:
+  void moveMultishotReadDataToBuffer(uint16_t bid, size_t data_length);
+  void copyMultishotReadBufferForMigration();
+
   // Since the write of IoUringSocket is async, there may have write request is on the fly when
   // close the socket. This timeout is setting for a time to wait the write request done.
   const uint32_t write_timeout_ms_;
@@ -237,6 +239,7 @@ protected:
   // TODO (soulxu): Add water mark here.
   Buffer::OwnedImpl read_buf_;
   absl::optional<int32_t> read_error_;
+  bool read_buf_contains_multishot_fragment_{false};
 
   // TODO (soulxu): We need water mark for write buffer.
   // The upper layer will think the buffer released when the data copy into this write buffer.

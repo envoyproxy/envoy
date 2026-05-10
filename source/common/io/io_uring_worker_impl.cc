@@ -3,6 +3,14 @@
 namespace Envoy {
 namespace Io {
 
+namespace {
+
+bool isUnsupportedMultishotRecvResult(int32_t result) {
+  return result == -EINVAL || result == -EOPNOTSUPP || result == -ENOSYS;
+}
+
+} // namespace
+
 ReadRequest::ReadRequest(IoUringSocket& socket, uint32_t size)
     : Request(RequestType::Read, socket), buf_(std::make_unique<uint8_t[]>(size)),
       iov_(std::make_unique<struct iovec>()) {
@@ -291,9 +299,7 @@ Buffer::BufferFragmentImpl* IoUringWorkerImpl::makeMultishotBufferFragment(uint1
   // Capture ``this`` and ``bid`` by value; the worker is guaranteed to outlive any in-flight
   // BufferFragment because dispatcher / sockets / buffers are torn down before the worker.
   return new Buffer::BufferFragmentImpl(
-      data, len,
-      [this, bid](const void*, size_t,
-                  const Buffer::BufferFragmentImpl* this_fragment) {
+      data, len, [this, bid](const void*, size_t, const Buffer::BufferFragmentImpl* this_fragment) {
         io_uring_->recycleBuffer(kMultishotBufGroupId, bid);
         delete this_fragment;
       });
@@ -310,8 +316,8 @@ void IoUringWorkerImpl::onFileEvent() {
     // For a multishot recv, the kernel reuses the same ``Request*`` across multiple completions
     // until ``IORING_CQE_F_MORE`` is clear. Detect that here so we know whether to free ``req``
     // at the end of the dispatch.
-    const bool keep_req_alive = req->type() == Request::RequestType::RecvMultishot &&
-                                (flags & IORING_CQE_F_MORE) != 0;
+    const bool keep_req_alive =
+        req->type() == Request::RequestType::RecvMultishot && (flags & IORING_CQE_F_MORE) != 0;
 
     switch (req->type()) {
     case Request::RequestType::Accept:
@@ -499,6 +505,24 @@ void IoUringServerSocket::moveReadDataToBuffer(Request* req, size_t data_length)
   read_buf_.addBufferFragment(*fragment);
 }
 
+void IoUringServerSocket::moveMultishotReadDataToBuffer(uint16_t bid, size_t data_length) {
+  read_buf_contains_multishot_fragment_ = true;
+  read_buf_.addBufferFragment(*parent_.makeMultishotBufferFragment(bid, data_length));
+}
+
+void IoUringServerSocket::copyMultishotReadBufferForMigration() {
+  if (!read_buf_contains_multishot_fragment_ || read_buf_.length() == 0) {
+    return;
+  }
+
+  Buffer::OwnedImpl copied_read_buf;
+  const uint64_t bytes_to_copy = read_buf_.length();
+  copied_read_buf.add(read_buf_);
+  read_buf_.drain(bytes_to_copy);
+  read_buf_.move(copied_read_buf);
+  read_buf_contains_multishot_fragment_ = false;
+}
+
 void IoUringServerSocket::onReadCompleted(int32_t result) {
   ENVOY_LOG(trace, "read from socket, fd = {}, result = {}", fd_, result);
   ReadParam param{read_buf_, result};
@@ -513,17 +537,16 @@ void IoUringServerSocket::onReadCompleted(int32_t result) {
 void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected, uint32_t flags) {
   IoUringSocketEntry::onRead(req, result, injected, flags);
 
-  ENVOY_LOG(
-      trace,
-      "onRead with result {}, fd = {}, injected = {}, status_ = {}, enable_close_event = {}, "
-      "flags = {:#x}",
-      result, fd_, injected, static_cast<int>(status_), enable_close_event_, flags);
+  ENVOY_LOG(trace,
+            "onRead with result {}, fd = {}, injected = {}, status_ = {}, enable_close_event = {}, "
+            "flags = {:#x}",
+            result, fd_, injected, static_cast<int>(status_), enable_close_event_, flags);
 
   // For a multishot completion, ``read_req_`` is only cleared when the SQE has terminated
   // (``IORING_CQE_F_MORE`` clear). While the SQE is still armed the same ``Request*`` is reused
-  // by the kernel for further completions, so leaving ``read_req_`` set causes ``submitReadRequest``
-  // below to short-circuit.
-  const bool is_multishot = req->type() == Request::RequestType::RecvMultishot;
+  // by the kernel for further completions, so leaving ``read_req_`` set causes
+  // ``submitReadRequest`` below to short-circuit.
+  const bool is_multishot = req != nullptr && req->type() == Request::RequestType::RecvMultishot;
   const bool sqe_terminated = !is_multishot || (flags & IORING_CQE_F_MORE) == 0;
   if (!injected && sqe_terminated) {
     read_req_ = nullptr;
@@ -533,7 +556,7 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected, ui
       if (result > 0 && keep_fd_open_) {
         if (is_multishot && (flags & IORING_CQE_F_BUFFER)) {
           const uint16_t bid = static_cast<uint16_t>(flags >> IORING_CQE_BUFFER_SHIFT);
-          read_buf_.addBufferFragment(*parent_.makeMultishotBufferFragment(bid, result));
+          moveMultishotReadDataToBuffer(bid, result);
         } else {
           moveReadDataToBuffer(req, result);
         }
@@ -543,13 +566,24 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected, ui
     }
   }
 
+  if (is_multishot && sqe_terminated && isUnsupportedMultishotRecvResult(result)) {
+    ENVOY_LOG(warn,
+              "io_uring recv multishot unsupported for fd = {}, result = {}; falling back to readv",
+              fd_, result);
+    parent_.disableMultishotRecv();
+    if (status_ == ReadEnabled || status_ == ReadDisabled) {
+      submitReadRequest();
+    }
+    return;
+  }
+
   // Move read data from request to buffer or store the error.
   if (result > 0) {
     if (is_multishot) {
       ASSERT(flags & IORING_CQE_F_BUFFER, "multishot recv completed with data but no buffer flag");
       const uint16_t bid = static_cast<uint16_t>(flags >> IORING_CQE_BUFFER_SHIFT);
       ENVOY_LOG(trace, "multishot recv: bid = {}, bytes = {}, fd = {}", bid, result, fd_);
-      read_buf_.addBufferFragment(*parent_.makeMultishotBufferFragment(bid, result));
+      moveMultishotReadDataToBuffer(bid, result);
     } else {
       moveReadDataToBuffer(req, result);
     }
@@ -690,6 +724,7 @@ void IoUringServerSocket::onShutdown(Request* req, int32_t result, bool injected
 
 void IoUringServerSocket::closeInternal() {
   if (keep_fd_open_) {
+    copyMultishotReadBufferForMigration();
     if (on_closed_cb_) {
       on_closed_cb_(read_buf_);
     }
