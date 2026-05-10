@@ -1286,14 +1286,19 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
     if (upstream_) {
       getStreamInfo().upstreamInfo()->setUpstreamLocalCloseReason(upstream_->localCloseReason());
     }
-    // Capture upstream detected close type before upstream is moved/reset.
+    // Capture upstream detected close type before upstream is moved/reset, and propagate it to
+    // the downstream stream info so it is reflected in access logs (e.g.
+    // %UPSTREAM_DETECTED_CLOSE_TYPE%) regardless of which upstream implementation
+    // (HttpUpstream / CombinedUpstream / direct TCP) produced it.
     const auto upstream_detected_close_type =
         upstream_ ? upstream_->detectedCloseType() : StreamInfo::DetectedCloseType::Normal;
+    if (upstream_) {
+      getStreamInfo().upstreamInfo()->setUpstreamDetectedCloseType(upstream_detected_close_type);
+    }
     if (Runtime::runtimeFeatureEnabled(
             "envoy.restart_features.upstream_http_filters_with_tcp_proxy")) {
       read_callbacks_->connection().dispatcher().deferredDelete(std::move(upstream_));
     } else if (upstream_) {
-      getStreamInfo().upstreamInfo()->setUpstreamDetectedCloseType(upstream_detected_close_type);
       upstream_.reset();
     }
     disableIdleTimer();

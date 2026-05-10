@@ -46,14 +46,16 @@ minor_behavior_changes:
 - area: http
   change: |
     Added a new ``Http::StreamResetReason::RemoteConnectionTermination`` reset reason. The HTTP
-    ``CodecClient`` now emits it (instead of ``ConnectionTermination``) when an established
-    upstream connection is closed by the remote peer, allowing downstream consumers (notably
-    HTTP CONNECT/upgrade tunneling in ``tcp_proxy``) to distinguish a remote-initiated termination
-    from a local one. Routing, retry classification, and the ``UC`` response flag are unchanged.
-    For HTTP CONNECT/upgrade tunnels, when ``envoy.reloadable_features.map_http_stream_reset_to_tcp_rst``
-    is enabled, this new reason is mapped to ``RemoteClose`` with ``DetectedCloseType::RemoteReset``
-    so a TCP RST is propagated to the downstream client (matching the existing remote reset
-    handling for other remote-originated reasons).
+    ``CodecClient`` and the QUIC remote-reset path now emit it (instead of ``ConnectionTermination``)
+    when an established upstream connection is closed by the remote peer, so that downstream
+    consumers (notably HTTP CONNECT/upgrade tunneling in ``tcp_proxy``) can distinguish a
+    remote-initiated termination from a local one. Routing, retry classification, and the ``UC``
+    response flag are unchanged. For HTTP CONNECT/upgrade tunnels (both the legacy
+    ``HttpUpstream`` and the upstream-HTTP-filters ``CombinedUpstream`` path), this new reason
+    maps to ``RemoteClose`` with ``DetectedCloseType::RemoteReset`` so a TCP RST is propagated to
+    the downstream client, matching the existing remote-reset handling for other remote-originated
+    reasons. This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.map_http_stream_reset_to_tcp_rst`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
