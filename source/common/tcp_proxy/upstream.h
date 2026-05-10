@@ -402,6 +402,9 @@ private:
   std::unique_ptr<HttpConnPool::Callbacks> conn_pool_callbacks_;
   bool read_half_closed_{};
   bool write_half_closed_{};
+  // Set in onUpstreamReset() based on the reset reason. tcp_proxy reads this via
+  // detectedCloseType() to decide whether to propagate a TCP RST to the downstream.
+  StreamInfo::DetectedCloseType detected_close_type_{StreamInfo::DetectedCloseType::Normal};
   // upstream_request_ has to be destroyed first as they may use CombinedUpstream parent
   // during destruction.
   UpstreamRequestPtr upstream_request_;

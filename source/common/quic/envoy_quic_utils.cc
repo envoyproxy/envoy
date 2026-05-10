@@ -176,7 +176,10 @@ Http::StreamResetReason quicRstErrorToEnvoyRemoteResetReason(quic::QuicRstStream
   case quic::QUIC_REFUSED_STREAM:
     return Http::StreamResetReason::RemoteRefusedStreamReset;
   case quic::QUIC_STREAM_CONNECTION_ERROR:
-    return Http::StreamResetReason::ConnectionTermination;
+    // Peer signaled that the stream was reset because the connection is being torn down by the
+    // peer. Use the remote-specific termination reason so downstream tcp_proxy can map this to
+    // a TCP RST when tunneling.
+    return Http::StreamResetReason::RemoteConnectionTermination;
   case quic::QUIC_STREAM_CONNECT_ERROR:
     return Http::StreamResetReason::ConnectError;
   case quic::QUIC_STREAM_NO_ERROR:
@@ -215,7 +218,10 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
   case quic::QUIC_HANDSHAKE_TIMEOUT:
     return Http::StreamResetReason::RemoteConnectionFailure;
   default:
-    return Http::StreamResetReason::ConnectionTermination;
+    // Peer-originated connection close after the connection was established. Use the
+    // remote-specific termination reason so downstream tcp_proxy can map this to a TCP RST
+    // when tunneling.
+    return Http::StreamResetReason::RemoteConnectionTermination;
   }
 }
 

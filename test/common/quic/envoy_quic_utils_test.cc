@@ -338,11 +338,25 @@ TEST(EnvoyQuicUtilsTest, QuicResetErrorToEnvoyResetReason) {
   EXPECT_EQ(quicRstErrorToEnvoyLocalResetReason(quic::QUIC_STREAM_CANCELLED),
             Http::StreamResetReason::LocalReset);
   EXPECT_EQ(quicRstErrorToEnvoyRemoteResetReason(quic::QUIC_STREAM_CONNECTION_ERROR),
-            Http::StreamResetReason::ConnectionTermination);
+            Http::StreamResetReason::RemoteConnectionTermination);
   EXPECT_EQ(quicRstErrorToEnvoyRemoteResetReason(quic::QUIC_STREAM_CONNECT_ERROR),
             Http::StreamResetReason::ConnectError);
   EXPECT_EQ(quicRstErrorToEnvoyRemoteResetReason(quic::QUIC_STREAM_CANCELLED),
             Http::StreamResetReason::RemoteReset);
+}
+
+TEST(EnvoyQuicUtilsTest, QuicErrorCodeToEnvoyRemoteResetReason) {
+  EXPECT_EQ(quicErrorCodeToEnvoyRemoteResetReason(quic::QUIC_HANDSHAKE_FAILED),
+            Http::StreamResetReason::RemoteConnectionFailure);
+  EXPECT_EQ(quicErrorCodeToEnvoyRemoteResetReason(quic::QUIC_HANDSHAKE_TIMEOUT),
+            Http::StreamResetReason::RemoteConnectionFailure);
+  // Default for any other peer-originated connection close after the connection was established.
+  EXPECT_EQ(quicErrorCodeToEnvoyRemoteResetReason(quic::QUIC_NO_ERROR),
+            Http::StreamResetReason::RemoteConnectionTermination);
+  EXPECT_EQ(quicErrorCodeToEnvoyRemoteResetReason(quic::QUIC_PACKET_WRITE_ERROR),
+            Http::StreamResetReason::RemoteConnectionTermination);
+  EXPECT_EQ(quicErrorCodeToEnvoyRemoteResetReason(quic::QUIC_NETWORK_IDLE_TIMEOUT),
+            Http::StreamResetReason::RemoteConnectionTermination);
 }
 
 TEST(EnvoyQuicUtilsTest, CreateConnectionSocket) {

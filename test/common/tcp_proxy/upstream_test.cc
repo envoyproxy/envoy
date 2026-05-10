@@ -842,6 +842,53 @@ TEST_F(CombinedUpstreamTest, UpstreamTrailersMarksDoneReading) {
   this->upstream_->responseDecoder().decodeTrailers(std::move(trailers));
 }
 
+// Verify that CombinedUpstream::onUpstreamReset propagates remote-originated reset reasons as
+// DetectedCloseType::RemoteReset so tcp_proxy can RST the downstream.
+TEST_F(CombinedUpstreamTest, OnUpstreamRemoteResetMapsToRemoteReset) {
+  this->setup();
+  const Http::StreamResetReason remote_reasons[] = {
+      Http::StreamResetReason::RemoteReset,
+      Http::StreamResetReason::RemoteRefusedStreamReset,
+      Http::StreamResetReason::RemoteConnectionFailure,
+      Http::StreamResetReason::RemoteConnectionTermination,
+  };
+  for (const auto reason : remote_reasons) {
+    EXPECT_CALL(this->callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
+    auto mock_conn_pool = std::make_unique<NiceMock<Router::MockGenericConnPool>>();
+    std::unique_ptr<Router::GenericConnPool> generic_conn_pool = std::move(mock_conn_pool);
+    auto mock_upst = std::make_unique<NiceMock<Router::MockUpstreamRequest>>(
+        *this->upstream_, std::move(generic_conn_pool));
+    this->upstream_->onUpstreamReset(reason, "", *mock_upst);
+    EXPECT_EQ(this->upstream_->detectedCloseType(), StreamInfo::DetectedCloseType::RemoteReset);
+    // Reset for next iteration.
+    this->upstream_ = std::make_unique<CombinedUpstream>(
+        *conn_pool_, callbacks_, decoder_callbacks_, *tunnel_config_, downstream_stream_info_);
+  }
+}
+
+// Verify that CombinedUpstream::onUpstreamReset reports DetectedCloseType::Normal for
+// Envoy-originated reset reasons (so tcp_proxy emits a graceful close, not RST).
+TEST_F(CombinedUpstreamTest, OnUpstreamLocalResetReportsNormal) {
+  this->setup();
+  const Http::StreamResetReason local_reasons[] = {
+      Http::StreamResetReason::LocalReset,
+      Http::StreamResetReason::LocalRefusedStreamReset,
+      Http::StreamResetReason::ConnectionTermination,
+      Http::StreamResetReason::LocalConnectionFailure,
+  };
+  for (const auto reason : local_reasons) {
+    EXPECT_CALL(this->callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
+    auto mock_conn_pool = std::make_unique<NiceMock<Router::MockGenericConnPool>>();
+    std::unique_ptr<Router::GenericConnPool> generic_conn_pool = std::move(mock_conn_pool);
+    auto mock_upst = std::make_unique<NiceMock<Router::MockUpstreamRequest>>(
+        *this->upstream_, std::move(generic_conn_pool));
+    this->upstream_->onUpstreamReset(reason, "", *mock_upst);
+    EXPECT_EQ(this->upstream_->detectedCloseType(), StreamInfo::DetectedCloseType::Normal);
+    this->upstream_ = std::make_unique<CombinedUpstream>(
+        *conn_pool_, callbacks_, decoder_callbacks_, *tunnel_config_, downstream_stream_info_);
+  }
+}
+
 } // namespace
 } // namespace TcpProxy
 } // namespace Envoy
