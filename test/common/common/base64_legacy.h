@@ -1,5 +1,11 @@
 #pragma once
 
+// Copied from source/common/common/base64.h prior to PR #44915 to verify
+// functional equivalence with the refactored implementation. Tests can be
+// found at:
+// test/common/common/base64_fuzz_test.cc
+// test/common/common/base64_speed_test.cc
+
 #include <cstdint>
 #include <string>
 

@@ -3,10 +3,8 @@
 #include <cstdint>
 #include <string>
 
-#include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 
-#include "absl/container/fixed_array.h"
 #include "absl/strings/escaping.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
@@ -47,9 +45,9 @@ std::string decodeHelper(absl::string_view input, const unsigned char* lookup_ta
   }
 
   // Strip up to two trailing '=' characters.
-  size_t n = input.length();
-  size_t count = (input[n - 1] == '=') + (n >= 2 && input[n - 2] == '=');
-  size_t real_chars = n - count;
+  const size_t n = input.length();
+  const size_t count = (input[n - 1] == '=') + (n >= 2 && input[n - 2] == '=');
+  const size_t real_chars = n - count;
 
   // A base64 string with length % 4 == 1 is structurally invalid
   if (real_chars % 4 == 1) {
@@ -58,7 +56,7 @@ std::string decodeHelper(absl::string_view input, const unsigned char* lookup_ta
 
   // Validate the trailing bits of the last real character.
   if (real_chars > 0) {
-    uint8_t last_value = lookup_table[static_cast<uint8_t>(input[real_chars - 1])];
+    const uint8_t last_value = lookup_table[static_cast<uint8_t>(input[real_chars - 1])];
     if (last_value == 64) {
       return EMPTY_STRING;
     }
@@ -78,7 +76,7 @@ std::string decodeHelper(absl::string_view input, const unsigned char* lookup_ta
     return EMPTY_STRING;
   }
 
-  // If abseil decoded fewer bytes than expected, we must reject the entire input.
+  // If abseil decodes the wrong number of bytes, we must reject the entire input.
   size_t expected_length = real_chars * 3 / 4;
   if (ret.length() != expected_length) {
     return EMPTY_STRING;
@@ -99,6 +97,8 @@ std::string Base64::decodeWithoutPadding(absl::string_view input) {
   return decodeHelper(input, REVERSE_LOOKUP_TABLE, absl::Base64Unescape);
 }
 
+// TODO: Remove this overload. Callers should use the char* or string_view alternatives to avoid the
+// intermediate copy.
 std::string Base64::encode(const Buffer::Instance& buffer, uint64_t length) {
   size_t encode_length = std::min(length, buffer.length());
   std::string ret;
@@ -121,9 +121,9 @@ std::string Base64::encode(const char* input, uint64_t length, bool add_padding)
 
   if (!add_padding) {
     // Remove trailing '='
-    while (!ret.empty() && ret.back() == '=') {
-      ret.pop_back();
-    }
+    const size_t n = ret.size();
+    const size_t count = (n >= 1 && ret[n - 1] == '=') + (n >= 2 && ret[n - 2] == '=');
+    ret.resize(n - count);
   }
   return ret;
 }
@@ -138,7 +138,8 @@ void Base64::completePadding(std::string& encoded) {
 std::string Base64Url::decode(absl::string_view input) {
   // URL decoding does not accept any padding
   if (!input.empty()) {
-    uint8_t last_value = URL_REVERSE_LOOKUP_TABLE[static_cast<uint8_t>(input[input.size() - 1])];
+    const uint8_t last_value =
+        URL_REVERSE_LOOKUP_TABLE[static_cast<uint8_t>(input[input.size() - 1])];
     if (last_value == 64) {
       return EMPTY_STRING;
     }
