@@ -338,7 +338,7 @@ public:
 
   static DataInputGetResult
   NoData(DataAvailability data_availability = DataAvailability::AllDataAvailable) {
-    return DataInputGetResult(absl::monostate(), data_availability);
+    return {absl::monostate(), data_availability};
   }
 
   /**
@@ -348,19 +348,19 @@ public:
   static DataInputGetResult
   CreateStringView(absl::string_view data,
                    DataAvailability data_availability = DataAvailability::AllDataAvailable) {
-    return DataInputGetResult(data, data_availability);
+    return {data, data_availability};
   }
 
   static DataInputGetResult
   CreateString(std::string&& data,
                DataAvailability data_availability = DataAvailability::AllDataAvailable) {
-    return DataInputGetResult(std::move(data), data_availability);
+    return {std::move(data), data_availability};
   }
 
   static DataInputGetResult
   CreateCustom(std::shared_ptr<CustomMatchData>&& data,
                DataAvailability data_availability = DataAvailability::AllDataAvailable) {
-    return DataInputGetResult(std::move(data), data_availability);
+    return {std::move(data), data_availability};
   }
 
 private:

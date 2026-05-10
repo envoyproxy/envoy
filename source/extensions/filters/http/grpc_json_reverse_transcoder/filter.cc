@@ -105,8 +105,9 @@ bool ReadToBuffer(Protobuf::io::ZeroCopyInputStream& stream, Buffer::Instance& b
   const void* out;
   int size;
   while (stream.Next(&out, &size)) {
-    if (size == 0)
+    if (size == 0) {
       return true;
+    }
     buffer.add(out, size);
   }
   return false;
@@ -192,8 +193,9 @@ bool GrpcJsonReverseTranscoderFilter::EncoderBufferLimitReached(uint64_t buffer_
 
 bool GrpcJsonReverseTranscoderFilter::CheckAndRejectIfRequestTranscoderFailed() const {
   const auto& status = transcoder_->RequestStatus();
-  if (status.ok())
+  if (status.ok()) {
     return false;
+  }
   decoder_callbacks_->sendLocalReply(
       Code::BadRequest, status.message(), nullptr, Status::WellKnownGrpcStatus::InvalidArgument,
       absl::StrCat(RcDetails::get().grpc_transcode_failed, "{",
@@ -204,8 +206,9 @@ bool GrpcJsonReverseTranscoderFilter::CheckAndRejectIfRequestTranscoderFailed() 
 
 bool GrpcJsonReverseTranscoderFilter::CheckAndRejectIfResponseTranscoderFailed() const {
   const auto& status = transcoder_->ResponseStatus();
-  if (status.ok())
+  if (status.ok()) {
     return false;
+  }
   ENVOY_STREAM_LOG(error, "Response transcoding failed: {}", *encoder_callbacks_, status.message());
   encoder_callbacks_->sendLocalReply(
       Code::InternalServerError, status.message(), nullptr, Status::WellKnownGrpcStatus::Internal,

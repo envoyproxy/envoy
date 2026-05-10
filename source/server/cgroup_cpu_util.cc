@@ -405,8 +405,9 @@ absl::optional<std::string> CgroupCpuUtil::discoverCgroupMount(Filesystem::Insta
       }
       line = line.substr(space_pos + 1);
     }
-    if (!line_valid)
+    if (!line_valid) {
       continue;
+    }
 
     // (5) mount point: extract mount point
     size_t mount_end = line.find(' ');
@@ -441,8 +442,9 @@ absl::optional<std::string> CgroupCpuUtil::discoverCgroupMount(Filesystem::Insta
       }
       line = line.substr(space_pos + 1);
     }
-    if (!line_valid || !separator_found)
+    if (!line_valid || !separator_found) {
       continue;
+    }
 
     // (9) filesystem type: extract filesystem type
     size_t fs_type_end = line.find(' ');

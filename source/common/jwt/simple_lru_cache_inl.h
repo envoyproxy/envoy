@@ -37,8 +37,6 @@
 
 #pragma once
 
-#include <stddef.h>
-
 #include <cassert>
 #include <chrono>
 #include <cmath>
@@ -167,8 +165,9 @@ template <typename Key, typename Value> struct SimpleLRUCacheElem {
   }
 
   void unlink() {
-    if (!isLinked())
+    if (!isLinked()) {
       return;
+    }
     prev->next = next;
     next->prev = prev;
     prev = nullptr;
@@ -248,8 +247,9 @@ public:
           value_(cache_->lookupWithOptions(key_, options_)) {}
 
     ~ScopedLookup() {
-      if (value_ != nullptr)
+      if (value_ != nullptr) {
         cache_->releaseWithOptions(key_, value_, options_);
+      }
     }
     const Key& key() const { return key_; }
     Value* value() const { return value_; }
@@ -391,8 +391,9 @@ public:
   // Remove all entries which have exceeded their max idle time or age
   // set using setMaxIdleSeconds() or setAgeBasedEviction() respectively.
   void removeExpiredEntries() {
-    if (max_idle_ >= 0)
+    if (max_idle_ >= 0) {
       discardIdle(max_idle_);
+    }
   }
 
   // Return current size of cache
@@ -608,8 +609,9 @@ template <class Key, class Value, class MapType, class EQ>
 void SimpleLRUCacheBase<Key, Value, MapType, EQ>::removeUnpinned() {
   for (Elem* e = head_.next; e != &head_;) {
     Elem* next = e->next;
-    if (e->pin == 0)
+    if (e->pin == 0) {
       remove(e->key);
+    }
     e = next;
   }
 }
@@ -650,8 +652,9 @@ Value* SimpleLRUCacheBase<Key, Value, MapType, EQ>::lookupWithOptions(
       pinned_units_ += e->units;
       // We are pinning this entry, take it off the LRU list if we are in LRU
       // mode. In strict age-based mode entries stay on the list while pinned.
-      if (lru_ && options.update_eviction_order())
+      if (lru_ && options.update_eviction_order()) {
         e->unlink();
+      }
     }
     e->pin++;
     return e->value;
@@ -707,8 +710,9 @@ void SimpleLRUCacheBase<Key, Value, MapType, EQ>::releaseWithOptions(
     e->pin--;
 
     if (e->pin == 0) {
-      if (lru_ && options.update_eviction_order())
+      if (lru_ && options.update_eviction_order()) {
         e->link(&head_);
+      }
       pinned_units_ -= e->units;
       if (isOverfullInternal()) {
         // This element is no longer needed, and we are full. So kick it out.
@@ -735,8 +739,9 @@ void SimpleLRUCacheBase<Key, Value, MapType, EQ>::insertPinned(const Key& k, Val
   // If we are in the strict age-based eviction mode, the entry goes on the LRU
   // list now and is never removed. In the LRU mode, the list will only contain
   // unpinned entries.
-  if (!lru_)
+  if (!lru_) {
     e->link(&head_);
+  }
   garbageCollect();
 }
 
@@ -793,8 +798,9 @@ bool SimpleLRUCacheBase<Key, Value, MapType, EQ>::inDeferredTable(const Key& k,
     const Elem* const head = iter->second;
     const Elem* e = head;
     do {
-      if (e->value == value || value == nullptr)
+      if (e->value == value || value == nullptr) {
         return true;
+      }
       e = e->prev;
     } while (e != head);
   }
@@ -858,8 +864,9 @@ static const int kAcceptableClockSynchronizationDriftCycles = 1;
 
 template <class Key, class Value, class MapType, class EQ>
 void SimpleLRUCacheBase<Key, Value, MapType, EQ>::discardIdle(int64_t max_idle) {
-  if (max_idle < 0)
+  if (max_idle < 0) {
     return;
+  }
 
   Elem* e = head_.prev;
   const int64_t threshold = SimpleCycleTimer::now() - max_idle;
@@ -928,8 +935,9 @@ int64_t SimpleLRUCacheBase<Key, Value, MapType, EQ>::deferredEntries() const {
 
 template <class Key, class Value, class MapType, class EQ>
 int64_t SimpleLRUCacheBase<Key, Value, MapType, EQ>::ageOfLRUItemInMicroseconds() const {
-  if (head_.prev == &head_)
+  if (head_.prev == &head_) {
     return 0;
+  }
   return kSecToUsec * (SimpleCycleTimer::now() - head_.prev->last_use_) /
          SimpleCycleTimer::frequency();
 }
@@ -939,8 +947,9 @@ int64_t SimpleLRUCacheBase<Key, Value, MapType, EQ>::getLastUseTime(const Key& k
   // getLastUseTime works only in LRU mode
   assert(lru_);
   TableConstIterator iter = table_.find(k);
-  if (iter == table_.end())
+  if (iter == table_.end()) {
     return -1;
+  }
   const Elem* e = iter->second;
   return e->last_use_;
 }
@@ -950,8 +959,9 @@ int64_t SimpleLRUCacheBase<Key, Value, MapType, EQ>::getInsertionTime(const Key&
   // getInsertionTime works only in age-based mode
   assert(!lru_);
   TableConstIterator iter = table_.find(k);
-  if (iter == table_.end())
+  if (iter == table_.end()) {
     return -1;
+  }
   const Elem* e = iter->second;
   return e->last_use_;
 }

@@ -1818,6 +1818,7 @@ void ConnectionImpl::onProtocolConstraintViolation() {
 
 void ConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
   // Notify the streams based on least recently encoding to the connection.
+  // NOLINTNEXTLINE(modernize-loop-convert)
   for (auto it = active_streams_.rbegin(); it != active_streams_.rend(); ++it) {
     (*it)->runLowWatermarkCallbacks();
   }

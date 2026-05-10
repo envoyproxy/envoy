@@ -248,6 +248,7 @@ void InstanceImpl::shutdownThread() {
   //                     number than the first. This is an edge case that does not exist anywhere
   //                     in the code today, but we can keep this in mind if things become more
   //                     complicated in the future.
+  // NOLINTNEXTLINE(modernize-loop-convert)
   for (auto it = thread_local_data_.data_.rbegin(); it != thread_local_data_.data_.rend(); ++it) {
     it->reset();
   }
