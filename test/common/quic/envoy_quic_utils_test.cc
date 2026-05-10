@@ -2,6 +2,7 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "test/mocks/api/mocks.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -357,6 +358,22 @@ TEST(EnvoyQuicUtilsTest, QuicErrorCodeToEnvoyRemoteResetReason) {
             Http::StreamResetReason::RemoteConnectionTermination);
   EXPECT_EQ(quicErrorCodeToEnvoyRemoteResetReason(quic::QUIC_NETWORK_IDLE_TIMEOUT),
             Http::StreamResetReason::RemoteConnectionTermination);
+}
+
+// With the runtime guard disabled, the QUIC remote-reset paths must fall back to the legacy
+// ``ConnectionTermination`` reason, preserving pre-existing behavior for downstream consumers.
+TEST(EnvoyQuicUtilsTest, QuicRemoteResetReasonsWithGuardDisabled) {
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime(
+      {{"emit_remote_connection_termination", false}});
+  EXPECT_EQ(quicRstErrorToEnvoyRemoteResetReason(quic::QUIC_STREAM_CONNECTION_ERROR),
+            Http::StreamResetReason::ConnectionTermination);
+  EXPECT_EQ(quicErrorCodeToEnvoyRemoteResetReason(quic::QUIC_NO_ERROR),
+            Http::StreamResetReason::ConnectionTermination);
+  EXPECT_EQ(quicErrorCodeToEnvoyRemoteResetReason(quic::QUIC_PACKET_WRITE_ERROR),
+            Http::StreamResetReason::ConnectionTermination);
+  // The remote-connection-failure cases (which already use a different reason) are unaffected.
+  EXPECT_EQ(quicErrorCodeToEnvoyRemoteResetReason(quic::QUIC_HANDSHAKE_FAILED),
+            Http::StreamResetReason::RemoteConnectionFailure);
 }
 
 TEST(EnvoyQuicUtilsTest, CreateConnectionSocket) {

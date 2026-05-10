@@ -179,7 +179,10 @@ Http::StreamResetReason quicRstErrorToEnvoyRemoteResetReason(quic::QuicRstStream
     // Peer signaled that the stream was reset because the connection is being torn down by the
     // peer. Use the remote-specific termination reason so downstream tcp_proxy can map this to
     // a TCP RST when tunneling.
-    return Http::StreamResetReason::RemoteConnectionTermination;
+    return Runtime::runtimeFeatureEnabled(
+               "envoy.reloadable_features.emit_remote_connection_termination")
+               ? Http::StreamResetReason::RemoteConnectionTermination
+               : Http::StreamResetReason::ConnectionTermination;
   case quic::QUIC_STREAM_CONNECT_ERROR:
     return Http::StreamResetReason::ConnectError;
   case quic::QUIC_STREAM_NO_ERROR:
@@ -221,7 +224,10 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
     // Peer-originated connection close after the connection was established. Use the
     // remote-specific termination reason so downstream tcp_proxy can map this to a TCP RST
     // when tunneling.
-    return Http::StreamResetReason::RemoteConnectionTermination;
+    return Runtime::runtimeFeatureEnabled(
+               "envoy.reloadable_features.emit_remote_connection_termination")
+               ? Http::StreamResetReason::RemoteConnectionTermination
+               : Http::StreamResetReason::ConnectionTermination;
   }
 }
 

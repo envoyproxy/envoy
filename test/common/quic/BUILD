@@ -346,6 +346,7 @@ envoy_cc_test(
         "//source/common/quic:envoy_quic_utils_lib",
         "//source/common/runtime:runtime_lib",
         "//test/mocks/api:api_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@quiche//:quic_test_tools_test_utils_lib",
     ]),
