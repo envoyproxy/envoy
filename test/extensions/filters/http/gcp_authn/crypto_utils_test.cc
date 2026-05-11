@@ -77,8 +77,9 @@ TEST_F(CryptoUtilsTest, GetBase64EncodedCertificateFingerprintSuccess) {
   ASSERT_TRUE(fingerprint.ok());
   // SHA256 fingerprint of
   // test/config/integration/certs/clientcert.pem
-  // Base64 (unpadded): wH4U/EO5x7PZLxAE+R06ngcdnJOlivx2tMFDA646DzQ
+  // SPELLCHECKER(off)
   EXPECT_EQ(fingerprint.value(), "wH4U/EO5x7PZLxAE+R06ngcdnJOlivx2tMFDA646DzQ");
+  // SPELLCHECKER(on)
 }
 
 TEST_F(CryptoUtilsTest, GetBase64EncodedCertificateFingerprintNoSecret) {
