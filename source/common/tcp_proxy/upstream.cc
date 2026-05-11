@@ -663,6 +663,11 @@ void CombinedUpstream::onUpstreamReset(Http::StreamResetReason reason, absl::str
       detected_close_type_ = StreamInfo::DetectedCloseType::Normal;
       break;
     }
+  } else {
+    // When the guard is disabled, behave like the pre-feature CombinedUpstream and always
+    // report Normal, matching HttpUpstream::onResetStream's else branch so the disabled-guard
+    // path is not order-dependent across repeated resets.
+    detected_close_type_ = StreamInfo::DetectedCloseType::Normal;
   }
   upstream_callbacks_.onEvent(Network::ConnectionEvent::RemoteClose);
 }
