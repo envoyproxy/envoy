@@ -288,7 +288,7 @@ Envoy will run *envoy_on_response* as a coroutine, passing a handle to the
 .. _config_http_filters_lua_request_handle_api:
 
 Request handle API
-~~~~~~~~~~~~~~~~~~
+------------------
 
 The following methods are available on the request handle passed to ``envoy_on_request``.
 
@@ -738,25 +738,23 @@ available methods.
 
 .. _config_http_filters_lua_response_handle_api:
 
-Response handle API
--------------------
+.. note::
 
-The response handle passed to ``envoy_on_response`` supports all of the same methods as the
-:ref:`request handle <config_http_filters_lua_request_handle_api>`, with the following
-differences:
-
-- ``respond()`` is **not** available on the response handle.
-- ``downstreamRequestHeaders()`` is available exclusively on the response handle.
+   The response handle passed to ``envoy_on_response`` supports all of the same methods listed
+   above, with two exceptions: ``respond()`` is not available on the response handle, and
+   ``downstreamRequestHeaders()`` (documented below) is available **only** on the response handle.
 
 ``downstreamRequestHeaders()``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
   local request_headers = handle:downstreamRequestHeaders()
 
-Returns the original downstream request headers. The returned handle is **read-only**; any attempt
-to modify it will result in a script error.
+Returns the original downstream request headers during response processing. This method is only
+available on the response handle passed to ``envoy_on_response``; it is not present on the request
+handle. The returned handle is **read-only**; any attempt to modify it will result in a script
+error.
 
 Returns ``nil`` if request headers are not available. This occurs when the response is generated
 before the downstream request headers have been fully received — for example, when Envoy produces
