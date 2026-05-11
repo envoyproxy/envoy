@@ -29,6 +29,8 @@ jobs:
     uses: ./.github/workflows/_load_env.yml
 
   android-release:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
       actions: read
       contents: read
@@ -161,6 +163,8 @@ jobs:
             ${{ matrix.output }}-javadoc.jar.asc
 
   python-release:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
       actions: read
       contents: read
@@ -236,4 +240,4 @@ jobs:
         name: python-wheel
         path: dist/
     - name: Publish to PyPi
-      uses: pypa/gh-action-pypi-publish@release/v1
+      uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b  # release/v1.14

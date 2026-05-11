@@ -54,7 +54,7 @@ envoy_cc_library(
         "//envoy/stats:stats_macros",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/common:non_copyable",
-        "//source/common/config:subscription_base_interface",
+        "//source/common/config:resource_type_helper_lib",
         "//source/common/grpc:common_lib",
         "//source/common/init:target_lib",
         "@envoy_api//contrib/envoy/extensions/filters/common/workload_discovery/v3:pkg_cc_proto",

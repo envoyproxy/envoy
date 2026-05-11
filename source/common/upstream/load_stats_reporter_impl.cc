@@ -12,6 +12,7 @@ namespace Upstream {
 namespace {
 
 envoy::service::load_stats::v3::LoadStatsRequest
+// NOLINTNEXTLINE(readability-identifier-naming)
 MakeRequestTemplate(const LocalInfo::LocalInfo& local_info) {
   envoy::service::load_stats::v3::LoadStatsRequest request;
   request.mutable_node()->MergeFrom(local_info.node());

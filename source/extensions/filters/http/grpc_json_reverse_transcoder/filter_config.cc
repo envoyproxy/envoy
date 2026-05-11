@@ -40,7 +40,6 @@ using ResponseTranslator = ::google::grpc::transcoding::JsonRequestTranslator;
 using ResponseInfo = ::google::grpc::transcoding::RequestInfo;
 using ::envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
     GrpcJsonReverseTranscoder;
-using ::google::api::HttpRule;
 using ::google::grpc::transcoding::Transcoder;
 using ::google::grpc::transcoding::TranscoderInputStream;
 using ::google::grpc::transcoding::TypeHelper;

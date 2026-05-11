@@ -1994,7 +1994,7 @@ RoutePluginConfig::RoutePluginConfig(
 };
 
 RoutePluginConfig::~RoutePluginConfig() {
-  absl::WriterMutexLock lock(&mutex_);
+  absl::WriterMutexLock lock(mutex_);
   if (config_id_ > 0) {
     dso_lib_->envoyGoFilterDestroyHttpPluginConfig(config_id_, 0);
   }
@@ -2026,12 +2026,12 @@ uint64_t RoutePluginConfig::getConfigId() {
 uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id) {
   {
     // this is the fast path for most cases.
-    absl::ReaderMutexLock lock(&mutex_);
+    absl::ReaderMutexLock lock(mutex_);
     if (merged_config_id_ > 0 && cached_parent_id_ == parent_id) {
       return merged_config_id_;
     }
   }
-  absl::WriterMutexLock lock(&mutex_);
+  absl::WriterMutexLock lock(mutex_);
   if (merged_config_id_ > 0) {
     if (cached_parent_id_ == parent_id) {
       return merged_config_id_;

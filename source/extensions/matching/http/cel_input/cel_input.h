@@ -28,7 +28,9 @@ using StreamActivationPtr = std::unique_ptr<Filters::Common::Expr::StreamActivat
 class CelMatchData : public ::Envoy::Matcher::CustomMatchData {
 public:
   explicit CelMatchData(StreamActivationPtr activation) : activation_(std::move(activation)) {}
+  // NOLINTNEXTLINE(readability-identifier-naming)
   bool needs_response() const { return activation_->needs_response_path_data(); }
+  // NOLINTNEXTLINE(readability-identifier-naming)
   bool has_response_data() const { return activation_->has_response_data(); }
   StreamActivationPtr activation_;
 };

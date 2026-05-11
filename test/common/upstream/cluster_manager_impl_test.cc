@@ -19,7 +19,6 @@
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/http/conn_pool.h"
 #include "test/mocks/matcher/mocks.h"
-#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/mocks/upstream/load_balancer_context.h"

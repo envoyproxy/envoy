@@ -85,8 +85,8 @@ PrefixRoutes::PrefixRoutes(
       absl::AsciiStrToLower(&copy);
     }
 
-    auto success = prefix_lookup_table_.add(
-        copy.c_str(), std::make_shared<Prefix>(route, upstreams_, runtime), false);
+    auto success =
+        prefix_lookup_table_.add(copy, std::make_shared<Prefix>(route, upstreams_, runtime), false);
     if (!success) {
       throw EnvoyException(fmt::format("prefix `{}` already exists.", route.prefix()));
     }

@@ -30,7 +30,6 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/socket_interface_swap.h"
 #include "test/integration/ssl_utility.h"
-#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "quiche/quic/core/crypto/quic_client_session_cache.h"
@@ -41,6 +40,7 @@
 #include "quiche/quic/test_tools/quic_session_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
+using testing::Eq;
 namespace Envoy {
 namespace Quic {
 class CodecClientCallbacksForTest : public Http::CodecClientCallbacks {
@@ -467,24 +467,25 @@ public:
     constexpr auto timeout_first = std::chrono::seconds(15 * TIMEOUT_FACTOR);
     constexpr auto timeout_subsequent = std::chrono::milliseconds(10 * TIMEOUT_FACTOR);
     if (version_ == Network::Address::IpVersion::v4) {
-      test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_cx_total", 8u, timeout_first);
+      test_server_->waitForCounter("listener.127.0.0.1_0.downstream_cx_total", Eq(8u),
+                                   timeout_first);
     } else {
-      test_server_->waitForCounterEq("listener.[__1]_0.downstream_cx_total", 8u, timeout_first);
+      test_server_->waitForCounter("listener.[__1]_0.downstream_cx_total", Eq(8u), timeout_first);
     }
     for (size_t i = 0; i < concurrency_; ++i) {
       if (version_ == Network::Address::IpVersion::v4) {
-        test_server_->waitForGaugeEq(
-            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_active", i), 1u,
+        test_server_->waitForGauge(
+            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_active", i), Eq(1u),
             timeout_subsequent);
-        test_server_->waitForCounterEq(
-            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_total", i), 1u,
+        test_server_->waitForCounter(
+            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_total", i), Eq(1u),
             timeout_subsequent);
       } else {
-        test_server_->waitForGaugeEq(
-            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_active", i), 1u,
+        test_server_->waitForGauge(
+            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_active", i), Eq(1u),
             timeout_subsequent);
-        test_server_->waitForCounterEq(
-            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_total", i), 1u,
+        test_server_->waitForCounter(
+            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_total", i), Eq(1u),
             timeout_subsequent);
       }
     }
@@ -571,25 +572,25 @@ public:
     constexpr auto timeout_first = std::chrono::seconds(15 * TIMEOUT_FACTOR);
     constexpr auto timeout_subsequent = std::chrono::milliseconds(10 * TIMEOUT_FACTOR);
     if (version_ == Network::Address::IpVersion::v4) {
-      test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_cx_total", 16u,
-                                     timeout_first);
+      test_server_->waitForCounter("listener.127.0.0.1_0.downstream_cx_total", Eq(16u),
+                                   timeout_first);
     } else {
-      test_server_->waitForCounterEq("listener.[__1]_0.downstream_cx_total", 16u, timeout_first);
+      test_server_->waitForCounter("listener.[__1]_0.downstream_cx_total", Eq(16u), timeout_first);
     }
     for (size_t i = 0; i < concurrency_; ++i) {
       if (version_ == Network::Address::IpVersion::v4) {
-        test_server_->waitForGaugeEq(
-            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_active", i), 2u,
+        test_server_->waitForGauge(
+            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_active", i), Eq(2u),
             timeout_subsequent);
-        test_server_->waitForCounterEq(
-            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_total", i), 2u,
+        test_server_->waitForCounter(
+            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_total", i), Eq(2u),
             timeout_subsequent);
       } else {
-        test_server_->waitForGaugeEq(
-            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_active", i), 2u,
+        test_server_->waitForGauge(
+            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_active", i), Eq(2u),
             timeout_subsequent);
-        test_server_->waitForCounterEq(
-            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_total", i), 2u,
+        test_server_->waitForCounter(
+            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_total", i), Eq(2u),
             timeout_subsequent);
       }
     }

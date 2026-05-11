@@ -222,7 +222,7 @@ DelegatingStreamFilter::encodeMetadata(Envoy::Http::MetadataMap& metadata_map) {
   if (match_state_.skipFilter()) {
     return Envoy::Http::FilterMetadataStatus::Continue;
   }
-  return decoder_filter_->decodeMetadata(metadata_map);
+  return encoder_filter_->encodeMetadata(metadata_map);
 }
 
 void DelegatingStreamFilter::encodeComplete() {

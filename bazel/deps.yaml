@@ -163,7 +163,7 @@ dd_trace_cpp:
   project_name: "Datadog C++ Tracing Library"
   project_desc: "Datadog distributed tracing for C++"
   project_url: "https://github.com/DataDog/dd-trace-cpp"
-  release_date: "2025-10-14"
+  release_date: "2026-05-06"
   use_category:
   - observability_ext
   extensions:
@@ -296,7 +296,7 @@ quiche:
   project_name: "QUICHE"
   project_desc: "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols"
   project_url: "https://github.com/google/quiche"
-  release_date: "2026-04-20"
+  release_date: "2026-04-30"
   use_category:
   - controlplane
   - dataplane_core
@@ -799,7 +799,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-04-20"
+  release_date: "2026-05-06"
   use_category:
   - build
   - controlplane
@@ -1080,7 +1080,7 @@ kafka_source:
   project_name: "Kafka (source)"
   project_desc: "Open-source distributed event streaming platform"
   project_url: "https://kafka.apache.org"
-  release_date: "2025-05-12"
+  release_date: "2026-02-07"
   use_category:
   - dataplane_ext
   extensions:
@@ -1397,7 +1397,7 @@ thrift:
   project_name: "Apache Thrift"
   project_desc: "Apache Thrift Python library"
   project_url: "https://thrift.apache.org/"
-  release_date: "2025-05-23"
+  release_date: "2026-04-27"
   use_category:
   - test_only
   cpe: "cpe:2.3:a:apache:thrift:*"

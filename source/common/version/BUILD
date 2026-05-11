@@ -47,6 +47,38 @@ genrule(
     visibility = ["//visibility:private"],
 )
 
+# Header-only interface for the Envoy version string. Consumers that need only to declare the
+# version-string API (such as the logger) depend on this target so that their build cache is not
+# invalidated every time the SCM revision changes. The actual implementation lives in
+# ":version_string_lib" below and must be linked by the final binary (or equivalent) alongside
+# "version_linkstamp" (production) or "test_version_linkstamp" (tests).
+envoy_cc_library(
+    name = "version_string_interface_lib",
+    hdrs = ["version_string.h"],
+)
+
+envoy_cc_library(
+    name = "version_string_lib",
+    srcs = ["version_string.cc"],
+    hdrs = [":generate_version_number"],
+    copts = select({
+        "//bazel:using_boringssl_fips": ["-DENVOY_SSL_VERSION=\\\"BoringSSL-FIPS\\\""],
+        "//bazel:using_aws_lc": ["-DENVOY_SSL_VERSION=\\\"AWS-LC-FIPS\\\""],
+        "//bazel:using_openssl": ["-DENVOY_SSL_VERSION=\\\"OpenSSL\\\""],
+        "//conditions:default": ["-DENVOY_SSL_VERSION=\\\"BoringSSL\\\""],
+    }),
+    tags = ["notidy"],
+    deps = [
+        ":version_string_interface_lib",
+        ":version_suffix_default",
+        "//source/common/common:fmt_lib",
+        "//source/common/common:macros",
+    ],
+    # Ensure that linkers that strip unreferenced archive objects (e.g. ld with --gc-sections)
+    # still pull in version_string.cc so that envoyVersionString() resolves in final binaries.
+    alwayslink = 1,
+)
+
 envoy_cc_library(
     name = "version_includes",
     hdrs = [
@@ -62,17 +94,11 @@ envoy_cc_library(
 envoy_cc_library(
     name = "version_lib",
     srcs = ["version.cc"],
-    copts = select({
-        "//bazel:using_boringssl_fips": ["-DENVOY_SSL_VERSION=\\\"BoringSSL-FIPS\\\""],
-        "//bazel:using_aws_lc": ["-DENVOY_SSL_VERSION=\\\"AWS-LC-FIPS\\\""],
-        "//bazel:using_openssl": ["-DENVOY_SSL_VERSION=\\\"OpenSSL\\\""],
-        "//conditions:default": ["-DENVOY_SSL_VERSION=\\\"BoringSSL\\\""],
-    }),
     external_deps = ["ssl"],
     tags = ["notidy"],
     deps = [
         ":version_includes",
-        ":version_suffix_default",
+        ":version_string_lib",
         "//source/common/common:macros",
         "//source/common/protobuf:utility_lib",
     ],
