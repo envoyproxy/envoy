@@ -749,7 +749,7 @@ differences:
 - ``downstreamRequestHeaders()`` is available exclusively on the response handle.
 
 ``downstreamRequestHeaders()``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
