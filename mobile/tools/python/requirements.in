@@ -6,3 +6,6 @@ pytest
 pytest-asyncio
 pytest-benchmark
 requests
+sniffio
+auditwheel
+patchelf
