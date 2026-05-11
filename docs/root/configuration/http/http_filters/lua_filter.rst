@@ -758,7 +758,11 @@ differences:
 Returns the original downstream request headers. The returned handle is **read-only**; any attempt
 to modify it will result in a script error.
 
-Returns ``nil`` if request headers are not available.
+Returns ``nil`` if request headers are not available. This occurs when the response is generated
+before the downstream request headers have been fully received — for example, when Envoy produces
+an early error response due to a request header timeout, a stream idle timeout that fires before
+headers arrive, or an immediate protocol-level rejection (e.g. ``400 Bad Request``) triggered
+during header parsing.
 
 Returns a :ref:`header object <config_http_filters_lua_header_wrapper>`.
 
