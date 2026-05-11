@@ -739,7 +739,7 @@ available methods.
 .. _config_http_filters_lua_response_handle_api:
 
 Response handle API
-~~~~~~~~~~~~~~~~~~~
+-------------------
 
 The response handle passed to ``envoy_on_response`` supports all of the same methods as the
 :ref:`request handle <config_http_filters_lua_request_handle_api>`, with the following
@@ -749,7 +749,7 @@ differences:
 - ``downstreamRequestHeaders()`` is available exclusively on the response handle.
 
 ``downstreamRequestHeaders()``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: lua
 
