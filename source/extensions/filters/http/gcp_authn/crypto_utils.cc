@@ -130,7 +130,6 @@ getCertificateFingerprint(Secret::TlsCertificateConfigProviderSharedPtr tls_cert
     return std::nullopt;
   }
   std::string file_content = file_content_or_error.value();
-  ENVOY_LOG_MISC(info, "ambient certificate chain: {}", file_content);
 
   if (file_content.empty()) {
     return std::nullopt;

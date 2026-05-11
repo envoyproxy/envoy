@@ -76,7 +76,7 @@ TEST_F(CryptoUtilsTest, GetCertificateFingerprintSuccess) {
   auto fingerprint = getCertificateFingerprint(secret_provider, san_matchers, *api_);
   ASSERT_TRUE(fingerprint.has_value());
   // SHA256 fingerprint of
-  // google3/test/config/integration/certs/clientcert.pem
+  // test/config/integration/certs/clientcert.pem
   // Base64 (unpadded): wH4U/EO5x7PZLxAE%252BR06ngcdnJOlivx2tMFDA646DzQ
   // This verifies that '/' is not encoded.
   EXPECT_EQ(fingerprint.value(), "wH4U/EO5x7PZLxAE%252BR06ngcdnJOlivx2tMFDA646DzQ");
