@@ -1,6 +1,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <cerrno>
 #include <cstring>
 #include <functional>
 
@@ -28,6 +29,10 @@ public:
 };
 
 using WaitConditionFunc = std::function<bool()>;
+
+bool isRecvMultishotUnsupportedResult(int32_t result) {
+  return result == -EINVAL || result == -EOPNOTSUPP || result == -ENOSYS;
+}
 
 class IoUringImplTest : public ::testing::Test {
 public:
@@ -176,20 +181,21 @@ TEST_F(IoUringImplTest, NestInjectCompletion) {
   auto file_event = dispatcher->createFileEvent(
       event_fd,
       [this, &fd2, &completions_nr, &request2](uint32_t) {
-        io_uring_->forEveryCompletion([this, &fd2, &completions_nr,
-                                       &request2](Request* user_data, int32_t res, bool injected, uint32_t) {
-          EXPECT_TRUE(injected);
-          if (completions_nr == 0) {
-            EXPECT_EQ(1, dynamic_cast<TestRequest*>(user_data)->data_);
-            EXPECT_EQ(-11, res);
-            io_uring_->injectCompletion(fd2, &request2, -22);
-          } else {
-            EXPECT_EQ(2, dynamic_cast<TestRequest*>(user_data)->data_);
-            EXPECT_EQ(-22, res);
-          }
+        io_uring_->forEveryCompletion(
+            [this, &fd2, &completions_nr, &request2](Request* user_data, int32_t res, bool injected,
+                                                     uint32_t) {
+              EXPECT_TRUE(injected);
+              if (completions_nr == 0) {
+                EXPECT_EQ(1, dynamic_cast<TestRequest*>(user_data)->data_);
+                EXPECT_EQ(-11, res);
+                io_uring_->injectCompletion(fd2, &request2, -22);
+              } else {
+                EXPECT_EQ(2, dynamic_cast<TestRequest*>(user_data)->data_);
+                EXPECT_EQ(-22, res);
+              }
 
-          completions_nr++;
-        });
+              completions_nr++;
+            });
         return absl::OkStatus();
       },
       trigger, Event::FileReadyType::Read);
@@ -254,7 +260,8 @@ TEST_F(IoUringImplTest, NestRemoveInjectCompletion) {
       event_fd,
       [this, &fd2, &completions_nr, &data2](uint32_t) {
         io_uring_->forEveryCompletion(
-            [this, &fd2, &completions_nr, &data2](Request* user_data, int32_t res, bool injected, uint32_t) {
+            [this, &fd2, &completions_nr, &data2](Request* user_data, int32_t res, bool injected,
+                                                  uint32_t) {
               EXPECT_TRUE(injected);
               if (completions_nr == 0) {
                 EXPECT_EQ(1, dynamic_cast<TestRequest*>(user_data)->data_);
@@ -352,15 +359,16 @@ TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
   auto file_event = dispatcher->createFileEvent(
       event_fd,
       [this, &completions_nr](uint32_t) {
-        io_uring_->forEveryCompletion([&completions_nr](Request* user_data, int32_t res, bool, uint32_t) {
-          EXPECT_TRUE(user_data != nullptr);
-          EXPECT_EQ(res, 2);
-          completions_nr++;
-          // Note: generally events are not guaranteed to complete in the same order
-          // we submit them, but for this case of reading from a single file it's ok
-          // to expect the same order.
-          EXPECT_EQ(dynamic_cast<TestRequest*>(user_data)->data_, completions_nr);
-        });
+        io_uring_->forEveryCompletion(
+            [&completions_nr](Request* user_data, int32_t res, bool, uint32_t) {
+              EXPECT_TRUE(user_data != nullptr);
+              EXPECT_EQ(res, 2);
+              completions_nr++;
+              // Note: generally events are not guaranteed to complete in the same order
+              // we submit them, but for this case of reading from a single file it's ok
+              // to expect the same order.
+              EXPECT_EQ(dynamic_cast<TestRequest*>(user_data)->data_, completions_nr);
+            });
         return absl::OkStatus();
       },
       trigger, Event::FileReadyType::Read);
@@ -410,28 +418,30 @@ TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
 TEST_F(IoUringImplTest, SetupBufRingValidatesInputs) {
   // Count must be > 0 and a power of two.
   EXPECT_EQ(IoUringResult::Failed, io_uring_->setupBufRing(/*group_id=*/0, /*count=*/0,
-                                                          /*buf_size=*/1024));
+                                                           /*buf_size=*/1024));
   EXPECT_EQ(IoUringResult::Failed, io_uring_->setupBufRing(/*group_id=*/0, /*count=*/3,
-                                                          /*buf_size=*/1024));
+                                                           /*buf_size=*/1024));
   // buf_size must be > 0.
   EXPECT_EQ(IoUringResult::Failed, io_uring_->setupBufRing(/*group_id=*/0, /*count=*/4,
-                                                          /*buf_size=*/0));
+                                                           /*buf_size=*/0));
 
-  // First valid call succeeds; a second is rejected because we only support one ring per
-  // ``IoUring`` instance.
-  ASSERT_EQ(IoUringResult::Ok, io_uring_->setupBufRing(/*group_id=*/0, /*count=*/4,
-                                                      /*buf_size=*/1024));
+  // First valid call succeeds when the kernel supports buf-rings; otherwise this
+  // capability-specific test is skipped. A second setup is rejected because we only support one
+  // ring per ``IoUring`` instance.
+  if (io_uring_->setupBufRing(/*group_id=*/0, /*count=*/4, /*buf_size=*/1024) !=
+      IoUringResult::Ok) {
+    GTEST_SKIP() << "buf-ring unsupported on this kernel";
+  }
   EXPECT_EQ(IoUringResult::Failed, io_uring_->setupBufRing(/*group_id=*/1, /*count=*/4,
-                                                          /*buf_size=*/1024));
+                                                           /*buf_size=*/1024));
 }
 
 // End-to-end: arm a multishot recv against one end of a socketpair, write from the other end,
 // and verify the kernel hands us a buffer plus the ``F_MORE`` flag indicating the SQE is still
 // armed. Recycling the buffer and writing again yields a second completion from the same SQE.
 TEST_F(IoUringImplTest, MultishotRecvDeliversBuffersAndStaysArmed) {
-  // Multishot recv requires kernel >= 5.19. ``isIoUringSupported`` only checks that
-  // ``io_uring_queue_init_params`` works, so probe the multishot path here and skip if buf-rings
-  // are unsupported on this kernel.
+  // ``isIoUringSupported`` only checks that ``io_uring_queue_init_params`` works. Buf-rings and
+  // multishot recv have their own kernel gates, so probe both before enforcing the happy path.
   if (io_uring_->setupBufRing(/*group_id=*/0, /*count=*/4, /*buf_size=*/1024) !=
       IoUringResult::Ok) {
     GTEST_SKIP() << "buf-ring unsupported on this kernel";
@@ -449,45 +459,64 @@ TEST_F(IoUringImplTest, MultishotRecvDeliversBuffersAndStaysArmed) {
   TestRequest request(data);
   std::vector<std::string> received;
   std::vector<uint16_t> bids;
+  size_t completion_count = 0;
+  int32_t first_completion_result = 0;
+  uint32_t first_completion_flags = 0;
   bool more_clear = false;
 
   auto file_event = dispatcher->createFileEvent(
       event_fd,
-      [this, &received, &bids, &more_clear](uint32_t) {
-        io_uring_->forEveryCompletion(
-            [this, &received, &bids, &more_clear](Request*, int32_t res, bool, uint32_t flags) {
-              ASSERT_GT(res, 0);
-              ASSERT_TRUE(flags & IORING_CQE_F_BUFFER);
-              const uint16_t bid = static_cast<uint16_t>(flags >> IORING_CQE_BUFFER_SHIFT);
-              bids.push_back(bid);
-              uint8_t* buf = io_uring_->getBufferForBid(/*group_id=*/0, bid);
-              received.emplace_back(reinterpret_cast<const char*>(buf),
-                                    static_cast<size_t>(res));
-              if (!(flags & IORING_CQE_F_MORE)) {
-                more_clear = true;
-              }
-              io_uring_->recycleBuffer(/*group_id=*/0, bid);
-            });
+      [this, &received, &bids, &completion_count, &first_completion_result, &first_completion_flags,
+       &more_clear](uint32_t) {
+        io_uring_->forEveryCompletion([this, &received, &bids, &completion_count,
+                                       &first_completion_result, &first_completion_flags,
+                                       &more_clear](Request*, int32_t res, bool, uint32_t flags) {
+          completion_count++;
+          if (completion_count == 1) {
+            first_completion_result = res;
+            first_completion_flags = flags;
+          }
+          if (res <= 0 || !(flags & IORING_CQE_F_BUFFER)) {
+            return;
+          }
+          const uint16_t bid = static_cast<uint16_t>(flags >> IORING_CQE_BUFFER_SHIFT);
+          bids.push_back(bid);
+          uint8_t* buf = io_uring_->getBufferForBid(/*group_id=*/0, bid);
+          received.emplace_back(reinterpret_cast<const char*>(buf), static_cast<size_t>(res));
+          if (!(flags & IORING_CQE_F_MORE)) {
+            more_clear = true;
+          }
+          io_uring_->recycleBuffer(/*group_id=*/0, bid);
+        });
         return absl::OkStatus();
       },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
-  ASSERT_EQ(IoUringResult::Ok,
-            io_uring_->prepareRecvMultishot(recv_fd, /*group_id=*/0, &request));
+  ASSERT_EQ(IoUringResult::Ok, io_uring_->prepareRecvMultishot(recv_fd, /*group_id=*/0, &request));
   ASSERT_EQ(IoUringResult::Ok, io_uring_->submit());
 
   const std::string msg1 = "hello";
-  ASSERT_EQ(static_cast<ssize_t>(msg1.size()),
-            ::write(send_fd, msg1.data(), msg1.size()));
-  waitForCondition(*dispatcher, [&received]() { return received.size() == 1; });
+  ASSERT_EQ(static_cast<ssize_t>(msg1.size()), ::write(send_fd, msg1.data(), msg1.size()));
+  waitForCondition(*dispatcher, [&received, &completion_count]() {
+    return received.size() == 1 || completion_count > 0;
+  });
+  if (received.empty()) {
+    ::close(send_fd);
+    ::close(recv_fd);
+    if (isRecvMultishotUnsupportedResult(first_completion_result)) {
+      GTEST_SKIP() << "recv multishot unsupported on this kernel";
+    }
+    ASSERT_GT(first_completion_result, 0) << "first recv multishot completion failed";
+    ASSERT_TRUE(first_completion_flags & IORING_CQE_F_BUFFER)
+        << "first recv multishot completion did not include a buffer id";
+  }
   EXPECT_EQ(msg1, received[0]);
   EXPECT_FALSE(more_clear) << "first completion should leave SQE armed (F_MORE set)";
 
   // Second write reuses the same multishot SQE — proves recycling worked and the SQE is still
   // armed.
   const std::string msg2 = "world";
-  ASSERT_EQ(static_cast<ssize_t>(msg2.size()),
-            ::write(send_fd, msg2.data(), msg2.size()));
+  ASSERT_EQ(static_cast<ssize_t>(msg2.size()), ::write(send_fd, msg2.data(), msg2.size()));
   waitForCondition(*dispatcher, [&received]() { return received.size() == 2; });
   EXPECT_EQ(msg2, received[1]);
 
