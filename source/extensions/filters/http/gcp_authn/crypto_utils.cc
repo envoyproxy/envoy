@@ -42,7 +42,7 @@ std::vector<std::string> getSubjectAltNames(X509* cert) {
   if (gens != nullptr) {
     int count = sk_GENERAL_NAME_num(gens);
     for (int i = 0; i < count; ++i) {
-       GENERAL_NAME* gen = sk_GENERAL_NAME_value(gens, i);
+      GENERAL_NAME* gen = sk_GENERAL_NAME_value(gens, i);
       if (gen->type == GEN_URI) {
         ASN1_IA5STRING* uri = gen->d.uniformResourceIdentifier;
         if (uri != nullptr) {
@@ -99,10 +99,9 @@ absl::StatusOr<std::string> calculateFingerprint(X509* cert) {
 
 } // namespace
 
-absl::StatusOr<std::string>
-getBase64EncodedCertificateFingerprint(Secret::TlsCertificateConfigProviderSharedPtr tls_cert_provider,
-                          const std::vector<Matchers::StringMatcherImpl>& san_matchers,
-                          Api::Api& api) {
+absl::StatusOr<std::string> getBase64EncodedCertificateFingerprint(
+    Secret::TlsCertificateConfigProviderSharedPtr tls_cert_provider,
+    const std::vector<Matchers::StringMatcherImpl>& san_matchers, Api::Api& api) {
   // Config::DataSource::read() is blocking and should only be called on the
   // main thread.
   ASSERT_IS_MAIN_OR_TEST_THREAD();
