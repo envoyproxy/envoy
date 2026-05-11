@@ -1,7 +1,7 @@
 abstracts>=0.0.12
 aio.api.bazel
 aio.api.github>=0.2.5
-aio.core>=0.10.2
+aio.core>=0.11.0
 aiodocker>=0.22.2
 aiohttp>=3.13.3
 aioquic>=0.9.21
