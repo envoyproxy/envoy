@@ -66,7 +66,7 @@ public:
       ABSL_LOCKS_EXCLUDED(mu_);
   void clearUncacheableState() ABSL_LOCKS_EXCLUDED(mu_);
 
-  ~CacheSession();
+  ~CacheSession() override;
 
   class Subscriber {
   public:

@@ -33,9 +33,9 @@
 
 using testing::_;
 using testing::AnyNumber;
+using testing::Ge;
 using testing::Return;
 using testing::ReturnRef;
-
 namespace Envoy {
 namespace {
 
@@ -61,14 +61,15 @@ protected:
   std::string value_;
 };
 
-class ClientIntegrationTest
-    : public BaseClientIntegrationTest,
-      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, Http::CodecType>> {
+class ClientIntegrationTest : public BaseClientIntegrationTest,
+                              public testing::TestWithParam<
+                                  std::tuple<Network::Address::IpVersion, Http::CodecType, bool>> {
 public:
   static void SetUpTestCase() { test_key_value_store_ = std::make_shared<TestKeyValueStore>(); }
   static void TearDownTestCase() { test_key_value_store_.reset(); }
 
   Http::CodecType getCodecType() { return std::get<1>(GetParam()); }
+  bool getUseWorkerThread() { return std::get<2>(GetParam()); }
 
   ClientIntegrationTest() : BaseClientIntegrationTest(/*ip_version=*/std::get<0>(GetParam())) {
     // For server TLS
@@ -86,6 +87,12 @@ public:
   }
 
   void initialize() override {
+    builder_.enableWorkerThread(getUseWorkerThread());
+    if (getUseWorkerThread()) {
+      // Platform cert validation is disabled when using worker thread. The engine will use the
+      // built-in root certs which doesn't have the CA cert for our fake upstream.
+      builder_.enforceTrustChainVerification(false);
+    }
     // Integration test starts upstreams before Envoy which can cause a data race.
     builder_.enableLogger(false);
     builder_.setLogLevel(Logger::Logger::trace);
@@ -194,13 +201,14 @@ public:
   }
 
   static std::string testParamsToString(
-      const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, Http::CodecType>>
+      const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, Http::CodecType, bool>>
           params) {
     return fmt::format(
-        "{}_{}",
+        "{}_{}_{}",
         TestUtility::ipTestParamsToString(testing::TestParamInfo<Network::Address::IpVersion>(
             std::get<0>(params.param), params.index)),
-        protocolToString(std::get<1>(params.param)));
+        protocolToString(std::get<1>(params.param)),
+        std::get<2>(params.param) ? "WorkerThreadOn" : "WorkerThreadOff");
   }
 
 protected:
@@ -218,14 +226,17 @@ INSTANTIATE_TEST_SUITE_P(
     IpVersions, ClientIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      testing::ValuesIn({Http::CodecType::HTTP1, Http::CodecType::HTTP2,
-                                        Http::CodecType::HTTP3})),
+                                        Http::CodecType::HTTP3}),
+                     testing::Bool()),
     ClientIntegrationTest::testParamsToString);
 
 void ClientIntegrationTest::basicTest() {
   if (getCodecType() != Http::CodecType::HTTP1) {
     EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).Times(0);
-    EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
-    EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
+    if (!getUseWorkerThread()) {
+      EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
+      EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
+    }
   }
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
   default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
@@ -417,6 +428,7 @@ TEST_P(ClientIntegrationTest, HandleNetworkChangeEventsAndroid) {
 }
 
 TEST_P(ClientIntegrationTest, Http3IdleConnectionClosedUponNetworkChangeEventsAndroid) {
+  expect_data_streams_ = false;
   builder_.enableQuicConnectionMigration(true);
   builder_.addRuntimeGuard("decouple_explicit_drain_pools_and_dns_refresh", true);
   builder_.addRuntimeGuard("mobile_use_network_observer_registry", true);
@@ -455,17 +467,17 @@ TEST_P(ClientIntegrationTest, Http3IdleConnectionClosedUponNetworkChangeEventsAn
   ASSERT_EQ(0, last_stream_final_intel_.socket_reused);
 
   // An h3 upstream connection should have been established.
-  ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_cx_http3_total", 1));
-  ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_rq_total", 1));
+  ASSERT_TRUE(waitForCounter("cluster.base.upstream_cx_http3_total", Ge(1)));
+  ASSERT_TRUE(waitForCounter("cluster.base.upstream_rq_total", Ge(1)));
 
   EXPECT_CALL(helper_handle_->mock_helper(), bindSocketToNetwork(_, 123)).Times(0u);
   // A new cellular network appears and becomes the default network. The idle connection should be
   // closed.
   internalEngine()->onNetworkConnectAndroid(ConnectionType::CONNECTION_4G, 123);
   internalEngine()->onDefaultNetworkChangedAndroid(ConnectionType::CONNECTION_4G, 123);
-  ASSERT_TRUE(waitForCounterGe("http3.upstream.tx.quic_connection_close_error_code_QUIC_CONNECTION_"
-                               "MIGRATION_NO_MIGRATABLE_STREAMS",
-                               1));
+  ASSERT_TRUE(waitForCounter("http3.upstream.tx.quic_connection_close_error_code_QUIC_CONNECTION_"
+                             "MIGRATION_NO_MIGRATABLE_STREAMS",
+                             Ge(1)));
 
   // A new connection will be created on the new default network to serve new requests.
   EXPECT_CALL(helper_handle_->mock_helper(), bindSocketToNetwork(_, 123))
@@ -493,7 +505,7 @@ TEST_P(ClientIntegrationTest, Http3IdleConnectionClosedUponNetworkChangeEventsAn
   ASSERT_EQ(3, last_stream_final_intel_.upstream_protocol);
   ASSERT_EQ(0, last_stream_final_intel_.socket_reused);
 
-  ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_rq_total", 2));
+  ASSERT_TRUE(waitForCounter("cluster.base.upstream_rq_total", Ge(2)));
   // The total h3 connection count should have increased.
   EXPECT_EQ(2, getCounterValue("cluster.base.upstream_cx_http3_total"));
 }
@@ -502,6 +514,7 @@ TEST_P(ClientIntegrationTest, Http3ConnectionMigrationUponNetworkChangeEventsAnd
   builder_.enableQuicConnectionMigration(true);
   builder_.addRuntimeGuard("decouple_explicit_drain_pools_and_dns_refresh", true);
   builder_.addRuntimeGuard("mobile_use_network_observer_registry", true);
+  builder_.setMigrateIdleQuicConnection(true);
   initialize();
 
   if (getCodecType() != Http::CodecType::HTTP3 || version_ != Network::Address::IpVersion::v4) {
@@ -521,8 +534,8 @@ TEST_P(ClientIntegrationTest, Http3ConnectionMigrationUponNetworkChangeEventsAnd
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        false);
   // Wait for the upstream connection to be established.
-  ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_cx_http3_total", 1));
-  ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_rq_total", 1));
+  ASSERT_TRUE(waitForCounter("cluster.base.upstream_cx_http3_total", Ge(1)));
+  ASSERT_TRUE(waitForCounter("cluster.base.upstream_rq_total", Ge(1)));
 
   absl::Notification probing_socket_created;
   EXPECT_CALL(helper_handle_->mock_helper(), bindSocketToNetwork(_, 123))
@@ -573,7 +586,7 @@ TEST_P(ClientIntegrationTest, Http3ConnectionMigrationUponNetworkChangeEventsAnd
   ASSERT_EQ(3, last_stream_final_intel_.upstream_protocol);
   ASSERT_EQ(1, last_stream_final_intel_.socket_reused);
 
-  ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_rq_total", 2));
+  ASSERT_TRUE(waitForCounter("cluster.base.upstream_rq_total", Ge(2)));
   // The total h3 connection count shouldn't have increased.
   EXPECT_EQ(1, getCounterValue("cluster.base.upstream_cx_http3_total"));
 }
@@ -609,8 +622,8 @@ TEST_P(ClientIntegrationTest, Http3ConnectionMigrationUponNetworkDisconnectedAnd
   ASSERT_EQ(0, last_stream_final_intel_.socket_reused);
 
   // Wait for the upstream connection to be established.
-  ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_cx_http3_total", 1));
-  ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_rq_total", 1));
+  ASSERT_TRUE(waitForCounter("cluster.base.upstream_cx_http3_total", Ge(1)));
+  ASSERT_TRUE(waitForCounter("cluster.base.upstream_rq_total", Ge(1)));
 
   // Send a new request with body during which network gets disconnected.
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
@@ -657,9 +670,9 @@ TEST_P(ClientIntegrationTest, Http3ConnectionMigrationUponNetworkDisconnectedAnd
   internalEngine()->onNetworkConnectAndroid(ConnectionType::CONNECTION_WIFI, 1);
   internalEngine()->onDefaultNetworkChangedAndroid(ConnectionType::CONNECTION_WIFI, 1);
 
-  ASSERT_TRUE(waitForCounterGe("http3.upstream.tx.quic_connection_close_error_code_QUIC_CONNECTION_"
-                               "MIGRATION_NO_MIGRATABLE_STREAMS",
-                               1));
+  ASSERT_TRUE(waitForCounter("http3.upstream.tx.quic_connection_close_error_code_QUIC_CONNECTION_"
+                             "MIGRATION_NO_MIGRATABLE_STREAMS",
+                             Ge(1)));
 }
 
 TEST_P(ClientIntegrationTest, LargeResponse) {
@@ -960,8 +973,10 @@ TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
 
 TEST_P(ClientIntegrationTest, BasicHttps) {
   EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).Times(0);
-  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
-  EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
+  if (!getUseWorkerThread()) {
+    EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
+    EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
+  }
 
   builder_.enablePlatformCertificatesValidation(true);
 
@@ -1109,6 +1124,7 @@ TEST_P(ClientIntegrationTest, InvalidDomainReresolveWithNoAddresses) {
 }
 
 TEST_P(ClientIntegrationTest, ReresolveAndDrain) {
+  expect_data_streams_ = false; // 0-RTT request might skip some fields in final stream intel.
   builder_.enableDrainPostDnsRefresh(true);
   // 0-RTT requests will not populate some of the final stream intel fields, so skip the validation.
   expect_data_streams_ = false;
@@ -1157,7 +1173,7 @@ TEST_P(ClientIntegrationTest, ReresolveAndDrain) {
   }
 
   // Make sure the attempt happened.
-  ASSERT_TRUE(waitForCounterGe("dns_cache.base_dns_cache.dns_query_attempt", 1));
+  ASSERT_TRUE(waitForCounter("dns_cache.base_dns_cache.dns_query_attempt", Ge(1)));
   EXPECT_EQ(0, getCounterValue("dns_cache.base_dns_cache.dns_query_success"));
   // The next request should go to the original upstream as there's been no drain.
   stream_ = createNewStream(createDefaultStreamCallbacks());
@@ -1171,7 +1187,7 @@ TEST_P(ClientIntegrationTest, ReresolveAndDrain) {
   // Force the lookup to resolve to localhost.
   // Unblock the resolution and wait for it to succeed.
   Network::TestResolver::unblockResolve("127.0.0.3");
-  ASSERT_TRUE(waitForCounterGe("dns_cache.base_dns_cache.dns_query_success", 1));
+  ASSERT_TRUE(waitForCounter("dns_cache.base_dns_cache.dns_query_success", Ge(1)));
 
   // Do one final request. It should go to the second upstream and return 202
   stream_ = createNewStream(createDefaultStreamCallbacks());
@@ -1420,9 +1436,9 @@ TEST_P(ClientIntegrationTest, CancelDuringResponse) {
     ASSERT_TRUE(upstream_connection_->waitForDisconnect());
     upstream_connection_.reset();
     ASSERT_TRUE(
-        waitForCounterGe("http3.upstream.tx.quic_connection_close_error_code_QUIC_NO_ERROR", 1));
-    ASSERT_TRUE(waitForCounterGe(
-        "http3.upstream.tx.quic_reset_stream_error_code_QUIC_STREAM_REQUEST_REJECTED", 1));
+        waitForCounter("http3.upstream.tx.quic_connection_close_error_code_QUIC_NO_ERROR", Ge(1)));
+    ASSERT_TRUE(waitForCounter(
+        "http3.upstream.tx.quic_reset_stream_error_code_QUIC_STREAM_REQUEST_REJECTED", Ge(1)));
   }
 }
 
@@ -1684,7 +1700,7 @@ TEST_P(ClientIntegrationTest, ResetWithBidiTrafficExplicitData) {
 }
 
 TEST_P(ClientIntegrationTest, Proxying) {
-  if (getCodecType() != Http::CodecType::HTTP1) {
+  if (getCodecType() != Http::CodecType::HTTP1 || getUseWorkerThread()) {
     return;
   }
   initialize();
@@ -1728,12 +1744,15 @@ TEST_P(ClientIntegrationTest, TestStats) {
   {
     absl::MutexLock l(engine_lock_);
     std::string stats = engine_->dumpStats();
-    EXPECT_TRUE((absl::StrContains(stats, "runtime.load_success: 1"))) << stats;
+    EXPECT_TRUE((absl::StrContains(stats, "runtime.load_success: 2"))) << stats;
   }
 }
 
 #if defined(__APPLE__)
 TEST_P(ClientIntegrationTest, TestProxyResolutionApi) {
+  if (getUseWorkerThread()) {
+    return;
+  }
   builder_.respectSystemProxySettings(true);
   initialize();
   ASSERT_TRUE(Envoy::Api::External::retrieveApi("envoy_proxy_resolver") != nullptr);
@@ -1744,6 +1763,9 @@ TEST_P(ClientIntegrationTest, TestProxyResolutionApi) {
 // doesn't crash. It doesn't really test the actual network change event.
 TEST_P(ClientIntegrationTest, OnNetworkChanged) {
   builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
+  if (getCodecType() == Http::CodecType::HTTP3) {
+    builder_.setDisableDnsRefreshOnNetworkChange(true);
+  }
   initialize();
   internalEngine()->onDefaultNetworkChanged(1);
   basicTest();
@@ -1756,6 +1778,9 @@ TEST_P(ClientIntegrationTest, OnNetworkChanged) {
 // doesn't crash. It doesn't really test the actual network change event.
 TEST_P(ClientIntegrationTest, OnNetworkChangeEvent) {
   builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
+  if (getCodecType() == Http::CodecType::HTTP3) {
+    builder_.setDisableDnsRefreshOnNetworkChange(true);
+  }
   initialize();
   int network = 0;
   network |= static_cast<int>(NetworkType::WWAN);
@@ -1767,15 +1792,36 @@ TEST_P(ClientIntegrationTest, OnNetworkChangeEvent) {
   }
 }
 
+// A thread-safe implementation which can fake SOCKET_ERROR_NOBUFS send errors.
 class MockSendOsSysCalls : public Api::OsSysCallsImpl {
 public:
+  MockSendOsSysCalls() {
+    ON_CALL(*this, send(_, _, _, _))
+        .WillByDefault([this](os_fd_t socket, void* buffer, size_t length, int flags) {
+          int target = target_fd_.load();
+          if (fail_send_.load() && (target == -1 || socket == target)) {
+            bool expected = true;
+            if (fail_send_.compare_exchange_strong(expected, false)) {
+              return Api::SysCallSizeResult{-1, SOCKET_ERROR_NOBUFS};
+            }
+          }
+          return Api::OsSysCallsImpl::send(socket, buffer, length, flags);
+        });
+  }
+
   MOCK_METHOD(Api::SysCallSizeResult, send,
               (os_fd_t socket, void* buffer, size_t length, int flags), (override));
+
+  std::atomic<bool> fail_send_{false};
+  std::atomic<int> target_fd_{-1};
 };
 
 // Tests that a transient write error due to no space available on the socket
 // does not cause the stream to error out when using HTTP/3.
 TEST_P(ClientIntegrationTest, NoSpaceAvailableWriteErrorSwallowed) {
+  testing::NiceMock<MockSendOsSysCalls> sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&sys_calls);
+
   initialize();
   if (upstreamProtocol() != Http::CodecType::HTTP3) {
     return;
@@ -1798,14 +1844,9 @@ TEST_P(ClientIntegrationTest, NoSpaceAvailableWriteErrorSwallowed) {
 
   // Wait for the upstream connection to be created and introduce a transient SOCKET_ERROR_NOBUFS
   // write error.
-  ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_cx_http3_total", 1));
-  MockSendOsSysCalls sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&sys_calls);
-  EXPECT_CALL(sys_calls, send(fd, _, _, _))
-      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_NOBUFS}))
-      .WillRepeatedly(Invoke([&](os_fd_t socket, void* buffer, size_t length, int flags) {
-        return injector.latched().send(socket, buffer, length, flags);
-      }));
+  ASSERT_TRUE(waitForCounter("cluster.base.upstream_cx_http3_total", Ge(1)));
+  sys_calls.target_fd_.store(fd);
+  sys_calls.fail_send_.store(true);
 
   // Complete the request.
   stream_->close(Http::Utility::createRequestTrailerMapPtr());
@@ -1815,6 +1856,9 @@ TEST_P(ClientIntegrationTest, NoSpaceAvailableWriteErrorSwallowed) {
   ASSERT_EQ(cc_.on_error_calls_, 0);
   ASSERT_EQ(cc_.on_complete_calls_, 1);
   EXPECT_EQ(cc_.status_, "200");
+
+  // Join background threads before local injector and mocks are destroyed to avoid TSAN data races.
+  TearDown();
 }
 
 TEST_P(ClientIntegrationTest, HttpsWithEarlyData) {
@@ -1855,11 +1899,12 @@ TEST_P(ClientIntegrationTest, HttpsWithEarlyData) {
   // Wait for session ticket to be received (QUIC sends it after handshake)
   timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(500));
 
+  int old_upstream_cx_destroy = getCounterValue("cluster.base.upstream_cx_destroy");
   // Close connection to force reconnect and use session ticket
   ASSERT_TRUE(upstream_connection_->close());
   ASSERT_TRUE(upstream_connection_->waitForDisconnect());
   upstream_connection_.reset();
-  ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_cx_destroy", 1));
+  ASSERT_TRUE(waitForCounter("cluster.base.upstream_cx_destroy", Ge(old_upstream_cx_destroy + 1)));
 
   // Reset terminal callback for the second request.
   ConditionalInitializer terminal_callback;

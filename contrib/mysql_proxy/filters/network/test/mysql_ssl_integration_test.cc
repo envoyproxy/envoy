@@ -22,6 +22,7 @@
 #include "openssl/evp.h"
 #include "openssl/pem.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -115,7 +116,7 @@ public:
   // Wait for the filter to process the SSL request and call startSecureTransport()
   // before initiating the client-side TLS handshake.
   void upgradeClientToTls() {
-    test_server_->waitForCounterGe("mysql.mysql_stats.upgraded_to_ssl", 1);
+    test_server_->waitForCounter("mysql.mysql_stats.upgraded_to_ssl", Ge(1));
     conn_->upgradeToTls(tls_context_->createTransportSocket(
         std::make_shared<Network::TransportSocketOptionsImpl>(
             absl::string_view(""), std::vector<std::string>(), std::vector<std::string>()),
@@ -245,8 +246,8 @@ TEST_P(MySQLSSLIntegrationTest, CachingSha2FastAuth) {
   conn_->close(Network::ConnectionCloseType::FlushWrite);
   ASSERT_TRUE(fake_upstream->waitForDisconnect());
 
-  test_server_->waitForCounterGe("mysql.mysql_stats.upgraded_to_ssl", 1);
-  test_server_->waitForCounterGe("mysql.mysql_stats.login_attempts", 1);
+  test_server_->waitForCounter("mysql.mysql_stats.upgraded_to_ssl", Ge(1));
+  test_server_->waitForCounter("mysql.mysql_stats.login_attempts", Ge(1));
   EXPECT_EQ(test_server_->counter("mysql.mysql_stats.login_failures")->value(), 0);
 }
 
@@ -331,8 +332,8 @@ TEST_P(MySQLSSLIntegrationTest, CachingSha2FullAuthRsaMediation) {
   conn_->close(Network::ConnectionCloseType::FlushWrite);
   ASSERT_TRUE(fake_upstream->waitForDisconnect());
 
-  test_server_->waitForCounterGe("mysql.mysql_stats.upgraded_to_ssl", 1);
-  test_server_->waitForCounterGe("mysql.mysql_stats.login_attempts", 1);
+  test_server_->waitForCounter("mysql.mysql_stats.upgraded_to_ssl", Ge(1));
+  test_server_->waitForCounter("mysql.mysql_stats.login_attempts", Ge(1));
   EXPECT_EQ(test_server_->counter("mysql.mysql_stats.login_failures")->value(), 0);
 }
 
@@ -396,7 +397,7 @@ TEST_P(MySQLSSLIntegrationTest, CachingSha2FullAuthRsaErr) {
   conn_->close(Network::ConnectionCloseType::FlushWrite);
   ASSERT_TRUE(fake_upstream->waitForDisconnect());
 
-  test_server_->waitForCounterGe("mysql.mysql_stats.login_failures", 1);
+  test_server_->waitForCounter("mysql.mysql_stats.login_failures", Ge(1));
 }
 
 /**
@@ -449,9 +450,9 @@ TEST_P(MySQLSSLIntegrationTest, SslTerminateLoginThenQuery) {
   conn_->close(Network::ConnectionCloseType::FlushWrite);
   ASSERT_TRUE(fake_upstream->waitForDisconnect());
 
-  test_server_->waitForCounterGe("mysql.mysql_stats.upgraded_to_ssl", 1);
-  test_server_->waitForCounterGe("mysql.mysql_stats.login_attempts", 1);
-  test_server_->waitForCounterGe("mysql.mysql_stats.queries_parsed", 1);
+  test_server_->waitForCounter("mysql.mysql_stats.upgraded_to_ssl", Ge(1));
+  test_server_->waitForCounter("mysql.mysql_stats.login_attempts", Ge(1));
+  test_server_->waitForCounter("mysql.mysql_stats.queries_parsed", Ge(1));
 }
 
 /**
@@ -525,7 +526,7 @@ TEST_P(MySQLSSLIntegrationTest, CachingSha2FullAuthRsaThenQuery) {
   conn_->close(Network::ConnectionCloseType::FlushWrite);
   ASSERT_TRUE(fake_upstream->waitForDisconnect());
 
-  test_server_->waitForCounterGe("mysql.mysql_stats.queries_parsed", 1);
+  test_server_->waitForCounter("mysql.mysql_stats.queries_parsed", Ge(1));
 }
 
 // =============================================================================
@@ -587,7 +588,7 @@ TEST_P(MySQLDisableIntegrationTest, DisableBasicLogin) {
   tcp_client->close();
   ASSERT_TRUE(fake_upstream->waitForDisconnect());
 
-  test_server_->waitForCounterGe("mysql.mysql_stats.login_attempts", 1);
+  test_server_->waitForCounter("mysql.mysql_stats.login_attempts", Ge(1));
   EXPECT_EQ(test_server_->counter("mysql.mysql_stats.login_failures")->value(), 0);
 }
 
@@ -686,7 +687,7 @@ public:
   }
 
   void upgradeClientToTls() {
-    test_server_->waitForCounterGe("mysql.mysql_stats.upgraded_to_ssl", 1);
+    test_server_->waitForCounter("mysql.mysql_stats.upgraded_to_ssl", Ge(1));
     conn_->upgradeToTls(tls_context_->createTransportSocket(
         std::make_shared<Network::TransportSocketOptionsImpl>(
             absl::string_view(""), std::vector<std::string>(), std::vector<std::string>()),
@@ -795,8 +796,8 @@ TEST_P(MySQLAllowIntegrationTest, AllowSslClientLogin) {
   conn_->close(Network::ConnectionCloseType::FlushWrite);
   ASSERT_TRUE(fake_upstream->waitForDisconnect());
 
-  test_server_->waitForCounterGe("mysql.mysql_stats.upgraded_to_ssl", 1);
-  test_server_->waitForCounterGe("mysql.mysql_stats.login_attempts", 1);
+  test_server_->waitForCounter("mysql.mysql_stats.upgraded_to_ssl", Ge(1));
+  test_server_->waitForCounter("mysql.mysql_stats.login_attempts", Ge(1));
 }
 
 /**
@@ -828,7 +829,7 @@ TEST_P(MySQLAllowIntegrationTest, AllowNonSslClientLogin) {
   conn_->close(Network::ConnectionCloseType::FlushWrite);
   ASSERT_TRUE(fake_upstream->waitForDisconnect());
 
-  test_server_->waitForCounterGe("mysql.mysql_stats.login_attempts", 1);
+  test_server_->waitForCounter("mysql.mysql_stats.login_attempts", Ge(1));
   EXPECT_EQ(test_server_->counter("mysql.mysql_stats.upgraded_to_ssl")->value(), 0);
 }
 
@@ -897,8 +898,8 @@ TEST_P(MySQLAllowIntegrationTest, AllowSslFullAuthRsaMediation) {
   conn_->close(Network::ConnectionCloseType::FlushWrite);
   ASSERT_TRUE(fake_upstream->waitForDisconnect());
 
-  test_server_->waitForCounterGe("mysql.mysql_stats.upgraded_to_ssl", 1);
-  test_server_->waitForCounterGe("mysql.mysql_stats.login_attempts", 1);
+  test_server_->waitForCounter("mysql.mysql_stats.upgraded_to_ssl", Ge(1));
+  test_server_->waitForCounter("mysql.mysql_stats.login_attempts", Ge(1));
   EXPECT_EQ(test_server_->counter("mysql.mysql_stats.login_failures")->value(), 0);
 }
 

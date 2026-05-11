@@ -1,14 +1,30 @@
+#include <memory>
+#include <string>
+
+#include "envoy/http/filter.h"
+#include "envoy/network/connection.h"
+#include "envoy/server/filter_config.h"
+
 #include "source/extensions/common/wasm/wasm.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
+#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/http_integration.h"
+#include "test/integration/http_protocol_integration.h"
+#include "test/test_common/registry.h"
+#include "test/test_common/utility.h"
 
+#include "absl/synchronization/mutex.h"
+#include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Wasm {
 namespace {
+
+using testing::Ge;
 
 class WasmFilterIntegrationTest
     : public HttpIntegrationTest,
@@ -288,6 +304,245 @@ TEST_P(WasmFilterIntegrationTest, LargeRequestHitBufferLimit) {
     ASSERT_TRUE(fake_upstream_connection_->close());
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   }
+}
+
+struct WasmDeferredDataSetupFilterState {
+  absl::Mutex mu;
+  bool destroyed ABSL_GUARDED_BY(mu){false};
+  bool decode_data_after_destroy ABSL_GUARDED_BY(mu){false};
+  Http::StreamDecoderFilterCallbacks* callbacks ABSL_GUARDED_BY(mu){nullptr};
+  Event::Dispatcher* dispatcher ABSL_GUARDED_BY(mu){nullptr};
+  bool headers_processed ABSL_GUARDED_BY(mu){false};
+};
+
+class WasmDeferredDataSetupFilter : public Http::PassThroughFilter {
+public:
+  explicit WasmDeferredDataSetupFilter(std::shared_ptr<WasmDeferredDataSetupFilterState> state)
+      : state_(std::move(state)) {}
+
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
+    bool first_request = false;
+    {
+      absl::MutexLock l(state_->mu);
+      first_request = !state_->headers_processed;
+    }
+    // Only the first request triggers the read-disable that the bug reproduction
+    // depends on. Follow-up requests pass through normally so they reach the
+    // upstream and exercise the Wasm filter's reload path.
+    if (!first_request) {
+      return Http::FilterHeadersStatus::Continue;
+    }
+    decoder_callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
+    {
+      absl::MutexLock l(state_->mu);
+      state_->callbacks = decoder_callbacks_;
+      state_->dispatcher = &decoder_callbacks_->dispatcher();
+      state_->headers_processed = true;
+    }
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
+    absl::MutexLock l(state_->mu);
+    if (state_->destroyed) {
+      state_->decode_data_after_destroy = true;
+    }
+    return Http::FilterDataStatus::Continue;
+  }
+
+  void onDestroy() override {
+    absl::MutexLock l(state_->mu);
+    state_->destroyed = true;
+    state_->callbacks = nullptr;
+  }
+
+private:
+  std::shared_ptr<WasmDeferredDataSetupFilterState> state_;
+};
+
+class WasmDeferredDataSetupFilterConfig
+    : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+public:
+  explicit WasmDeferredDataSetupFilterConfig(
+      std::shared_ptr<WasmDeferredDataSetupFilterState> state)
+      : EmptyHttpFilterConfig("setup-filter"), state_(std::move(state)) {}
+
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
+    return [state = state_](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+      callbacks.addStreamFilter(std::make_shared<WasmDeferredDataSetupFilter>(state));
+    };
+  }
+
+private:
+  std::shared_ptr<WasmDeferredDataSetupFilterState> state_;
+};
+
+class WasmDeferredDataTest : public HttpProtocolIntegrationTest {};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, WasmDeferredDataTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecType::HTTP2}, {Http::CodecType::HTTP1})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+// Verifies that a deferred data-processing callback does not invoke
+// proxy_on_request_body on a Wasm filter whose context has already been
+// destroyed (via proxy_on_delete) during connection close.
+//
+// Filter chain: [Wasm passthrough filter] -> [setup filter]
+//
+// Scenario:
+//   1. Setup filter calls readDisable(true) in decodeHeaders.
+//   2. Client sends DATA + END_STREAM -> codec buffers the frame.
+//   3. A posted callback calls readDisable(false) (schedules
+//      process_buffered_data_callback_) then closes the connection
+//      (destroys filter chain -> Wasm context is deleted via proxy_on_delete).
+//   4. Without the fix, the deferred process_buffered_data_callback_ fires,
+//      calls decodeData on the Wasm filter with an already-deleted context_id,
+//      causing a Rust panic "invalid context_id" that disables the Wasm VM.
+TEST_P(WasmDeferredDataTest, InvalidContextIdPanicOnDeferredData) {
+  // The bug is runtime-agnostic, but testing with v8 is sufficient.
+  auto runtimes = Extensions::Common::Wasm::wasmTestMatrix(false, false);
+  if (!absl::c_any_of(runtimes, [](const auto& p) { return std::get<0>(p) == "v8"; })) {
+    GTEST_SKIP() << "v8 runtime not available";
+  }
+
+  auto state = std::make_shared<WasmDeferredDataSetupFilterState>();
+
+  // Register the C++ setup filter.
+  WasmDeferredDataSetupFilterConfig filter_config(state);
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registered(
+      filter_config);
+
+  // Prepend the setup filter (will end up second in chain).
+  config_helper_.prependFilter(R"EOF(
+name: setup-filter
+)EOF");
+
+  // Prepend the Wasm filter (will end up first in chain — hit by deferred data).
+  // Use FAIL_RELOAD so that any Wasm panic during the test (i.e. the bug
+  // reproduction firing proxy_on_request_body on a destroyed context) puts the
+  // VM into RuntimeError; the next request through the filter then triggers a
+  // VM reload and bumps the wasm.<name>.vm_reload_* counters. With the fix in
+  // place, no panic occurs and these counters stay at 0.
+  const std::string wasm_filter = TestEnvironment::substitute(R"EOF(
+name: envoy.filters.http.wasm
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm
+  config:
+    name: deferred_data_regression
+    failure_policy: FAIL_RELOAD
+    reload_config:
+      backoff:
+        base_interval: 0.01s
+    vm_config:
+      runtime: envoy.wasm.runtime.v8
+      code:
+        local:
+          filename: "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/deferred_data_rust.wasm"
+)EOF");
+  config_helper_.prependFilter(wasm_filter);
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send HEADERS only. The Wasm filter passes through; the setup filter
+  // calls readDisable(true) and sets headers_processed.
+  auto [request_encoder, response_decoder] = codec_client_->startRequest(default_request_headers_);
+
+  // Wait until the server has processed decodeHeaders and readDisable is on.
+  {
+    absl::MutexLock l(state->mu);
+    state->mu.Await(absl::Condition(&state->headers_processed));
+  }
+
+  // Record rx bytes before DATA so we can tell when it arrives.
+  uint64_t bytes_before_data = 0;
+  if (auto ctr = test_server_->counter("http.config_test.downstream_cx_rx_bytes_total")) {
+    bytes_before_data = ctr->value();
+  }
+
+  // Send DATA + END_STREAM. Because readDisable is on, the codec buffers
+  // the frame (body_buffered_ = true) instead of delivering to the filter chain.
+  codec_client_->sendData(request_encoder, 1024, true);
+
+  // Wait until the DATA frame (1024 payload + 9-byte frame header) has been
+  // received by the server's HTTP/2 codec.
+  test_server_->waitForCounter("http.config_test.downstream_cx_rx_bytes_total",
+                               Ge(bytes_before_data + 1033));
+
+  // Grab the worker-thread dispatcher and callbacks.
+  Event::Dispatcher* conn_dispatcher;
+  Http::StreamDecoderFilterCallbacks* cbs;
+  {
+    absl::MutexLock l(state->mu);
+    conn_dispatcher = state->dispatcher;
+    cbs = state->callbacks;
+  }
+  ASSERT_NE(conn_dispatcher, nullptr);
+  ASSERT_NE(cbs, nullptr);
+
+  // Post a callback to the connection's worker-thread dispatcher:
+  //   (a) readDisable(false)  ->  schedules process_buffered_data_callback_
+  //   (b) Close connection    ->  synchronously destroys filter chain
+  // After the callback returns, the event loop fires the deferred
+  // process_buffered_data_callback_.
+  absl::Notification first_callback_done;
+  conn_dispatcher->post([cbs, &first_callback_done]() {
+    cbs->onDecoderFilterBelowWriteBufferLowWatermark();
+    auto conn_ref = cbs->connection();
+    if (conn_ref.has_value()) {
+      const_cast<Network::Connection&>(conn_ref.ref())
+          .close(Network::ConnectionCloseType::NoFlush, "wasm-deferred-data-test");
+    }
+    first_callback_done.Notify();
+  });
+
+  // Wait for the client to see the disconnect.
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  first_callback_done.WaitForNotification();
+
+  // Post a fence callback: because process_buffered_data_callback_ was
+  // scheduled via scheduleCallbackCurrentIteration() before this post(), the
+  // event loop will fire it BEFORE this fence. Waiting guarantees that the
+  // deferred decodeData (and any resulting Wasm panic) has already happened.
+  absl::Notification event_loop_drained;
+  conn_dispatcher->post([&event_loop_drained]() { event_loop_drained.Notify(); });
+  event_loop_drained.WaitForNotification();
+
+  // Check 1: the setup filter must not have seen decodeData after destroy.
+  {
+    absl::MutexLock l(state->mu);
+    EXPECT_FALSE(state->decode_data_after_destroy)
+        << "decodeData was invoked after onDestroy — deferred processing "
+           "callback fired on the destroyed filter chain (use-after-free bug)";
+  }
+
+  // Check 2: send a normal follow-up request that traverses the Wasm filter on
+  // the same worker thread. With the bug present, the Wasm VM was put into
+  // RuntimeError by the deferred decodeData panic, and FAIL_RELOAD will trigger
+  // a reload here — incrementing one of the vm_reload_* counters. With the fix,
+  // the VM is healthy and no reload is attempted.
+  const uint64_t initial_rq_total =
+      test_server_->counter("http.config_test.downstream_rq_total")->value();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto follow_up_response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  test_server_->waitForCounter("http.config_test.downstream_rq_total", Ge(initial_rq_total + 1));
+  // The reload check (when the bug is present) runs on the worker thread as
+  // part of the Wasm filter's per-request setup; downstream_rq_total can tick
+  // before that work has finished. Post a fence to the same worker dispatcher
+  // and wait for it so any pending vm_reload_* increments have landed before
+  // we read the counters below.
+  absl::Notification follow_up_drained;
+  conn_dispatcher->post([&follow_up_drained]() { follow_up_drained.Notify(); });
+  follow_up_drained.WaitForNotification();
+  codec_client_->close();
+
+  constexpr absl::string_view stat_prefix = "wasm.deferred_data_regression.";
+  EXPECT_EQ(0, test_server_->counter(absl::StrCat(stat_prefix, "vm_reload_success"))->value());
+  EXPECT_EQ(0, test_server_->counter(absl::StrCat(stat_prefix, "vm_reload_backoff"))->value());
+  EXPECT_EQ(0, test_server_->counter(absl::StrCat(stat_prefix, "vm_reload_failure"))->value());
 }
 
 } // namespace

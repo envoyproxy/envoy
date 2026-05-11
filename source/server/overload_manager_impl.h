@@ -157,7 +157,7 @@ public:
          ThreadLocal::SlotAllocator& slot_allocator,
          const envoy::config::overload::v3::OverloadManager& config,
          ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-         const Server::Options& options);
+         const Server::Options& options, Runtime::Loader& runtime);
 
   // Server::OverloadManager
   void start() override;
@@ -177,7 +177,8 @@ protected:
                       ThreadLocal::SlotAllocator& slot_allocator,
                       const envoy::config::overload::v3::OverloadManager& config,
                       ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-                      const Server::Options& options, absl::Status& creation_status);
+                      const Server::Options& options, Runtime::Loader& runtime,
+                      absl::Status& creation_status);
 
   // Factory for timer managers. This allows test-only subclasses to inject a mock implementation.
   virtual Event::ScaledRangeTimerManagerPtr createScaledRangeTimerManager(

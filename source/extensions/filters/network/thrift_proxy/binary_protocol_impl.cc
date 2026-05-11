@@ -30,6 +30,7 @@ bool BinaryProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMetad
 
   // The byte at offset 2 is unused and ignored.
 
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
   MessageType type = static_cast<MessageType>(buffer.peekInt<int8_t>(3));
   if (type < MessageType::Call || type > MessageType::LastMessageType) {
     throw EnvoyException(
@@ -392,6 +393,7 @@ bool LaxBinaryProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMe
     return false;
   }
 
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
   MessageType type = static_cast<MessageType>(buffer.peekInt<int8_t>(name_len + 4));
   if (type < MessageType::Call || type > MessageType::LastMessageType) {
     throw EnvoyException(

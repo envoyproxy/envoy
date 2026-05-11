@@ -39,7 +39,7 @@ on:
 # For a job that does, you can restore with something like:
 #
 #    steps:
-#    - uses: envoyproxy/toolshed/actions/docker/cache/restore@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
+#    - uses: envoyproxy/toolshed/actions/docker/cache/restore@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
 #      with:
 #        key: "${{ needs.env.outputs.build-image }}"
 #
@@ -51,13 +51,13 @@ jobs:
     name: "[${{ inputs.arch }}] Prime Docker cache"
     if: ${{ ! fromJSON(inputs.caches).docker[inputs.arch] }}
     steps:
-    - uses: envoyproxy/toolshed/actions/appauth@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
+    - uses: envoyproxy/toolshed/actions/appauth@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
       id: appauth
       name: Appauth (mutex lock)
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
-    - uses: envoyproxy/toolshed/actions/docker/cache/prime@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
+    - uses: envoyproxy/toolshed/actions/docker/cache/prime@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
       id: docker
       name: Prime Docker cache (${{ inputs.image-tag }}${{ inputs.cache-suffix }})
       with:
@@ -65,7 +65,7 @@ jobs:
         key-suffix: ${{ inputs.cache-suffix }}
         lock-token: ${{ steps.appauth.outputs.token }}
         lock-repository: ${{ inputs.lock-repository }}
-    - uses: envoyproxy/toolshed/actions/jq@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
+    - uses: envoyproxy/toolshed/actions/jq@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
       id: data
       name: Cache data
       with:
@@ -73,7 +73,7 @@ jobs:
         input: |
           cached: ${{ steps.docker.outputs.cached }}
           key: ${{ inputs.image-tag }}${{ inputs.cache-suffix }}
-    - uses: envoyproxy/toolshed/actions/json/table@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
+    - uses: envoyproxy/toolshed/actions/json/table@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
       name: Summary
       with:
         json: ${{ steps.data.outputs.value }}

@@ -65,7 +65,7 @@ private:
   // for some protocols (e.g., HTTP/2 frames may span multiple reads/writes).
   // Add sequence number to allow the receiver to reconstruct byte order and
   // determine completeness, similar to TCP sequence numbers.
-  uint64_t seq_num{};
+  uint64_t seq_num_ = 0;
   SocketTapConfigSharedPtr config_;
   Extensions::Common::Tap::PerTapSinkHandleManagerPtr sink_handle_;
   const Network::Connection& connection_;

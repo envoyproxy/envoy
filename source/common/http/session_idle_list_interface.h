@@ -10,6 +10,7 @@ public:
 
   // Terminates the idle session. This is called by the SessionIdleList when
   // the system is overloaded and the session is eligible for termination.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   virtual void TerminateIdleSession() = 0;
 };
 
@@ -19,13 +20,16 @@ public:
   virtual ~SessionIdleListInterface() = default;
 
   // Adds a session to the idle list.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   virtual void AddSession(IdleSessionInterface& session) = 0;
 
   // Removes a session from the idle list.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   virtual void RemoveSession(IdleSessionInterface& session) = 0;
 
   // Terminates idle sessions if they are eligible for termination. This is
   // called by the worker thread when the system is overloaded.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   virtual void MaybeTerminateIdleSessions(bool is_saturated) = 0;
 };
 
