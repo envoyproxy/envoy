@@ -144,8 +144,9 @@ Http::FilterDataStatus A2aFilter::decodeData(Buffer::Instance& data, bool end_st
       }
     }
 
-    if (max_size > 0 && bytes_parsed_ == max_size)
+    if (max_size > 0 && bytes_parsed_ == max_size) {
       break;
+    }
   }
 
   // If we are here, we haven't collected all fields yet.

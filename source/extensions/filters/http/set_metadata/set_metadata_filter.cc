@@ -15,7 +15,7 @@ namespace SetMetadataFilter {
 
 namespace {
 
-void ApplyConfigToMetadata(const Config& config,
+void applyConfigToMetadata(const Config& config,
                            envoy::config::core::v3::Metadata& dynamic_metadata) {
 
   // Add configured untyped metadata.
@@ -97,13 +97,13 @@ SetMetadataFilter::~SetMetadataFilter() = default;
 
 Http::FilterHeadersStatus SetMetadataFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   // Apply global config first.
-  ApplyConfigToMetadata(*config_, decoder_callbacks_->streamInfo().dynamicMetadata());
+  applyConfigToMetadata(*config_, decoder_callbacks_->streamInfo().dynamicMetadata());
 
   // Apply route-specific config if present.
   const Config* route_specific_cfg =
       dynamic_cast<const Config*>(decoder_callbacks_->mostSpecificPerFilterConfig());
   if (route_specific_cfg) {
-    ApplyConfigToMetadata(*route_specific_cfg, decoder_callbacks_->streamInfo().dynamicMetadata());
+    applyConfigToMetadata(*route_specific_cfg, decoder_callbacks_->streamInfo().dynamicMetadata());
   }
 
   return Http::FilterHeadersStatus::Continue;

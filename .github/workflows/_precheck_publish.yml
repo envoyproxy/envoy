@@ -88,7 +88,7 @@ jobs:
           upload-name: docs
           upload-path: generated/docs
           steps-post: |
-            - uses: envoyproxy/toolshed/actions/jq@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
+            - uses: envoyproxy/toolshed/actions/jq@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
               with:
                 output-path: generated/docs/gcs-metadata.json
                 input-format: yaml

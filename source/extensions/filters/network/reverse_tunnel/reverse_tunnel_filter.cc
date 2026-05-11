@@ -581,8 +581,7 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
 
   // Report the connection to the extension -> reporter.
   if (auto extension = socket_manager->getUpstreamExtension()) {
-    extension->reportConnection(std::string(node_id), std::string(cluster_id),
-                                std::string(tenant_id));
+    extension->reportConnection(socket_node_id, socket_cluster_id, tenant_id);
   }
 }
 

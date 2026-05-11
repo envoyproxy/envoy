@@ -181,6 +181,7 @@ public:
     PEM_write_bio_PUBKEY(bio.get(), pkey.get());
     char* pem_data;
     long pem_len = BIO_get_mem_data(bio.get(), &pem_data);
+    // NOLINTNEXTLINE(modernize-return-braced-init-list)
     return std::string(pem_data, pem_len);
   }
 
@@ -228,7 +229,7 @@ TEST_P(MySQLSSLIntegrationTest, CachingSha2FastAuth) {
 
   // Upstream receives the rewritten login in cleartext.
   std::string upstream_data;
-  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return data.length() > 0; },
+  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return !data.empty(); },
                                          &upstream_data));
 
   // 5. Server responds with fast auth success (seq=2, rewritten to seq=3 for client).
@@ -277,7 +278,7 @@ TEST_P(MySQLSSLIntegrationTest, CachingSha2FullAuthRsaMediation) {
   clientWrite(encodeClientLogin(CLIENT_PROTOCOL_41, "testuser", CHALLENGE_SEQ_NUM + 1));
 
   std::string upstream_data;
-  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return data.length() > 0; },
+  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return !data.empty(); },
                                          &upstream_data));
 
   // 4. Server: full auth required (seq=2).
@@ -356,7 +357,7 @@ TEST_P(MySQLSSLIntegrationTest, CachingSha2FullAuthRsaErr) {
   clientWrite(encodeClientLogin(CLIENT_PROTOCOL_41, "testuser", CHALLENGE_SEQ_NUM + 1));
 
   std::string upstream_data;
-  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return data.length() > 0; },
+  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return !data.empty(); },
                                          &upstream_data));
 
   // Full auth required.
@@ -424,7 +425,7 @@ TEST_P(MySQLSSLIntegrationTest, SslTerminateLoginThenQuery) {
   clientWrite(encodeClientLogin(CLIENT_PROTOCOL_41, "testuser", CHALLENGE_SEQ_NUM + 1));
 
   std::string upstream_data;
-  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return data.length() > 0; },
+  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return !data.empty(); },
                                          &upstream_data));
 
   // Server OK (seq=2, rewritten to seq=3 for client).
@@ -476,7 +477,7 @@ TEST_P(MySQLSSLIntegrationTest, CachingSha2FullAuthRsaThenQuery) {
   clientWrite(encodeClientLogin(CLIENT_PROTOCOL_41, "testuser", CHALLENGE_SEQ_NUM + 1));
 
   std::string upstream_data;
-  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return data.length() > 0; },
+  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return !data.empty(); },
                                          &upstream_data));
 
   // Full auth required → client password → RSA.
@@ -749,6 +750,7 @@ public:
     PEM_write_bio_PUBKEY(bio.get(), pkey.get());
     char* pem_data;
     long pem_len = BIO_get_mem_data(bio.get(), &pem_data);
+    // NOLINTNEXTLINE(modernize-return-braced-init-list)
     return std::string(pem_data, pem_len);
   }
 
@@ -785,7 +787,7 @@ TEST_P(MySQLAllowIntegrationTest, AllowSslClientLogin) {
   clientWrite(encodeClientLogin(CLIENT_PROTOCOL_41, "testuser", CHALLENGE_SEQ_NUM + 1));
 
   std::string upstream_data;
-  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return data.length() > 0; },
+  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return !data.empty(); },
                                          &upstream_data));
 
   ASSERT_TRUE(fake_upstream->write(encodeClientLoginResp(MYSQL_RESP_OK)));
@@ -818,7 +820,7 @@ TEST_P(MySQLAllowIntegrationTest, AllowNonSslClientLogin) {
   clientWrite(encodeClientLogin(CLIENT_PROTOCOL_41, "testuser", CHALLENGE_SEQ_NUM));
 
   std::string upstream_data;
-  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return data.length() > 0; },
+  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return !data.empty(); },
                                          &upstream_data));
 
   ASSERT_TRUE(fake_upstream->write(encodeClientLoginResp(MYSQL_RESP_OK)));
@@ -854,7 +856,7 @@ TEST_P(MySQLAllowIntegrationTest, AllowSslFullAuthRsaMediation) {
   clientWrite(encodeClientLogin(CLIENT_PROTOCOL_41, "testuser", CHALLENGE_SEQ_NUM + 1));
 
   std::string upstream_data;
-  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return data.length() > 0; },
+  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return !data.empty(); },
                                          &upstream_data));
 
   // Full auth required.

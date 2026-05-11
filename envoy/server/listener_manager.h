@@ -323,6 +323,8 @@ public:
 // combination of flags, such as listeners(ListenerState::WARMING|ListenerState::ACTIVE)
 constexpr ListenerManager::ListenerState operator|(const ListenerManager::ListenerState lhs,
                                                    const ListenerManager::ListenerState rhs) {
+  // Bitmask combinations intentionally produce intermediate values that are not named enumerators.
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
   return static_cast<ListenerManager::ListenerState>(static_cast<uint8_t>(lhs) |
                                                      static_cast<uint8_t>(rhs));
 }

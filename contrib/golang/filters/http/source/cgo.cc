@@ -113,7 +113,7 @@ CAPIStatus envoyGoFilterHttpSendLocalReply(void* s, int response_code, void* bod
           for (size_t i = 0; i < header_values.size(); i += 2) {
             const auto& key = header_values[i];
             const auto& value = header_values[i + 1];
-            if (value.length() > 0) {
+            if (!value.empty()) {
               headers.addCopy(Http::LowerCaseString(key), value);
             }
           }

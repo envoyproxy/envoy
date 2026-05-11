@@ -103,6 +103,7 @@ protected:
 
 private:
   friend class EnvoyQuicDispatcherTest;
+  // NOLINTNEXTLINE(readability-identifier-naming)
   Http::SessionIdleListInterface* idle_session_list() { return session_idle_list_.get(); }
 
   Network::ConnectionHandler& connection_handler_;
