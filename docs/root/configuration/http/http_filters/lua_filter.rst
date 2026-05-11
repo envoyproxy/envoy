@@ -738,11 +738,13 @@ available methods.
 
 .. _config_http_filters_lua_response_handle_api:
 
-.. note::
+Response handle API
+-------------------
 
-   The response handle passed to ``envoy_on_response`` supports all of the same methods listed
-   above, with two exceptions: ``respond()`` is not available on the response handle, and
-   ``downstreamRequestHeaders()`` (documented below) is available **only** on the response handle.
+The response handle passed to ``envoy_on_response`` supports all of the same methods as the
+:ref:`request handle <config_http_filters_lua_request_handle_api>`, with two exceptions:
+``respond()`` is not available on the response handle, and ``downstreamRequestHeaders()``
+(documented below) is available **only** on the response handle.
 
 ``downstreamRequestHeaders()``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
