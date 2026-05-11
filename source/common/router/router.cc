@@ -884,6 +884,13 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
   if (!upstream_requests_.front()->acceptHeadersFromRouter(end_stream)) {
     return false;
   }
+
+  // If the upstream HTTP filters dropped this request by sending a local reply, we should not
+  // start any shadow streams since the request won't be proxied upstream.
+  if (saw_local_reply_) {
+    active_shadow_policies.clear();
+  }
+
   // Start the shadow streams.
   const size_t num_shadow_policies = active_shadow_policies.size();
   for (size_t i = 0; i < num_shadow_policies; ++i) {
@@ -944,8 +951,9 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
     onRequestComplete();
   }
 
-  // If this was called due to asynchronous host selection, the caller should continueDecoding.
-  return true;
+  // If this was called due to asynchronous host selection, the caller should continueDecoding
+  // if and only if we did not send a local reply.
+  return !saw_local_reply_;
 }
 
 std::unique_ptr<GenericConnPool> Filter::createConnPool(Upstream::ThreadLocalCluster& cluster,
@@ -1976,7 +1984,7 @@ void Filter::onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_re
   // When route retry policy is configured and an upstream filter is returning StopIteration
   // in it's encodeHeaders() method, upstream_requests_.size() is equal to 0 in this case,
   // and we should just return.
-  if (upstream_requests_.size() == 0) {
+  if (upstream_requests_.empty()) {
     return;
   }
 
@@ -2000,7 +2008,7 @@ void Filter::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
   // When route retry policy is configured and an upstream filter is returning StopIteration
   // in it's encodeHeaders() method, upstream_requests_.size() is equal to 0 in this case,
   // and we should just return.
-  if (upstream_requests_.size() == 0) {
+  if (upstream_requests_.empty()) {
     return;
   }
 

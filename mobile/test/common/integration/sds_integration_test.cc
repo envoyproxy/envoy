@@ -9,6 +9,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -94,17 +95,17 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_P(SdsIntegrationTest, SdsForUpstreamCluster) {
   // Wait until the new cluster from CDS is added before sending the SDS response.
   sendCdsResponse();
-  ASSERT_TRUE(waitForCounterGe("cluster_manager.cluster_added", 1));
+  ASSERT_TRUE(waitForCounter("cluster_manager.cluster_added", Ge(1)));
 
   // Wait until the Envoy instance has obtained an updated secret from the SDS cluster. This
   // verifies that the SDS API is working from the Envoy client and allows us to know we can start
   // sending HTTP requests to the upstream cluster using the secret.
   sendSdsResponse(getClientSecret());
-  ASSERT_TRUE(waitForCounterGe(fmt::format("sds.{}.update_success", SECRET_NAME), 1));
+  ASSERT_TRUE(waitForCounter(fmt::format("sds.{}.update_success", SECRET_NAME), Ge(1)));
   ASSERT_TRUE(
-      waitForCounterGe(fmt::format("cluster.{}.client_ssl_socket_factory.ssl_context_update_by_sds",
-                                   XDS_CLUSTER_NAME),
-                       1));
+      waitForCounter(fmt::format("cluster.{}.client_ssl_socket_factory.ssl_context_update_by_sds",
+                                 XDS_CLUSTER_NAME),
+                     Ge(1)));
 }
 
 } // namespace

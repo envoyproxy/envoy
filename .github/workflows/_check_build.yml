@@ -5,6 +5,9 @@ permissions:
 
 on:
   workflow_call:
+    secrets:
+      dockerhub-token:
+      slack-bot-token:
     inputs:
       request:
         type: string
@@ -20,6 +23,9 @@ concurrency:
 
 jobs:
   build:
+    secrets:
+      dockerhub-token: ${{ secrets.dockerhub-token }}
+      slack-bot-token: ${{ secrets.slack-bot-token }}
     permissions:
       actions: read
       contents: read
@@ -38,7 +44,9 @@ jobs:
         Error:
       rbe: true
       request: ${{ inputs.request }}
+      catch-errors: ${{ matrix.catch-errors || false }}
       skip: ${{ matrix.skip != false && true || false }}
+      slack-channel: ${{ matrix.slack-channel || '' }}
       target: ${{ matrix.target }}
       timeout-minutes: 180
       trusted: ${{ inputs.trusted }}
@@ -56,3 +64,5 @@ jobs:
         - target: openssl
           name: OpenSSL
           skip: ${{ ! fromJSON(inputs.request).run.check-build-openssl }}
+          catch-errors: true
+          slack-channel: '#envoy-openssl'

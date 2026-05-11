@@ -26,6 +26,10 @@ public:
       "/reverse_connections/request";
   static constexpr absl::string_view TENANT_SCOPE_DELIMITER = ":";
 
+  // Upgrade token advertised when the handshake is negotiated as an HTTP/1.1 Upgrade.
+  // Used by both the initiator (request `Upgrade:` header) and responder (`101` response).
+  static constexpr absl::string_view REVERSE_TUNNEL_UPGRADE_PROTOCOL = "reverse-tunnel";
+
   struct TenantScopedIdentifierView {
     absl::string_view tenant;
     absl::string_view identifier;

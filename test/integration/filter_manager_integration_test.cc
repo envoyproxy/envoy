@@ -734,7 +734,7 @@ TEST_F(NetworkFilterAccessLogIntegrationTest, AccessLogHandlerCalled) {
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
-  test_server_->waitForCounterGe("test_access_log_filter.log_called", 1);
+  test_server_->waitForCounter("test_access_log_filter.log_called", testing::Ge(1));
 }
 
 } // namespace

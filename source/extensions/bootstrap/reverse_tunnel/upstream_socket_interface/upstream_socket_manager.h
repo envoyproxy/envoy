@@ -38,7 +38,7 @@ public:
   UpstreamSocketManager(Event::Dispatcher& dispatcher,
                         ReverseTunnelAcceptorExtension* extension = nullptr);
 
-  ~UpstreamSocketManager();
+  ~UpstreamSocketManager() override;
 
   /**
    * Add accepted connection to socket manager.

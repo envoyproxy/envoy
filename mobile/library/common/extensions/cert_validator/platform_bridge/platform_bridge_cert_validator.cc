@@ -109,6 +109,8 @@ ValidationResults PlatformBridgeCertValidator::doVerifyCertChain(
   ValidationJob job;
   job.result_callback_ = std::move(callback);
   Event::Dispatcher& dispatcher = job.result_callback_->dispatcher();
+  ASSERT(Thread::MainThread::isMainOrTestThread(),
+         "Certification validation must happen on the main thread.");
   Thread::Options thread_options;
   thread_options.priority_ = thread_priority_;
   job.validation_thread_ = thread_factory_->createThread(

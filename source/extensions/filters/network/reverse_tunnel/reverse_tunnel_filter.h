@@ -62,6 +62,9 @@ public:
   // Returns the required cluster name for validation.
   const std::string& requiredClusterName() const { return required_cluster_name_; }
 
+  // Returns whether the handshake is negotiated as an HTTP/1.1 Upgrade exchange.
+  bool useHttpUpgrade() const { return use_http_upgrade_; }
+
 private:
   ReverseTunnelFilterConfig(
       const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
@@ -83,6 +86,9 @@ private:
 
   // Required cluster name for validation (empty means no validation).
   const std::string required_cluster_name_;
+
+  // When true, expect `Connection: Upgrade` + `Upgrade: reverse-tunnel` and respond `101`.
+  const bool use_http_upgrade_{false};
 };
 
 using ReverseTunnelFilterConfigSharedPtr = std::shared_ptr<ReverseTunnelFilterConfig>;

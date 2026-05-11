@@ -15,8 +15,10 @@ envoy_cc_library(
     hdrs = [
         "dynamic_modules.h",
     ],
+    external_deps = ["ssl"],
     deps = [
         "//envoy/common:exception_lib",
+        "//source/common/common:hex_lib",
         "//source/common/common:utility_lib",
         "//source/extensions/dynamic_modules/abi",
     ],

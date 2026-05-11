@@ -8,6 +8,7 @@ on:
     secrets:
       app-id:
       app-key:
+      dockerhub-token:
       rbe-key:
       ssh-key-extra:
     inputs:
@@ -132,14 +133,15 @@ on:
 
 jobs:
   ci:
-    uses: ./.github/workflows/_run.yml
-    name: ${{ inputs.target }}
+    secrets:
+      dockerhub-token: ${{ secrets.dockerhub-token }}
+      ssh-key-extra: ${{ secrets.ssh-key-extra }}
     permissions:
       actions: read
       contents: read
       packages: read
-    secrets:
-      ssh-key-extra: ${{ secrets.ssh-key-extra }}
+    uses: ./.github/workflows/_run.yml
+    name: ${{ inputs.target }}
     with:
       args: ${{ inputs.args }}
       rbe: ${{ inputs.rbe }}

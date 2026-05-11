@@ -34,6 +34,15 @@ minor_behavior_changes:
     Optimized prometheus stats endpoint. Users should see a roughly 30-40% latency improvement in calls to the endpoint
     for cases where the scrape results in lots of cluster stats.
     There should be no visible changes to users, or incompatibilities.
+- area: tls
+  change: |
+    ``SslSocket`` now reports ``ECONNRESET`` as ``ConnectionReset`` by reading the system error
+    code from BoringSSL's error queue, matching ``RawBufferSocket`` behavior. When a connection
+    is closed with ``ConnectionCloseType::AbortReset``, ``SslSocket`` also skips the TLS
+    ``close_notify`` shutdown so the peer reliably observes a TCP RST instead of racing a
+    graceful close against the reset.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.ssl_socket_report_connection_reset`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -72,6 +81,12 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: tcp_proxy
+  change: |
+    Added :ref:`check_drain_close
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.check_drain_close>` to the TCP proxy
+    filter to close downstream connections with ``FlushWrite`` when the drain manager requests drain close during
+    downstream read or write handling.
 - area: stat_sinks
   change: |
     Added :ref:`max_data_points_per_request
@@ -128,6 +143,34 @@ new_features:
     in the composite HTTP filter. Now users could specify the matcher inline in the filter configuration
     instead of using the :ref:`ExtensionWithMatcher
     <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` filter.
+- area: resource_monitors
+  change: |
+    Overload manager fixed heap resource monitor now supports :ref:`max_heap_size_bytes_runtime
+    <envoy_v3_api_field_extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig.max_heap_size_bytes_runtime>`
+    for runtime-overridable max heap size (e.g. RTDS or ``/runtime_modify``).
+- area: jwt_authn
+  change: |
+    Added :ref:`verification_status_header
+    <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.ExtractOnlyWithoutValidation.verification_status_header>`
+    to the ``ExtractOnlyWithoutValidation`` requirement. When a JWT is present in the request but fails
+    signature verification, the named request header (default ``x-jwt-signature-verified``) is set to
+    ``false`` so downstream filters (RBAC, ext_authz) can distinguish forwarded-but-unverified claims
+    from validated ones. The header is not set on a successfully verified JWT or when no JWT is present.
+    This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.jwt_authn_add_verification_status_header`` to ``false``.
+- area: access_log
+  change: |
+    Added ``%UPSTREAM_SERVER_NAME%`` access log formatter returning the SNI from the established upstream
+    TLS connection.
+- area: attributes
+  change: |
+    Added ``upstream.server_name`` CEL attribute returning the SNI from the established upstream
+    TLS connection.
+
+- area: tls
+  change: |
+    Added substitution commands ``%DOWNSTREAM_TLS_GROUP%`` and ``%UPSTREAM_TLS_GROUP%``. The TLS group may be used
+    to discern if a TLS connection used a post quantum safe key exchange (e.g. X25519MLKEM768).
 - area: upstream
   change: |
     Added ``onHostSelected()`` pre-connection callback to the ``UpstreamCallbacks`` interface. Upstream
