@@ -17,6 +17,8 @@
 #include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -181,8 +183,8 @@ void WebsocketIntegrationTest::performUpgrade(
   auto encoder_decoder = codec_client_->startRequest(upgrade_request_headers);
   request_encoder_ = &encoder_decoder.first;
   response_ = std::move(encoder_decoder.second);
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_upgrades_total", 1);
-  test_server_->waitForGaugeGe("http.config_test.downstream_cx_upgrades_active", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_upgrades_total", Ge(1));
+  test_server_->waitForGauge("http.config_test.downstream_cx_upgrades_active", Ge(1));
 
   // Verify the upgrade was received upstream.
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
@@ -228,7 +230,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionDownstreamDisconnect) {
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "hellobye!"));
 
   ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
-  test_server_->waitForGaugeEq("http.config_test.downstream_cx_upgrades_active", 0);
+  test_server_->waitForGauge("http.config_test.downstream_cx_upgrades_active", Eq(0));
 }
 
 TEST_P(WebsocketIntegrationTest, PortStrippingForHttp2) {
@@ -262,8 +264,8 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
         auto* route_config = hcm.mutable_route_config();
         auto* virtual_host = route_config->mutable_virtual_hosts(0);
         auto* route = virtual_host->mutable_routes(0)->mutable_route();
-        route->mutable_idle_timeout()->set_seconds(0);
-        route->mutable_idle_timeout()->set_nanos(200 * 1000 * 1000);
+        route->mutable_idle_timeout()->set_seconds(1);
+        route->mutable_idle_timeout()->set_nanos(0);
       });
   initialize();
 
@@ -271,7 +273,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
   performUpgrade(upgradeRequestHeaders(), upgradeResponseHeaders());
   sendBidirectionalData();
 
-  test_server_->waitForCounterGe("http.config_test.downstream_rq_idle_timeout", 1);
+  test_server_->waitForCounter("http.config_test.downstream_rq_idle_timeout", Ge(1));
   waitForClientDisconnectOrReset();
   ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
 }
@@ -619,8 +621,8 @@ TEST_P(WebsocketIntegrationTest, Http1UpgradeStatusCodeOK) {
   EXPECT_EQ("upgrade", response_->headers().Connection()->value().getStringView());
   EXPECT_EQ("websocket", response_->headers().Upgrade()->value().getStringView());
 
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
-  test_server_->waitForGaugeEq("http.config_test.downstream_cx_upgrades_active", 0);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
+  test_server_->waitForGauge("http.config_test.downstream_cx_upgrades_active", Eq(0));
   ASSERT_TRUE(codec_client_->waitForDisconnect());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
@@ -641,7 +643,7 @@ TEST_P(WebsocketIntegrationTest, NonHttp1UpgradeStatusCodeOK) {
 
   // HTTP2 upstream response 200 is converted to 101.
   EXPECT_EQ("101", response_->headers().Status()->value().getStringView());
-  test_server_->waitForGaugeEq("http.config_test.downstream_cx_upgrades_active", 1);
+  test_server_->waitForGauge("http.config_test.downstream_cx_upgrades_active", Eq(1));
   codec_client_->close();
 }
 
@@ -661,7 +663,7 @@ TEST_P(WebsocketIntegrationTest, NoHttp1UpstreamUpgradeStatus201) {
   performUpgrade(upgradeRequestHeaders(), correct_status_response_headers, true);
 
   EXPECT_EQ("201", response_->headers().Status()->value().getStringView());
-  test_server_->waitForGaugeEq("http.config_test.downstream_cx_upgrades_active", 1);
+  test_server_->waitForGauge("http.config_test.downstream_cx_upgrades_active", Eq(1));
   codec_client_->close();
 }
 
@@ -690,8 +692,8 @@ TEST_P(WebsocketIntegrationTest, Http1UpgradeStatusCodeUpgradeRequired) {
   EXPECT_EQ("upgrade", response_->headers().Connection()->value().getStringView());
   EXPECT_EQ("websocket", response_->headers().Upgrade()->value().getStringView());
 
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
-  test_server_->waitForGaugeEq("http.config_test.downstream_cx_upgrades_active", 0);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
+  test_server_->waitForGauge("http.config_test.downstream_cx_upgrades_active", Eq(0));
   ASSERT_TRUE(codec_client_->waitForDisconnect());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
@@ -718,8 +720,8 @@ TEST_P(WebsocketIntegrationTest, Http1UpgradeStatus5OOWithFilterChain) {
   performUpgrade(upgradeRequestHeaders(), in_correct_status_response_headers, true);
   EXPECT_EQ("500", response_->headers().Status()->value().getStringView());
 
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 0);
-  test_server_->waitForGaugeEq("http.config_test.downstream_cx_upgrades_active", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(0));
+  test_server_->waitForGauge("http.config_test.downstream_cx_upgrades_active", Eq(1));
   codec_client_->close();
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
@@ -748,8 +750,8 @@ TEST_P(WebsocketIntegrationTest, Http1UpgradeRetryWithFilterChain) {
   auto encoder_decoder = codec_client_->startRequest(upgradeRequestHeaders());
   request_encoder_ = &encoder_decoder.first;
   response_ = std::move(encoder_decoder.second);
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_upgrades_total", 1);
-  test_server_->waitForGaugeGe("http.config_test.downstream_cx_upgrades_active", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_upgrades_total", Ge(1));
+  test_server_->waitForGauge("http.config_test.downstream_cx_upgrades_active", Ge(1));
 
   // Verify the first upgrade was received upstream.
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
@@ -769,7 +771,7 @@ TEST_P(WebsocketIntegrationTest, Http1UpgradeRetryWithFilterChain) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   validateUpgradeRequestHeaders(upstream_request_->headers(), upgradeRequestHeaders());
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_retry", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_retry", Eq(1));
 
   // Send the successful 101 upgrade response on the second try
   auto success_response_headers = upgradeResponseHeaders();
@@ -781,7 +783,7 @@ TEST_P(WebsocketIntegrationTest, Http1UpgradeRetryWithFilterChain) {
   EXPECT_EQ("upgrade", response_->headers().Connection()->value().getStringView());
   EXPECT_EQ("websocket", response_->headers().Upgrade()->value().getStringView());
   validateUpgradeResponseHeaders(response_->headers(), success_response_headers);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_retry_success", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_retry_success", Eq(1));
 
   // Verify successful websocket connection by sending bidirectional data
   sendBidirectionalData();
@@ -850,8 +852,8 @@ TEST_P(WebsocketIntegrationTest, WebSocketUpgradePerTryTimeout) {
         auto* route_config = hcm.mutable_route_config();
         auto* virtual_host = route_config->mutable_virtual_hosts(0);
         auto* route = virtual_host->mutable_routes(0)->mutable_route();
-        route->mutable_retry_policy()->mutable_per_try_timeout()->set_nanos(
-            200 * 1000 * 1000); // 200ms per-try timeout
+        route->mutable_retry_policy()->mutable_per_try_timeout()->set_seconds(
+            2); // 2s per-try timeout (safe under msan/tsan)
       });
   initialize();
 
@@ -859,13 +861,13 @@ TEST_P(WebsocketIntegrationTest, WebSocketUpgradePerTryTimeout) {
   auto encoder_decoder = codec_client_->startRequest(upgradeRequestHeaders());
   request_encoder_ = &encoder_decoder.first;
   response_ = std::move(encoder_decoder.second);
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_upgrades_total", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_upgrades_total", Ge(1));
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
 
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_per_try_timeout", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_per_try_timeout", Ge(1));
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_EQ("504", response_->headers().getStatusValue());
 
@@ -886,7 +888,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketUpgradeRouteTimeout) {
         auto* route_config = hcm.mutable_route_config();
         auto* virtual_host = route_config->mutable_virtual_hosts(0);
         auto* route = virtual_host->mutable_routes(0)->mutable_route();
-        route->mutable_timeout()->set_nanos(200 * 1000 * 1000); // 200ms route timeout
+        route->mutable_timeout()->set_seconds(2); // 2s route timeout (safe under msan/tsan)
       });
   initialize();
 
@@ -894,13 +896,13 @@ TEST_P(WebsocketIntegrationTest, WebSocketUpgradeRouteTimeout) {
   auto encoder_decoder = codec_client_->startRequest(upgradeRequestHeaders());
   request_encoder_ = &encoder_decoder.first;
   response_ = std::move(encoder_decoder.second);
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_upgrades_total", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_upgrades_total", Ge(1));
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
 
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_timeout", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_timeout", Ge(1));
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_EQ("504", response_->headers().getStatusValue());
 
@@ -922,7 +924,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketUpgradeRouteTimeoutWithRetries) {
         auto* route_config = hcm.mutable_route_config();
         auto* virtual_host = route_config->mutable_virtual_hosts(0);
         auto* route = virtual_host->mutable_routes(0)->mutable_route();
-        route->mutable_timeout()->set_nanos(200 * 1000 * 1000); // 200ms route timeout
+        route->mutable_timeout()->set_seconds(2); // 2s route timeout
       });
   initialize();
 
@@ -930,17 +932,17 @@ TEST_P(WebsocketIntegrationTest, WebSocketUpgradeRouteTimeoutWithRetries) {
   auto encoder_decoder = codec_client_->startRequest(upgradeRequestHeaders());
   request_encoder_ = &encoder_decoder.first;
   response_ = std::move(encoder_decoder.second);
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_upgrades_total", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_upgrades_total", Ge(1));
 
   // First attempt - send 500 to trigger retry
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  upstream_request_->encodeHeaders(upgradeFailedResponseHeaders(), false);
+  upstream_request_->encodeHeaders(upgradeFailedResponseHeaders(), true);
 
   // Wait for the first request to be reset or disconnected
   ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_retry", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_retry", Eq(1));
 
   // Second attempt - wait for new connection or reuse existing one
   FakeHttpConnectionPtr fake_upstream_connection2;
@@ -956,7 +958,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketUpgradeRouteTimeoutWithRetries) {
   ASSERT_TRUE(upstream_request2->waitForHeadersComplete());
 
   // Route timeout should still fire after retry
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_timeout", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_timeout", Ge(1));
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_EQ("504", response_->headers().getStatusValue());
 

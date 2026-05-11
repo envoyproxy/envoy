@@ -55,14 +55,14 @@ jobs:
       caches: ${{ steps.caches.outputs.value }}
       config: ${{ steps.config.outputs.config }}
     steps:
-    - uses: envoyproxy/toolshed/actions/jq@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+    - uses: envoyproxy/toolshed/actions/jq@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
       id: started
       name: Create timestamp
       with:
         options: -r
         filter: |
           now
-    - uses: envoyproxy/toolshed/actions/github/checkout@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+    - uses: envoyproxy/toolshed/actions/github/checkout@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
       id: checkout
       name: Checkout Envoy repository (requested)
       with:
@@ -76,7 +76,7 @@ jobs:
     # *ALL* variables collected should be treated as untrusted and should be sanitized before
     # use
     - name: Generate environment variables from commit
-      uses: envoyproxy/toolshed/actions/envoy/ci/request@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+      uses: envoyproxy/toolshed/actions/envoy/ci/request@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
       id: env
       with:
         branch-name: ${{ steps.checkout.outputs.branch-name }}
@@ -87,7 +87,7 @@ jobs:
         vars: ${{ toJSON(vars) }}
         working-directory: requested
 
-    - uses: envoyproxy/toolshed/actions/github/checkout@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+    - uses: envoyproxy/toolshed/actions/github/checkout@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
       id: checkout-target
       name: Checkout Envoy repository (target branch)
       with:
@@ -95,7 +95,7 @@ jobs:
         config: |
           fetch-depth: 1
           path: target
-    - uses: envoyproxy/toolshed/actions/hashfiles@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+    - uses: envoyproxy/toolshed/actions/hashfiles@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
       id: bazel-cache-hash
       name: Bazel cache hash
       with:
@@ -104,7 +104,7 @@ jobs:
 
     - name: Request summary
       id: summary
-      uses: envoyproxy/toolshed/actions/github/env/summary@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+      uses: envoyproxy/toolshed/actions/github/env/summary@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
       with:
         actor: ${{ toJSON(fromJSON(steps.env.outputs.data).request.actor) }}
         base-sha: ${{ fromJSON(steps.env.outputs.data).request.base-sha }}
@@ -120,28 +120,28 @@ jobs:
         target-branch: ${{ fromJSON(steps.env.outputs.data).request.target-branch }}
 
     - id: cache-id-bazel-x64
-      uses: envoyproxy/toolshed/actions/github/artifact/cache/id@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+      uses: envoyproxy/toolshed/actions/github/artifact/cache/id@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
       with:
         name: ${{ steps.bazel-cache-hash.outputs.value }}-x64
         wf-path: .github/workflows/request.yml
     - id: cache-id-bazel-arm64
-      uses: envoyproxy/toolshed/actions/github/artifact/cache/id@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+      uses: envoyproxy/toolshed/actions/github/artifact/cache/id@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
       with:
         name: ${{ steps.bazel-cache-hash.outputs.value }}-arm64
         wf-path: .github/workflows/request.yml
     - id: cache-id-bazel-docs-x64
-      uses: envoyproxy/toolshed/actions/github/artifact/cache/id@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+      uses: envoyproxy/toolshed/actions/github/artifact/cache/id@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
       with:
         name: ${{ steps.bazel-cache-hash.outputs.value }}-docs-x64
         wf-path: .github/workflows/request.yml
     - id: cache-id-bazel-external-x64
-      uses: envoyproxy/toolshed/actions/github/artifact/cache/id@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+      uses: envoyproxy/toolshed/actions/github/artifact/cache/id@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
       with:
         name: ${{ steps.bazel-cache-hash.outputs.value }}-external-x64
         wf-path: .github/workflows/request.yml
 
     - name: Environment data
-      uses: envoyproxy/toolshed/actions/jq@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+      uses: envoyproxy/toolshed/actions/jq@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
       id: data
       with:
         input: |
@@ -189,7 +189,7 @@ jobs:
         path: /tmp/cache
         key: ${{ fromJSON(steps.data.outputs.value).request.build-image.default }}-arm64
     - name: Caches
-      uses: envoyproxy/toolshed/actions/jq@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+      uses: envoyproxy/toolshed/actions/jq@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
       id: caches
       with:
         input-format: yaml
@@ -205,8 +205,8 @@ jobs:
           target-branch: ${{ fromJSON(steps.env.outputs.data).request.target-branch }}
         filter: |
           .["target-branch"] as $branch
-          | if ($branch | test("^release/v[0-9]+\\.[0-9]+$")) then
-              ($branch | sub("^release/v"; "") + ".0") as $version_str
+          | if ($branch | test("^(release/v|patches/)[0-9]+\\.[0-9]+$")) then
+              ($branch | sub("^(release/v|patches/)"; "") + ".0") as $version_str
               | ($version_str | utils::version) as $version
               | if ($version.major < 1 or ($version.major == 1 and $version.minor <= 37)) then
                   .bazel["docs-x64"] = "skip"

@@ -92,7 +92,7 @@ parseTrustBundles(absl::string_view trust_bundle_mapping_str) {
                 return false;
               }
               const auto& certs = key->getStringArray("x5c");
-              if (!certs.ok() || (*certs).size() == 0) {
+              if (!certs.ok() || (*certs).empty()) {
                 parsing_status = absl::InvalidArgumentError(fmt::format(
                     "missing or empty 'x5c' field found in keys for domain: '{}'", domain_name));
                 return false;

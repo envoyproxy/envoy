@@ -102,6 +102,9 @@ without further review.
 * Antonio Leonti ([antoniovleonti](https://github.com/antoniovleonti)) (leonti@google.com)
 * Takeshi Yoneda ([mathetake](https://github.com/mathetake)) (tyoneda@netflix.com)
 * Reuben Tanner ([reubent-goog](https://github.com/reubent-goog)) (reubent@google.com)
+* Paul Ogilby ([paul-r-gall](https://github.com/paul-r-gall)) (pgal@google.com)
+* Peng Gao ([penguingao](https://github.com/penguingao)) (pengg@google.com)
+* Jonh Wendell ([jwendell](https://github.com/jwendell)) (jwendell@redhat.com)
 
 # Emeritus maintainers
 

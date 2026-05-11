@@ -44,6 +44,7 @@ namespace Http {
 namespace Http2 {
 
 // Types inherited from nghttp2 and preserved in oghttp2
+// NOLINTBEGIN(readability-identifier-naming)
 enum ErrorType {
   OGHTTP2_NO_ERROR,
   OGHTTP2_PROTOCOL_ERROR,
@@ -60,6 +61,7 @@ enum ErrorType {
   OGHTTP2_INADEQUATE_SECURITY,
   OGHTTP2_HTTP_1_1_REQUIRED,
 };
+// NOLINTEND(readability-identifier-naming)
 
 class Http2CodecImplTestFixture;
 

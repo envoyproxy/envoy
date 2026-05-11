@@ -26,6 +26,8 @@
 #include "gtest/gtest.h"
 
 using testing::AssertionResult;
+using testing::Eq;
+using testing::Ge;
 
 namespace Envoy {
 
@@ -48,16 +50,16 @@ TEST_P(AdsIntegrationTest, BasicClusterInitialWarming) {
   EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       cds_type_url, {buildCluster("cluster_0")}, {buildCluster("cluster_0")}, {}, "1");
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
-  test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_0.warming_state", Eq(1));
   EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {"cluster_0"}, {"cluster_0"}, {}));
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       eds_type_url, {buildClusterLoadAssignment("cluster_0")},
       {buildClusterLoadAssignment("cluster_0")}, {}, "1");
 
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
-  test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 0);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(2));
+  test_server_->waitForGauge("cluster.cluster_0.warming_state", Eq(0));
 }
 
 // Basic CDS/EDS update that warms and makes active a single cluster.
@@ -71,16 +73,16 @@ TEST_P(AdsIntegrationTest, BasicClusterInitialWarmingWithResourceWrapper) {
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       cds_type_url, {buildCluster("cluster_0")}, {buildCluster("cluster_0")}, {}, "1",
       {{"test", Protobuf::Any()}});
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
-  test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_0.warming_state", Eq(1));
   EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {"cluster_0"}, {"cluster_0"}, {}));
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       eds_type_url, {buildClusterLoadAssignment("cluster_0")},
       {buildClusterLoadAssignment("cluster_0")}, {}, "1", {{"test", Protobuf::Any()}});
 
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
-  test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 0);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(2));
+  test_server_->waitForGauge("cluster.cluster_0.warming_state", Eq(0));
 }
 
 // Tests that the Envoy xDS client can handle updates to a subset of the subscribed resources from
@@ -98,9 +100,9 @@ TEST_P(AdsIntegrationTest, UpdateToSubsetOfResources) {
   EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {cluster_0, cluster_1},
                                                              {cluster_0, cluster_1}, {}, "1");
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 2);
-  test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 1);
-  test_server_->waitForGaugeEq("cluster.cluster_1.warming_state", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(2));
+  test_server_->waitForGauge("cluster.cluster_0.warming_state", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_1.warming_state", Eq(1));
   EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {cluster_0.name(), cluster_1.name()},
                                       {cluster_0.name(), cluster_1.name()}, {}));
   auto cla_0 = buildClusterLoadAssignment(cluster_0.name());
@@ -108,10 +110,10 @@ TEST_P(AdsIntegrationTest, UpdateToSubsetOfResources) {
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       eds_type_url, {cla_0, cla_1}, {cla_0, cla_1}, {}, "1");
 
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
-  test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 0);
-  test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 0);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(4));
+  test_server_->waitForGauge("cluster.cluster_0.warming_state", Eq(0));
+  test_server_->waitForGauge("cluster.cluster_0.warming_state", Eq(0));
 
   // Send an update for one of the ClusterLoadAssignments only.
   cla_0.mutable_endpoints(0)->mutable_lb_endpoints(0)->mutable_load_balancing_weight()->set_value(
@@ -121,10 +123,10 @@ TEST_P(AdsIntegrationTest, UpdateToSubsetOfResources) {
 
   // Verify that getting an update for only one of the ClusterLoadAssignment resources does not
   // delete the other. We use cluster membership health as a proxy for this.
-  test_server_->waitForCounterEq("cluster.cluster_0.update_success", 2);
-  test_server_->waitForCounterEq("cluster.cluster_1.update_success", 1);
-  test_server_->waitForGaugeEq("cluster.cluster_0.membership_healthy", 1);
-  test_server_->waitForGaugeEq("cluster.cluster_1.membership_healthy", 1);
+  test_server_->waitForCounter("cluster.cluster_0.update_success", Eq(2));
+  test_server_->waitForCounter("cluster.cluster_1.update_success", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_0.membership_healthy", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(1));
 }
 
 // Update the only warming cluster. Verify that the new cluster is still warming and the cluster
@@ -138,7 +140,7 @@ TEST_P(AdsIntegrationTest, ClusterInitializationUpdateTheOnlyWarmingCluster) {
   EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       cds_type_url, {buildCluster("cluster_0")}, {buildCluster("cluster_0")}, {}, "1");
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(1));
   // Update lb policy to MAGLEV so that cluster update is not skipped due to the same hash.
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       cds_type_url, {buildCluster("cluster_0", envoy::config::cluster::v3::Cluster::MAGLEV)},
@@ -148,8 +150,8 @@ TEST_P(AdsIntegrationTest, ClusterInitializationUpdateTheOnlyWarmingCluster) {
       eds_type_url, {buildClusterLoadAssignment("cluster_0")},
       {buildClusterLoadAssignment("cluster_0")}, {}, "1");
 
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(2));
 }
 
 // Primary cluster is warming during cluster initialization. Update the cluster with immediate ready
@@ -189,15 +191,15 @@ TEST_P(AdsIntegrationTest, TestPrimaryClusterWarmClusterInitialization) {
   ASSERT_TRUE(fake_upstreams_.back()->waitForRawConnection(fake_upstream_connection));
 
   // fake_cluster is in warming.
-  test_server_->waitForGaugeGe("cluster_manager.warming_clusters", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Ge(1));
 
   // Now replace the warming cluster by the config which will turn ready immediately.
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {active_cluster},
                                                              {active_cluster}, {}, "2");
 
   // All clusters are ready.
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(2));
 }
 
 // Two cluster warming, update one of them. Verify that the clusters are eventually initialized.
@@ -216,7 +218,7 @@ TEST_P(AdsIntegrationTest, ClusterInitializationUpdateOneOfThe2Warming) {
        buildCluster("cluster_0"), buildCluster("cluster_1")},
       {}, "1");
 
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 2);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(2));
 
   // Update lb policy to MAGLEV so that cluster update is not skipped due to the same hash.
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
@@ -235,8 +237,8 @@ TEST_P(AdsIntegrationTest, ClusterInitializationUpdateOneOfThe2Warming) {
       {buildClusterLoadAssignment("cluster_0"), buildClusterLoadAssignment("cluster_1")},
       {buildClusterLoadAssignment("cluster_0"), buildClusterLoadAssignment("cluster_1")}, {}, "1");
 
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(4));
 }
 
 // Verify that Delta SDS Removals don't result in a NACK.
@@ -280,7 +282,7 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
       compareDeltaDiscoveryRequest(sds_type_url, {"validation_context"}, {}, {}, {}, false));
 
   // Cluster should start off warming as the secret is being requested.
-  test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 1);
+  test_server_->waitForGauge("cluster.cluster_0.warming_state", Eq(1));
 
   // Ack the original CDS sub.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(cds_type_url, {}, {}, {}, {}, false));
@@ -291,7 +293,7 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
 
   // The cluster shouldn't be warming anymore since the server signaled
   // that the requested resource doesn't exist.
-  test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 0);
+  test_server_->waitForGauge("cluster.cluster_0.warming_state", Eq(0));
 
   // Ack the original LDS subscription.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(lds_type_url, {}, {}, {}, {}, false));
@@ -323,7 +325,7 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
   // Follow that up with a secret removal.
   sendDeltaDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
       sds_type_url, {}, {"validation_context"}, "3");
-  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 1);
+  test_server_->waitForCounter("cluster_manager.cluster_removed", Eq(1));
   // Ack the CDS removal.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(cds_type_url, {}, {}, {}, {}, false));
   // Should be an ACK, not a NACK since the SDS removal is ignored.
@@ -365,9 +367,9 @@ TEST_P(AdsIntegrationTest, ClusterSharingSecretWarming) {
 
   EXPECT_TRUE(compareDiscoveryRequest(sds_type_url, "", {"validation_context"},
                                       {"validation_context"}, {}));
-  test_server_->waitForGaugeGe("cluster_manager.warming_clusters", 2);
-  test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 1);
-  test_server_->waitForGaugeEq("cluster.cluster_1.warming_state", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Ge(2));
+  test_server_->waitForGauge("cluster.cluster_0.warming_state", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_1.warming_state", Eq(1));
 
   envoy::extensions::transport_sockets::tls::v3::Secret validation_context;
   TestUtility::loadFromYaml(fmt::format(R"EOF(
@@ -382,7 +384,7 @@ TEST_P(AdsIntegrationTest, ClusterSharingSecretWarming) {
 
   sendDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
       sds_type_url, {validation_context}, {validation_context}, {}, "1");
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
 }
 
 // Make sure two clusters with different secrets send only a single SDS request.
@@ -422,7 +424,7 @@ TEST_P(AdsIntegrationTest, SecretsPausedDuringCDS) {
   EXPECT_TRUE(compareDiscoveryRequest(sds_type_url, "",
                                       {"validation_context_0", "validation_context_1"},
                                       {"validation_context_0", "validation_context_1"}, {}));
-  test_server_->waitForGaugeGe("cluster_manager.warming_clusters", 2);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Ge(2));
 
   std::vector<envoy::extensions::transport_sockets::tls::v3::Secret> validation_contexts;
   for (int i = 0; i < 2; ++i) {
@@ -442,7 +444,7 @@ TEST_P(AdsIntegrationTest, SecretsPausedDuringCDS) {
 
   sendDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
       sds_type_url, validation_contexts, validation_contexts, {}, "1");
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
 }
 
 // Validate basic config delivery and upgrade with RateLimiting.
@@ -522,7 +524,7 @@ TEST_P(AdsIntegrationTest, Failure) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "1",
                                       {"route_config_0"}, {}, {}));
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
 
   makeSingleRequest();
 }
@@ -626,7 +628,7 @@ TEST_P(AdsIntegrationTest, DuplicateWarmingListeners) {
       {buildListener("duplicae_listener", "route_config_0"),
        buildListener("duplicae_listener", "route_config_0")},
       {}, "1");
-  test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_rejected", Ge(1));
 }
 
 // Validate that the use of V2 transport version is rejected by default.
@@ -643,7 +645,7 @@ TEST_P(AdsIntegrationTest, DEPRECATED_FEATURE_TEST(RejectV2TransportConfigByDefa
   setGrpcService(*grpc_service, "ads_cluster", xds_upstream_->localAddress());
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
                                                              {cluster}, {cluster}, {}, "1");
-  test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 1);
+  test_server_->waitForCounter("cluster_manager.cds.update_rejected", Ge(1));
 }
 
 // Regression test for the use-after-free crash when processing RDS update (#3953).
@@ -664,7 +666,7 @@ TEST_P(AdsIntegrationTest, RdsAfterLdsWithNoRdsChanges) {
       Config::TestTypeUrl::get().RouteConfiguration,
       {buildRouteConfig("route_config_0", "cluster_0")},
       {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1");
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
 
   // Validate that we can process a request.
   makeSingleRequest();
@@ -674,7 +676,7 @@ TEST_P(AdsIntegrationTest, RdsAfterLdsWithNoRdsChanges) {
       Config::TestTypeUrl::get().Listener,
       {buildListener("listener_0", "route_config_0", "rds_crash")},
       {buildListener("listener_0", "route_config_0", "rds_crash")}, {}, "2");
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(2));
 
   // Update existing RDS (no changes).
   sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
@@ -720,7 +722,7 @@ TEST_P(AdsIntegrationTest, CdsEdsReplacementWarming) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "1",
                                       {"route_config_0"}, {}, {}));
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   makeSingleRequest();
 
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
@@ -782,7 +784,7 @@ TEST_P(AdsIntegrationTest, CdsKeepEdsAfterWarmingFailure) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "1",
                                       {"route_config_0"}, {}, {}));
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   makeSingleRequest();
 
   // Update a cluster's field (connect_timeout) so the cluster in Envoy will be explicitly updated.
@@ -799,7 +801,7 @@ TEST_P(AdsIntegrationTest, CdsKeepEdsAfterWarmingFailure) {
 
   // Avoid sending an EDS update, and wait for EDS update timeout (that results in
   // a cluster update without resources).
-  test_server_->waitForCounterGe("cluster.cluster_0.init_fetch_timeout", 1);
+  test_server_->waitForCounter("cluster.cluster_0.init_fetch_timeout", Ge(1));
   if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
     // Expect another EDS request after the previous one wasn't answered and timed out.
     EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
@@ -846,7 +848,7 @@ TEST_P(AdsIntegrationTest, CdsKeepEdsDropOverloadAfterWarmingFailure) {
       {buildRouteConfig("route_config_0", "cluster_0")},
       {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1");
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   // Send a HTTP request and verify it is dropped with unconditional_drop_overload.
   makeSingleRequestWithDropOverload();
 
@@ -856,7 +858,7 @@ TEST_P(AdsIntegrationTest, CdsKeepEdsDropOverloadAfterWarmingFailure) {
                                                              {cluster}, {cluster}, {}, "2");
   // Avoid sending an EDS update, and wait for EDS update timeout (that results in
   // a cluster update without resources).
-  test_server_->waitForCounterGe("cluster.cluster_0.init_fetch_timeout", 1);
+  test_server_->waitForCounter("cluster.cluster_0.init_fetch_timeout", Ge(1));
   // Envoy uses the cached resource.
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.assignment_use_cached")->value());
   // Send a HTTP request again and verify it is dropped with unconditional_drop_overload.
@@ -910,7 +912,7 @@ TEST_P(AdsIntegrationTest, DoubleClustersCachedLoadAssignment) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "1", {}, {}, {}));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "1",
                                       {"route_config_0"}, {}, {}));
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   makeSingleRequest();
 
   // Update a field of the clusters (connect_timeout) so the clusters in Envoy will be explicitly
@@ -929,7 +931,7 @@ TEST_P(AdsIntegrationTest, DoubleClustersCachedLoadAssignment) {
 
   // Avoid sending an EDS update, and wait for EDS update timeout (that results in
   // a cluster update without resources).
-  test_server_->waitForCounterGe("cluster.cluster_0.init_fetch_timeout", 1);
+  test_server_->waitForCounter("cluster.cluster_0.init_fetch_timeout", Ge(1));
 
   if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
     // Expect another EDS request after the previous one wasn't answered and timed out.
@@ -951,7 +953,7 @@ TEST_P(AdsIntegrationTest, DoubleClustersCachedLoadAssignment) {
       Config::TestTypeUrl::get().ClusterLoadAssignment, {cla_0}, {cla_0}, {}, "2");
 
   // Wait for ingesting the update.
-  test_server_->waitForCounterEq("cluster.cluster_0.update_success", 2);
+  test_server_->waitForCounter("cluster.cluster_0.update_success", Eq(2));
 
   // A single message should be successfully sent to the upstream.
   makeSingleRequest();
@@ -970,7 +972,7 @@ TEST_P(AdsIntegrationTest, DuplicateInitialClusters) {
       {buildCluster("duplicate_cluster"), buildCluster("duplicate_cluster")},
       {buildCluster("duplicate_cluster"), buildCluster("duplicate_cluster")}, {}, "1");
 
-  test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 1);
+  test_server_->waitForCounter("cluster_manager.cds.update_rejected", Ge(1));
 }
 
 // Validate that the request with duplicate clusters in the subsequent requests (warming clusters)
@@ -1009,7 +1011,7 @@ TEST_P(AdsIntegrationTest, DuplicateWarmingClusters) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "1",
                                       {"route_config_0"}, {}, {}));
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   makeSingleRequest();
 
   // Send duplicate warming clusters and validate that the update is rejected.
@@ -1017,7 +1019,7 @@ TEST_P(AdsIntegrationTest, DuplicateWarmingClusters) {
       Config::TestTypeUrl::get().Cluster,
       {buildCluster("duplicate_cluster"), buildCluster("duplicate_cluster")},
       {buildCluster("duplicate_cluster"), buildCluster("duplicate_cluster")}, {}, "2");
-  test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 1);
+  test_server_->waitForCounter("cluster_manager.cds.update_rejected", Ge(1));
 }
 
 // Verify CDS is paused during cluster warming.
@@ -1055,7 +1057,7 @@ TEST_P(AdsIntegrationTest, CdsPausedDuringWarming) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "1",
                                       {"route_config_0"}, {}, {}));
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   makeSingleRequest();
 
   // Send the first warming cluster.
@@ -1063,8 +1065,8 @@ TEST_P(AdsIntegrationTest, CdsPausedDuringWarming) {
       Config::TestTypeUrl::get().Cluster, {buildCluster("warming_cluster_1")},
       {buildCluster("warming_cluster_1")}, {"cluster_0"}, "2");
 
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
-  test_server_->waitForGaugeEq("cluster.warming_cluster_1.warming_state", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(1));
+  test_server_->waitForGauge("cluster.warming_cluster_1.warming_state", Eq(1));
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
                                       {"warming_cluster_1"}, {"warming_cluster_1"}, {"cluster_0"}));
@@ -1074,8 +1076,8 @@ TEST_P(AdsIntegrationTest, CdsPausedDuringWarming) {
       Config::TestTypeUrl::get().Cluster,
       {buildCluster("warming_cluster_1"), buildCluster("warming_cluster_2")},
       {buildCluster("warming_cluster_1"), buildCluster("warming_cluster_2")}, {}, "3");
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 2);
-  test_server_->waitForGaugeEq("cluster.warming_cluster_2.warming_state", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(2));
+  test_server_->waitForGauge("cluster.warming_cluster_2.warming_state", Eq(1));
 
   // We would've got a Cluster discovery request with version 2 here, had the CDS not been paused.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
@@ -1092,9 +1094,9 @@ TEST_P(AdsIntegrationTest, CdsPausedDuringWarming) {
       {"cluster_0"}, "2");
 
   // Validate that clusters are warmed.
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  test_server_->waitForGaugeEq("cluster.warming_cluster_1.warming_state", 0);
-  test_server_->waitForGaugeEq("cluster.warming_cluster_2.warming_state", 0);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
+  test_server_->waitForGauge("cluster.warming_cluster_1.warming_state", Eq(0));
+  test_server_->waitForGauge("cluster.warming_cluster_2.warming_state", Eq(0));
 
   // CDS is resumed and EDS response was acknowledged.
   // TODO (dmitri-d) remove the conditional when legacy mux implementations are removed.
@@ -1143,7 +1145,7 @@ TEST_P(AdsIntegrationTest, RemoveWarmingCluster) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "1",
                                       {"route_config_0"}, {}, {}));
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   makeSingleRequest();
 
   // Send the first warming cluster.
@@ -1151,7 +1153,7 @@ TEST_P(AdsIntegrationTest, RemoveWarmingCluster) {
       Config::TestTypeUrl::get().Cluster, {buildCluster("warming_cluster_1")},
       {buildCluster("warming_cluster_1")}, {"cluster_0"}, "2");
 
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(1));
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
                                       {"warming_cluster_1"}, {"warming_cluster_1"}, {"cluster_0"}));
@@ -1162,7 +1164,7 @@ TEST_P(AdsIntegrationTest, RemoveWarmingCluster) {
                                                              {buildCluster("warming_cluster_2")},
                                                              // Delta: remove warming_cluster_1.
                                                              {"warming_cluster_1"}, "3");
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(1));
   // We would've got a Cluster discovery request with version 2 here, had the CDS not been paused.
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
@@ -1177,8 +1179,8 @@ TEST_P(AdsIntegrationTest, RemoveWarmingCluster) {
       {buildClusterLoadAssignment("warming_cluster_2")}, {"cluster_0"}, "2");
 
   // Validate that all clusters are warmed.
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  test_server_->waitForGaugeEq("cluster_manager.active_clusters", 3);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
+  test_server_->waitForGauge("cluster_manager.active_clusters", Eq(3));
 
   // CDS is resumed and EDS response was acknowledged.
   // TODO (dmitri-d) remove the conditional when legacy mux implementations are removed.
@@ -1227,7 +1229,7 @@ TEST_P(AdsIntegrationTest, RemoveWarmingListener) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "1",
                                       {"route_config_0"}, {}, {}));
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   makeSingleRequest();
 
   // Send a listener without its route, so it will be added as warming.
@@ -1236,7 +1238,7 @@ TEST_P(AdsIntegrationTest, RemoveWarmingListener) {
       {buildListener("listener_0", "route_config_0"),
        buildListener("warming_listener_1", "nonexistent_route")},
       {buildListener("warming_listener_1", "nonexistent_route")}, {}, "2");
-  test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", 1);
+  test_server_->waitForGauge("listener_manager.total_listeners_warming", Eq(1));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "1",
                                       {"nonexistent_route", "route_config_0"},
                                       {"nonexistent_route"}, {}));
@@ -1251,8 +1253,8 @@ TEST_P(AdsIntegrationTest, RemoveWarmingListener) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "3", {}, {}, {}));
 
   // The warming listener should be successfully removed.
-  test_server_->waitForCounterEq("listener_manager.listener_removed", 1);
-  test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", 0);
+  test_server_->waitForCounter("listener_manager.listener_removed", Eq(1));
+  test_server_->waitForGauge("listener_manager.total_listeners_warming", Eq(0));
 }
 
 // Verify cluster warming is finished only on named EDS response.
@@ -1290,14 +1292,14 @@ TEST_P(AdsIntegrationTest, ClusterWarmingOnNamedResponse) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "1",
                                       {"route_config_0"}, {}, {}));
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   makeSingleRequest();
 
   // Send the first warming cluster.
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TestTypeUrl::get().Cluster, {buildCluster("warming_cluster_1")},
       {buildCluster("warming_cluster_1")}, {"cluster_0"}, "2");
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(1));
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
                                       {"warming_cluster_1"}, {"warming_cluster_1"}, {"cluster_0"}));
@@ -1307,7 +1309,7 @@ TEST_P(AdsIntegrationTest, ClusterWarmingOnNamedResponse) {
       Config::TestTypeUrl::get().Cluster,
       {buildCluster("warming_cluster_1"), buildCluster("warming_cluster_2")},
       {buildCluster("warming_cluster_1"), buildCluster("warming_cluster_2")}, {}, "3");
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 2);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(2));
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
                                       {"warming_cluster_2", "warming_cluster_1"},
@@ -1321,7 +1323,7 @@ TEST_P(AdsIntegrationTest, ClusterWarmingOnNamedResponse) {
 
   // Envoy will not finish warming of the second cluster because of the missing load assignments
   // i,e. no named EDS response.
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(1));
 
   // Disconnect and reconnect the stream.
   xds_stream_->finishGrpcStream(Grpc::Status::Internal);
@@ -1332,7 +1334,7 @@ TEST_P(AdsIntegrationTest, ClusterWarmingOnNamedResponse) {
 
   // Envoy will not finish warming of the second cluster because of the missing load assignments
   // i,e. no named EDS response even after disconnect and reconnect.
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(1));
 
   // Finish warming the second cluster.
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
@@ -1340,7 +1342,7 @@ TEST_P(AdsIntegrationTest, ClusterWarmingOnNamedResponse) {
       {buildClusterLoadAssignment("warming_cluster_2")},
       {buildClusterLoadAssignment("warming_cluster_2")}, {}, "3");
 
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
 }
 
 // This test validates two cases.
@@ -1364,7 +1366,7 @@ TEST_P(AdsIntegrationTest, ListenerWarmingOnNamedResponse) {
       {buildRouteConfig("route_config_0", "cluster_0")},
       {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1");
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
 
   // Validate that we can process a request.
   makeSingleRequest();
@@ -1382,8 +1384,8 @@ TEST_P(AdsIntegrationTest, ListenerWarmingOnNamedResponse) {
       {buildListener("listener_0", "route_config_0", "rds_test")}, {}, "2");
 
   // Validate that listener is updated correctly and does not get in to warming state.
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
-  test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", 0);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(2));
+  test_server_->waitForGauge("listener_manager.total_listeners_warming", Eq(0));
 
   // Update listener with a new route.
   sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
@@ -1392,16 +1394,16 @@ TEST_P(AdsIntegrationTest, ListenerWarmingOnNamedResponse) {
       {buildListener("listener_0", "route_config_1", "rds_test")}, {}, "2");
 
   // Validate that the listener gets in to warming state waiting for RDS.
-  test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", 1);
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  test_server_->waitForGauge("listener_manager.total_listeners_warming", Eq(1));
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(2));
 
   // Send the new route and validate that listener finishes warming.
   sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
       Config::TestTypeUrl::get().RouteConfiguration,
       {buildRouteConfig("route_config_1", "cluster_1")},
       {buildRouteConfig("route_config_1", "cluster_1")}, {}, "2");
-  test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", 0);
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 3);
+  test_server_->waitForGauge("listener_manager.total_listeners_warming", Eq(0));
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(3));
 }
 
 // Regression test for the use-after-free crash when processing RDS update (#3953).
@@ -1422,7 +1424,7 @@ TEST_P(AdsIntegrationTest, RdsAfterLdsWithRdsChange) {
       Config::TestTypeUrl::get().RouteConfiguration,
       {buildRouteConfig("route_config_0", "cluster_0")},
       {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1");
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
 
   // Validate that we can process a request.
   makeSingleRequest();
@@ -1438,7 +1440,7 @@ TEST_P(AdsIntegrationTest, RdsAfterLdsWithRdsChange) {
       Config::TestTypeUrl::get().Listener,
       {buildListener("listener_0", "route_config_0", "rds_crash")},
       {buildListener("listener_0", "route_config_0", "rds_crash")}, {}, "2");
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(2));
 
   // Update existing RDS (migrate traffic to cluster_1).
   sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
@@ -1447,7 +1449,7 @@ TEST_P(AdsIntegrationTest, RdsAfterLdsWithRdsChange) {
       {buildRouteConfig("route_config_0", "cluster_1")}, {}, "2");
 
   // Validate that we can process a request after RDS update
-  test_server_->waitForCounterGe("http.ads_test.rds.route_config_0.config_reload", 2);
+  test_server_->waitForCounter("http.ads_test.rds.route_config_0.config_reload", Ge(2));
   makeSingleRequest();
 }
 
@@ -1496,7 +1498,7 @@ TEST_P(AdsIntegrationTest, RdsAfterLdsInvalidated) {
 
   // Wait for initial listener to be created successfully. Any subsequent listeners will then use
   // the dynamic InitManager (see ListenerImpl::initManager).
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
 
   // STEP 2: Listener with dynamic InitManager
   // -----------------------------------------
@@ -1535,7 +1537,7 @@ TEST_P(AdsIntegrationTest, RdsAfterLdsInvalidated) {
       {buildRouteConfig("route_config_1", "cluster_0")},
       {buildRouteConfig("route_config_1", "cluster_0")}, {"route_config_0"}, "1");
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(2));
 }
 
 class AdsFailIntegrationTest : public AdsDeltaSotwIntegrationSubStateParamTest,
@@ -1721,7 +1723,7 @@ TEST_P(AdsIntegrationTest, ListenerDrainBeforeServerStart) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
                                       {"route_config_0"}, {"route_config_0"}, {}));
 
-  test_server_->waitForGaugeGe("listener_manager.total_listeners_active", 1);
+  test_server_->waitForGauge("listener_manager.total_listeners_active", Ge(1));
   // Before server is started, even though listeners are added to active list
   // we mark them as "warming" in config dump since they're not initialized yet.
   ASSERT_EQ(getListenersConfigDump().dynamic_listeners().size(), 1);
@@ -1731,7 +1733,7 @@ TEST_P(AdsIntegrationTest, ListenerDrainBeforeServerStart) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "1", {}, {}, {}));
   sendDiscoveryResponse<envoy::config::listener::v3::Listener>(Config::TestTypeUrl::get().Listener,
                                                                {}, {}, {"listener_0"}, "2");
-  test_server_->waitForGaugeEq("listener_manager.total_listeners_active", 0);
+  test_server_->waitForGauge("listener_manager.total_listeners_active", Eq(0));
 }
 
 // Validate that Node message is well formed.
@@ -1914,7 +1916,7 @@ public:
     sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
         Config::TestTypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
 
-    test_server_->waitForCounterGe("runtime.load_success", 1);
+    test_server_->waitForCounter("runtime.load_success", Ge(1));
     EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}));
     EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Runtime, "1", {"ads_rtds_layer"},
                                         {}, {}));
@@ -1960,7 +1962,7 @@ public:
     sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
         Config::TestTypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
 
-    test_server_->waitForCounterGe("runtime.load_success", 1);
+    test_server_->waitForCounter("runtime.load_success", Ge(1));
     EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "",
                                         {"eds_cluster"}, {"eds_cluster"}, {}, false));
     sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
@@ -2149,7 +2151,7 @@ TEST_P(XdsTpAdsIntegrationTest, Basic) {
   EXPECT_TRUE(
       compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "1", {}, {}, {}));
 
-  test_server_->waitForCounterEq("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Eq(1));
   makeSingleRequest();
 
   // Add a second listener in the foo namespace.
@@ -2171,7 +2173,7 @@ TEST_P(XdsTpAdsIntegrationTest, Basic) {
   EXPECT_TRUE(
       compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "2", {}, {}, {}));
 
-  test_server_->waitForCounterEq("listener_manager.listener_create_success", 2);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Eq(2));
   makeSingleRequest();
 
   // Updates only apply to the Delta protocol, not SotW.
@@ -2183,7 +2185,7 @@ TEST_P(XdsTpAdsIntegrationTest, Basic) {
     sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
         Config::TestTypeUrl::get().Listener, {baz_listener}, {}, {}, "3");
     EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "3", {}, {}, {}));
-    test_server_->waitForCounterEq("listener_manager.listener_removed", 1);
+    test_server_->waitForCounter("listener_manager.listener_removed", Eq(1));
     makeSingleRequest();
   } else {
     // Update bar listener in the foo namespace.
@@ -2191,14 +2193,14 @@ TEST_P(XdsTpAdsIntegrationTest, Basic) {
         Config::TestTypeUrl::get().Listener, {}, {buildListener(bar_listener, route_name_1)}, {},
         "3");
     EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "3", {}, {}, {}));
-    test_server_->waitForCounterEq("listener_manager.listener_in_place_updated", 1);
+    test_server_->waitForCounter("listener_manager.listener_in_place_updated", Eq(1));
     makeSingleRequest();
 
     // Remove bar listener from the foo namespace.
     sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
         Config::TestTypeUrl::get().Listener, {}, {}, {bar_listener}, "3");
     EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "4", {}, {}, {}));
-    test_server_->waitForCounterEq("listener_manager.listener_removed", 1);
+    test_server_->waitForCounter("listener_manager.listener_removed", Eq(1));
     makeSingleRequest();
   }
 }
@@ -2242,7 +2244,7 @@ TEST_P(XdsTpAdsIntegrationTest, BasicWithLeds) {
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "1", {}, {}, {}));
 
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(1));
 
   // Receive LEDS request, and send 2 endpoints.
   EXPECT_TRUE(compareDiscoveryRequest(
@@ -2261,8 +2263,8 @@ TEST_P(XdsTpAdsIntegrationTest, BasicWithLeds) {
   // Receive the EDS ack.
   EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "1", {}, {}, {}));
 
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(2));
 
   // LDS/RDS xDS initialization (LDS via xdstp:// glob collection)
   EXPECT_TRUE(
@@ -2318,7 +2320,7 @@ TEST_P(XdsTpAdsIntegrationTest, LedsClusterWarmingUpdatingEds) {
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "1", {}, {}, {}));
 
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(1));
 
   // Receive LEDS request, and send an updated EDS response.
   EXPECT_TRUE(compareDiscoveryRequest(
@@ -2368,8 +2370,8 @@ TEST_P(XdsTpAdsIntegrationTest, LedsClusterWarmingUpdatingEds) {
                                               {});
 
   // The cluster should be warmed up.
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(2));
 
   // Receive the LEDS ack.
   EXPECT_TRUE(compareDiscoveryRequest(leds_type_url, "3", {}, {}, {}));
@@ -2426,7 +2428,7 @@ TEST_P(XdsTpAdsIntegrationTest, LedsClusterWarmingUpdatingCds) {
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "1", {}, {}, {}));
 
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(1));
 
   // Receive LEDS request, and send an updated CDS response (removing previous
   // cluster and adding a new one).
@@ -2499,8 +2501,8 @@ TEST_P(XdsTpAdsIntegrationTest, LedsClusterWarmingUpdatingCds) {
        buildLbEndpointResource(endpoint2_name_cluster2, "2")},
       {});
 
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(2));
 
   // LDS/RDS xDS initialization (LDS via xdstp:// glob collection)
   EXPECT_TRUE(
@@ -2565,16 +2567,16 @@ TEST_P(XdsTpAdsIntegrationTest, LedsTimeout) {
       {}));
 
   // The cluster should be warming. Wait until initial fetch timeout.
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(1));
 
-  test_server_->waitForCounterEq(
+  test_server_->waitForCounter(
       "cluster.xdstp_test/envoy.config.cluster.v3.Cluster/foo-cluster/"
       "baz?xds.node.cluster=cluster_name&xds.node.id=node_name.leds.init_fetch_timeout",
-      1);
+      Eq(1));
 
   // After timeout the cluster should be active, not warming.
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  test_server_->waitForGaugeEq("cluster_manager.active_clusters", 3);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
+  test_server_->waitForGauge("cluster_manager.active_clusters", Eq(3));
 
   // Receive the EDS ack.
   EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "1", {}, {}, {}));
@@ -2652,7 +2654,7 @@ TEST_P(XdsTpAdsIntegrationTest, EdsAlternatingLedsUsage) {
   EXPECT_TRUE(
       compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "1", {}, {}, {}));
 
-  test_server_->waitForCounterEq("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Eq(1));
   makeSingleRequest();
 
   // Send a new EDS update that uses LEDS.
@@ -2778,7 +2780,7 @@ TEST_P(AdsIntegrationTest, SrdsPausedDuringLds) {
   sendDiscoveryResponse<envoy::config::listener::v3::Listener>(lds_type_url, listeners, listeners,
                                                                {}, "1");
 
-  test_server_->waitForCounterEq("listener_manager.listener_added", 2);
+  test_server_->waitForCounter("listener_manager.listener_added", Eq(2));
 
   EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "1", {}, {}, {}));
 
@@ -2819,7 +2821,7 @@ TEST_P(AdsIntegrationTest, SrdsPausedDuringLds) {
 
   EXPECT_TRUE(compareDiscoveryRequest(rds_type_url, "1", {"route_0", "route_1"}, {}, {}));
 
-  test_server_->waitForCounterEq("listener_manager.listener_create_success", 2);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Eq(2));
 }
 
 // ADS integration tests that exercise the ADS-replacement mechanism.
@@ -3115,7 +3117,7 @@ TEST_P(AdsIntegrationTest, MultipleVhdsOverAds) {
       {}, "1");
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, "", {}, {}, {}));
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 3);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(3));
 
   auto foo_request_headers = Http::TestRequestHeaderMapImpl{
       {":method", "GET"}, {":path", "/foo"}, {":scheme", "http"}, {":authority", "foo.com"}};
@@ -3156,6 +3158,9 @@ TEST_P(AdsIntegrationTest, MultipleVhdsOverAds) {
   // reachable from listener_1.
   sendDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
       Config::TestTypeUrl::get().VirtualHost, {}, {}, {"route_config_0/foo"}, "1");
+
+  test_server_->waitForCounter("http.ads_test.rds.vhds.route_config_0.config_reload", Ge(2));
+
   send_request_and_verify("http1", foo_request_headers, true);
   send_request_and_verify("http1", bar_request_headers);
 
@@ -3208,7 +3213,7 @@ TEST_P(AdsIntegrationTest, VHDSUpdatesAfterListenerRemoval) {
       Config::TestTypeUrl::get().VirtualHost, {},
       {buildVirtualHost("route_config_0/foo", "foo.com", "/foo", "cluster_0")}, {}, "1");
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, "", {}, {}, {}));
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(2));
   registerTestServerPorts({"http0", "http1"});
 
   auto send_request_and_verify = [this](const std::string& port_name,
@@ -3240,7 +3245,7 @@ TEST_P(AdsIntegrationTest, VHDSUpdatesAfterListenerRemoval) {
   sendDiscoveryResponse<envoy::config::listener::v3::Listener>(Config::TestTypeUrl::get().Listener,
                                                                {}, {}, {"listener_1"}, "1");
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}));
-  test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", 0);
+  test_server_->waitForGauge("listener_manager.total_listeners_draining", Eq(0));
 
   // Verify that listener_0 still works.
   send_request_and_verify("http0", Http::TestRequestHeaderMapImpl{{":method", "GET"},
@@ -3306,7 +3311,7 @@ TEST_P(AdsIntegrationTest, NewListenerUsesLocalRouteConfig) {
       Config::TestTypeUrl::get().VirtualHost, {},
       {buildVirtualHost("route_config_0/foo", "foo.com", "/foo", "cluster_0")}, {}, "1");
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, "", {}, {}, {}));
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   registerTestServerPorts({"http0"});
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http0"))));
   auto response = sendRequestAndWaitForResponse(
@@ -3322,7 +3327,7 @@ TEST_P(AdsIntegrationTest, NewListenerUsesLocalRouteConfig) {
       Config::TestTypeUrl::get().Listener, {}, {buildListener("listener_1", "route_config_0")}, {},
       "1");
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}));
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(2));
   registerTestServerPorts({"http0", "http1"});
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http1"))));
   response = sendRequestAndWaitForResponse(

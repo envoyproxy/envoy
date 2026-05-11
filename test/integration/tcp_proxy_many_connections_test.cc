@@ -5,7 +5,6 @@
 
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
-#include "test/test_common/registry.h"
 
 #include "gtest/gtest.h"
 
@@ -59,8 +58,8 @@ TEST_P(TcpProxyManyConnectionsTest, TcpProxyManyConnections) {
 
   for (int i = 0; i < num_connections; ++i) {
     clients[i] = makeTcpConnection(lookupPort("tcp_proxy"));
-    test_server_->waitForGaugeGe("cluster.cluster_0.upstream_cx_active", i,
-                                 TestUtility::DefaultTimeout * timeout_scaling_factor_);
+    test_server_->waitForGauge("cluster.cluster_0.upstream_cx_active", testing::Ge(i),
+                               TestUtility::DefaultTimeout * timeout_scaling_factor_);
   }
   for (int i = 0; i < num_connections; ++i) {
     IntegrationTcpClientPtr& tcp_client = clients[i];

@@ -161,7 +161,7 @@ class HostDescriptionImplBase : virtual public HostDescription,
                                 protected Logger::Loggable<Logger::Id::upstream> {
 public:
   Network::UpstreamTransportSocketFactory& transportSocketFactory() const override {
-    absl::ReaderMutexLock lock(&metadata_mutex_);
+    absl::ReaderMutexLock lock(metadata_mutex_);
     return socket_factory_;
   }
 
@@ -175,17 +175,17 @@ public:
   // would be to use TLS and post metadata updates from the main thread. This model would
   // possibly benefit other related and expensive computations too (e.g.: updating subsets).
   MetadataConstSharedPtr metadata() const override {
-    absl::ReaderMutexLock lock(&metadata_mutex_);
+    absl::ReaderMutexLock lock(metadata_mutex_);
     return endpoint_metadata_;
   }
   std::size_t metadataHash() const override {
-    absl::ReaderMutexLock lock(&metadata_mutex_);
+    absl::ReaderMutexLock lock(metadata_mutex_);
     return endpoint_metadata_hash_;
   }
   void metadata(MetadataConstSharedPtr new_metadata) override {
     auto& new_socket_factory = resolveTransportSocketFactory(address(), new_metadata.get());
     {
-      absl::WriterMutexLock lock(&metadata_mutex_);
+      absl::WriterMutexLock lock(metadata_mutex_);
       endpoint_metadata_ = new_metadata;
       endpoint_metadata_hash_ = new_metadata ? MessageUtil::hash(*new_metadata) : 0;
       // Update data members dependent on metadata.
@@ -390,9 +390,12 @@ public:
   uint32_t healthFlagsGetAll() const override { return health_flags_; }
   void healthFlagsSetAll(uint32_t bits) override { health_flags_ |= bits; }
 
-  void setLastHealthCheckHttpStatus(uint64_t status) override { last_hc_http_status_ = status; }
+  void setLastHealthCheckHttpStatus(uint64_t status) override {
+    last_hc_http_status_.store(status, std::memory_order_relaxed);
+  }
   absl::optional<uint64_t> lastHealthCheckHttpStatus() const override {
-    return last_hc_http_status_;
+    const uint64_t status = last_hc_http_status_.load(std::memory_order_relaxed);
+    return status == 0 ? absl::nullopt : absl::make_optional(status);
   }
 
   Host::HealthStatus healthStatus() const override {
@@ -483,7 +486,8 @@ private:
   // flag access? May be we could refactor HealthFlag to contain all these statuses and flags in the
   // future.
   std::atomic<Host::HealthStatus> eds_health_status_{};
-  absl::optional<std::atomic<uint64_t>> last_hc_http_status_ = absl::nullopt;
+  // 0 indicates no status has been set.
+  std::atomic<uint64_t> last_hc_http_status_{0};
 
   struct HostHandleImpl : HostHandle {
     HostHandleImpl(const std::shared_ptr<const HostImplBase>& parent) : parent_(parent) {

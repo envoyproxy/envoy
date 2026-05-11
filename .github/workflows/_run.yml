@@ -8,8 +8,10 @@ on:
     secrets:
       app-id:
       app-key:
+      dockerhub-token:
       gpg-key:
       gpg-key-password:
+      slack-bot-token:
       ssh-key:
       ssh-key-extra:
     inputs:
@@ -81,9 +83,6 @@ on:
       docker-ipv6:
         default: true
         type: boolean
-      dockerhub-username:
-        default: envoyproxy
-        type: string
       downloads:
         type: string
       entrypoint:
@@ -138,12 +137,16 @@ on:
       skip:
         type: boolean
         default: false
+      slack-channel:
+        type: string
+        default: ''
+        description: Slack channel for failure notifications (opt-in, e.g. '#envoy-ci'). Leave empty to disable.
       source:
         type: string
       summary-post:
         type: string
         default: |
-          - uses: envoyproxy/toolshed/actions/envoy/run/summary@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+          - uses: envoyproxy/toolshed/actions/envoy/run/summary@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
             with:
               context: %{{ inputs.context }}
       steps-pre:
@@ -212,7 +215,7 @@ jobs:
     name: ${{ inputs.target-suffix && format('[{0}] ', inputs.target-suffix) || '' }}${{ inputs.command }} ${{ inputs.target }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     steps:
-    - uses: envoyproxy/toolshed/actions/jq@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+    - uses: envoyproxy/toolshed/actions/jq@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
       id: started
       name: Create timestamp
       with:
@@ -220,7 +223,7 @@ jobs:
         filter: |
           now
     # This controls which input vars are exposed to the run action (and related steps)
-    - uses: envoyproxy/toolshed/actions/jq@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+    - uses: envoyproxy/toolshed/actions/jq@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
       name: Context
       id: context
       with:
@@ -253,14 +256,14 @@ jobs:
         fi
         echo "mnt-available=$MNT_AVAILABLE" >> "$GITHUB_OUTPUT"
       id: disk
-    - uses: envoyproxy/toolshed/actions/github/remnt@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+    - uses: envoyproxy/toolshed/actions/github/remnt@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
       if: steps.disk.outputs.should-remnt == 'true'
-    - uses: envoyproxy/toolshed/actions/bind-mounts@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+    - uses: envoyproxy/toolshed/actions/bind-mounts@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
       if: inputs.bind-mount && steps.disk.outputs.mnt-available == 'true'
       with:
         mounts: ${{ inputs.bind-mounts }}
     - name: Free diskspace
-      uses: envoyproxy/toolshed/actions/diskspace@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+      uses: envoyproxy/toolshed/actions/diskspace@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
       if: inputs.diskspace-hack || steps.disk.outputs.mnt-available != 'true'
       with:
         to_remove: ${{ inputs.diskspace-hack-paths }}
@@ -268,7 +271,7 @@ jobs:
         mount
         df -h
 
-    - uses: envoyproxy/toolshed/actions/bson@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+    - uses: envoyproxy/toolshed/actions/bson@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
       name: Configure Docker
       if: runner.os == 'Linux'
       with:
@@ -284,7 +287,7 @@ jobs:
           | "${{ inputs.template-docker-configure }}"
 
     # Caches
-    - uses: envoyproxy/toolshed/actions/cache/restore@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+    - uses: envoyproxy/toolshed/actions/cache/restore@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
       if: >-
         fromJSON(inputs.bazel-cache)
       name: >-
@@ -325,12 +328,12 @@ jobs:
         key: ${{ inputs.cache-build-image }}${{ inputs.cache-build-image-key-suffix }}
     - if: ${{ inputs.cache-build-image && steps.cache-lookup.outputs.cache-hit == 'true' }}
       name: Restore Docker cache ${{ inputs.cache-build-image && format('({0})', inputs.cache-build-image) || '' }}
-      uses: envoyproxy/toolshed/actions/docker/cache/restore@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+      uses: envoyproxy/toolshed/actions/docker/cache/restore@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
       with:
         image-tag: ${{ inputs.cache-build-image }}
         key-suffix: ${{ inputs.cache-build-image-key-suffix }}
 
-    - uses: envoyproxy/toolshed/actions/appauth@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+    - uses: envoyproxy/toolshed/actions/appauth@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
       id: appauth
       name: Appauth
       if: ${{ inputs.trusted }}
@@ -341,7 +344,7 @@ jobs:
         # - the workaround is to allow the token to be passed through.
         token: ${{ github.token }}
         token-ok: true
-    - uses: envoyproxy/toolshed/actions/github/checkout@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+    - uses: envoyproxy/toolshed/actions/github/checkout@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
       id: checkout
       name: Checkout Envoy repository
       with:
@@ -357,7 +360,7 @@ jobs:
         token: ${{ inputs.trusted && steps.appauth.outputs.token || github.token }}
 
     # This is currently only use by mobile-docs and can be removed once they are updated to the newer website
-    - uses: envoyproxy/toolshed/actions/github/checkout@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+    - uses: envoyproxy/toolshed/actions/github/checkout@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
       id: checkout-extra
       name: Checkout extra repository (for publishing)
       if: ${{ inputs.checkout-extra }}
@@ -366,7 +369,7 @@ jobs:
         ssh-key: ${{ inputs.trusted && inputs.ssh-key-extra || '' }}
 
     - name: Import GPG key
-      uses: envoyproxy/toolshed/actions/gpg/import@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+      uses: envoyproxy/toolshed/actions/gpg/import@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
       if: ${{ inputs.import-gpg }}
       with:
         key: ${{ secrets.gpg-key }}
@@ -386,9 +389,25 @@ jobs:
       env:
         BAZELRC_CONTENT: ${{ vars.ENVOY_CI_BAZELRC }}
 
+    - id: dockerhub
+      if: inputs.container-command != ''
+      run: |
+        if [[ -n "$DOCKERHUB_TOKEN" ]]; then
+          echo "login=true" >> "$GITHUB_OUTPUT"
+        fi
+      env:
+        DOCKERHUB_TOKEN: ${{ secrets.dockerhub-token }}
+    - name: Login to Docker Hub (read-only)
+      if: inputs.container-command != '' && steps.dockerhub.outputs.login == 'true'
+      uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v4.1.0
+      with:
+        username: ${{ vars.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.dockerhub-token }}
+
     # NOTE: This is where untrusted code can be run!!!
-    #  It MUST be the last step in the workflow
-    - uses: envoyproxy/toolshed/actions/github/run@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+    #  Only post-failure notification steps (which don't use any repo code) should follow this step.
+    - uses: envoyproxy/toolshed/actions/github/run@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
+      id: ci-run
       name: Run CI ${{ inputs.command }} ${{ inputs.target }}
       with:
         args: ${{ inputs.args != '--' && inputs.args || inputs.target }}
@@ -443,3 +462,20 @@ jobs:
         ENVOY_COMMIT: ${{ fromJSON(inputs.request).request.sha }}
         ENVOY_REPO: ${{ github.repository }}
         ENVOY_PUBLISH_DRY_RUN: ${{ (fromJSON(inputs.request).request.version.dev || ! inputs.trusted) && 1 || '' }}
+
+    - name: Notify Slack on failure
+      if: ${{ steps.ci-run.outputs.exit-code != 0 && inputs.slack-channel != '' && github.event.workflow_run.event == 'push' }}
+      uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c  # v3.0.3
+      env:
+        JOB_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      with:
+        method: chat.postMessage
+        token: ${{ secrets.slack-bot-token }}
+        payload: |
+          channel: "${{ inputs.slack-channel }}"
+          text: "CI job failed: ${{ inputs.target }}"
+          blocks:
+          - type: section
+            text:
+              type: mrkdwn
+              text: ":x: *CI job failed:* `${{ inputs.target }}`\n<${{ env.JOB_URL }}|View workflow run>"

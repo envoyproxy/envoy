@@ -201,6 +201,49 @@ logger_name: test_logger
       EnvoyException, "Failed to resolve symbol.*logger_destroy");
 }
 
+// Verifies that the unified Rust SDK factory correctly rejects unknown logger names by
+// returning `None`, which the C++ factory translates into an `InvalidArgumentError` with the
+// standard "Failed to initialize" message. This exercises the dispatch-by-name code path
+// installed via the `access_logger:` arm of `declare_all_init_functions!`.
+class DynamicModuleAccessLogFactoryRustTest : public testing::Test {
+public:
+  DynamicModuleAccessLogFactoryRustTest() {
+    TestEnvironment::setEnvVar(
+        "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+        TestEnvironment::substitute(
+            "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/rust"),
+        1);
+  }
+
+  DynamicModuleAccessLogFactory factory_;
+};
+
+TEST_F(DynamicModuleAccessLogFactoryRustTest, UnknownLoggerNameRejectedAtConfigLoad) {
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  NiceMock<Server::MockOptions> options;
+  ON_CALL(options, concurrency()).WillByDefault(testing::Return(1));
+  ON_CALL(context.server_context_, options()).WillByDefault(testing::ReturnRef(options));
+  ScopedThreadLocalServerContextSetter setter(context.server_context_);
+
+  const std::string yaml = R"EOF(
+dynamic_module_config:
+  name: access_log_integration_test
+  do_not_close: true
+logger_name: unknown_logger
+logger_config:
+  "@type": type.googleapis.com/google.protobuf.StringValue
+  value: test_config
+)EOF";
+
+  envoy::extensions::access_loggers::dynamic_modules::v3::DynamicModuleAccessLog proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  AccessLog::FilterPtr filter;
+  EXPECT_THROW_WITH_REGEX(
+      factory_.createAccessLogInstance(proto_config, std::move(filter), context, {}),
+      EnvoyException, "Failed to initialize dynamic module access logger config");
+}
+
 } // namespace
 } // namespace DynamicModules
 } // namespace AccessLoggers

@@ -1553,9 +1553,9 @@ ClusterInfoImpl::processHttpForOutlierDetection(Http::ResponseHeaderMap& headers
   // Run matchers.
   http_protocol_options_->outlier_detection_http_error_matcher_[0]->onHttpResponseHeaders(headers,
                                                                                           statuses);
-  return absl::optional<bool>(http_protocol_options_->outlier_detection_http_error_matcher_[0]
-                                  ->matchStatus(statuses)
-                                  .matches_);
+  return http_protocol_options_->outlier_detection_http_error_matcher_[0]
+      ->matchStatus(statuses)
+      .matches_;
 }
 
 absl::StatusOr<bool> validateTransportSocketSupportsQuic(

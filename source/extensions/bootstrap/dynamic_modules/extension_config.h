@@ -93,7 +93,7 @@ public:
                                         Server::Configuration::ServerFactoryContext& context,
                                         Stats::Store& stats_store);
 
-  ~DynamicModuleBootstrapExtensionConfig();
+  ~DynamicModuleBootstrapExtensionConfig() override;
 
   /**
    * This is called when an event is scheduled via
@@ -395,6 +395,11 @@ public:
   // Stats scope for metric creation.
   const Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNamePool stat_name_pool_;
+  // We only allow the module to create stats during on_bootstrap_extension_config_new, and not
+  // later from worker threads, so that we don't have to wrap stat_name_pool_ in a lock.
+  // Per-request label values use a stack-local Stats::StatNameDynamicPool in the increment
+  // callbacks (see abi_impl.cc).
+  bool stat_creation_frozen_ = false;
 
   // Temporary storage for the admin response body. Set by the
   // envoy_dynamic_module_callback_bootstrap_extension_admin_set_response callback during
@@ -476,14 +481,19 @@ using DynamicModuleBootstrapExtensionConfigSharedPtr =
  */
 class DynamicModuleBootstrapExtensionConfigScheduler {
 public:
-  DynamicModuleBootstrapExtensionConfigScheduler(
-      std::weak_ptr<DynamicModuleBootstrapExtensionConfig> config, Event::Dispatcher& dispatcher)
-      : config_(std::move(config)), dispatcher_(dispatcher) {}
+  explicit DynamicModuleBootstrapExtensionConfigScheduler(
+      std::weak_ptr<DynamicModuleBootstrapExtensionConfig> config)
+      : config_(std::move(config)) {}
 
   void commit(uint64_t event_id) {
-    dispatcher_.post([config = config_, event_id]() {
-      if (std::shared_ptr<DynamicModuleBootstrapExtensionConfig> config_shared = config.lock()) {
-        config_shared->onScheduled(event_id);
+    // Lock the config so its dispatcher member stays valid across `post`.
+    auto config_shared = config_.lock();
+    if (!config_shared) {
+      return;
+    }
+    config_shared->main_thread_dispatcher_.post([config = config_, event_id]() {
+      if (std::shared_ptr<DynamicModuleBootstrapExtensionConfig> cs = config.lock()) {
+        cs->onScheduled(event_id);
       }
     });
   }
@@ -492,8 +502,6 @@ private:
   // The config that this scheduler is associated with. Using a weak pointer to avoid unnecessarily
   // extending the lifetime of the config.
   std::weak_ptr<DynamicModuleBootstrapExtensionConfig> config_;
-  // The dispatcher is used to post the event to the main thread.
-  Event::Dispatcher& dispatcher_;
 };
 
 /**

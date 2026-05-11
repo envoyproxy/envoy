@@ -23,7 +23,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/listener/local_ratelimit:config",
         "//source/extensions/filters/listener/local_ratelimit:local_ratelimit_lib",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/stats:stats_mocks",
     ],
 )
 

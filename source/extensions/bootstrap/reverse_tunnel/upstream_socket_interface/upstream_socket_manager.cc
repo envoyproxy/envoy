@@ -342,7 +342,7 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
 void UpstreamSocketManager::cleanStaleNodeEntry(const std::string& node_id) {
   // Clean the given node ID if there are no active sockets.
   if (accepted_reverse_connections_.find(node_id) != accepted_reverse_connections_.end() &&
-      accepted_reverse_connections_[node_id].size() > 0) {
+      !accepted_reverse_connections_[node_id].empty()) {
     ENVOY_LOG(trace, "reverse_tunnel: found {} active sockets for node {}.",
               accepted_reverse_connections_[node_id].size(), node_id);
     return;

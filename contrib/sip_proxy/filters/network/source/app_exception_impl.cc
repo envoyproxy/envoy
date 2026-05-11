@@ -25,7 +25,7 @@ DirectResponse::ResponseType AppException::encode(MessageMetadata& metadata,
       // unique number. The salt I am using here is the summation of each
       // character of the proxy's IP address
       output << ";tag=";
-      if (metadata.ep().has_value() && metadata.ep().value().length() > 0) {
+      if (metadata.ep().has_value() && !metadata.ep().value().empty()) {
         output << fmt::format("{}-", metadata.ep().value());
       }
       std::time_t t;

@@ -6,6 +6,7 @@ permissions:
 on:
   workflow_call:
     secrets:
+      dockerhub-token:
       gcp-key:
         required: true
     inputs:
@@ -23,6 +24,8 @@ concurrency:
 
 jobs:
   publish:
+    secrets:
+      dockerhub-token: ${{ secrets.dockerhub-token }}
     permissions:
       actions: read
       contents: read
@@ -85,7 +88,7 @@ jobs:
           upload-name: docs
           upload-path: generated/docs
           steps-post: |
-            - uses: envoyproxy/toolshed/actions/jq@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+            - uses: envoyproxy/toolshed/actions/jq@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
               with:
                 output-path: generated/docs/gcs-metadata.json
                 input-format: yaml

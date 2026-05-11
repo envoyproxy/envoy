@@ -5,3 +5,5 @@ licenses(["notice"])  # Apache 2
 test_program(name = "http")
 
 test_program(name = "http_integration_test")
+
+test_program(name = "network_integration_test")

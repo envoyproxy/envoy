@@ -49,7 +49,6 @@ x-envoy-build-base: &envoy-build-base
   # Build configuration
   - NUM_CPUS
   - ENVOY_BRANCH
-  - ENVOY_RBE
   - ENVOY_BUILD_IMAGE
   - ENVOY_DOCS_PATH
   - ENVOY_SRCDIR

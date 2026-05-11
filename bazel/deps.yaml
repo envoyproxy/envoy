@@ -163,7 +163,7 @@ dd_trace_cpp:
   project_name: "Datadog C++ Tracing Library"
   project_desc: "Datadog distributed tracing for C++"
   project_url: "https://github.com/DataDog/dd-trace-cpp"
-  release_date: "2025-10-14"
+  release_date: "2026-05-06"
   use_category:
   - observability_ext
   extensions:
@@ -296,7 +296,7 @@ quiche:
   project_name: "QUICHE"
   project_desc: "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols"
   project_url: "https://github.com/google/quiche"
-  release_date: "2026-04-14"
+  release_date: "2026-04-30"
   use_category:
   - controlplane
   - dataplane_core
@@ -548,7 +548,7 @@ wasmtime:
   project_name: "wasmtime"
   project_desc: "A standalone runtime for WebAssembly"
   project_url: "https://github.com/bytecodealliance/wasmtime"
-  release_date: "2025-07-18"
+  release_date: "2026-04-09"
   use_category:
   - dataplane_ext
   extensions:
@@ -799,7 +799,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-04-06"
+  release_date: "2026-05-06"
   use_category:
   - build
   - controlplane
@@ -828,7 +828,7 @@ fips_cmake_linux_aarch64:
   project_name: "CMake (Linux aarch64)"
   project_desc: "Cross-platform family of tools designed to build, test and package software"
   project_url: "https://cmake.org/"
-  release_date: "2026-03-27"
+  release_date: "2026-04-21"
   use_category:
   - build
   - dataplane_core
@@ -841,7 +841,7 @@ fips_cmake_linux_x86_64:
   project_name: "CMake (Linux x86_64)"
   project_desc: "Cross-platform family of tools designed to build, test and package software"
   project_url: "https://cmake.org/"
-  release_date: "2026-03-27"
+  release_date: "2026-04-21"
   use_category:
   - build
   - dataplane_core
@@ -888,6 +888,45 @@ fips_ninja:
   cpe: "cpe:2.3:a:ninja-build:ninja:*"
   license: "Apache-2.0"
   license_url: "https://github.com/ninja-build/ninja/blob/v{version}/COPYING"
+
+fips_clang_ppc64le:
+  project_name: "Clang (Linux ppc64le)"
+  project_desc: "LLVM/Clang compiler for ppc64le FIPS builds"
+  project_url: "https://llvm.org/"
+  release_date: "2022-03-23"
+  use_category:
+  - build
+  - dataplane_core
+  - controlplane
+  cpe: "cpe:2.3:a:llvm:clang:*"
+  license: "Apache-2.0 WITH LLVM-exception"
+  license_url: "https://github.com/llvm/llvm-project/blob/llvmorg-{version}/LICENSE.TXT"
+
+fips_go_ppc64le:
+  project_name: "Go (Linux ppc64le)"
+  project_desc: "Go programming language (Linux ppc64le)"
+  project_url: "https://golang.org/"
+  release_date: "2026-04-07"
+  use_category:
+  - build
+  - dataplane_core
+  - controlplane
+  cpe: "cpe:2.3:a:golang:go:*"
+  license: "BSD-3-Clause"
+  license_url: "https://go.dev/LICENSE"
+
+fips_cmake_src:
+  project_name: "CMake (source)"
+  project_desc: "CMake built from source for ppc64le FIPS builds"
+  project_url: "https://cmake.org/"
+  release_date: "2026-04-21"
+  use_category:
+  - build
+  - dataplane_core
+  - controlplane
+  cpe: "cpe:2.3:a:kitware:cmake:*"
+  license: "BSD-3-Clause"
+  license_url: "https://github.com/Kitware/CMake/blob/v{version}/Copyright.txt"
 
 fp16:
   project_name: "Conversion to/from half-precision floating point formats"
@@ -1041,7 +1080,7 @@ kafka_source:
   project_name: "Kafka (source)"
   project_desc: "Open-source distributed event streaming platform"
   project_url: "https://kafka.apache.org"
-  release_date: "2025-05-12"
+  release_date: "2026-02-07"
   use_category:
   - dataplane_ext
   extensions:
@@ -1346,7 +1385,7 @@ skywalking_data_collect_protocol:
   project_name: "skywalking-data-collect-protocol"
   project_desc: "Data Collect Protocols of Apache SkyWalking"
   project_url: "https://github.com/apache/skywalking-data-collect-protocol"
-  release_date: "2025-11-10"
+  release_date: "2026-04-21"
   use_category:
   - observability_ext
   extensions:
@@ -1358,7 +1397,7 @@ thrift:
   project_name: "Apache Thrift"
   project_desc: "Apache Thrift Python library"
   project_url: "https://thrift.apache.org/"
-  release_date: "2025-05-23"
+  release_date: "2026-04-27"
   use_category:
   - test_only
   cpe: "cpe:2.3:a:apache:thrift:*"

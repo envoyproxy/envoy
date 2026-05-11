@@ -405,8 +405,8 @@ TEST_F(CacheFilterTest, GetBodyAdvancesRequestRange) {
   captured_lookup_callback_(std::make_unique<ActiveLookupResult>(
       ActiveLookupResult{std::move(mock_http_source_), CacheEntryStatus::Miss}));
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(IsSupersetOfHeaders(response_headers_), false));
-  EXPECT_CALL(decoder_callbacks_, encodeData(BufferStringEqual("hello"), false));
-  EXPECT_CALL(decoder_callbacks_, encodeData(BufferStringEqual(" world!"), true));
+  EXPECT_CALL(decoder_callbacks_, encodeData(BufferString("hello"), false));
+  EXPECT_CALL(decoder_callbacks_, encodeData(BufferString(" world!"), true));
   captured_get_headers_callback_(createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers_),
                                  EndStream::More);
   captured_get_body_callback_(std::make_unique<Buffer::OwnedImpl>("hello"), EndStream::More);
@@ -426,8 +426,8 @@ TEST_F(CacheFilterTest, GetBodyReturningNullBufferAndEndStreamCompletes) {
   captured_lookup_callback_(std::make_unique<ActiveLookupResult>(
       ActiveLookupResult{std::move(mock_http_source_), CacheEntryStatus::Hit}));
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(IsSupersetOfHeaders(response_headers_), false));
-  EXPECT_CALL(decoder_callbacks_, encodeData(BufferStringEqual("hello"), false));
-  EXPECT_CALL(decoder_callbacks_, encodeData(BufferStringEqual(""), true));
+  EXPECT_CALL(decoder_callbacks_, encodeData(BufferString("hello"), false));
+  EXPECT_CALL(decoder_callbacks_, encodeData(BufferString(""), true));
   captured_get_headers_callback_(createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers_),
                                  EndStream::More);
   captured_get_body_callback_(std::make_unique<Buffer::OwnedImpl>("hello"), EndStream::More);
@@ -448,7 +448,7 @@ TEST_F(CacheFilterTest, GetBodyReturningNullBufferAndNoEndStreamGoesOnToTrailers
   captured_lookup_callback_(std::make_unique<ActiveLookupResult>(
       ActiveLookupResult{std::move(mock_http_source_), CacheEntryStatus::Hit}));
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(IsSupersetOfHeaders(response_headers_), false));
-  EXPECT_CALL(decoder_callbacks_, encodeData(BufferStringEqual("hello"), false));
+  EXPECT_CALL(decoder_callbacks_, encodeData(BufferString("hello"), false));
   EXPECT_CALL(decoder_callbacks_, encodeTrailers_(IsSupersetOfHeaders(response_trailers_)));
   captured_get_headers_callback_(createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers_),
                                  EndStream::More);
@@ -494,7 +494,7 @@ TEST_F(CacheFilterTest, EndOfRequestedRangeEndsStreamWhenUpstreamDoesNot) {
   captured_lookup_callback_(std::make_unique<ActiveLookupResult>(
       ActiveLookupResult{std::move(mock_http_source_), CacheEntryStatus::Hit}));
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(IsSupersetOfHeaders(response_headers_), false));
-  EXPECT_CALL(decoder_callbacks_, encodeData(BufferStringEqual("hello"), true));
+  EXPECT_CALL(decoder_callbacks_, encodeData(BufferString("hello"), true));
   captured_get_headers_callback_(createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers_),
                                  EndStream::More);
   captured_get_body_callback_(std::make_unique<Buffer::OwnedImpl>("hello"), EndStream::More);
@@ -515,7 +515,7 @@ TEST_F(CacheFilterTest, EndOfRequestedRangeEndsTraileredStreamWithoutSendingTrai
   captured_lookup_callback_(std::make_unique<ActiveLookupResult>(
       ActiveLookupResult{std::move(mock_http_source_), CacheEntryStatus::Hit}));
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(IsSupersetOfHeaders(response_headers_), false));
-  EXPECT_CALL(decoder_callbacks_, encodeData(BufferStringEqual("beep"), true));
+  EXPECT_CALL(decoder_callbacks_, encodeData(BufferString("beep"), true));
   captured_get_headers_callback_(createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers_),
                                  EndStream::More);
   // More here, at the end of the source data, indicates that trailers exist.
@@ -534,8 +534,9 @@ TEST_F(CacheFilterTest, FilterDestroyedDuringEncodeDataPreventsFurtherRequests) 
   captured_lookup_callback_(std::make_unique<ActiveLookupResult>(
       ActiveLookupResult{std::move(mock_http_source_), CacheEntryStatus::Hit}));
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(IsSupersetOfHeaders(response_headers_), false));
-  EXPECT_CALL(decoder_callbacks_, encodeData(BufferStringEqual("hello"), false))
-      .WillOnce([&filter]() { filter->onDestroy(); });
+  EXPECT_CALL(decoder_callbacks_, encodeData(BufferString("hello"), false)).WillOnce([&filter]() {
+    filter->onDestroy();
+  });
   captured_get_headers_callback_(createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers_),
                                  EndStream::More);
   captured_get_body_callback_(std::make_unique<Buffer::OwnedImpl>("hello"), EndStream::More);
@@ -554,7 +555,7 @@ TEST_F(CacheFilterTest, WatermarkDelaysUpstreamRequestingMore) {
   captured_lookup_callback_(std::make_unique<ActiveLookupResult>(
       ActiveLookupResult{std::move(mock_http_source_), CacheEntryStatus::Hit}));
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(IsSupersetOfHeaders(response_headers_), false));
-  EXPECT_CALL(decoder_callbacks_, encodeData(BufferStringEqual("hello"), false));
+  EXPECT_CALL(decoder_callbacks_, encodeData(BufferString("hello"), false));
   captured_get_headers_callback_(createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers_),
                                  EndStream::More);
   filter->onAboveWriteBufferHighWatermark();
@@ -573,7 +574,7 @@ TEST_F(CacheFilterTest, WatermarkDelaysUpstreamRequestingMore) {
   // Unwatermarking back to zero should release the request.
   filter->onBelowWriteBufferLowWatermark();
   EXPECT_THAT(captured_get_body_callback_, NotNull());
-  EXPECT_CALL(decoder_callbacks_, encodeData(BufferStringEqual("world"), true));
+  EXPECT_CALL(decoder_callbacks_, encodeData(BufferString("world"), true));
   captured_get_body_callback_(std::make_unique<Buffer::OwnedImpl>("world"), EndStream::End);
   EXPECT_THAT(decoder_callbacks_.details(), Eq("cache.response_from_cache_filter"));
 }
@@ -602,8 +603,8 @@ TEST_F(CacheFilterTest, DeepRecursionOfGetBodyDoesntOverflowStack) {
   captured_lookup_callback_(std::make_unique<ActiveLookupResult>(
       ActiveLookupResult{std::move(mock_http_source_), CacheEntryStatus::Hit}));
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(IsSupersetOfHeaders(response_headers_), false));
-  EXPECT_CALL(decoder_callbacks_, encodeData(BufferStringEqual("a"), false)).Times(max_depth - 1);
-  EXPECT_CALL(decoder_callbacks_, encodeData(BufferStringEqual("a"), true));
+  EXPECT_CALL(decoder_callbacks_, encodeData(BufferString("a"), false)).Times(max_depth - 1);
+  EXPECT_CALL(decoder_callbacks_, encodeData(BufferString("a"), true));
   captured_get_headers_callback_(createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers_),
                                  EndStream::More);
   EXPECT_THAT(decoder_callbacks_.details(), Eq("cache.response_from_cache_filter"));

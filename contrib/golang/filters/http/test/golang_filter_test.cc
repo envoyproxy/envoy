@@ -31,7 +31,6 @@ using testing::AtLeast;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Extensions {
@@ -40,8 +39,10 @@ namespace Golang {
 
 class TestFilter : public Filter {
 public:
+  using Filter::continueStatus;
   using Filter::continueStatusInternal;
   using Filter::Filter;
+  using Filter::sendLocalReply;
   DecodingProcessorState& testDecodingState() { return decoding_state_; }
   HttpRequestInternal* testReq() { return req_; }
 };
@@ -263,6 +264,114 @@ TEST_F(GolangHttpFilterTest, BufferedDataAfterDestroyDuringContinue) {
 
   ASSERT_NE(nullptr, filter->testReq());
   delete filter->testReq();
+}
+
+// Helper to set up a mock-based filter for dispatcher post tests.
+struct MockFilterContext {
+  std::shared_ptr<NiceMock<Dso::MockHttpFilterDsoImpl>> dso_lib;
+  std::shared_ptr<FilterConfig> config;
+  NiceMock<Server::Configuration::MockFactoryContext> mock_context;
+  Network::Address::InstanceConstSharedPtr addr;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> mock_callbacks;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> mock_enc_callbacks;
+  NiceMock<Envoy::Network::MockConnection> mock_connection;
+  std::shared_ptr<TestFilter> filter;
+
+  void setup(bool thread_safe) {
+    dso_lib = std::make_shared<NiceMock<Dso::MockHttpFilterDsoImpl>>();
+    ON_CALL(*dso_lib, envoyGoFilterNewHttpPluginConfig(_)).WillByDefault(Return(1));
+    ON_CALL(*dso_lib, envoyGoFilterOnHttpHeader(_, _, _, _))
+        .WillByDefault(Return(static_cast<uint64_t>(GolangStatus::Running)));
+
+    const auto yaml = R"EOF(
+      library_id: test
+      library_path: test
+      plugin_name: test
+      )EOF";
+    envoy::extensions::filters::http::golang::v3alpha::Config proto_config;
+    TestUtility::loadFromYaml(yaml, proto_config);
+    config = std::make_shared<FilterConfig>(proto_config, dso_lib, "", mock_context);
+    config->newGoPluginConfig();
+
+    addr.reset((*Network::Address::PipeInstance::create("/test/test.sock")).release());
+    ON_CALL(mock_callbacks, connection())
+        .WillByDefault(Return(OptRef<const Network::Connection>{mock_connection}));
+    mock_connection.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr);
+    mock_connection.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr);
+    EXPECT_CALL(mock_callbacks.dispatcher_, isThreadSafe()).WillRepeatedly(Return(thread_safe));
+
+    filter = std::make_shared<TestFilter>(config, dso_lib, 0);
+    filter->setDecoderFilterCallbacks(mock_callbacks);
+    filter->setEncoderFilterCallbacks(mock_enc_callbacks);
+
+    Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+              filter->decodeHeaders(request_headers, false));
+  }
+
+  void teardown() {
+    filter->onDestroy();
+    delete filter->testReq();
+  }
+};
+
+// Verify that continueStatus executes inline when already on the worker thread,
+// bypassing dispatcher.post for lower latency.
+TEST_F(GolangHttpFilterTest, ContinueStatusSkipsPostOnWorkerThread) {
+  MockFilterContext ctx;
+  ctx.setup(true);
+
+  EXPECT_CALL(ctx.mock_callbacks.dispatcher_, post(_)).Times(0);
+  EXPECT_CALL(ctx.mock_callbacks, continueDecoding());
+
+  auto status = ctx.filter->continueStatus(ctx.filter->testDecodingState(), GolangStatus::Continue);
+  EXPECT_EQ(CAPIStatus::CAPIOK, status);
+
+  ctx.teardown();
+}
+
+// Verify that continueStatus posts to the dispatcher when not on the worker thread.
+TEST_F(GolangHttpFilterTest, ContinueStatusPostsOffWorkerThread) {
+  MockFilterContext ctx;
+  ctx.setup(false);
+
+  EXPECT_CALL(ctx.mock_callbacks.dispatcher_, post(_));
+
+  auto status = ctx.filter->continueStatus(ctx.filter->testDecodingState(), GolangStatus::Continue);
+  EXPECT_EQ(CAPIStatus::CAPIOK, status);
+
+  ctx.teardown();
+}
+
+// Verify that sendLocalReply executes inline when already on the worker thread.
+TEST_F(GolangHttpFilterTest, SendLocalReplySkipsPostOnWorkerThread) {
+  MockFilterContext ctx;
+  ctx.setup(true);
+
+  EXPECT_CALL(ctx.mock_callbacks.dispatcher_, post(_)).Times(0);
+  EXPECT_CALL(ctx.mock_callbacks, sendLocalReply(Http::Code::BadRequest, "bad request", _, _, _));
+
+  auto status =
+      ctx.filter->sendLocalReply(ctx.filter->testDecodingState(), Http::Code::BadRequest,
+                                 "bad request", nullptr, Grpc::Status::WellKnownGrpcStatus::Ok, "");
+  EXPECT_EQ(CAPIStatus::CAPIOK, status);
+
+  ctx.teardown();
+}
+
+// Verify that sendLocalReply posts to the dispatcher when not on the worker thread.
+TEST_F(GolangHttpFilterTest, SendLocalReplyPostsOffWorkerThread) {
+  MockFilterContext ctx;
+  ctx.setup(false);
+
+  EXPECT_CALL(ctx.mock_callbacks.dispatcher_, post(_));
+
+  auto status =
+      ctx.filter->sendLocalReply(ctx.filter->testDecodingState(), Http::Code::BadRequest,
+                                 "bad request", nullptr, Grpc::Status::WellKnownGrpcStatus::Ok, "");
+  EXPECT_EQ(CAPIStatus::CAPIOK, status);
+
+  ctx.teardown();
 }
 
 } // namespace

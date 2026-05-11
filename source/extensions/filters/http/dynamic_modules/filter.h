@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 #include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
@@ -42,9 +44,12 @@ public:
   FilterMetadataStatus decodeMetadata(MetadataMap&) override;
   void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
-    // We always register for downstream watermark callbacks. This allows all filters
-    // including the terminal filter to receive flow control events.
-    decoder_callbacks_->addDownstreamWatermarkCallbacks(*this);
+    // Publish the worker dispatcher for cross-thread `commit()`; see `dispatcher()`.
+    cached_dispatcher_.store(&callbacks.dispatcher(), std::memory_order_release);
+    // Registration is deferred until the in-module filter exists: the factory wires callbacks
+    // before initializeInModuleFilter(), and addDownstreamWatermarkCallbacks() synchronously
+    // replays any pending onAboveWriteBufferHighWatermark() into the newly registered callback.
+    maybeRegisterDownstreamWatermarkCallbacks();
   }
   void decodeComplete() override;
 
@@ -61,6 +66,12 @@ public:
 
   bool isDestroyed() const { return destroyed_; }
 
+  /**
+   * Returns the worker dispatcher this filter is running on; safe to call from any thread.
+   * Returns nullptr until callbacks are wired and after `onDestroy()`.
+   */
+  Event::Dispatcher* dispatcher() { return cached_dispatcher_.load(std::memory_order_acquire); }
+
   // ----------  Http::DownstreamWatermarkCallbacks  ----------
   void onAboveWriteBufferHighWatermark() override;
   void onBelowWriteBufferLowWatermark() override;
@@ -70,7 +81,8 @@ public:
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details);
 
-  // The callbacks for the filter. They are only valid until onDestroy() is called.
+  // The callbacks for the filter. Worker-thread only; foreign threads must use `dispatcher()`.
+  // They are only valid until onDestroy() is called.
   StreamDecoderFilterCallbacks* decoder_callbacks_ = nullptr;
   StreamEncoderFilterCallbacks* encoder_callbacks_ = nullptr;
   bool destroyed_ = false;
@@ -242,6 +254,13 @@ private:
    */
   void destroy();
 
+  /**
+   * Registers this filter for downstream watermark callbacks once both decoder callbacks have been
+   * set and the in-module filter has been constructed. Idempotent; safe to call from either
+   * entry point regardless of which runs first.
+   */
+  void maybeRegisterDownstreamWatermarkCallbacks();
+
   // True if the filter is in the continue state. This is to avoid prohibited calls to
   // continueDecoding() or continueEncoding() multiple times.
   bool in_continue_ = false;
@@ -257,6 +276,13 @@ private:
   envoy_dynamic_module_type_http_filter_module_ptr in_module_filter_ = nullptr;
   Stats::StatNameDynamicPool stat_name_pool_;
   uint32_t worker_index_;
+  // Tracks whether addDownstreamWatermarkCallbacks() has been invoked on decoder_callbacks_.
+  // Also gates the paired remove in onDestroy(), because removeDownstreamWatermarkCallbacks()
+  // asserts that the callback was previously added.
+  bool downstream_watermark_callbacks_registered_ = false;
+
+  // Worker dispatcher published at callback-init, cleared on destroy. Read via `dispatcher()`.
+  std::atomic<Event::Dispatcher*> cached_dispatcher_{nullptr};
 
   /**
    * This implementation of the AsyncClient::Callbacks is used to handle the response from the HTTP
@@ -389,14 +415,24 @@ using DynamicModuleHttpFilterWeakPtr = std::weak_ptr<DynamicModuleHttpFilter>;
  */
 class DynamicModuleHttpFilterScheduler {
 public:
-  DynamicModuleHttpFilterScheduler(DynamicModuleHttpFilterWeakPtr filter,
-                                   Event::Dispatcher& dispatcher)
-      : filter_(std::move(filter)), dispatcher_(dispatcher) {}
+  explicit DynamicModuleHttpFilterScheduler(DynamicModuleHttpFilterWeakPtr filter)
+      : filter_(std::move(filter)) {}
 
+  // Safe to call from any thread. Reads only the weak_ptr and the atomic dispatcher cache (see
+  // `DynamicModuleHttpFilter::dispatcher()`); it never dereferences `decoder_callbacks_` from a
+  // foreign thread.
   void commit(uint64_t event_id) {
-    dispatcher_.post([filter = filter_, event_id]() {
-      if (DynamicModuleHttpFilterSharedPtr filter_shared = filter.lock()) {
-        filter_shared->onScheduled(event_id);
+    DynamicModuleHttpFilterSharedPtr filter_shared = filter_.lock();
+    if (!filter_shared) {
+      return;
+    }
+    Event::Dispatcher* dispatcher = filter_shared->dispatcher();
+    if (dispatcher == nullptr) {
+      return;
+    }
+    dispatcher->post([filter = filter_, event_id]() {
+      if (DynamicModuleHttpFilterSharedPtr fs = filter.lock()) {
+        fs->onScheduled(event_id);
       }
     });
   }
@@ -405,8 +441,6 @@ private:
   // The filter that this scheduler is associated with. Using a weak pointer to avoid unnecessarily
   // extending the lifetime of the filter.
   DynamicModuleHttpFilterWeakPtr filter_;
-  // The dispatcher is used to post the event to the worker thread that filter_ is assigned to.
-  Event::Dispatcher& dispatcher_;
 };
 
 } // namespace HttpFilters
