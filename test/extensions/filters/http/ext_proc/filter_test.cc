@@ -6570,13 +6570,10 @@ TEST_F(HttpFilterTest, ModeOverrideDisallowed) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse& pr, HeadersResponse&) {
-    pr.mutable_mode_override()->set_request_header_mode(ProcessingMode::SKIP); // Not allowed
+    pr.mutable_mode_override()->set_request_body_mode(ProcessingMode::STREAMED); // Not allowed
   });
-  // Should still be SEND (original mode)
-  EXPECT_EQ(ProcessingMode::SEND,
-            FilterAccessor::decodingState(*filter_).bodyMode() == ProcessingMode::BUFFERED
-                ? ProcessingMode::SEND
-                : ProcessingMode::SEND);
+  // Should still be NONE (default mode)
+  EXPECT_EQ(ProcessingMode::NONE, FilterAccessor::decodingState(*filter_).bodyMode());
   filter_->onDestroy();
 }
 
