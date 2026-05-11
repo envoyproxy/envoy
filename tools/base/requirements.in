@@ -1,6 +1,6 @@
 abstracts>=0.0.12
 aio.api.bazel
-aio.api.github>=0.2.5
+aio.api.github>=0.3.0
 aio.core>=0.10.2
 aiodocker>=0.22.2
 aiohttp>=3.13.3
