@@ -980,11 +980,9 @@ TEST_F(LuaHttpFilterTest, RequestHeadersInResponseCached) {
   EXPECT_CALL(encoder_callbacks_, requestHeaders())
       .Times(1)
       .WillOnce(Return(Http::RequestHeaderMapOptRef{request_headers}));
-  EXPECT_LOG_CONTAINS_ALL_OF(
-      Envoy::ExpectedLogMessages({{"trace", "/cached"}, {"trace", "GET"}}), {
-        EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-                  filter_->encodeHeaders(response_headers, true));
-      });
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({{"trace", "/cached"}, {"trace", "GET"}}), {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 

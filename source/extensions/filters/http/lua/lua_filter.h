@@ -151,9 +151,9 @@ public:
 
 class Filter;
 
-// Generates only the static thunk for a Lua function (userdata at stack slot 1), without
-// redeclaring the int Name(lua_State*) method. Used by the concrete handle wrapper types to
-// forward calls to implementations inherited from StreamHandleWrapperBase.
+// Generates only the static thunk for a Lua function (userdata at stack slot 1). The concrete
+// handle wrapper types use this to forward calls to implementations inherited from
+// StreamHandleWrapperBase without needing to repeat the int Name(lua_State*) signature.
 #define FORWARD_LUA_FUNCTION(Class, Name)                                                          \
   static int static_##Name(lua_State* state) {                                                     \
     Class* object = ::Envoy::Extensions::Filters::Common::Lua::alignAndCast<Class>(                \

@@ -537,19 +537,20 @@ int StreamHandleWrapperBase::luaHeaders(lua_State* state) {
 int StreamHandleWrapperBase::luaDownstreamRequestHeaders(lua_State* state) {
   ASSERT(state_ == State::Running);
 
+  if (downstream_request_headers_wrapper_.get() != nullptr) {
+    downstream_request_headers_wrapper_.pushStack();
+    return 1;
+  }
+
   Http::RequestHeaderMapOptRef request_headers = callbacks_.downstreamRequestHeaders();
   if (!request_headers.has_value()) {
     return 0;
   }
 
-  if (downstream_request_headers_wrapper_.get() != nullptr) {
-    downstream_request_headers_wrapper_.pushStack();
-  } else {
-    // The "can modify" callback returns false to make this wrapper read-only at the Lua level.
-    // Mutating request headers after they have been forwarded upstream has no effect.
-    downstream_request_headers_wrapper_.reset(
-        HeaderMapWrapper::create(state, request_headers.value().get(), [] { return false; }), true);
-  }
+  // The "can modify" callback returns false to make this wrapper read-only at the Lua level.
+  // Mutating request headers after they have been forwarded upstream has no effect.
+  downstream_request_headers_wrapper_.reset(
+      HeaderMapWrapper::create(state, request_headers.value().get(), [] { return false; }), true);
   return 1;
 }
 
