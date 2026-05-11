@@ -1056,9 +1056,8 @@ TEST_F(LuaHttpFilterTest, DownstreamRequestHeadersNotAvailableInRequest) {
 }
 
 // downstreamRequestHeaders() called after a coroutine yield (body() suspends the script until the
-// full body arrives) still returns the correct wrapper. onMarkDead() resets the cached wrapper on
-// yield, so the second call re-fetches via requestHeaders() — Times(2) is the load-bearing
-// assertion confirming the cache is invalidated across the yield boundary.
+// full body arrives) still returns the correct wrapper. The cache is cleared by onMarkDead() on
+// yield, so requestHeaders() is called exactly once when the script resumes and accesses headers.
 TEST_F(LuaHttpFilterTest, RequestHeadersInResponseAfterYield) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_response(response_handle)
