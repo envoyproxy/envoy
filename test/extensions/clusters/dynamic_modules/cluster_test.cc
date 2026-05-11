@@ -1,3 +1,6 @@
+#include <atomic>
+#include <thread>
+
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.h"
 
@@ -18,6 +21,7 @@
 #include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -35,7 +39,7 @@ public:
   }
 
   static size_t getHostMapSize(DynamicModuleCluster& cluster) {
-    absl::ReaderMutexLock lock(&cluster.host_map_lock_);
+    absl::ReaderMutexLock lock(cluster.host_map_lock_);
     return cluster.host_map_.size();
   }
 
@@ -65,6 +69,11 @@ public:
     Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr, false);
     DynamicModuleClusterFactory factory;
     return factory.create(cluster_config, factory_context);
+  }
+
+  // Re-opens stat creation so tests can call `define_*` from the test thread.
+  static void unfreezeStatCreation(DynamicModuleClusterConfig& config) {
+    config.stat_creation_frozen_ = false;
   }
 
   std::string makeYamlConfig(const std::string& module_name,
@@ -1336,6 +1345,7 @@ TEST_F(DynamicModuleClusterTest, MetricsDefineAndIncrementCounter) {
 
   auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
   auto* config = cluster->config().get();
+  unfreezeStatCreation(*config);
 
   // Define a scalar counter.
   size_t counter_id = 0;
@@ -1359,6 +1369,7 @@ TEST_F(DynamicModuleClusterTest, MetricsDefineAndUseGauge) {
 
   auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
   auto* config = cluster->config().get();
+  unfreezeStatCreation(*config);
 
   // Define a scalar gauge.
   size_t gauge_id = 0;
@@ -1388,6 +1399,7 @@ TEST_F(DynamicModuleClusterTest, MetricsDefineAndRecordHistogram) {
 
   auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
   auto* config = cluster->config().get();
+  unfreezeStatCreation(*config);
 
   // Define a scalar histogram.
   size_t histogram_id = 0;
@@ -1411,6 +1423,7 @@ TEST_F(DynamicModuleClusterTest, MetricsNotFoundForInvalidId) {
 
   auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
   auto* config = cluster->config().get();
+  unfreezeStatCreation(*config);
 
   // Increment a counter that was never defined.
   EXPECT_EQ(
@@ -1444,6 +1457,7 @@ TEST_F(DynamicModuleClusterTest, MetricsCounterVecWithLabels) {
 
   auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
   auto* config = cluster->config().get();
+  unfreezeStatCreation(*config);
 
   // Define a counter vec with two labels.
   size_t counter_id = 0;
@@ -1488,6 +1502,7 @@ TEST_F(DynamicModuleClusterTest, MetricsGaugeVecWithLabels) {
 
   auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
   auto* config = cluster->config().get();
+  unfreezeStatCreation(*config);
 
   // Define a gauge vec.
   size_t gauge_id = 0;
@@ -1523,6 +1538,7 @@ TEST_F(DynamicModuleClusterTest, MetricsHistogramVecWithLabels) {
 
   auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
   auto* config = cluster->config().get();
+  unfreezeStatCreation(*config);
 
   // Define a histogram vec.
   size_t histogram_id = 0;
@@ -1554,6 +1570,7 @@ TEST_F(DynamicModuleClusterTest, MetricsVecScalarIdConflictErrors) {
 
   auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
   auto* config = cluster->config().get();
+  unfreezeStatCreation(*config);
 
   envoy_dynamic_module_type_module_buffer label_name = {const_cast<char*>("lbl"), strlen("lbl")};
 
@@ -1608,6 +1625,7 @@ TEST_F(DynamicModuleClusterTest, MetricsVecWrongLabelCount) {
 
   auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
   auto* config = cluster->config().get();
+  unfreezeStatCreation(*config);
 
   // Define a gauge vec with one label.
   envoy_dynamic_module_type_module_buffer gauge_name = {const_cast<char*>("gwl"), strlen("gwl")};
@@ -1652,6 +1670,7 @@ TEST_F(DynamicModuleClusterTest, MetricsVecNotFoundWithLabels) {
 
   auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
   auto* config = cluster->config().get();
+  unfreezeStatCreation(*config);
 
   envoy_dynamic_module_type_module_buffer label_val = {const_cast<char*>("val"), strlen("val")};
 
@@ -3249,6 +3268,178 @@ TEST_F(DynamicModuleClusterTest, LbRepeatedConstructTeardownWithUpdates) {
         0,
         Upstream::HostSetImpl::partitionHosts(all_hosts, Upstream::HostsPerLocalityImpl::empty()),
         {}, {hosts[1]}, {}, absl::nullopt, absl::nullopt);
+  }
+}
+
+// =============================================================================
+// Off-main-thread guard tests for cluster ABI callbacks.
+// =============================================================================
+
+// Verifies that `cluster_add_hosts` is fail-closed when called off the main thread.
+TEST_F(DynamicModuleClusterTest, AddHostsOffMainThreadFailsClosed) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  envoy_dynamic_module_type_module_buffer addr = {"127.0.0.1:10001", 15};
+  uint32_t weight = 1;
+  envoy_dynamic_module_type_module_buffer empty = {"", 0};
+  envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptr = nullptr;
+  void* cluster_ptr = cluster.get();
+
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t([&] {
+          EXPECT_FALSE(envoy_dynamic_module_callback_cluster_add_hosts(
+              cluster_ptr, 0, &addr, &weight, &empty, &empty, &empty, nullptr, 0, 1, &host_ptr));
+        });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_cluster_add_hosts must be called on the main thread");
+}
+
+// Verifies that `cluster_remove_hosts` is fail-closed when called off the main thread.
+TEST_F(DynamicModuleClusterTest, RemoveHostsOffMainThreadFailsClosed) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptrs[1] = {nullptr};
+  void* cluster_ptr = cluster.get();
+
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t([&] {
+          EXPECT_EQ(0u,
+                    envoy_dynamic_module_callback_cluster_remove_hosts(cluster_ptr, host_ptrs, 1));
+        });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_cluster_remove_hosts must be called on the main thread");
+}
+
+// Verifies that `cluster_update_host_health` is fail-closed when called off the main thread.
+TEST_F(DynamicModuleClusterTest, UpdateHostHealthOffMainThreadFailsClosed) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  void* cluster_ptr = cluster.get();
+
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t([&] {
+          EXPECT_FALSE(envoy_dynamic_module_callback_cluster_update_host_health(
+              cluster_ptr, nullptr, envoy_dynamic_module_type_host_health_Healthy));
+        });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_cluster_update_host_health must be called on the main "
+      "thread");
+}
+
+// Verifies that `cluster_pre_init_complete` is a safe no-op when called off the main thread.
+TEST_F(DynamicModuleClusterTest, PreInitCompleteOffMainThreadFailsClosed) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  void* cluster_ptr = cluster.get();
+
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t(
+            [&] { envoy_dynamic_module_callback_cluster_pre_init_complete(cluster_ptr); });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_cluster_pre_init_complete must be called on the main thread");
+}
+
+// Verifies the factory auto-freezes stat creation so `define_*` returns `Frozen` after init.
+TEST_F(DynamicModuleClusterTest, MetricsFrozenAfterInit) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  auto* config = cluster->config().get();
+  EXPECT_TRUE(config->stat_creation_frozen_);
+
+  envoy_dynamic_module_type_module_buffer name = {const_cast<char*>("frozen_counter"), 14};
+  envoy_dynamic_module_type_module_buffer label = {const_cast<char*>("label"), 5};
+  size_t out_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_cluster_config_define_counter(config, name, nullptr, 0,
+                                                                        &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_cluster_config_define_counter(config, name, &label, 1,
+                                                                        &out_id));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_Frozen,
+      envoy_dynamic_module_callback_cluster_config_define_gauge(config, name, nullptr, 0, &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_cluster_config_define_histogram(config, name, nullptr, 0,
+                                                                          &out_id));
+}
+
+// Drives concurrent labeled increments from multiple threads to verify no data race in the
+// shared `stat_name_pool_`. Run under `--config=tsan` to verify.
+TEST_F(DynamicModuleClusterTest, MetricsConcurrentIncrementCounterVecNoRace) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  auto* config = cluster->config().get();
+  unfreezeStatCreation(*config);
+
+  envoy_dynamic_module_type_module_buffer name = {const_cast<char*>("race_counter"), 12};
+  envoy_dynamic_module_type_module_buffer label_names = {const_cast<char*>("status"), 6};
+  size_t counter_id = 0;
+  ASSERT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_config_define_counter(config, name, &label_names,
+                                                                        1, &counter_id));
+
+  constexpr int kNumThreads = 8;
+  constexpr int kIncrementsPerThread = 2000;
+
+  // Pre-warm the test scope's counter cache so workers only hit the cache. `TestScope` uses an
+  // unsynchronized map for counter caching that would otherwise race independently of the path
+  // under test.
+  for (int t = 0; t < kNumThreads; ++t) {
+    const std::string label_value_str = absl::StrCat("worker_", t);
+    envoy_dynamic_module_type_module_buffer label_value = {
+        const_cast<char*>(label_value_str.data()), label_value_str.size()};
+    ASSERT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+              envoy_dynamic_module_callback_cluster_config_increment_counter(config, counter_id,
+                                                                             &label_value, 1, 0));
+  }
+
+  std::vector<std::thread> threads;
+  threads.reserve(kNumThreads);
+  std::atomic<int> ready{0};
+  std::atomic<bool> go{false};
+  for (int t = 0; t < kNumThreads; ++t) {
+    threads.emplace_back([&, t]() {
+      const std::string label_value_str = absl::StrCat("worker_", t);
+      envoy_dynamic_module_type_module_buffer label_value = {
+          const_cast<char*>(label_value_str.data()), label_value_str.size()};
+      ready.fetch_add(1, std::memory_order_relaxed);
+      while (!go.load(std::memory_order_acquire)) {
+      }
+      for (int i = 0; i < kIncrementsPerThread; ++i) {
+        ASSERT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+                  envoy_dynamic_module_callback_cluster_config_increment_counter(
+                      config, counter_id, &label_value, 1, 1));
+      }
+    });
+  }
+  while (ready.load(std::memory_order_acquire) < kNumThreads) {
+  }
+  go.store(true, std::memory_order_release);
+  for (auto& th : threads) {
+    th.join();
   }
 }
 

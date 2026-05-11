@@ -12,9 +12,9 @@ class StaticNameMapper : public Ssl::TlsCertificateMapper,
                          public Ssl::UpstreamTlsCertificateMapper {
 public:
   explicit StaticNameMapper(const std::string& name) : name_(name) {}
-  std::string deriveFromClientHello(const SSL_CLIENT_HELLO&) { return name_; }
+  std::string deriveFromClientHello(const SSL_CLIENT_HELLO&) override { return name_; }
   std::string deriveFromServerHello(const SSL&,
-                                    const Network::TransportSocketOptionsConstSharedPtr&) {
+                                    const Network::TransportSocketOptionsConstSharedPtr&) override {
     return name_;
   }
 

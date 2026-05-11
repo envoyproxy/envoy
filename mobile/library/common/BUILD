@@ -28,6 +28,7 @@ envoy_cc_library(
         ":mobile_process_wide_lib",
         "//library/common/bridge:utility_lib",
         "//library/common/event:provisional_dispatcher_lib",
+        "//library/common/extensions/listener_managers/api_listener_manager:api_listener_manager_lib",
         "//library/common/http:client_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/logger:logger_delegate_lib",

@@ -1,3 +1,5 @@
+#include <thread>
+
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
 #include "test/mocks/server/server_factory_context.h"
@@ -38,6 +40,60 @@ TEST(CommonAbiImplTest, IsValidationModeReturnsFalseInInitOnlyMode) {
 
   ScopedThreadLocalServerContextSetter setter(context);
   EXPECT_FALSE(envoy_dynamic_module_callback_is_validation_mode());
+}
+
+// Verifies that `is_validation_mode` is fail-closed when called off the main thread.
+TEST(CommonAbiImplTest, IsValidationModeOffMainThreadFailsClosed) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context.options_, mode()).WillByDefault(Return(Server::Mode::Validate));
+  ScopedThreadLocalServerContextSetter setter(context);
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t([] { EXPECT_FALSE(envoy_dynamic_module_callback_is_validation_mode()); });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_is_validation_mode must be called on the main thread");
+}
+
+// Verifies that `is_validation_mode` is fail-closed when called before the server context is
+// installed.
+TEST(CommonAbiImplTest, IsValidationModeBeforeServerContextFailsClosed) {
+  EXPECT_ENVOY_BUG(EXPECT_FALSE(envoy_dynamic_module_callback_is_validation_mode()),
+                   "envoy_dynamic_module_callback_is_validation_mode called before the server "
+                   "context was initialized");
+}
+
+// =============================================================================
+// Concurrency Tests
+// =============================================================================
+
+TEST(CommonAbiImplTest, GetConcurrencyReturnsConfiguredValue) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context.options_, concurrency()).WillByDefault(Return(4));
+
+  ScopedThreadLocalServerContextSetter setter(context);
+  EXPECT_EQ(4u, envoy_dynamic_module_callback_get_concurrency());
+}
+
+// Verifies that `get_concurrency` is fail-closed when called off the main thread.
+TEST(CommonAbiImplTest, GetConcurrencyOffMainThreadFailsClosed) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context.options_, concurrency()).WillByDefault(Return(4));
+  ScopedThreadLocalServerContextSetter setter(context);
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t([] { EXPECT_EQ(0u, envoy_dynamic_module_callback_get_concurrency()); });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_get_concurrency must be called on the main thread");
+}
+
+// Verifies that `get_concurrency` is fail-closed when called before the server context is
+// installed.
+TEST(CommonAbiImplTest, GetConcurrencyBeforeServerContextFailsClosed) {
+  EXPECT_ENVOY_BUG(EXPECT_EQ(0u, envoy_dynamic_module_callback_get_concurrency()),
+                   "envoy_dynamic_module_callback_get_concurrency called before the server "
+                   "context was initialized");
 }
 
 // =============================================================================

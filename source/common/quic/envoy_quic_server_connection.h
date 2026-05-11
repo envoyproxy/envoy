@@ -160,6 +160,7 @@ protected:
 
 private:
   // Called when a packet is written to the packet writer.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void OnWritePacketDone(size_t packet_size, const quic::WriteResult& result);
   std::unique_ptr<QuicListenerFilterManagerImpl> listener_filter_manager_;
   bool first_packet_received_ = false;

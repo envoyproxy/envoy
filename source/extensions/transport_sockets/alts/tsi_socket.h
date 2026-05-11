@@ -71,7 +71,7 @@ public:
   bool startSecureTransport() override { return false; }
   void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
-  void closeSocket(Network::ConnectionEvent event) override;
+  void closeSocket(Network::ConnectionEvent event, bool abort_reset) override;
   Network::IoResult doRead(Buffer::Instance& buffer) override;
   void onConnected() override;
 

@@ -1710,7 +1710,7 @@ bool eosSeenInBody(ProcessorState& state,
     return false;
   case ProcessingMode::STREAMED:
     if (!state.chunkQueue().empty()) {
-      return state.chunkQueue().queue().front()->end_stream;
+      return state.chunkQueue().queue().front().end_stream;
     }
     return false;
   case ProcessingMode::FULL_DUPLEX_STREAMED: {

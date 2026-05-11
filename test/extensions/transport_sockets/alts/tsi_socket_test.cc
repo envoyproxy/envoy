@@ -176,10 +176,10 @@ protected:
 
   void TearDown() override {
     if (client_.tsi_socket_ != nullptr) {
-      client_.tsi_socket_->closeSocket(Network::ConnectionEvent::LocalClose);
+      client_.tsi_socket_->closeSocket(Network::ConnectionEvent::LocalClose, false);
     }
     if (server_.tsi_socket_ != nullptr) {
-      server_.tsi_socket_->closeSocket(Network::ConnectionEvent::RemoteClose);
+      server_.tsi_socket_->closeSocket(Network::ConnectionEvent::RemoteClose, false);
     }
     if (handshaker_server_thread_) {
       handshaker_server_->Shutdown(std::chrono::system_clock::now()); // NO_CHECK_FORMAT(real_time)

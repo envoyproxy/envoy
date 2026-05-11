@@ -87,7 +87,7 @@ private:
   const std::chrono::milliseconds fill_interval_;
   const std::function<void(Buffer::Instance&, bool)> write_data_cb_;
   const std::function<void()> continue_cb_;
-  const std::function<void(uint64_t, bool, std::chrono::milliseconds)> write_stats_cb_;
+  const std::function<void(uint64_t, uint64_t, std::chrono::milliseconds)> write_stats_cb_;
   const ScopeTrackedObject& scope_;
   std::shared_ptr<TokenBucket> token_bucket_;
   Event::TimerPtr token_timer_;
