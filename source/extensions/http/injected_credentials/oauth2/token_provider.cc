@@ -109,7 +109,7 @@ void TokenProvider::onGetAccessTokenSuccess(const std::string& access_token,
   tls_->set(
       [value](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return value; });
 
-  token_expiry_time_ = std::chrono::steady_clock::now() + expires_in;
+  token_expiry_time_ = dispatcher_->timeSource().monotonicTime() + expires_in;
   stats_.token_fetched_.inc();
   ENVOY_LOG(debug, "onGetAccessTokenSuccess: Token fetched successfully, expires in {} seconds.",
             expires_in.count());
@@ -137,7 +137,7 @@ void TokenProvider::onGetAccessTokenFailure(FailureReason failure_reason) {
   }
 
   // clear the cached expired token, so that requests are not forwarded with a stale token. 
-  if (std::chrono::steady_clock::now() >= token_expiry_time_) {
+  if (dispatcher_->timeSource().monotonicTime() >= token_expiry_time_) {
     ENVOY_LOG(warn, "onGetAccessTokenFailure: Cached token has expired, clearing it.");
     ThreadLocalOauth2ClientCredentialsTokenSharedPtr empty(
         new ThreadLocalOauth2ClientCredentialsToken(""));

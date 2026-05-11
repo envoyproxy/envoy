@@ -3,6 +3,7 @@
 #include <chrono>
 #include <string>
 
+#include "envoy/common/time.h"
 #include "envoy/extensions/http/injected_credentials/oauth2/v3/oauth2.pb.h"
 #include "envoy/extensions/http/injected_credentials/oauth2/v3/oauth2.pb.validate.h"
 #include "envoy/stats/stats_macros.h"
@@ -81,7 +82,7 @@ private:
   }
 
   std::string token_;
-  std::chrono::steady_clock::time_point token_expiry_time_;
+  MonotonicTime token_expiry_time_;
   const Common::SecretReaderConstSharedPtr secret_reader_;
   ThreadLocal::SlotPtr tls_;
   std::unique_ptr<OAuth2Client> oauth2_client_;
