@@ -533,7 +533,7 @@ void CombinedUpstream::setRouterUpstreamRequest(
 }
 
 void CombinedUpstream::newStream(GenericConnectionPoolCallbacks&) {
-  (void)upstream_request_->acceptHeadersFromRouter(false);
+  upstream_request_->acceptHeadersFromRouter(false);
 }
 
 void CombinedUpstream::encodeData(Buffer::Instance& data, bool end_stream) {

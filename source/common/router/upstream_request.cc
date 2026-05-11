@@ -411,7 +411,7 @@ void UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstShare
   parent_.onUpstreamHostSelected(host, pool_success);
 }
 
-bool UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
+void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
   ASSERT(!router_sent_end_stream_);
   router_sent_end_stream_ = end_stream;
 
@@ -447,7 +447,7 @@ bool UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
   auto* upstream_fm = static_cast<UpstreamFilterManager*>(filter_manager_.get());
   if (upstream_fm->notifyHostSelected()) {
     ENVOY_LOG(debug, "upstream request aborted during onHostSelected");
-    return false;
+    return;
   }
 
   conn_pool_->newStream(this);
@@ -480,7 +480,6 @@ bool UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
   filter_manager_->requestHeadersInitialized();
   filter_manager_->streamInfo().setRequestHeaders(*parent_.downstreamHeaders());
   filter_manager_->decodeHeaders(*parent_.downstreamHeaders(), end_stream);
-  return true;
 }
 
 void UpstreamRequest::acceptDataFromRouter(Buffer::Instance& data, bool end_stream) {
