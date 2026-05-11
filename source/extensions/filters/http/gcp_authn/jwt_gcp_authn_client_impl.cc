@@ -49,9 +49,7 @@ void JwtGcpAuthnClientImpl::fetchToken(
 
   // Failed to fetch the token if the cluster is not configured.
   if (thread_local_cluster == nullptr) {
-    ENVOY_LOG(error, "Failed to fetch the token: [cluster = {}] is not found or configured.",
-              cluster);
-    onError();
+    onError(absl::StrFormat("Failed to fetch the token: [cluster = %s] is not found or configured.", cluster));
     return;
   }
 
@@ -85,16 +83,14 @@ void JwtGcpAuthnClientImpl::onSuccess(const Http::AsyncClient::Request&,
     uint64_t status_code = status.value();
     if (status_code == Envoy::enumToInt(Envoy::Http::Code::OK)) {
       ASSERT(callbacks_ != nullptr);
-      callbacks_->onComplete(std::string(response->bodyAsString()));
+      callbacks_->onComplete(response->bodyAsString());
       callbacks_ = nullptr;
     } else {
-      ENVOY_LOG(error, "Response status is not OK, status: {}", status_code);
-      onError();
+      onError(absl::StrFormat("Response status is not OK, status: %d", status_code));
     }
   } else {
     // This occurs if the response headers are invalid.
-    ENVOY_LOG(error, "Failed to get the response because response headers are not valid.");
-    onError();
+    onError("Failed to get the response because response headers are not valid.");
   }
 }
 
@@ -102,9 +98,8 @@ void JwtGcpAuthnClientImpl::onFailure(const Http::AsyncClient::Request&,
                                       Http::AsyncClient::FailureReason reason) {
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset ||
          reason == Http::AsyncClient::FailureReason::ExceedResponseBufferLimit);
-  ENVOY_LOG(error, "Request failed: stream has been reset");
   active_request_ = nullptr;
-  onError();
+  onError(absl::StrFormat("Request failed with reason: %d", enumToInt(reason)));
 }
 
 void JwtGcpAuthnClientImpl::cancel() {
@@ -114,12 +109,14 @@ void JwtGcpAuthnClientImpl::cancel() {
   }
 }
 
-void JwtGcpAuthnClientImpl::onError() {
+void JwtGcpAuthnClientImpl::onError(absl::string_view error_msg) {
+  ENVOY_LOG(error, "{}", error_msg);
+
   // Cancel if the request is active.
   cancel();
 
   ASSERT(callbacks_ != nullptr);
-  callbacks_->onComplete(absl::InternalError("Failed to fetch token"));
+  callbacks_->onComplete(absl::InternalError(error_msg));
   callbacks_ = nullptr;
 }
 

@@ -16,7 +16,7 @@ namespace GcpAuthn {
 
 class JwtGcpAuthnClientImpl : public GcpAuthnClient,
                               public Http::AsyncClient::Callbacks,
-                              public Logger::Loggable<Logger::Id::init> {
+                              public Logger::Loggable<Logger::Id::filter> {
 public:
   JwtGcpAuthnClientImpl(
       const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config,
@@ -39,7 +39,7 @@ public:
                  Http::AsyncClient::FailureReason reason) override;
 
 private:
-  void onError();
+  void onError(absl::string_view error_msg);
   const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config_;
   Server::Configuration::FactoryContext& context_;
   Http::AsyncClient::Request* active_request_{};
