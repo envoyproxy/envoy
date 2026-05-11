@@ -101,13 +101,13 @@ Status ProtocolConstraints::checkInboundFrameLimits() {
   }
 
   if (inbound_priority_frames_ >
-      static_cast<uint64_t>(max_inbound_priority_frames_per_stream_) * (1 + opened_streams_)) {
+      static_cast<uint64_t>(max_inbound_priority_frames_per_stream_) * (1 + active_streams_)) {
     stats_.inbound_priority_frames_flood_.inc();
     return bufferFloodError("Too many PRIORITY frames");
   }
 
   if (inbound_window_update_frames_ >
-      5 + 2 * (opened_streams_ +
+      5 + 2 * (active_streams_ +
                max_inbound_window_update_frames_per_data_frame_sent_ * outbound_data_frames_)) {
     stats_.inbound_window_update_frames_flood_.inc();
     return bufferFloodError("Too many WINDOW_UPDATE frames");
@@ -124,7 +124,8 @@ void ProtocolConstraints::dumpState(std::ostream& os, int indent_level) const {
      << DUMP_MEMBER(max_outbound_control_frames_)
      << DUMP_MEMBER(consecutive_inbound_frames_with_empty_payload_)
      << DUMP_MEMBER(max_consecutive_inbound_frames_with_empty_payload_)
-     << DUMP_MEMBER(opened_streams_) << DUMP_MEMBER(inbound_priority_frames_)
+     << DUMP_MEMBER(opened_streams_) << DUMP_MEMBER(active_streams_)
+     << DUMP_MEMBER(inbound_priority_frames_)
      << DUMP_MEMBER(max_inbound_priority_frames_per_stream_)
      << DUMP_MEMBER(inbound_window_update_frames_) << DUMP_MEMBER(outbound_data_frames_)
      << DUMP_MEMBER(max_inbound_window_update_frames_per_data_frame_sent_) << '\n';

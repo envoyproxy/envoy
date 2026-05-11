@@ -1028,6 +1028,41 @@ TEST_P(Http2FloodMitigationTest, PriorityClosedStream) {
                   1);
 }
 
+TEST_P(Http2FloodMitigationTest, PriorityFloodBypassAttempt) {
+  autonomous_upstream_ = true;
+  beginSession();
+
+  const uint32_t num_streams = 10;
+
+  // Open and close multiple streams to inflate opened_streams_ counter.
+  for (uint32_t i = 0; i < num_streams; ++i) {
+    const uint32_t stream_id = Http2Frame::makeClientStreamId(i);
+    sendFrame(Http2Frame::makeRequest(
+        stream_id, "host", "/",
+        {Http2Frame::Header("response_data_blocks", "0"), Http2Frame::Header("no_trailers", "1")}));
+    // Read response to close the stream.
+    auto frame = readFrame();
+    EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
+    EXPECT_TRUE(frame.endStream());
+  }
+
+  // opened_streams_ is 10
+  // This test confirms that a PRIORITY flood is detected when detection is based on
+  // active_streams instead of opened_streams.
+
+  uint32_t num_priority_frames = 500;
+  Http2Frame priority_frame = Http2Frame::makePriorityFrame(Http2Frame::makeClientStreamId(0),
+                                                            Http2Frame::makeClientStreamId(1));
+  auto buf = serializeFrames(priority_frame, num_priority_frames);
+
+  ASSERT_TRUE(tcp_client_->write({buf.begin(), buf.end()}, false, false));
+
+  tcp_client_->waitForDisconnect();
+
+  // Verify that the flood is correctly detected.
+  EXPECT_EQ(1, test_server_->counter("http2.inbound_priority_frames_flood")->value());
+}
+
 TEST_P(Http2FloodMitigationTest, WindowUpdate) {
   beginSession();
 

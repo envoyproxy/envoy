@@ -1580,6 +1580,7 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
       return okStatus();
     }
 
+    protocol_constraints_.decrementActiveStreamCount();
     stream->destroy();
     current_stream_id_.reset();
     // TODO(antoniovicente) Test coverage for onCloseStream before deferred reset handling happens.

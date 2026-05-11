@@ -66,7 +66,14 @@ public:
   Status trackInboundFrame(uint8_t type, bool end_stream, bool is_empty);
   // Increment the number of DATA frames sent to the peer.
   void incrementOutboundDataFrameCount() { ++outbound_data_frames_; }
-  void incrementOpenedStreamCount() { ++opened_streams_; }
+  void incrementOpenedStreamCount() {
+    ++opened_streams_;
+    ++active_streams_;
+  }
+  void decrementActiveStreamCount() {
+    ASSERT(active_streams_ > 0);
+    --active_streams_;
+  }
 
   Status checkOutboundFrameLimits();
 
@@ -113,6 +120,8 @@ private:
   // For upstream connections this is incremented when the first HEADERS frame with the new
   // stream ID is sent to the upstream server.
   uint32_t opened_streams_ = 0;
+  // This counter keeps track of the number of currently active streams.
+  uint32_t active_streams_ = 0;
   // This counter keeps track of the number of inbound PRIORITY frames. If this counter exceeds
   // the value calculated using this formula:
   //
