@@ -175,7 +175,7 @@ HttpAccessLoggerCacheImpl::getOrCreateApplicator(
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   const std::size_t config_hash = MessageUtil::hash(http_service);
 
-  absl::MutexLock lock(&applicator_mutex_);
+  absl::MutexLock lock(applicator_mutex_);
 
   const auto it = applicators_.find(config_hash);
   if (it != applicators_.end()) {
@@ -196,7 +196,7 @@ HttpAccessLoggerCacheImpl::getOrCreateApplicator(
       headers_applicator.release(),
       [self, config_hash](const Http::HttpServiceHeadersApplicator* ptr) {
         {
-          absl::MutexLock lock(&self->applicator_mutex_);
+          absl::MutexLock lock(self->applicator_mutex_);
           const auto it = self->applicators_.find(config_hash);
           // Check for expired in case a new entry was added at nearly the same time because the
           // check for an existing entry failed to `lock()`.

@@ -38,7 +38,7 @@ public:
   MOCK_METHOD(ReverseTunnelEvent::ConnectionsList, getAllConnections, (), (override));
 };
 
-GrpcConfigProto mock_config() {
+GrpcConfigProto mockConfig() {
   GrpcConfigProto config_;
 
   config_.set_cluster("test_cluster");
@@ -51,7 +51,7 @@ GrpcConfigProto mock_config() {
   return config_;
 }
 
-ReverseTunnelEvent::ConnectionsList make_connections(std::vector<std::string> node_ids) {
+ReverseTunnelEvent::ConnectionsList makeConnections(std::vector<std::string> node_ids) {
   ReverseTunnelEvent::ConnectionsList connections;
   std::string cluster = "test_cluster";
   std::string tenant = "test_tenant";
@@ -65,7 +65,7 @@ ReverseTunnelEvent::ConnectionsList make_connections(std::vector<std::string> no
   return connections;
 }
 
-ReverseTunnelEvent::DisconnectionsList make_disconnections(std::vector<std::string> node_ids) {
+ReverseTunnelEvent::DisconnectionsList makeDisconnections(std::vector<std::string> node_ids) {
   std::string cluster = "test_cluster";
   ReverseTunnelEvent::DisconnectionsList disconnections;
 
@@ -78,8 +78,8 @@ ReverseTunnelEvent::DisconnectionsList make_disconnections(std::vector<std::stri
   return disconnections;
 }
 
-StreamTunnelsResp validate_req(Buffer::InstancePtr& request,
-                               const ReverseTunnelEvent::TunnelUpdates& actual, bool full_push) {
+StreamTunnelsResp validateReq(Buffer::InstancePtr& request,
+                              const ReverseTunnelEvent::TunnelUpdates& actual, bool full_push) {
   StreamTunnelsReq req;
   bool success = Grpc::Common::parseBufferInstance(std::move(request), req);
   EXPECT_EQ(success, true);
@@ -87,11 +87,13 @@ StreamTunnelsResp validate_req(Buffer::InstancePtr& request,
   EXPECT_EQ(req.added_tunnels_size(), actual.connections.size());
   EXPECT_EQ(req.removed_tunnel_names_size(), actual.disconnections.size());
 
-  for (std::size_t i = 0; i < actual.connections.size(); i++)
+  for (std::size_t i = 0; i < actual.connections.size(); i++) {
     EXPECT_EQ(actual.connections[i]->node_id, req.added_tunnels(i).identity().node_id());
+  }
 
-  for (std::size_t i = 0; i < actual.disconnections.size(); i++)
+  for (std::size_t i = 0; i < actual.disconnections.size(); i++) {
     EXPECT_EQ(actual.disconnections[i]->name, req.removed_tunnel_names(i));
+  }
 
   EXPECT_EQ(full_push, req.full_push());
 
@@ -108,7 +110,7 @@ Protobuf::Duration getHalfDuration(const Protobuf::Duration& dur) {
 
 class GrpcClientTest : public testing::Test {
 public:
-  GrpcClientTest() {}
+  GrpcClientTest() = default;
 
   void SetUp() override {
     api_ = Api::createApiForTest(time_system_);
@@ -132,13 +134,13 @@ public:
   }
 
 protected:
-  void inc_time(const Protobuf::Duration& dur) {
+  void incTime(const Protobuf::Duration& dur) {
     time_system_.advanceTimeAsyncImpl(
         std::chrono::milliseconds(DurationUtil::durationToMilliseconds(dur)));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  void get_stream(int times) {
+  void getStream(int times) {
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
         .Times(times)
         .WillRepeatedly(Invoke([this](absl::string_view, absl::string_view,
@@ -175,7 +177,7 @@ protected:
   std::string node_id{"tunnel-v2"};
   std::string cluster_id{"tunnel-v2"};
 
-  GrpcConfigProto config_{mock_config()};
+  GrpcConfigProto config_{mockConfig()};
   NiceMock<MockReverseTunnelReporter> mock_reporter_;
 };
 
@@ -193,7 +195,7 @@ TEST_F(GrpcClientTest, RetryAttemptsOnStreamCreationFailure) {
   client.onServerInitialized(&mock_reporter_);
 
   for (std::size_t i = 0; i < config_.max_retries() + 1; i++) {
-    inc_time(config_.connect_retry_interval());
+    incTime(config_.connect_retry_interval());
   }
 
   // Not incremented because no connection attempt was successful.
@@ -216,15 +218,15 @@ TEST_F(GrpcClientTest, ClientSendsFullPushOnConnect) {
   GrpcClient client{context_, config_};
   auto stats_{getStats()};
 
-  ReverseTunnelEvent::TunnelUpdates events{make_connections({"node_1"}), {}};
+  ReverseTunnelEvent::TunnelUpdates events{makeConnections({"node_1"}), {}};
 
   EXPECT_CALL(mock_reporter_, getAllConnections()).WillOnce(Return(events.connections));
 
-  get_stream(1);
+  getStream(1);
 
   EXPECT_CALL(*async_stream_, sendMessageRaw_(_, false))
       .WillOnce(Invoke([&events](Buffer::InstancePtr& request, bool) {
-        auto resp = validate_req(request, events, true);
+        auto resp = validateReq(request, events, true);
         EXPECT_EQ(resp.request_nonce(), 1);
       }));
 
@@ -251,14 +253,14 @@ TEST_F(GrpcClientTest, ClientSendsDiffAfterFullPush) {
   int cur = 0, total = 4;
 
   ReverseTunnelEvent::TunnelUpdates updates[] = {
-      ReverseTunnelEvent::TunnelUpdates{make_connections({"node_1"}), {}},
-      ReverseTunnelEvent::TunnelUpdates{make_connections({"node_2"}),
-                                        make_disconnections({"node_1"})},
-      ReverseTunnelEvent::TunnelUpdates{make_connections({"node_3", "node_4"}), {}},
-      ReverseTunnelEvent::TunnelUpdates{make_connections({"node_5"}),
-                                        make_disconnections({"node_3"})}};
+      ReverseTunnelEvent::TunnelUpdates{makeConnections({"node_1"}), {}},
+      ReverseTunnelEvent::TunnelUpdates{makeConnections({"node_2"}),
+                                        makeDisconnections({"node_1"})},
+      ReverseTunnelEvent::TunnelUpdates{makeConnections({"node_3", "node_4"}), {}},
+      ReverseTunnelEvent::TunnelUpdates{makeConnections({"node_5"}),
+                                        makeDisconnections({"node_3"})}};
 
-  get_stream(1);
+  getStream(1);
 
   EXPECT_CALL(mock_reporter_, getAllConnections()).WillOnce(Invoke([&updates]() {
     return updates[0].connections;
@@ -267,7 +269,7 @@ TEST_F(GrpcClientTest, ClientSendsDiffAfterFullPush) {
   EXPECT_CALL(*async_stream_, sendMessageRaw_(_, false))
       .Times(total)
       .WillRepeatedly(Invoke([this, &updates, &cur](Buffer::InstancePtr& request, bool) {
-        auto resp = validate_req(request, updates[cur], cur == 0);
+        auto resp = validateReq(request, updates[cur], cur == 0);
         EXPECT_EQ(resp.request_nonce(), cur + 1);
         callbacks_->onReceiveMessageRaw(Grpc::Common::serializeMessage(resp));
       }));
@@ -277,7 +279,7 @@ TEST_F(GrpcClientTest, ClientSendsDiffAfterFullPush) {
 
   for (; cur < total; cur++) {
     client.receiveEvents(updates[cur]);
-    inc_time(config_.default_send_interval());
+    incTime(config_.default_send_interval());
   }
 
   int total_events = 0;
@@ -307,7 +309,7 @@ TEST_F(GrpcClientTest, ReportIntervalChangesReflectInClient) {
 
   ReverseTunnelEvent::TunnelUpdates events;
 
-  get_stream(1);
+  getStream(1);
 
   EXPECT_CALL(mock_reporter_, getAllConnections()).WillOnce(Invoke([&events]() {
     return events.connections;
@@ -318,7 +320,7 @@ TEST_F(GrpcClientTest, ReportIntervalChangesReflectInClient) {
   EXPECT_CALL(*async_stream_, sendMessageRaw_(_, false))
       .Times(3)
       .WillRepeatedly(Invoke([this, &events, &cur](Buffer::InstancePtr& request, bool) {
-        auto resp = validate_req(request, events, cur == 0);
+        auto resp = validateReq(request, events, cur == 0);
         EXPECT_EQ(resp.request_nonce(), ++cur);
 
         if (cur == 1) {
@@ -335,8 +337,8 @@ TEST_F(GrpcClientTest, ReportIntervalChangesReflectInClient) {
             DurationUtil::durationToMilliseconds(getHalfDuration(config_.default_send_interval())));
 
   // This is already scheduled from the next time we will use the half interval for sending.
-  inc_time(config_.default_send_interval());
-  inc_time(getHalfDuration(config_.default_send_interval()));
+  incTime(config_.default_send_interval());
+  incTime(getHalfDuration(config_.default_send_interval()));
 
   EXPECT_EQ(stats_.send_attempts_counter_.value(), 3);
 }
@@ -348,15 +350,15 @@ TEST_F(GrpcClientTest, FullPushAndDiffOnReconnect) {
   int cur = 0, total = 4;
 
   ReverseTunnelEvent::TunnelUpdates updates[] = {
-      ReverseTunnelEvent::TunnelUpdates{make_connections({"node_1"}), {}},
-      ReverseTunnelEvent::TunnelUpdates{make_connections({"node_2"}),
-                                        make_disconnections({"node_1"})},
-      ReverseTunnelEvent::TunnelUpdates{make_connections({"node_3", "node_4"}), {}},
-      ReverseTunnelEvent::TunnelUpdates{make_connections({"node_5"}),
-                                        make_disconnections({"node_3"})}};
+      ReverseTunnelEvent::TunnelUpdates{makeConnections({"node_1"}), {}},
+      ReverseTunnelEvent::TunnelUpdates{makeConnections({"node_2"}),
+                                        makeDisconnections({"node_1"})},
+      ReverseTunnelEvent::TunnelUpdates{makeConnections({"node_3", "node_4"}), {}},
+      ReverseTunnelEvent::TunnelUpdates{makeConnections({"node_5"}),
+                                        makeDisconnections({"node_3"})}};
 
   // 2 stream creations: initial connect + reconnect after remote close.
-  get_stream(2);
+  getStream(2);
 
   // getAllConnections is called once per full push (initial + reconnect).
   EXPECT_CALL(mock_reporter_, getAllConnections()).Times(2).WillRepeatedly(Invoke([&updates]() {
@@ -369,7 +371,7 @@ TEST_F(GrpcClientTest, FullPushAndDiffOnReconnect) {
       .WillRepeatedly(Invoke([this, &updates, &cur](Buffer::InstancePtr& request, bool) {
         // cur is still 0 during both the initial connect and the reconnect full push,
         // so both correctly validate as full_push=true against updates[0].
-        auto resp = validate_req(request, updates[cur], cur == 0);
+        auto resp = validateReq(request, updates[cur], cur == 0);
         EXPECT_EQ(resp.request_nonce(), cur + 1);
         callbacks_->onReceiveMessageRaw(Grpc::Common::serializeMessage(resp));
       }));
@@ -378,12 +380,12 @@ TEST_F(GrpcClientTest, FullPushAndDiffOnReconnect) {
 
   // disconnect and reconnect -> sends the full push automatically
   callbacks_->onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Unknown, "Testing");
-  inc_time(config_.connect_retry_interval());
+  incTime(config_.connect_retry_interval());
   cur++; // cur becomes 1 only after the reconnect full push has already fired.
 
   for (; cur < total; cur++) {
     client.receiveEvents(updates[cur]);
-    inc_time(config_.default_send_interval());
+    incTime(config_.default_send_interval());
   }
 
   int total_sz = 0;
@@ -418,7 +420,7 @@ TEST_F(GrpcClientTest, DisconnectOnTooManyUnAckedRequests) {
   std::size_t cur = 0;
 
   ReverseTunnelEvent::TunnelUpdates events;
-  get_stream(1);
+  getStream(1);
 
   // max_retries + 1: the initial connect sends once, then max_retries timer ticks each send once.
   // On the next timer tick send() sees (nonce_current_ - nonce_acked_) > max_retries and
@@ -426,7 +428,7 @@ TEST_F(GrpcClientTest, DisconnectOnTooManyUnAckedRequests) {
   EXPECT_CALL(*async_stream_, sendMessageRaw_(_, false))
       .Times(config_.max_retries() + 1)
       .WillRepeatedly(Invoke([&events, &cur](Buffer::InstancePtr& request, bool) {
-        auto resp = validate_req(request, events, cur == 0);
+        auto resp = validateReq(request, events, cur == 0);
         EXPECT_EQ(resp.request_nonce(), cur + 1);
 
         // No ACK is sent. It should eventually disconnect.
@@ -440,7 +442,7 @@ TEST_F(GrpcClientTest, DisconnectOnTooManyUnAckedRequests) {
   // max_retries + 2: we need max_retries timer ticks for the sends, plus one more tick
   // to trigger the disconnect check. The first send happens on connect (cur=0).
   for (; cur < config_.max_retries() + 2; cur++) {
-    inc_time(config_.default_send_interval());
+    incTime(config_.default_send_interval());
   }
 
   EXPECT_EQ(stats_.connection_attempts_counter_.value(), 1);
@@ -463,11 +465,11 @@ TEST_F(GrpcClientTest, DisconnectOnNack) {
   auto stats_{getStats()};
 
   ReverseTunnelEvent::TunnelUpdates events;
-  get_stream(1);
+  getStream(1);
 
   EXPECT_CALL(*async_stream_, sendMessageRaw_(_, false))
       .WillOnce(Invoke([this, &events](Buffer::InstancePtr& request, bool) {
-        auto resp = validate_req(request, events, true);
+        auto resp = validateReq(request, events, true);
         EXPECT_EQ(resp.request_nonce(), 1);
         resp.mutable_error_detail()->set_code(Grpc::Status::WellKnownGrpcStatus::Unavailable);
         callbacks_->onReceiveMessageRaw(Grpc::Common::serializeMessage(resp));
@@ -498,8 +500,8 @@ TEST_F(GrpcClientTest, DisconnectOnBufferFull) {
     nodes.push_back("node_" + std::to_string(i));
   }
 
-  ReverseTunnelEvent::TunnelUpdates connect_events{make_connections(nodes), {}};
-  get_stream(1);
+  ReverseTunnelEvent::TunnelUpdates connect_events{makeConnections(nodes), {}};
+  getStream(1);
 
   EXPECT_CALL(mock_reporter_, getAllConnections()).WillOnce([&connect_events]() {
     return connect_events.connections;
@@ -507,7 +509,7 @@ TEST_F(GrpcClientTest, DisconnectOnBufferFull) {
 
   EXPECT_CALL(*async_stream_, sendMessageRaw_(_, false))
       .WillOnce(Invoke([this, &connect_events](Buffer::InstancePtr& request, bool) {
-        auto resp = validate_req(request, connect_events, true);
+        auto resp = validateReq(request, connect_events, true);
         EXPECT_EQ(resp.request_nonce(), 1);
         callbacks_->onReceiveMessageRaw(Grpc::Common::serializeMessage(resp));
       }));
@@ -539,7 +541,7 @@ TEST_F(GrpcClientTest, OutOfOrderNonce) {
   std::size_t cur = 0;
 
   ReverseTunnelEvent::TunnelUpdates events;
-  get_stream(1);
+  getStream(1);
 
   // Send nonce=0 (already acked) for all responses to trigger out-of-order.
   // nonce=0 is always <= nonce_acked_ (which starts at 0), so every response lands
@@ -549,7 +551,7 @@ TEST_F(GrpcClientTest, OutOfOrderNonce) {
   EXPECT_CALL(*async_stream_, sendMessageRaw_(_, false))
       .Times(config_.max_retries() + 1)
       .WillRepeatedly(Invoke([this, &events, &cur](Buffer::InstancePtr& request, bool) {
-        auto resp = validate_req(request, events, cur == 0);
+        auto resp = validateReq(request, events, cur == 0);
         EXPECT_EQ(resp.request_nonce(), cur + 1);
 
         resp.set_request_nonce(0);
@@ -562,7 +564,7 @@ TEST_F(GrpcClientTest, OutOfOrderNonce) {
   cur++;
 
   for (; cur < config_.max_retries() + 2; cur++) {
-    inc_time(config_.default_send_interval());
+    incTime(config_.default_send_interval());
   }
 
   EXPECT_EQ(stats_.connection_attempts_counter_.value(), 1);
@@ -586,14 +588,14 @@ TEST_F(GrpcClientTest, SkipNonce) {
   std::size_t cur = 0;
 
   ReverseTunnelEvent::TunnelUpdates events;
-  get_stream(1);
+  getStream(1);
 
   // max_retries + 2: the normal max_retries + 1 sends that would trigger disconnect,
   // but a late ACK at iteration max_retries advances nonce_acked_ and buys one more send.
   EXPECT_CALL(*async_stream_, sendMessageRaw_(_, false))
       .Times(config_.max_retries() + 2)
       .WillRepeatedly(Invoke([this, &events, &cur](Buffer::InstancePtr& request, bool) {
-        auto resp = validate_req(request, events, cur == 0);
+        auto resp = validateReq(request, events, cur == 0);
         EXPECT_EQ(resp.request_nonce(), cur + 1);
 
         // Only ACK the nonce at iteration max_retries, proving a single late ACK
@@ -607,7 +609,7 @@ TEST_F(GrpcClientTest, SkipNonce) {
   cur++;
 
   for (; cur < config_.max_retries() + 2; cur++) {
-    inc_time(config_.default_send_interval());
+    incTime(config_.default_send_interval());
   }
 
   // After the stream is up, retroactively send ACKs for earlier nonces.
@@ -632,11 +634,11 @@ TEST_F(GrpcClientTest, OkRemoteClose) {
   auto stats_{getStats()};
 
   ReverseTunnelEvent::TunnelUpdates events;
-  get_stream(1);
+  getStream(1);
 
   EXPECT_CALL(*async_stream_, sendMessageRaw_(_, false))
       .WillOnce(Invoke([&events](Buffer::InstancePtr& request, bool) {
-        auto response = validate_req(request, events, true);
+        auto response = validateReq(request, events, true);
         EXPECT_EQ(response.request_nonce(), 1);
       }));
 
@@ -661,7 +663,7 @@ TEST_F(GrpcClientTest, ReceiveEventsBeforeInitialized) {
   GrpcClient client{context_, config_};
   auto stats_{getStats()};
 
-  ReverseTunnelEvent::TunnelUpdates events{make_connections({"node_1"}), {}};
+  ReverseTunnelEvent::TunnelUpdates events{makeConnections({"node_1"}), {}};
   client.receiveEvents(std::move(events));
 
   EXPECT_EQ(stats_.queued_updates_counter_.value(), 0);
@@ -675,7 +677,7 @@ TEST_F(GrpcClientTest, ClusterNotFoundLogsAndReturns) {
 
   client.onServerInitialized(&mock_reporter_);
 
-  ReverseTunnelEvent::TunnelUpdates events{make_connections({"node_1"}), {}};
+  ReverseTunnelEvent::TunnelUpdates events{makeConnections({"node_1"}), {}};
   client.receiveEvents(std::move(events));
 
   auto stats_{getStats()};
@@ -691,7 +693,7 @@ TEST_F(GrpcClientTest, ClientCreationFailureLogsAndReturns) {
 
   client.onServerInitialized(&mock_reporter_);
 
-  ReverseTunnelEvent::TunnelUpdates events{make_connections({"node_1"}), {}};
+  ReverseTunnelEvent::TunnelUpdates events{makeConnections({"node_1"}), {}};
   client.receiveEvents(std::move(events));
 
   auto stats_{getStats()};
@@ -708,14 +710,14 @@ TEST_F(GrpcClientTest, BufferOverflowWhileDisconnectedDoesNotRearmRetry) {
     nodes.push_back("node_" + std::to_string(i));
   }
 
-  ReverseTunnelEvent::TunnelUpdates big_update{make_connections(nodes), {}};
-  get_stream(1);
+  ReverseTunnelEvent::TunnelUpdates big_update{makeConnections(nodes), {}};
+  getStream(1);
 
   EXPECT_CALL(mock_reporter_, getAllConnections()).WillOnce(Return(big_update.connections));
 
   EXPECT_CALL(*async_stream_, sendMessageRaw_(_, false))
       .WillOnce(Invoke([this, &big_update](Buffer::InstancePtr& request, bool) {
-        auto resp = validate_req(request, big_update, true);
+        auto resp = validateReq(request, big_update, true);
         callbacks_->onReceiveMessageRaw(Grpc::Common::serializeMessage(resp));
       }));
 
@@ -724,7 +726,7 @@ TEST_F(GrpcClientTest, BufferOverflowWhileDisconnectedDoesNotRearmRetry) {
   client.onServerInitialized(&mock_reporter_);
 
   // First overflow: stream is alive, should disconnect.
-  client.receiveEvents(ReverseTunnelEvent::TunnelUpdates{make_connections(nodes), {}});
+  client.receiveEvents(ReverseTunnelEvent::TunnelUpdates{makeConnections(nodes), {}});
   EXPECT_EQ(
       stats_
           .getCounter(stats_.disconnects_,
@@ -734,7 +736,7 @@ TEST_F(GrpcClientTest, BufferOverflowWhileDisconnectedDoesNotRearmRetry) {
       1);
 
   // Second overflow: stream is null, should NOT increment disconnect counter.
-  client.receiveEvents(ReverseTunnelEvent::TunnelUpdates{make_connections(nodes), {}});
+  client.receiveEvents(ReverseTunnelEvent::TunnelUpdates{makeConnections(nodes), {}});
   EXPECT_EQ(
       stats_
           .getCounter(stats_.disconnects_,

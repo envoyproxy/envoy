@@ -378,6 +378,8 @@ newDynamicModuleBootstrapExtensionConfig(
   config->on_bootstrap_extension_listener_add_or_update_ = on_listener_add_or_update.value();
   config->on_bootstrap_extension_listener_removal_ = on_listener_removal.value();
 
+  config->stat_creation_frozen_ = true;
+
   return config;
 }
 

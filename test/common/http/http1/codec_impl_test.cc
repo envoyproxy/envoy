@@ -4215,7 +4215,7 @@ TEST_F(Http1ClientConnectionImplTest, FirstReadEOF) {
 
   Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\n\r\nfoo");
   EXPECT_CALL(decoder, decodeHeaders_(_, false));
-  EXPECT_CALL(decoder, decodeData(BufferStringEqual("foo"), false));
+  EXPECT_CALL(decoder, decodeData(BufferString("foo"), false));
   status = codec_->dispatch(buffer);
   EXPECT_EQ(0, buffer.length());
   EXPECT_TRUE(status.ok());
@@ -4282,7 +4282,7 @@ TEST_F(Http1ServerConnectionImplTest, EOFDuringChunkedBody) {
       }));
 
   EXPECT_CALL(decoder, decodeHeaders_(_, false));
-  EXPECT_CALL(decoder, decodeData(BufferStringEqual("foo"), false));
+  EXPECT_CALL(decoder, decodeData(BufferString("foo"), false));
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\n"
                            "transfer-encoding: chunked\r\n\r\n"
                            "9\r\n"
@@ -4311,7 +4311,7 @@ TEST_F(Http1ClientConnectionImplTest, EOFDuringChunkedBody) {
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   EXPECT_CALL(decoder, decodeHeaders_(_, false));
-  EXPECT_CALL(decoder, decodeData(BufferStringEqual("foo"), false));
+  EXPECT_CALL(decoder, decodeData(BufferString("foo"), false));
   Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\n"
                            "transfer-encoding: chunked\r\n\r\n"
                            "9\r\n"
@@ -4340,7 +4340,7 @@ TEST_F(Http1ServerConnectionImplTest, EOFDuringContentLengthBody) {
       }));
 
   EXPECT_CALL(decoder, decodeHeaders_(_, false));
-  EXPECT_CALL(decoder, decodeData(BufferStringEqual("foo"), false));
+  EXPECT_CALL(decoder, decodeData(BufferString("foo"), false));
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\n"
                            "content-length: 9\r\n\r\n"
                            "foo");
@@ -4368,7 +4368,7 @@ TEST_F(Http1ClientConnectionImplTest, EOFDuringContentLengthBody) {
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   EXPECT_CALL(decoder, decodeHeaders_(_, false));
-  EXPECT_CALL(decoder, decodeData(BufferStringEqual("foo"), false));
+  EXPECT_CALL(decoder, decodeData(BufferString("foo"), false));
   Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\n"
                            "content-length: 9\r\n\r\n"
                            "foo");
@@ -4422,11 +4422,11 @@ TEST_F(Http1ClientConnectionImplTest, NoContentLengthResponse) {
     EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
     EXPECT_CALL(decoder, decodeHeaders_(_, false));
-    EXPECT_CALL(decoder, decodeData(BufferStringEqual("foo"), false));
+    EXPECT_CALL(decoder, decodeData(BufferString("foo"), false));
     Buffer::OwnedImpl buffer(kResponseWithBody);
     auto status = codec_->dispatch(buffer);
 
-    EXPECT_CALL(decoder, decodeData(BufferStringEqual(""), true));
+    EXPECT_CALL(decoder, decodeData(BufferString(""), true));
     Buffer::OwnedImpl empty;
     status = codec_->dispatch(empty);
     ASSERT_TRUE(status.ok());
@@ -4439,14 +4439,14 @@ TEST_F(Http1ClientConnectionImplTest, NoContentLengthResponse) {
     EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
     EXPECT_CALL(decoder, decodeHeaders_(_, false));
-    EXPECT_CALL(decoder, decodeData(BufferStringEqual("foo"), false));
+    EXPECT_CALL(decoder, decodeData(BufferString("foo"), false));
 
     Buffer::OwnedImpl buffer(kResponseWithBody);
     auto status = codec_->dispatch(buffer);
     EXPECT_EQ(0, buffer.length());
     ASSERT_TRUE(status.ok());
 
-    EXPECT_CALL(decoder, decodeData(BufferStringEqual(""), true));
+    EXPECT_CALL(decoder, decodeData(BufferString(""), true));
     Buffer::OwnedImpl empty;
     status = codec_->dispatch(empty);
     EXPECT_TRUE(status.ok());
@@ -4720,7 +4720,7 @@ TEST_F(Http1ClientConnectionImplTest, MalformedTrailerLine) {
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
-  EXPECT_CALL(response_decoder, decodeData(BufferStringEqual("foo"), false));
+  EXPECT_CALL(response_decoder, decodeData(BufferString("foo"), false));
 
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n"
                              "transfer-encoding: chunked\r\n"
@@ -4744,7 +4744,7 @@ TEST_F(Http1ClientConnectionImplTest, InvalidCharacterInTrailerName) {
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
-  EXPECT_CALL(response_decoder, decodeData(BufferStringEqual("foo"), false));
+  EXPECT_CALL(response_decoder, decodeData(BufferString("foo"), false));
 
   // SPELLCHECKER(off)
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n"
@@ -5051,8 +5051,8 @@ TEST_F(Http1ClientConnectionImplTest, FirstLineInvalidCR) {
       {"content-length", "5"},
   };
   EXPECT_CALL(response_decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
-  EXPECT_CALL(response_decoder, decodeData(BufferStringEqual("hello"), false));
-  EXPECT_CALL(response_decoder, decodeData(BufferStringEqual(""), true));
+  EXPECT_CALL(response_decoder, decodeData(BufferString("hello"), false));
+  EXPECT_CALL(response_decoder, decodeData(BufferString(""), true));
 
   Buffer::OwnedImpl buffer("HTTP/1.1 200\rOK\r\ncontent-length: 5\r\n\r\n"
                            "hello");
@@ -5213,8 +5213,8 @@ TEST_F(Http1ClientConnectionImplTest, RequestAfterConnectionClose) {
     EXPECT_TRUE(request_encoder.encodeHeaders(request_headers, true).ok());
 
     EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
-    EXPECT_CALL(response_decoder, decodeData(BufferStringEqual("foo"), false));
-    EXPECT_CALL(response_decoder, decodeData(BufferStringEqual(""), true));
+    EXPECT_CALL(response_decoder, decodeData(BufferString("foo"), false));
+    EXPECT_CALL(response_decoder, decodeData(BufferString(""), true));
 
     Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\n"
                              "content-length: 3\r\n"
@@ -5233,8 +5233,8 @@ TEST_F(Http1ClientConnectionImplTest, RequestAfterConnectionClose) {
     EXPECT_TRUE(request_encoder.encodeHeaders(request_headers, true).ok());
 
     EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
-    EXPECT_CALL(response_decoder, decodeData(BufferStringEqual("bar"), false));
-    EXPECT_CALL(response_decoder, decodeData(BufferStringEqual(""), true));
+    EXPECT_CALL(response_decoder, decodeData(BufferString("bar"), false));
+    EXPECT_CALL(response_decoder, decodeData(BufferString(""), true));
 
     Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\n"
                              "content-length: 3\r\n"

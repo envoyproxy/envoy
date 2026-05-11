@@ -27,6 +27,8 @@
 
 using test::integration::filters::LoggingTestFilterConfig;
 using testing::AssertionResult;
+using testing::Eq;
+using testing::Ge;
 using testing::Not;
 using testing::TestWithParam;
 using testing::ValuesIn;
@@ -1368,8 +1370,8 @@ TEST_P(ExtAuthzGrpcIntegrationTest, Retry) {
   waitForSuccessfulUpstreamResponse("200");
 
   // Verify retry stats are incremented correctly.
-  test_server_->waitForCounterGe("cluster.ext_authz_cluster.upstream_rq_retry", 1);
-  test_server_->waitForCounterGe("cluster.ext_authz_cluster.upstream_rq_total", 2);
+  test_server_->waitForCounter("cluster.ext_authz_cluster.upstream_rq_retry", Ge(1));
+  test_server_->waitForCounter("cluster.ext_authz_cluster.upstream_rq_total", Ge(2));
 
   cleanup();
 }
@@ -1394,7 +1396,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ValidateMutations) {
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ("500", response_->headers().getStatusValue());
-  test_server_->waitForCounterEq("cluster.cluster_0.ext_authz.invalid", 1);
+  test_server_->waitForCounter("cluster.cluster_0.ext_authz.invalid", Eq(1));
 
   cleanup();
 }
@@ -1417,7 +1419,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ValidateMutationsSentinelAppendAction) {
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ("500", response_->headers().getStatusValue());
-  test_server_->waitForCounterEq("cluster.cluster_0.ext_authz.invalid", 1);
+  test_server_->waitForCounter("cluster.cluster_0.ext_authz.invalid", Eq(1));
 
   cleanup();
 }

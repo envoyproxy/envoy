@@ -85,7 +85,7 @@ public:
     }
   }
 
-  virtual ~GrpcMuxFailover() = default;
+  ~GrpcMuxFailover() override = default;
 
   // Attempts to establish a new stream to the either the primary or failover source.
   void establishNewStream() override {

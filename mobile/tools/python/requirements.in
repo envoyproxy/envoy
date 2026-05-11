@@ -1,1 +1,8 @@
 black
+gevent
+httpx
+mypy
+pytest
+pytest-asyncio
+pytest-benchmark
+requests

@@ -51,6 +51,8 @@ public:
         cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
+    // Re-open stat creation so tests can call `define_*` from the test thread.
+    filter_config_->stat_creation_frozen_ = false;
 
     ON_CALL(callbacks_, dispatcher()).WillByDefault(testing::ReturnRef(dispatcher));
   }

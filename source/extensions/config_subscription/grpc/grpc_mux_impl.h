@@ -104,7 +104,7 @@ public:
                  grpc_stream_.get())
           ->currentStreamForTest();
     }
-    return *grpc_stream_.get();
+    return *grpc_stream_;
   }
 
 private:

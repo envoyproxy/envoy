@@ -86,6 +86,8 @@ envoy_extension_cc_test(
     srcs = ["wasm_filter_integration_test.cc"],
     data = envoy_select_wasm_cpp_tests([
         "//test/extensions/filters/http/wasm/test_data:test_cpp.wasm",
+    ]) + envoy_select_wasm_rust_tests([
+        "//test/extensions/filters/http/wasm/test_data:deferred_data_rust.wasm",
     ]),
     extension_names = ["envoy.filters.http.wasm"],
     rbe_pool = "4core",
@@ -97,13 +99,18 @@ envoy_extension_cc_test(
         "//source/common/crypto:utility_lib",
         "//source/common/http:message_lib",
         "//source/extensions/common/wasm:wasm_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/filters/http/wasm:config",
         "//test/extensions/common/wasm:wasm_runtime",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
         "//test/integration:http_integration_lib",
+        "//test/integration:http_protocol_integration_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/synchronization",
     ],
 )

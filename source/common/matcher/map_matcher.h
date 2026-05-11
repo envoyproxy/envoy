@@ -17,6 +17,9 @@ public:
   virtual void addChild(std::string value, OnMatch<DataType>&& on_match) PURE;
 
   ActionMatchResult doNoMatch(const DataType& data, SkippedMatchCb skipped_match_cb) {
+    // This is not true redundant-smartptr-get but we still add a NOLINT to make the
+    // clang-tidy check happy.
+    // NOLINTNEXTLINE(readability-redundant-smartptr-get)
     if (data_input_->get(data).availability() == DataAvailability::MoreDataMightBeAvailable) {
       return ActionMatchResult::insufficientData();
     }

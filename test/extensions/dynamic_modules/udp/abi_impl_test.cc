@@ -28,6 +28,8 @@ public:
 
     filter_config_ = std::make_shared<DynamicModuleUdpListenerFilterConfig>(
         proto_config, std::move(dynamic_module.value()), *stats_.rootScope());
+    // Re-open stat creation so tests can call `define_*` from the test thread.
+    filter_config_->stat_creation_frozen_ = false;
 
     filter_ = std::make_shared<DynamicModuleUdpListenerFilter>(callbacks_, filter_config_, 1);
   }
@@ -582,6 +584,22 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, GetWorkerIndex) {
   uint32_t worker_index =
       envoy_dynamic_module_callback_udp_listener_filter_get_worker_index(filterPtr());
   EXPECT_EQ(1u, worker_index);
+}
+
+// Verifies the constructor auto-freezes stat creation so `define_*` returns `Frozen` after init.
+TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, MetricsFrozenAfterInit) {
+  filter_config_->stat_creation_frozen_ = true;
+  envoy_dynamic_module_type_module_buffer name = {const_cast<char*>("frozen_counter"), 14};
+  size_t out_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_udp_listener_filter_config_define_counter(
+                static_cast<void*>(filter_config_.get()), name, &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_udp_listener_filter_config_define_gauge(
+                static_cast<void*>(filter_config_.get()), name, &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_udp_listener_filter_config_define_histogram(
+                static_cast<void*>(filter_config_.get()), name, &out_id));
 }
 
 } // namespace DynamicModules

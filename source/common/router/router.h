@@ -322,7 +322,7 @@ public:
       host_selection_cancelable_->cancel();
       host_selection_cancelable_.reset();
     }
-
+    saw_local_reply_ = true;
     // Clean up the upstream_requests_.
     resetAll();
     return Http::LocalErrorStatus::Continue;
@@ -701,6 +701,7 @@ private:
   // Cached runtime flag value for reject_early_connect_data to avoid evaluating it on every data
   // chunk.
   bool reject_early_connect_data_enabled_ : 1 = false;
+  bool saw_local_reply_ : 1 = false;
 };
 
 class ProdFilter : public Filter {

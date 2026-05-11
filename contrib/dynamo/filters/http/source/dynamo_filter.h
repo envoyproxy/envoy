@@ -71,9 +71,9 @@ private:
   const DynamoStatsSharedPtr stats_;
 
   bool enabled_{};
-  std::string operation_{};
+  std::string operation_;
   RequestParser::TableDescriptor table_descriptor_{"", true};
-  std::string error_type_{};
+  std::string error_type_;
   MonotonicTime start_decode_;
   Http::ResponseHeaderMap* response_headers_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};

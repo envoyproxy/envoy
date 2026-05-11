@@ -665,6 +665,11 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   loadServerFlags(initial_config.flagsPath());
 
+  // Runtime is initialized before the overload manager so resource monitor factories can use
+  // runtime keys (e.g. RuntimeUInt64).
+  runtime_ = component_factory.createRuntime(*this, initial_config);
+  validation_context_.setRuntime(runtime());
+
   // Initialize the overload manager early so other modules can register for actions.
   auto overload_manager_or_error = createOverloadManager();
   RETURN_IF_NOT_OK(overload_manager_or_error.status());
@@ -734,6 +739,13 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
       *listener_manager_config, *this, nullptr, worker_factory_,
       bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
 
+  // Runtime is initialized before the overload manager so resource monitors can read runtime keys;
+  // that means the first runtime snapshot is published before workers register for thread-local
+  // updates. Refresh the snapshot now so worker threads receive a valid TLS snapshot.
+  if (runtime_) {
+    RETURN_IF_NOT_OK(runtime().onWorkerThreadsRegistered());
+  }
+
   // We can now initialize stats for threading.
   stats_store_.initializeThreading(*dispatcher_, thread_local_);
 
@@ -756,11 +768,6 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   // Please note: this order requires that RTDS is provisioned using a primary cluster. If RTDS is
   // provisioned through ADS then ADS must use primary cluster as well. This invariant is enforced
   // during RTDS initialization and invalid configuration will be rejected.
-
-  // Runtime gets initialized before the main configuration since during main configuration
-  // load things may grab a reference to the loader for later use.
-  runtime_ = component_factory.createRuntime(*this, initial_config);
-  validation_context_.setRuntime(runtime());
 
 #ifndef WIN32
   // Envoy automatically raises soft file limits, but we do it here in order to allow
