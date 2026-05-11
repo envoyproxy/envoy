@@ -854,12 +854,13 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
     EXPECT_EQ(response->headers().getProxyStatusValue(),
               "envoy; error=connection_terminated; "
-              "details=\"upstream_reset_before_response_started{connection_termination|QUIC_NO_"
-              "ERROR|FROM_PEER|Closed_by_application}; UC\"");
+              "details=\"upstream_reset_before_response_started{remote_connection_termination|"
+              "QUIC_NO_ERROR|FROM_PEER|Closed_by_application}; UC\"");
   } else {
     EXPECT_EQ(response->headers().getProxyStatusValue(),
               "envoy; error=connection_terminated; "
-              "details=\"upstream_reset_before_response_started{connection_termination}; UC\"");
+              "details=\"upstream_reset_before_response_started{remote_connection_termination}; "
+              "UC\"");
   }
 }
 

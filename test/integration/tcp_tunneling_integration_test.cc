@@ -1273,6 +1273,11 @@ TEST_P(TcpTunnelingIntegrationTest, SendDataUpstreamAfterUpstreamCloseConnection
     // HTTP/1.1 can't frame with FIN bits.
     return;
   }
+  // Disable RemoteConnectionTermination + RST mapping so a graceful upstream connection close
+  // (after end_stream) still surfaces as a half-close downstream rather than a TCP RST. This
+  // preserves the original idle-close semantics this test was written to exercise.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.emit_remote_connection_termination",
+                                    "false");
   initialize();
 
   setUpConnection(fake_upstream_connection_);
@@ -2208,7 +2213,13 @@ TEST_P(TcpTunnelingIntegrationTest, H1UpstreamCloseNoConnectionReuse) {
   ASSERT_TRUE(fake_upstream_connection_->close());
 
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  tcp_client_1->waitForHalfClose();
+  // For HTTP/3 the upstream close while a CONNECT tunnel is active maps to a TCP RST on the
+  // downstream rather than a half-close.
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    tcp_client_1->waitForDisconnect();
+  } else {
+    tcp_client_1->waitForHalfClose();
+  }
   tcp_client_1->close();
 
   // Establish a new connection.
@@ -2224,7 +2235,11 @@ TEST_P(TcpTunnelingIntegrationTest, H1UpstreamCloseNoConnectionReuse) {
   ASSERT_TRUE(fake_upstream_connection_->close());
 
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  tcp_client_2->waitForHalfClose();
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    tcp_client_2->waitForDisconnect();
+  } else {
+    tcp_client_2->waitForHalfClose();
+  }
   tcp_client_2->close();
 }
 

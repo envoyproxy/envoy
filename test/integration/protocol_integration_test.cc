@@ -4896,7 +4896,7 @@ TEST_P(ProtocolIntegrationTest, ValidateUpstreamHeadersWithOverride) {
 
     EXPECT_EQ("503", response->headers().getStatusValue());
     EXPECT_THAT(waitForAccessLog(access_log_name_),
-                HasSubstr("upstream_reset_before_response_started{connection_termination}"));
+                HasSubstr("upstream_reset_before_response_started{remote_connection_termination}"));
   } else {
     response->waitForHeaders();
 
@@ -5099,7 +5099,7 @@ TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
             "PACKET_WRITE_ERROR|FROM_SELF|Write_failed_with_error:_9_(Bad_file_descriptor)}"));
   } else {
     EXPECT_THAT(waitForAccessLog(access_log_name_),
-                HasSubstr("upstream_reset_before_response_started{connection_termination}"));
+                HasSubstr("upstream_reset_before_response_started{remote_connection_termination}"));
   }
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());

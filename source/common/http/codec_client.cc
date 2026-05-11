@@ -134,8 +134,9 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
           Runtime::runtimeFeatureEnabled(
               "envoy.reloadable_features.emit_remote_connection_termination")) {
         // Distinguish a peer-originated termination on an established connection from a local
-        // one so downstream consumers (e.g. tcp_proxy CONNECT/upgrade tunneling) can map this to
-        // a TCP RST. Routing, retry classification, and the UC response flag are unchanged.
+        // one so downstream consumers (e.g. tcp_proxy CONNECT/upgrade tunneling) can map this
+        // to a TCP RST. Routing, retry classification, and the upstream connection-termination
+        // response flag are unchanged.
         reason = StreamResetReason::RemoteConnectionTermination;
       } else {
         reason = StreamResetReason::ConnectionTermination;

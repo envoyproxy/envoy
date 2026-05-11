@@ -852,17 +852,11 @@ TEST_F(CombinedUpstreamTest, OnUpstreamRemoteResetMapsToRemoteReset) {
       Http::StreamResetReason::RemoteConnectionFailure,
       Http::StreamResetReason::RemoteConnectionTermination,
   };
+  EXPECT_CALL(this->callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
+      .Times(static_cast<int>(std::size(remote_reasons)));
   for (const auto reason : remote_reasons) {
-    EXPECT_CALL(this->callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
-    auto mock_conn_pool = std::make_unique<NiceMock<Router::MockGenericConnPool>>();
-    std::unique_ptr<Router::GenericConnPool> generic_conn_pool = std::move(mock_conn_pool);
-    auto mock_upst = std::make_unique<NiceMock<Router::MockUpstreamRequest>>(
-        *this->upstream_, std::move(generic_conn_pool));
-    this->upstream_->onUpstreamReset(reason, "", *mock_upst);
+    this->upstream_->onUpstreamReset(reason, "", *this->mock_router_upstream_request_);
     EXPECT_EQ(this->upstream_->detectedCloseType(), StreamInfo::DetectedCloseType::RemoteReset);
-    // Reset for next iteration.
-    this->upstream_ = std::make_unique<CombinedUpstream>(
-        *conn_pool_, callbacks_, decoder_callbacks_, *tunnel_config_, downstream_stream_info_);
   }
 }
 
@@ -876,16 +870,11 @@ TEST_F(CombinedUpstreamTest, OnUpstreamLocalResetReportsNormal) {
       Http::StreamResetReason::ConnectionTermination,
       Http::StreamResetReason::LocalConnectionFailure,
   };
+  EXPECT_CALL(this->callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
+      .Times(static_cast<int>(std::size(local_reasons)));
   for (const auto reason : local_reasons) {
-    EXPECT_CALL(this->callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
-    auto mock_conn_pool = std::make_unique<NiceMock<Router::MockGenericConnPool>>();
-    std::unique_ptr<Router::GenericConnPool> generic_conn_pool = std::move(mock_conn_pool);
-    auto mock_upst = std::make_unique<NiceMock<Router::MockUpstreamRequest>>(
-        *this->upstream_, std::move(generic_conn_pool));
-    this->upstream_->onUpstreamReset(reason, "", *mock_upst);
+    this->upstream_->onUpstreamReset(reason, "", *this->mock_router_upstream_request_);
     EXPECT_EQ(this->upstream_->detectedCloseType(), StreamInfo::DetectedCloseType::Normal);
-    this->upstream_ = std::make_unique<CombinedUpstream>(
-        *conn_pool_, callbacks_, decoder_callbacks_, *tunnel_config_, downstream_stream_info_);
   }
 }
 

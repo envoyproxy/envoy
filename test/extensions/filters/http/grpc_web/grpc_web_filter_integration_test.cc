@@ -199,7 +199,7 @@ TEST_P(GrpcWebFilterIntegrationTest, GrpcWebTrailersNotDuplicated) {
 
 TEST_P(GrpcWebFilterIntegrationTest, UpstreamDisconnect) {
   testUpstreamDisconnect("upstream connect error or disconnect/reset before headers. reset reason: "
-                         "connection termination");
+                         "remote connection termination");
 }
 
 TEST_P(GrpcWebFilterIntegrationTest, UpstreamDisconnectWithLargeBody) {
