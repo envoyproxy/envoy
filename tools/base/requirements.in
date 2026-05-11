@@ -1,14 +1,8 @@
-abstracts>=0.0.12
 aio.api.bazel
 aio.api.github>=0.2.5
 aio.core>=0.10.2
-aiodocker>=0.22.2
 aiohttp>=3.13.3
 aioquic>=0.9.21
-cffi>=1.15.0
-colorama
-coloredlogs
-cryptography
 dependatool>=0.2.2
 envoy.base.utils>=0.5.10
 envoy.ci.report>=0.0.3
@@ -24,21 +18,12 @@ flake8>=6
 frozendict>=2.3.7
 gitpython
 icalendar>=6.1.1
-jinja2
-
-multidict>=6.0.2
 orjson>=3.10.15
 pep8-naming
-ply
 # Upgrading beyond 4.21.x doesnt currently work. 4.23+ might work when the following is resolved
 # `MessageFactory class is deprecated. Please use GetMessageClass() instead of MessageFactory.GetPrototype`
 protobuf<7.35.0
 pygithub
-pyopenssl>=26.1.0
-pyreadline
 pyyaml
 setuptools
 slack_sdk
-thrift
-verboselogs
-yarl>=1.17.2
