@@ -1286,10 +1286,10 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListPerRouteConfig) {
       override_config;
 
   auto* tool1 = override_config.mutable_tool_config()->add_tools();
-  tool1->set_name("my_tool");
+  tool1->set_name("simple_tool");
   tool1->mutable_tool_list_config()->set_title("My Tool");
   tool1->mutable_tool_list_config()->set_description("Does something.");
-  tool1->mutable_tool_list_config()->set_input_schema(R"({"type":"object"})");
+  tool1->mutable_tool_list_config()->set_input_schema("");
 
   auto* tool2 = override_config.mutable_tool_config()->add_tools();
   tool2->set_name("complex_tool");
@@ -1297,6 +1297,8 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListPerRouteConfig) {
   tool2->mutable_tool_list_config()->set_description("Has\\nspecial \"chars\" & \\t stuff.");
   tool2->mutable_tool_list_config()->set_input_schema(
       R"({"type": "object", "properties": {"a": {"type": "string"}}})");
+  tool2->mutable_tool_list_config()->set_output_schema(
+      R"({"type": "string"})");
 
   McpJsonRestBridgePerRouteConfig override(override_config);
 
@@ -1326,7 +1328,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListPerRouteConfig) {
         auto tools = parsed_response["result"]["tools"];
         EXPECT_EQ(tools.size(), 2);
 
-        EXPECT_EQ(tools[0]["name"], "my_tool");
+        EXPECT_EQ(tools[0]["name"], "simple_tool");
         EXPECT_EQ(tools[0]["title"], "My Tool");
         EXPECT_EQ(tools[0]["description"], "Does something.");
         EXPECT_EQ(tools[0]["inputSchema"]["type"], "object");
@@ -1336,6 +1338,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListPerRouteConfig) {
         EXPECT_EQ(tools[1]["description"], "Has\\nspecial \"chars\" & \\t stuff.");
         EXPECT_EQ(tools[1]["inputSchema"]["type"], "object");
         EXPECT_EQ(tools[1]["inputSchema"]["properties"]["a"]["type"], "string");
+        EXPECT_EQ(tools[1]["outputSchema"]["type"], "string");
       }));
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data, true));
