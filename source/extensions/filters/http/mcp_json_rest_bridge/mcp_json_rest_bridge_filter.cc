@@ -261,6 +261,7 @@ Http::FilterHeadersStatus McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseH
   // The response for InitializedNotification is empty body so we don't need
   // to modify the response headers.
   case McpOperation::InitializationAck:
+  // ToolsListLocal sends a local reply, so the headers are already correct.
   case McpOperation::ToolsListLocal:
     return Http::FilterHeadersStatus::Continue;
   default:
@@ -278,7 +279,8 @@ Http::FilterHeadersStatus McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseH
 
 Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& data,
                                                            bool end_stream) {
-  // No need to encode the response body for Initialization and InitializationAck.
+  // No need to encode the response body for Initialization and InitializationAck. ToolsListLocal is
+  // a local response, and the response body is already encoded.
   if (mcp_operation_ == McpOperation::Unspecified ||
       mcp_operation_ == McpOperation::Initialization ||
       mcp_operation_ == McpOperation::InitializationAck ||
@@ -327,6 +329,8 @@ Http::FilterTrailersStatus McpJsonRestBridgeFilter::encodeTrailers(Http::Respons
   return Http::FilterTrailersStatus::Continue;
 }
 
+// Send a local reply for a tools/list call. Construct the response body directly instead of
+// building a JSON object, to minimize copying.
 void McpJsonRestBridgeFilter::serveToolsListLocal(
     const McpJsonRestBridgePerRouteConfig& per_route_config, const nlohmann::json& json_rpc) {
   std::string request_id_json = "null";

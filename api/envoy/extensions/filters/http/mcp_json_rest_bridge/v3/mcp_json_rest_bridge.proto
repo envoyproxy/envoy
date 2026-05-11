@@ -170,21 +170,21 @@ message ServerToolConfig {
   HttpRule tool_list_http_rule = 3;
 }
 
-// Note: Based on the method in HttpRule, we will set the readOnlyHint bit in
-// annotations for GET method to indicate no server state mutation.
+// Configuration for a specific MCP tool.
 message ToolsListSpecificConfig {
   // Optional, human-readable name of the tool for display purposes.
   string title = 1;
 
   // Human-readable description of functionality.
-  string description = 2;
+  string description = 2 [(validate.rules).string = {min_len: 1}];
 
-  // The JSON Schema describing expected parameters, as a serialized JSON string.
-  // It is raw json without type: object which includes "properties" and "required" key
+  // A JSON Schema describing expected parameters, as a serialized JSON string, in the JSON Schema
+  // 2020-12 dialect. This should be raw JSON, including the "properties" and "required" keys, but
+  // not "type". Tools with no parameters may omit this to signify a tool with no constraints on the
+  // parameters object, or set to '"additionalProperties": false' to require empty parameters.
   string input_schema = 3;
 
-  // [#not-implemented-hide:]
-  // The validation of structured results
+  // Optional output schema. If present, uses the same format as input_schema.
   string output_schema = 4;
 }
 
