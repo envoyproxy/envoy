@@ -493,6 +493,9 @@ public:
 
 private:
   // Filters::Common::Lua::BaseLuaObject
+  // NOTE: This must be kept in sync with ResponseStreamHandleWrapper::onMarkDead() below.
+  // Both reset every LuaDeathRef field declared in StreamHandleWrapperBase. If a new wrapper
+  // field is added to the base, it must be reset in both subclass onMarkDead() overrides.
   void onMarkDead() override {
     headers_wrapper_.reset();
     downstream_request_headers_wrapper_.reset();
@@ -578,6 +581,9 @@ public:
 
 private:
   // Filters::Common::Lua::BaseLuaObject
+  // NOTE: This must be kept in sync with RequestStreamHandleWrapper::onMarkDead() above.
+  // Both reset every LuaDeathRef field declared in StreamHandleWrapperBase. If a new wrapper
+  // field is added to the base, it must be reset in both subclass onMarkDead() overrides.
   void onMarkDead() override {
     headers_wrapper_.reset();
     downstream_request_headers_wrapper_.reset();
@@ -788,9 +794,10 @@ private:
       return callbacks_->filterConfigName();
     }
     Stats::Scope& statsScope() override { return parent_.config_->luaStatsScope(); }
-    Http::RequestHeaderMapOptRef downstreamRequestHeaders() override {
-      return callbacks_->requestHeaders();
-    }
+    // downstreamRequestHeaders() is only meaningful on the response path. The method exists on
+    // FilterCallbacks so StreamHandleWrapperBase can call it uniformly, but RequestStreamHandleWrapper
+    // does not expose it in exportedFunctions(), so Lua scripts cannot reach this code path.
+    Http::RequestHeaderMapOptRef downstreamRequestHeaders() override { return {}; }
 
     Filter& parent_;
     Http::StreamDecoderFilterCallbacks* callbacks_{};
