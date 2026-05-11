@@ -83,6 +83,7 @@ aiodocker==0.25.0 \
     --hash=sha256:e5145ba622a8eceee9263c277c6d4e7ff6be4632d11765c554c80756b2d58be8
     # via
     #   -r requirements.in
+    #   envoy-distribution-distrotest
     #   envoy-distribution-verify
     #   envoy-docker-utils
 aiofiles==24.1.0 \
@@ -529,9 +530,9 @@ envoy-dependency-check==0.1.13 \
     --hash=sha256:4337b9c4129ae723dc92f70733b167a8dde187368d873687c6c54732d6fb5e48 \
     --hash=sha256:795e885eccd072d7878dc8ce11fe9f84761f0e449603e583fdab5e9e17111af2
     # via -r requirements.in
-envoy-distribution-distrotest==0.0.12 \
-    --hash=sha256:04f2f5302c039aca82eb4e7d1e8a6fee5fc274a1cdae27130d15754eb3abb4b4 \
-    --hash=sha256:2762ff531715c1e8d057f10f0fc6c79807f0f67930fc5032fa5a2f239498a7d7
+envoy-distribution-distrotest==0.0.13 \
+    --hash=sha256:b07aa9819040a4d8cbf0a85ab8c899c2601b3db348286a464d04e5630b56810d \
+    --hash=sha256:cdc8f860e1bef7a0c92d227456e9095fd9b1565f3d77fa22e4bb84a20a6c391d
     # via
     #   -r requirements.in
     #   envoy-distribution-verify
