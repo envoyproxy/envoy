@@ -49,7 +49,8 @@ void JwtGcpAuthnClientImpl::fetchToken(
 
   // Failed to fetch the token if the cluster is not configured.
   if (thread_local_cluster == nullptr) {
-    onError(absl::StrFormat("Failed to fetch the token: [cluster = %s] is not found or configured.", cluster));
+    onError(absl::StrFormat("Failed to fetch the token: [cluster = %s] is not found or configured.",
+                            cluster));
     return;
   }
 
