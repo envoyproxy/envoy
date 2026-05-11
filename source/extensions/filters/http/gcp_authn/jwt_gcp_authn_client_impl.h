@@ -29,7 +29,6 @@ public:
 
   // GcpAuthnClient implemented by this class.
   void fetchToken(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-                  const absl::optional<std::string>& fingerprint,
                   GcpAuthnClient::Callbacks& callbacks) override;
   void cancel() override;
 

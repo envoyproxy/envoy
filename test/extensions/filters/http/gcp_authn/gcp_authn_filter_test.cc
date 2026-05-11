@@ -122,7 +122,7 @@ TEST_F(GcpAuthnFilterTest, Success) {
 
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.set_url("http://test_audience");
-  client_->fetchToken(audience, absl::nullopt, request_callbacks_);
+  client_->fetchToken(audience, request_callbacks_);
   EXPECT_EQ(message_->headers().Method()->value().getStringView(), "GET");
   EXPECT_EQ(message_->headers().Path()->value().getStringView(),
             "/computeMetadata/v1/instance/service-accounts/default/identity?audience=http://"
@@ -172,7 +172,7 @@ TEST_F(GcpAuthnFilterTest, NoCluster) {
   createClient();
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.set_url("http://test_audience");
-  client_->fetchToken(audience, absl::nullopt, request_callbacks_);
+  client_->fetchToken(audience, request_callbacks_);
 }
 
 TEST_F(GcpAuthnFilterTest, Failure) {
@@ -182,7 +182,7 @@ TEST_F(GcpAuthnFilterTest, Failure) {
   EXPECT_CALL(request_callbacks_, onComplete(_));
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.set_url("http://test_audience");
-  client_->fetchToken(audience, absl::nullopt, request_callbacks_);
+  client_->fetchToken(audience, request_callbacks_);
   client_callback_->onFailure(client_request_, Http::AsyncClient::FailureReason::Reset);
 }
 
@@ -193,7 +193,7 @@ TEST_F(GcpAuthnFilterTest, NotOkResponse) {
 
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.set_url("http://test_audience");
-  client_->fetchToken(audience, absl::nullopt, request_callbacks_);
+  client_->fetchToken(audience, request_callbacks_);
 
   Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
       {":status", "504"},
@@ -211,7 +211,7 @@ TEST_F(GcpAuthnFilterTest, EmptyResponseHeader) {
 
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.set_url("http://test_audience");
-  client_->fetchToken(audience, absl::nullopt, request_callbacks_);
+  client_->fetchToken(audience, request_callbacks_);
 
   Envoy::Http::ResponseHeaderMapPtr empty_resp_headers(
       new Envoy::Http::TestResponseHeaderMapImpl({}));

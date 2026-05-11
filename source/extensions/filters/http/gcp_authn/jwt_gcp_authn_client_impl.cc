@@ -36,7 +36,7 @@ Http::RequestMessagePtr buildRequest(absl::string_view url) {
 
 void JwtGcpAuthnClientImpl::fetchToken(
     const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-    const absl::optional<std::string>& /*fingerprint*/, GcpAuthnClient::Callbacks& callbacks) {
+    GcpAuthnClient::Callbacks& callbacks) {
   // Cancel any active requests.
   cancel();
   ASSERT(callbacks_ == nullptr);

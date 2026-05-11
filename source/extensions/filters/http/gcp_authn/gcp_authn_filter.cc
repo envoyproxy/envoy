@@ -82,7 +82,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
     // Save the pointer to the request headers for header manipulation based on http response later.
     request_header_map_ = &hdrs;
 
-    client_->fetchToken(audience_proto, absl::nullopt, *this);
+    client_->fetchToken(audience_proto, *this);
     initiating_call_ = false;
   } else {
     // There is no need to fetch the token if no audience is specified because no

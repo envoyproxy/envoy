@@ -35,11 +35,9 @@ public:
    * Fetch a token.
    *
    * @param audience the Audience proto containing the audience URL.
-   * @param fingerprint an optional string for token fingerprint.
    * @param callbacks the callbacks to be notified when the token fetch completes.
    */
   virtual void fetchToken(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-                          const absl::optional<std::string>& fingerprint,
                           Callbacks& callbacks) PURE;
 
   /**
