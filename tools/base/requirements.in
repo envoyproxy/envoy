@@ -1,4 +1,4 @@
-abstracts>=0.0.12
+abstracts>=0.2.0
 aio.api.bazel
 aio.api.github>=0.2.5
 aio.core>=0.10.2
