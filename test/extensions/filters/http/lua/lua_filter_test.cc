@@ -1111,8 +1111,7 @@ TEST_F(LuaHttpFilterTest, RequestHeadersInResponseWithBody) {
   // end_stream=false: response has a body, but the script doesn't call body() so it completes
   // during encodeHeaders and does not yield.
   EXPECT_LOG_CONTAINS("trace", "/with-body", {
-    EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-              filter_->encodeHeaders(response_headers, false));
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   });
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }

@@ -795,8 +795,9 @@ private:
     }
     Stats::Scope& statsScope() override { return parent_.config_->luaStatsScope(); }
     // downstreamRequestHeaders() is only meaningful on the response path. The method exists on
-    // FilterCallbacks so StreamHandleWrapperBase can call it uniformly, but RequestStreamHandleWrapper
-    // does not expose it in exportedFunctions(), so Lua scripts cannot reach this code path.
+    // FilterCallbacks so StreamHandleWrapperBase can call it uniformly, but
+    // RequestStreamHandleWrapper does not expose it in exportedFunctions(), so Lua scripts cannot
+    // reach this code path.
     Http::RequestHeaderMapOptRef downstreamRequestHeaders() override { return {}; }
 
     Filter& parent_;
