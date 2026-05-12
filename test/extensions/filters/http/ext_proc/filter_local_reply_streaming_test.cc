@@ -1345,6 +1345,7 @@ TEST_F(StreamingLocalReplyTest, StartLocalResponseInvalidHeaders) {
   h->set_key(":status");
   h->set_raw_value(std::string(1, '\0')); // Invalid header value
 
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
   stream_callbacks_->onReceiveMessage(std::move(response));
 }
 
@@ -1376,6 +1377,7 @@ TEST_F(StreamingLocalReplyTest, ProcessLocalTrailersInvalid) {
   h2->set_key("invalid name");
   h2->set_raw_value("value");
 
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
   stream_callbacks_->onReceiveMessage(std::move(response2));
 }
 

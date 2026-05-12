@@ -13,6 +13,8 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 
 class ExpressionManager : public Logger::Loggable<Logger::Id::ext_proc> {
+  friend class ExpressionManagerTestAccessor;
+
 public:
   using CelExpression = Filters::Common::Expr::CompiledExpression;
 

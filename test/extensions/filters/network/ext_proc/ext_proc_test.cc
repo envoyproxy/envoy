@@ -258,7 +258,16 @@ TEST_F(NetworkExtProcFilterTest, OnComplete) {
 
 // Test the onError method
 TEST_F(NetworkExtProcFilterTest, OnError) {
-  // Simply call the method to ensure coverage
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(Return(ByMove(std::move(stream))));
+
+  Buffer::OwnedImpl data("test");
+  filter_->onData(data, false);
+
+  // onError should close the stream
+  EXPECT_CALL(*stream_ptr, close());
   filter_->onError();
 }
 
@@ -1410,24 +1419,55 @@ TEST_F(NetworkExtProcFilterTest, RecordCallCompletionNullStartTime) {
   auto response = std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>();
   response->mutable_read_data()->set_data("test");
 
+  auto& filter_state = read_callbacks_.connection().streamInfo().filterState();
+  auto logging_info =
+      filter_state->getDataReadOnly<NetworkExtProcLoggingInfo>("envoy.filters.network.ext_proc");
+
+  uint32_t initial_grpc_calls = logging_info->readStats().grpc_calls_;
+
   filter_->onReceiveMessage(std::move(response));
+
+  // Should not have incremented grpc_calls since call_start_time was nullopt
+  EXPECT_EQ(initial_grpc_calls, logging_info->readStats().grpc_calls_);
 }
 
 // Test message timeout triggered via Timer
 TEST_F(NetworkExtProcFilterTest, MessageTimeoutViaTimer) {
-  // Capture the read timer callback from the initially created filter
-  // We need to trigger a timeout on the filter already held in filter_
+  // Capture the read timer callback by recreating the filter
+  Event::TimerCb captured_cb;
+  EXPECT_CALL(connection_.dispatcher_, createTimer_(_))
+      .Times(2)
+      .WillOnce([&](Event::TimerCb cb) -> Event::MockTimer* {
+        captured_cb = cb;
+        auto* timer = new Event::MockTimer();
+        EXPECT_CALL(*timer, enableTimer(_, _));
+        EXPECT_CALL(*timer, disableTimer()).Times(testing::AnyNumber());
+        return timer;
+      })
+      .WillOnce([&](Event::TimerCb) -> Event::MockTimer* {
+        auto* timer = new Event::MockTimer();
+        EXPECT_CALL(*timer, enableTimer(_, _)).Times(testing::AnyNumber());
+        EXPECT_CALL(*timer, disableTimer()).Times(testing::AnyNumber());
+        return timer;
+      });
+
+  auto filter_config = std::make_shared<Config>(createConfig(false), scope_);
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  auto* client_ptr = client.get();
+  auto local_filter = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  local_filter->initializeReadFilterCallbacks(read_callbacks_);
+  local_filter->initializeWriteFilterCallbacks(write_callbacks_);
 
   auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
-  EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(Return(ByMove(std::move(stream))));
+  EXPECT_CALL(*client_ptr, start(_, _, _, _)).WillOnce(Return(ByMove(std::move(stream))));
 
   Buffer::OwnedImpl data("test");
-  filter_->onData(data, false);
+  local_filter->onData(data, false);
 
-  // Trigger timeout directly via the filter
+  // Trigger timeout via the captured callback
   EXPECT_CALL(connection_,
               close(Network::ConnectionCloseType::FlushWrite, "ext_proc_message_timeout"));
-  filter_->handleMessageTimeout(true);
+  captured_cb();
 
   EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.message_timeouts"));
 }

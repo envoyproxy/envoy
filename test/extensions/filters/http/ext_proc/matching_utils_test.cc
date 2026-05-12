@@ -13,6 +13,13 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
+class ExpressionManagerTestAccessor {
+public:
+  static size_t requestExprSize(const ExpressionManager& manager) {
+    return manager.request_expr_.size();
+  }
+};
+
 namespace {
 
 using ::Envoy::Http::TestRequestHeaderMapImpl;
@@ -57,6 +64,7 @@ TEST_F(ExpressionManagerTest, RepeatedMatchers) {
   auto builder = Filters::Common::Expr::getBuilder(context_);
   ExpressionManager test_manager(builder, context_.local_info_, request_matchers, {});
   EXPECT_TRUE(test_manager.hasRequestExpr());
+  EXPECT_EQ(1, ExpressionManagerTestAccessor::requestExprSize(test_manager));
 }
 
 TEST_F(ExpressionManagerTest, EvaluateAttributesTypes) {

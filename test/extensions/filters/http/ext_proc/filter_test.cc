@@ -6606,6 +6606,7 @@ TEST_F(HttpFilterTest, SendDataInObservabilityModeInvalidMode) {
   auto& decoding_state = FilterAccessor::decodingState(*filter_);
   // Manually call the private method that contains the branch we want to cover.
   FilterAccessor::sendDataInObservabilityMode(*filter_, data, decoding_state, false);
+  EXPECT_EQ(0, config_->stats().stream_msgs_sent_.value());
   filter_->onDestroy();
 }
 
@@ -6615,6 +6616,7 @@ TEST_F(HttpFilterTest, LogStreamInfoHttpService) {
   auto& decoding_state = FilterAccessor::decodingState(*filter_);
   FilterAccessor::onStartProcessorCall(
       decoding_state, []() {}, 100ms, ProcessorState::CallbackState::HeadersCallback, false);
+  EXPECT_EQ(ProcessorState::CallbackState::HeadersCallback, decoding_state.callbackState());
   decoding_state.onFinishProcessorCall(Grpc::Status::Ok);
   filter_->onDestroy();
 }
@@ -6629,6 +6631,7 @@ TEST_F(HttpFilterTest, ProcessHeaderMutationNoHeadersAvailable) {
   auto& decoding_state = FilterAccessor::decodingState(*filter_);
   FilterAccessor::onStartProcessorCall(
       decoding_state, []() {}, 100ms, ProcessorState::CallbackState::BufferedBodyCallback, false);
+  EXPECT_EQ(ProcessorState::CallbackState::BufferedBodyCallback, decoding_state.callbackState());
 
   BodyResponse response;
   response.mutable_response()->mutable_header_mutation()->add_set_headers();
