@@ -62,6 +62,99 @@ from typing import Dict, FrozenSet, List, Optional, Set, Tuple
 # failures.  Set to True only when you explicitly want to allow full removal.
 ALLOW_FULL_REMOVAL: bool = False
 
+# ---------------------------------------------------------------------------
+# Transitive-include safety guard
+# ---------------------------------------------------------------------------
+# When the script narrows a broad server-mock include (e.g. instance.h →
+# admin.h), symbols that the file relied upon via the *broader* header's
+# transitive include chain can become invisible to the compiler.  This table
+# maps regex patterns for such "at-risk" non-server symbols to the direct
+# #include that must already be present in the file for the narrowing to be
+# safe.
+#
+# Each entry is a tuple:
+#   (symbol_pattern, required_direct_include, bazel_dep)
+#
+# If the source file contains a token matching *symbol_pattern* and does NOT
+# already have a direct `#include "required_direct_include"` line, the
+# narrowing is skipped (default safe mode) to avoid breaking the build.
+#
+# Extend this table when new cross-subsystem transitive-include classes are
+# discovered.
+TRANSITIVE_GUARD: List[Tuple[str, str, str]] = [
+    # HTTP mocks — Http::MockStreamDecoderFilterCallbacks, etc.
+    (
+        r"\bHttp::Mock\w+",
+        "test/mocks/http/mocks.h",
+        "//test/mocks/http:http_mocks",
+    ),
+    # HTTP test map types — Http::TestRequestHeaderMapImpl, etc.
+    (
+        r"\bHttp::Test\w+(?:Header|Trailer)Map\w*",
+        "test/test_common/utility.h",
+        "//test/test_common:utility_lib",
+    ),
+    # API mocks — Api::MockApi, etc.
+    (
+        r"\bApi::Mock\w+",
+        "test/mocks/api/mocks.h",
+        "//test/mocks/api:api_mocks",
+    ),
+    # createApiForTest helper
+    (
+        r"\bApi::createApiForTest\b",
+        "test/test_common/utility.h",
+        "//test/test_common:utility_lib",
+    ),
+    # Network mocks — Network::MockConnection, etc.
+    (
+        r"\bNetwork::Mock\w+",
+        "test/mocks/network/mocks.h",
+        "//test/mocks/network:network_mocks",
+    ),
+    # Upstream mocks — Upstream::MockClusterManager, etc.
+    (
+        r"\bUpstream::Mock\w+",
+        "test/mocks/upstream/mocks.h",
+        "//test/mocks/upstream:upstream_mocks",
+    ),
+    # Stats mocks — Stats::MockStore, etc.
+    (
+        r"\bStats::Mock\w+",
+        "test/mocks/stats/mocks.h",
+        "//test/mocks/stats:stats_mocks",
+    ),
+    # Runtime mocks — Runtime::MockLoader, etc.
+    (
+        r"\bRuntime::Mock\w+",
+        "test/mocks/runtime/mocks.h",
+        "//test/mocks/runtime:runtime_mocks",
+    ),
+    # Tracing mocks — Tracing::MockTracer, etc.
+    (
+        r"\bTracing::Mock\w+",
+        "test/mocks/tracing/mocks.h",
+        "//test/mocks/tracing:tracing_mocks",
+    ),
+    # Singleton::ManagerImpl
+    (
+        r"\bSingleton::ManagerImpl\b",
+        "source/common/singleton/manager_impl.h",
+        "//source/common/singleton:manager_impl_lib",
+    ),
+    # TestUtility / TestEnvironment helpers
+    (
+        r"\bTestUtility::\w+",
+        "test/test_common/utility.h",
+        "//test/test_common:utility_lib",
+    ),
+    (
+        r"\bTestEnvironment::\w+",
+        "test/test_common/utility.h",
+        "//test/test_common:utility_lib",
+    ),
+]
+
 FAMILY_RULES: Dict = {
     "server": {
         "symbol_to_header_dep": {
@@ -400,6 +493,32 @@ def _has_using_namespace(content: str) -> bool:
     return bool(_USING_NS_RE.search(content))
 
 
+def _check_transitive_guard(
+    content: str,
+    all_includes: Set[str],
+    verbose: bool = False,
+    filepath: str = "",
+) -> bool:
+    """Return False (skip) if narrowing would break a transitive-include chain.
+
+    Scans *content* for non-server symbols listed in TRANSITIVE_GUARD.  For
+    each matching symbol, checks whether the required direct ``#include`` is
+    already present in the file's explicit include list.  If a symbol is used
+    but its required include is missing, the narrowing would silently drop that
+    header from the compilation unit — so we skip the file.
+    """
+    for pattern, required_header, _dep in TRANSITIVE_GUARD:
+        if re.search(pattern, content) and required_header not in all_includes:
+            if verbose:
+                print(
+                    f"  SKIP {filepath}: matches '{pattern}' but lacks direct "
+                    f'#include "{required_header}" — narrowing would break '
+                    "transitive-include chain"
+                )
+            return False
+    return True
+
+
 def _reduce_includes(includes: Set[str], dominance: Dict[str, Set[str]]) -> Set[str]:
     """Remove headers from *includes* that are already covered by a
     more-specific header in the same set (via the dominance relation).
@@ -549,6 +668,14 @@ def _analyze_file(
                         "narrower than original"
                     )
                 return None
+
+    # Transitive-include safety guard: if the file uses non-server symbols
+    # (e.g. Http::MockStreamDecoderFilterCallbacks) that would have been
+    # visible via the broader header's transitive include chain, but those
+    # symbols lack their own direct #include, the narrowing would silently
+    # break the build.  Skip in that case.
+    if not _check_transitive_guard(content, all_includes, verbose, filepath):
+        return None
 
     return old_includes, new_includes, old_deps, new_deps
 

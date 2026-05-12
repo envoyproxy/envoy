@@ -14,7 +14,9 @@ if _TOOLS_CODE_DIR not in sys.path:
 from narrow_test_mocks import (  # noqa: E402
     ALLOW_FULL_REMOVAL,
     FAMILY_RULES,
+    TRANSITIVE_GUARD,
     _analyze_file,
+    _check_transitive_guard,
     _rewrite_includes,
     _rewrite_build_deps,
     _reduce_includes,
@@ -199,16 +201,19 @@ void foo() {
         self.assertIsNone(result)
 
     def test_mocks_umbrella_no_server_symbols_removed_when_full_removal_allowed(self):
+        # Use content that references only non-server symbols that are NOT in
+        # the TRANSITIVE_GUARD (so the guard doesn't fire), to isolate the
+        # ALLOW_FULL_REMOVAL behaviour.
         content = """\
 #include "test/mocks/server/mocks.h"
 
-// Uses only non-server mock symbols
+// Uses only symbols not covered by the transitive guard
 void foo() {
-  testing::NiceMock<Network::MockConnection> conn;
+  int x = 42;
 }
 """
-        # With ALLOW_FULL_REMOVAL=True the old behaviour is preserved: the
-        # include/dep is removed entirely when no server symbols are referenced.
+        # With ALLOW_FULL_REMOVAL=True the include/dep is removed entirely
+        # when no server symbols are referenced AND the transitive guard passes.
         import narrow_test_mocks as _m
         with unittest.mock.patch.object(_m, "ALLOW_FULL_REMOVAL", True):
             result = _analyze_file(content, SERVER_RULES)
@@ -217,6 +222,26 @@ void foo() {
         self.assertIn("test/mocks/server/mocks.h", old_inc)
         self.assertNotIn("test/mocks/server/mocks.h", new_inc)
         self.assertEqual(new_inc, set())
+
+    def test_mocks_umbrella_no_server_symbols_guard_fires_even_with_full_removal(self):
+        """The transitive guard takes precedence even when ALLOW_FULL_REMOVAL=True.
+
+        If the file uses Network::MockConnection without a direct
+        test/mocks/network/mocks.h, narrowing is still skipped — the guard is
+        stronger than the full-removal flag.
+        """
+        content = """\
+#include "test/mocks/server/mocks.h"
+
+void foo() {
+  testing::NiceMock<Network::MockConnection> conn;
+}
+"""
+        import narrow_test_mocks as _m
+        with unittest.mock.patch.object(_m, "ALLOW_FULL_REMOVAL", True):
+            result = _analyze_file(content, SERVER_RULES)
+        # Guard fires: Network::MockConnection lacks test/mocks/network/mocks.h
+        self.assertIsNone(result)
 
 
 class TestReduceIncludes(unittest.TestCase):
@@ -496,6 +521,183 @@ envoy_extension_cc_test(
         # factory_context_mocks should be gone — check for the exact dep
         self.assertNotIn('"//test/mocks/server:factory_context_mocks"', new_build)
         self.assertIn("//source/other:lib", new_build)
+
+
+class TestTransitiveGuard(unittest.TestCase):
+    """Tests for _check_transitive_guard() and its integration in _analyze_file()."""
+
+    # ------------------------------------------------------------------
+    # Direct unit tests for _check_transitive_guard()
+    # ------------------------------------------------------------------
+
+    def test_safe_when_no_guarded_symbols(self):
+        """A file with no non-server symbols passes the guard."""
+        content = """\
+#include "test/mocks/server/admin.h"
+
+void foo() {
+  testing::NiceMock<Server::MockAdmin> admin;
+}
+"""
+        includes = {"test/mocks/server/admin.h"}
+        self.assertTrue(_check_transitive_guard(content, includes))
+
+    def test_safe_when_guarded_symbol_has_direct_include(self):
+        """Http::MockStreamDecoderFilterCallbacks is safe when its include is present."""
+        content = """\
+#include "test/mocks/http/mocks.h"
+#include "test/mocks/server/admin.h"
+
+void foo() {
+  testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> cbs;
+  testing::NiceMock<Server::MockAdmin> admin;
+}
+"""
+        includes = {"test/mocks/http/mocks.h", "test/mocks/server/admin.h"}
+        self.assertTrue(_check_transitive_guard(content, includes))
+
+    def test_skip_when_http_mock_lacks_direct_include(self):
+        """Http::MockStreamDecoderFilterCallbacks without test/mocks/http/mocks.h → skip."""
+        content = """\
+#include "test/mocks/server/admin.h"
+
+void foo() {
+  testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> cbs;
+  testing::NiceMock<Server::MockAdmin> admin;
+}
+"""
+        includes = {"test/mocks/server/admin.h"}
+        self.assertFalse(_check_transitive_guard(content, includes))
+
+    def test_skip_when_test_header_map_lacks_direct_include(self):
+        """Http::TestRequestHeaderMapImpl without utility.h → skip."""
+        content = """\
+#include "test/mocks/server/instance.h"
+
+void foo() {
+  Http::TestRequestHeaderMapImpl hdrs;
+}
+"""
+        includes = {"test/mocks/server/instance.h"}
+        self.assertFalse(_check_transitive_guard(content, includes))
+
+    def test_safe_when_test_header_map_has_utility_include(self):
+        """Http::TestRequestHeaderMapImpl with utility.h already present → safe."""
+        content = """\
+#include "test/mocks/server/admin.h"
+#include "test/test_common/utility.h"
+
+void foo() {
+  Http::TestRequestHeaderMapImpl hdrs;
+}
+"""
+        includes = {"test/mocks/server/admin.h", "test/test_common/utility.h"}
+        self.assertTrue(_check_transitive_guard(content, includes))
+
+    def test_skip_when_singleton_manager_impl_lacks_direct_include(self):
+        """Singleton::ManagerImpl without its own header → skip."""
+        content = """\
+#include "test/mocks/server/instance.h"
+
+void foo() {
+  Singleton::ManagerImpl mgr;
+}
+"""
+        includes = {"test/mocks/server/instance.h"}
+        self.assertFalse(_check_transitive_guard(content, includes))
+
+    def test_verbose_output_on_skip(self):
+        """Verbose mode emits a diagnostic message when skipping."""
+        content = """\
+#include "test/mocks/server/admin.h"
+
+void foo() {
+  Http::MockStreamDecoderFilterCallbacks cbs;
+}
+"""
+        includes = {"test/mocks/server/admin.h"}
+        import io
+        from contextlib import redirect_stdout
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            result = _check_transitive_guard(
+                content, includes, verbose=True, filepath="some/test.cc"
+            )
+        self.assertFalse(result)
+        self.assertIn("some/test.cc", buf.getvalue())
+        self.assertIn("test/mocks/http/mocks.h", buf.getvalue())
+
+    # ------------------------------------------------------------------
+    # Integration: _analyze_file() skips when guard fires
+    # ------------------------------------------------------------------
+
+    def test_analyze_file_skips_when_http_mock_lacks_include(self):
+        """admin_filter_test.cc scenario: MockAdmin used (narrowed to admin.h)
+        but Http::MockStreamDecoderFilterCallbacks lacks a direct include.
+        _analyze_file must return None (skip).
+        """
+        content = """\
+#include "test/mocks/server/instance.h"
+
+void foo() {
+  testing::NiceMock<Server::MockAdmin> admin;
+  testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> cbs;
+}
+"""
+        result = _analyze_file(content, SERVER_RULES)
+        # The guard fires: Http::MockStreamDecoderFilterCallbacks is used but
+        # test/mocks/http/mocks.h is not directly included → skip.
+        self.assertIsNone(result)
+
+    def test_analyze_file_narrows_when_http_mock_has_direct_include(self):
+        """Same as above but with test/mocks/http/mocks.h already present.
+        The narrowing should proceed.
+        """
+        content = """\
+#include "test/mocks/http/mocks.h"
+#include "test/mocks/server/instance.h"
+
+void foo() {
+  testing::NiceMock<Server::MockAdmin> admin;
+  testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> cbs;
+}
+"""
+        result = _analyze_file(content, SERVER_RULES)
+        # Guard is satisfied (http/mocks.h is directly included) → narrowing proceeds.
+        self.assertIsNotNone(result)
+        old_inc, new_inc, old_dep, new_dep = result
+        self.assertIn("test/mocks/server/instance.h", old_inc)
+        # Replaced with admin.h (narrowest header for MockAdmin)
+        self.assertIn("test/mocks/server/admin.h", new_inc)
+
+    def test_analyze_file_skips_test_env_without_utility(self):
+        """TestEnvironment:: used but test/test_common/utility.h missing → skip."""
+        content = """\
+#include "test/mocks/server/instance.h"
+
+void foo() {
+  testing::NiceMock<Server::MockAdmin> admin;
+  auto versions = TestEnvironment::getIpVersionsForTest();
+}
+"""
+        result = _analyze_file(content, SERVER_RULES)
+        self.assertIsNone(result)
+
+    def test_analyze_file_narrows_when_test_env_has_utility(self):
+        """TestEnvironment:: used AND utility.h directly included → narrowing proceeds."""
+        content = """\
+#include "test/mocks/server/instance.h"
+#include "test/test_common/utility.h"
+
+void foo() {
+  testing::NiceMock<Server::MockAdmin> admin;
+  auto versions = TestEnvironment::getIpVersionsForTest();
+}
+"""
+        result = _analyze_file(content, SERVER_RULES)
+        self.assertIsNotNone(result)
+        _, new_inc, _, _ = result
+        self.assertIn("test/mocks/server/admin.h", new_inc)
 
 
 if __name__ == "__main__":

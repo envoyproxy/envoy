@@ -97,3 +97,43 @@ Then pass `--rules server network` on the command line.
 - Proto-generated files and build-system files are never touched.
 - BUILD rewriting preserves all existing non-server-mock deps unchanged and
   keeps the list sorted alphabetically to satisfy `buildifier`.
+
+### Transitive-include safety check
+
+When narrowing from a broad server-mock header (e.g. `instance.h`) to a
+narrower sibling (e.g. `admin.h`), the script may inadvertently remove
+symbols that the file relied upon via the *broader* header's transitive
+include chain.  For example, `instance.h` transitively pulls in HTTP mock
+headers; `admin.h` does not.  A file that uses
+`Http::MockStreamDecoderFilterCallbacks` without its own
+`#include "test/mocks/http/mocks.h"` line would silently break.
+
+To prevent this, the script maintains a `TRANSITIVE_GUARD` table (at the top
+of `narrow_test_mocks.py`) that maps regex patterns for at-risk non-server
+symbols to the direct include that must be present for the narrowing to be
+safe:
+
+| Pattern | Required direct include |
+|---|---|
+| `Http::Mock*` | `test/mocks/http/mocks.h` |
+| `Http::Test*HeaderMap*` / `Http::Test*TrailerMap*` | `test/test_common/utility.h` |
+| `Api::Mock*` | `test/mocks/api/mocks.h` |
+| `Api::createApiForTest` | `test/test_common/utility.h` |
+| `Network::Mock*` | `test/mocks/network/mocks.h` |
+| `Upstream::Mock*` | `test/mocks/upstream/mocks.h` |
+| `Stats::Mock*` | `test/mocks/stats/mocks.h` |
+| `Runtime::Mock*` | `test/mocks/runtime/mocks.h` |
+| `Tracing::Mock*` | `test/mocks/tracing/mocks.h` |
+| `Singleton::ManagerImpl` | `source/common/singleton/manager_impl.h` |
+| `TestUtility::*` / `TestEnvironment::*` | `test/test_common/utility.h` |
+
+**Default (safe) behaviour**: if any guarded symbol is used but its required
+direct include is missing, the entire narrowing for that file is skipped and a
+diagnostic is emitted with `--verbose`.  The file is left untouched.
+
+To fix a skipped file, manually add the required direct `#include` and Bazel
+dep listed in the table, then re-run the script — it will then narrow
+successfully.
+
+To extend the guard for new at-risk symbol classes, add entries to the
+`TRANSITIVE_GUARD` list at the top of `narrow_test_mocks.py`.
