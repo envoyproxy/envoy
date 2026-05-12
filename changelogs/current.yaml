@@ -95,7 +95,6 @@ new_features:
     type is HTTP and the failure type is ``ACTIVE``, the field is populated with the HTTP response
     status code that caused the failure. For non-HTTP health checkers and network-level failures,
     the field defaults to ``0``. Fixes :issue:`40221`.
-- area: ext_authz
 - area: stat_sinks
   change: |
     Added :ref:`max_data_points_per_request
