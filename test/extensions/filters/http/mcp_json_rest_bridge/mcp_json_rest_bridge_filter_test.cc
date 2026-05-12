@@ -1297,18 +1297,24 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListPerRouteConfig) {
   tool2->mutable_tool_list_config()->set_description("Has\\nspecial \"chars\" & \\t stuff.");
   tool2->mutable_tool_list_config()->set_input_schema(
       R"({"type": "object", "properties": {"a": {"type": "string"}}})");
-  tool2->mutable_tool_list_config()->set_output_schema(
-      R"({"type": "string"})");
+  tool2->mutable_tool_list_config()->set_output_schema(R"({"type": "string"})");
+
+  override_config.mutable_tool_config()->mutable_tool_list_local();
 
   McpJsonRestBridgePerRouteConfig override(override_config);
 
   ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
       .WillByDefault(testing::Return(&override));
 
-  Http::TestRequestHeaderMapImpl headers{
-      {":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(testing::Return(Http::RequestHeaderMapOptRef(request_headers_)));
 
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+  request_headers_.setMethod("POST");
+  request_headers_.setPath("/mcp");
+  request_headers_.setContentType("application/json");
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
 
   std::string json = R"({"jsonrpc": "2.0", "method": "tools/list", "id": "req-1"})";
   Buffer::OwnedImpl data(json);

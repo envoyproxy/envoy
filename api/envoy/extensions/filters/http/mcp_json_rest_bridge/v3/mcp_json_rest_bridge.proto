@@ -147,6 +147,9 @@ message ServerInfo {
   google.protobuf.StringValue fallback_protocol_version = 3;
 }
 
+message ToolsListLocal {
+}
+
 // Configuration for the MCP tool capability of the server.
 message ServerToolConfig {
   // List of MCP tools configurations.
@@ -157,17 +160,22 @@ message ServerToolConfig {
   // Whether this server supports notifications for changes to the tool list.
   bool list_changed = 2;
 
-  // Optional configuration to transcode the tools/list requests to a standard HTTP request.
+  // Optional configuration for tools/list requests. If not set: The ``tools/list`` request is
+  // passed through. This allows subsequent extension or the backend itself to handle the tools/list
+  // request if they support it.
   //
   // Note: tools/list should be mapped to a GET request with an empty body.
-  //
-  // - If provided: The extension transcodes the request and forwards it down the filter chain.
-  //   The response (whether from an upstream backend, a configured ``direct_response``, or another
-  //   extension) MUST be a JSON body strictly matching the MCP ``ListToolsResult`` schema.
-  //   Ref: https://modelcontextprotocol.io/specification/2025-11-25/schema#listtoolsresult
-  // - If not provided: The ``tools/list`` request is passed through. This allows subsequent
-  //   extension or the backend itself to handle the tools/list request if they support it.
-  HttpRule tool_list_http_rule = 3;
+  oneof tool_list_config {
+    // Configuration to transcode the tools/list requests to a standard HTTP request. If provided:
+    // The extension transcodes the request and forwards it down the filter chain. The response
+    // (whether from an upstream backend, a configured ``direct_response``, or another extension)
+    // MUST be a JSON body strictly matching the MCP ``ListToolsResult`` schema. Ref:
+    // https://modelcontextprotocol.io/specification/2025-11-25/schema#listtoolsresult
+    HttpRule tool_list_http_rule = 3;
+
+    // If provided: The extension sends a local response.
+    ToolsListLocal tool_list_local = 4;
+  }
 }
 
 // Configuration for a specific MCP tool.

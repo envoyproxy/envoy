@@ -561,6 +561,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsListLocalResponse) {
                                           v3::HttpConnectionManager& hcm) {
     auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute per_route;
+    per_route.mutable_tool_config()->mutable_tool_list_local();
     auto* tool = per_route.mutable_tool_config()->add_tools();
     tool->set_name("my_local_tool");
     tool->mutable_tool_list_config()->set_title("My Local Tool");

@@ -160,12 +160,54 @@ McpJsonRestBridgeFilterConfig::getHttpRule(absl::string_view tool_name) const {
   return it->second;
 }
 
-absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
-McpJsonRestBridgeFilterConfig::getToolsListHttpRule() const {
-  if (!proto_config_.tool_config().has_tool_list_http_rule()) {
-    return absl::NotFoundError("tools_list_http_rule is not configured.");
+std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>
+McpJsonRestBridgeFilter::getCombinedTools() const {
+  absl::flat_hash_set<std::string> seen_tools;
+  std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>
+      combined;
+
+  const auto* per_route_config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<McpJsonRestBridgePerRouteConfig>(
+          decoder_callbacks_);
+
+  if (per_route_config) {
+    for (const auto& tool : per_route_config->toolConfig().tools()) {
+      if (seen_tools.insert(tool.name()).second) {
+        combined.push_back(&tool);
+      }
+    }
   }
-  return proto_config_.tool_config().tool_list_http_rule();
+
+  for (const auto& tool : config_->toolConfig().tools()) {
+    if (seen_tools.insert(tool.name()).second) {
+      combined.push_back(&tool);
+    }
+  }
+
+  return combined;
+}
+
+const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*
+McpJsonRestBridgeFilter::getTool(absl::string_view tool_name) const {
+  const auto* per_route_config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<McpJsonRestBridgePerRouteConfig>(
+          decoder_callbacks_);
+
+  if (per_route_config) {
+    for (const auto& tool : per_route_config->toolConfig().tools()) {
+      if (tool.name() == tool_name) {
+        return &tool;
+      }
+    }
+  }
+
+  for (const auto& tool : config_->toolConfig().tools()) {
+    if (tool.name() == tool_name) {
+      return &tool;
+    }
+  }
+
+  return nullptr;
 }
 
 Http::FilterHeadersStatus
@@ -331,8 +373,7 @@ Http::FilterTrailersStatus McpJsonRestBridgeFilter::encodeTrailers(Http::Respons
 
 // Send a local reply for a tools/list call. Construct the response body directly instead of
 // building a JSON object, to minimize copying.
-void McpJsonRestBridgeFilter::serveToolsListLocal(
-    const McpJsonRestBridgePerRouteConfig& per_route_config, const nlohmann::json& json_rpc) {
+void McpJsonRestBridgeFilter::serveToolsListLocal(const nlohmann::json& json_rpc) {
   std::string request_id_json = "null";
   if (json_rpc.contains("id")) {
     request_id_json = json_rpc["id"].dump();
@@ -344,37 +385,37 @@ void McpJsonRestBridgeFilter::serveToolsListLocal(
   response_data.add(",\"result\":{\"tools\":[");
 
   bool first_tool = true;
-  for (const auto& tool : per_route_config.toolConfig().tools()) {
+  for (const auto* tool : getCombinedTools()) {
     if (!first_tool) {
       response_data.add(",");
     }
     first_tool = false;
 
     response_data.add("{");
-    nlohmann::json name_json = tool.name();
+    nlohmann::json name_json = tool->name();
     response_data.add("\"name\":");
     response_data.add(name_json.dump());
 
-    if (!tool.tool_list_config().title().empty()) {
-      nlohmann::json title_json = tool.tool_list_config().title();
+    if (!tool->tool_list_config().title().empty()) {
+      nlohmann::json title_json = tool->tool_list_config().title();
       response_data.add(",\"title\":");
       response_data.add(title_json.dump());
     }
 
-    nlohmann::json desc_json = tool.tool_list_config().description();
+    nlohmann::json desc_json = tool->tool_list_config().description();
     response_data.add(",\"description\":");
     response_data.add(desc_json.dump());
 
     response_data.add(",\"inputSchema\":");
-    if (!tool.tool_list_config().input_schema().empty()) {
-      response_data.add(tool.tool_list_config().input_schema());
+    if (!tool->tool_list_config().input_schema().empty()) {
+      response_data.add(tool->tool_list_config().input_schema());
     } else {
       response_data.add("{\"type\":\"object\"}");
     }
 
-    if (!tool.tool_list_config().output_schema().empty()) {
+    if (!tool->tool_list_config().output_schema().empty()) {
       response_data.add(",\"outputSchema\":");
-      response_data.add(tool.tool_list_config().output_schema());
+      response_data.add(tool->tool_list_config().output_schema());
     }
 
     response_data.add("}");
@@ -407,19 +448,29 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc,
                       generateErrorJsonResponse(-32602, "Unsupported protocol version").dump());
     return;
   }
-  // TODO(guoyilin42): Consider supporting local response for tools/list in addition to the GET.
   if (method == McpConstants::Methods::TOOLS_LIST) {
-    mcp_operation_ = McpOperation::ToolsListLocal;
     const auto* per_route_config =
         Http::Utility::resolveMostSpecificPerFilterConfig<McpJsonRestBridgePerRouteConfig>(
             decoder_callbacks_);
-    if (per_route_config && !per_route_config->toolConfig().tools().empty()) {
-      serveToolsListLocal(*per_route_config, json_rpc);
-      return;
+
+    bool has_tool_list_http_rule = config_->toolConfig().has_tool_list_http_rule();
+    bool has_tool_list_local = config_->toolConfig().has_tool_list_local();
+    const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule* http_rule =
+        has_tool_list_http_rule ? &config_->toolConfig().tool_list_http_rule() : nullptr;
+
+    if (per_route_config) {
+      if (per_route_config->toolConfig().has_tool_list_http_rule()) {
+        has_tool_list_http_rule = true;
+        has_tool_list_local = false;
+        http_rule = &per_route_config->toolConfig().tool_list_http_rule();
+      } else if (per_route_config->toolConfig().has_tool_list_local()) {
+        has_tool_list_local = true;
+        has_tool_list_http_rule = false;
+        http_rule = nullptr;
+      }
     }
-    absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule> http_rule =
-        config_->getToolsListHttpRule();
-    if (http_rule.ok() && !http_rule->get().empty()) {
+
+    if (has_tool_list_http_rule) {
       mcp_operation_ = McpOperation::ToolsList;
       // We don't support pagination for the tools/list request for now.
       if (request_headers.has_value()) {
@@ -436,12 +487,17 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc,
       if (decoder_callbacks_->downstreamCallbacks().has_value()) {
         decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
       }
-    } else {
-      // TODO(guoyilin42): Handle this more elegantly to avoid an unnecessary copy here. This can
-      // be addressed later when the JSON parser is updated.
-      mcp_operation_ = McpOperation::Unspecified;
-      request_body_str_ = json_rpc.dump();
+      return;
+    } else if (has_tool_list_local && !getCombinedTools().empty()) {
+      mcp_operation_ = McpOperation::ToolsListLocal;
+      serveToolsListLocal(json_rpc);
+      return;
     }
+
+    // TODO(guoyilin42): Handle this more elegantly to avoid an unnecessary copy here. This can
+    // be addressed later when the JSON parser is updated.
+    mcp_operation_ = McpOperation::Unspecified;
+    request_body_str_ = json_rpc.dump();
   } else if (method == McpConstants::Methods::INITIALIZE) {
     mcp_operation_ = McpOperation::Initialization;
     if (json_rpc.contains(McpConstants::PARAMS_FIELD) &&
@@ -590,9 +646,8 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_
   }
   const auto& tool_name = name_it->get<std::string>();
 
-  absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule> http_rule =
-      config_->getHttpRule(tool_name);
-  if (!http_rule.ok()) {
+  const auto* tool = getTool(tool_name);
+  if (!tool || !tool->has_http_rule()) {
     ENVOY_STREAM_LOG(error, "Failed to get http rule for method: {}", *decoder_callbacks_,
                      tool_name);
     sendErrorResponse(Http::Code::BadRequest, "mcp_json_rest_bridge_filter_unknown_tool",
@@ -612,7 +667,7 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_
   const nlohmann::json empty_arguments = nlohmann::json::object();
   const nlohmann::json& arguments = arguments_it != params.end() ? *arguments_it : empty_arguments;
 
-  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(*http_rule, arguments);
+  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(tool->http_rule(), arguments);
   if (!http_request.ok()) {
     ENVOY_STREAM_LOG(error, "Failed to build HTTP request for method: {} with status: {}",
                      *decoder_callbacks_, tool_name, http_request.status());

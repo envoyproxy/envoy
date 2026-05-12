@@ -35,13 +35,16 @@ public:
 
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
   getHttpRule(absl::string_view tool_name) const;
-  absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
-  getToolsListHttpRule() const;
 
   const std::string& fallbackProtocolVersion() const { return fallback_protocol_version_; }
 
   uint32_t maxRequestBodySize() const { return max_request_body_size_; }
   uint32_t maxResponseBodySize() const { return max_response_body_size_; }
+
+  const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ServerToolConfig&
+  toolConfig() const {
+    return proto_config_.tool_config();
+  }
 
 private:
   absl::flat_hash_map<std::string,
@@ -95,8 +98,13 @@ private:
                        Http::RequestHeaderMapOptRef request_headers);
 
   // Serves a local tools/list response using the per-route configuration, bypassing upstream.
-  void serveToolsListLocal(const McpJsonRestBridgePerRouteConfig& per_route_config,
-                           const nlohmann::json& json_rpc);
+  void serveToolsListLocal(const nlohmann::json& json_rpc);
+
+  std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>
+  getCombinedTools() const;
+
+  const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*
+  getTool(absl::string_view tool_name) const;
 
   // Modifies the response from upstream into JSON-RPC response.
   void encodeJsonRpcData(Http::ResponseHeaderMapOptRef response_headers);
