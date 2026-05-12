@@ -144,7 +144,7 @@ private:
 
   uint64_t buffer_memory_allocated_ = 0;
   // Current bucket index where the account is being tracked in.
-  absl::optional<uint32_t> current_bucket_idx_{};
+  absl::optional<uint32_t> current_bucket_idx_;
 
   WatermarkBufferFactory* factory_ = nullptr;
 

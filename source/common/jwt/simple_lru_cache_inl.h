@@ -113,7 +113,7 @@ public:
 
   // This default constructed Iterator can only be assigned to or destroyed.
   // All other operations give undefined behaviour.
-  SimpleLRUCacheConstIterator() {}
+  SimpleLRUCacheConstIterator() = default;
   SimpleLRUCacheConstIterator(HashMapConstIterator it, HashMapConstIterator end);
   SimpleLRUCacheConstIterator& operator++();
 
@@ -193,7 +193,7 @@ template <typename Key, typename Value> const int64_t SimpleLRUCacheElem<Key, Va
 // behavior for that single call.
 class SimpleLRUCacheOptions {
 public:
-  SimpleLRUCacheOptions() : update_eviction_order_(true) {}
+  SimpleLRUCacheOptions() = default;
 
   // If false neither the last modified time (for based age eviction) nor
   // the element ordering (for LRU eviction) will be updated.
@@ -205,7 +205,7 @@ public:
   void set_update_eviction_order(bool v) { update_eviction_order_ = v; }
 
 private:
-  bool update_eviction_order_;
+  bool update_eviction_order_ = true;
 };
 
 // The MapType's value_type must be pair<const Key, Elem*>

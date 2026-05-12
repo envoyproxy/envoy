@@ -49,7 +49,7 @@ GrpcJsonReverseTranscoderConfig::GrpcJsonReverseTranscoderConfig(
   Protobuf::FileDescriptorSet descriptor_set;
   if (!transcoder_config.descriptor_path().empty()) {
     auto file_or_error = api.fileSystem().fileReadToEnd(transcoder_config.descriptor_path());
-    THROW_IF_NOT_OK(file_or_error.status());
+    THROW_IF_NOT_OK_REF(file_or_error.status());
     if (!descriptor_set.ParseFromString(file_or_error.value())) {
       throw EnvoyException("Unable to parse proto descriptor");
     }

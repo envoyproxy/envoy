@@ -46,7 +46,7 @@ public:
 
 private:
   MessageType message_type_{MessageType::Request};
-  absl::optional<ResponseStatus> response_status_{};
+  absl::optional<ResponseStatus> response_status_;
 
   int64_t request_id_{};
   size_t body_size_{};
