@@ -21,8 +21,8 @@ public:
       const Http::RequestHeaderMap& request_headers,
       UpstreamRequestFactoryPtr upstream_request_factory, absl::string_view cluster_name,
       Event::Dispatcher& dispatcher, SystemTime timestamp,
-      const std::shared_ptr<const CacheableResponseChecker> cacheable_response_checker_,
-      const std::shared_ptr<const CacheFilterStatsProvider> stats_provider_,
+      const std::shared_ptr<const CacheableResponseChecker> cacheable_response_checker,
+      const std::shared_ptr<const CacheFilterStatsProvider> stats_provider,
       bool ignore_request_cache_control_header);
 
   // Caches may modify the key according to local needs, though care must be

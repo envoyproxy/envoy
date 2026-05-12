@@ -39,6 +39,8 @@ jobs:
       check-name: mobile-perf
 
   build:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
       actions: read
       contents: read
@@ -85,6 +87,8 @@ jobs:
           target: size-main
 
   compare:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
       actions: read
       contents: read

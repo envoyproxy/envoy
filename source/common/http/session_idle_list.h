@@ -30,24 +30,30 @@ public:
   ~SessionIdleList() override = default;
 
   // Adds a session to the idle list.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void AddSession(IdleSessionInterface& session) override;
 
   // Removes a session from the idle list.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void RemoveSession(IdleSessionInterface& session) override;
 
   // Terminates idle sessions if they are eligible for termination. This is
   // called by the worker thread when the system is overloaded.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void MaybeTerminateIdleSessions(bool is_saturated) override;
 
   // Sets the minimum time before a session can be terminated.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void set_min_time_before_termination_allowed(absl::Duration min_time_before_termination_allowed) {
     min_time_before_termination_allowed_ = min_time_before_termination_allowed;
   };
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void set_max_sessions_to_terminate_in_one_round(int max_sessions_to_terminate_in_one_round) {
     max_sessions_to_terminate_in_one_round_ = max_sessions_to_terminate_in_one_round;
   }
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void set_max_sessions_to_terminate_in_one_round_when_saturated(
       int max_sessions_to_terminate_in_one_round_when_saturated) {
     max_sessions_to_terminate_in_one_round_when_saturated_ =
@@ -55,6 +61,7 @@ public:
   }
 
   // Sets whether to ignore the minimum time before a session can be terminated.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void set_ignore_min_time_before_termination_allowed(bool ignore) {
     ignore_min_time_before_termination_allowed_ = ignore;
   };
@@ -88,16 +95,21 @@ private:
     IdleSessions(const IdleSessions&) = delete;
     IdleSessions& operator=(const IdleSessions&) = delete;
 
+    // NOLINTNEXTLINE(readability-identifier-naming)
     IdleSessionInterface& next_session_to_terminate() { return *set_.begin()->session; }
 
+    // NOLINTNEXTLINE(readability-identifier-naming)
     void AddSessionToList(MonotonicTime enqueue_time, IdleSessionInterface& session);
 
+    // NOLINTNEXTLINE(readability-identifier-naming)
     void RemoveSessionFromList(IdleSessionInterface& session);
 
     // Get the time at which the session was added to the idle list.
+    // NOLINTNEXTLINE(readability-identifier-naming)
     MonotonicTime GetEnqueueTime(IdleSessionInterface& session) const;
 
     // Returns true if the session is in the map. For testing only.
+    // NOLINTNEXTLINE(readability-identifier-naming)
     bool ContainsForTest(IdleSessionInterface& session) const { return map_.contains(&session); }
 
     size_t size() const { return set_.size(); }
@@ -111,14 +123,17 @@ private:
     IdleSessionMap map_;
   };
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   const IdleSessions* idle_sessions() const { return &idle_sessions_; }
 
   // If this is > 0 then we do not terminate more than that many
   // sessions in a single attempt. This prevents us from doing too
   // much work in a single round. We want a small constant for this.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   size_t MaxSessionsToTerminateInOneRound(bool is_saturated) const;
 
   // Returns the minimum time before a session can be terminated.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   absl::Duration MinTimeBeforeTerminationAllowed() const;
 
   Event::Dispatcher& dispatcher_;

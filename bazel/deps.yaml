@@ -163,7 +163,7 @@ dd_trace_cpp:
   project_name: "Datadog C++ Tracing Library"
   project_desc: "Datadog distributed tracing for C++"
   project_url: "https://github.com/DataDog/dd-trace-cpp"
-  release_date: "2025-10-14"
+  release_date: "2026-05-06"
   use_category:
   - observability_ext
   extensions:

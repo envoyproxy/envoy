@@ -174,8 +174,7 @@ private:
   Grpc::AsyncClient<envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse,
                     envoy::service::health::v3::HealthCheckSpecifier>
       async_client_;
-  Grpc::AsyncStream<envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse>
-      stream_{};
+  Grpc::AsyncStream<envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse> stream_;
   Event::Dispatcher& dispatcher_;
   Server::Configuration::ServerFactoryContext& server_context_;
   Envoy::Stats::Store& store_stats_;

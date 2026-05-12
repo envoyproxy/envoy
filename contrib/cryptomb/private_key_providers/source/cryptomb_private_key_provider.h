@@ -50,7 +50,7 @@ private:
   Event::Dispatcher& dispatcher_;
   Ssl::PrivateKeyConnectionCallbacks& cb_;
   // For scheduling the callback to the next dispatcher cycle.
-  Event::SchedulableCallbackPtr schedulable_{};
+  Event::SchedulableCallbackPtr schedulable_;
 };
 
 // CryptoMbEcdsaContext is a CryptoMbContext which holds the extra ECDSA parameters and has
@@ -63,9 +63,9 @@ public:
   bool ecdsaInit(const uint8_t* in, size_t in_len);
 
   // ECDSA key.
-  bssl::UniquePtr<EC_KEY> ec_key_{};
+  bssl::UniquePtr<EC_KEY> ec_key_;
   // ECDSA context to create the ephemeral key k_.
-  bssl::UniquePtr<BN_CTX> ctx_{};
+  bssl::UniquePtr<BN_CTX> ctx_;
   BIGNUM* k_{};
   // ECDSA parameters, which will contain values whose memory is managed within
   // BoringSSL ECDSA key structure, so not wrapped in smart pointers.
@@ -88,7 +88,7 @@ public:
   bool rsaInit(const uint8_t* in, size_t in_len);
 
   // RSA key.
-  bssl::UniquePtr<RSA> rsa_{};
+  bssl::UniquePtr<RSA> rsa_;
   // RSA parameters. Const pointers, which will contain values whose memory is
   // managed within BoringSSL RSA key structure, so not wrapped in smart
   // pointers.
@@ -142,13 +142,13 @@ private:
   int key_size_{};
 
   // Thread local data slot.
-  ThreadLocal::SlotPtr slot_{};
+  ThreadLocal::SlotPtr slot_;
 
   // Crypto operations library interface.
-  IppCryptoSharedPtr ipp_{};
+  IppCryptoSharedPtr ipp_;
 
   // Timer to trigger queue processing if eight requests are not received in time.
-  Event::TimerPtr timer_{};
+  Event::TimerPtr timer_;
 
   CryptoMbStats& stats_;
 };
@@ -170,10 +170,10 @@ public:
   CryptoMbQueue& queue_;
   Event::Dispatcher& dispatcher_;
   Ssl::PrivateKeyConnectionCallbacks& cb_;
-  CryptoMbContextSharedPtr mb_ctx_{};
+  CryptoMbContextSharedPtr mb_ctx_;
 
 private:
-  Event::FileEventPtr ssl_async_event_{};
+  Event::FileEventPtr ssl_async_event_;
   bssl::UniquePtr<EVP_PKEY> pkey_;
 };
 
@@ -211,7 +211,7 @@ private:
     CryptoMbQueue queue_;
   };
 
-  Ssl::BoringSslPrivateKeyMethodSharedPtr method_{};
+  Ssl::BoringSslPrivateKeyMethodSharedPtr method_;
   Api::Api& api_;
   bssl::UniquePtr<EVP_PKEY> pkey_;
   enum KeyType key_type_;

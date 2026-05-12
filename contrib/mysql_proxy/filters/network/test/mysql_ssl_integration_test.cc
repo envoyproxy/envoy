@@ -22,6 +22,7 @@
 #include "openssl/evp.h"
 #include "openssl/pem.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -69,20 +70,23 @@ public:
 
   void initialize() override {
     EXPECT_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
-        .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
-                             std::function<void()> above_overflow) -> Buffer::Instance* {
-          client_write_buffer_ =
-              new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
-          ON_CALL(*client_write_buffer_, move(_))
-              .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
-          ON_CALL(*client_write_buffer_, drain(_))
-              .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
-          return client_write_buffer_;
-        }))
-        .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
-                             std::function<void()> above_overflow) -> Buffer::Instance* {
-          return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
-        }));
+        .WillOnce(
+            Invoke([&](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                       absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+              client_write_buffer_ = new NiceMock<MockWatermarkBuffer>(
+                  std::move(below_low), std::move(above_high), std::move(above_overflow));
+              ON_CALL(*client_write_buffer_, move(_))
+                  .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
+              ON_CALL(*client_write_buffer_, drain(_))
+                  .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
+              return client_write_buffer_;
+            }))
+        .WillOnce(
+            Invoke([&](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                       absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+              return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
+                                                 std::move(above_overflow));
+            }));
 
     // Create raw buffer and TLS transport socket factories.
     auto raw_config =
@@ -115,7 +119,7 @@ public:
   // Wait for the filter to process the SSL request and call startSecureTransport()
   // before initiating the client-side TLS handshake.
   void upgradeClientToTls() {
-    test_server_->waitForCounterGe("mysql.mysql_stats.upgraded_to_ssl", 1);
+    test_server_->waitForCounter("mysql.mysql_stats.upgraded_to_ssl", Ge(1));
     conn_->upgradeToTls(tls_context_->createTransportSocket(
         std::make_shared<Network::TransportSocketOptionsImpl>(
             absl::string_view(""), std::vector<std::string>(), std::vector<std::string>()),
@@ -180,6 +184,7 @@ public:
     PEM_write_bio_PUBKEY(bio.get(), pkey.get());
     char* pem_data;
     long pem_len = BIO_get_mem_data(bio.get(), &pem_data);
+    // NOLINTNEXTLINE(modernize-return-braced-init-list)
     return std::string(pem_data, pem_len);
   }
 
@@ -227,7 +232,7 @@ TEST_P(MySQLSSLIntegrationTest, CachingSha2FastAuth) {
 
   // Upstream receives the rewritten login in cleartext.
   std::string upstream_data;
-  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return data.length() > 0; },
+  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return !data.empty(); },
                                          &upstream_data));
 
   // 5. Server responds with fast auth success (seq=2, rewritten to seq=3 for client).
@@ -245,8 +250,8 @@ TEST_P(MySQLSSLIntegrationTest, CachingSha2FastAuth) {
   conn_->close(Network::ConnectionCloseType::FlushWrite);
   ASSERT_TRUE(fake_upstream->waitForDisconnect());
 
-  test_server_->waitForCounterGe("mysql.mysql_stats.upgraded_to_ssl", 1);
-  test_server_->waitForCounterGe("mysql.mysql_stats.login_attempts", 1);
+  test_server_->waitForCounter("mysql.mysql_stats.upgraded_to_ssl", Ge(1));
+  test_server_->waitForCounter("mysql.mysql_stats.login_attempts", Ge(1));
   EXPECT_EQ(test_server_->counter("mysql.mysql_stats.login_failures")->value(), 0);
 }
 
@@ -276,7 +281,7 @@ TEST_P(MySQLSSLIntegrationTest, CachingSha2FullAuthRsaMediation) {
   clientWrite(encodeClientLogin(CLIENT_PROTOCOL_41, "testuser", CHALLENGE_SEQ_NUM + 1));
 
   std::string upstream_data;
-  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return data.length() > 0; },
+  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return !data.empty(); },
                                          &upstream_data));
 
   // 4. Server: full auth required (seq=2).
@@ -331,8 +336,8 @@ TEST_P(MySQLSSLIntegrationTest, CachingSha2FullAuthRsaMediation) {
   conn_->close(Network::ConnectionCloseType::FlushWrite);
   ASSERT_TRUE(fake_upstream->waitForDisconnect());
 
-  test_server_->waitForCounterGe("mysql.mysql_stats.upgraded_to_ssl", 1);
-  test_server_->waitForCounterGe("mysql.mysql_stats.login_attempts", 1);
+  test_server_->waitForCounter("mysql.mysql_stats.upgraded_to_ssl", Ge(1));
+  test_server_->waitForCounter("mysql.mysql_stats.login_attempts", Ge(1));
   EXPECT_EQ(test_server_->counter("mysql.mysql_stats.login_failures")->value(), 0);
 }
 
@@ -355,7 +360,7 @@ TEST_P(MySQLSSLIntegrationTest, CachingSha2FullAuthRsaErr) {
   clientWrite(encodeClientLogin(CLIENT_PROTOCOL_41, "testuser", CHALLENGE_SEQ_NUM + 1));
 
   std::string upstream_data;
-  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return data.length() > 0; },
+  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return !data.empty(); },
                                          &upstream_data));
 
   // Full auth required.
@@ -396,7 +401,7 @@ TEST_P(MySQLSSLIntegrationTest, CachingSha2FullAuthRsaErr) {
   conn_->close(Network::ConnectionCloseType::FlushWrite);
   ASSERT_TRUE(fake_upstream->waitForDisconnect());
 
-  test_server_->waitForCounterGe("mysql.mysql_stats.login_failures", 1);
+  test_server_->waitForCounter("mysql.mysql_stats.login_failures", Ge(1));
 }
 
 /**
@@ -423,7 +428,7 @@ TEST_P(MySQLSSLIntegrationTest, SslTerminateLoginThenQuery) {
   clientWrite(encodeClientLogin(CLIENT_PROTOCOL_41, "testuser", CHALLENGE_SEQ_NUM + 1));
 
   std::string upstream_data;
-  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return data.length() > 0; },
+  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return !data.empty(); },
                                          &upstream_data));
 
   // Server OK (seq=2, rewritten to seq=3 for client).
@@ -449,9 +454,9 @@ TEST_P(MySQLSSLIntegrationTest, SslTerminateLoginThenQuery) {
   conn_->close(Network::ConnectionCloseType::FlushWrite);
   ASSERT_TRUE(fake_upstream->waitForDisconnect());
 
-  test_server_->waitForCounterGe("mysql.mysql_stats.upgraded_to_ssl", 1);
-  test_server_->waitForCounterGe("mysql.mysql_stats.login_attempts", 1);
-  test_server_->waitForCounterGe("mysql.mysql_stats.queries_parsed", 1);
+  test_server_->waitForCounter("mysql.mysql_stats.upgraded_to_ssl", Ge(1));
+  test_server_->waitForCounter("mysql.mysql_stats.login_attempts", Ge(1));
+  test_server_->waitForCounter("mysql.mysql_stats.queries_parsed", Ge(1));
 }
 
 /**
@@ -475,7 +480,7 @@ TEST_P(MySQLSSLIntegrationTest, CachingSha2FullAuthRsaThenQuery) {
   clientWrite(encodeClientLogin(CLIENT_PROTOCOL_41, "testuser", CHALLENGE_SEQ_NUM + 1));
 
   std::string upstream_data;
-  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return data.length() > 0; },
+  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return !data.empty(); },
                                          &upstream_data));
 
   // Full auth required → client password → RSA.
@@ -525,7 +530,7 @@ TEST_P(MySQLSSLIntegrationTest, CachingSha2FullAuthRsaThenQuery) {
   conn_->close(Network::ConnectionCloseType::FlushWrite);
   ASSERT_TRUE(fake_upstream->waitForDisconnect());
 
-  test_server_->waitForCounterGe("mysql.mysql_stats.queries_parsed", 1);
+  test_server_->waitForCounter("mysql.mysql_stats.queries_parsed", Ge(1));
 }
 
 // =============================================================================
@@ -587,7 +592,7 @@ TEST_P(MySQLDisableIntegrationTest, DisableBasicLogin) {
   tcp_client->close();
   ASSERT_TRUE(fake_upstream->waitForDisconnect());
 
-  test_server_->waitForCounterGe("mysql.mysql_stats.login_attempts", 1);
+  test_server_->waitForCounter("mysql.mysql_stats.login_attempts", Ge(1));
   EXPECT_EQ(test_server_->counter("mysql.mysql_stats.login_failures")->value(), 0);
 }
 
@@ -645,20 +650,23 @@ public:
 
   void initialize() override {
     EXPECT_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
-        .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
-                             std::function<void()> above_overflow) -> Buffer::Instance* {
-          client_write_buffer_ =
-              new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
-          ON_CALL(*client_write_buffer_, move(_))
-              .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
-          ON_CALL(*client_write_buffer_, drain(_))
-              .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
-          return client_write_buffer_;
-        }))
-        .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
-                                  std::function<void()> above_overflow) -> Buffer::Instance* {
-          return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
-        }));
+        .WillOnce(
+            Invoke([&](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                       absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+              client_write_buffer_ = new NiceMock<MockWatermarkBuffer>(
+                  std::move(below_low), std::move(above_high), std::move(above_overflow));
+              ON_CALL(*client_write_buffer_, move(_))
+                  .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
+              ON_CALL(*client_write_buffer_, drain(_))
+                  .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
+              return client_write_buffer_;
+            }))
+        .WillRepeatedly(
+            Invoke([](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                      absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+              return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
+                                                 std::move(above_overflow));
+            }));
 
     auto raw_config =
         std::make_unique<envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer>();
@@ -686,7 +694,7 @@ public:
   }
 
   void upgradeClientToTls() {
-    test_server_->waitForCounterGe("mysql.mysql_stats.upgraded_to_ssl", 1);
+    test_server_->waitForCounter("mysql.mysql_stats.upgraded_to_ssl", Ge(1));
     conn_->upgradeToTls(tls_context_->createTransportSocket(
         std::make_shared<Network::TransportSocketOptionsImpl>(
             absl::string_view(""), std::vector<std::string>(), std::vector<std::string>()),
@@ -748,6 +756,7 @@ public:
     PEM_write_bio_PUBKEY(bio.get(), pkey.get());
     char* pem_data;
     long pem_len = BIO_get_mem_data(bio.get(), &pem_data);
+    // NOLINTNEXTLINE(modernize-return-braced-init-list)
     return std::string(pem_data, pem_len);
   }
 
@@ -784,7 +793,7 @@ TEST_P(MySQLAllowIntegrationTest, AllowSslClientLogin) {
   clientWrite(encodeClientLogin(CLIENT_PROTOCOL_41, "testuser", CHALLENGE_SEQ_NUM + 1));
 
   std::string upstream_data;
-  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return data.length() > 0; },
+  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return !data.empty(); },
                                          &upstream_data));
 
   ASSERT_TRUE(fake_upstream->write(encodeClientLoginResp(MYSQL_RESP_OK)));
@@ -795,8 +804,8 @@ TEST_P(MySQLAllowIntegrationTest, AllowSslClientLogin) {
   conn_->close(Network::ConnectionCloseType::FlushWrite);
   ASSERT_TRUE(fake_upstream->waitForDisconnect());
 
-  test_server_->waitForCounterGe("mysql.mysql_stats.upgraded_to_ssl", 1);
-  test_server_->waitForCounterGe("mysql.mysql_stats.login_attempts", 1);
+  test_server_->waitForCounter("mysql.mysql_stats.upgraded_to_ssl", Ge(1));
+  test_server_->waitForCounter("mysql.mysql_stats.login_attempts", Ge(1));
 }
 
 /**
@@ -817,7 +826,7 @@ TEST_P(MySQLAllowIntegrationTest, AllowNonSslClientLogin) {
   clientWrite(encodeClientLogin(CLIENT_PROTOCOL_41, "testuser", CHALLENGE_SEQ_NUM));
 
   std::string upstream_data;
-  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return data.length() > 0; },
+  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return !data.empty(); },
                                          &upstream_data));
 
   ASSERT_TRUE(fake_upstream->write(encodeClientLoginResp(MYSQL_RESP_OK)));
@@ -828,7 +837,7 @@ TEST_P(MySQLAllowIntegrationTest, AllowNonSslClientLogin) {
   conn_->close(Network::ConnectionCloseType::FlushWrite);
   ASSERT_TRUE(fake_upstream->waitForDisconnect());
 
-  test_server_->waitForCounterGe("mysql.mysql_stats.login_attempts", 1);
+  test_server_->waitForCounter("mysql.mysql_stats.login_attempts", Ge(1));
   EXPECT_EQ(test_server_->counter("mysql.mysql_stats.upgraded_to_ssl")->value(), 0);
 }
 
@@ -853,7 +862,7 @@ TEST_P(MySQLAllowIntegrationTest, AllowSslFullAuthRsaMediation) {
   clientWrite(encodeClientLogin(CLIENT_PROTOCOL_41, "testuser", CHALLENGE_SEQ_NUM + 1));
 
   std::string upstream_data;
-  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return data.length() > 0; },
+  ASSERT_TRUE(fake_upstream->waitForData([](const std::string& data) { return !data.empty(); },
                                          &upstream_data));
 
   // Full auth required.
@@ -897,8 +906,8 @@ TEST_P(MySQLAllowIntegrationTest, AllowSslFullAuthRsaMediation) {
   conn_->close(Network::ConnectionCloseType::FlushWrite);
   ASSERT_TRUE(fake_upstream->waitForDisconnect());
 
-  test_server_->waitForCounterGe("mysql.mysql_stats.upgraded_to_ssl", 1);
-  test_server_->waitForCounterGe("mysql.mysql_stats.login_attempts", 1);
+  test_server_->waitForCounter("mysql.mysql_stats.upgraded_to_ssl", Ge(1));
+  test_server_->waitForCounter("mysql.mysql_stats.login_attempts", Ge(1));
   EXPECT_EQ(test_server_->counter("mysql.mysql_stats.login_failures")->value(), 0);
 }
 

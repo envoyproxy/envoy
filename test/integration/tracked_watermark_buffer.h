@@ -9,6 +9,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/container/node_hash_map.h"
+#include "absl/functional/any_invocable.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/synchronization/notification.h"
 
@@ -23,9 +24,11 @@ public:
       std::function<void(uint64_t watermark)> update_high_watermark,
       std::function<void(TrackedWatermarkBuffer*)> on_delete,
       std::function<void(BufferMemoryAccountSharedPtr&, TrackedWatermarkBuffer*)> on_bind,
-      std::function<void()> below_low_watermark, std::function<void()> above_high_watermark,
-      std::function<void()> above_overflow_watermark)
-      : WatermarkBuffer(below_low_watermark, above_high_watermark, above_overflow_watermark),
+      absl::AnyInvocable<void()> below_low_watermark,
+      absl::AnyInvocable<void()> above_high_watermark,
+      absl::AnyInvocable<void()> above_overflow_watermark)
+      : WatermarkBuffer(std::move(below_low_watermark), std::move(above_high_watermark),
+                        std::move(above_overflow_watermark)),
         update_size_(update_size), update_high_watermark_(update_high_watermark),
         on_delete_(on_delete), on_bind_(on_bind) {}
   ~TrackedWatermarkBuffer() override { on_delete_(this); }
@@ -66,9 +69,9 @@ public:
   TrackedWatermarkBufferFactory(uint32_t min_tracking_bytes);
   ~TrackedWatermarkBufferFactory() override;
   // Buffer::WatermarkFactory
-  Buffer::InstancePtr createBuffer(std::function<void()> below_low_watermark,
-                                   std::function<void()> above_high_watermark,
-                                   std::function<void()> above_overflow_watermark) override;
+  Buffer::InstancePtr createBuffer(absl::AnyInvocable<void()> below_low_watermark,
+                                   absl::AnyInvocable<void()> above_high_watermark,
+                                   absl::AnyInvocable<void()> above_overflow_watermark) override;
   BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler& reset_handler) override;
   void unregisterAccount(const BufferMemoryAccountSharedPtr& account,
                          absl::optional<uint32_t> current_class) override;

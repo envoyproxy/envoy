@@ -2,7 +2,6 @@
 
 #include "test/mocks/http/stateful_session.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/server/instance.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 

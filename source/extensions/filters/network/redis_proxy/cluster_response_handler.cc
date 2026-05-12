@@ -243,7 +243,7 @@ bool AllshardSameResponseHandler::areAllResponsesSame() const {
 
   const Common::Redis::RespValue* first_response = pending_responses_.front().get();
   for (const auto& response : pending_responses_) {
-    if (!response || !first_response || *(response.get()) != *first_response) {
+    if (!response || !first_response || *response != *first_response) {
       return false;
     }
   }
@@ -354,12 +354,15 @@ void ArrayAppendAggregateResponseHandler::processAggregatedResponses(
 void HelloResponseHandler::processAggregatedResponses(ClusterScopeCmdRequest& request) {
   // Helper to check if two RespValues are equal
   auto valuesEqual = [](const Common::Redis::RespValue& v1, const Common::Redis::RespValue& v2) {
-    if (v1.type() != v2.type())
+    if (v1.type() != v2.type()) {
       return false;
-    if (v1.type() == Common::Redis::RespType::BulkString)
+    }
+    if (v1.type() == Common::Redis::RespType::BulkString) {
       return v1.asString() == v2.asString();
-    if (v1.type() == Common::Redis::RespType::Integer)
+    }
+    if (v1.type() == Common::Redis::RespType::Integer) {
       return v1.asInteger() == v2.asInteger();
+    }
     return true;
   };
 

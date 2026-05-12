@@ -7,7 +7,6 @@
 #include "source/extensions/filters/http/header_to_metadata/header_to_metadata_filter.h"
 
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/server/instance.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
