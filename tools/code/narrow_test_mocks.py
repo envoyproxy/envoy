@@ -51,6 +51,17 @@ from typing import Dict, FrozenSet, List, Optional, Set, Tuple
 #       pulls in via transitive #includes.  Used to remove redundant entries
 #       from the include list.
 
+# ---------------------------------------------------------------------------
+# Safety flag
+# ---------------------------------------------------------------------------
+# When False (the default), _analyze_file() will skip any test file that
+# references *no* server Mock* symbol at all.  Such files may be silently
+# relying on the server-mock dep for its transitive includes (e.g.
+# Singleton::ManagerImpl, Api::createApiForTest, various TLS/HTTP context
+# libs, etc.).  Fully removing the dep in that case causes IWYU-style build
+# failures.  Set to True only when you explicitly want to allow full removal.
+ALLOW_FULL_REMOVAL: bool = False
+
 FAMILY_RULES: Dict = {
     "server": {
         "symbol_to_header_dep": {
@@ -469,6 +480,18 @@ def _analyze_file(
     # Find server-mock symbols actually referenced.
     known_symbols = set(s2hd.keys())
     used_server_symbols = all_symbols & known_symbols
+
+    # Safety: if no server Mock* symbols are referenced, the test may be
+    # relying on this dep solely for its transitive includes (e.g.
+    # Singleton::ManagerImpl, Api::createApiForTest).  Never fully remove
+    # the dep with no replacement unless ALLOW_FULL_REMOVAL is True.
+    if not used_server_symbols and not ALLOW_FULL_REMOVAL:
+        if verbose:
+            print(
+                f"  SKIP {filepath}: no server Mock* symbols referenced; "
+                "skipping to avoid removing dep relied upon for transitive includes"
+            )
+        return None
 
     # Map each used symbol to its canonical narrow header and dep.
     needed_headers: Set[str] = set()

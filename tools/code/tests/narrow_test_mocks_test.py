@@ -11,6 +11,7 @@ if _TOOLS_CODE_DIR not in sys.path:
     sys.path.insert(0, _TOOLS_CODE_DIR)
 
 from narrow_test_mocks import (  # noqa: E402
+    ALLOW_FULL_REMOVAL,
     FAMILY_RULES,
     _analyze_file,
     _rewrite_includes,
@@ -177,7 +178,7 @@ void foo() {
         self.assertIsNone(result)
 
     # ------------------------------------------------------------------
-    # Case 9: mocks.h + zero server-mock symbols → drop mocks.h
+    # Case 9: mocks.h + zero server-mock symbols → skip (ALLOW_FULL_REMOVAL=False)
     # ------------------------------------------------------------------
     def test_mocks_umbrella_no_server_symbols(self):
         content = """\
@@ -188,13 +189,13 @@ void foo() {
   testing::NiceMock<Network::MockConnection> conn;
 }
 """
+        # With ALLOW_FULL_REMOVAL=False (the default), _analyze_file must skip
+        # the file entirely to avoid removing a dep that may be needed for its
+        # transitive includes (e.g. Singleton::ManagerImpl, createApiForTest).
+        self.assertFalse(ALLOW_FULL_REMOVAL,
+                         "This test assumes ALLOW_FULL_REMOVAL is False")
         result = _analyze_file(content, SERVER_RULES)
-        self.assertIsNotNone(result)
-        old_inc, new_inc, old_dep, new_dep = result
-        self.assertIn("test/mocks/server/mocks.h", old_inc)
-        self.assertNotIn("test/mocks/server/mocks.h", new_inc)
-        # new_inc should be empty (no server symbols needed)
-        self.assertEqual(new_inc, set())
+        self.assertIsNone(result)
 
 
 class TestReduceIncludes(unittest.TestCase):
