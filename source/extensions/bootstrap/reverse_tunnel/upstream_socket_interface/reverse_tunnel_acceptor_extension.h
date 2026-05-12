@@ -73,7 +73,14 @@ public:
   Stats::Gauge* total_clusters_gauge_{nullptr};
   Stats::Gauge* total_nodes_gauge_{nullptr};
 
+  Stats::Histogram* cx_upgrade_time_{nullptr};
+  Stats::Histogram* cx_idle_expire_time_{nullptr};
+  Stats::Histogram* cx_post_upgrade_lifetime_{nullptr};
+
 private:
+  Stats::Histogram* getHistogram(absl::string_view name, Stats::Scope& stats_store,
+                                 absl::string_view stat_prefix);
+
   // Thread-local dispatcher.
   Event::Dispatcher& dispatcher_;
   // Thread-local socket manager.
@@ -233,6 +240,24 @@ public:
   void reportDisconnection(absl::string_view node_id, absl::string_view cluster_id) {
     if (reporter_ != nullptr) {
       reporter_->reportDisconnectionEvent(node_id, cluster_id);
+    }
+  }
+
+  uint64_t diffMs(Envoy::MonotonicTime& start, Envoy::MonotonicTime& end) {
+    ASSERT(start <= end, "Invalid the start of the period must be before the end");
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    return ms.count();
+  }
+
+  void updateIdleExpireTime(Envoy::MonotonicTime& start, Envoy::MonotonicTime& end) {
+    if (auto registry = getLocalRegistry()) {
+      registry->cx_idle_expire_time_->recordValue(diffMs(start, end));
+    }
+  }
+
+  void updateUpgradeTime(Envoy::MonotonicTime& start, Envoy::MonotonicTime& end) {
+    if (auto registry = getLocalRegistry()) {
+      registry->cx_upgrade_time_->recordValue(diffMs(start, end));
     }
   }
 

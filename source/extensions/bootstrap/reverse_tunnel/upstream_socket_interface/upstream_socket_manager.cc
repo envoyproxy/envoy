@@ -218,6 +218,9 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
   fd_to_ping_send_timer_map_[fd]->enableTimer(
       std::chrono::milliseconds(pingIntervalWithJitterMs()));
 
+  // Note the reverse connection start time.
+  fd_to_start_time_map_[fd] = dispatcher_.timeSource().monotonicTime();
+
   ENVOY_LOG(debug, "reverse_tunnel: added socket to maps. node: {} connection key: {} fd: {}.",
             scoped_node_id, connectionKey, fd);
 }
@@ -276,6 +279,13 @@ UpstreamSocketManager::getConnectionSocket(const std::string& node_id) {
           AccessLog::AccessLogType::UpstreamPoolReady, kLifecycleHandoffKindPoolToUpstream);
     }
   }
+
+  auto& start_time = fd_to_start_time_map_[fd];
+  auto end_time = dispatcher_.timeSource().monotonicTime();
+  if (auto extension = getUpstreamExtension()) {
+    extension->updateUpgradeTime(start_time, end_time);
+  }
+  fd_to_start_time_map_.erase(fd);
 
   return socket;
 }
@@ -435,6 +445,15 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
     fd_to_event_map_.erase(fd);
     fd_to_timer_map_.erase(fd);
     fd_to_ping_send_timer_map_.erase(fd);
+
+    // Update the cx_idle_expire_time_ histogram with this info.
+    auto& start_time = fd_to_start_time_map_[fd];
+    auto end_time = dispatcher_.timeSource().monotonicTime();
+    if (auto extension = getUpstreamExtension()) {
+      extension->updateIdleExpireTime(start_time, end_time);
+    }
+    fd_to_start_time_map_.erase(fd);
+
   } else {
     // FD not found in idle pool, this is a used socket.
     // The socket will be closed by the owning UpstreamReverseConnectionIOHandle.

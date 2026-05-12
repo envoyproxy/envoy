@@ -13,6 +13,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/reverse_tunnel_reporting_service/reporter.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
@@ -20,6 +21,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -61,6 +63,7 @@ protected:
   }
 
   void TearDown() override {
+    tls_registry_.reset();
     socket_manager_.reset();
     extension_.reset();
     socket_interface_.reset();
@@ -108,6 +111,12 @@ protected:
            socket_manager_->fd_to_socket_it_map_.end();
   }
   size_t getFDToSocketItMapSize() { return socket_manager_->fd_to_socket_it_map_.size(); }
+
+  bool verifyFDToStartTimeMap(int fd) {
+    return socket_manager_->fd_to_start_time_map_.find(fd) !=
+           socket_manager_->fd_to_start_time_map_.end();
+  }
+  size_t getFDToStartTimeMapSize() { return socket_manager_->fd_to_start_time_map_.size(); }
 
   uint32_t getNodeToActiveFdCount(const std::string& node_id) {
     auto it = socket_manager_->node_to_active_fd_count_.find(node_id);
@@ -203,6 +212,19 @@ protected:
     return (it != manager->node_to_conn_count_map_.end()) ? it->second : 0;
   }
 
+  // Wire up TLS so extension_->getLocalRegistry() returns a real registry,
+  // then swap in mock histograms for recording verification.
+  void setupTLSWithMockHistograms() {
+    tls_registry_ = std::make_shared<UpstreamSocketThreadLocal>(dispatcher_, extension_.get());
+    auto tls_slot = ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>::makeUnique(thread_local_);
+    thread_local_.setDispatcher(&dispatcher_);
+    tls_slot->set([registry = tls_registry_](Event::Dispatcher&) { return registry; });
+    extension_->setTestOnlyTLSRegistry(std::move(tls_slot));
+
+    tls_registry_->cx_upgrade_time_ = &mock_cx_upgrade_time_;
+    tls_registry_->cx_idle_expire_time_ = &mock_cx_idle_expire_time_;
+  }
+
   const Protobuf::Struct& lifecycleMetadata(const StreamInfo::StreamInfo& stream_info) const {
     return stream_info.dynamicMetadata().filter_metadata().at(
         std::string(kAccessLogMetadataNamespace));
@@ -233,6 +255,10 @@ protected:
   std::unique_ptr<ReverseTunnelAcceptor> socket_interface_;
   std::unique_ptr<ReverseTunnelAcceptorExtension> extension_;
   std::unique_ptr<UpstreamSocketManager> socket_manager_;
+
+  std::shared_ptr<UpstreamSocketThreadLocal> tls_registry_;
+  NiceMock<Stats::MockHistogram> mock_cx_upgrade_time_;
+  NiceMock<Stats::MockHistogram> mock_cx_idle_expire_time_;
 
   // Set log level to debug for this test class.
   LogLevelSetter log_level_setter_ = LogLevelSetter(spdlog::level::debug);
@@ -1672,6 +1698,88 @@ TEST_F(TestUpstreamSocketManagerRebalancing, MainThreadExcludedFromRebalancing) 
   // Verify connection count was incremented only on worker_0.
   EXPECT_EQ(getNodeConnCount(socket_manager1_.get(), node_id), 101);
   EXPECT_EQ(getNodeConnCount(main_socket_manager.get(), node_id), 0);
+}
+
+// --- Start-time map lifecycle tests ---
+
+TEST_F(TestUpstreamSocketManager, StartTimeMapPopulatedOnAdd) {
+  auto socket = createMockSocket(123);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval);
+
+  EXPECT_TRUE(verifyFDToStartTimeMap(123));
+  EXPECT_EQ(getFDToStartTimeMapSize(), 1);
+}
+
+TEST_F(TestUpstreamSocketManager, StartTimeMapCleanedOnGetConnectionSocket) {
+  auto socket = createMockSocket(123);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval);
+  EXPECT_EQ(getFDToStartTimeMapSize(), 1);
+
+  auto retrieved = socket_manager_->getConnectionSocket(node_id);
+  EXPECT_NE(retrieved, nullptr);
+  EXPECT_EQ(getFDToStartTimeMapSize(), 0);
+}
+
+TEST_F(TestUpstreamSocketManager, StartTimeMapCleanedOnMarkIdleSocketDead) {
+  auto socket = createMockSocket(123);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval);
+  EXPECT_EQ(getFDToStartTimeMapSize(), 1);
+
+  socket_manager_->markSocketDead(123);
+  EXPECT_EQ(getFDToStartTimeMapSize(), 0);
+}
+
+TEST_F(TestUpstreamSocketManager, StartTimeMapMultipleSocketsTrackedIndependently) {
+  auto socket1 = createMockSocket(100, "127.0.0.1:8080", "127.0.0.1:9090");
+  auto socket2 = createMockSocket(200, "127.0.0.1:8081", "127.0.0.1:9091");
+  const std::chrono::seconds ping_interval(30);
+
+  socket_manager_->addConnectionSocket("node1", "cluster1", std::move(socket1), ping_interval);
+  socket_manager_->addConnectionSocket("node2", "cluster2", std::move(socket2), ping_interval);
+
+  EXPECT_EQ(getFDToStartTimeMapSize(), 2);
+  EXPECT_TRUE(verifyFDToStartTimeMap(100));
+  EXPECT_TRUE(verifyFDToStartTimeMap(200));
+
+  socket_manager_->getConnectionSocket("node1");
+  EXPECT_EQ(getFDToStartTimeMapSize(), 1);
+  EXPECT_FALSE(verifyFDToStartTimeMap(100));
+  EXPECT_TRUE(verifyFDToStartTimeMap(200));
+}
+
+TEST_F(TestUpstreamSocketManager, UpgradeTimeHistogramRecordedOnGet) {
+  setupTLSWithMockHistograms();
+
+  auto socket = createMockSocket(123);
+  const std::chrono::seconds ping_interval(30);
+  socket_manager_->addConnectionSocket("node", "cluster", std::move(socket), ping_interval);
+
+  EXPECT_CALL(mock_cx_upgrade_time_, recordValue(_));
+  auto retrieved = socket_manager_->getConnectionSocket("node");
+  EXPECT_NE(retrieved, nullptr);
+}
+
+TEST_F(TestUpstreamSocketManager, IdleExpireTimeHistogramRecordedOnMarkDead) {
+  setupTLSWithMockHistograms();
+
+  auto socket = createMockSocket(123);
+  const std::chrono::seconds ping_interval(30);
+  socket_manager_->addConnectionSocket("node", "cluster", std::move(socket), ping_interval);
+
+  EXPECT_CALL(mock_cx_idle_expire_time_, recordValue(_));
+  socket_manager_->markSocketDead(123);
 }
 
 TEST_F(TestUpstreamSocketManager, SendPingEmitsIdlePingSentEvent) {
