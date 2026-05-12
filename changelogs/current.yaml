@@ -123,6 +123,13 @@ new_features:
   change: |
     Added ``envoy_dynamic_module_callback_is_validation_mode`` ABI callback that allows dynamic
     modules to check if the server is running in config validation mode.
+- area: dynamic_modules
+  change: |
+    Added ``envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes`` and
+    ``envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed`` ABI callbacks so
+    that a dynamic-module cluster's load balancer can read filter state set by an upstream HTTP
+    filter (or any other producer) when picking a host. The Rust SDK exposes these as
+    ``ClusterLbContext::get_filter_state_bytes`` and ``ClusterLbContext::get_filter_state_typed``.
 - area: access_log
   change: |
     Supported the singleton stats scope in the :ref:`stats access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>`.

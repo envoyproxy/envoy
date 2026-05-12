@@ -25,6 +25,7 @@ envoy_cc_library(
         "//source/common/http:message_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
+        "//source/common/router:string_accessor_lib",
         "//source/common/stats:utility_lib",
         "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:upstream_includes",
