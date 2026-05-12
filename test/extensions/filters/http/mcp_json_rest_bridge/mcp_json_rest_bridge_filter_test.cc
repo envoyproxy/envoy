@@ -1295,6 +1295,9 @@ TEST_F(McpJsonRestBridgeFilterTest, DynamicMetadataStoredWhenConfigured) {
     }
   )pb");
 
+  ON_CALL(decoder_callbacks_, filterConfigName())
+      .WillByDefault(Return("envoy.filters.http.mcp_json_rest_bridge"));
+
   EXPECT_CALL(decoder_callbacks_.stream_info_,
               setDynamicMetadata("envoy.filters.http.mcp_json_rest_bridge", _))
       .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {

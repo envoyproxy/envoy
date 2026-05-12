@@ -605,7 +605,8 @@ void McpJsonRestBridgeFilter::setDynamicMetadata(absl::string_view method,
       }
     }
   }
-  decoder_callbacks_->streamInfo().setDynamicMetadata(FilterName, metadata);
+  decoder_callbacks_->streamInfo().setDynamicMetadata(
+      std::string(decoder_callbacks_->filterConfigName()), metadata);
   ENVOY_STREAM_LOG(debug, "MCP JSON REST Bridge filter set dynamic metadata: {}",
                    *decoder_callbacks_, metadata.DebugString());
 }
