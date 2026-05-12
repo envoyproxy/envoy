@@ -109,7 +109,7 @@ class TestAsyncClientFetch(unittest.TestCase):
                 ]
                 responses = await asyncio.wait_for(
                     asyncio.gather(*tasks),
-                    timeout=30
+                    timeout=30,
                 )
 
                 for resp in responses:
