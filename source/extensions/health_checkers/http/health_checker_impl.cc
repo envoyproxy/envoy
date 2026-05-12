@@ -362,8 +362,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onGoAway(
 }
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HealthCheckResult
-HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
-  const uint64_t response_code = Http::Utility::getResponseStatus(*response_headers_);
+HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult(uint64_t response_code) {
   ENVOY_CONN_LOG(debug, "hc response_code={} health_flags={}", *client_, response_code,
                  HostUtility::healthFlagsToString(*host_));
 
@@ -428,7 +427,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
     host_->setLastHealthCheckHttpStatus(response_code);
   }
 
-  switch (healthCheckResult()) {
+  switch (healthCheckResult(response_code)) {
   case HealthCheckResult::Succeeded:
     handleSuccess(false);
     break;
