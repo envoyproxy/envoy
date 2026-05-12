@@ -426,8 +426,7 @@ TEST(RouteMatchContextTest, Cookies) {
   Http::TestRequestHeaderMapImpl headers{{":path", "/foo"}, {"cookie", "session=abc; user=xyz"}};
   RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
 
-  const absl::flat_hash_set<absl::string_view> names = {"session", "user"};
-  const auto& cookies = ctx.cookies(names);
+  const auto& cookies = ctx.cookies();
   EXPECT_EQ(cookies.at("session"), "abc");
   EXPECT_EQ(cookies.at("user"), "xyz");
   EXPECT_EQ(cookies.size(), 2);
@@ -437,8 +436,46 @@ TEST(RouteMatchContextTest, NoCookies) {
   Http::TestRequestHeaderMapImpl headers{{":path", "/foo"}};
   RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
 
-  const absl::flat_hash_set<absl::string_view> names;
-  EXPECT_TRUE(ctx.cookies(names).empty());
+  EXPECT_TRUE(ctx.cookies().empty());
+}
+
+// Regression test: route 1 checks cookie "session" (no match), route 2 checks
+// cookie "user" (match). With the old filtered-cache bug, route 1's evaluation
+// would cache only {"session": ...}, causing route 2 to miss "user" and fail.
+TEST_F(RouteMatcherTest, CookiesCachedAcrossDifferentNameSets) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: cookie
+    domains: ["*"]
+    routes:
+      - match:
+          prefix: "/"
+          cookies:
+            - name: session
+              string_match:
+                exact: expected
+        route: { cluster: session-cluster }
+      - match:
+          prefix: "/"
+          cookies:
+            - name: user
+              string_match:
+                exact: xyz
+        route: { cluster: user-cluster }
+      - match:
+          prefix: "/"
+        route: { cluster: default }
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters(
+      {"session-cluster", "user-cluster", "default"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  // session=other → route 1 misses; user=xyz → route 2 matches.
+  auto headers = genHeaders("www.example.com", "/foo", "GET");
+  headers.addCopy("cookie", "session=other; user=xyz");
+  EXPECT_EQ("user-cluster", config.route(headers, 0)->routeEntry()->clusterName());
 }
 
 TEST_F(RouteMatcherTest, TestConnectRoutes) {

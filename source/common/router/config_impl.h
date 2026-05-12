@@ -121,11 +121,9 @@ public:
     return is_grpc_;
   }
 
-  const absl::flat_hash_map<std::string, std::string>&
-  cookies(const absl::flat_hash_set<absl::string_view>& names) const {
+  const absl::flat_hash_map<std::string, std::string>& cookies() const {
     if (!cookies_computed_) {
-      cookies_ = Http::Utility::parseCookies(
-          headers_, [&names](absl::string_view key) { return names.contains(key); });
+      cookies_ = Http::Utility::parseCookies(headers_);
       cookies_computed_ = true;
     }
     return cookies_;
@@ -983,7 +981,6 @@ private:
   std::vector<Http::HeaderUtility::HeaderDataPtr> config_headers_;
   std::vector<ConfigUtility::QueryParameterMatcherPtr> config_query_parameters_;
   std::vector<ConfigUtility::CookieMatcherPtr> config_cookies_;
-  absl::flat_hash_set<absl::string_view> config_cookie_names_;
 
   UpgradeMap upgrade_map_;
   std::unique_ptr<const Http::HashPolicyImpl> hash_policy_;

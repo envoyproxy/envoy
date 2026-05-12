@@ -646,12 +646,6 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
     config_cookies_.push_back(
         std::make_unique<ConfigUtility::CookieMatcher>(cookie_matcher, factory_context));
   }
-  if (!config_cookies_.empty()) {
-    config_cookie_names_.reserve(config_cookies_.size());
-    for (const auto& matcher : config_cookies_) {
-      config_cookie_names_.insert(matcher->name());
-    }
-  }
 
   if (!route.route().hash_policy().empty()) {
     hash_policy_ = THROW_OR_RETURN_VALUE(
@@ -883,8 +877,7 @@ bool RouteEntryImplBase::matchRoute(const RouteMatchContext& route_match_context
   }
 
   if (!config_cookies_.empty()) {
-    if (!ConfigUtility::matchCookies(route_match_context.cookies(config_cookie_names_),
-                                     config_cookies_)) {
+    if (!ConfigUtility::matchCookies(route_match_context.cookies(), config_cookies_)) {
       return false;
     }
   }
