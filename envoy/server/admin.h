@@ -111,7 +111,7 @@ public:
     Type type_;
     std::string id_;   // HTML form ID and query-param name (JS var name rules).
     std::string help_; // Rendered into home-page HTML and /help text.
-    std::vector<absl::string_view> enum_choices_{};
+    std::vector<absl::string_view> enum_choices_;
   };
   using ParamDescriptorVec = std::vector<ParamDescriptor>;
 
@@ -163,7 +163,7 @@ public:
     const GenRequestFn handler_;
     const bool removable_;
     const bool mutates_server_state_;
-    const ParamDescriptorVec params_{};
+    const ParamDescriptorVec params_;
   };
 
   /**

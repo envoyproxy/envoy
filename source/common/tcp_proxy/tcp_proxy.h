@@ -757,7 +757,7 @@ protected:
   // the upstream connection is established.
   bool receive_before_connect_{false};
   bool early_data_end_stream_{false};
-  Buffer::OwnedImpl early_data_buffer_{};
+  Buffer::OwnedImpl early_data_buffer_;
   HttpStreamDecoderFilterCallbacks upstream_decoder_filter_callbacks_;
 
   // Connection establishment mode configuration.

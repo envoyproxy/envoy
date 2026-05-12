@@ -56,16 +56,19 @@ void ReverseTunnelAcceptorExtension::onServerInitialized(Server::Instance&) {
   // Create thread-local slot for the dispatcher and socket manager.
   tls_slot_ = ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>::makeUnique(context_.threadLocal());
 
+  const uint32_t ping_failure_threshold = ping_failure_threshold_;
+  const bool enable_tenant_isolation = enable_tenant_isolation_;
   // Set up the thread-local dispatcher and socket manager.
-  tls_slot_->set([this](Event::Dispatcher& dispatcher) {
-    auto tls = std::make_shared<UpstreamSocketThreadLocal>(dispatcher, this);
-    // Propagate configured miss threshold and tenant isolation into the socket manager.
-    if (tls->socketManager()) {
-      tls->socketManager()->setMissThreshold(ping_failure_threshold_);
-      tls->socketManager()->setTenantIsolationEnabled(enable_tenant_isolation_);
-    }
-    return tls;
-  });
+  tls_slot_->set(
+      [this, ping_failure_threshold, enable_tenant_isolation](Event::Dispatcher& dispatcher) {
+        auto tls = std::make_shared<UpstreamSocketThreadLocal>(dispatcher, this);
+        // Propagate configured miss threshold and tenant isolation into the socket manager.
+        if (auto* socket_manager = tls->socketManager(); socket_manager != nullptr) {
+          socket_manager->setMissThreshold(ping_failure_threshold);
+          socket_manager->setTenantIsolationEnabled(enable_tenant_isolation);
+        }
+        return tls;
+      });
 }
 
 // Get thread-local registry for the current thread.

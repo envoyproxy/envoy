@@ -188,10 +188,6 @@ DynamicModuleConfigFactory::createFilterFactoryFromRemoteSource(
   };
   auto async_state = std::make_shared<AsyncState>();
 
-  // Copies for use in the callback — the originals may not outlive the async fetch.
-  const FilterConfig proto_config_copy = proto_config;
-  const auto module_config_copy = module_config;
-
   // Use a weak_ptr in the callback to break the reference cycle:
   // async_state -> remote_provider -> callback -> async_state.
   std::weak_ptr<AsyncState> weak_state = async_state;
@@ -200,7 +196,7 @@ DynamicModuleConfigFactory::createFilterFactoryFromRemoteSource(
       context.clusterManager(), init_manager, module_config.module().remote(),
       context.mainThreadDispatcher(), context.api().randomGenerator(),
       /*allow_empty=*/true,
-      [weak_state, proto_config_copy, module_config_copy, &context,
+      [weak_state, proto_config_copy = proto_config, module_config_copy = module_config, &context,
        &scope](const std::string& data) {
         auto state = weak_state.lock();
         if (!state) {

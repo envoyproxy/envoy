@@ -17,7 +17,7 @@ namespace ReverseConnection {
 
 // ReverseTunnelAcceptor implementation
 ReverseTunnelAcceptor::ReverseTunnelAcceptor(Server::Configuration::ServerFactoryContext& context)
-    : extension_(nullptr), context_(&context) {
+    : context_(&context) {
   ENVOY_LOG(debug, "reverse_tunnel: created acceptor");
 }
 
