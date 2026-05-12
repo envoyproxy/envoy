@@ -38,25 +38,12 @@ Http::Code zeroHttpCode() {
   return static_cast<Http::Code>(0);
 }
 
-// Static response used for creating authorization ERROR responses.
+// Response used for creating authorization ERROR responses.
 // Note: status_code is left unset so the filter can use the configured status_on_error
 // configuration.
-const Response& errorResponse() {
-  CONSTRUCT_ON_FIRST_USE(Response, Response{CheckStatus::Error,
-                                            UnsafeHeaderVector{},
-                                            UnsafeHeaderVector{},
-                                            UnsafeHeaderVector{},
-                                            UnsafeHeaderVector{},
-                                            UnsafeHeaderVector{},
-                                            UnsafeHeaderVector{},
-                                            UnsafeHeaderVector{},
-                                            false,
-                                            {{}},
-                                            Http::Utility::QueryParamsVector{},
-                                            {},
-                                            EMPTY_STRING,
-                                            zeroHttpCode(),
-                                            Protobuf::Struct{}});
+ResponsePtr errorResponse() {
+  return std::make_unique<Response>(
+      Response{.status = CheckStatus::Error, .status_code = zeroHttpCode()});
 }
 
 // Static matcher that never matches anything. Used for matchers that are not applicable
@@ -376,7 +363,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   if (thread_local_cluster == nullptr) {
     // TODO(dio): Add stats related to this.
     ENVOY_LOG(debug, "ext_authz cluster '{}' does not exist", cluster);
-    callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
+    callbacks_->onComplete(errorResponse());
     callbacks_ = nullptr;
   } else {
     // Do not enforce a sampling decision on this span; instead keep the parent's sampling status.
@@ -409,7 +396,7 @@ void RawHttpClientImpl::onFailure(const Http::AsyncClient::Request&,
   // TODO(botengyao): handle different failure reasons.
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset ||
          reason == Http::AsyncClient::FailureReason::ExceedResponseBufferLimit);
-  callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
+  callbacks_->onComplete(errorResponse());
   callbacks_ = nullptr;
 }
 
@@ -432,7 +419,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
   // codes. A Forbidden response is sent to the client if the filter has not been configured with
   // failure_mode_allow.
   if (Http::CodeUtility::is5xx(status_code)) {
-    return std::make_unique<Response>(errorResponse());
+    return errorResponse();
   }
 
   // Extract headers-to-remove from the storage header coming from the
