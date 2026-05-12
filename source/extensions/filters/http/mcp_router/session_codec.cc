@@ -35,7 +35,7 @@ std::string SessionCodec::buildCompositeSessionId(
 }
 
 absl::StatusOr<SessionCodec::ParsedSession>
-SessionCodec::parseCompositeSessionId(const std::string& composite) {
+SessionCodec::parseCompositeSessionId(absl::string_view composite) {
   std::vector<absl::string_view> parts = absl::StrSplit(composite, '@');
   if (parts.size() != 3) {
     return absl::InvalidArgumentError("Invalid session format");

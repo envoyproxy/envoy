@@ -132,7 +132,7 @@ private:
    * @return Mount point string if line contains `cgroup` filesystem, nullopt if not a `cgroup`
    * line.
    */
-  static absl::optional<std::string> parseMountInfoLine(const std::string& line);
+  static absl::optional<std::string> parseMountInfoLine(absl::string_view line);
 
   /**
    * Unescapes octal escape sequences in paths from `/proc/self/mountinfo`.
