@@ -51,6 +51,16 @@ bug_fixes:
     Fixed a bug in load stats reporting where reports were dropped if only custom metrics or completed
     requests were present in a reporting interval. This behavioral change can be reverted by setting
     the runtime guard ``envoy.reloadable_features.report_load_for_non_zero_stats`` to ``false``.
+- area: spiffe_validator
+  change: |
+    Fixed a bug where if an invalid custom SAN matcher was configured it would later lead to a crash
+    when validating a certificate.
+- area: rbac
+  change: |
+    Fixed a bug in the :ref:`mTLS Authenticated <envoy_v3_api_msg_extensions.rbac.principals.mtls_authenticated.v3.Config>`
+    principal extension where if an invalid SAN matcher was configured, it would incorrectly match any
+    certificate in the allowed trust chain. Known bad configurations are an invalid ``OID`` when using
+    an ``OTHER_NAME``, or specifying a ``StringMatcher`` with an invalid configuration.
 - area: build
   change: |
     Fixed ``Illegal ambiguous match`` error when building contrib targets with ``--config=aws-lc-fips``
