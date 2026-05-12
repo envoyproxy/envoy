@@ -72,6 +72,7 @@ class EchoTestServer:
     def __init__(self, ip, port):
         self._server = HTTPServer((ip, port), EchoServerHandler)
         self._server_thread = Thread(target=self._server.serve_forever, daemon=True)
+        self._server.socket.settimeout(10.0)
 
     def start(self):
         self._server_thread.start()
