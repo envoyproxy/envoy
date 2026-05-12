@@ -71,7 +71,8 @@ ClientCodecFrameInjector::ClientCodecFrameInjector() : CodecFrameInjector("serve
       .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
         ENVOY_LOG_MISC(
             trace, "client write: {}",
-            Hex::encode(static_cast<uint8_t*>(data.linearize(data.length())), data.length()));
+            Hex::encode(absl::Span<const uint8_t>(static_cast<uint8_t*>(data.linearize(data.length())),
+                                                  data.length())));
         data.drain(data.length());
       }));
 }
@@ -87,7 +88,8 @@ ServerCodecFrameInjector::ServerCodecFrameInjector() : CodecFrameInjector("clien
       .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
         ENVOY_LOG_MISC(
             trace, "server write: {}",
-            Hex::encode(static_cast<uint8_t*>(data.linearize(data.length())), data.length()));
+            Hex::encode(absl::Span<const uint8_t>(static_cast<uint8_t*>(data.linearize(data.length())),
+                                                  data.length())));
         data.drain(data.length());
       }));
 }
@@ -95,7 +97,8 @@ ServerCodecFrameInjector::ServerCodecFrameInjector() : CodecFrameInjector("clien
 Http::Status CodecFrameInjector::write(const Frame& frame, Http::Connection& connection) {
   Buffer::OwnedImpl buffer;
   buffer.add(frame.data(), frame.size());
-  ENVOY_LOG_MISC(trace, "{} write: {}", injector_name_, Hex::encode(frame.data(), frame.size()));
+  ENVOY_LOG_MISC(trace, "{} write: {}", injector_name_,
+                 Hex::encode(absl::Span<const uint8_t>(frame.data(), frame.size())));
   auto status = Http::okStatus();
   while (buffer.length() > 0 && status.ok()) {
     status = connection.dispatch(buffer);

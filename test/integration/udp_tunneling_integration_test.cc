@@ -443,7 +443,8 @@ typed_config:
 
   const std::string encapsulate(std::string datagram) {
     uint8_t capsule_length = datagram.length() + 1;
-    return absl::HexStringToBytes(absl::StrCat("00", Hex::encode(&capsule_length, 1), "00")) +
+    return absl::HexStringToBytes(absl::StrCat(
+               "00", Hex::encode(absl::Span<const uint8_t>(&capsule_length, 1)), "00")) +
            datagram;
   }
 

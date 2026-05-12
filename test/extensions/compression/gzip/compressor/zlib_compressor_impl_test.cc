@@ -21,17 +21,18 @@ void expectValidFlushedBuffer(const Buffer::OwnedImpl& output_buffer) {
   Buffer::RawSliceVector compressed_slices = output_buffer.getRawSlices();
   const uint64_t num_comp_slices = compressed_slices.size();
 
-  const std::string header_hex_str = Hex::encode(
-      reinterpret_cast<unsigned char*>(compressed_slices[0].mem_), compressed_slices[0].len_);
+  const std::string header_hex_str =
+      Hex::encode(absl::Span<const uint8_t>(reinterpret_cast<const uint8_t*>(compressed_slices[0].mem_),
+                                            compressed_slices[0].len_));
 
   // HEADER 0x1f = 31 (window_bits)
   EXPECT_EQ("1f8b", header_hex_str.substr(0, 4));
   // CM 0x8 = deflate (compression method)
   EXPECT_EQ("08", header_hex_str.substr(4, 2));
 
-  const std::string footer_hex_str =
-      Hex::encode(reinterpret_cast<unsigned char*>(compressed_slices[num_comp_slices - 1].mem_),
-                  compressed_slices[num_comp_slices - 1].len_);
+  const std::string footer_hex_str = Hex::encode(absl::Span<const uint8_t>(
+      reinterpret_cast<const uint8_t*>(compressed_slices[num_comp_slices - 1].mem_),
+      compressed_slices[num_comp_slices - 1].len_));
   // FOOTER four-byte sequence (sync flush)
   EXPECT_EQ("0000ffff", footer_hex_str.substr(footer_hex_str.size() - 8, 10));
 }
@@ -47,16 +48,17 @@ void expectValidFinishedBuffer(const Buffer::OwnedImpl& output_buffer, const uin
   Buffer::RawSliceVector compressed_slices = output_buffer.getRawSlices();
   const uint64_t num_comp_slices = compressed_slices.size();
 
-  const std::string header_hex_str = Hex::encode(
-      reinterpret_cast<unsigned char*>(compressed_slices[0].mem_), compressed_slices[0].len_);
+  const std::string header_hex_str =
+      Hex::encode(absl::Span<const uint8_t>(reinterpret_cast<const uint8_t*>(compressed_slices[0].mem_),
+                                            compressed_slices[0].len_));
   // HEADER 0x1f = 31 (window_bits)
   EXPECT_EQ("1f8b", header_hex_str.substr(0, 4));
   // CM 0x8 = deflate (compression method)
   EXPECT_EQ("08", header_hex_str.substr(4, 2));
 
-  const std::string footer_bytes_str =
-      Hex::encode(reinterpret_cast<unsigned char*>(compressed_slices[num_comp_slices - 1].mem_),
-                  compressed_slices[num_comp_slices - 1].len_);
+  const std::string footer_bytes_str = Hex::encode(absl::Span<const uint8_t>(
+      reinterpret_cast<const uint8_t*>(compressed_slices[num_comp_slices - 1].mem_),
+      compressed_slices[num_comp_slices - 1].len_));
 
   // A valid finished compressed buffer should have trailer with input size in it.
   expectEqualInputSize(footer_bytes_str, input_size);

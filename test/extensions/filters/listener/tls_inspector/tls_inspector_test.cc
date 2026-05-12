@@ -387,7 +387,8 @@ void TlsInspectorTest::testJA3(const std::string& fingerprint, bool expect_serve
   if (hash.empty()) {
     uint8_t buf[MD5_DIGEST_LENGTH];
     MD5(reinterpret_cast<const uint8_t*>(fingerprint.data()), fingerprint.size(), buf);
-    EXPECT_CALL(socket_, setJA3Hash(absl::string_view(Envoy::Hex::encode(buf, MD5_DIGEST_LENGTH))));
+    EXPECT_CALL(socket_, setJA3Hash(absl::string_view(
+                             Envoy::Hex::encode(absl::Span<const uint8_t>(buf, MD5_DIGEST_LENGTH)))));
   } else {
     EXPECT_CALL(socket_, setJA3Hash(absl::string_view(hash)));
   }
@@ -441,7 +442,7 @@ TEST_P(TlsInspectorTest, ConnectionJA3HashGREASE) {
 
   uint8_t buf[MD5_DIGEST_LENGTH];
   MD5(reinterpret_cast<const uint8_t*>(fingerprint.data()), fingerprint.size(), buf);
-  std::string hash = Envoy::Hex::encode(buf, MD5_DIGEST_LENGTH);
+  std::string hash = Envoy::Hex::encode(absl::Span<const uint8_t>(buf, MD5_DIGEST_LENGTH));
 
   testJA3(fingerprint_with_grease, true, hash);
 }
