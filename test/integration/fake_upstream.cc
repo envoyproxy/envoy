@@ -761,8 +761,8 @@ bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
   if (http_type_ == Http::CodecType::HTTP3) {
     quic_connections_.push_back(std::make_unique<FakeHttpConnection>(
         *this, consumeConnection(/*defer_read_enable=*/true), http_type_, time_system_,
-        config_.max_request_headers_kb_,
-        config_.max_request_headers_count_, config_.headers_with_underscores_action_));
+        config_.max_request_headers_kb_, config_.max_request_headers_count_,
+        config_.headers_with_underscores_action_));
     quic_connections_.back()->initialize();
   }
   return true;
@@ -833,8 +833,8 @@ AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_di
     absl::MutexLock lock(lock_);
     connection = std::make_unique<FakeHttpConnection>(
         *this, consumeConnection(/*defer_read_enable=*/true), http_type_, time_system_,
-        config_.max_request_headers_kb_,
-        config_.max_request_headers_count_, config_.headers_with_underscores_action_);
+        config_.max_request_headers_kb_, config_.max_request_headers_count_,
+        config_.headers_with_underscores_action_);
     connection->initialize();
     return AssertionSuccess();
   });
@@ -870,10 +870,9 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
       EXPECT_TRUE(upstream.runOnDispatcherThreadAndWait([&]() {
         absl::MutexLock lock(upstream.lock_);
         connection = std::make_unique<FakeHttpConnection>(
-            upstream, upstream.consumeConnection(/*defer_read_enable=*/true),
-            upstream.http_type_, upstream.timeSystem(),
-            Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
-            envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+            upstream, upstream.consumeConnection(/*defer_read_enable=*/true), upstream.http_type_,
+            upstream.timeSystem(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
+            Http::DEFAULT_MAX_HEADERS_COUNT, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
         connection->initialize();
         return AssertionSuccess();
       }));
