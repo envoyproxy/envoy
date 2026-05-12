@@ -8,7 +8,6 @@
 #include "test/mocks/http/conn_pool.h"
 #include "test/mocks/network/connection.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/server/instance.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"

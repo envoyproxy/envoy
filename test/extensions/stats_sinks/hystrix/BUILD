@@ -40,7 +40,7 @@ envoy_extension_cc_test(
         "//source/extensions/stat_sinks/hystrix:hystrix_lib",
         "//test/mocks/server:admin_mocks",
         "//test/mocks/server:admin_stream_mocks",
-        "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",

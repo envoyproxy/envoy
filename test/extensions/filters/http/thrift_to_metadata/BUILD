@@ -21,7 +21,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/thrift_proxy:protocol_converter_lib",
         "//test/common/buffer:utility_lib",
         "//test/common/stream_info:test_util",
-        "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
     ],
 )

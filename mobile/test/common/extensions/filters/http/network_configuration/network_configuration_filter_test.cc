@@ -3,7 +3,6 @@
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"

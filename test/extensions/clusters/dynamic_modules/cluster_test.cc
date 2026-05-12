@@ -12,7 +12,7 @@
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/connection.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"

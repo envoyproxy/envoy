@@ -32,7 +32,7 @@ envoy_cc_test(
         "//source/common/ssl/matching:inputs_lib",
         "//test/common/matcher:test_utility_lib",
         "//test/mocks/matcher:matcher_mocks",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:test_time_lib",
     ],
 )

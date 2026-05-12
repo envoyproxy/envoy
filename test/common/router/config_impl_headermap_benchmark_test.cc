@@ -5,7 +5,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/router/config_impl.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "benchmark/benchmark.h"

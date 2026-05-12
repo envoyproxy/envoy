@@ -18,7 +18,7 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/matching/common_inputs/environment_variable:config",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 

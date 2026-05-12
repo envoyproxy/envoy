@@ -5,7 +5,6 @@
 #include "source/extensions/filters/http/ratelimit/config.h"
 
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/server/instance.h"
 
 #include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
