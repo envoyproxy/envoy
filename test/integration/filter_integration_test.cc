@@ -573,7 +573,7 @@ TEST_P(FilterIntegrationTest, HittingEncoderFilterLimit) {
   // sure this path does standard HCM header transformations.
   EXPECT_TRUE(response->headers().Date() != nullptr);
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("500"));
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_5xx", 1);
+  test_server_->waitForCounter("http.config_test.downstream_rq_5xx", testing::Eq(1));
 }
 
 TEST_P(FilterIntegrationTest, LocalReplyDuringEncoding) {

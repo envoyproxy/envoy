@@ -61,9 +61,9 @@ Rule::Rule(const ProtoRule& rule, Regex::Engine& regex_engine, absl::Status& cre
   // Initialize the shared pointer.
   if (!rule.header().empty()) {
     selector_ =
-        std::make_shared<HeaderValueSelector>(Http::LowerCaseString(rule.header()), rule.remove());
+        std::make_unique<HeaderValueSelector>(Http::LowerCaseString(rule.header()), rule.remove());
   } else if (!rule.cookie().empty()) {
-    selector_ = std::make_shared<CookieValueSelector>(rule.cookie());
+    selector_ = std::make_unique<CookieValueSelector>(rule.cookie());
   } else {
     creation_status =
         absl::InvalidArgumentError("One of Cookie or Header option needs to be specified");

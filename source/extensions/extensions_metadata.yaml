@@ -417,6 +417,7 @@ envoy.filters.http.composite:
   status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.composite.v3.Composite
+  - envoy.extensions.filters.http.composite.v3.CompositePerRoute
 envoy.filters.http.compressor:
   categories:
   - envoy.filters.http

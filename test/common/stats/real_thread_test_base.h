@@ -3,7 +3,6 @@
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/thread_local/thread_local_impl.h"
 
-#include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/real_threads_test_helper.h"
 
 namespace Envoy {

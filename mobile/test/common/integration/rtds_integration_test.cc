@@ -5,11 +5,14 @@
 
 #include "test/common/integration/xds_integration_test.h"
 #include "test/test_common/environment.h"
+#include "extension_registry.h"
+#include "source/common/tls/server_context_impl.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -34,12 +37,16 @@ public:
     xds_builder.addRuntimeDiscoveryService("some_rtds_resource", /*timeout_in_seconds=*/1)
         .setSslRootCerts(getUpstreamCert());
     builder_.setXds(std::move(xds_builder));
+    builder_.setLogLevel(Logger::Logger::trace);
+    builder_.enforceTrustChainVerification(false);
     XdsIntegrationTest::createEnvoy();
   }
 
-  void SetUp() override { initialize(); }
+  void SetUp() override {}
 
   void runReloadTest() {
+    initialize();
+
     stream_ = createNewStream(createDefaultStreamCallbacks());
     // Send a request on the data plane.
     stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
@@ -73,7 +80,7 @@ public:
         Config::getTypeUrl<envoy::service::runtime::v3::Runtime>(), {some_rtds_resource},
         {some_rtds_resource}, {}, "1");
     // Wait until the RTDS updates from the DiscoveryResponse have been applied.
-    ASSERT_TRUE(waitForCounterGe(load_success_counter, load_success_value + 1));
+    ASSERT_TRUE(waitForCounter(load_success_counter, Ge(load_success_value + 1)));
 
     // Verify that the Runtime config values are from the RTDS response.
     EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
@@ -89,7 +96,7 @@ public:
         Config::getTypeUrl<envoy::service::runtime::v3::Runtime>(), {some_rtds_resource},
         {some_rtds_resource}, {}, "2", {{"test", Protobuf::Any()}});
     // Wait until the RTDS updates from the DiscoveryResponse have been applied.
-    ASSERT_TRUE(waitForCounterGe(load_success_counter, load_success_value + 1));
+    ASSERT_TRUE(waitForCounter(load_success_counter, Ge(load_success_value + 1)));
 
     // Verify that the Runtime config values are from the RTDS response.
     EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
@@ -110,6 +117,11 @@ TEST_P(RtdsIntegrationTest, RtdsReloadWithDfpMixedScheme) {
 
 TEST_P(RtdsIntegrationTest, RtdsReloadWithoutDfpMixedScheme) {
   TestScopedStaticReloadableFeaturesRuntime scoped_runtime({{"async_host_selection", false}});
+  runReloadTest();
+}
+
+TEST_P(RtdsIntegrationTest, RtdsReloadWithWorkerThread) {
+  builder_.enableWorkerThread(true);
   runReloadTest();
 }
 

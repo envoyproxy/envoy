@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "source/extensions/filters/http/proto_message_extraction/extraction_util/extraction_util.h"
+#include "source/extensions/filters/http/proto_message_extraction/extraction_util/proto_extractor.h"
 
 #include "test/proto/extraction.pb.h"
 #include "test/test_common/environment.h"
@@ -671,6 +672,12 @@ TEST_F(ExtractionUtilTest, ExtractStringFieldValue_OK_DefaultValue) {
       IsOkAndHolds(""));
 }
 
+TEST_F(ExtractionUtilTest, ExtractStringFieldValue_OK_RepeatedStringLeafNode) {
+  EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_, "repeated_strings",
+                                      test_request_raw_proto_),
+              IsOkAndHolds("repeated-string-0"));
+}
+
 TEST_F(ExtractionUtilTest, ExtractStringFieldValue_Error_EmptyPath) {
   EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_, "", test_request_raw_proto_),
               StatusIs(absl::StatusCode::kInvalidArgument));
@@ -686,12 +693,6 @@ TEST_F(ExtractionUtilTest, ExtractStringFieldValue_Error_UnknownField) {
       StatusIs(absl::StatusCode::kInvalidArgument));
 
   EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_, "unknown1.unknown2",
-                                      test_request_raw_proto_),
-              StatusIs(absl::StatusCode::kInvalidArgument));
-}
-
-TEST_F(ExtractionUtilTest, ExtractStringFieldValue_Error_RepeatedStringLeafNode) {
-  EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_, "repeated_strings",
                                       test_request_raw_proto_),
               StatusIs(absl::StatusCode::kInvalidArgument));
 }
@@ -1080,6 +1081,61 @@ INSTANTIATE_TEST_SUITE_P(
     [](const ::testing::TestParamInfo<ExtractLocationIdFromResourceNameTest::ParamType>& info) {
       return info.param.test_name;
     });
+
+// When the extracted field value is non-empty, both target_resource (callback=false) and
+// target_resource_callback (callback=true) should be populated.
+TEST_F(ExtractionUtilTest, GetTargetResourceOrTargetResourceCallback_NonEmptyValue) {
+  FieldPathToExtractType field_policies = {{"bucket.name", {ExtractedMessageDirective::EXTRACT}}};
+  auto extractor = ProtoExtractor::Create(ScrubberContext::kTestScrubbing, type_helper_.get(),
+                                          request_type_, field_policies);
+
+  ExtractedMessageMetadata metadata = extractor->ExtractMessage(test_request_raw_proto_);
+
+  // callback=false path: target_resource is set.
+  ASSERT_TRUE(metadata.target_resource.has_value());
+  EXPECT_EQ(metadata.target_resource.value(), "test-bucket");
+
+  // callback=true path with non-empty value: target_resource_callback is set.
+  ASSERT_TRUE(metadata.target_resource_callback.has_value());
+  EXPECT_EQ(metadata.target_resource_callback.value(), "test-bucket");
+}
+
+// When the extracted field value is empty, callback=false sets target_resource to "" and
+// callback=true falls through to the else branch (also setting target_resource to ""), so
+// target_resource_callback remains unset.
+TEST_F(ExtractionUtilTest, GetTargetResourceOrTargetResourceCallback_EmptyValue) {
+  test_request_proto_.mutable_bucket()->clear_name();
+  test_request_raw_proto_ = CordMessageData(test_request_proto_.SerializeAsCord());
+
+  FieldPathToExtractType field_policies = {{"bucket.name", {ExtractedMessageDirective::EXTRACT}}};
+  auto extractor = ProtoExtractor::Create(ScrubberContext::kTestScrubbing, type_helper_.get(),
+                                          request_type_, field_policies);
+
+  ExtractedMessageMetadata metadata = extractor->ExtractMessage(test_request_raw_proto_);
+
+  // callback=false path: target_resource is set with an empty string.
+  ASSERT_TRUE(metadata.target_resource.has_value());
+  EXPECT_EQ(metadata.target_resource.value(), "");
+
+  // callback=true path with empty value hits the else branch, so target_resource_callback is NOT
+  // set.
+  EXPECT_FALSE(metadata.target_resource_callback.has_value());
+}
+
+// When ExtractStringFieldValue fails (field is not a string type), the function returns early
+// without setting either target_resource or target_resource_callback.
+TEST_F(ExtractionUtilTest, GetTargetResourceOrTargetResourceCallback_ExtractionFailure) {
+  // "bucket.ratio" is a float field (not a string), so ExtractStringFieldValue will fail,
+  // but it is a valid field path for the scrubber so no crash occurs.
+  FieldPathToExtractType field_policies = {{"bucket.ratio", {ExtractedMessageDirective::EXTRACT}}};
+  auto extractor = ProtoExtractor::Create(ScrubberContext::kTestScrubbing, type_helper_.get(),
+                                          request_type_, field_policies);
+
+  ExtractedMessageMetadata metadata = extractor->ExtractMessage(test_request_raw_proto_);
+
+  EXPECT_FALSE(metadata.target_resource.has_value());
+  EXPECT_FALSE(metadata.target_resource_callback.has_value());
+}
 
 } // namespace
 } // namespace ProtoMessageExtraction

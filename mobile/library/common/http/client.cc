@@ -6,6 +6,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
+#include "source/common/quic/scone_state.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
@@ -303,7 +304,7 @@ void Client::DirectStreamCallbacks::onError() {
   // error occurs (e.g., timeout)?
 
   if (explicit_flow_control_ && (hasDataToSend() || response_trailers_.get())) {
-    ENVOY_LOG(debug, "[S{}] defering remote reset stream due to explicit flow control",
+    ENVOY_LOG(debug, "[S{}] deferring remote reset stream due to explicit flow control",
               direct_stream_.stream_handle_);
     if (direct_stream_.parent_.getStream(direct_stream_.stream_handle_,
                                          GetStreamFilters::AllowOnlyForOpenStreams)) {
@@ -408,6 +409,18 @@ void Client::DirectStream::saveLatestStreamIntel() {
   }
   stream_intel_.stream_id = static_cast<uint64_t>(stream_handle_);
   stream_intel_.attempt_count = info.attemptCount().value_or(0);
+
+  const auto* scone_state =
+      info.filterState().getDataReadOnly<Envoy::Quic::SconeState>(Envoy::Quic::SconeStateKey);
+  if (scone_state && scone_state->scone_max_kbps.has_value() &&
+      scone_state->timestamp_ms.has_value()) {
+    // Only update if the new timestamp from scone_state is greater than the last recorded
+    // timestamp.
+    if (scone_state->timestamp_ms.value() > stream_intel_.scone_timestamp_ms) {
+      stream_intel_.scone_max_kbps = scone_state->scone_max_kbps.value();
+      stream_intel_.scone_timestamp_ms = scone_state->timestamp_ms.value();
+    }
+  }
 }
 
 void Client::DirectStream::saveFinalStreamIntel() {
@@ -459,7 +472,7 @@ void Client::DirectStreamCallbacks::latchError() {
       !resp_code_details.empty()) {
     error_msg_details.push_back(absl::StrCat("det: ", std::move(resp_code_details)));
   }
-  // The format of the error message propogated to callbacks is:
+  // The format of the error message propagated to callbacks is:
   // rc: {value}|ec: {value}|rsp_flags: {value}|http: {value}|det: {value}
   //
   // Where envoy_rc is the HTTP response code from StreamInfo::responseCode().
@@ -534,6 +547,13 @@ void Client::DirectStream::dumpState(std::ostream&, int indent_level) const {
 void Client::startStream(envoy_stream_t new_stream_handle, EnvoyStreamCallbacks&& stream_callbacks,
                          bool explicit_flow_control) {
   ASSERT(dispatcher_.isThreadSafe());
+
+  if (!api_listener_) {
+    ENVOY_LOG(debug, "[S{}] stream can't be started after shutdown.", new_stream_handle);
+    stream_callbacks.on_cancel_({}, {});
+    return;
+  }
+
   Client::DirectStreamSharedPtr direct_stream{new DirectStream(new_stream_handle, *this)};
   direct_stream->explicit_flow_control_ = explicit_flow_control;
   direct_stream->callbacks_ =

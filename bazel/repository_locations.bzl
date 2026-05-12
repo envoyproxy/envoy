@@ -46,8 +46,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.3.33",
-        sha256 = "0d35c07b06033cebf50c767b0acdd31f215035785da4ecb9fbc02c23f2d53805",
+        version = "0.3.34",
+        sha256 = "49bb8b3cff6b28d74f9cd18ca9b3607cf4a5b2e81ecb57a04a9bc3fe94ac7ac8",
         strip_prefix = "toolshed-bazel-v{version}",
         urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),
@@ -290,8 +290,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/SkyAPM/cpp2sky/archive/v{version}.tar.gz"],
     ),
     dd_trace_cpp = dict(
-        version = "2.0.0",
-        sha256 = "e4a0dabc3e186ce99c71685178448f93c501577102cdc50ddbf12cbaaba54713",
+        version = "2.1.0",
+        sha256 = "8152fb69e61518a5b55ecb96edcbb19585f8950b6f070ac98ebd0b6dd6177492",
         strip_prefix = "dd-trace-cpp-{version}",
         urls = ["https://github.com/DataDog/dd-trace-cpp/archive/v{version}.tar.gz"],
     ),
@@ -553,8 +553,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     quiche = dict(
-        version = "ba02ee8fc1c0ab27d55f6bbb9e1ac7c9705c3e69",
-        sha256 = "670791b54c8f73eafbb25226b27132bad5d336b70f8543be9d39bbfd9dc7222c",
+        version = "13384c955f76e3a2b157f7b613ce6c02d594770f",
+        sha256 = "a2310cab30a46e9ccf533cd10632d44852d46784f4192e202cc53b6e353d5876",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
     ),
@@ -589,8 +589,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/re2/releases/download/{version}/re2-{version}.zip"],
     ),
     kafka_source = dict(
-        version = "3.9.1",
-        sha256 = "c15b82940cfb9f67fce909d8600dc8bcfc42d2795da2c26c149d03a627f85234",
+        version = "3.9.2",
+        sha256 = "085bbee8208fea6d1cb22498afa6ffc3835037516643208f705420564b49b80e",
         strip_prefix = "kafka-{version}/clients/src/main/resources/common/message",
         urls = ["https://github.com/apache/kafka/archive/{version}.zip"],
     ),
@@ -677,8 +677,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/maxmind/libmaxminddb/releases/download/{version}/libmaxminddb-{version}.tar.gz"],
     ),
     thrift = dict(
-        version = "0.22.0",
-        sha256 = "c4649c5879dd56c88f1e7a1c03e0fbfcc3b2a2872fb81616bffba5aa8a225a37",
+        version = "0.23.0",
+        sha256 = "087ba9517063c8252e9e7fb4e3891a9fd85e20af80e0309e2276eff16791d75c",
         strip_prefix = "thrift-{version}/lib/py/",
         urls = ["https://github.com/apache/thrift/archive/refs/tags/v{version}.tar.gz"],
     ),
@@ -708,14 +708,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/ninja-build/ninja/archive/refs/tags/v{version}.tar.gz"],
     ),
     fips_cmake_linux_x86_64 = dict(
-        version = "4.3.1",
-        sha256 = "208d76804009cbe8ec9aea0aa052c857c6e59bd289b43b9941c99324dc78b1d8",
+        version = "4.3.2",
+        sha256 = "791ae3604841ca03cb3889a3ad89165346e4b180ae3448efd4b0caa9ef46d245",
         strip_prefix = "cmake-{version}-linux-x86_64",
         urls = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}-linux-x86_64.tar.gz"],
     ),
     fips_cmake_linux_aarch64 = dict(
-        version = "4.3.1",
-        sha256 = "2c0eca48ac7d0e3a8b4120b801d48903b0630c8ff1e73c44a90398a300dec1ac",
+        version = "4.3.2",
+        sha256 = "377079ab739f5765176f427609d9a2015b756ea20d5cba908d279c3731a2f481",
         strip_prefix = "cmake-{version}-linux-aarch64",
         urls = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}-linux-aarch64.tar.gz"],
     ),
@@ -730,6 +730,24 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "c958a1fe1b361391db163a485e21f5f228142d6f8b584f6bef89b26f66dc5b23",
         strip_prefix = "go",
         urls = ["https://dl.google.com/go/go{version}.linux-arm64.tar.gz"],
+    ),
+    fips_clang_ppc64le = dict(
+        version = "14.0.0",
+        sha256 = "2d504c4920885c86b306358846178bc2232dfac83b47c3b1d05861a8162980e6",
+        strip_prefix = "clang+llvm-{version}-powerpc64le-linux-ubuntu-18.04",
+        urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/clang+llvm-{version}-powerpc64le-linux-ubuntu-18.04.tar.xz"],
+    ),
+    fips_go_ppc64le = dict(
+        version = "1.26.2",
+        sha256 = "62b7645dd2404052535617c59e91cf03c7aa28e332dbaddbe4c0d7de7bcc6736",
+        strip_prefix = "go",
+        urls = ["https://dl.google.com/go/go{version}.linux-ppc64le.tar.gz"],
+    ),
+    fips_cmake_src = dict(
+        version = "4.3.2",
+        sha256 = "b0231eb39b3c3cabdc568c619df78208a7bd95ea10c9b2236d61218bac1b367d",
+        strip_prefix = "cmake-{version}",
+        urls = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}.tar.gz"],
     ),
 )
 

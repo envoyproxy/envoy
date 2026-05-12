@@ -18,11 +18,8 @@
 #include "source/extensions/tracers/datadog/tracer.h"
 
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/local_info/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/tracer_factory.h"
 #include "test/mocks/server/tracer_factory_context.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"

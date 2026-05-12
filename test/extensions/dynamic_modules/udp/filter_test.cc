@@ -25,6 +25,8 @@ public:
 
     filter_config_ = std::make_shared<DynamicModuleUdpListenerFilterConfig>(
         proto_config, std::move(dynamic_module.value()), *stats_.rootScope());
+    // Re-open stat creation so tests can call `define_*` from the test thread.
+    filter_config_->stat_creation_frozen_ = false;
   }
 
   Stats::IsolatedStoreImpl stats_;

@@ -3,6 +3,8 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/stats.h"
 
+#include "gmock/gmock.h"
+
 namespace Envoy {
 
 // Abstract interface for IntegrationTestServer stats methods.
@@ -11,26 +13,15 @@ public:
   virtual ~IntegrationTestServerStats() = default;
 
   /**
-   * Wait for a counter to == a given value.
+   * Wait for a counter to match a given value matcher.
    * @param name counter name.
-   * @param value target value.
+   * @param value_matcher supplies the value matcher for the counter.
    * @param timeout amount of time to wait before asserting false, or 0 for no timeout.
    * @param dispatcher the dispatcher to run non-blocking periodically during the wait.
    */
-  virtual void
-  waitForCounterEq(const std::string& name, uint64_t value,
-                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),
-                   Event::Dispatcher* dispatcher = nullptr) PURE;
-
-  /**
-   * Wait for a counter to >= a given value.
-   * @param name counter name.
-   * @param value target value.
-   * @param timeout amount of time to wait before asserting false, or 0 for no timeout.
-   */
-  virtual void
-  waitForCounterGe(const std::string& name, uint64_t value,
-                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) PURE;
+  virtual void waitForCounter(const std::string& name, testing::Matcher<uint64_t> value_matcher,
+                              std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),
+                              Event::Dispatcher* dispatcher = nullptr) PURE;
 
   /**
    * Wait for a counter to exist.
@@ -65,24 +56,14 @@ public:
       std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) PURE;
 
   /**
-   * Wait for a gauge to >= a given value.
+   * Wait for a gauge to match a given value matcher.
    * @param name gauge name.
-   * @param value target value.
+   * @param value_matcher supplies the value matcher for the gauge.
    * @param timeout amount of time to wait before asserting false, or 0 for no timeout.
    */
   virtual void
-  waitForGaugeGe(const std::string& name, uint64_t value,
-                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) PURE;
-
-  /**
-   * Wait for a gauge to == a given value.
-   * @param name gauge name.
-   * @param value target value.
-   * @param timeout amount of time to wait before asserting false, or 0 for no timeout.
-   */
-  virtual void
-  waitForGaugeEq(const std::string& name, uint64_t value,
-                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) PURE;
+  waitForGauge(const std::string& name, testing::Matcher<uint64_t> value_matcher,
+               std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) PURE;
 
   /**
    * Wait for a gauge to be destroyed. Note that MockStatStore does not destroy stat.

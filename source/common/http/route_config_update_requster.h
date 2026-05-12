@@ -45,9 +45,7 @@ private:
 class RdsRouteConfigUpdateRequesterFactory : public RouteConfigUpdateRequesterFactory {
 public:
   // UntypedFactory
-  virtual std::string name() const override {
-    return "envoy.route_config_update_requester.default";
-  }
+  std::string name() const override { return "envoy.route_config_update_requester.default"; }
 
   std::unique_ptr<RouteConfigUpdateRequester>
   createRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider) override {

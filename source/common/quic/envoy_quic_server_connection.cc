@@ -66,6 +66,7 @@ bool EnvoyQuicServerConnection::OnPacketHeader(const quic::QuicPacketHeader& hea
   return true;
 }
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 void EnvoyQuicServerConnection::OnWritePacketDone(size_t packet_size,
                                                   const quic::WriteResult& /*result*/) {
   if (hasConnectionStats()) {

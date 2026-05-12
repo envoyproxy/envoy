@@ -43,11 +43,15 @@ void DynamicModuleListenerFilter::destroy() {
     config_->on_listener_filter_destroy_(in_module_filter_);
     in_module_filter_ = nullptr;
   }
+  // Clear the cached dispatcher so any concurrent foreign-thread `commit()` short-circuits.
+  cached_dispatcher_.store(nullptr, std::memory_order_release);
   destroyed_ = true;
 }
 
 Network::FilterStatus DynamicModuleListenerFilter::onAccept(Network::ListenerFilterCallbacks& cb) {
   callbacks_ = &cb;
+  // Publish the worker dispatcher for cross-thread `commit()`; see `dispatcher()`.
+  cached_dispatcher_.store(&cb.dispatcher(), std::memory_order_release);
 
   const std::string& worker_name = cb.dispatcher().name();
   auto pos = worker_name.find_first_of('_');

@@ -32,7 +32,6 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
@@ -264,6 +263,74 @@ TEST_P(TcpProxyTest, HalfCloseProxy) {
 
   EXPECT_CALL(filter_callbacks_.connection_, close(_));
   upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_P(TcpProxyTest, DrainCloseIgnoredWhenFlagDisabled) {
+  setup(1);
+
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All)).Times(0);
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _)).Times(0);
+
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), false));
+  filter_->onData(buffer, false);
+}
+
+TEST_P(TcpProxyTest, DrainCloseAfterDownstreamRead) {
+  auto config = defaultConfig();
+  config.mutable_check_drain_close()->set_value(true);
+  setup(1, config);
+
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
+      .WillOnce(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWrite,
+                    StreamInfo::LocalCloseReasons::get().TcpProxyDrainClose));
+
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), false));
+  filter_->onData(buffer, false);
+}
+
+TEST_P(TcpProxyTest, DrainCloseUsesInboundOnlyScopeForInboundListeners) {
+  auto config = defaultConfig();
+  config.mutable_check_drain_close()->set_value(true);
+  EXPECT_CALL(factory_context_.listener_info_, direction())
+      .WillRepeatedly(Return(envoy::config::core::v3::TrafficDirection::INBOUND));
+  setup(1, config);
+
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::InboundOnly))
+      .WillOnce(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWrite,
+                    StreamInfo::LocalCloseReasons::get().TcpProxyDrainClose));
+
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), false));
+  filter_->onData(buffer, false);
+}
+
+TEST_P(TcpProxyTest, DrainCloseAfterDownstreamWrite) {
+  auto config = defaultConfig();
+  config.mutable_check_drain_close()->set_value(true);
+  setup(1, config);
+
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("world");
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
+      .WillOnce(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&buffer), false));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWrite,
+                    StreamInfo::LocalCloseReasons::get().TcpProxyDrainClose));
+  upstream_callbacks_->onUpstreamData(buffer, false);
 }
 
 // Test with an explicitly configured upstream.
@@ -857,7 +924,7 @@ TEST_P(TcpProxyTest, ReceiveBeforeConnectBuffersOnEarlyData) {
   filter_->onData(early_data_buffer, /*end_stream=*/false);
 
   // Now when upstream connection is established, early buffer will be sent.
-  EXPECT_CALL(*upstream_connections_.at(0), write(BufferStringEqual(early_data), false));
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferString(early_data), false));
   raiseEventUpstreamConnected(/*conn_index=*/0);
 
   // Any further communications between client and server can resume normally.
@@ -881,8 +948,7 @@ TEST_P(TcpProxyTest, ReceiveBeforeConnectEarlyDataWithEndStream) {
   filter_->onData(early_data_buffer, /*end_stream=*/true);
 
   // Now when upstream connection is established, early buffer will be sent.
-  EXPECT_CALL(*upstream_connections_.at(0),
-              write(BufferStringEqual(early_data), /*end_stream*/ true));
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferString(early_data), /*end_stream*/ true));
   raiseEventUpstreamConnected(/*conn_index=*/0);
 
   // Any further communications between client and server can resume normally.
@@ -904,7 +970,7 @@ TEST_P(TcpProxyTest, ReceiveBeforeConnectDownstreamClosesWithoutData) {
 
   // When upstream connection is established, the end_stream signal should be sent even though
   // the buffer is empty. This ensures the upstream connection is properly closed.
-  EXPECT_CALL(*upstream_connections_.at(0), write(BufferStringEqual(""), /*end_stream*/ true));
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferString(""), /*end_stream*/ true));
   raiseEventUpstreamConnected(/*conn_index=*/0);
 }
 
@@ -919,7 +985,7 @@ TEST_P(TcpProxyTest, ReceiveBeforeConnectEmptyBufferWithEndStream) {
   filter_->onData(empty_buffer, /*end_stream=*/true);
 
   // When upstream connection is established, end_stream should be propagated.
-  EXPECT_CALL(*upstream_connections_.at(0), write(BufferStringEqual(""), /*end_stream*/ true));
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferString(""), /*end_stream*/ true));
   raiseEventUpstreamConnected(/*conn_index=*/0);
 
   // Upstream can still send data back.

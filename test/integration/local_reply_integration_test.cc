@@ -49,19 +49,11 @@ body_format:
   initialize();
 
   std::string expected_body;
-  if (GetParam().upstream_protocol == Http::CodecType::HTTP3) {
-    expected_body = R"({
-      "level": "TRACE",
-      "user_agent": null,
-      "response_body": "upstream connect error or disconnect/reset before headers. reset reason: connection termination, transport failure reason: QUIC_NO_ERROR|FROM_PEER|Closed by application"
-  })";
-  } else {
-    expected_body = R"({
+  expected_body = R"({
       "level": "TRACE",
       "user_agent": null,
       "response_body": "upstream connect error or disconnect/reset before headers. reset reason: connection termination"
   })";
-  }
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -92,11 +84,7 @@ body_format:
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("application/json-custom", response->headers().ContentType()->value().getStringView());
-  if (GetParam().upstream_protocol == Http::CodecType::HTTP3) {
-    EXPECT_EQ("223", response->headers().ContentLength()->value().getStringView());
-  } else {
-    EXPECT_EQ("150", response->headers().ContentLength()->value().getStringView());
-  }
+  EXPECT_EQ("150", response->headers().ContentLength()->value().getStringView());
   EXPECT_EQ("550", response->headers().Status()->value().getStringView());
   if (GetParam().upstream_protocol == Http::CodecType::HTTP3) {
     EXPECT_EQ(response->headers().getProxyStatusValue(),
@@ -186,17 +174,10 @@ body_format:
 
   std::string expected_grpc_message;
 
-  if (GetParam().upstream_protocol == Http::CodecType::HTTP3) {
-    expected_grpc_message = R"({
-      "code": 503,
-      "message":"upstream connect error or disconnect/reset before headers. reset reason: connection termination, transport failure reason: QUIC_NO_ERROR|FROM_PEER|Closed by application"
-})";
-  } else {
-    expected_grpc_message = R"({
+  expected_grpc_message = R"({
       "code": 503,
       "message":"upstream connect error or disconnect/reset before headers. reset reason: connection termination"
 })";
-  }
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -247,17 +228,9 @@ body_format:
   initialize();
 
   // Note: there should be an %0A at the end.
-  std::string expected_grpc_message;
-  if (GetParam().upstream_protocol == Http::CodecType::HTTP3) {
-    expected_grpc_message =
-        "upstream connect error or disconnect/reset before headers. reset reason:"
-        " connection termination, transport failure reason: "
-        "QUIC_NO_ERROR|FROM_PEER|Closed by application:503:path=/package.service/method%0A";
-  } else {
-    expected_grpc_message =
-        "upstream connect error or disconnect/reset before headers. reset reason:"
-        " connection termination:503:path=/package.service/method%0A";
-  }
+  std::string expected_grpc_message =
+      "upstream connect error or disconnect/reset before headers. reset reason:"
+      " connection termination:503:path=/package.service/method%0A";
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -411,20 +384,11 @@ body_format:
   setLocalReplyConfig(yaml);
   initialize();
 
-  std::string expected_body;
-  if (GetParam().upstream_protocol == Http::CodecType::HTTP3) {
-    expected_body = R"({
-      "level": "TRACE",
-      "response_flags": "UC",
-      "response_body": "upstream connect error or disconnect/reset before headers. reset reason: connection termination, transport failure reason: QUIC_NO_ERROR|FROM_PEER|Closed by application"
-      })";
-  } else {
-    expected_body = R"({
+  std::string expected_body = R"({
       "level": "TRACE",
       "response_flags": "UC",
       "response_body": "upstream connect error or disconnect/reset before headers. reset reason: connection termination"
       })";
-  }
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -455,11 +419,7 @@ body_format:
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("application/json", response->headers().ContentType()->value().getStringView());
-  if (GetParam().upstream_protocol == Http::CodecType::HTTP3) {
-    EXPECT_EQ("227", response->headers().ContentLength()->value().getStringView());
-  } else {
-    EXPECT_EQ("154", response->headers().ContentLength()->value().getStringView());
-  }
+  EXPECT_EQ("154", response->headers().ContentLength()->value().getStringView());
   EXPECT_EQ("503", response->headers().Status()->value().getStringView());
   // Check if returned json is same as expected
   EXPECT_TRUE(TestUtility::jsonStringEqual(response->body(), expected_body));
@@ -523,13 +483,45 @@ mappers:
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("text/plain", response->headers().ContentType()->value().getStringView());
-  if (GetParam().upstream_protocol == Http::CodecType::HTTP3) {
-    EXPECT_EQ("168", response->headers().ContentLength()->value().getStringView());
-  } else {
-    EXPECT_EQ("95", response->headers().ContentLength()->value().getStringView());
-  }
+  EXPECT_EQ("95", response->headers().ContentLength()->value().getStringView());
 
   EXPECT_EQ("551", response->headers().Status()->value().getStringView());
+
+  EXPECT_EQ(response->body(), "upstream connect error or disconnect/reset before headers. reset "
+                              "reason: connection termination");
+}
+
+// When the runtime guard is disabled, transport failure reason should appear in the response body.
+TEST_P(LocalReplyIntegrationTest, TransportFailureReasonInBodyWhenRuntimeGuardDisabled) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.hide_transport_failure_reason_in_response_body", "false");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "sni.lyft.com"}});
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  ASSERT_TRUE(response->waitForEndStream());
+
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    codec_client_->close();
+  }
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
 
   if (GetParam().upstream_protocol == Http::CodecType::HTTP3) {
     EXPECT_EQ(response->body(), "upstream connect error or disconnect/reset before headers. reset "

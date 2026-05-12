@@ -66,7 +66,7 @@ public:
       ABSL_LOCKS_EXCLUDED(mu_);
   void clearUncacheableState() ABSL_LOCKS_EXCLUDED(mu_);
 
-  ~CacheSession();
+  ~CacheSession() override;
 
   class Subscriber {
   public:
@@ -275,7 +275,7 @@ public:
   CacheSessionsImpl(Server::Configuration::FactoryContext& context,
                     std::unique_ptr<HttpCache> cache)
       : time_source_(context.serverFactoryContext().timeSource()), cache_(std::move(cache)),
-        stats_(generateStats(context.scope(), cache_->cacheInfo().name_)) {}
+        stats_(generateStats(context.serverFactoryContext().scope(), cache_->cacheInfo().name_)) {}
 
   void lookup(ActiveLookupRequestPtr request, ActiveLookupResultCallback&& cb) override;
   CacheFilterStats& stats() const override { return *stats_; }

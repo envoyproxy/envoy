@@ -59,6 +59,7 @@ public:
   }
   bool loggingDone() { return logging_done_; }
   uint64_t bytesOutstanding() { return bytes_outstanding_; }
+  // NOLINTNEXTLINE(readability-identifier-naming)
   bool notify_ack_listener_before_soon_to_be_destroyed() const {
     return notify_ack_listener_before_soon_to_be_destroyed_;
   }
