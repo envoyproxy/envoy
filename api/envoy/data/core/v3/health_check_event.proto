@@ -120,7 +120,7 @@ message HealthCheckFailure {
 
   // The HTTP status code of the health check response that caused this failure.
   // Only set when the health checker type is HTTP and the failure type is ``ACTIVE``.
-  // A value of 0 indicates that no HTTP status code was recorded (e.g., network-level failures
+  // A value of ``0`` indicates that no HTTP status code was recorded (e.g., network-level failures
   // or non-HTTP health checkers).
   uint32 http_status_code = 3;
 }
