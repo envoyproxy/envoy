@@ -17,6 +17,7 @@ envoy_cc_library(
         ":http_request_builder_lib",
         "//envoy/http:filter_interface",
         "//envoy/server:filter_config_interface",
+        "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf",
