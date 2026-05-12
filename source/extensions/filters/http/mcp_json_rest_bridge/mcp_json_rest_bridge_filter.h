@@ -101,7 +101,7 @@ private:
   void serveToolsListLocal(const nlohmann::json& json_rpc);
 
   std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>
-  getCombinedTools() const;
+  getTools() const;
 
   const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*
   getTool(absl::string_view tool_name) const;

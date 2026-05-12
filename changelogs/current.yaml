@@ -84,7 +84,7 @@ new_features:
 - area: mcp_json_rest_bridge
   change: |
     Added local response handling for the ``tools/list`` JSON-RPC method in the MCP JSON REST bridge filter.
-    Configuring ``tools_list_local`` on a per-route basis will cause the filter to directly generate and 
+    Configuring ``tools_list_local`` will cause the filter to directly generate and 
     serve the available tools list response without sending a request upstream.
 - area: tcp_proxy
   change: |

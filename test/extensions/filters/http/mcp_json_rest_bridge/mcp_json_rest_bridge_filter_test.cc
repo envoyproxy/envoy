@@ -1350,6 +1350,45 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListPerRouteConfig) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data, true));
 }
 
+TEST_F(McpJsonRestBridgeFilterTest, ToolsListLocalEmpty) {
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
+  proto_config.mutable_tool_config()->mutable_tool_list_local();
+  auto config = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
+  filter_ = std::make_unique<McpJsonRestBridgeFilter>(config);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(testing::Return(Http::RequestHeaderMapOptRef(request_headers_)));
+
+  request_headers_.setMethod("POST");
+  request_headers_.setPath("/mcp");
+  request_headers_.setContentType("application/json");
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  std::string json = R"({"jsonrpc": "2.0", "method": "tools/list", "id": "req-1"})";
+  Buffer::OwnedImpl data(json);
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(testing::_, false))
+      .WillOnce(testing::Invoke([](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("200", headers.getStatusValue());
+        EXPECT_EQ("application/json", headers.getContentTypeValue());
+      }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(testing::_, true))
+      .WillOnce(testing::Invoke([](Buffer::Instance& data, bool) {
+        auto parsed_response = nlohmann::json::parse(data.toString());
+
+        EXPECT_EQ(parsed_response["jsonrpc"], "2.0");
+        EXPECT_EQ(parsed_response["id"], "req-1");
+
+        auto tools = parsed_response["result"]["tools"];
+        EXPECT_TRUE(tools.empty());
+      }));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data, true));
+}
 } // namespace
 } // namespace McpJsonRestBridge
 } // namespace HttpFilters

@@ -161,7 +161,7 @@ McpJsonRestBridgeFilterConfig::getHttpRule(absl::string_view tool_name) const {
 }
 
 std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>
-McpJsonRestBridgeFilter::getCombinedTools() const {
+McpJsonRestBridgeFilter::getTools() const {
   absl::flat_hash_set<std::string> seen_tools;
   std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>
       combined;
@@ -189,6 +189,8 @@ McpJsonRestBridgeFilter::getCombinedTools() const {
 
 const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*
 McpJsonRestBridgeFilter::getTool(absl::string_view tool_name) const {
+  // TODO(mkbehr): Preprocess or cache a lookup table if we ever need to check many tools per
+  // request.
   const auto* per_route_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<McpJsonRestBridgePerRouteConfig>(
           decoder_callbacks_);
@@ -385,7 +387,7 @@ void McpJsonRestBridgeFilter::serveToolsListLocal(const nlohmann::json& json_rpc
   response_data.add(",\"result\":{\"tools\":[");
 
   bool first_tool = true;
-  for (const auto* tool : getCombinedTools()) {
+  for (const auto* tool : getTools()) {
     if (!first_tool) {
       response_data.add(",");
     }
@@ -488,7 +490,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc,
         decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
       }
       return;
-    } else if (has_tool_list_local && !getCombinedTools().empty()) {
+    } else if (has_tool_list_local) {
       mcp_operation_ = McpOperation::ToolsListLocal;
       serveToolsListLocal(json_rpc);
       return;
