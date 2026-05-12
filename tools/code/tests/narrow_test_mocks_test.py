@@ -4,6 +4,7 @@ import sys
 import os
 import tempfile
 import unittest
+import unittest.mock
 
 # Make the tools/code package importable when running standalone.
 _TOOLS_CODE_DIR = os.path.join(os.path.dirname(__file__), "..")
@@ -180,7 +181,7 @@ void foo() {
     # ------------------------------------------------------------------
     # Case 9: mocks.h + zero server-mock symbols → skip (ALLOW_FULL_REMOVAL=False)
     # ------------------------------------------------------------------
-    def test_mocks_umbrella_no_server_symbols(self):
+    def test_mocks_umbrella_no_server_symbols_skip_when_no_full_removal(self):
         content = """\
 #include "test/mocks/server/mocks.h"
 
@@ -189,13 +190,33 @@ void foo() {
   testing::NiceMock<Network::MockConnection> conn;
 }
 """
-        # With ALLOW_FULL_REMOVAL=False (the default), _analyze_file must skip
-        # the file entirely to avoid removing a dep that may be needed for its
+        # With ALLOW_FULL_REMOVAL=False, _analyze_file must skip the file
+        # entirely to avoid removing a dep that may be needed for its
         # transitive includes (e.g. Singleton::ManagerImpl, createApiForTest).
-        self.assertFalse(ALLOW_FULL_REMOVAL,
-                         "This test assumes ALLOW_FULL_REMOVAL is False")
-        result = _analyze_file(content, SERVER_RULES)
+        import narrow_test_mocks as _m
+        with unittest.mock.patch.object(_m, "ALLOW_FULL_REMOVAL", False):
+            result = _analyze_file(content, SERVER_RULES)
         self.assertIsNone(result)
+
+    def test_mocks_umbrella_no_server_symbols_removed_when_full_removal_allowed(self):
+        content = """\
+#include "test/mocks/server/mocks.h"
+
+// Uses only non-server mock symbols
+void foo() {
+  testing::NiceMock<Network::MockConnection> conn;
+}
+"""
+        # With ALLOW_FULL_REMOVAL=True the old behaviour is preserved: the
+        # include/dep is removed entirely when no server symbols are referenced.
+        import narrow_test_mocks as _m
+        with unittest.mock.patch.object(_m, "ALLOW_FULL_REMOVAL", True):
+            result = _analyze_file(content, SERVER_RULES)
+        self.assertIsNotNone(result)
+        old_inc, new_inc, old_dep, new_dep = result
+        self.assertIn("test/mocks/server/mocks.h", old_inc)
+        self.assertNotIn("test/mocks/server/mocks.h", new_inc)
+        self.assertEqual(new_inc, set())
 
 
 class TestReduceIncludes(unittest.TestCase):

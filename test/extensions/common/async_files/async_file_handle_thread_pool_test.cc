@@ -14,10 +14,9 @@
 #include "source/extensions/common/async_files/async_file_manager.h"
 #include "source/extensions/common/async_files/async_file_manager_factory.h"
 
+#include "test/mocks/api/mocks.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
-
-#include "test/mocks/api/mocks.h"
 
 #include "absl/status/statusor.h"
 #include "gmock/gmock.h"
