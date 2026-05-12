@@ -547,6 +547,8 @@ public:
                      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                          headers_with_underscores_action);
 
+  void initialize() override;
+
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
   waitForNewStream(Event::Dispatcher& client_dispatcher, FakeStreamPtr& stream,
@@ -1002,7 +1004,8 @@ private:
   };
 
   void threadRoutine();
-  SharedConnectionWrapper& consumeConnection() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  SharedConnectionWrapper& consumeConnection(bool defer_read_enable = false)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
   Network::FilterStatus onRecvDatagram(Network::UdpRecvData& data);
   AssertionResult
   runOnDispatcherThreadAndWait(std::function<AssertionResult()> cb,
