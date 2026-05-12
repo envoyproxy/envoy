@@ -1,5 +1,6 @@
 load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 load("@envoy_repo//:path.bzl", "PATH")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
 load(
@@ -106,4 +107,27 @@ sh_test(
     args = ["$(location :checked)"],
     data = [":checked"],
     tags = ["no-remote-exec"],
+)
+
+py_library(
+    name = "narrow_test_mocks_lib",
+    srcs = ["narrow_test_mocks.py"],
+    visibility = ["//tools/code/tests:__pkg__"],
+)
+
+py_binary(
+    name = "narrow_test_mocks",
+    srcs = ["narrow_test_mocks.py"],
+    args = [
+        "--root=%s" % PATH,
+    ],
+    main = "narrow_test_mocks.py",
+    visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "narrow_test_mocks_test",
+    srcs = ["tests/narrow_test_mocks_test.py"],
+    main = "tests/narrow_test_mocks_test.py",
+    deps = [":narrow_test_mocks_lib"],
 )

@@ -130,9 +130,9 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.network.dubbo_proxy"],
     rbe_pool = "6gig",
     deps = [
-        "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
         "//source/extensions/filters/network/dubbo_proxy/router:route_matcher",
-        "//test/mocks/server:factory_context_mocks",
+        "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
+        "//test/mocks/server:server_factory_context_mocks",
         "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/v3:pkg_cc_proto",
     ],
 )

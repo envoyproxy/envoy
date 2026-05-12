@@ -68,14 +68,13 @@ envoy_cc_test(
     srcs = ["conn_manager_test.cc"],
     rbe_pool = "6gig",
     deps = [
-        ":utility_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/common/upstream:utility_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
-        "//test/mocks/server:instance_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
+        ":utility_lib",
     ],
 )
 

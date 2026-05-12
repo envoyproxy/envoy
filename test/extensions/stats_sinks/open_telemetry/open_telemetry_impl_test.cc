@@ -7,7 +7,7 @@
 
 #include "test/mocks/common.h"
 #include "test/mocks/grpc/mocks.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 
 #include "gtest/gtest.h"

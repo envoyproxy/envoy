@@ -8,7 +8,7 @@
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/filters/http/health_check/health_check.h"
 
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"

@@ -35,11 +35,10 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/network/generic_proxy/router:router_lib",
-        "//test/extensions/filters/network/generic_proxy:fake_codec_lib",
         "//test/extensions/filters/network/generic_proxy/mocks:codec_mocks",
         "//test/extensions/filters/network/generic_proxy/mocks:filter_mocks",
         "//test/extensions/filters/network/generic_proxy/mocks:route_mocks",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/extensions/filters/network/generic_proxy:fake_codec_lib",
         "//test/test_common:utility_lib",
     ],
 )

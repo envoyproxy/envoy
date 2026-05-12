@@ -27,7 +27,7 @@
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/fuzz/utility.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/retry_priority.h"
 #include "test/mocks/upstream/retry_priority_factory.h"
 #include "test/mocks/upstream/test_retry_host_predicate_factory.h"

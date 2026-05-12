@@ -3,7 +3,6 @@
 #include "source/extensions/common/wasm/wasm.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
-#include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"

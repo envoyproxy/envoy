@@ -4,7 +4,6 @@
 #include "source/extensions/health_checkers/thrift/config.h"
 
 #include "test/common/upstream/utility.h"
-#include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/health_checker_factory_context.h"
 #include "test/mocks/upstream/health_checker.h"
 #include "test/mocks/upstream/priority_set.h"

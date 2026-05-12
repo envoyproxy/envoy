@@ -180,11 +180,11 @@ envoy_cc_test(
     srcs = ["config_provider_impl_test.cc"],
     rbe_pool = "6gig",
     deps = [
-        ":dummy_config_proto_cc_proto",
         "//source/common/config:config_provider_lib",
         "//source/common/protobuf:utility_lib",
-        "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:simulated_time_system_lib",
+        ":dummy_config_proto_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],

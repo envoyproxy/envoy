@@ -13,7 +13,6 @@
 #include "source/extensions/common/async_files/async_file_manager.h"
 #include "source/extensions/common/async_files/async_file_manager_factory.h"
 
-#include "test/mocks/server/mocks.h"
 #include "test/test_common/status_utility.h"
 
 #include "absl/status/statusor.h"

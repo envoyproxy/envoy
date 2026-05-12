@@ -17,7 +17,7 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/admin.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_info_factory.h"
 #include "test/mocks/upstream/cluster_manager.h"

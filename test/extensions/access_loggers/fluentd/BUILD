@@ -35,7 +35,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/access_loggers/fluentd:substitution_formatter_lib",
-        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],

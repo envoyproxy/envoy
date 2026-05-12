@@ -68,7 +68,7 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:logging_lib",
     ],
@@ -80,7 +80,7 @@ envoy_cc_test(
     srcs = ["config_validation_test.cc"],
     deps = [
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3:pkg_cc_proto",
     ],
 )

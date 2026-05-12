@@ -37,7 +37,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/file_system_buffer:config",
         "//test/extensions/common/async_files:mocks",
-        "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
     ],
 )

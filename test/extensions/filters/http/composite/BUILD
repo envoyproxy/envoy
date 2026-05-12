@@ -17,8 +17,8 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.composite"],
     rbe_pool = "6gig",
     deps = [
-        "//source/common/http:header_map_lib",
         "//source/common/http/matching:data_impl_lib",
+        "//source/common/http:header_map_lib",
         "//source/common/matcher:matcher_lib",
         "//source/extensions/filters/http/composite:config",
         "//source/extensions/filters/http/composite:filter_lib",
@@ -28,7 +28,6 @@ envoy_extension_cc_test(
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
-        "//test/mocks/server:instance_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:registry_lib",
     ],

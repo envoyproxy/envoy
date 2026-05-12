@@ -6,7 +6,6 @@
 #include "source/server/hot_restarting_parent.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/instance.h"
 #include "test/mocks/server/listener_manager.h"
 #include "test/server/hot_restart_udp_forwarding_test_helper.h"
 #include "test/server/utility.h"

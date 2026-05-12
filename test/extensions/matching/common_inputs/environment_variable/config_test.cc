@@ -1,7 +1,6 @@
 #include "source/common/config/utility.h"
 #include "source/extensions/matching/common_inputs/environment_variable/config.h"
 
-#include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
 
 #include "gtest/gtest.h"
