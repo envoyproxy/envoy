@@ -113,19 +113,19 @@ of `narrow_test_mocks.py`) that maps regex patterns for at-risk non-server
 symbols to the direct include that must be present for the narrowing to be
 safe:
 
-| Pattern | Required direct include |
-|---|---|
-| `Http::Mock*` | `test/mocks/http/mocks.h` |
-| `Http::Test*HeaderMap*` / `Http::Test*TrailerMap*` | `test/test_common/utility.h` |
-| `Api::Mock*` | `test/mocks/api/mocks.h` |
-| `Api::createApiForTest` | `test/test_common/utility.h` |
-| `Network::Mock*` | `test/mocks/network/mocks.h` |
-| `Upstream::Mock*` | `test/mocks/upstream/mocks.h` |
-| `Stats::Mock*` | `test/mocks/stats/mocks.h` |
-| `Runtime::Mock*` | `test/mocks/runtime/mocks.h` |
-| `Tracing::Mock*` | `test/mocks/tracing/mocks.h` |
-| `Singleton::ManagerImpl` | `source/common/singleton/manager_impl.h` |
-| `TestUtility::*` / `TestEnvironment::*` | `test/test_common/utility.h` |
+| Pattern | Required direct include | Bazel dependency |
+|---|---|---|
+| `Http::Mock*` | `test/mocks/http/mocks.h` | `//test/mocks/http:http_mocks` |
+| `Http::Test*HeaderMap*` / `Http::Test*TrailerMap*` | `test/test_common/utility.h` | `//test/test_common:utility_lib` |
+| `Api::Mock*` | `test/mocks/api/mocks.h` | `//test/mocks/api:api_mocks` |
+| `Api::createApiForTest` | `test/test_common/utility.h` | `//test/test_common:utility_lib` |
+| `Network::Mock*` | `test/mocks/network/mocks.h` | `//test/mocks/network:network_mocks` |
+| `Upstream::Mock*` | `test/mocks/upstream/mocks.h` | `//test/mocks/upstream:upstream_mocks` |
+| `Stats::Mock*` | `test/mocks/stats/mocks.h` | `//test/mocks/stats:stats_mocks` |
+| `Runtime::Mock*` | `test/mocks/runtime/mocks.h` | `//test/mocks/runtime:runtime_mocks` |
+| `Tracing::Mock*` | `test/mocks/tracing/mocks.h` | `//test/mocks/tracing:tracing_mocks` |
+| `Singleton::ManagerImpl` | `source/common/singleton/manager_impl.h` | `//source/common/singleton:manager_impl_lib` |
+| `TestUtility::*` / `TestEnvironment::*` | `test/test_common/utility.h` | `//test/test_common:utility_lib` |
 
 **Default (safe) behaviour**: if any guarded symbol is used but its required
 direct include is missing, the entire narrowing for that file is skipped and a

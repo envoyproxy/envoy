@@ -499,13 +499,18 @@ def _check_transitive_guard(
     verbose: bool = False,
     filepath: str = "",
 ) -> bool:
-    """Return False (skip) if narrowing would break a transitive-include chain.
+    """Check whether narrowing is safe given the file's non-server symbol usage.
 
     Scans *content* for non-server symbols listed in TRANSITIVE_GUARD.  For
     each matching symbol, checks whether the required direct ``#include`` is
     already present in the file's explicit include list.  If a symbol is used
     but its required include is missing, the narrowing would silently drop that
     header from the compilation unit — so we skip the file.
+
+    Returns True if narrowing is safe (all required direct includes are present
+    for every non-server symbol referenced in *content*).  Returns False if
+    narrowing should be skipped because at least one non-server symbol lacks
+    its required direct ``#include``.
     """
     for pattern, required_header, _dep in TRANSITIVE_GUARD:
         if re.search(pattern, content) and required_header not in all_includes:
