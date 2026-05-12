@@ -203,7 +203,7 @@ void foo() {
     def test_mocks_umbrella_no_server_symbols_removed_when_full_removal_allowed(self):
         # Use content that references only non-server symbols that are NOT in
         # the TRANSITIVE_GUARD (so the guard doesn't fire), to isolate the
-        # ALLOW_FULL_REMOVAL behaviour.  We use a bare Stats::IsolatedStoreImpl
+        # ALLOW_FULL_REMOVAL behavior.  We use a bare Stats::IsolatedStoreImpl
         # identifier — it is not a Mock* or Test* type and therefore not in any
         # TRANSITIVE_GUARD entry.
         content = """\

@@ -127,7 +127,7 @@ safe:
 | `Singleton::ManagerImpl` | `source/common/singleton/manager_impl.h` | `//source/common/singleton:manager_impl_lib` |
 | `TestUtility::*` / `TestEnvironment::*` | `test/test_common/utility.h` | `//test/test_common:utility_lib` |
 
-**Default (safe) behaviour**: if any guarded symbol is used but its required
+**Default (safe) behavior**: if any guarded symbol is used but its required
 direct include is missing, the entire narrowing for that file is skipped and a
 diagnostic is emitted with `--verbose`.  The file is left untouched.
 
