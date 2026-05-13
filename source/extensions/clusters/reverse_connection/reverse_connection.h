@@ -3,6 +3,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 
+#include <atomic>
 #include <cstdint>
 #include <cstring>
 #include <functional>
@@ -24,6 +25,7 @@
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 
+#include "absl/container/node_hash_map.h"
 #include "absl/status/statusor.h"
 
 namespace Envoy {
@@ -199,11 +201,18 @@ private:
     const std::shared_ptr<RevConCluster> cluster_;
   };
 
+  // Result of a host lookup-or-create. The caller posts addHostToHostSet()
+  // only when this call performed the insertion.
+  struct HostLookupResult {
+    Upstream::HostSharedPtr host;
+    bool newly_created;
+  };
+
   // Periodically cleans the stale hosts from host_map_.
   void cleanup();
 
-  Upstream::HostSelectionResponse checkAndCreateHost(absl::string_view host_id,
-                                                     Upstream::HostSharedPtr& created_host);
+  // Checks if a host exists for a given host identifier and if not creates and caches it.
+  HostLookupResult checkAndCreateHost(absl::string_view host_id);
 
   void addHostToHostSet(Upstream::HostSharedPtr host);
 
@@ -213,11 +222,22 @@ private:
   // No pre-initialize work needs to be completed by REVERSE CONNECTION cluster.
   void startPreInit() override { onPreInitComplete(); }
 
+  // host_map_ entry. The used bit mirrors OriginalDstCluster's recently-used
+  // grace period so cleanup() cannot delete a selected host before its posted
+  // priority-set update or connection-pool handle acquisition happens.
+  struct HostMapEntry {
+    HostMapEntry() = default;
+    explicit HostMapEntry(Upstream::HostSharedPtr h) : host(std::move(h)) {}
+    Upstream::HostSharedPtr host;
+    std::atomic<bool> used{true};
+  };
+
   Event::Dispatcher& dispatcher_;
   std::chrono::milliseconds cleanup_interval_;
   Event::TimerPtr cleanup_timer_;
   absl::Mutex host_map_lock_;
-  absl::flat_hash_map<std::string, Upstream::HostSharedPtr> host_map_;
+  // HostMapEntry contains std::atomic<bool>, so store values in stable nodes.
+  absl::node_hash_map<std::string, HostMapEntry> host_map_;
   // Formatter for computing host identifier from request context.
   Envoy::Formatter::FormatterPtr host_id_formatter_;
   // Optional formatter for computing tenant identifier from request context.
