@@ -273,6 +273,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "grpc_mux_cache_test",
+    srcs = ["grpc_mux_cache_test.cc"],
+    deps = [
+        "//source/common/config:grpc_mux_cache_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "xds_manager_impl_test",
     srcs = ["xds_manager_impl_test.cc"],
     rbe_pool = "2core",

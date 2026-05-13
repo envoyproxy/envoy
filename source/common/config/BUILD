@@ -303,10 +303,31 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "grpc_mux_cache_lib",
+    srcs = ["grpc_mux_cache.cc"],
+    hdrs = ["grpc_mux_cache.h"],
+    deps = [
+        "//envoy/config:grpc_mux_interface",
+        "//envoy/config:subscription_factory_interface",
+        "//envoy/config:subscription_interface",
+        "//envoy/grpc:async_client_interface",
+        "//envoy/local_info:local_info_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/hash",
+        "@abseil-cpp//absl/strings",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "xds_manager_lib",
     srcs = ["xds_manager_impl.cc"],
     hdrs = ["xds_manager_impl.h"],
     deps = [
+        ":grpc_mux_cache_lib",
         ":null_grpc_mux_lib",
         ":subscription_factory_lib",
         ":utility_lib",
