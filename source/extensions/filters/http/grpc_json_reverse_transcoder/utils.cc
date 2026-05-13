@@ -25,7 +25,7 @@ namespace GrpcJsonReverseTranscoder {
 
 namespace {
 
-absl::Status BuildReplacementVector(nlohmann::json& request, std::string http_rule_path,
+absl::Status buildReplacementVector(nlohmann::json& request, std::string http_rule_path,
                                     std::vector<std::pair<std::string, std::string>>& replacements,
                                     absl::flat_hash_set<std::string>& param_set) {
   size_t end = 0;
@@ -139,7 +139,8 @@ absl::StatusOr<std::string> BuildPath(nlohmann::json& request, std::string http_
                                       std::string http_body_field) {
   std::vector<std::pair<std::string, std::string>> replacements;
   absl::flat_hash_set<std::string> param_set;
-  absl::Status status = BuildReplacementVector(request, http_rule_path, replacements, param_set);
+  const absl::Status status =
+      buildReplacementVector(request, http_rule_path, replacements, param_set);
   if (!status.ok()) {
     return status;
   }

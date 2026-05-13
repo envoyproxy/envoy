@@ -234,7 +234,7 @@ public:
       : host_plugin_ptr_(host_plugin_ptr), child_span_ptr_(child_span_ptr),
         span_ptr_(reinterpret_cast<envoy_dynamic_module_type_span_envoy_ptr>(child_span_ptr)) {}
 
-  ~ChildSpanImpl() override { finish(); }
+  ~ChildSpanImpl() override { finishImpl(); }
 
   void setTag(std::string_view key, std::string_view value) override {
     envoy_dynamic_module_callback_http_span_set_tag(
@@ -298,7 +298,10 @@ public:
     return std::make_unique<ChildSpanImpl>(host_plugin_ptr_, child);
   }
 
-  void finish() override {
+  void finish() override { finishImpl(); }
+
+private:
+  void finishImpl() {
     if (child_span_ptr_ == nullptr) {
       return;
     }
@@ -306,8 +309,6 @@ public:
     child_span_ptr_ = nullptr;
     span_ptr_ = nullptr;
   }
-
-private:
   const envoy_dynamic_module_type_http_filter_envoy_ptr host_plugin_ptr_;
   envoy_dynamic_module_type_child_span_module_ptr child_span_ptr_;
   envoy_dynamic_module_type_span_envoy_ptr span_ptr_;

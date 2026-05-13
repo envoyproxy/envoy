@@ -10,6 +10,18 @@ bootstrap_extensions:
     "@type": >-
       type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface
     stat_prefix: "upstream_reverse_connection"
+    access_log:
+    - name: envoy.access_loggers.stdout
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+        log_format:
+          text_format_source:
+            inline_string: >-
+              event=%DYNAMIC_METADATA(envoy.reverse_tunnel.lifecycle:event)%
+              node=%FILTER_STATE(envoy.reverse_tunnel.node_id)%
+              cluster=%FILTER_STATE(envoy.reverse_tunnel.cluster_id)%
+              tenant=%FILTER_STATE(envoy.reverse_tunnel.tenant_id)%
+              reason=%CONNECTION_TERMINATION_DETAILS%
 
 static_resources:
   listeners:
@@ -93,6 +105,10 @@ static_resources:
   - name: reverse_connection_cluster
     connect_timeout: 200s
     lb_policy: CLUSTER_PROVIDED
+    filters:
+    - name: envoy.filters.upstream_network.reverse_tunnel_lifecycle
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Empty
     cluster_type:
       name: envoy.clusters.reverse_connection
       typed_config:

@@ -3320,6 +3320,40 @@ TEST_F(HttpConnectionManagerImplTest, DoNotStartSpanIfTracingIsNotEnabled) {
   conn_manager_->onData(fake_input, false);
 }
 
+// When the active span reports exportedSpan()==false, the HCM calls
+// HttpTracerUtility::finalizeDownstreamSpan but skips tag string building and storage
+// work on spans whose driver-level export pipeline will drop them. Propagation and
+// per-request span creation are unaffected (exercised elsewhere). The span should
+// still be finished.
+TEST_F(HttpConnectionManagerImplTest, SkipFinalizeDownstreamSpanWhenNotRecording) {
+  setup(SetupOpts().setTracing(true));
+
+  auto* span = new NiceMock<Tracing::MockSpan>();
+  EXPECT_CALL(*tracer_, startSpan_(_, _, _, _)).WillOnce(Return(span));
+  EXPECT_CALL(*span, exportedSpan()).WillRepeatedly(Return(false));
+
+  // finalizeDownstreamSpan-owned methods must not fire when not wanted
+  EXPECT_CALL(*span, setTag(_, _)).Times(0);
+  EXPECT_CALL(*span, log(_, _)).Times(0);
+  // but finishSpan must still be called
+  EXPECT_CALL(*span, finishSpan());
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        decoder_ = &conn_manager_->newStream(response_encoder_);
+        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+            {":method", "GET"}, {":authority", "host"}, {":path", "/"}}};
+        decoder_->decodeHeaders(std::move(headers), true);
+        ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+        decoder_->streamInfo().setResponseCodeDetails("");
+        response_encoder_.getStream().resetStream(StreamResetReason::LocalReset);
+        data.drain(4);
+        return Http::okStatus();
+      }));
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
 TEST_F(HttpConnectionManagerImplTest, NoPath) {
   setup();
 

@@ -304,7 +304,7 @@ void Client::DirectStreamCallbacks::onError() {
   // error occurs (e.g., timeout)?
 
   if (explicit_flow_control_ && (hasDataToSend() || response_trailers_.get())) {
-    ENVOY_LOG(debug, "[S{}] defering remote reset stream due to explicit flow control",
+    ENVOY_LOG(debug, "[S{}] deferring remote reset stream due to explicit flow control",
               direct_stream_.stream_handle_);
     if (direct_stream_.parent_.getStream(direct_stream_.stream_handle_,
                                          GetStreamFilters::AllowOnlyForOpenStreams)) {
@@ -472,7 +472,7 @@ void Client::DirectStreamCallbacks::latchError() {
       !resp_code_details.empty()) {
     error_msg_details.push_back(absl::StrCat("det: ", std::move(resp_code_details)));
   }
-  // The format of the error message propogated to callbacks is:
+  // The format of the error message propagated to callbacks is:
   // rc: {value}|ec: {value}|rsp_flags: {value}|http: {value}|det: {value}
   //
   // Where envoy_rc is the HTTP response code from StreamInfo::responseCode().
@@ -547,6 +547,13 @@ void Client::DirectStream::dumpState(std::ostream&, int indent_level) const {
 void Client::startStream(envoy_stream_t new_stream_handle, EnvoyStreamCallbacks&& stream_callbacks,
                          bool explicit_flow_control) {
   ASSERT(dispatcher_.isThreadSafe());
+
+  if (!api_listener_) {
+    ENVOY_LOG(debug, "[S{}] stream can't be started after shutdown.", new_stream_handle);
+    stream_callbacks.on_cancel_({}, {});
+    return;
+  }
+
   Client::DirectStreamSharedPtr direct_stream{new DirectStream(new_stream_handle, *this)};
   direct_stream->explicit_flow_control_ = explicit_flow_control;
   direct_stream->callbacks_ =

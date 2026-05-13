@@ -926,6 +926,7 @@ gso
 gzip
 hackery
 hacky
+handoff
 handshaker
 hardcoded
 hardcodes
@@ -1148,6 +1149,7 @@ num
 numkeys
 oauth
 observability
+observations
 ocagent
 offsetof
 oneof
@@ -1709,3 +1711,6 @@ IWYU
 CRTP
 bitrate
 kbps
+dataset
+datasets
+smartptr

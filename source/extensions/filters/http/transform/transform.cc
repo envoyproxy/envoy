@@ -101,7 +101,7 @@ Transformation::Transformation(const ProtoTransformation& config,
     }
   }
 
-  if (config.headers_mutations().size() > 0) {
+  if (!config.headers_mutations().empty()) {
     auto mutations_or =
         Http::HeaderMutations::create(config.headers_mutations(), context, bodyCommandParsers());
     SET_AND_RETURN_IF_NOT_OK(mutations_or.status(), creation_status);

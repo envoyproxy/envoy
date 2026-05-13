@@ -382,11 +382,11 @@ RegisterForeignFunction registerStatsFilterGetAllMetricTags(
       const auto& histograms = ctx->snapshot->histograms();
 
       auto collectBufferedTags = [](const auto& metrics, const auto& buffer_to_snapshot,
-                                    auto extractTags) {
+                                    auto extract_tags) {
         std::vector<Stats::TagVector> all;
         all.reserve(buffer_to_snapshot.size());
         for (uint32_t snapshot_index : buffer_to_snapshot) {
-          all.push_back(extractTags(metrics[snapshot_index]));
+          all.push_back(extract_tags(metrics[snapshot_index]));
         }
         return all;
       };

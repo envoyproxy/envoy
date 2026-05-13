@@ -583,6 +583,13 @@ TEST_F(ZipkinTracerTest, FinishNotSampledSpan) {
   // Creates a root-span with a CS annotation
   SpanPtr span = tracer.startSpan(config, "my_span", timestamp);
   span->setSampled(false);
+
+  // exportedSpan() must track sampled state
+  EXPECT_FALSE(span->exportedSpan());
+  span->setSampled(true);
+  EXPECT_TRUE(span->exportedSpan());
+  span->setSampled(false);
+
   span->finishSpan();
 
   // Test if the reporter's reportSpan method was NOT called upon finishing the span

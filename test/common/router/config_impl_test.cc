@@ -7221,6 +7221,219 @@ TEST_F(RouteMatcherTest, WeightedClusterInvalidConfigWithInvalidHttpHeader) {
                           EnvoyException, "Proto constraint validation failed.*");
 }
 
+// Tests for WeightedClusterEntry::refreshRouteCluster which allows re-selecting a different
+// weighted cluster (e.g. for retries).
+TEST_F(RouteMatcherTest, WeightedClusterRefreshRouteClusters) {
+  const std::string yaml = R"EOF(
+      virtual_hosts:
+        - name: www1
+          domains: ["www1.lyft.com"]
+          routes:
+            - match: { prefix: "/" }
+              route:
+                weighted_clusters:
+                  clusters:
+                    - name: cluster1
+                      weight: 30
+                    - name: cluster2
+                      weight: 30
+                    - name: cluster3
+                      weight: 40
+      )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"cluster1", "cluster2", "cluster3"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  // With random_value=0: cluster1 selected (range [0,30) of total 100).
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www1.lyft.com", "/foo", "GET");
+  RouteConstSharedPtr route = config.route(headers, 0);
+  ASSERT_NE(nullptr, route);
+  const RouteEntry* route_entry = route->routeEntry();
+  EXPECT_EQ("cluster1", route_entry->clusterName());
+
+  // First refresh: cluster1 is marked used. Eligible: cluster2 (wt=30), cluster3 (wt=40).
+  // random_value=0, 0 % 70 = 0 → [0,30) → cluster2.
+  route_entry->refreshRouteCluster(headers, stream_info);
+  EXPECT_EQ("cluster2", route_entry->clusterName());
+
+  // Second refresh: cluster2 is now marked used. Eligible: cluster3 (wt=40) only.
+  // random_value=0, 0 % 40 = 0 → cluster3.
+  route_entry->refreshRouteCluster(headers, stream_info);
+  EXPECT_EQ("cluster3", route_entry->clusterName());
+
+  // Third refresh: all 3 clusters used → reset pool.
+  // Now full list is eligible, random_value=0 → cluster1 again.
+  route_entry->refreshRouteCluster(headers, stream_info);
+  EXPECT_EQ("cluster1", route_entry->clusterName());
+
+  // Fourth refresh after reset: cluster1 marked used again → cluster2.
+  route_entry->refreshRouteCluster(headers, stream_info);
+  EXPECT_EQ("cluster2", route_entry->clusterName());
+}
+
+// Two equal-weight clusters: refresh always picks the other cluster and cycles.
+TEST_F(RouteMatcherTest, WeightedClusterRefreshRouteClustersTwoCluster) {
+  const std::string yaml = R"EOF(
+      virtual_hosts:
+        - name: www1
+          domains: ["www1.lyft.com"]
+          routes:
+            - match: { prefix: "/" }
+              route:
+                weighted_clusters:
+                  clusters:
+                    - name: cluster1
+                      weight: 50
+                    - name: cluster2
+                      weight: 50
+      )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"cluster1", "cluster2"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  // random_value=0 → cluster1.
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www1.lyft.com", "/foo", "GET");
+  RouteConstSharedPtr route = config.route(headers, 0);
+  const RouteEntry* route_entry = route->routeEntry();
+  EXPECT_EQ("cluster1", route_entry->clusterName());
+
+  // After one refresh, the only unused cluster is cluster2.
+  route_entry->refreshRouteCluster(headers, stream_info);
+  EXPECT_EQ("cluster2", route_entry->clusterName());
+
+  // After second refresh, all clusters exhausted → reset → cluster1.
+  route_entry->refreshRouteCluster(headers, stream_info);
+  EXPECT_EQ("cluster1", route_entry->clusterName());
+}
+
+// A single cluster: refresh exhausts the single-cluster pool immediately, resets,
+// and re-selects the same cluster.
+TEST_F(RouteMatcherTest, WeightedClusterRefreshRouteClustersOneCluster) {
+  const std::string yaml = R"EOF(
+      virtual_hosts:
+        - name: www1
+          domains: ["www1.lyft.com"]
+          routes:
+            - match: { prefix: "/" }
+              route:
+                weighted_clusters:
+                  clusters:
+                    - name: cluster1
+                      weight: 100
+      )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"cluster1"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www1.lyft.com", "/foo", "GET");
+  RouteConstSharedPtr route = config.route(headers, 0);
+  const RouteEntry* route_entry = route->routeEntry();
+  EXPECT_EQ("cluster1", route_entry->clusterName());
+
+  // Refresh: pool immediately exhausted and reset → only option is cluster1.
+  route_entry->refreshRouteCluster(headers, stream_info);
+  EXPECT_EQ("cluster1", route_entry->clusterName());
+
+  route_entry->refreshRouteCluster(headers, stream_info);
+  EXPECT_EQ("cluster1", route_entry->clusterName());
+}
+
+// Cluster-header mode: refreshing reads the cluster name from the request header again.
+TEST_F(RouteMatcherTest, WeightedClusterRefreshRouteClustersClusterHeader) {
+  const std::string yaml = R"EOF(
+      virtual_hosts:
+        - name: www1
+          domains: ["www1.lyft.com"]
+          routes:
+            - match: { prefix: "/" }
+              route:
+                weighted_clusters:
+                  clusters:
+                    - cluster_header: x-cluster
+                      weight: 30
+                    - name: cluster1
+                      weight: 30
+                    - name: cluster2
+                      weight: 40
+      )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"dynamic", "cluster1", "cluster2"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  // random_value=0 with x-cluster="dynamic" header → cluster at index 0 (header-based), name
+  // "dynamic".
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www1.lyft.com", "/foo", "GET");
+  headers.addCopy("x-cluster", "dynamic");
+  RouteConstSharedPtr route = config.route(headers, 0);
+  const RouteEntry* route_entry = route->routeEntry();
+  EXPECT_EQ("dynamic", route_entry->clusterName());
+
+  // First refresh: header cluster (idx=0) marked used. Eligible: cluster1 (wt=30), cluster2
+  // (wt=40). 0%70=0 → [0,30) → clusterIndex=1 → cluster1 (static name).
+  route_entry->refreshRouteCluster(headers, stream_info);
+  EXPECT_EQ("cluster1", route_entry->clusterName());
+
+  // Second refresh: cluster1 (idx=1) marked used. Eligible: cluster2 (wt=40) only.
+  route_entry->refreshRouteCluster(headers, stream_info);
+  EXPECT_EQ("cluster2", route_entry->clusterName());
+
+  // Third refresh: all clusters exhausted → reset → back to header cluster "dynamic".
+  route_entry->refreshRouteCluster(headers, stream_info);
+  EXPECT_EQ("dynamic", route_entry->clusterName());
+}
+
+// Refreshes on different RouteConstSharedPtrs from the same config are independent:
+// each entry tracks its own used-cluster state.
+TEST_F(RouteMatcherTest, WeightedClusterRefreshRouteClustersIndependentPerEntry) {
+  const std::string yaml = R"EOF(
+      virtual_hosts:
+        - name: www1
+          domains: ["www1.lyft.com"]
+          routes:
+            - match: { prefix: "/" }
+              route:
+                weighted_clusters:
+                  clusters:
+                    - name: cluster1
+                      weight: 50
+                    - name: cluster2
+                      weight: 50
+      )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"cluster1", "cluster2"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www1.lyft.com", "/foo", "GET");
+  RouteConstSharedPtr route_a = config.route(headers, 0);
+  RouteConstSharedPtr route_b = config.route(headers, 0);
+
+  const RouteEntry* entry_a = route_a->routeEntry();
+  const RouteEntry* entry_b = route_b->routeEntry();
+
+  EXPECT_EQ("cluster1", entry_a->clusterName());
+  EXPECT_EQ("cluster1", entry_b->clusterName());
+
+  // Refresh entry_a: it picks cluster2, entry_b is unaffected.
+  entry_a->refreshRouteCluster(headers, stream_info);
+  EXPECT_EQ("cluster2", entry_a->clusterName());
+  EXPECT_EQ("cluster1", entry_b->clusterName());
+
+  // Refresh entry_b independently: it also picks cluster2.
+  entry_b->refreshRouteCluster(headers, stream_info);
+  EXPECT_EQ("cluster2", entry_a->clusterName());
+  EXPECT_EQ("cluster2", entry_b->clusterName());
+}
+
 TEST(NullConfigImplTest, All) {
   NullConfigImpl config;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;

@@ -81,7 +81,8 @@ token_bucket:
   tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   tcp_client->waitForDisconnect();
 
-  test_server_->waitForCounterGe("listener_local_ratelimit.local_rate_limit_stats.rate_limited", 1);
+  test_server_->waitForCounter("listener_local_ratelimit.local_rate_limit_stats.rate_limited",
+                               testing::Ge(1));
 }
 
 } // namespace Envoy

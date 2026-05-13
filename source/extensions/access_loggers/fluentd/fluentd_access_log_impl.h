@@ -26,7 +26,7 @@ public:
                           Event::Dispatcher& dispatcher, const FluentdAccessLogConfig& config,
                           BackOffStrategyPtr backoff_strategy, Stats::Scope& parent_scope);
 
-  void packMessage(MessagePackPacker& packer);
+  void packMessage(MessagePackPacker& packer) override;
 };
 
 using FluentdAccessLoggerWeakPtr = std::weak_ptr<FluentdService>;
