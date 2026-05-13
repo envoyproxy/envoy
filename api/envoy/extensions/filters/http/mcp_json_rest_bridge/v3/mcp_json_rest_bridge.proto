@@ -147,10 +147,12 @@ message ServerInfo {
   google.protobuf.StringValue fallback_protocol_version = 3;
 }
 
+// Configuration for sending locally-generated responses to tools/list requests.
 message ToolsListLocal {
 }
 
 // Configuration for the MCP tool capability of the server.
+// [#next-free-field: 5]
 message ServerToolConfig {
   // List of MCP tools configurations.
   repeated ToolConfig tools = 1;
@@ -163,8 +165,6 @@ message ServerToolConfig {
   // Optional configuration for tools/list requests. If not set: The ``tools/list`` request is
   // passed through. This allows subsequent extension or the backend itself to handle the tools/list
   // request if they support it.
-  //
-  // Note: tools/list should be mapped to a GET request with an empty body.
   oneof tool_list_config {
     // Configuration to transcode the tools/list requests to a standard HTTP request. If provided:
     // The extension transcodes the request and forwards it down the filter chain. The response
@@ -173,12 +173,14 @@ message ServerToolConfig {
     // https://modelcontextprotocol.io/specification/2025-11-25/schema#listtoolsresult
     HttpRule tool_list_http_rule = 3;
 
-    // If provided: The extension sends a local response.
+    // If provided: The extension sends a local response, according to each tool's
+    // ToolsListSpecificConfig.
     ToolsListLocal tool_list_local = 4;
   }
 }
 
-// Configuration for a specific MCP tool.
+// Configuration for a tool's entry in tools/list responses.
+// [#next-free-field: 5]
 message ToolsListSpecificConfig {
   // Optional, human-readable name of the tool for display purposes.
   string title = 1;
@@ -196,12 +198,7 @@ message ToolsListSpecificConfig {
   string output_schema = 4;
 }
 
-// Path and host of MCP server that hosts this tool
-message McpServerInfo {
-  string path = 1;
-  string host = 2;
-}
-
+// [#next-free-field: 4]
 message ToolConfig {
   // Unique identifier of the tool. Used both for tools/list and tools/call transcoding.
   string name = 1 [(validate.rules).string = {min_len: 1}];
@@ -209,9 +206,9 @@ message ToolConfig {
   // The HTTP configuration rules that apply to the normal backend.
   HttpRule http_rule = 2;
 
+  // Config for this tool's entry in a local tools/list response. Used when tool_list_local is set
+  // in the ServerToolConfig.
   ToolsListSpecificConfig tool_list_config = 3;
-
-  McpServerInfo server_info = 4;
 }
 
 // Defines the schema of the JSON-RPC to REST mapping. It specifies how the "arguments"
