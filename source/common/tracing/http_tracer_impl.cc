@@ -242,10 +242,12 @@ void HttpTracerUtility::setCommonTags(Span& span, const StreamInfo::StreamInfo& 
   span.setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
   span.setTag(Tracing::Tags::get().NetworkProtocolName, Tracing::Tags::get().Http);
   if (stream_info.protocol().has_value()) {
-    span.setTag(Tracing::Tags::get().NetworkProtocolVersion,
-                Http::Utility::getProtocolVersionString(stream_info.protocol().value()));
+    const std::string& version =
+        Http::Utility::getProtocolVersionString(stream_info.protocol().value());
+    if (!version.empty()) {
+      span.setTag(Tracing::Tags::get().NetworkProtocolVersion, version);
+    }
   }
-
   // Cluster info.
   if (const auto cluster_info = stream_info.upstreamClusterInfo()) {
     span.setTag(Tracing::Tags::get().UpstreamCluster, cluster_info->name());
