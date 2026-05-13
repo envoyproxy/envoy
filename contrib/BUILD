@@ -23,6 +23,20 @@ selects.config_setting_group(
     visibility = ["//visibility:public"],
 )
 
+# Disambiguation for SELECTED_CONTRIB_EXTENSIONS' select, where both
+# "//bazel:linux_aarch64" and "//bazel:using_boringssl_fips" otherwise match for an
+# arm64 boringssl fips build. Restricting the boringssl fips branch to x86_64 lets the
+# aarch64 branch win on arm64; arm64 + boringssl fips builds then fall through
+# to their platform skip lists, which already exclude the Intel-specific contribs.
+selects.config_setting_group(
+    name = "using_boringssl_fips_on_linux_x86_64",
+    match_all = [
+        "//bazel:using_boringssl_fips",
+        "//bazel:linux_x86_64",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 exports_files([
     "extensions_metadata.yaml",
     "contrib_build_config.bzl",

@@ -86,6 +86,11 @@ bug_fixes:
     resulting binary "plaintext" was written back into the ``Cookie:`` request header and tripped a
     ``HeaderString`` validation assert. Such plaintexts are now rejected and the original cookie value
     is preserved, matching the behavior already documented for the explicit decryption-failure case.
+- area: build
+  change: |
+    Fixed ``Illegal ambiguous match`` error when building contrib targets with ``--config=boringssl-fips``
+    on aarch64 by restricting the ``using_boringssl_fips`` branch of ``SELECTED_CONTRIB_EXTENSIONS`` to
+    ``linux_x86_64``. Mirrors the approach taken by #44661 for ``aws-lc``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
