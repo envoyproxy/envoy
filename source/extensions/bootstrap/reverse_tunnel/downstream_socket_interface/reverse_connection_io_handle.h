@@ -94,10 +94,10 @@ struct ReverseConnectionSocketConfig {
   // multiple remote clusters in the same ReverseConnectionAddress and therefore should be able
   // to use a single ReverseConnectionIOHandle for multiple remote clusters.
   std::vector<RemoteClusterConnectionConfig>
-      remote_clusters;         // List of remote cluster configurations.
-  bool enable_circuit_breaker; // Whether to place a cluster in backoff when reverse connection
-                               // attempts fail.
-  ReverseConnectionSocketConfig() : enable_circuit_breaker(true) {}
+      remote_clusters;               // List of remote cluster configurations.
+  bool enable_circuit_breaker{true}; // Whether to place a cluster in backoff when reverse
+                                     // connection attempts fail.
+  ReverseConnectionSocketConfig() = default;
 };
 
 /**

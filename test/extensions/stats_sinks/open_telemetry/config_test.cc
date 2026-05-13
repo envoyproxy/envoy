@@ -3,7 +3,7 @@
 #include "source/extensions/stat_sinks/open_telemetry/config.h"
 #include "source/extensions/stat_sinks/open_telemetry/open_telemetry_impl.h"
 
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"

@@ -99,7 +99,7 @@ private:
 
   HandshakerFactory handshaker_factory_;
   HandshakeValidator handshake_validator_;
-  TsiHandshakerPtr handshaker_{};
+  TsiHandshakerPtr handshaker_;
   bool handshaker_next_calling_{};
 
   TsiFrameProtectorPtr frame_protector_;

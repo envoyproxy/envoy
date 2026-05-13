@@ -51,7 +51,7 @@ public:
                    Upstream::HostDescriptionConstSharedPtr host) override;
 
 private:
-  absl::optional<Upstream::TcpPoolData> conn_pool_data_{};
+  absl::optional<Upstream::TcpPoolData> conn_pool_data_;
   Tcp::ConnectionPool::Cancellable* upstream_handle_{};
   GenericConnectionPoolCallbacks* callbacks_{};
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
@@ -166,7 +166,7 @@ private:
                           Ssl::ConnectionInfoConstSharedPtr ssl_info);
   const TunnelingConfigHelper& config_;
   Http::CodecType type_;
-  absl::optional<Upstream::HttpPoolData> conn_pool_data_{};
+  absl::optional<Upstream::HttpPoolData> conn_pool_data_;
   Http::ConnectionPool::Cancellable* upstream_handle_{};
   GenericConnectionPoolCallbacks* callbacks_{};
   Http::StreamDecoderFilterCallbacks* decoder_filter_callbacks_;

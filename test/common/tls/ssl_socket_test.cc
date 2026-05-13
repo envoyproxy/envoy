@@ -6913,15 +6913,19 @@ protected:
     // By default, expect 4 buffers to be created - the client and server read and write buffers.
     EXPECT_CALL(*factory, createBuffer_(_, _, _))
         .Times(4)
-        .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
-                             std::function<void()> above_overflow) -> Buffer::Instance* {
-          client_write_buffer = new MockWatermarkBuffer(below_low, above_high, above_overflow);
+        .WillOnce(Invoke([&](absl::AnyInvocable<void()> below_low,
+                             absl::AnyInvocable<void()> above_high,
+                             absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+          client_write_buffer = new MockWatermarkBuffer(std::move(below_low), std::move(above_high),
+                                                        std::move(above_overflow));
           return client_write_buffer;
         }))
-        .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
-                                  std::function<void()> above_overflow) -> Buffer::Instance* {
-          return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
-        }));
+        .WillRepeatedly(
+            Invoke([](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                      absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+              return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
+                                                 std::move(above_overflow));
+            }));
 
     initialize();
 

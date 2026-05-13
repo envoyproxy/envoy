@@ -162,7 +162,10 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
         // SAN types. See the discussion: https://github.com/envoyproxy/envoy/issues/15392
         // TODO(pradeepcrao): Throw an exception when a non-URI matcher is encountered after the
         // deprecated field match_subject_alt_names is removed
-        subject_alt_name_matchers_.emplace_back(createStringSanMatcher(matcher, context));
+        auto status_or_matcher = createStringSanMatcher(matcher, context);
+        SET_AND_RETURN_IF_NOT_OK(status_or_matcher.status(), creation_status);
+
+        subject_alt_name_matchers_.emplace_back(std::move(*status_or_matcher));
       }
     }
   }
