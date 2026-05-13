@@ -145,6 +145,12 @@ public:
   static bool safeFileNameMatch(absl::string_view pattern, absl::string_view str);
 
   /**
+   * Check if a logger's name matches the given file and logger name.
+   */
+  bool checkFineGrainLogger(spdlog::logger* logger, absl::string_view file, absl::string_view name)
+      ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
+
+  /**
    * Remove a fine grain log entry for testing only.
    */
   void removeFineGrainLogEntryForTest(absl::string_view key)
@@ -220,15 +226,32 @@ FineGrainLogContext& getFineGrainLogContext();
  * spdlog::logger* as atomic<shared_ptr> is a C++20 feature.
  */
 #define FINE_GRAIN_LOGGER(NAME)                                                                    \
-  ([&]() -> spdlog::logger* {                                                                      \
+  ([&](absl::string_view name) -> spdlog::logger* {                                                \
     static std::atomic<spdlog::logger*> flogger{nullptr};                                          \
     spdlog::logger* local_flogger = flogger.load(std::memory_order_acquire);                       \
-    if (!local_flogger) {                                                                          \
-      local_flogger =                                                                              \
-          ::Envoy::getFineGrainLogContext().initFineGrainLogger(__FILE__, NAME, flogger);          \
+                                                                                                   \
+    if (__builtin_constant_p(NAME)) {                                                              \
+      if (ABSL_PREDICT_FALSE(!local_flogger)) {                                                    \
+        local_flogger =                                                                            \
+            ::Envoy::getFineGrainLogContext().initFineGrainLogger(__FILE__, name, flogger);        \
+      }                                                                                            \
+    } else {                                                                                       \
+      static std::atomic<const char*> cached_name_ptr{nullptr};                                    \
+      const char* current_ptr = name.data();                                                       \
+      if (ABSL_PREDICT_FALSE(!local_flogger ||                                                     \
+                               cached_name_ptr.load(std::memory_order_relaxed) != current_ptr)) {  \
+        if (!local_flogger ||                                                                      \
+            !::Envoy::getFineGrainLogContext().checkFineGrainLogger(local_flogger, __FILE__, name)) { \
+          local_flogger =                                                                          \
+              ::Envoy::getFineGrainLogContext().initFineGrainLogger(__FILE__, name, flogger);       \
+        }                                                                                          \
+        if (local_flogger) {                                                                       \
+          cached_name_ptr.store(current_ptr, std::memory_order_relaxed);                           \
+        }                                                                                          \
+      }                                                                                            \
     }                                                                                              \
     return local_flogger;                                                                          \
-  }())
+  }(NAME))
 
 /**
  * Macro for fine-grain logger to log without a group.

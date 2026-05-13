@@ -11,6 +11,16 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+envoy_cc_benchmark_binary(
+    name = "fine_grain_logger_benchmark",
+    srcs = ["fine_grain_logger_benchmark.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/common:minimal_logger_lib",
+        "@benchmark",
+    ],
+)
+
 envoy_cc_test(
     name = "backoff_strategy_test",
     srcs = ["backoff_strategy_test.cc"],

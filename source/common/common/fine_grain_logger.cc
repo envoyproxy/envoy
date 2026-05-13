@@ -7,6 +7,7 @@
 
 #include "source/common/common/logger.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 
 using spdlog::level::level_enum;
@@ -48,6 +49,26 @@ SpdLoggerSharedPtr FineGrainLogContext::getFineGrainLogEntryForFlush(absl::strin
 spdlog::level::level_enum FineGrainLogContext::getVerbosityDefaultLevel() const {
   absl::ReaderMutexLock l(fine_grain_log_lock_);
   return verbosity_default_level_;
+}
+
+bool FineGrainLogContext::checkFineGrainLogger(spdlog::logger* logger, absl::string_view file,
+                                             absl::string_view name) {
+  absl::string_view logger_name = logger->name();
+  // Fast path for static strings: the pointer address might match if they are string literals.
+  // spdlog logger name is usually a std::string, so logger_name.data() is not the same as file.data().
+  
+  if (name.empty()) {
+    return logger_name == file;
+  }
+
+  // Common case: logger_name was created as absl::StrCat(file, ":", name)
+  if (logger_name.size() != file.size() + 1 + name.size()) {
+    return false;
+  }
+
+  const char* d = logger_name.data();
+  return d[file.size()] == ':' && absl::StartsWith(logger_name, file) &&
+         absl::EndsWith(logger_name, name);
 }
 
 spdlog::logger* FineGrainLogContext::initFineGrainLogger(absl::string_view file,
