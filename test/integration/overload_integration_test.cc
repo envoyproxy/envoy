@@ -1449,13 +1449,15 @@ typed_config:
   EXPECT_EQ("200", send_request_with_priority(20));
 
   updateResource(0.75);
-  test_server_->waitForGauge("overload.envoy.load_shed_points.priority.high.scale_percent", Eq(100));
+  test_server_->waitForGauge("overload.envoy.load_shed_points.priority.high.scale_percent",
+                             Eq(100));
   test_server_->waitForGauge("overload.envoy.load_shed_points.priority.low.scale_percent", Eq(0));
   EXPECT_EQ("503", send_request_with_priority(5));
   EXPECT_EQ("200", send_request_with_priority(20));
 
   updateResource(0.95);
-  test_server_->waitForGauge("overload.envoy.load_shed_points.priority.high.scale_percent", Eq(100));
+  test_server_->waitForGauge("overload.envoy.load_shed_points.priority.high.scale_percent",
+                             Eq(100));
   test_server_->waitForGauge("overload.envoy.load_shed_points.priority.low.scale_percent", Eq(100));
   EXPECT_EQ("503", send_request_with_priority(5));
   EXPECT_EQ("503", send_request_with_priority(20));
@@ -1498,8 +1500,10 @@ typed_config:
     )EOF"));
 
   updateResource(0.95);
-  test_server_->waitForGauge("overload.envoy.load_shed_points.priority.high.scale_percent", Eq(100));
-  test_server_->waitForGauge("overload.envoy.load_shed_points.priority.default.scale_percent", Eq(100));
+  test_server_->waitForGauge("overload.envoy.load_shed_points.priority.high.scale_percent",
+                             Eq(100));
+  test_server_->waitForGauge("overload.envoy.load_shed_points.priority.default.scale_percent",
+                             Eq(100));
 
   auto codec_client = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
@@ -1549,8 +1553,10 @@ typed_config:
     )EOF"));
 
   updateResource(0.95);
-  test_server_->waitForGauge("overload.envoy.load_shed_points.priority.high.scale_percent", Eq(100));
-  test_server_->waitForGauge("overload.envoy.load_shed_points.priority.default.scale_percent", Eq(100));
+  test_server_->waitForGauge("overload.envoy.load_shed_points.priority.high.scale_percent",
+                             Eq(100));
+  test_server_->waitForGauge("overload.envoy.load_shed_points.priority.default.scale_percent",
+                             Eq(100));
 
   auto codec_client = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
