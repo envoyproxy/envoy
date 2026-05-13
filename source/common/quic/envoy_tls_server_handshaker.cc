@@ -10,11 +10,17 @@ EnvoyTlsServerHandshaker::EnvoyTlsServerHandshaker(
     quic::QuicSession* session, const quic::QuicCryptoServerConfig* crypto_config,
     Ssl::ServerContextSharedPtr pinned_ssl_ctx, bool disable_resumption)
     : TlsServerHandshaker(session, crypto_config), pinned_ssl_ctx_(std::move(pinned_ssl_ctx)) {
-  SSL_set_ex_data(ssl(), handshakerExDataIndex(), this);
-  // Also check the pinned context for keys: the factory is shared across workers and
-  // config_ may reflect an SDS update before ssl_ctx_ is swapped on the main thread.
-  if (disable_resumption || !pinnedServerContext()->hasSessionTicketKeys()) {
-    DisableResumption();
+  RELEASE_ASSERT(SSL_set_ex_data(ssl(), handshakerExDataIndex(), this) == 1,
+                 "Failed to set SSL ex_data for QUIC handshaker");
+  // Refuse resumption for this connection if the caller already decided to
+  // disable it or the pinned context lost its ticket keys (the latter can
+  // happen when SDS leaves the factory config ahead of ssl_ctx_ on the worker).
+  // DisableResumption sets SSL_OP_NO_TICKET on the SSL, which is what gates
+  // the QUIC/TLS 1.3 ticket paths in BoringSSL.
+  if (disable_resumption || pinnedServerContext() == nullptr ||
+      !pinnedServerContext()->hasSessionTicketKeys()) {
+    const bool disabled = DisableResumption();
+    ASSERT(disabled);
   }
 }
 
@@ -26,16 +32,16 @@ int EnvoyTlsServerHandshaker::handshakerExDataIndex() {
   }());
 }
 
+EnvoyTlsServerHandshaker* EnvoyTlsServerHandshaker::handshakerFromSsl(const SSL* ssl) {
+  // Null is valid for the vanilla QUICHE fallback path.
+  return static_cast<EnvoyTlsServerHandshaker*>(SSL_get_ex_data(ssl, handshakerExDataIndex()));
+}
+
 int EnvoyTlsServerHandshaker::ticketKeyCallback(SSL* ssl, uint8_t* key_name, uint8_t* iv,
                                                 EVP_CIPHER_CTX* ctx, HMAC_CTX* hmac_ctx,
                                                 int encrypt) {
-  auto* handshaker =
-      static_cast<EnvoyTlsServerHandshaker*>(SSL_get_ex_data(ssl, handshakerExDataIndex()));
+  auto* handshaker = handshakerFromSsl(ssl);
   if (handshaker == nullptr || handshaker->pinnedServerContext() == nullptr) {
-    // Null handshaker can occur if the runtime guard was toggled between
-    // OnNewSslCtx (which installed this callback on the SSL_CTX) and
-    // connection creation (which fell back to the vanilla TlsServerHandshaker).
-    // Return 0 to disable ticket for this connection — graceful fallback.
     return 0;
   }
   return handshaker->pinnedServerContext()->sessionTicketProcess(ssl, key_name, iv, ctx, hmac_ctx,
@@ -43,17 +49,14 @@ int EnvoyTlsServerHandshaker::ticketKeyCallback(SSL* ssl, uint8_t* key_name, uin
 }
 
 void EnvoyTlsServerHandshaker::keylogCallback(const SSL* ssl, const char* line) {
-  auto* handshaker =
-      static_cast<EnvoyTlsServerHandshaker*>(SSL_get_ex_data(ssl, handshakerExDataIndex()));
+  auto* handshaker = handshakerFromSsl(ssl);
   if (handshaker == nullptr || handshaker->pinnedServerContext() == nullptr) {
-    // Same gating rationale as ticketKeyCallback: when EnvoyTlsServerHandshaker is not
-    // installed (vanilla quic::TlsServerHandshaker path), there is no pinned context
-    // to write through, so silently skip.
     return;
   }
   // EnvoyQuicServerSession is-a Network::Connection, so reuse the cached
   // envoy address objects from its connection info provider rather than
   // re-converting QUICHE addresses on every key log line.
+  ASSERT(dynamic_cast<EnvoyQuicServerSession*>(handshaker->session()) != nullptr);
   const auto& info =
       static_cast<EnvoyQuicServerSession*>(handshaker->session())->connectionInfoProvider();
   handshaker->pinnedServerContext()->maybeWriteKeyLog(line, info.localAddress().get(),

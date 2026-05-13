@@ -8,13 +8,6 @@ namespace Envoy {
 namespace Quic {
 namespace {
 
-TEST(EnvoyTlsServerHandshakerTest, HandshakerExDataIndex) {
-  int index = EnvoyTlsServerHandshaker::handshakerExDataIndex();
-  EXPECT_GE(index, 0);
-  // Calling again returns the same index.
-  EXPECT_EQ(index, EnvoyTlsServerHandshaker::handshakerExDataIndex());
-}
-
 TEST(EnvoyTlsServerHandshakerTest, TicketKeyCallbackNullHandshaker) {
   bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
   ASSERT_NE(ssl_ctx, nullptr);

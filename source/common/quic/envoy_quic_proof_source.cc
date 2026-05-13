@@ -117,10 +117,8 @@ void EnvoyQuicProofSource::updateFilterChainManager(
 
 void EnvoyQuicProofSource::OnNewSslCtx(SSL_CTX* ssl_ctx) {
   registerCertCompression(ssl_ctx);
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_session_ticket_support")) {
-    SSL_CTX_set_tlsext_ticket_key_cb(ssl_ctx, EnvoyTlsServerHandshaker::ticketKeyCallback);
-    SSL_CTX_set_keylog_callback(ssl_ctx, EnvoyTlsServerHandshaker::keylogCallback);
-  }
+  SSL_CTX_set_keylog_callback(ssl_ctx, EnvoyTlsServerHandshaker::keylogCallback);
+  SSL_CTX_set_tlsext_ticket_key_cb(ssl_ctx, EnvoyTlsServerHandshaker::ticketKeyCallback);
 }
 
 } // namespace Quic

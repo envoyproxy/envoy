@@ -74,7 +74,6 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
-        "//test/test_common:test_runtime_lib",
         "@quiche//:quic_core_versions_lib",
         "@quiche//:quic_platform",
         "@quiche//:quic_test_tools_test_certificates_lib",

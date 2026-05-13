@@ -10,16 +10,19 @@
 namespace Envoy {
 namespace Quic {
 
-// TlsServerHandshaker subclass for QUIC session ticket handling.
+// TlsServerHandshaker subclass that bridges shared QUICHE SSL_CTX callbacks
+// to per-connection Envoy state, including Envoy-managed stateless session
+// ticket processing and key logging.
 //
-// The session ticket key callback is installed on the shared QUICHE ssl
-// context, so every connection reaches the same callback regardless of which
-// filter chain served it. To find the right session ticket keys at callback
-// time, each connection pins a shared pointer to its ServerContextImpl in
-// ssl ex data at creation time. The pinned pointer keeps the context alive
-// for the connection even after an SDS update rotates the factory's active
-// context, and it matches TCP TLS behavior where each connection is bound
-// to the ServerContextImpl that was current at connection creation.
+// The shared callbacks are installed on the shared QUICHE ssl context, so
+// every connection reaches the same callback regardless of which filter
+// chain served it. To find the right per-connection state at callback time,
+// each connection stores its EnvoyTlsServerHandshaker in ssl ex_data; the
+// handshaker pins a shared pointer to its ServerContextImpl, keeping the
+// context alive for the connection even after an SDS update rotates the
+// factory's active context. This matches TCP TLS behavior where each
+// connection is bound to the ServerContextImpl that was current at
+// connection creation.
 class EnvoyTlsServerHandshaker : public quic::TlsServerHandshaker {
 public:
   EnvoyTlsServerHandshaker(quic::QuicSession* session,
@@ -28,7 +31,10 @@ public:
 
   // Session ticket key callback installed on the QUICHE ssl context.
   // Retrieves the handshaker from ssl ex_data and delegates to the pinned
-  // ServerContextImpl::sessionTicketProcess().
+  // ServerContextImpl::sessionTicketProcess(). BoringSSL only invokes this
+  // when SSL_OP_NO_TICKET is not set on the SSL; the constructor calls
+  // DisableResumption() to set that flag when this connection should not
+  // process Envoy-managed tickets.
   static int ticketKeyCallback(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
                                HMAC_CTX* hmac_ctx, int encrypt);
 
@@ -39,16 +45,18 @@ public:
   // QUIC session at callback time.
   static void keylogCallback(const SSL* ssl, const char* line);
 
-  // SSL ex_data index for storing the handshaker pointer per-connection.
-  static int handshakerExDataIndex();
-
 private:
-  // QuicServerTransportSocketFactory always creates ServerContextImpl,
-  // so this downcast is safe for all QUIC connections.
+  // QuicServerTransportSocketFactory creates ServerContextImpl when sslCtx()
+  // is available, so this downcast is safe for non-null contexts.
   Extensions::TransportSockets::Tls::ServerContextImpl* pinnedServerContext() const {
     return static_cast<Extensions::TransportSockets::Tls::ServerContextImpl*>(
         pinned_ssl_ctx_.get());
   }
+
+  // Private to lock down the contract that the ex_data slot is written only
+  // by this class's constructor and stores either nullptr or this.
+  static int handshakerExDataIndex();
+  static EnvoyTlsServerHandshaker* handshakerFromSsl(const SSL* ssl);
 
   Ssl::ServerContextSharedPtr pinned_ssl_ctx_;
 };
