@@ -25,10 +25,13 @@
 #include "test/integration/utility.h"
 #include "test/test_common/registry.h"
 
+#include "absl/functional/any_invocable.h"
 #include "gtest/gtest.h"
 
 using testing::_;
 using testing::AtLeast;
+using testing::Eq;
+using testing::Ge;
 using testing::Invoke;
 using testing::MatchesRegex;
 using testing::NiceMock;
@@ -69,8 +72,8 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   // Any time an associated connection is destroyed, it increments both counters.
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy_with_active_rq", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy_with_active_rq", Ge(1));
 
   IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("tcp_proxy"));
   FakeRawConnectionPtr fake_upstream_connection2;
@@ -97,8 +100,8 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamTls) {
 
   EXPECT_EQ("world", tcp_client->data());
   // Any time an associated connection is destroyed, it increments both counters.
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy_with_active_rq", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy_with_active_rq", Ge(1));
 }
 
 // Test proxying data in both directions, and that all data is flushed properly
@@ -283,7 +286,8 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamFlush) {
 
   ASSERT_TRUE(fake_upstream_connection->write(data, true));
 
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_flow_control_paused_reading_total", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_paused_reading_total",
+                               Ge(1));
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_flow_control_resumed_reading_total")
                 ->value(),
             0);
@@ -322,7 +326,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlush) {
 
   ASSERT_TRUE(tcp_client->write(data, true, true, std::chrono::milliseconds(30000)));
 
-  test_server_->waitForGaugeEq("tcp.tcpproxy_stats.upstream_flush_active", 1);
+  test_server_->waitForGauge("tcp.tcpproxy_stats.upstream_flush_active", Eq(1));
   ASSERT_TRUE(fake_upstream_connection->readDisable(false));
   ASSERT_TRUE(fake_upstream_connection->waitForData(data.size()));
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
@@ -330,7 +334,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlush) {
   tcp_client->waitForHalfClose();
 
   EXPECT_EQ(test_server_->counter("tcp.tcpproxy_stats.upstream_flush_total")->value(), 1);
-  test_server_->waitForGaugeEq("tcp.tcpproxy_stats.upstream_flush_active", 0);
+  test_server_->waitForGauge("tcp.tcpproxy_stats.upstream_flush_active", Eq(0));
 }
 
 // Test that Envoy doesn't crash or assert when shutting down with an upstream flush active
@@ -353,7 +357,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlushEnvoyExit) {
 
   ASSERT_TRUE(tcp_client->write(data, true));
 
-  test_server_->waitForGaugeEq("tcp.tcpproxy_stats.upstream_flush_active", 1);
+  test_server_->waitForGauge("tcp.tcpproxy_stats.upstream_flush_active", Eq(1));
   test_server_.reset();
   ASSERT_TRUE(fake_upstream_connection->close());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
@@ -572,15 +576,15 @@ TEST_P(TcpProxyIntegrationTest, AccessLogUpstreamDetectedCloseType) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   // Wait for the upstream to close to ensure we get the correct close type.
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy_remote", 1,
-                                 TestUtility::DefaultTimeout * 100);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy_remote", Ge(1),
+                               TestUtility::DefaultTimeout * 100);
 
   // Downstream should be closed by proxy.
   tcp_client->close();
 
   // Guarantee client is done writing to the log.
   auto log_result = waitForAccessLog(access_log_path);
-  EXPECT_THAT(log_result, testing::Eq("RemoteReset"));
+  EXPECT_THAT(log_result, Eq("RemoteReset"));
 }
 
 // Verifies that upstream RST is propagated to downstream as RST (default behavior).
@@ -624,7 +628,7 @@ TEST_P(TcpProxyIntegrationTest, UpstreamRstPropagation) {
   tcp_client->waitForDisconnect();
 
   auto log_result = waitForAccessLog(access_log_path);
-  EXPECT_THAT(log_result, testing::Eq("RemoteReset"));
+  EXPECT_THAT(log_result, Eq("RemoteReset"));
 }
 #endif
 
@@ -975,12 +979,12 @@ TEST_P(TcpProxyIntegrationTest, TestPerClientIdletimeout) {
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   // Platforms could prevent ActiveTcpClient construction unless we explicitly wait for it.
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Ge(1));
 
   tcp_client->close();
 
   // Two pre-connections are closed by idle timers.
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 2);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Ge(2));
 }
 
 TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
@@ -1350,7 +1354,7 @@ void TcpProxyMetadataMatchIntegrationTest::expectEndpointToMatchRoute(
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForDisconnect();
 
-  test_server_->waitForCounterGe("cluster.cluster_0.lb_subsets_selected", 1);
+  test_server_->waitForCounter("cluster.cluster_0.lb_subsets_selected", Ge(1));
 }
 
 // Verifies connection failure.
@@ -1363,8 +1367,8 @@ void TcpProxyMetadataMatchIntegrationTest::expectEndpointNotToMatchRoute(
   // e.g. on 'envoy-linux (bazel compile_time_options)' and 'envoy-linux (bazel release)'
   // tcp_client->waitForDisconnect();
 
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_none_healthy", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.lb_subsets_selected", 0);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_none_healthy", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.lb_subsets_selected", Eq(0));
 
   tcp_client->close();
 }
@@ -1837,7 +1841,7 @@ TEST_P(MysqlIntegrationTest, DisconnectDetected) {
 
   // Close the prefetched connection.
   ASSERT_TRUE(fake_upstream_connection1->close());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Ge(1));
 
   tcp_client->close();
 }
@@ -1983,11 +1987,11 @@ TEST_P(TcpProxyReceiveBeforeConnectIntegrationTest, ReceiveBeforeConnectEarlyDat
   // Until total data size > 6 is received, the PauseFilter stops the iteration. Downstream counter
   // is incremented, but no connection attempt to upstream is made.
   ASSERT_TRUE(tcp_client->write("hello"));
-  test_server_->waitForCounterEq("tcp.tcpproxy_stats.downstream_cx_total", 1);
+  test_server_->waitForCounter("tcp.tcpproxy_stats.downstream_cx_total", Eq(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
 
   ASSERT_TRUE(tcp_client->write("world"));
-  test_server_->waitForCounterEq("tcp.tcpproxy_stats.early_data_received_count_total", 1);
+  test_server_->waitForCounter("tcp.tcpproxy_stats.early_data_received_count_total", Eq(1));
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
 
@@ -2023,13 +2027,13 @@ TEST_P(TcpProxyReceiveBeforeConnectIntegrationTest, UpstreamBufferHighWatermark)
 
   // PauseFilter stops the iteration until sufficient data is received.
   ASSERT_TRUE(tcp_client->write(data.substr(0, upstream_buffer_limit - 1)));
-  test_server_->waitForCounterEq("tcp.tcpproxy_stats.downstream_cx_total", 1);
+  test_server_->waitForCounter("tcp.tcpproxy_stats.downstream_cx_total", Eq(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
 
   // Downstream sends more data. PauseFilter allows the iteration to continue, upstream connection
   // is established. The buffered early data is sent to the upstream.
   ASSERT_TRUE(tcp_client->write(data.substr(upstream_buffer_limit - 1)));
-  test_server_->waitForCounterEq("tcp.tcpproxy_stats.early_data_received_count_total", 1);
+  test_server_->waitForCounter("tcp.tcpproxy_stats.early_data_received_count_total", Eq(1));
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
 
@@ -2526,16 +2530,17 @@ TEST_P(TcpProxySslIntegrationTest, OnDownstreamTlsHandshakeModeWithEarlyData) {
   // buffer. This allows us to track the bytes actually written to the socket.
   EXPECT_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
       .Times(AtLeast(1))
-      .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
-                           std::function<void()> above_overflow) -> Buffer::Instance* {
-        client_write_buffer =
-            new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
-        ON_CALL(*client_write_buffer, move(_))
-            .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::baseMove));
-        ON_CALL(*client_write_buffer, drain(_))
-            .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::trackDrains));
-        return client_write_buffer;
-      }));
+      .WillOnce(
+          Invoke([&](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                     absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+            client_write_buffer = new NiceMock<MockWatermarkBuffer>(
+                std::move(below_low), std::move(above_high), std::move(above_overflow));
+            ON_CALL(*client_write_buffer, move(_))
+                .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::baseMove));
+            ON_CALL(*client_write_buffer, drain(_))
+                .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::trackDrains));
+            return client_write_buffer;
+          }));
 
   // Set up the SSL client.
   Network::Address::InstanceConstSharedPtr address =

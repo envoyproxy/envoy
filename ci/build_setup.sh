@@ -82,6 +82,9 @@ case $CI_TARGET in
     external)
         ENVOY_OUTPUT_BASE_DIR="${ENVOY_OUTPUT_BASE_DIR:-external}"
         ;;
+    refresh_compdb|pre_refresh_compdb)
+        ENVOY_OUTPUT_BASE_DIR="${ENVOY_OUTPUT_BASE_DIR:-base-envoy-compdb}"
+        ;;
     *)
         ENVOY_OUTPUT_BASE_DIR="${ENVOY_OUTPUT_BASE_DIR:-base}"
         ;;

@@ -40,7 +40,7 @@ generate_x509_cert() {
 generate_expired_x509_cert() {
   local days="${3:-730}"
   openssl req -new -key "${1}key.pem" -out "${1}cert.csr" -config "${1}cert.cfg" -batch -sha256
-  docker run --rm -u root -v "$(pwd):/work" -w /work envoyproxy/envoy-build:gcc-86873047235e9b8232df989a5999b9bebf9db69c sh -c "apt-get update -y && apt-get install -y faketime && faketime '370 days ago' openssl x509 -req -days \"${days}\" -in \"${1}cert.csr\" -sha256 -CA \"${2}cert.pem\" -CAkey \"${2}key.pem\" -CAcreateserial -out \"${1}cert.pem\" -extensions v3_ca -extfile \"${1}cert.cfg\""
+  docker run --rm -u root -v "$(pwd):/work" -w /work envoyproxy/envoy-build:gcc-v0.1.3 sh -c "apt-get update -y && apt-get install -y faketime && faketime '370 days ago' openssl x509 -req -days \"${days}\" -in \"${1}cert.csr\" -sha256 -CA \"${2}cert.pem\" -CAkey \"${2}key.pem\" -CAcreateserial -out \"${1}cert.pem\" -extensions v3_ca -extfile \"${1}cert.cfg\""
   echo -e "// NOLINT(namespace-envoy)\nconstexpr char TEST_$(echo "$1" | tr "[:lower:]" "[:upper:]")_CERT_HASH[] = \"$(openssl x509 -in "${1}cert.pem" -noout -fingerprint -sha256 | cut -d"=" -f2)\";" > "${1}cert_hash.h"
 }
 

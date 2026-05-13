@@ -34,14 +34,39 @@ minor_behavior_changes:
     Optimized prometheus stats endpoint. Users should see a roughly 30-40% latency improvement in calls to the endpoint
     for cases where the scrape results in lots of cluster stats.
     There should be no visible changes to users, or incompatibilities.
+- area: tls
+  change: |
+    ``SslSocket`` now reports ``ECONNRESET`` as ``ConnectionReset`` by reading the system error
+    code from BoringSSL's error queue, matching ``RawBufferSocket`` behavior. When a connection
+    is closed with ``ConnectionCloseType::AbortReset``, ``SslSocket`` also skips the TLS
+    ``close_notify`` shutdown so the peer reliably observes a TCP RST instead of racing a
+    graceful close against the reset.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.ssl_socket_report_connection_reset`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: wasm
+  change: |
+    Fixed a bug where Envoy did not recreate the Wasm VM when only
+    :ref:`environment_variables <envoy_v3_api_field_extensions.wasm.v3.VmConfig.environment_variables>`
+    changed in ``vm_config``. The VM was previously reused from the cache because environment variables
+    were not included in the vm_key computation.
 - area: load_report
   change: |
     Fixed a bug in load stats reporting where reports were dropped if only custom metrics or completed
     requests were present in a reporting interval. This behavioral change can be reverted by setting
     the runtime guard ``envoy.reloadable_features.report_load_for_non_zero_stats`` to ``false``.
+- area: spiffe_validator
+  change: |
+    Fixed a bug where if an invalid custom SAN matcher was configured it would later lead to a crash
+    when validating a certificate.
+- area: rbac
+  change: |
+    Fixed a bug in the :ref:`mTLS Authenticated <envoy_v3_api_msg_extensions.rbac.principals.mtls_authenticated.v3.Config>`
+    principal extension where if an invalid SAN matcher was configured, it would incorrectly match any
+    certificate in the allowed trust chain. Known bad configurations are an invalid ``OID`` when using
+    an ``OTHER_NAME``, or specifying a ``StringMatcher`` with an invalid configuration.
 - area: build
   change: |
     Fixed ``Illegal ambiguous match`` error when building contrib targets with ``--config=aws-lc-fips``
@@ -72,6 +97,20 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: router
+  change: |
+    Added support for ``refreshRouteCluster`` on weighted cluster routes. When a filter calls
+    ``refreshRouteCluster()``, the weighted cluster entry will select a different cluster from the
+    configured pool, avoiding previously-tried clusters within the same request. Once all clusters
+    have been tried, the selection pool resets so that any cluster may be chosen again. This enables
+    filters to implement per-attempt cluster failover across weighted clusters without replacing the
+    entire route.
+- area: tcp_proxy
+  change: |
+    Added :ref:`check_drain_close
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.check_drain_close>` to the TCP proxy
+    filter to close downstream connections with ``FlushWrite`` when the drain manager requests drain close during
+    downstream read or write handling.
 - area: stat_sinks
   change: |
     Added :ref:`max_data_points_per_request
@@ -128,6 +167,11 @@ new_features:
     in the composite HTTP filter. Now users could specify the matcher inline in the filter configuration
     instead of using the :ref:`ExtensionWithMatcher
     <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` filter.
+- area: resource_monitors
+  change: |
+    Overload manager fixed heap resource monitor now supports :ref:`max_heap_size_bytes_runtime
+    <envoy_v3_api_field_extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig.max_heap_size_bytes_runtime>`
+    for runtime-overridable max heap size (e.g. RTDS or ``/runtime_modify``).
 - area: jwt_authn
   change: |
     Added :ref:`verification_status_header
@@ -143,5 +187,18 @@ new_features:
     Added ``close_sidestream`` to :ref:`ProcessingResponse
     <envoy_v3_api_msg_service.network_ext_proc.v3.ProcessingResponse>` to allow the external processor to request
     closing the gRPC stream early, causing subsequent data to bypass the network ``ext_proc`` filter.
+- area: access_log
+  change: |
+    Added ``%UPSTREAM_SERVER_NAME%`` access log formatter returning the SNI from the established upstream
+    TLS connection.
+- area: attributes
+  change: |
+    Added ``upstream.server_name`` CEL attribute returning the SNI from the established upstream
+    TLS connection.
+
+- area: tls
+  change: |
+    Added substitution commands ``%DOWNSTREAM_TLS_GROUP%`` and ``%UPSTREAM_TLS_GROUP%``. The TLS group may be used
+    to discern if a TLS connection used a post quantum safe key exchange (e.g. X25519MLKEM768).
 
 deprecated:

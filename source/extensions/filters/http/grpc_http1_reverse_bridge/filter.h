@@ -57,11 +57,11 @@ private:
   // The actual size of the response returned by the upstream so far.
   uint32_t upstream_response_bytes_{};
 
-  std::string content_type_{};
+  std::string content_type_;
   Grpc::Status::GrpcStatus grpc_status_{};
   // Normally we'd use the encoding buffer, but since we need to mutate the
   // buffer we instead maintain our own.
-  Buffer::OwnedImpl buffer_{};
+  Buffer::OwnedImpl buffer_;
 };
 
 using FilterPtr = std::unique_ptr<Filter>;

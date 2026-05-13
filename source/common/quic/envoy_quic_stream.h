@@ -245,6 +245,7 @@ protected:
 
   std::string quicStreamState();
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   http2::adapter::HeaderValidator& header_validator() { return header_validator_; }
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS

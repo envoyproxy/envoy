@@ -26,6 +26,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
+#include "absl/functional/any_invocable.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -57,10 +58,12 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
   // necessary right now.
   timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(10));
   ON_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
-      .WillByDefault(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
-                               std::function<void()> above_overflow) -> Buffer::Instance* {
-        return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
-      }));
+      .WillByDefault(
+          Invoke([](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                    absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+            return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
+                                               std::move(above_overflow));
+          }));
   ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
   ON_CALL(factory_context_, statsScope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
   ON_CALL(factory_context_.server_context_, sslContextManager())

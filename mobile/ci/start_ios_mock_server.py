@@ -12,7 +12,7 @@ import time
 
 class MockHandler(http.server.SimpleHTTPRequestHandler):
 
-    def do_GET(self):
+    def do_GET(self):  # noqa: N802
         if self.path == '/ping':
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')

@@ -135,6 +135,8 @@ absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>> DynamicModuleCluster
     return absl::InvalidArgumentError("Failed to create in-module cluster configuration");
   }
 
+  config->stat_creation_frozen_ = true;
+
   return config;
 }
 
@@ -188,7 +190,6 @@ DynamicModuleCluster::DynamicModuleCluster(const envoy::config::cluster::v3::Clu
                                            Upstream::ClusterFactoryContext& context,
                                            absl::Status& creation_status)
     : ClusterImplBase(cluster, context, creation_status), config_(std::move(config)),
-      in_module_cluster_(nullptr),
       dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       server_context_(context.serverFactoryContext()) {
 
@@ -358,7 +359,7 @@ bool DynamicModuleCluster::addHosts(
   }
 
   {
-    absl::WriterMutexLock lock(&host_map_lock_);
+    absl::WriterMutexLock lock(host_map_lock_);
     for (const auto& host : result_hosts) {
       host_map_[host.get()] = host;
     }
@@ -440,7 +441,7 @@ Upstream::HostSharedPtr DynamicModuleCluster::findHostByAddress(const std::strin
 }
 
 Upstream::HostSharedPtr DynamicModuleCluster::findHost(void* raw_host_ptr) {
-  absl::ReaderMutexLock lock(&host_map_lock_);
+  absl::ReaderMutexLock lock(host_map_lock_);
   auto it = host_map_.find(raw_host_ptr);
   if (it == host_map_.end()) {
     return nullptr;
@@ -454,7 +455,7 @@ size_t DynamicModuleCluster::removeHosts(const std::vector<Upstream::HostSharedP
 
   // Remove all valid hosts from the map.
   {
-    absl::WriterMutexLock lock(&host_map_lock_);
+    absl::WriterMutexLock lock(host_map_lock_);
     for (const auto& host : hosts) {
       if (host == nullptr) {
         continue;
@@ -472,7 +473,7 @@ size_t DynamicModuleCluster::removeHosts(const std::vector<Upstream::HostSharedP
   }
 
   // Build the remaining host list and update the priority set once.
-  ASSERT(priority_set_.hostSetsPerPriority().size() >= 1);
+  ASSERT(!priority_set_.hostSetsPerPriority().empty());
   const auto& first_host_set = priority_set_.getOrCreateHostSet(0);
 
   // Build a set of removed host pointers for O(1) lookup.
@@ -617,12 +618,12 @@ absl::flat_hash_set<const DynamicModuleLoadBalancer*>& activeDynamicModuleLoadBa
 }
 
 void registerActiveDynamicModuleLoadBalancer(const DynamicModuleLoadBalancer* lb) {
-  absl::MutexLock lock(&activeDynamicModuleLoadBalancersMutex());
+  absl::MutexLock lock(activeDynamicModuleLoadBalancersMutex());
   activeDynamicModuleLoadBalancers().insert(lb);
 }
 
 void unregisterActiveDynamicModuleLoadBalancer(const DynamicModuleLoadBalancer* lb) {
-  absl::MutexLock lock(&activeDynamicModuleLoadBalancersMutex());
+  absl::MutexLock lock(activeDynamicModuleLoadBalancersMutex());
   activeDynamicModuleLoadBalancers().erase(lb);
 }
 } // namespace
@@ -630,7 +631,7 @@ void unregisterActiveDynamicModuleLoadBalancer(const DynamicModuleLoadBalancer* 
 bool DynamicModuleLoadBalancer::withActiveInstance(
     const DynamicModuleLoadBalancer* lb,
     absl::FunctionRef<void(const DynamicModuleLoadBalancer&)> f) {
-  absl::MutexLock lock(&activeDynamicModuleLoadBalancersMutex());
+  absl::MutexLock lock(activeDynamicModuleLoadBalancersMutex());
   if (!activeDynamicModuleLoadBalancers().contains(lb)) {
     return false;
   }
@@ -640,7 +641,7 @@ bool DynamicModuleLoadBalancer::withActiveInstance(
 
 DynamicModuleLoadBalancer::DynamicModuleLoadBalancer(
     const DynamicModuleClusterHandleSharedPtr& handle, const Upstream::PrioritySet& priority_set)
-    : handle_(handle), priority_set_(priority_set), in_module_lb_(nullptr) {
+    : handle_(handle), priority_set_(priority_set) {
   // Register before invoking any module hook so a concurrent async host selection completion can
   // validate its raw pointer against a live instance.
   registerActiveDynamicModuleLoadBalancer(this);

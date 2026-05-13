@@ -519,6 +519,7 @@ public:
   const uint8_t* bytes() const { return bytes_.get(); }
 
 protected:
+  SymbolTable::StoragePtr releaseBytes() { return std::move(bytes_); }
   void setBytes(SymbolTable::StoragePtr&& bytes) { bytes_ = std::move(bytes); }
   void clear() { bytes_.reset(); }
 
@@ -567,6 +568,9 @@ public:
    * @param table the symbol table.
    */
   void free(SymbolTable& table);
+
+protected:
+  StatNameStorage() = default;
 };
 
 /**
@@ -733,8 +737,9 @@ public:
   // generate symbols for it.
   StatNameManagedStorage(absl::string_view name, SymbolTable& table)
       : StatNameStorage(name, table), symbol_table_(table) {}
-  StatNameManagedStorage(StatNameManagedStorage&& src) noexcept
-      : StatNameStorage(std::move(src)), symbol_table_(src.symbol_table_) {}
+  StatNameManagedStorage(StatNameManagedStorage&& src) noexcept : symbol_table_(src.symbol_table_) {
+    setBytes(src.releaseBytes());
+  }
   StatNameManagedStorage(StatName src, SymbolTable& table) noexcept
       : StatNameStorage(src, table), symbol_table_(table) {}
 

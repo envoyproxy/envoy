@@ -42,6 +42,8 @@ jobs:
       check-name: prechecks
 
   format:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
       actions: read
       contents: read
@@ -57,6 +59,8 @@ jobs:
       trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 
   deps:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
       actions: read
       contents: read
@@ -74,6 +78,7 @@ jobs:
 
   publish:
     secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
       gcp-key: >-
         ${{ needs.load.outputs.trusted
             && fromJSON(needs.load.outputs.trusted)
@@ -94,6 +99,8 @@ jobs:
       trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 
   external:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
       actions: read
       contents: read

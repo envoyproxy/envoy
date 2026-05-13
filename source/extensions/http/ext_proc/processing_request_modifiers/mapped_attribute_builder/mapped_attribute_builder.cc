@@ -11,8 +11,6 @@ namespace Envoy {
 namespace Http {
 namespace ExternalProcessing {
 
-using envoy::service::ext_proc::v3::ProcessingRequest;
-
 // Helper function to convert proto map values to a unique vector of strings.
 // The order of elements in the returned vector is not guaranteed.
 Protobuf::RepeatedPtrField<std::string>
