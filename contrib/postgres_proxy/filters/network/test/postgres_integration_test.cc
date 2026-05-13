@@ -19,6 +19,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Eq;
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -121,7 +122,7 @@ TEST_P(BasicPostgresIntegrationTest, Login) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   // Make sure that the successful login bumped up the number of sessions.
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions", 1);
+  test_server_->waitForCounter("postgres.postgres_stats.sessions", Eq(1));
 }
 INSTANTIATE_TEST_SUITE_P(IpVersions, BasicPostgresIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
@@ -180,7 +181,7 @@ TEST_P(DownstreamSSLPostgresIntegrationTest, TerminateSSL) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   // Make sure that the successful login bumped up the number of sessions.
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_terminated_ssl", 1);
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_terminated_ssl", Eq(1));
 }
 
 // Test verifies that Postgres filter replies with error code upon
@@ -244,7 +245,7 @@ TEST_P(DownstreamSSLWrongConfigPostgresIntegrationTest, TerminateSSLNoStartTlsTr
   tcp_client->waitForDisconnect();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_terminated_ssl", 0);
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_terminated_ssl", Eq(0));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, DownstreamSSLWrongConfigPostgresIntegrationTest,
@@ -414,8 +415,8 @@ TEST_P(UpstreamSSLDisabledPostgresIntegrationTest, BasicConnectivityTest) {
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_upstream_ssl_success", 0);
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_upstream_ssl_failed", 0);
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_upstream_ssl_success", Eq(0));
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_upstream_ssl_failed", Eq(0));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamSSLDisabledPostgresIntegrationTest,
@@ -477,8 +478,8 @@ TEST_P(UpstreamSSLRequirePostgresIntegrationTest, ServerAgreesForSSLTest) {
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_upstream_ssl_success", 1);
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_upstream_ssl_failed", 0);
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_upstream_ssl_success", Eq(1));
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_upstream_ssl_failed", Eq(0));
 }
 
 // Test verifies that postgres filter will not continue when upstream SSL
@@ -513,8 +514,8 @@ TEST_P(UpstreamSSLRequirePostgresIntegrationTest, ServerDeniesSSLTest) {
   tcp_client->waitForDisconnect();
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_upstream_ssl_success", 0);
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_upstream_ssl_failed", 1);
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_upstream_ssl_success", Eq(0));
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_upstream_ssl_failed", Eq(1));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamSSLRequirePostgresIntegrationTest,
@@ -663,9 +664,9 @@ TEST_P(UpstreamAndDownstreamSSLIntegrationTest, ServerAgreesForSSL) {
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_terminated_ssl", 1);
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_upstream_ssl_success", 1);
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_upstream_ssl_failed", 0);
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_terminated_ssl", Eq(1));
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_upstream_ssl_success", Eq(1));
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_upstream_ssl_failed", Eq(0));
 }
 
 // Integration test when both downstream and upstream SSL is enabled.
@@ -733,9 +734,9 @@ TEST_P(UpstreamAndDownstreamSSLIntegrationTest, ServerRejectsSSL) {
   tcp_client->waitForDisconnect();
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_terminated_ssl", 1);
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_upstream_ssl_success", 0);
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_upstream_ssl_failed", 1);
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_terminated_ssl", Eq(1));
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_upstream_ssl_success", Eq(0));
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_upstream_ssl_failed", Eq(1));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamAndDownstreamSSLIntegrationTest,

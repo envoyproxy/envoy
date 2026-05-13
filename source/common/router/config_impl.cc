@@ -1369,12 +1369,16 @@ RouteEntryImplBase::perFilterConfigs(absl::string_view filter_name) const {
 }
 
 const envoy::config::core::v3::Metadata& RouteEntryImplBase::metadata() const {
-  return metadata_ != nullptr ? metadata_->proto_metadata_
-                              : DefaultRouteMetadataPack::get().proto_metadata_;
+  if (metadata_ != nullptr) {
+    return metadata_->proto_metadata_;
+  }
+  return DefaultRouteMetadataPack::get().proto_metadata_;
 }
 const Envoy::Config::TypedMetadata& RouteEntryImplBase::typedMetadata() const {
-  return metadata_ != nullptr ? metadata_->typed_metadata_
-                              : DefaultRouteMetadataPack::get().typed_metadata_;
+  if (metadata_ != nullptr) {
+    return metadata_->typed_metadata_;
+  }
+  return DefaultRouteMetadataPack::get().typed_metadata_;
 }
 
 UriTemplateMatcherRouteEntryImpl::UriTemplateMatcherRouteEntryImpl(
@@ -1728,12 +1732,16 @@ CommonVirtualHostImpl::perFilterConfigs(absl::string_view filter_name) const {
 }
 
 const envoy::config::core::v3::Metadata& CommonVirtualHostImpl::metadata() const {
-  return metadata_ != nullptr ? metadata_->proto_metadata_
-                              : DefaultRouteMetadataPack::get().proto_metadata_;
+  if (metadata_ != nullptr) {
+    return metadata_->proto_metadata_;
+  }
+  return DefaultRouteMetadataPack::get().proto_metadata_;
 }
 const Envoy::Config::TypedMetadata& CommonVirtualHostImpl::typedMetadata() const {
-  return metadata_ != nullptr ? metadata_->typed_metadata_
-                              : DefaultRouteMetadataPack::get().typed_metadata_;
+  if (metadata_ != nullptr) {
+    return metadata_->typed_metadata_;
+  }
+  return DefaultRouteMetadataPack::get().typed_metadata_;
 }
 
 absl::StatusOr<std::shared_ptr<CommonVirtualHostImpl>>
@@ -2136,12 +2144,16 @@ CommonConfigImpl::clusterSpecifierPlugin(absl::string_view provider) const {
 }
 
 const envoy::config::core::v3::Metadata& CommonConfigImpl::metadata() const {
-  return metadata_ != nullptr ? metadata_->proto_metadata_
-                              : DefaultRouteMetadataPack::get().proto_metadata_;
+  if (metadata_ != nullptr) {
+    return metadata_->proto_metadata_;
+  }
+  return DefaultRouteMetadataPack::get().proto_metadata_;
 }
 const Envoy::Config::TypedMetadata& CommonConfigImpl::typedMetadata() const {
-  return metadata_ != nullptr ? metadata_->typed_metadata_
-                              : DefaultRouteMetadataPack::get().typed_metadata_;
+  if (metadata_ != nullptr) {
+    return metadata_->typed_metadata_;
+  }
+  return DefaultRouteMetadataPack::get().typed_metadata_;
 }
 
 absl::StatusOr<std::shared_ptr<CommonConfigImpl>>

@@ -96,7 +96,7 @@ message Validation {
 // Configuration for the reverse tunnel network filter.
 // This filter handles reverse tunnel connection acceptance and rejection by processing
 // HTTP requests where required identification values are provided via HTTP headers.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message ReverseTunnel {
   // Ping interval for health checks on established reverse tunnel connections.
   // If not specified, defaults to ``2 seconds``.
@@ -133,4 +133,11 @@ message ReverseTunnel {
   // via ``x-envoy-reverse-tunnel-upstream-cluster-name`` header. Connections with mismatched or missing
   // cluster names are rejected with HTTP ``400 Bad Request``. When empty, no cluster name validation is performed.
   string required_cluster_name = 6 [(validate.rules).string = {max_len: 255 ignore_empty: true}];
+
+  // Accept the handshake as an HTTP/1.1 ``Upgrade`` exchange (``Upgrade: reverse-tunnel``,
+  // reply ``101``) so HTTP proxies can route the handshake and splice the tunnel
+  // afterward. Non-upgrade requests are rejected with ``426``. The initiator must set this
+  // flag to the same value.
+  // Defaults to ``false``.
+  bool use_http_upgrade = 7;
 }

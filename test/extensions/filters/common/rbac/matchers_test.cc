@@ -628,6 +628,21 @@ TEST(MtlsAuthenticatedMatcher, SanMatcher) {
   checkMatcher(Principals::MtlsAuthenticatedMatcher(auth, factory_context), false, conn);
 }
 
+TEST(MtlsAuthenticatedMatcher, InvalidOid) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+
+  envoy::extensions::rbac::principals::mtls_authenticated::v3::Config auth;
+  auto* matcher = auth.mutable_san_matcher();
+  matcher->set_san_type(
+      envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::OTHER_NAME);
+  matcher->mutable_matcher()->set_exact("test_value");
+  matcher->set_oid("not_a_valid_oid");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      { Principals::MtlsAuthenticatedMatcher m(auth, factory_context); }, EnvoyException,
+      "Failed to create SAN matcher for OTHER_NAME with OID: not_a_valid_oid");
+}
+
 TEST(MetadataMatcher, MetadataMatcher) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Envoy::Network::MockConnection conn;

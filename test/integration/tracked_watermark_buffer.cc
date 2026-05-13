@@ -27,9 +27,9 @@ TrackedWatermarkBufferFactory::~TrackedWatermarkBufferFactory() {
 }
 
 Buffer::InstancePtr
-TrackedWatermarkBufferFactory::createBuffer(std::function<void()> below_low_watermark,
-                                            std::function<void()> above_high_watermark,
-                                            std::function<void()> above_overflow_watermark) {
+TrackedWatermarkBufferFactory::createBuffer(absl::AnyInvocable<void()> below_low_watermark,
+                                            absl::AnyInvocable<void()> above_high_watermark,
+                                            absl::AnyInvocable<void()> above_overflow_watermark) {
   absl::MutexLock lock(mutex_);
   uint64_t idx = next_idx_++;
   ++active_buffer_count_;
@@ -88,7 +88,8 @@ TrackedWatermarkBufferFactory::createBuffer(std::function<void()> below_low_wate
           actively_bound_buffers_.emplace(buffer);
         }
       },
-      below_low_watermark, above_high_watermark, above_overflow_watermark);
+      std::move(below_low_watermark), std::move(above_high_watermark),
+      std::move(above_overflow_watermark));
 }
 
 BufferMemoryAccountSharedPtr

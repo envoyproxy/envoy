@@ -666,7 +666,7 @@ TEST_P(RemoteJwksIntegrationTest, WithGoodTokenAsyncFetchFast) {
   // the first request will trigger a second jwks fetch, this is not expected, test will fail.
   // To avoid such race condition, before making the first request, wait for the first
   // fetch stats to be updated.
-  test_server_->waitForCounterGe("http.config_test.jwt_authn.jwks_fetch_success", 1);
+  test_server_->waitForCounter("http.config_test.jwt_authn.jwks_fetch_success", testing::Ge(1));
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 

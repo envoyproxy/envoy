@@ -18,6 +18,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace Extensions {
 namespace Clusters {
@@ -343,15 +345,15 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTest) {
   ENVOY_LOG_MISC(info, "Waiting for reverse tunnel connections to be established.");
 
   // Wait for reverse tunnel to establish.
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1,
-                                 std::chrono::milliseconds(5000));
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1),
+                               std::chrono::milliseconds(5000));
   // Wait for the listener to accept a downstream connection.
-  test_server_->waitForCounterGe("listener.reverse_conn_listener.downstream_cx_total", 1,
-                                 std::chrono::milliseconds(5000));
+  test_server_->waitForCounter("listener.reverse_conn_listener.downstream_cx_total", Ge(1),
+                               std::chrono::milliseconds(5000));
 
   // Verify reverse tunnel stats.
-  test_server_->waitForGaugeGe("reverse_tunnel_acceptor.nodes.test-node-id", 1);
-  test_server_->waitForGaugeGe("reverse_tunnel_acceptor.clusters.test-cluster-id", 1);
+  test_server_->waitForGauge("reverse_tunnel_acceptor.nodes.test-node-id", Ge(1));
+  test_server_->waitForGauge("reverse_tunnel_acceptor.clusters.test-cluster-id", Ge(1));
 
   // Verify no handshake errors occurred.
   EXPECT_EQ(test_server_->counter("reverse_tunnel.handshake.parse_error")->value(), 0);
@@ -364,10 +366,10 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTest) {
   const std::string formatted_tunnel_address = formattedTunnelAddress(tunnel_listener_port);
   const std::string initiator_host_stat =
       fmt::format("reverse_tunnel_initiator.host.{}.connected", formatted_tunnel_address);
-  test_server_->waitForGaugeGe(initiator_host_stat, 1, std::chrono::milliseconds(2000));
+  test_server_->waitForGauge(initiator_host_stat, Ge(1), std::chrono::milliseconds(2000));
 
   // Verify cluster-level initiator stats.
-  test_server_->waitForGaugeGe("reverse_tunnel_initiator.cluster.tunnel_cluster.connected", 1);
+  test_server_->waitForGauge("reverse_tunnel_initiator.cluster.tunnel_cluster.connected", Ge(1));
 
   ENVOY_LOG_MISC(info, "Reverse tunnel established. Sending HTTP request through tunnel.");
 
@@ -398,9 +400,9 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTest) {
 
   // Verify cluster stats for the reverse connection cluster.
   ENVOY_LOG_MISC(info, "Verifying reverse connection cluster stats.");
-  test_server_->waitForCounterGe("cluster.reverse_connection_cluster.upstream_cx_total", 1);
-  test_server_->waitForCounterGe("cluster.reverse_connection_cluster.upstream_rq_total", 1);
-  test_server_->waitForCounterGe("cluster.reverse_connection_cluster.upstream_rq_completed", 1);
+  test_server_->waitForCounter("cluster.reverse_connection_cluster.upstream_cx_total", Ge(1));
+  test_server_->waitForCounter("cluster.reverse_connection_cluster.upstream_rq_total", Ge(1));
+  test_server_->waitForCounter("cluster.reverse_connection_cluster.upstream_rq_completed", Ge(1));
   EXPECT_EQ(
       test_server_->counter("cluster.reverse_connection_cluster.upstream_cx_connect_fail")->value(),
       0);
@@ -493,14 +495,14 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTest) {
 
   // Verify updated cluster stats after concurrent requests.
   ENVOY_LOG_MISC(info, "Verifying updated stats after concurrent requests.");
-  test_server_->waitForCounterGe("cluster.reverse_connection_cluster.upstream_rq_total",
-                                 6); // 1 initial + 5 concurrent
-  test_server_->waitForCounterGe("cluster.reverse_connection_cluster.upstream_rq_completed", 6);
+  test_server_->waitForCounter("cluster.reverse_connection_cluster.upstream_rq_total",
+                               Ge(6)); // 1 initial + 5 concurrent
+  test_server_->waitForCounter("cluster.reverse_connection_cluster.upstream_rq_completed", Ge(6));
 
   // Verify that all requests routed through the existing reverse tunnel.
   // Since all requests use test-node-id or test-cluster-id (which both map to the same tunnel),
   // they all successfully use the established connection.
-  test_server_->waitForCounterEq("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Eq(1));
   ENVOY_LOG_MISC(info,
                  "All concurrent requests successfully routed through single established tunnel.");
 
@@ -517,8 +519,8 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTest) {
   EXPECT_EQ("200", drain_response->headers().getStatusValue());
 
   // Wait for listeners to be fully stopped before test cleanup.
-  test_server_->waitForCounterEq("listener_manager.listener_stopped", 3,
-                                 std::chrono::milliseconds(5000));
+  test_server_->waitForCounter("listener_manager.listener_stopped", Eq(3),
+                               std::chrono::milliseconds(5000));
 }
 
 // End-to-end reverse connection cluster test with mTLS.
@@ -601,14 +603,14 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTestWithMut
   ENVOY_LOG_MISC(info, "Waiting for mTLS reverse tunnel connections to be established.");
 
   // Wait for reverse tunnel to establish with mTLS.
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1,
-                                 std::chrono::milliseconds(5000));
-  test_server_->waitForCounterGe("listener.reverse_conn_listener.downstream_cx_total", 1,
-                                 std::chrono::milliseconds(5000));
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1),
+                               std::chrono::milliseconds(5000));
+  test_server_->waitForCounter("listener.reverse_conn_listener.downstream_cx_total", Ge(1),
+                               std::chrono::milliseconds(5000));
 
   // Verify reverse tunnel stats.
-  test_server_->waitForGaugeGe("reverse_tunnel_acceptor.nodes.test-node-id", 1);
-  test_server_->waitForGaugeGe("reverse_tunnel_acceptor.clusters.test-cluster-id", 1);
+  test_server_->waitForGauge("reverse_tunnel_acceptor.nodes.test-node-id", Ge(1));
+  test_server_->waitForGauge("reverse_tunnel_acceptor.clusters.test-cluster-id", Ge(1));
 
   // Verify no handshake errors occurred.
   EXPECT_EQ(test_server_->counter("reverse_tunnel.handshake.parse_error")->value(), 0);
@@ -620,12 +622,12 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTestWithMut
   const std::string formatted_tunnel_address = formattedTunnelAddress(tunnel_listener_port);
   const std::string initiator_host_stat =
       fmt::format("reverse_tunnel_initiator.host.{}.connected", formatted_tunnel_address);
-  test_server_->waitForGaugeGe(initiator_host_stat, 1, std::chrono::milliseconds(1000));
-  test_server_->waitForGaugeGe("reverse_tunnel_initiator.cluster.tunnel_cluster.connected", 1);
+  test_server_->waitForGauge(initiator_host_stat, Ge(1), std::chrono::milliseconds(1000));
+  test_server_->waitForGauge("reverse_tunnel_initiator.cluster.tunnel_cluster.connected", Ge(1));
 
   // Give a small delay for pings to occur.
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1,
-                                 std::chrono::milliseconds(1000));
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1),
+                               std::chrono::milliseconds(1000));
 
   ENVOY_LOG_MISC(info, "Sending HTTP request through mTLS tunnel.");
 
@@ -655,9 +657,9 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTestWithMut
 
   // Verify cluster stats for the reverse connection cluster.
   ENVOY_LOG_MISC(info, "Verifying reverse connection cluster stats.");
-  test_server_->waitForCounterGe("cluster.reverse_connection_cluster.upstream_cx_total", 1);
-  test_server_->waitForCounterGe("cluster.reverse_connection_cluster.upstream_rq_total", 1);
-  test_server_->waitForCounterGe("cluster.reverse_connection_cluster.upstream_rq_completed", 1);
+  test_server_->waitForCounter("cluster.reverse_connection_cluster.upstream_cx_total", Ge(1));
+  test_server_->waitForCounter("cluster.reverse_connection_cluster.upstream_rq_total", Ge(1));
+  test_server_->waitForCounter("cluster.reverse_connection_cluster.upstream_rq_completed", Ge(1));
   EXPECT_EQ(
       test_server_->counter("cluster.reverse_connection_cluster.upstream_cx_connect_fail")->value(),
       0);
@@ -675,8 +677,8 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTestWithMut
   EXPECT_EQ("200", drain_response->headers().getStatusValue());
 
   // Wait for listeners to be fully stopped before test cleanup.
-  test_server_->waitForCounterEq("listener_manager.listener_stopped", 3,
-                                 std::chrono::milliseconds(5000));
+  test_server_->waitForCounter("listener_manager.listener_stopped", Eq(3),
+                               std::chrono::milliseconds(5000));
 }
 
 // Test resilience when an initiator node goes down and comes back up.
@@ -917,12 +919,12 @@ typed_config:
 
   HttpIntegrationTest::initialize();
 
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
-  test_server_->waitForCounterGe("listener_manager.listener_create_success",
-                                 4); // 4 initiator listeners
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
+  test_server_->waitForCounter("listener_manager.listener_create_success",
+                               Ge(4)); // 4 initiator listeners
   test_server_->waitUntilListenersReady();
-  test_server_->waitForGaugeGe("listener_manager.total_listeners_active",
-                               7); // egress + 2 clouds + 4 initiators
+  test_server_->waitForGauge("listener_manager.total_listeners_active",
+                             Ge(7)); // egress + 2 clouds + 4 initiators
 
   // Register static listener ports (cloud listeners and egress).
   registerTestServerPorts({"cloud_1_listener", "cloud_2_listener", "egress_listener"});
@@ -930,14 +932,14 @@ typed_config:
   ENVOY_LOG_MISC(info, "Waiting for all 4 tunnel connections to establish.");
 
   // Wait for all 4 tunnels (2 nodes x 2 clouds).
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 4,
-                                 std::chrono::milliseconds(10000));
-  test_server_->waitForCounterGe("listener.reverse_conn_listener.downstream_cx_total", 4,
-                                 std::chrono::milliseconds(5000));
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(4),
+                               std::chrono::milliseconds(10000));
+  test_server_->waitForCounter("listener.reverse_conn_listener.downstream_cx_total", Ge(4),
+                               std::chrono::milliseconds(5000));
 
-  test_server_->waitForGaugeGe("reverse_tunnel_acceptor.nodes.node-1", 2);
-  test_server_->waitForGaugeGe("reverse_tunnel_acceptor.nodes.node-2", 2);
-  test_server_->waitForGaugeGe("reverse_tunnel_acceptor.clusters.test-cluster", 4);
+  test_server_->waitForGauge("reverse_tunnel_acceptor.nodes.node-1", Ge(2));
+  test_server_->waitForGauge("reverse_tunnel_acceptor.nodes.node-2", Ge(2));
+  test_server_->waitForGauge("reverse_tunnel_acceptor.clusters.test-cluster", Ge(4));
 
   ENVOY_LOG_MISC(info, "All 4 tunnels established. Testing initial connectivity.");
 
@@ -980,14 +982,14 @@ typed_config:
   ENVOY_LOG_MISC(info, "Simulating node-1 failure by removing its initiator listeners via LDS.");
   sendLdsResponse({node2_cloud1_config, node2_cloud2_config}, "2");
 
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 2);
-  test_server_->waitForCounterGe("listener_manager.listener_removed",
-                                 2); // 2 node-1 listeners removed
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(2));
+  test_server_->waitForCounter("listener_manager.listener_removed",
+                               Ge(2)); // 2 node-1 listeners removed
 
   // Verify stats show reduced connections (should drop from 4 to 2).
   ENVOY_LOG_MISC(info, "Verifying that node-1 connections are gone.");
-  test_server_->waitForGaugeEq("reverse_tunnel_acceptor.nodes.node-1", 0);
-  test_server_->waitForGaugeEq("reverse_tunnel_acceptor.nodes.node-2", 2);
+  test_server_->waitForGauge("reverse_tunnel_acceptor.nodes.node-1", Eq(0));
+  test_server_->waitForGauge("reverse_tunnel_acceptor.nodes.node-2", Eq(2));
 
   // Verify node-2 still works.
   ENVOY_LOG_MISC(info, "Verifying node-2 still works after node-1 failure.");
@@ -1023,19 +1025,19 @@ typed_config:
   sendLdsResponse(
       {node1_cloud1_config, node1_cloud2_config, node2_cloud1_config, node2_cloud2_config}, "3");
 
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 3);
-  test_server_->waitForCounterGe("listener_manager.listener_create_success",
-                                 6); // 4 initial + 2 re-added
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(3));
+  test_server_->waitForCounter("listener_manager.listener_create_success",
+                               Ge(6)); // 4 initial + 2 re-added
 
   // Wait for node-1 tunnels to re-establish.
   ENVOY_LOG_MISC(info, "Waiting for node-1 tunnels to re-establish.");
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 6,
-                                 std::chrono::milliseconds(10000)); // 4 initial + 2 reconnect
-  test_server_->waitForCounterGe("listener.reverse_conn_listener.downstream_cx_total", 6,
-                                 std::chrono::milliseconds(5000));
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(6),
+                               std::chrono::milliseconds(10000)); // 4 initial + 2 reconnect
+  test_server_->waitForCounter("listener.reverse_conn_listener.downstream_cx_total", Ge(6),
+                               std::chrono::milliseconds(5000));
 
-  test_server_->waitForGaugeGe("reverse_tunnel_acceptor.nodes.node-1", 2);
-  test_server_->waitForGaugeEq("reverse_tunnel_acceptor.nodes.node-2", 2);
+  test_server_->waitForGauge("reverse_tunnel_acceptor.nodes.node-1", Ge(2));
+  test_server_->waitForGauge("reverse_tunnel_acceptor.nodes.node-2", Eq(2));
 
   // Verify both nodes work after recovery.
   ENVOY_LOG_MISC(info, "Verifying full connectivity restored.");
@@ -1098,8 +1100,8 @@ typed_config:
   EXPECT_EQ("200", drain_response->headers().getStatusValue());
 
   // Wait for listeners to be fully stopped before test cleanup.
-  test_server_->waitForCounterGe("listener_manager.listener_stopped", 7,
-                                 std::chrono::milliseconds(5000));
+  test_server_->waitForCounter("listener_manager.listener_stopped", Ge(7),
+                               std::chrono::milliseconds(5000));
 }
 
 // Multi-worker reverse tunnel test where:
@@ -1136,15 +1138,15 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
   ENVOY_LOG_MISC(info, "Waiting for all 4 workers to establish reverse tunnel connections.");
 
   // Each of the 4 workers should establish 1 connection, so we expect 4 total handshakes.
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 4,
-                                 std::chrono::milliseconds(10000));
-  test_server_->waitForCounterGe("listener.reverse_conn_listener.downstream_cx_total", 4,
-                                 std::chrono::milliseconds(5000));
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(4),
+                               std::chrono::milliseconds(10000));
+  test_server_->waitForCounter("listener.reverse_conn_listener.downstream_cx_total", Ge(4),
+                               std::chrono::milliseconds(5000));
 
   // Verify total node connections. Since all workers use the same node-id (test-node-id),
   // the acceptor should show 4 connections from the same logical node.
-  test_server_->waitForGaugeGe("reverse_tunnel_acceptor.nodes.test-node-id", 4);
-  test_server_->waitForGaugeGe("reverse_tunnel_acceptor.clusters.test-cluster-id", 4);
+  test_server_->waitForGauge("reverse_tunnel_acceptor.nodes.test-node-id", Ge(4));
+  test_server_->waitForGauge("reverse_tunnel_acceptor.clusters.test-cluster-id", Ge(4));
 
   // Verify no handshake errors occurred.
   EXPECT_EQ(test_server_->counter("reverse_tunnel.handshake.parse_error")->value(), 0);
@@ -1163,12 +1165,12 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
     const std::string worker_host_stat =
         fmt::format("reverse_tunnel_initiator.worker_{}.host.{}.connected", worker_id,
                     formatted_tunnel_address);
-    test_server_->waitForGaugeEq(worker_host_stat, 1, std::chrono::milliseconds(2000));
+    test_server_->waitForGauge(worker_host_stat, Eq(1), std::chrono::milliseconds(2000));
 
     // Check per-worker cluster stat
     const std::string worker_cluster_stat = fmt::format(
         "reverse_tunnel_initiator.worker_{}.cluster.tunnel_cluster.connected", worker_id);
-    test_server_->waitForGaugeEq(worker_cluster_stat, 1, std::chrono::milliseconds(2000));
+    test_server_->waitForGauge(worker_cluster_stat, Eq(1), std::chrono::milliseconds(2000));
 
     ENVOY_LOG_MISC(info, "Worker {} has initiated 1 reverse connection.", worker_id);
   }
@@ -1176,12 +1178,12 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
   // Verify cross-worker initiator stats (aggregated across all workers).
   const std::string cross_worker_initiator_host_stat =
       fmt::format("reverse_tunnel_initiator.host.{}.connected", formatted_tunnel_address);
-  test_server_->waitForGaugeEq(cross_worker_initiator_host_stat, 4,
-                               std::chrono::milliseconds(2000));
+  test_server_->waitForGauge(cross_worker_initiator_host_stat, Eq(4),
+                             std::chrono::milliseconds(2000));
   const std::string cross_worker_initiator_cluster_stat =
       "reverse_tunnel_initiator.cluster.tunnel_cluster.connected";
-  test_server_->waitForGaugeEq(cross_worker_initiator_cluster_stat, 4,
-                               std::chrono::milliseconds(2000));
+  test_server_->waitForGauge(cross_worker_initiator_cluster_stat, Eq(4),
+                             std::chrono::milliseconds(2000));
 
   // Verify that each worker accepted exactly 1 connection (acceptor side).
   ENVOY_LOG_MISC(info, "Verifying per-worker acceptor connections.");
@@ -1190,21 +1192,21 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
     // Check per-worker node stat
     const std::string worker_node_stat =
         fmt::format("reverse_tunnel_acceptor.worker_{}.node.test-node-id", worker_id);
-    test_server_->waitForGaugeEq(worker_node_stat, 1, std::chrono::milliseconds(2000));
+    test_server_->waitForGauge(worker_node_stat, Eq(1), std::chrono::milliseconds(2000));
 
     // Check per-worker cluster stat
     const std::string worker_cluster_stat =
         fmt::format("reverse_tunnel_acceptor.worker_{}.cluster.test-cluster-id", worker_id);
-    test_server_->waitForGaugeEq(worker_cluster_stat, 1, std::chrono::milliseconds(2000));
+    test_server_->waitForGauge(worker_cluster_stat, Eq(1), std::chrono::milliseconds(2000));
 
     // Check per-worker aggregate metrics (total_nodes and total_clusters for each worker)
     const std::string worker_total_nodes_stat =
         fmt::format("reverse_tunnel_acceptor.worker_{}.total_nodes", worker_id);
-    test_server_->waitForGaugeEq(worker_total_nodes_stat, 1, std::chrono::milliseconds(2000));
+    test_server_->waitForGauge(worker_total_nodes_stat, Eq(1), std::chrono::milliseconds(2000));
 
     const std::string worker_total_clusters_stat =
         fmt::format("reverse_tunnel_acceptor.worker_{}.total_clusters", worker_id);
-    test_server_->waitForGaugeEq(worker_total_clusters_stat, 1, std::chrono::milliseconds(2000));
+    test_server_->waitForGauge(worker_total_clusters_stat, Eq(1), std::chrono::milliseconds(2000));
 
     ENVOY_LOG_MISC(info, "Worker {} has accepted 1 reverse connection.", worker_id);
   }
@@ -1246,8 +1248,8 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
   ENVOY_LOG_MISC(info, "{} of {} requests returned 200.", success_count, num_requests);
 
   // Verify cluster stats — all requests were attempted through the tunnel.
-  test_server_->waitForCounterGe("cluster.reverse_connection_cluster.upstream_rq_total",
-                                 num_requests);
+  test_server_->waitForCounter("cluster.reverse_connection_cluster.upstream_rq_total",
+                               Ge(num_requests));
 
   // Verify that the 4 worker tunnels were established.
   EXPECT_EQ(test_server_->counter("reverse_tunnel.handshake.accepted")->value(), 4);
@@ -1265,8 +1267,8 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
   EXPECT_EQ("200", drain_response->headers().getStatusValue());
 
   // Wait for listeners to be fully stopped before test cleanup.
-  test_server_->waitForCounterEq("listener_manager.listener_stopped", 3,
-                                 std::chrono::milliseconds(5000));
+  test_server_->waitForCounter("listener_manager.listener_stopped", Eq(3),
+                               std::chrono::milliseconds(5000));
 }
 
 } // namespace

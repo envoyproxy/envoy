@@ -368,6 +368,7 @@ RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_he
   }
 
   if ((retry_on_ & RetryPolicy::RETRY_ON_RETRIABLE_4XX)) {
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
     Http::Code code = static_cast<Http::Code>(response_status);
     if (code == Http::Code::Conflict) {
       return RetryDecision::RetryWithBackoff;

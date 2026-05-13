@@ -561,10 +561,10 @@ private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Http::RequestHeaderMap* request_headers_;
-  Http::HeaderVector response_headers_to_add_{};
-  Http::HeaderVector response_headers_to_set_{};
-  Http::HeaderVector response_headers_to_add_if_absent_{};
-  Http::HeaderVector response_headers_to_overwrite_if_exists_{};
+  Http::HeaderVector response_headers_to_add_;
+  Http::HeaderVector response_headers_to_set_;
+  Http::HeaderVector response_headers_to_add_if_absent_;
+  Http::HeaderVector response_headers_to_overwrite_if_exists_;
   State state_{State::NotStarted};
   FilterReturn filter_return_{FilterReturn::ContinueDecoding};
   Upstream::ClusterInfoConstSharedPtr cluster_;
@@ -580,7 +580,7 @@ private:
   bool initiating_call_{};
   bool buffer_data_{};
   bool skip_check_{false};
-  envoy::service::auth::v3::CheckRequest check_request_{};
+  envoy::service::auth::v3::CheckRequest check_request_;
 };
 
 } // namespace ExtAuthz

@@ -67,8 +67,8 @@ using Extensions::HttpFilters::ExternalProcessing::TestOnProcessingResponseFacto
 using Http::LowerCaseString;
 using test::integration::filters::LoggingTestFilterConfig;
 using testing::_;
+using testing::Ge;
 using testing::Not;
-
 using namespace std::chrono_literals;
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing, ExtProcIntegrationTest,
@@ -379,7 +379,7 @@ TEST_P(ExtProcIntegrationTest, OnlyRequestHeadersResetOnServerMessage) {
   EXPECT_TRUE(processor_stream_->waitForReset());
   // In case of Envoy gRPC client the cluster reset stat will be incremented
   if (IsEnvoyGrpc()) {
-    test_server_->waitForCounterGe("cluster.ext_proc_server_0.upstream_rq_tx_reset", 1);
+    test_server_->waitForCounter("cluster.ext_proc_server_0.upstream_rq_tx_reset", Ge(1));
   }
 }
 
@@ -4392,8 +4392,8 @@ TEST_P(ExtProcIntegrationTest, RetryStatsVerification) {
             "success");
 
   // Verify retry stats are incremented correctly.
-  test_server_->waitForCounterGe("cluster.ext_proc_server_0.upstream_rq_retry", 2);
-  test_server_->waitForCounterGe("cluster.ext_proc_server_0.upstream_rq_total", 3);
+  test_server_->waitForCounter("cluster.ext_proc_server_0.upstream_rq_retry", Ge(2));
+  test_server_->waitForCounter("cluster.ext_proc_server_0.upstream_rq_total", Ge(3));
 
   verifyDownstreamResponse(*response, 200);
 }
@@ -4455,8 +4455,8 @@ TEST_P(ExtProcIntegrationTest, RetryOnDeadlineExceeded) {
             "passed");
 
   // Verify retry stats are incremented.
-  test_server_->waitForCounterGe("cluster.ext_proc_server_0.upstream_rq_retry", 1);
-  test_server_->waitForCounterGe("cluster.ext_proc_server_0.upstream_rq_total", 2);
+  test_server_->waitForCounter("cluster.ext_proc_server_0.upstream_rq_retry", Ge(1));
+  test_server_->waitForCounter("cluster.ext_proc_server_0.upstream_rq_total", Ge(2));
 
   verifyDownstreamResponse(*response, 200);
 }
@@ -4530,9 +4530,9 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackUpstream) {
 
   // Large body is sent from sidestream server to downstream client. Thus, flow control is expected
   // to be triggered in sidestream cluster.
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_flow_control_"
-                                 "paused_reading_total",
-                                 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_"
+                               "paused_reading_total",
+                               Ge(1));
 
   verifyDownstreamResponse(*response, 200);
 }
@@ -4579,9 +4579,9 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackUpstreamObservabilityMode) {
 
   // Large body is sent from sidestream server to downstream client. Thus, flow control is expected
   // to be triggered in sidestream cluster.
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_flow_control_"
-                                 "paused_reading_total",
-                                 2);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_"
+                               "paused_reading_total",
+                               Ge(2));
 
   verifyDownstreamResponse(*response, 200);
 }

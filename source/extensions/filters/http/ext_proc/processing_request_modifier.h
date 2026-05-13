@@ -35,7 +35,7 @@ public:
   // Implementations may modify the request and must return true if any modifications were made.
   virtual bool
   modifyRequest(const Params& params,
-                envoy::service::ext_proc::v3::ProcessingRequest& processingRequest) PURE;
+                envoy::service::ext_proc::v3::ProcessingRequest& processing_request) PURE;
 };
 
 class ProcessingRequestModifierFactory : public Config::TypedFactory {

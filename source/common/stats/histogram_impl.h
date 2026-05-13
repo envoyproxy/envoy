@@ -35,7 +35,7 @@ private:
     absl::optional<ConstSupportedBuckets> buckets_;
     absl::optional<uint32_t> bins_;
   };
-  const std::vector<Config> configs_{};
+  const std::vector<Config> configs_;
 };
 
 /**

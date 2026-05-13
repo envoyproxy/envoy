@@ -82,7 +82,7 @@ private:
   const bool readonly_;
   const CelStateType type_;
   absl::string_view schema_;
-  std::string value_{};
+  std::string value_;
   bool initialized_{false};
 };
 

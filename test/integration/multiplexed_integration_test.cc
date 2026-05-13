@@ -31,6 +31,8 @@
 #include "absl/synchronization/mutex.h"
 #include "gtest/gtest.h"
 
+using ::testing::Eq;
+using ::testing::Ge;
 using ::testing::HasSubstr;
 using ::testing::MatchesRegex;
 
@@ -249,7 +251,7 @@ TEST_P(MultiplexedIntegrationTest, CodecStreamIdleTimeout) {
   std::string flush_timeout_counter(downstreamProtocol() == Http::CodecType::HTTP3
                                         ? "http3.tx_flush_timeout"
                                         : "http2.tx_flush_timeout");
-  test_server_->waitForCounterEq(flush_timeout_counter, 1);
+  test_server_->waitForCounter(flush_timeout_counter, Eq(1));
   ASSERT_TRUE(response->waitForReset());
 }
 
@@ -294,7 +296,7 @@ TEST_P(MultiplexedIntegrationTest, CodecStreamIdleTimeoutOverride) {
   std::string flush_timeout_counter(downstreamProtocol() == Http::CodecType::HTTP3
                                         ? "http3.tx_flush_timeout"
                                         : "http2.tx_flush_timeout");
-  test_server_->waitForCounterEq(flush_timeout_counter, 1);
+  test_server_->waitForCounter(flush_timeout_counter, Eq(1));
   ASSERT_TRUE(response->waitForReset());
 }
 
@@ -321,8 +323,8 @@ TEST_P(MultiplexedIntegrationTest, Http2DownstreamKeepalive) {
 
   // This call is NOT running the event loop of the client, so downstream PINGs will
   // not receive a response.
-  test_server_->waitForCounterEq("http2.keepalive_timeout", 1,
-                                 std::chrono::milliseconds(timeout_ms * 2));
+  test_server_->waitForCounter("http2.keepalive_timeout", Eq(1),
+                               std::chrono::milliseconds(timeout_ms * 2));
 
   ASSERT_TRUE(response->waitForReset());
 }
@@ -509,7 +511,7 @@ TEST_P(MetadataIntegrationTest, ProxyMetadataInResponse) {
   // The downstream codec should send one.
   std::string counter =
       absl::StrCat("cluster.cluster_0.", upstreamProtocolStatsRoot(), ".rx_reset");
-  test_server_->waitForCounterEq(counter, 1);
+  test_server_->waitForCounter(counter, Eq(1));
 }
 
 TEST_P(MetadataIntegrationTest, ProxyMultipleMetadata) {
@@ -1309,8 +1311,8 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayAfterTooManyResets) {
 
   // Envoy should disconnect client due to premature reset check
   ASSERT_TRUE(codec_client_->waitForDisconnect());
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", total_streams);
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_too_many_premature_resets", 1);
+  test_server_->waitForCounter("http.config_test.downstream_rq_rx_reset", Eq(total_streams));
+  test_server_->waitForCounter("http.config_test.downstream_rq_too_many_premature_resets", Eq(1));
 }
 
 TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, GoAwayQuicklyAfterTooManyResets) {
@@ -1335,8 +1337,8 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, GoAwayQuicklyAfterT
 
   // Envoy should disconnect client due to premature reset check
   ASSERT_TRUE(codec_client_->waitForDisconnect());
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", num_reset_streams);
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_too_many_premature_resets", 1);
+  test_server_->waitForCounter("http.config_test.downstream_rq_rx_reset", Eq(num_reset_streams));
+  test_server_->waitForCounter("http.config_test.downstream_rq_too_many_premature_resets", Eq(1));
 }
 
 TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, TooManyRequestResetAndNoRecursion) {
@@ -1379,9 +1381,9 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, TooManyRequestReset
       // Send and wait
       encoder_decoders.emplace_back(codec_client_->startRequest(headers));
     }
-    test_server_->waitForCounterEq("http.config_test.downstream_rq_total",
-                                   pending_streams_per_iteration * (i + 1),
-                                   TestUtility::DefaultTimeout * 5);
+    test_server_->waitForCounter("http.config_test.downstream_rq_total",
+                                 Eq(pending_streams_per_iteration * (i + 1)),
+                                 TestUtility::DefaultTimeout * 5);
   }
 
   // Reset 50 streams and then the connection should be closed because too much premature resets.
@@ -1397,10 +1399,10 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, TooManyRequestReset
 
   // Envoy should disconnect client due to premature reset check
   ASSERT_TRUE(codec_client_->waitForDisconnect());
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", pending_streams + 50,
-                                 TestUtility::DefaultTimeout * 5);
+  test_server_->waitForCounter("http.config_test.downstream_rq_rx_reset", Eq(pending_streams + 50),
+                               TestUtility::DefaultTimeout * 5);
   // If there is recursion, this result won't be 1.
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_too_many_premature_resets", 1);
+  test_server_->waitForCounter("http.config_test.downstream_rq_too_many_premature_resets", Eq(1));
 }
 
 TEST_P(MultiplexedIntegrationTestWithSimulatedTime, DontGoAwayAfterTooManyResetsForLongStreams) {
@@ -1426,11 +1428,11 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTime, DontGoAwayAfterTooManyResets
     auto encoder_decoder = codec_client_->startRequest(headers);
     request_encoder_ = &encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
-    test_server_->waitForCounterEq(request_counter, i + 1);
+    test_server_->waitForCounter(request_counter, Eq(i + 1));
     timeSystem().advanceTimeWait(std::chrono::seconds(2 * stream_lifetime_seconds));
     codec_client_->sendReset(*request_encoder_);
     ASSERT_TRUE(response->waitForReset());
-    test_server_->waitForCounterEq(reset_counter, i + 1);
+    test_server_->waitForCounter(reset_counter, Eq(i + 1));
   }
 }
 
@@ -1592,7 +1594,7 @@ TEST_P(MultiplexedIntegrationTest, IdleTimeoutWithSimultaneousRequests) {
   // Do not send any requests and validate idle timeout kicks in after both the requests are done.
   ASSERT_TRUE(fake_upstream_connection1->waitForDisconnect());
   ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 2);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_idle_timeout", Ge(2));
 }
 
 // Test request mirroring / shadowing with an HTTP/2 downstream and a request with a body.
@@ -2326,7 +2328,7 @@ TEST_P(Http2FrameIntegrationTest, UpstreamRemoteMalformedFrameEndstreamWith1xxHe
   const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
   ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
 
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
 
   // A malformed frame is translated to 103 header with END_STREAM by the underlying codec.
   // Typically we should get a protocol error, but this should not crash Envoy.
@@ -2346,7 +2348,7 @@ TEST_P(Http2FrameIntegrationTest, UpstreamRemoteMalformedFrameEndstreamWith1xxHe
   EXPECT_EQ(Http2Frame::Type::Headers, response.type());
 
   tcp_client_->close();
-  test_server_->waitForGaugeEq("http.config_test.downstream_rq_active", 0);
+  test_server_->waitForGauge("http.config_test.downstream_rq_active", Eq(0));
 }
 
 TEST_P(Http2FrameIntegrationTest, MaxConcurrentStreamsIsRespected) {
@@ -2366,7 +2368,7 @@ TEST_P(Http2FrameIntegrationTest, MaxConcurrentStreamsIsRespected) {
 
   ASSERT_TRUE(tcp_client_->write(buffer, false, false));
   tcp_client_->waitForDisconnect();
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy_local", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy_local", Ge(1));
 }
 
 // Regression test.
@@ -2412,10 +2414,10 @@ TEST_P(Http2FrameIntegrationTest, AdjustUpstreamSettingsMaxStreams) {
       Http2Frame::SettingsFlags::None, {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 1}});
   std::string settings_data(settings_frame);
   ASSERT_TRUE(fake_upstream_connection1->write(settings_data));
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total",
-                                 settings_data.size());
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_rx_bytes_total",
+                               Ge(settings_data.size()));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Eq(1));
 
   // Start another request, it should create another upstream connection because of the max
   // concurrent streams of upstream connection created above.
@@ -2423,8 +2425,8 @@ TEST_P(Http2FrameIntegrationTest, AdjustUpstreamSettingsMaxStreams) {
   sendFrame(Http2Frame::makePostRequest(3, "host", "/path/to/long/url"));
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
   ASSERT_TRUE(fake_upstream_connection2->write(std::string(settings_frame)));
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 2);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 2);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(2));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Eq(2));
 
   // Adjust the max concurrent streams of one connection created above to 2.
   auto bytes_read = test_server_->counter("cluster.cluster_0.upstream_cx_rx_bytes_total");
@@ -2432,19 +2434,19 @@ TEST_P(Http2FrameIntegrationTest, AdjustUpstreamSettingsMaxStreams) {
       Http2Frame::SettingsFlags::None, {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 3}});
   std::string settings_data2(settings_frame2);
   ASSERT_TRUE(fake_upstream_connection1->write(settings_data2));
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total",
-                                 bytes_read + settings_data2.size());
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_rx_bytes_total",
+                               Ge(bytes_read + settings_data2.size()));
   // Now create another request.
   sendFrame(Http2Frame::makePostRequest(5, "host", "/path/to/long/url"));
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 3);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 2);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(3));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Eq(2));
 
   // The configured max concurrent streams is 2, even the SETTINGS frame above wants to
   // set the max concurrent streams to 3, it still reaches the upper bound. So the new request
   // below should result in the third connection.
   sendFrame(Http2Frame::makePostRequest(7, "host", "/path/to/long/url"));
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 4);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 3);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(4));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Eq(3));
 
   // Cleanup.
   tcp_client_->close();
@@ -2460,7 +2462,7 @@ TEST_P(Http2FrameIntegrationTest, UpstreamSettingsMaxStreamsAfterGoAway) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
   ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
 
   // Send RST_STREAM, GOAWAY and SETTINGS(0 max streams)
   const Http2Frame rst_stream =
@@ -2473,7 +2475,7 @@ TEST_P(Http2FrameIntegrationTest, UpstreamSettingsMaxStreamsAfterGoAway) {
       absl::StrCat(std::string(rst_stream), std::string(go_away_frame),
                    std::string(settings_max_connections_frame))));
 
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_close_notify", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_close_notify", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_protocol_error")->value());
 
   // Cleanup.
@@ -2490,7 +2492,7 @@ TEST_P(Http2FrameIntegrationTest, UpstreamGoAway) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
   ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
 
   const Http2Frame rst_stream =
       Http2Frame::makeResetStreamFrame(client_stream_idx, Http2Frame::ErrorCode::FlowControlError);
@@ -2500,7 +2502,7 @@ TEST_P(Http2FrameIntegrationTest, UpstreamGoAway) {
       absl::StrCat(std::string(rst_stream), std::string(go_away_frame))));
   ASSERT_TRUE(fake_upstream_connection->close());
 
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_close_notify", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_close_notify", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_protocol_error")->value());
 
   // Cleanup.
@@ -2518,11 +2520,11 @@ TEST_P(Http2FrameIntegrationTest, UpstreamProtocolError) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
   ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
 
   ASSERT_TRUE(fake_upstream_connection->write("abcdefg this is not a valid h2 frame"));
 
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_protocol_error", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_protocol_error", Ge(1));
 
   // Cleanup.
   tcp_client_->close();
@@ -2540,14 +2542,14 @@ TEST_P(Http2FrameIntegrationTest, UpstreamWindowUpdateAfterGoAway) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
   ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
 
   // Start a second request and wait for it to reach the upstream. This is to exercise the case
   // where numActiveRequests > 0 at the time that GOAWAY is received from upstream, which is needed
   // to replicate the original assertion failure.
   sendFrame(
       Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(1), "host", "/path/to/long/url"));
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 2);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(2));
 
   // Send RST_STREAM, GOAWAY followed by WINDOW_UPDATE
   const Http2Frame rst_stream =
@@ -2561,7 +2563,7 @@ TEST_P(Http2FrameIntegrationTest, UpstreamWindowUpdateAfterGoAway) {
   ASSERT_TRUE(fake_upstream_connection->write(absl::StrCat(
       std::string(rst_stream), std::string(go_away_frame), std::string(window_update_frame))));
 
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_close_notify", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_close_notify", Ge(1));
 
   // Cleanup.
   tcp_client_->close();
@@ -3061,8 +3063,8 @@ TEST_P(Http2FrameIntegrationTest, MultipleHeaderOnlyRequestsFollowedByReset) {
   }
 
   ASSERT_TRUE(tcp_client_->write(buffer, false, false));
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset",
-                                 kRequestsSentPerIOCycle);
+  test_server_->waitForCounter("http.config_test.downstream_rq_rx_reset",
+                               Eq(kRequestsSentPerIOCycle));
   // Client should remain connected
   ASSERT_TRUE(tcp_client_->connected());
   tcp_client_->close();
@@ -3092,7 +3094,7 @@ TEST_P(Http2FrameIntegrationTest, ResettingDeferredRequestsTriggersPrematureRese
   ASSERT_TRUE(tcp_client_->write(buffer, false, false));
   // Envoy should close the client connection due to too many premature resets
   tcp_client_->waitForDisconnect();
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_too_many_premature_resets", 1);
+  test_server_->waitForCounter("http.config_test.downstream_rq_too_many_premature_resets", Eq(1));
   tcp_client_->close();
 }
 
@@ -3131,8 +3133,8 @@ TEST_P(Http2FrameIntegrationTest, CloseConnectionWithDeferredStreams) {
   tcp_client_->close();
   // Test that Envoy can clean-up deferred streams
   // Make the timeout longer to accommodate non optimized builds
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", kRequestsSentPerIOCycle,
-                                 TestUtility::DefaultTimeout * 10);
+  test_server_->waitForCounter("http.config_test.downstream_rq_rx_reset",
+                               Eq(kRequestsSentPerIOCycle), TestUtility::DefaultTimeout * 10);
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FrameIntegrationTest,
@@ -3508,22 +3510,23 @@ TEST_P(SocketSwappableMultiplexedIntegrationTest, BackedUpDownstreamConnectionCl
   auto response_decoder = codec_client_->makeRequestWithBody(default_request_headers_, 10);
 
   waitForNextUpstreamRequest();
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(1000, false);
 
   // We should trigger pause at least once, and eventually have at least 1k
   // bytes buffered.
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_flow_control_paused_reading_total", 1);
-  test_server_->waitForGaugeGe("http.config_test.downstream_cx_tx_bytes_buffered", 1000);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_paused_reading_total",
+                               Ge(1));
+  test_server_->waitForGauge("http.config_test.downstream_cx_tx_bytes_buffered", Ge(1000));
 
   // Close downstream, check cleanup.
   codec_client_->close();
 
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
-  test_server_->waitForGaugeEq("http.config_test.downstream_rq_active", 0);
-  test_server_->waitForGaugeEq("http.config_test.downstream_cx_tx_bytes_buffered", 0);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(0));
+  test_server_->waitForGauge("http.config_test.downstream_rq_active", Eq(0));
+  test_server_->waitForGauge("http.config_test.downstream_cx_tx_bytes_buffered", Eq(0));
 }
 
 TEST_P(SocketSwappableMultiplexedIntegrationTest, BackedUpUpstreamConnectionClose) {
@@ -3541,19 +3544,19 @@ TEST_P(SocketSwappableMultiplexedIntegrationTest, BackedUpUpstreamConnectionClos
 
   // We should trigger pause at least once, and eventually have at least 1k
   // bytes buffered.
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_flow_control_backed_up_total", 1);
-  test_server_->waitForCounterGe("http.config_test.downstream_flow_control_paused_reading_total",
-                                 1);
-  test_server_->waitForGaugeGe("cluster.cluster_0.upstream_cx_tx_bytes_buffered", 1000);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_backed_up_total", Ge(1));
+  test_server_->waitForCounter("http.config_test.downstream_flow_control_paused_reading_total",
+                               Ge(1));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_cx_tx_bytes_buffered", Ge(1000));
 
   // Close upstream, check cleanup.
   fake_upstreams_[0].reset();
 
   ASSERT_TRUE(response_decoder->waitForAnyTermination());
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
-  test_server_->waitForGaugeEq("http.config_test.downstream_rq_active", 0);
-  test_server_->waitForGaugeGe("cluster.cluster_0.upstream_cx_tx_bytes_buffered", 0);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(0));
+  test_server_->waitForGauge("http.config_test.downstream_rq_active", Eq(0));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_cx_tx_bytes_buffered", Ge(0));
 }
 
 TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogation) {

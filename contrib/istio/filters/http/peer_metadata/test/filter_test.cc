@@ -83,7 +83,7 @@ protected:
 
   void checkShared(bool expected) {
     EXPECT_EQ(expected,
-              stream_info_.filterState()->objectsSharedWithUpstreamConnection()->size() > 0);
+              !stream_info_.filterState()->objectsSharedWithUpstreamConnection()->empty());
   }
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   NiceMock<MockSingletonManager> singleton_manager_;

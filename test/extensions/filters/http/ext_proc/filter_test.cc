@@ -670,6 +670,13 @@ protected:
     EXPECT_THAT(loggedMetadata, ProtoEq(expected_metadata));
   }
 
+  testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  testing::NiceMock<Event::MockDispatcher> dispatcher_;
+  Envoy::Event::SimulatedTimeSystem* test_time_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
+  Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder_;
+  TestScopedRuntime scoped_runtime_;
+
   absl::optional<envoy::config::core::v3::GrpcService> final_expected_grpc_service_;
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
   std::unique_ptr<MockClient> client_;
@@ -677,10 +684,8 @@ protected:
   ProcessingRequest last_request_;
   bool server_closed_stream_ = false;
   bool observability_mode_ = false;
-  testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   FilterConfigSharedPtr config_;
   std::shared_ptr<Filter> filter_;
-  testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<::Envoy::Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   testing::NiceMock<::Envoy::Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Router::RouteConstSharedPtr route_;
@@ -692,12 +697,8 @@ protected:
   TestResponseTrailerMapImpl response_trailers_;
   std::vector<Event::MockTimer*> timers_;
   Event::MockTimer* deferred_close_timer_;
-  Envoy::Event::SimulatedTimeSystem* test_time_;
   envoy::config::core::v3::Metadata dynamic_metadata_;
   testing::NiceMock<Network::MockConnection> connection_;
-  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
-  Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder_;
-  TestScopedRuntime scoped_runtime_;
   DoStartOption do_start_option_ = DEFAULT;
 };
 
@@ -3531,6 +3532,45 @@ TEST_F(HttpFilterTest, OutOfOrderFailClose) {
   EXPECT_EQ(0, config_->stats().failure_mode_allowed_.value());
   EXPECT_EQ(0, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+// Test the "!chunk.has_value()" behavior when chunk_queue_ is empty during a streamed body
+// callback.
+TEST_F(HttpFilterTest, StreamedBodyCallbackWithEmptyQueue) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SKIP"
+    request_body_mode: "STREAMED"
+  )EOF");
+
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  // Handle headers response to establish the gRPC stream and initialize stream_callbacks_.
+  processRequestHeaders(false, absl::nullopt);
+
+  // Manually transition decoding_state_ to StreamedBodyCallback while the chunk_queue_ is empty.
+  auto& decoding_state = const_cast<ProcessorState&>(filter_->decodingState());
+  decoding_state.onFinishProcessorCall(Grpc::Status::Ok,
+                                       ProcessorState::CallbackState::StreamedBodyCallback);
+
+  // Receive a body response from the server.
+  std::unique_ptr<ProcessingResponse> resp = std::make_unique<ProcessingResponse>();
+  resp->mutable_request_body();
+
+  // This triggers handleBodyResponse, which delegates to handleStreamedBodyResponse.
+  // Since the chunk_queue_ is empty, it will hit the "!chunk.has_value()" branch, trigger
+  // IS_ENVOY_BUG, and return false.
+  EXPECT_ENVOY_BUG(
+      { stream_callbacks_->onReceiveMessage(std::move(resp)); },
+      "Bad streamed body callback state");
+
+  filter_->onDestroy();
 }
 
 class OverrideTest : public testing::Test {
