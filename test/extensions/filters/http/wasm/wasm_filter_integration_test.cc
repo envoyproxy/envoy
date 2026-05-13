@@ -24,6 +24,8 @@ namespace Extensions {
 namespace Wasm {
 namespace {
 
+using testing::Ge;
+
 class WasmFilterIntegrationTest
     : public HttpIntegrationTest,
       public testing::TestWithParam<std::tuple<std::string, std::string, bool, Http::CodecType>> {
@@ -321,7 +323,7 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
     bool first_request = false;
     {
-      absl::MutexLock l(&state_->mu);
+      absl::MutexLock l(state_->mu);
       first_request = !state_->headers_processed;
     }
     // Only the first request triggers the read-disable that the bug reproduction
@@ -332,7 +334,7 @@ public:
     }
     decoder_callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
     {
-      absl::MutexLock l(&state_->mu);
+      absl::MutexLock l(state_->mu);
       state_->callbacks = decoder_callbacks_;
       state_->dispatcher = &decoder_callbacks_->dispatcher();
       state_->headers_processed = true;
@@ -341,7 +343,7 @@ public:
   }
 
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
-    absl::MutexLock l(&state_->mu);
+    absl::MutexLock l(state_->mu);
     if (state_->destroyed) {
       state_->decode_data_after_destroy = true;
     }
@@ -349,7 +351,7 @@ public:
   }
 
   void onDestroy() override {
-    absl::MutexLock l(&state_->mu);
+    absl::MutexLock l(state_->mu);
     state_->destroyed = true;
     state_->callbacks = nullptr;
   }
@@ -451,7 +453,7 @@ typed_config:
 
   // Wait until the server has processed decodeHeaders and readDisable is on.
   {
-    absl::MutexLock l(&state->mu);
+    absl::MutexLock l(state->mu);
     state->mu.Await(absl::Condition(&state->headers_processed));
   }
 
@@ -467,14 +469,14 @@ typed_config:
 
   // Wait until the DATA frame (1024 payload + 9-byte frame header) has been
   // received by the server's HTTP/2 codec.
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_rx_bytes_total",
-                                 bytes_before_data + 1033);
+  test_server_->waitForCounter("http.config_test.downstream_cx_rx_bytes_total",
+                               Ge(bytes_before_data + 1033));
 
   // Grab the worker-thread dispatcher and callbacks.
   Event::Dispatcher* conn_dispatcher;
   Http::StreamDecoderFilterCallbacks* cbs;
   {
-    absl::MutexLock l(&state->mu);
+    absl::MutexLock l(state->mu);
     conn_dispatcher = state->dispatcher;
     cbs = state->callbacks;
   }
@@ -511,7 +513,7 @@ typed_config:
 
   // Check 1: the setup filter must not have seen decodeData after destroy.
   {
-    absl::MutexLock l(&state->mu);
+    absl::MutexLock l(state->mu);
     EXPECT_FALSE(state->decode_data_after_destroy)
         << "decodeData was invoked after onDestroy — deferred processing "
            "callback fired on the destroyed filter chain (use-after-free bug)";
@@ -526,7 +528,7 @@ typed_config:
       test_server_->counter("http.config_test.downstream_rq_total")->value();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto follow_up_response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  test_server_->waitForCounterGe("http.config_test.downstream_rq_total", initial_rq_total + 1);
+  test_server_->waitForCounter("http.config_test.downstream_rq_total", Ge(initial_rq_total + 1));
   // The reload check (when the bug is present) runs on the worker thread as
   // part of the Wasm filter's per-request setup; downstream_rq_total can tick
   // before that work has finished. Post a fence to the same worker dispatcher

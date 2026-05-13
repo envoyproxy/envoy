@@ -105,12 +105,15 @@ public:
   // Register this session to the given registry for receiving network change events.
   void registerNetworkObserver(EnvoyQuicNetworkObserverRegistry& registry);
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   const quic::TransportParameters::ParameterMap& received_custom_transport_parameters() {
     return received_custom_transport_parameters_;
   }
+  // NOLINTNEXTLINE(readability-identifier-naming)
   const absl::optional<quic::QuicSocketAddress>& received_ipv6_alternate_server_address() {
     return received_ipv6_alternate_server_address_;
   }
+  // NOLINTNEXTLINE(readability-identifier-naming)
   const absl::optional<quic::QuicSocketAddress>& received_ipv4_alternate_server_address() {
     return received_ipv4_alternate_server_address_;
   }

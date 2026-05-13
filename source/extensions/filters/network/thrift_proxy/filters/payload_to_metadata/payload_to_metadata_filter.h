@@ -45,7 +45,7 @@ private:
   };
   const ProtoRule rule_;
   absl::optional<Matcher::RegexReplace> regex_replace_;
-  std::string method_or_service_name_{};
+  std::string method_or_service_name_;
   MatchType match_type_;
   uint16_t rule_id_;
 };

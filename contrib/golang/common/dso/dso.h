@@ -291,7 +291,7 @@ public:
     auto dso = load(dso_id, dso_name);
     if (dso != nullptr) {
       DsoStoreType& dsoStore = getDsoStore();
-      absl::WriterMutexLock lock(&dsoStore.mutex_);
+      absl::WriterMutexLock lock(dsoStore.mutex_);
       dsoStore.plugin_name_to_dso_[plugin_name] = dso;
     }
     return dso;
@@ -307,7 +307,7 @@ public:
     ENVOY_LOG_MISC(debug, "load {} {} dso instance.", dso_id, dso_name);
 
     DsoStoreType& dsoStore = getDsoStore();
-    absl::WriterMutexLock lock(&dsoStore.mutex_);
+    absl::WriterMutexLock lock(dsoStore.mutex_);
     auto it = dsoStore.id_to_dso_.find(dso_id);
     if (it != dsoStore.id_to_dso_.end()) {
       return it->second;
@@ -328,7 +328,7 @@ public:
    */
   static std::shared_ptr<T> getDsoByID(std::string dso_id) {
     DsoStoreType& dsoStore = getDsoStore();
-    absl::ReaderMutexLock lock(&dsoStore.mutex_);
+    absl::ReaderMutexLock lock(dsoStore.mutex_);
     auto it = dsoStore.id_to_dso_.find(dso_id);
     if (it != dsoStore.id_to_dso_.end()) {
       return it->second;
@@ -343,7 +343,7 @@ public:
    */
   static std::shared_ptr<T> getDsoByPluginName(std::string plugin_name) {
     DsoStoreType& dsoStore = getDsoStore();
-    absl::ReaderMutexLock lock(&dsoStore.mutex_);
+    absl::ReaderMutexLock lock(dsoStore.mutex_);
     auto it = dsoStore.plugin_name_to_dso_.find(plugin_name);
     if (it != dsoStore.plugin_name_to_dso_.end()) {
       return it->second;
@@ -356,7 +356,7 @@ public:
    */
   static void cleanUpForTest() {
     DsoStoreType& dsoStore = getDsoStore();
-    absl::WriterMutexLock lock(&dsoStore.mutex_);
+    absl::WriterMutexLock lock(dsoStore.mutex_);
     for (auto it = dsoStore.id_to_dso_.begin(); it != dsoStore.id_to_dso_.end(); it++) {
       auto dso = it->second;
       if (dso != nullptr) {

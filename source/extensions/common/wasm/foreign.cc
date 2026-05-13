@@ -262,7 +262,7 @@ protected:
     const Filters::Common::Expr::Builder* builder() const { return builder_.get(); }
 
   private:
-    const Filters::Common::Expr::BuilderConstPtr builder_{};
+    const Filters::Common::Expr::BuilderConstPtr builder_;
     uint32_t next_expr_token_ = 0;
     absl::flat_hash_map<uint32_t, ExpressionData> expr_;
   };

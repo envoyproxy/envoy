@@ -19,7 +19,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.stat_sinks.open_telemetry"],
     deps = [
         "//source/extensions/stat_sinks/open_telemetry:config",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/stat_sinks/open_telemetry/v3:pkg_cc_proto",
     ],

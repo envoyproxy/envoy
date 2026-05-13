@@ -147,7 +147,7 @@ public:
     EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "1",
                                         {"route_config_0"}, {}, {}));
 
-    test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+    test_server_->waitForCounter("listener_manager.listener_create_success", testing::Ge(1));
 
     // Make a request to verify listener_0 is working.
     makeSingleRequest();

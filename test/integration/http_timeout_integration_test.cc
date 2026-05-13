@@ -616,7 +616,7 @@ TEST_P(HttpTimeoutIntegrationTest, RequestHeaderTimeout) {
   while (!connection_driver->allBytesSent()) {
     ASSERT_TRUE(connection_driver->run(Event::Dispatcher::RunType::NonBlock));
   }
-  test_server_->waitForGaugeGe("http.config_test.downstream_rq_active", 1);
+  test_server_->waitForGauge("http.config_test.downstream_rq_active", testing::Ge(1));
   ASSERT_FALSE(connection_driver->closed());
 
   timeSystem().advanceTimeWait(std::chrono::milliseconds(1001));

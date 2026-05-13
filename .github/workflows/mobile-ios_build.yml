@@ -39,6 +39,8 @@ jobs:
       check-name: mobile-ios
 
   build:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
       actions: read
       contents: read
@@ -101,7 +103,7 @@ jobs:
   #       source ./ci/mac_ci_setup.sh
   #       bazel shutdown
   #     steps-post: |
-  #       - uses: envoyproxy/toolshed/actions/envoy/ios/post@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
+  #       - uses: envoyproxy/toolshed/actions/envoy/ios/post@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
   #         with:
   #           app: ${{ matrix.app }}
   #           args: ${{ matrix.args || '--config=mobile-ios' }}
@@ -146,7 +148,7 @@ jobs:
   #     source: |
   #       source ./ci/mac_ci_setup.sh
   #     steps-post: |
-  #       - uses: envoyproxy/toolshed/actions/envoy/ios/post@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
+  #       - uses: envoyproxy/toolshed/actions/envoy/ios/post@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
   #         with:
   #           app: ${{ matrix.app }}
   #           args: ${{ matrix.args || '--config=mobile-ios' }}

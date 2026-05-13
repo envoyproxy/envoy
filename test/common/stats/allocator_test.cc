@@ -138,6 +138,11 @@ TEST_F(AllocatorTest, RefCountDecAllocRaceSynchronized) {
 }
 
 TEST_F(AllocatorTest, HiddenGauge) {
+  GaugeSharedPtr uninitialized_gauge =
+      alloc_.makeGauge(makeStat("uninitialized"), StatName(), {}, Gauge::ImportMode::Uninitialized);
+  EXPECT_EQ(uninitialized_gauge->importMode(), Gauge::ImportMode::Uninitialized);
+  EXPECT_FALSE(uninitialized_gauge->hidden());
+
   GaugeSharedPtr hidden_gauge =
       alloc_.makeGauge(makeStat("hidden"), StatName(), {}, Gauge::ImportMode::HiddenAccumulate);
   EXPECT_EQ(hidden_gauge->importMode(), Gauge::ImportMode::HiddenAccumulate);

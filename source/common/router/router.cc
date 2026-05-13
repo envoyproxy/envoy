@@ -904,6 +904,8 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
       // copy whole headers map is not cheap.
       shadow_headers = std::move(original_shadow_headers);
     } else {
+      ASSERT(original_shadow_headers != nullptr);
+      // NOLINTNEXTLINE(bugprone-use-after-move)
       shadow_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(*original_shadow_headers);
     }
     applyShadowPolicyHeaders(shadow_policy, *shadow_headers);
@@ -1181,6 +1183,8 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trail
       // copy whole trailers map is not cheap.
       shadow_trailer = std::move(original_shadow_trailer);
     } else {
+      ASSERT(original_shadow_trailer != nullptr);
+      // NOLINTNEXTLINE(bugprone-use-after-move)
       shadow_trailer = Http::createHeaderMap<Http::RequestTrailerMapImpl>(*original_shadow_trailer);
     }
     ASSERT(shadow_trailer != nullptr);
@@ -1982,7 +1986,7 @@ void Filter::onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_re
   // When route retry policy is configured and an upstream filter is returning StopIteration
   // in it's encodeHeaders() method, upstream_requests_.size() is equal to 0 in this case,
   // and we should just return.
-  if (upstream_requests_.size() == 0) {
+  if (upstream_requests_.empty()) {
     return;
   }
 
@@ -2006,7 +2010,7 @@ void Filter::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
   // When route retry policy is configured and an upstream filter is returning StopIteration
   // in it's encodeHeaders() method, upstream_requests_.size() is equal to 0 in this case,
   // and we should just return.
-  if (upstream_requests_.size() == 0) {
+  if (upstream_requests_.empty()) {
     return;
   }
 

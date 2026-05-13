@@ -10,9 +10,7 @@ namespace OpenTelemetry {
 
 using ::opentelemetry::proto::metrics::v1::AggregationTemporality;
 using ::opentelemetry::proto::metrics::v1::HistogramDataPoint;
-using ::opentelemetry::proto::metrics::v1::Metric;
 using ::opentelemetry::proto::metrics::v1::NumberDataPoint;
-using ::opentelemetry::proto::metrics::v1::ResourceMetrics;
 
 using MetricsExportRequest =
     opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest;
