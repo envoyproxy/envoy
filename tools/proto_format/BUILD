@@ -23,6 +23,9 @@ API_FILES_IGNORED = [
     "test/**",
     "tools/**",
     "envoy/service/auth/**/*",
+    # Vendored only for buf linting; not part of the normalized Bazel API tree.
+    # See api/src/proto/grpc/health/v1/README.md.
+    "src/proto/grpc/health/v1/health.proto",
 ]
 
 # Bazel query doesnt support json output, and jq insists on inputs with json suffix,
