@@ -405,11 +405,18 @@ TEST_F(AllowMissingFilterTest, InvalidBasicCredentialsRejected) {
 
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
       .WillOnce(Invoke([&](Http::Code code, absl::string_view body,
-                           std::function<void(Http::ResponseHeaderMap & headers)>,
+                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
                            const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                            absl::string_view details) {
         EXPECT_EQ(Http::Code::Unauthorized, code);
         EXPECT_EQ("User authentication failed. Invalid username/password combination.", body);
+
+        Http::TestResponseHeaderMapImpl response_headers{{":status", "401"}};
+        modify_headers(response_headers);
+        EXPECT_EQ(
+            "Basic realm=\"http://host/\"",
+            response_headers.get(Http::Headers::get().WWWAuthenticate)[0]->value().getStringView());
+
         EXPECT_EQ(grpc_status, absl::nullopt);
         EXPECT_EQ(details, "invalid_credential_for_basic_auth");
       }));
