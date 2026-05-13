@@ -39,6 +39,8 @@ jobs:
       check-name: macos
 
   macos:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
       actions: read
       contents: read

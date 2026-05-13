@@ -141,7 +141,7 @@ envoy_extension_cc_test(
     deps = [
         "//envoy/registry",
         "//source/extensions/http/header_validators/envoy_default:config",
-        "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],

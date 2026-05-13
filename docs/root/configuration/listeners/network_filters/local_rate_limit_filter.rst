@@ -35,7 +35,7 @@ be immediately closed without further filter iteration.
 Statistics
 ----------
 
-Every configured local rate limit filter has statistics rooted at *local_ratelimit.<stat_prefix>.*
+Every configured local rate limit filter has statistics rooted at *local_rate_limit.<stat_prefix>.*
 with the following statistics:
 
 .. csv-table::

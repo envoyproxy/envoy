@@ -102,8 +102,8 @@ private:
   // Even in the worst case where the status code and response flag are different for every
   // request, we will only do some additional integer comparisons and local variable
   // assignments which should be very cheap.
-  std::pair<uint32_t, OptRef<Stats::Counter>> last_code_counter_{};
-  std::pair<StreamInfo::ResponseFlag, OptRef<Stats::Counter>> last_flag_counter_{};
+  std::pair<uint32_t, OptRef<Stats::Counter>> last_code_counter_;
+  std::pair<StreamInfo::ResponseFlag, OptRef<Stats::Counter>> last_flag_counter_;
 };
 
 } // namespace GenericProxy

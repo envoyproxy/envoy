@@ -24,8 +24,8 @@ public:
   std::string apply(absl::string_view in) const;
 
 private:
-  Regex::CompiledMatcherPtr regex_{};
-  const std::string substitution_{};
+  Regex::CompiledMatcherPtr regex_;
+  const std::string substitution_;
 };
 
 } // namespace Matcher

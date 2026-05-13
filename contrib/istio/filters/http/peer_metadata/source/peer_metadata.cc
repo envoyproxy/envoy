@@ -241,7 +241,7 @@ void BaggagePropagationMethod::inject(const StreamInfo::StreamInfo&, Http::Heade
   headers.setReference(Headers::get().Baggage, value_);
 }
 
-BaggageDiscoveryMethod::BaggageDiscoveryMethod() {}
+BaggageDiscoveryMethod::BaggageDiscoveryMethod() = default;
 
 absl::optional<PeerInfo> BaggageDiscoveryMethod::derivePeerInfo(const StreamInfo::StreamInfo&,
                                                                 Http::HeaderMap& headers,
