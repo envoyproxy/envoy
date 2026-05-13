@@ -368,7 +368,7 @@ class CodecEventCallbacks {
 public:
   virtual ~CodecEventCallbacks() = default;
   /**
-   * Called when the the underlying codec finishes encoding.
+   * Called when the underlying codec finishes encoding.
    */
   virtual void onCodecEncodeComplete() PURE;
 
