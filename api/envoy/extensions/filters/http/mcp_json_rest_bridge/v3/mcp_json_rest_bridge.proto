@@ -97,8 +97,10 @@ message McpJsonRestBridge {
     // Unspecified. Uses default behavior (nothing is stored).
     MODE_UNSPECIFIED = 0;
 
-    // Store request attributes in dynamic metadata under the key
-    // ``envoy.filters.http.mcp_json_rest_bridge``.
+    // Store request attributes in dynamic metadata. The metadata namespace
+    // is the filter's config name as specified by the ``name`` field in the
+    // ``http_filters`` list (e.g. ``envoy.filters.http.mcp_json_rest_bridge``
+    // if using the canonical filter name).
     DYNAMIC_METADATA = 1;
   }
 
@@ -130,8 +132,9 @@ message McpJsonRestBridge {
 
   // Where to store parsed MCP request attributes.
   // Default is not storing anything.
-  // When set to ``DYNAMIC_METADATA``, attributes are stored under the metadata key
-  // ``envoy.filters.http.mcp_json_rest_bridge``.
+  // When set to ``DYNAMIC_METADATA``, attributes are stored in dynamic metadata
+  // using the filter's config name (i.e. the ``name`` field of this filter's entry
+  // in the ``http_filters`` list) as the metadata namespace.
   RequestStorageMode request_storage_mode = 5 [(validate.rules).enum = {defined_only: true}];
 }
 
