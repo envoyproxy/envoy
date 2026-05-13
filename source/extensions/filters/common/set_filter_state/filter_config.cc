@@ -91,8 +91,7 @@ void Config::updateFilterState(const Formatter::Context& context,
       continue;
     }
     ENVOY_LOG(debug, "Created the filter state '{}' from value '{}'", value.key_, bytes_value);
-    info.filterState()->setData(value.key_, std::move(object), life_span_,
-                                value.stream_sharing_);
+    info.filterState()->setData(value.key_, std::move(object), life_span_, value.stream_sharing_);
   }
 }
 
