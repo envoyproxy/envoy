@@ -404,6 +404,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSize) {
   // 2026/01/23           44528       45000   Fix test flakes
   // 2026/02/13  43467    45575       46000   Update tcmalloc to 12f2552 (2025-09-27)
   // 2026/02/22           46519       47000   Coalesce LB rebuilds during batch updates
+  // 2026/05/13  44147    47086       47500   Retry budget interval state
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -418,7 +419,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSize) {
   // https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
 
-  EXPECT_MEMORY_LE(m_per_cluster, 47000); // Round up to allow platform variations.
+  EXPECT_MEMORY_LE(m_per_cluster, 47500); // Round up to allow platform variations.
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
