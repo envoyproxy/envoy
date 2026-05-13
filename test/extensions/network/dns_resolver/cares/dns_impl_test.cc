@@ -1,4 +1,5 @@
 #include <ares.h>
+#include <sys/types.h>
 
 #include <list>
 #include <memory>
@@ -32,6 +33,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -67,6 +69,15 @@ using IpList = std::list<std::string>;
 using HostMap = absl::node_hash_map<std::string, IpList>;
 // Map from hostname to CNAME
 using CNameMap = absl::node_hash_map<std::string, std::string>;
+
+bool setQcacheMaxTtl(
+    envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig& config,
+    uint32_t value) {
+  auto qcache_max_ttl = std::make_unique<Protobuf::UInt32Value>();
+  qcache_max_ttl->set_value(value);
+  config.set_allocated_qcache_max_ttl(qcache_max_ttl.release());
+  return true;
+}
 
 class TestDnsServerQuery {
 public:
@@ -438,6 +449,17 @@ protected:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   envoy::config::core::v3::DnsResolverOptions dns_resolver_options_;
+
+  envoy::config::core::v3::TypedExtensionConfig getCaresDnsResolverConfig(uint32_t qcache_max_ttl) {
+    envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+    cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
+    setQcacheMaxTtl(cares, qcache_max_ttl);
+
+    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+    typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+    typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
+    return typed_dns_resolver_config;
+  }
 };
 
 TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
@@ -2262,6 +2284,113 @@ TEST_F(DnsImplConstructor, VerifyCustomTimeoutAndTries) {
   EXPECT_TRUE(opts.tries == 7);
   ares_free_data(resolvers);
   ares_destroy_options(&opts);
+}
+
+TEST_F(DnsImplConstructor, VerifyCustomQcacheMaxTtl) {
+  auto typed_dns_resolver_config = getCaresDnsResolverConfig(123);
+
+  Network::DnsResolverFactory& dns_resolver_factory =
+      createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+  auto resolver =
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+          .value();
+
+  auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
+  ares_options opts{};
+  int optmask = 0;
+  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer->channel(), &opts, &optmask));
+  EXPECT_TRUE((optmask & ARES_OPT_QUERY_CACHE) == ARES_OPT_QUERY_CACHE);
+  EXPECT_EQ(123, opts.qcache_max_ttl);
+  ares_destroy_options(&opts);
+}
+
+TEST_F(DnsImplConstructor, ReusesResolverForIdenticalConfig) {
+  auto typed_dns_resolver_config = getCaresDnsResolverConfig(0);
+  Network::DnsResolverFactory& dns_resolver_factory =
+      createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+
+  auto resolver1 =
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+          .value();
+  auto resolver2 =
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+          .value();
+
+  EXPECT_EQ(resolver1.get(), resolver2.get());
+}
+
+TEST_F(DnsImplConstructor, DoesNotReuseResolverForIdenticalConfigWhenFeatureDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.restart_features.shared_cares_dns_resolver", "false"}});
+
+  auto typed_dns_resolver_config = getCaresDnsResolverConfig(0);
+  Network::DnsResolverFactory& dns_resolver_factory =
+      createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+
+  auto resolver1 =
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+          .value();
+  auto resolver2 =
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+          .value();
+
+  EXPECT_NE(resolver1.get(), resolver2.get());
+}
+
+TEST_F(DnsImplConstructor, DoesNotReuseResolverForDifferentConfig) {
+  auto typed_dns_resolver_config1 = getCaresDnsResolverConfig(67);
+  auto typed_dns_resolver_config2 = getCaresDnsResolverConfig(123);
+
+  Network::DnsResolverFactory& dns_resolver_factory =
+      createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config1);
+
+  auto resolver1 =
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config1)
+          .value();
+  auto resolver2 =
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config2)
+          .value();
+
+  EXPECT_NE(resolver1.get(), resolver2.get());
+}
+
+TEST_F(DnsImplConstructor, CleansExpiredResolverBeforeReinsertingIdenticalConfig) {
+  auto typed_dns_resolver_config = getCaresDnsResolverConfig(1234);
+
+  Network::DnsResolverFactory& dns_resolver_factory =
+      createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+
+  DnsResolver* first_resolver = nullptr;
+  {
+    auto resolver1 =
+        dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+            .value();
+    // Save the pointer only for identity comparison after resolver1 is destroyed.
+    first_resolver = resolver1.get();
+  }
+
+  auto typed_dns_resolver_config2 = getCaresDnsResolverConfig(5678);
+  // Create another resolver with a different config to trigger eviction of the first resolver from
+  // the resolver map.
+  auto resolver2 =
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config2)
+          .value();
+
+  // This is a dummy resolver so if memory is immediately reused, this will take the memory released
+  // by the first resolver.
+  auto typed_dns_resolver_config3 = getCaresDnsResolverConfig(890);
+  auto resolver3 =
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config3)
+          .value();
+
+  // Create a forth resolver with the same config as the first resolver and verify the first
+  // resolver is not reused, which proves that the first resolver was evicted from the resolver map.
+  auto resolver4 =
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+          .value();
+
+  EXPECT_NE(resolver2.get(), resolver4.get());
+  EXPECT_NE(first_resolver, resolver4.get());
 }
 
 class DnsImplAresFlagsForMaxUdpQueriesinTest : public DnsImplTest {

@@ -29,6 +29,8 @@ private:
   createClusterWithConfig(const envoy::config::cluster::v3::Cluster& cluster,
                           const envoy::extensions::clusters::dns::v3::DnsCluster& proto_config,
                           Upstream::ClusterFactoryContext& context) override;
+
+  absl::flat_hash_map<std::size_t, std::weak_ptr<Network::DnsResolver>> resolver_map_;
 };
 
 class DnsClusterImpl : public BaseDynamicClusterImpl {
