@@ -20,10 +20,9 @@ Bucket ranges use half-open interval semantics ``[start, end)``:
 
 A request is rejected only when all of the following are true:
 
-* either:
-  * the configured header is present and the first header value parses as a non-negative integer
-    and matches a configured bucket, or
-  * ``default_load_shed_point`` is configured (used for missing, invalid, or unmatched values),
+* the configured header is present, its first value parses as a non-negative integer, and the
+  parsed value matches a configured bucket; or ``default_load_shed_point`` is configured and used
+  for a missing, invalid, or unmatched value,
 * neither ``reject_on_missing_header`` nor ``reject_on_invalid_header`` is triggered,
 * the selected load shed point exists, and
 * that load shed point indicates load should be shed.
