@@ -2495,13 +2495,13 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceOnSignedRequestId) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-request-id", "-1aaaaaa-6f55-44ba-ad80-413f09f48a28"}};
 
-  EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("tracing.random_sampling",
-                             An<const envoy::type::v3::FractionalPercent&>(), _))
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("tracing.random_sampling", An<const envoy::type::v3::FractionalPercent&>(), _))
       .Times(0);
-  EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("tracing.global_enabled",
-                             An<const envoy::type::v3::FractionalPercent&>(), _))
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
       .Times(0);
   EXPECT_CALL(*request_id_extension_, setTraceReason(_, _)).Times(0);
 
