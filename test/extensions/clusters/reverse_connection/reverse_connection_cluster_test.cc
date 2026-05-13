@@ -257,13 +257,6 @@ public:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 
   std::shared_ptr<RevConCluster> cluster_;
-  // NiceMock because Event::MockDispatcher's default post(_) action invokes
-  // the callback inline; chooseHost posts addHostToHostSet which fires this
-  // watcher, and strict-mocking it would force every existing test to add
-  // an EXPECT_CALL just to acknowledge an inline post-handling artifact.
-  // The membership-stats tests below pin specific behavior via direct
-  // assertions on cluster_->info()->endpointStats() instead, which is
-  // strictly stronger than counting watcher invocations.
   NiceMock<ReadyWatcher> membership_updated_;
   ReadyWatcher initialized_;
   Event::MockTimer* cleanup_timer_;
@@ -2085,30 +2078,10 @@ TEST_F(ReverseConnectionClusterWithTenantIsolationTest, ClusterUsesRequestStream
   EXPECT_EQ(result.host->address()->logicalName(), "tenant1:node1");
 }
 
-namespace {
-// Captures dispatcher posts so tests can drain priority-set updates deterministically.
-class PostCapture {
-public:
-  void install(Event::MockDispatcher& dispatcher) {
-    EXPECT_CALL(dispatcher, post(_)).WillRepeatedly(testing::Invoke([this](Event::PostCb cb) {
-      cbs_.push_back(std::move(cb));
-    }));
-  }
-  void runAll() {
-    for (auto& cb : cbs_) {
-      cb();
-    }
-    cbs_.clear();
-  }
-  size_t size() const { return cbs_.size(); }
+// --- Cluster membership stats tests ---
 
-private:
-  std::vector<Event::PostCb> cbs_;
-};
-} // namespace
-
-// Verify that chooseHost() posts a priority set update for new hosts, and
-// that the membership stat counters reflect reality after the post drains.
+// Verify that chooseHost() posts a priority set update for new hosts, and that
+// membership_total/membership_healthy/membership_change reflect the actual state.
 TEST_F(ReverseConnectionClusterTest, HostCreationUpdatesMembership) {
   const std::string yaml = R"EOF(
     name: name
@@ -2128,13 +2101,12 @@ TEST_F(ReverseConnectionClusterTest, HostCreationUpdatesMembership) {
   setupThreadLocalSlot();
   addTestSocket("test-node-1", "test-cluster-1");
 
-  PostCapture posts;
-  posts.install(server_context_.dispatcher_);
+  // Capture the callback posted to the dispatcher by chooseHost().
+  Event::PostCb post_cb;
+  EXPECT_CALL(server_context_.dispatcher_, post(_))
+      .WillOnce(testing::Invoke([&post_cb](Event::PostCb cb) { post_cb = std::move(cb); }));
 
-  auto& stats = cluster_->info()->endpointStats();
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ(0U, stats.membership_total_.value());
-  EXPECT_EQ(0U, stats.membership_change_.value());
 
   RevConCluster::LoadBalancer lb(cluster_);
   NiceMock<Network::MockConnection> connection;
@@ -2145,21 +2117,19 @@ TEST_F(ReverseConnectionClusterTest, HostCreationUpdatesMembership) {
   auto result = lb.chooseHost(&lb_context);
   ASSERT_NE(result.host, nullptr);
 
-  // Stats unchanged until the posted callback runs on the main thread.
+  // Priority set not yet updated (post hasn't run).
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ(0U, stats.membership_total_.value());
 
+  // Simulate main thread processing the posted callback.
   EXPECT_CALL(membership_updated_, ready());
-  posts.runAll();
+  post_cb();
 
+  // Now membership should reflect the new host.
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(1U, stats.membership_total_.value());
-  EXPECT_EQ(1U, stats.membership_healthy_.value());
-  EXPECT_EQ(1U, stats.membership_change_.value());
 }
 
-// Verify that reusing an existing host does not bump membership_change_.
+// Verify that reusing an existing host does not post another priority set update.
 TEST_F(ReverseConnectionClusterTest, HostReuseDoesNotDoubleMembership) {
   const std::string yaml = R"EOF(
     name: name
@@ -2179,8 +2149,10 @@ TEST_F(ReverseConnectionClusterTest, HostReuseDoesNotDoubleMembership) {
   setupThreadLocalSlot();
   addTestSocket("test-node-1", "test-cluster-1");
 
-  PostCapture posts;
-  posts.install(server_context_.dispatcher_);
+  Event::PostCb post_cb;
+  // Expect exactly one post (for the first chooseHost only).
+  EXPECT_CALL(server_context_.dispatcher_, post(_))
+      .WillOnce(testing::Invoke([&post_cb](Event::PostCb cb) { post_cb = std::move(cb); }));
 
   RevConCluster::LoadBalancer lb(cluster_);
   NiceMock<Network::MockConnection> connection;
@@ -2188,29 +2160,25 @@ TEST_F(ReverseConnectionClusterTest, HostReuseDoesNotDoubleMembership) {
   lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
       new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "test-node-1"}}};
 
+  // First call creates the host and posts.
   auto result1 = lb.chooseHost(&lb_context);
   ASSERT_NE(result1.host, nullptr);
 
+  // Run the posted callback.
   EXPECT_CALL(membership_updated_, ready());
-  posts.runAll();
+  post_cb();
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
 
-  auto& stats = cluster_->info()->endpointStats();
-  EXPECT_EQ(1U, stats.membership_total_.value());
-  EXPECT_EQ(1U, stats.membership_change_.value());
-
+  // Second call reuses the host — no additional post expected.
   auto result2 = lb.chooseHost(&lb_context);
   ASSERT_NE(result2.host, nullptr);
   EXPECT_EQ(result1.host, result2.host);
 
-  // Drain any speculative post; stats must not change.
-  posts.runAll();
-
+  // Membership unchanged.
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ(1U, stats.membership_total_.value());
-  EXPECT_EQ(1U, stats.membership_change_.value());
 }
 
-// Verify that multiple distinct hosts each contribute to membership stats.
+// Verify that multiple distinct hosts each trigger a membership update.
 TEST_F(ReverseConnectionClusterTest, MultipleHostsMembershipUpdate) {
   const std::string yaml = R"EOF(
     name: name
@@ -2231,33 +2199,46 @@ TEST_F(ReverseConnectionClusterTest, MultipleHostsMembershipUpdate) {
   addTestSocket("node-a", "cluster-a");
   addTestSocket("node-b", "cluster-b");
 
-  PostCapture posts;
-  posts.install(server_context_.dispatcher_);
+  std::vector<Event::PostCb> post_cbs;
+  EXPECT_CALL(server_context_.dispatcher_, post(_))
+      .Times(2)
+      .WillRepeatedly(
+          testing::Invoke([&post_cbs](Event::PostCb cb) { post_cbs.push_back(std::move(cb)); }));
 
   RevConCluster::LoadBalancer lb(cluster_);
 
-  for (const std::string& node_id : {"node-a", "node-b"}) {
+  // Create host A.
+  {
     NiceMock<Network::MockConnection> connection;
     TestLoadBalancerContext lb_context(&connection);
     lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
-        new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", node_id}}};
+        new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "node-a"}}};
     auto result = lb.chooseHost(&lb_context);
     ASSERT_NE(result.host, nullptr);
   }
 
-  ASSERT_EQ(2UL, posts.size());
-  EXPECT_CALL(membership_updated_, ready()).Times(2);
-  posts.runAll();
+  // Create host B.
+  {
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+        new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "node-b"}}};
+    auto result = lb.chooseHost(&lb_context);
+    ASSERT_NE(result.host, nullptr);
+  }
 
-  auto& stats = cluster_->info()->endpointStats();
+  ASSERT_EQ(2UL, post_cbs.size());
+
+  // Run both posted callbacks.
+  EXPECT_CALL(membership_updated_, ready()).Times(2);
+  post_cbs[0]();
+  post_cbs[1]();
+
   EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(2U, stats.membership_total_.value());
-  EXPECT_EQ(2U, stats.membership_healthy_.value());
-  EXPECT_EQ(2U, stats.membership_change_.value());
 }
 
-// Verify that an unused host is removed after the recently-used grace interval.
+// Verify that cleanup() removes stale hosts from the priority set.
 TEST_F(ReverseConnectionClusterTest, CleanupRemovesHostsFromPrioritySet) {
   const std::string yaml = R"EOF(
     name: name
@@ -2277,8 +2258,9 @@ TEST_F(ReverseConnectionClusterTest, CleanupRemovesHostsFromPrioritySet) {
   setupThreadLocalSlot();
   addTestSocket("stale-node", "stale-cluster");
 
-  PostCapture posts;
-  posts.install(server_context_.dispatcher_);
+  Event::PostCb post_cb;
+  EXPECT_CALL(server_context_.dispatcher_, post(_))
+      .WillOnce(testing::Invoke([&post_cb](Event::PostCb cb) { post_cb = std::move(cb); }));
 
   RevConCluster::LoadBalancer lb(cluster_);
   NiceMock<Network::MockConnection> connection;
@@ -2289,89 +2271,17 @@ TEST_F(ReverseConnectionClusterTest, CleanupRemovesHostsFromPrioritySet) {
   auto result = lb.chooseHost(&lb_context);
   ASSERT_NE(result.host, nullptr);
 
+  // Run the post to add to priority set.
   EXPECT_CALL(membership_updated_, ready());
-  posts.runAll();
-
-  auto& stats = cluster_->info()->endpointStats();
+  post_cb();
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ(1U, stats.membership_total_.value());
 
-  // First cleanup pass: clears the grace bit, host is preserved.
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
-  callCleanup();
-  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size())
-      << "First cleanup pass must NOT delete a freshly-created host (grace flag).";
-  EXPECT_EQ(1U, stats.membership_total_.value());
-
-  // Second cleanup pass: bit was cleared, host->used() is false, deletion proceeds
-  // and fires a membership update.
+  // The host is not "used" (no active connection pool holds it), so cleanup should remove it.
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   callCleanup();
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ(0U, stats.membership_total_.value());
-  // membership_change_ incremented twice: once on add, once on remove.
-  EXPECT_EQ(2U, stats.membership_change_.value());
-}
-
-// Regression test for cleanup running before the posted priority-set update.
-TEST_F(ReverseConnectionClusterTest, CleanupBeforePendingPostDoesNotLeakHost) {
-  const std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 0.25s
-    lb_policy: CLUSTER_PROVIDED
-    cleanup_interval: 1s
-    cluster_type:
-      name: envoy.clusters.reverse_connection
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
-        cleanup_interval: 10s
-        host_id_format: "%REQ(x-remote-node-id)%"
-  )EOF";
-
-  setupFromYaml(yaml);
-  setupUpstreamExtension();
-  setupThreadLocalSlot();
-  addTestSocket("racy-node", "racy-cluster");
-
-  PostCapture posts;
-  posts.install(server_context_.dispatcher_);
-
-  RevConCluster::LoadBalancer lb(cluster_);
-  NiceMock<Network::MockConnection> connection;
-  TestLoadBalancerContext lb_context(&connection);
-  lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
-      new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "racy-node"}}};
-
-  // chooseHost inserts into host_map_ and queues addHostToHostSet. Do not
-  // drain the post yet, so cleanup observes the racy ordering.
-  auto result = lb.chooseHost(&lb_context);
-  ASSERT_NE(result.host, nullptr);
-  ASSERT_EQ(1UL, posts.size());
-
-  auto& stats = cluster_->info()->endpointStats();
-  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ(0U, stats.membership_total_.value());
-
-  // The grace flag protects the host from deletion until the queued add runs.
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
-  callCleanup();
-
-  EXPECT_CALL(membership_updated_, ready());
-  posts.runAll();
-
-  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size())
-      << "Race regression: cleanup ran before the post drained. The grace flag "
-         "must protect the freshly-created host so the post lands in a "
-         "priority_set_ that still has the host in host_map_.";
-  EXPECT_EQ(1U, stats.membership_total_.value());
-  EXPECT_EQ(1U, stats.membership_change_.value());
-
-  // A second chooseHost proves the host is still tracked and reusable.
-  auto result2 = lb.chooseHost(&lb_context);
-  ASSERT_NE(result2.host, nullptr);
-  EXPECT_EQ(result.host, result2.host);
 }
 
 } // namespace ReverseConnection

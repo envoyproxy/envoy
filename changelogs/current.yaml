@@ -86,11 +86,6 @@ bug_fixes:
     resulting binary "plaintext" was written back into the ``Cookie:`` request header and tripped a
     ``HeaderString`` validation assert. Such plaintexts are now rejected and the original cookie value
     is preserved, matching the behavior already documented for the explicit decryption-failure case.
-- area: reverse_connection
-  change: |
-    Fixed cluster membership stats (``membership_total``, ``membership_healthy``,
-    ``membership_change``) for reverse-connection clusters. Hosts are now published to and removed
-    from the priority set as they are created and cleaned up.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

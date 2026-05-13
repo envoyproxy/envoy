@@ -95,24 +95,25 @@ RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) 
 
   ENVOY_LOG(debug, "reverse_connection: using host identifier: {}", final_host_id);
 
-  HostLookupResult lookup = parent_->checkAndCreateHost(final_host_id);
+  Upstream::HostSharedPtr created_host;
+  auto response = parent_->checkAndCreateHost(final_host_id, created_host);
 
-  if (lookup.newly_created) {
-    // Mutate priority_set_ on the main dispatcher, where cleanup() also runs.
-    Upstream::HostSharedPtr host = lookup.host;
+  if (created_host != nullptr) {
     std::weak_ptr<RevConCluster> weak_parent = parent_;
-    parent_->dispatcher_.post(
-        [weak_parent, host = std::move(host)]() mutable {
-          if (auto parent = weak_parent.lock()) {
-            parent->addHostToHostSet(std::move(host));
-          }
-        });
+    parent_->dispatcher_.post([weak_parent, created_host]() {
+      if (auto parent = weak_parent.lock()) {
+        parent->addHostToHostSet(created_host);
+      }
+    });
   }
 
-  return Upstream::HostSelectionResponse{lookup.host};
+  return response;
 }
 
-RevConCluster::HostLookupResult RevConCluster::checkAndCreateHost(absl::string_view host_id) {
+Upstream::HostSelectionResponse
+RevConCluster::checkAndCreateHost(absl::string_view host_id,
+                                  Upstream::HostSharedPtr& created_host) {
+  created_host = nullptr;
   // Get the SocketManager to resolve cluster ID to node ID.
   // The bootstrap extension is validated during cluster creation, and TLS is initialized before
   // request handling, so socket_manager should always be available.
@@ -125,12 +126,13 @@ RevConCluster::HostLookupResult RevConCluster::checkAndCreateHost(absl::string_v
 
   {
     absl::ReaderMutexLock rlock(host_map_lock_);
+    // Check if node_id is already present in host_map_ or not. This ensures,
+    // that envoy reuses a conn_pool_container for an endpoint.
     auto host_itr = host_map_.find(node_id);
     if (host_itr != host_map_.end()) {
       ENVOY_LOG(debug, "reverse_connection: reusing existing host for {}.", node_id);
-      // Keep the host alive for at least one cleanup interval after selection.
-      host_itr->second.used.store(true, std::memory_order_relaxed);
-      return {host_itr->second.host, /*newly_created=*/false};
+      Upstream::HostSharedPtr host = host_itr->second;
+      return {host};
     }
   }
 
@@ -140,8 +142,7 @@ RevConCluster::HostLookupResult RevConCluster::checkAndCreateHost(absl::string_v
   auto host_itr2 = host_map_.find(node_id);
   if (host_itr2 != host_map_.end()) {
     ENVOY_LOG(debug, "reverse_connection: host already created for {} during contention.", node_id);
-    host_itr2->second.used.store(true, std::memory_order_relaxed);
-    return {host_itr2->second.host, /*newly_created=*/false};
+    return {host_itr2->second};
   }
 
   // Create a custom address that uses the UpstreamReverseSocketInterface.
@@ -160,20 +161,20 @@ RevConCluster::HostLookupResult RevConCluster::checkAndCreateHost(absl::string_v
   Upstream::HostSharedPtr host(std::move(host_result.value()));
   ENVOY_LOG(trace, "reverse_connection: created HostImpl {} for {}.", *host, node_id);
 
-  auto [it, inserted] = host_map_.try_emplace(node_id, host);
-  ASSERT(inserted, "host_map_ entry already existed despite re-check under writer lock");
-  return {it->second.host, /*newly_created=*/true};
+  host_map_[node_id] = host;
+  created_host = host;
+  return {host};
 }
 
 void RevConCluster::addHostToHostSet(Upstream::HostSharedPtr host) {
   const auto& first_host_set = priority_set_.getOrCreateHostSet(0);
-  auto all_hosts = std::make_shared<Upstream::HostVector>(first_host_set.hosts());
+  Upstream::HostVectorSharedPtr all_hosts(new Upstream::HostVector(first_host_set.hosts()));
   all_hosts->emplace_back(host);
   ENVOY_LOG(debug, "reverse_connection: adding host to priority set, total hosts: {}",
             all_hosts->size());
   priority_set_.updateHosts(
       0, Upstream::HostSetImpl::partitionHosts(all_hosts, Upstream::HostsPerLocalityImpl::empty()),
-      {}, {std::move(host)}, {}, /*weighted_priority_health=*/false, absl::nullopt);
+      {}, {std::move(host)}, {}, absl::nullopt, absl::nullopt);
 }
 
 void RevConCluster::cleanup() {
@@ -185,31 +186,23 @@ void RevConCluster::cleanup() {
     keeping_hosts = std::make_shared<Upstream::HostVector>();
 
     for (auto iter = host_map_.begin(); iter != host_map_.end();) {
-      auto& entry = iter->second;
-      if (entry.used.load(std::memory_order_relaxed)) {
-        entry.used.store(false, std::memory_order_relaxed);
-        keeping_hosts->push_back(entry.host);
-        ++iter;
-      } else if (entry.host->used()) {
-        keeping_hosts->push_back(entry.host);
-        ++iter;
-      } else {
-        ENVOY_LOG(debug, "Removing stale host: {}", *entry.host);
-        to_be_removed.push_back(entry.host);
+      const auto& host = iter->second;
+      if (!host->used()) {
+        ENVOY_LOG(debug, "Removing stale host: {}", *host);
+        to_be_removed.push_back(host);
         host_map_.erase(iter++);
+      } else {
+        keeping_hosts->push_back(host);
+        ++iter;
       }
     }
   }
 
   if (!to_be_removed.empty()) {
-    ENVOY_LOG(debug,
-              "reverse_connection: cleaned up {} stale hosts from priority set, remaining: {}",
-              to_be_removed.size(), keeping_hosts->size());
     priority_set_.updateHosts(0,
                               Upstream::HostSetImpl::partitionHosts(
                                   keeping_hosts, Upstream::HostsPerLocalityImpl::empty()),
-                              {}, {}, to_be_removed, /*weighted_priority_health=*/false,
-                              absl::nullopt);
+                              {}, {}, to_be_removed, absl::nullopt, absl::nullopt);
   }
 
   cleanup_timer_->enableTimer(cleanup_interval_);
