@@ -152,7 +152,6 @@ message ToolsListLocal {
 }
 
 // Configuration for the MCP tool capability of the server.
-// [#next-free-field: 5]
 message ServerToolConfig {
   // List of MCP tools configurations.
   repeated ToolConfig tools = 1;
@@ -180,7 +179,6 @@ message ServerToolConfig {
 }
 
 // Configuration for a tool's entry in tools/list responses.
-// [#next-free-field: 5]
 message ToolsListSpecificConfig {
   // Optional, human-readable name of the tool for display purposes.
   string title = 1;
@@ -198,7 +196,6 @@ message ToolsListSpecificConfig {
   string output_schema = 4;
 }
 
-// [#next-free-field: 4]
 message ToolConfig {
   // Unique identifier of the tool. Used both for tools/list and tools/call transcoding.
   string name = 1 [(validate.rules).string = {min_len: 1}];
