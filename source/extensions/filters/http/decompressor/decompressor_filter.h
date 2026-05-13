@@ -238,8 +238,8 @@ private:
   }
 
   DecompressorFilterConfigSharedPtr config_;
-  Compression::Decompressor::DecompressorPtr request_decompressor_{};
-  Compression::Decompressor::DecompressorPtr response_decompressor_{};
+  Compression::Decompressor::DecompressorPtr request_decompressor_;
+  Compression::Decompressor::DecompressorPtr response_decompressor_;
   ByteTracker request_byte_tracker_;
   ByteTracker response_byte_tracker_;
 };

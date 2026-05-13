@@ -35,10 +35,10 @@ public:
           redirects_threshold_(redirects_threshold), failure_threshold_(failure_threshold),
           host_degraded_threshold_(host_degraded_threshold), cb_(std::move(cb)) {}
     std::string cluster_name_;
-    std::atomic<uint64_t> last_callback_time_ms_{};
-    std::atomic<uint32_t> redirects_count_{};
-    std::atomic<uint32_t> failures_count_{};
-    std::atomic<uint32_t> host_degraded_count_{};
+    std::atomic<uint64_t> last_callback_time_ms_{0};
+    std::atomic<uint32_t> redirects_count_{0};
+    std::atomic<uint32_t> failures_count_{0};
+    std::atomic<uint32_t> host_degraded_count_{0};
     std::chrono::milliseconds min_time_between_triggering_;
     const uint32_t redirects_threshold_;
     const uint32_t failure_threshold_;

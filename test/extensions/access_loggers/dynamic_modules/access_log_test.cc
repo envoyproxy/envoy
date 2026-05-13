@@ -3,7 +3,6 @@
 #include "source/extensions/access_loggers/dynamic_modules/access_log_config.h"
 
 #include "test/extensions/dynamic_modules/util.h"
-#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -40,6 +39,8 @@ public:
                                         std::move(dynamic_module.value()), *stats_.rootScope());
     EXPECT_TRUE(config.ok()) << config.status().message();
     config_ = std::move(config.value());
+    // Re-open stat creation so tests can call `define_*` from the test thread.
+    config_->stat_creation_frozen_ = false;
   }
 
   Stats::IsolatedStoreImpl stats_;
@@ -327,6 +328,22 @@ TEST_F(DynamicModuleAccessLogTest, MetricsInvalidId) {
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
             envoy_dynamic_module_callback_access_logger_record_histogram_value(
                 static_cast<void*>(config_.get()), 999, 1));
+}
+
+// Verifies the factory auto-freezes stat creation so `define_*` returns `Frozen` after init.
+TEST_F(DynamicModuleAccessLogTest, MetricsFrozenAfterInit) {
+  config_->stat_creation_frozen_ = true;
+  envoy_dynamic_module_type_module_buffer name = {.ptr = "frozen_counter", .length = 14};
+  size_t out_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_access_logger_config_define_counter(
+                static_cast<void*>(config_.get()), name, &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_access_logger_config_define_gauge(
+                static_cast<void*>(config_.get()), name, &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_access_logger_config_define_histogram(
+                static_cast<void*>(config_.get()), name, &out_id));
 }
 
 } // namespace

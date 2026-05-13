@@ -16,6 +16,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -138,7 +140,7 @@ TEST_P(TcpProxyOdcdsIntegrationTest, SingleTcpClient) {
   result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
   RELEASE_ASSERT(result, result.message());
   odcds_stream_->startGrpcStream();
-  test_server_->waitForCounterEq("tcp.tcpproxy_stats.on_demand_cluster_attempt", 1);
+  test_server_->waitForCounter("tcp.tcpproxy_stats.on_demand_cluster_attempt", Eq(1));
   // Verify the on-demand CDS request and respond with the prepared `new_cluster`.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster"}, {},
                                            odcds_stream_.get()));
@@ -188,8 +190,8 @@ TEST_P(TcpProxyOdcdsIntegrationTest, RepeatedRequest) {
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster"}, {},
                                            odcds_stream_.get()));
 
-  test_server_->waitForCounterEq("tcp.tcpproxy_stats.on_demand_cluster_attempt",
-                                 expected_upstream_connections);
+  test_server_->waitForCounter("tcp.tcpproxy_stats.on_demand_cluster_attempt",
+                               Eq(expected_upstream_connections));
 
   sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TestTypeUrl::get().Cluster, {new_cluster_}, {}, "1", odcds_stream_.get());
@@ -304,7 +306,7 @@ TEST_P(TcpProxyOdcdsIntegrationTest, ShutdownAllConnectionsOnClusterLookupTimeou
 
   // TODO: assert there is no more on-demand cds request since the first cluster is in flight.
   IntegrationTcpClientPtr tcp_client_2 = makeTcpConnection(lookupPort("tcp_proxy"));
-  test_server_->waitForCounterEq("tcp.tcpproxy_stats.on_demand_cluster_attempt", 2);
+  test_server_->waitForCounter("tcp.tcpproxy_stats.on_demand_cluster_attempt", Eq(2));
 
   tcp_client_1->waitForHalfClose(true);
   tcp_client_2->waitForHalfClose(true);
@@ -453,7 +455,7 @@ TEST_P(TcpProxyOdcdsAdsIntegrationTest, NoCdsConfigOnDemandDiscoveryBasic) {
   // Establish a tcp request to the Envoy.
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
 
-  test_server_->waitForCounterEq("tcp.tcpproxy_stats.on_demand_cluster_attempt", 1);
+  test_server_->waitForCounter("tcp.tcpproxy_stats.on_demand_cluster_attempt", Eq(1));
   // Verify the on-demand CDS request and respond with the prepared `new_cluster`.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster"}, {},
                                            odcds_stream_.get()));
@@ -496,7 +498,7 @@ TEST_P(TcpProxyOdcdsAdsIntegrationTest, NoCdsConfigOnDemandDiscoveryTwoRequests)
   RELEASE_ASSERT(result, result.message());
   odcds_stream_->startGrpcStream();
 
-  test_server_->waitForCounterEq("tcp.tcpproxy_stats.on_demand_cluster_attempt", 2);
+  test_server_->waitForCounter("tcp.tcpproxy_stats.on_demand_cluster_attempt", Eq(2));
 
   // Verify the on-demand CDS request for "new_cluster".
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster"}, {},
@@ -547,7 +549,7 @@ TEST_P(TcpProxyOdcdsAdsIntegrationTest, NoCdsConfigOnDemandDiscoveryTwoListeners
   // Establish tcp request to first listener (cluster1).
   tcp_clients_.push_back(makeTcpConnection(lookupPort("tcp_proxy")));
 
-  test_server_->waitForCounterEq("tcp.tcpproxy_stats.on_demand_cluster_attempt", 1);
+  test_server_->waitForCounter("tcp.tcpproxy_stats.on_demand_cluster_attempt", Eq(1));
 
   // Expect the ADS server to receive the request, but don't send the response yet.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster1"}, {},
@@ -556,7 +558,7 @@ TEST_P(TcpProxyOdcdsAdsIntegrationTest, NoCdsConfigOnDemandDiscoveryTwoListeners
   // Establish tcp request to second listener (cluster2).
   tcp_clients_.push_back(makeTcpConnection(lookupPort("tcp_proxy_2")));
 
-  test_server_->waitForCounterEq("tcp.tcpproxy_stats.on_demand_cluster_attempt", 2);
+  test_server_->waitForCounter("tcp.tcpproxy_stats.on_demand_cluster_attempt", Eq(2));
 
   // Expect the ADS server to receive the request for new_cluster2.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster2"}, {},
@@ -588,7 +590,7 @@ TEST_P(TcpProxyOdcdsAdsIntegrationTest, NoCdsConfigOnDemandDiscoveryTwoListeners
   tcp_clients_[0]->close();
   tcp_clients_[1]->close();
 
-  test_server_->waitForCounterGe("tcp.tcpproxy_stats.on_demand_cluster_success", 2);
+  test_server_->waitForCounter("tcp.tcpproxy_stats.on_demand_cluster_success", Ge(2));
 }
 
 } // namespace

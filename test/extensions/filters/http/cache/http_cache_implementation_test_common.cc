@@ -9,7 +9,6 @@
 #include "source/extensions/filters/http/cache/http_cache.h"
 
 #include "test/mocks/http/mocks.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "absl/cleanup/cleanup.h"

@@ -5,7 +5,6 @@
 #include "source/common/upstream/load_balancer_factory_base.h"
 
 #include "test/integration/load_balancers/config.pb.h"
-#include "test/test_common/registry.h"
 
 namespace Envoy {
 

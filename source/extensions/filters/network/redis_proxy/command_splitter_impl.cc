@@ -1163,7 +1163,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   }
 
   // Get the handler for the downstream request
-  auto handler = handler_lookup_table_.find(command_name.c_str());
+  auto handler = handler_lookup_table_.find(command_name);
   ASSERT(handler != nullptr);
 
   // If we are within a transaction, forward all requests to the transaction handler (i.e. handler
@@ -1227,7 +1227,7 @@ void InstanceImpl::addHandler(Stats::Scope& scope, const std::string& stat_prefi
   Stats::StatNameManagedStorage storage{command_stat_prefix + std::string("latency"),
                                         scope.symbolTable()};
   handler_lookup_table_.add(
-      to_lower_name.c_str(),
+      to_lower_name,
       std::make_shared<HandlerData>(HandlerData{
           CommandStats{ALL_COMMAND_STATS(POOL_COUNTER_PREFIX(scope, command_stat_prefix))
                            scope.histogramFromStatName(storage.statName(),

@@ -16,6 +16,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -389,7 +391,7 @@ public:
     loadstats_response.set_report_endpoint_granularity(report_endpoint_granularity);
     loadstats_stream_->sendGrpcMessage(loadstats_response);
     // Wait until the request has been received by Envoy.
-    test_server_->waitForCounterGe("load_reporter.requests", ++load_requests_);
+    test_server_->waitForCounter("load_reporter.requests", Ge(++load_requests_));
   }
 
   envoy::config::endpoint::v3::UpstreamLocalityStats localityStats(const std::string& sub_zone,
@@ -448,7 +450,7 @@ public:
     initiateClientConnection();
     waitForUpstreamResponse(endpoint_index, response_code, send_orca_load_report);
     cleanupUpstreamAndDownstream();
-    test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 0);
+    test_server_->waitForGauge("cluster.cluster_0.upstream_cx_active", Eq(0));
   }
 
   void updateDropOverloadConfig() {
@@ -534,7 +536,7 @@ TEST_P(LoadStatsIntegrationTest, Success) {
   // Change to 50/50 for the failover clusters.
   updateClusterLoadAssignment({}, {}, {{3}}, {{4}});
   requestLoadStatsResponse({"cluster_0"});
-  test_server_->waitForGaugeEq("cluster.cluster_0.membership_total", 2);
+  test_server_->waitForGauge("cluster.cluster_0.membership_total", Eq(2));
 
   for (uint32_t i = 0; i < 4; ++i) {
     sendAndReceiveUpstream(i % 2 + 3);
@@ -875,7 +877,7 @@ TEST_P(LoadStatsIntegrationTest, SuccessWithCustomMetrics) {
   // Change to 50/50 for the failover clusters.
   updateClusterLoadAssignment({}, {}, {{3}}, {{4}});
   requestLoadStatsResponse({"cluster_0"});
-  test_server_->waitForGaugeEq("cluster.cluster_0.membership_total", 2);
+  test_server_->waitForGauge("cluster.cluster_0.membership_total", Eq(2));
 
   for (uint32_t i = 0; i < 4; ++i) {
     sendAndReceiveUpstream(i % 2 + 3, 200, true);
@@ -999,7 +1001,7 @@ TEST_P(LoadStatsIntegrationTest, EndpointLevelStatsReportingSuccessAndFailure) {
   // Configure cluster_0 with one endpoint (service_upstream_[0], which is fake_upstreams_[1])
   // in the "winter" locality.
   updateClusterLoadAssignment({{0}}, {}, {}, {});
-  test_server_->waitForGaugeEq("cluster.cluster_0.membership_total", 1);
+  test_server_->waitForGauge("cluster.cluster_0.membership_total", Eq(1));
 
   sendAndReceiveUpstream(0, 200, false /*send_orca_load_report*/);
   sendAndReceiveUpstream(0, 503, false /*send_orca_load_report*/);

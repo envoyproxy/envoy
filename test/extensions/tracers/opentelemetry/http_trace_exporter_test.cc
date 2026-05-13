@@ -5,7 +5,6 @@
 #include "source/extensions/tracers/opentelemetry/http_trace_exporter.h"
 
 #include "test/mocks/common.h"
-#include "test/mocks/grpc/mocks.h"
 #include "test/mocks/server/tracer_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"

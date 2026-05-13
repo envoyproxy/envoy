@@ -92,6 +92,7 @@ public:
    * Return a JSON representation of this object's configuration. This function
    * is used in the startup banner logged by \c dd-trace-cpp.
    */
+  // NOLINTNEXTLINE(readability-identifier-naming)
   const nlohmann::json& config_json() const;
 
   // Http::AsyncClient::Callbacks

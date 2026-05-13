@@ -141,7 +141,7 @@ TEST_P(OriginalDstTcpProxyIntegrationTest, TestManyConnections) {
     ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
     ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   }
-  test_server_->waitForCounterGe("cluster_manager.cluster_updated", kMaxConnections);
+  test_server_->waitForCounter("cluster_manager.cluster_updated", testing::Ge(kMaxConnections));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, OriginalDstTcpProxyIntegrationTest,

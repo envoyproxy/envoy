@@ -78,9 +78,9 @@ TEST_F(ResourceProviderTest, NoResourceDetectorsConfigured) {
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
   ResourceProviderImpl resource_provider;
-  Resource resource =
-      resource_provider.getResource(opentelemetry_config.resource_detectors(),
-                                    server_factory_context_, opentelemetry_config.service_name());
+  Resource resource = resource_provider.getResource(
+      opentelemetry_config.resource_detectors(), server_factory_context_,
+      opentelemetry_config.service_name(), ResourceProviderOptions{});
 
   EXPECT_EQ(resource.schema_url_, "");
 
@@ -99,6 +99,58 @@ TEST_F(ResourceProviderTest, NoResourceDetectorsConfigured) {
     EXPECT_TRUE(expected != expected_attributes.end());
     EXPECT_EQ(expected->second, actual.second);
   }
+}
+
+// Verifies a resource with only service name is returned when telemetry SDK attributes are disabled
+TEST_F(ResourceProviderTest, NoResourceDetectorsConfiguredAttributesDisabled) {
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    service_name: my-service
+    set_telemetry_sdk_resource_attributes: false
+    )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+  ResourceProviderImpl resource_provider;
+  ResourceProviderOptions options;
+  options.set_telemetry_sdk_resource_attributes = false;
+  Resource resource = resource_provider.getResource(opentelemetry_config.resource_detectors(),
+                                                    server_factory_context_,
+                                                    opentelemetry_config.service_name(), options);
+
+  // Verify that telemetry SDK attributes are NOT present
+  EXPECT_TRUE(resource.attributes_.find("telemetry.sdk.language") == resource.attributes_.end());
+  EXPECT_TRUE(resource.attributes_.find("telemetry.sdk.name") == resource.attributes_.end());
+  EXPECT_TRUE(resource.attributes_.find("telemetry.sdk.version") == resource.attributes_.end());
+}
+
+// Verifies a resource without service name is returned when service name attribute is disabled
+TEST_F(ResourceProviderTest, NoResourceDetectorsConfiguredServiceNameDisabled) {
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    service_name: my-service
+    set_service_name_resource_attribute: false
+    )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+  ResourceProviderImpl resource_provider;
+  ResourceProviderOptions options;
+  options.set_service_name_resource_attribute = false;
+  Resource resource = resource_provider.getResource(opentelemetry_config.resource_detectors(),
+                                                    server_factory_context_,
+                                                    opentelemetry_config.service_name(), options);
+
+  // Verify that service.name attribute is NOT present
+  EXPECT_TRUE(resource.attributes_.find("service.name") == resource.attributes_.end());
+  // Verify other attributes are still present since only service.name was disabled
+  EXPECT_TRUE(resource.attributes_.find("telemetry.sdk.language") != resource.attributes_.end());
 }
 
 // Verifies it is possible to configure multiple resource detectors
@@ -147,9 +199,9 @@ TEST_F(ResourceProviderTest, MultipleResourceDetectorsConfigured) {
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
   ResourceProviderImpl resource_provider;
-  Resource resource =
-      resource_provider.getResource(opentelemetry_config.resource_detectors(),
-                                    server_factory_context_, opentelemetry_config.service_name());
+  Resource resource = resource_provider.getResource(
+      opentelemetry_config.resource_detectors(), server_factory_context_,
+      opentelemetry_config.service_name(), ResourceProviderOptions{});
 
   EXPECT_EQ(resource.schema_url_, "");
 
@@ -184,7 +236,8 @@ TEST_F(ResourceProviderTest, UnknownResourceDetectors) {
   ResourceProviderImpl resource_provider;
   EXPECT_THROW_WITH_MESSAGE(
       resource_provider.getResource(opentelemetry_config.resource_detectors(),
-                                    server_factory_context_, opentelemetry_config.service_name()),
+                                    server_factory_context_, opentelemetry_config.service_name(),
+                                    ResourceProviderOptions{}),
       EnvoyException,
       "Resource detector factory not found: "
       "'envoy.tracers.opentelemetry.resource_detectors.UnkownResourceDetector'");
@@ -214,9 +267,9 @@ TEST_F(ResourceProviderTest, ProblemCreatingResourceDetector) {
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
   ResourceProviderImpl resource_provider;
-  EXPECT_THROW_WITH_MESSAGE(resource_provider.getResource(opentelemetry_config.resource_detectors(),
-                                                          server_factory_context_,
-                                                          opentelemetry_config.service_name()),
+  EXPECT_THROW_WITH_MESSAGE(resource_provider.getResource(
+                                opentelemetry_config.resource_detectors(), server_factory_context_,
+                                opentelemetry_config.service_name(), ResourceProviderOptions{}),
                             EnvoyException,
                             "Resource detector could not be created: "
                             "'envoy.tracers.opentelemetry.resource_detectors.a'");
@@ -266,9 +319,9 @@ TEST_F(ResourceProviderTest, OldSchemaEmptyUpdatingSet) {
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
   ResourceProviderImpl resource_provider;
-  Resource resource =
-      resource_provider.getResource(opentelemetry_config.resource_detectors(),
-                                    server_factory_context_, opentelemetry_config.service_name());
+  Resource resource = resource_provider.getResource(
+      opentelemetry_config.resource_detectors(), server_factory_context_,
+      opentelemetry_config.service_name(), ResourceProviderOptions{});
 
   // OTel spec says the updating schema should be used
   EXPECT_EQ(expected_schema_url, resource.schema_url_);
@@ -318,9 +371,9 @@ TEST_F(ResourceProviderTest, OldSchemaSetUpdatingEmpty) {
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
   ResourceProviderImpl resource_provider;
-  Resource resource =
-      resource_provider.getResource(opentelemetry_config.resource_detectors(),
-                                    server_factory_context_, opentelemetry_config.service_name());
+  Resource resource = resource_provider.getResource(
+      opentelemetry_config.resource_detectors(), server_factory_context_,
+      opentelemetry_config.service_name(), ResourceProviderOptions{});
 
   // OTel spec says the updating schema should be used
   EXPECT_EQ(expected_schema_url, resource.schema_url_);
@@ -370,9 +423,9 @@ TEST_F(ResourceProviderTest, OldAndUpdatingSchemaAreEqual) {
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
   ResourceProviderImpl resource_provider;
-  Resource resource =
-      resource_provider.getResource(opentelemetry_config.resource_detectors(),
-                                    server_factory_context_, opentelemetry_config.service_name());
+  Resource resource = resource_provider.getResource(
+      opentelemetry_config.resource_detectors(), server_factory_context_,
+      opentelemetry_config.service_name(), ResourceProviderOptions{});
 
   EXPECT_EQ(expected_schema_url, resource.schema_url_);
 }
@@ -421,9 +474,9 @@ TEST_F(ResourceProviderTest, OldAndUpdatingSchemaAreDifferent) {
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
   ResourceProviderImpl resource_provider;
-  Resource resource =
-      resource_provider.getResource(opentelemetry_config.resource_detectors(),
-                                    server_factory_context_, opentelemetry_config.service_name());
+  Resource resource = resource_provider.getResource(
+      opentelemetry_config.resource_detectors(), server_factory_context_,
+      opentelemetry_config.service_name(), ResourceProviderOptions{});
 
   // OTel spec says Old schema should be used
   EXPECT_EQ(expected_schema_url, resource.schema_url_);

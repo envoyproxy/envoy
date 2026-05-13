@@ -33,6 +33,11 @@ const Http::HeaderMap& lengthZeroHeader() {
   return *headers;
 }
 
+Http::Code zeroHttpCode() {
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
+  return static_cast<Http::Code>(0);
+}
+
 // Static response used for creating authorization ERROR responses.
 // Note: status_code is left unset so the filter can use the configured status_on_error
 // configuration.
@@ -50,7 +55,7 @@ const Response& errorResponse() {
                                             Http::Utility::QueryParamsVector{},
                                             {},
                                             EMPTY_STRING,
-                                            static_cast<Http::Code>(0),
+                                            zeroHttpCode(),
                                             Protobuf::Struct{}});
 }
 
@@ -70,7 +75,7 @@ struct SuccessResponse {
       : headers_(headers), matchers_(matchers), append_matchers_(append_matchers),
         response_matchers_(response_matchers),
         to_dynamic_metadata_matchers_(dynamic_metadata_matchers),
-        response_(std::make_unique<Response>(response)) {
+        response_(std::make_unique<Response>(std::move(response))) {
     headers_.iterate([this](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
       // UpstreamHeaderMatcher
       if (matchers_->matches(header.key().getStringView())) {

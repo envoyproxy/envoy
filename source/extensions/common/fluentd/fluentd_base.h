@@ -78,7 +78,7 @@ public:
               const std::string& stat_prefix, BackOffStrategyPtr backoff_strategy,
               uint64_t buffer_flush_interval, uint64_t max_buffer_size);
 
-  virtual ~FluentdBase() = default;
+  ~FluentdBase() override = default;
 
   // Tcp::AsyncTcpClientCallbacks
   void onEvent(Network::ConnectionEvent event) override;
@@ -138,7 +138,7 @@ public:
     });
   }
 
-  virtual ~FluentdCacheBase() = default;
+  ~FluentdCacheBase() override = default;
 
   SharedPtrType getOrCreate(const std::shared_ptr<ConfigType>& config,
                             Random::RandomGenerator& random,

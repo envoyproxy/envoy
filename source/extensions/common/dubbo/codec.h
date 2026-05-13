@@ -40,7 +40,7 @@ public:
   static constexpr int32_t MaxBodySize = 16 * 1024 * 1024;
 
 private:
-  SerializerPtr serializer_{};
+  SerializerPtr serializer_;
 };
 
 class DirectResponseUtil {

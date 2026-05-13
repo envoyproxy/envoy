@@ -13,6 +13,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::Ge;
 namespace Envoy {
 
 namespace {
@@ -50,7 +51,7 @@ TEST_P(HttpInspectorTcpIntegrationTest, DetectNoHttp) {
   ASSERT_TRUE(fake_upstream_connection->close());
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
-  test_server_->waitForCounterGe("http_inspector.http_not_found", 1);
+  test_server_->waitForCounter("http_inspector.http_not_found", Ge(1));
 }
 
 TEST_P(HttpInspectorTcpIntegrationTest, DetectHttp) {
@@ -65,7 +66,7 @@ TEST_P(HttpInspectorTcpIntegrationTest, DetectHttp) {
   ASSERT_TRUE(fake_upstream_connection->close());
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
-  test_server_->waitForCounterGe("http_inspector.http11_found", 1);
+  test_server_->waitForCounter("http_inspector.http11_found", Ge(1));
 }
 
 // Tests that the inspector makes a decision when CRLF is read.
@@ -81,7 +82,7 @@ TEST_P(HttpInspectorTcpIntegrationTest, DetectCRLF) {
   ASSERT_TRUE(fake_upstream_connection->close());
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
-  test_server_->waitForCounterGe("http_inspector.http_not_found", 1);
+  test_server_->waitForCounter("http_inspector.http_not_found", Ge(1));
 }
 
 } // namespace Envoy

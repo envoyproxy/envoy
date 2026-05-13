@@ -76,10 +76,10 @@ public:
 
 private:
   struct DispatcherStore {
-    std::vector<std::reference_wrapper<Event::Dispatcher>> dispatchers_ ABSL_GUARDED_BY(lock_){};
+    std::vector<std::reference_wrapper<Event::Dispatcher>> dispatchers_ ABSL_GUARDED_BY(lock_);
     int dispatcher_idx_ ABSL_GUARDED_BY(lock_){0};
     Thread::MutexBasicLockable lock_{};
-    std::once_flag init_once_{};
+    std::once_flag init_once_;
   };
   static DispatcherStore& dispatcherStore() { MUTABLE_CONSTRUCT_ON_FIRST_USE(DispatcherStore); }
 
@@ -104,8 +104,8 @@ private:
   Upstream::HostDescriptionConstSharedPtr host_{nullptr};
   Tcp::ConnectionPool::Cancellable* handler_{nullptr};
   bool closed_{false};
-  std::string addr_{};
-  std::string remote_addr_{};
+  std::string addr_;
+  std::string remote_addr_;
 };
 
 using UpstreamConnPtr = std::shared_ptr<UpstreamConn>;
@@ -117,7 +117,7 @@ public:
 
   // Must be strong shared_ptr, otherwise the UpstreamConn will be released immediately since we do
   // not have any other place to keep strong reference of the UpstreamConn.
-  UpstreamConnPtr conn_ptr_{};
+  UpstreamConnPtr conn_ptr_;
   // anchor a string temporarily, make sure it won't be freed before copied to Go.
   std::string str_value_;
 };
