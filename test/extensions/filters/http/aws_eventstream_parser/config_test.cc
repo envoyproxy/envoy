@@ -189,6 +189,33 @@ TEST(AwsEventstreamParserConfigTest, HeaderRuleEmptyKey) {
                           "Proto constraint validation failed");
 }
 
+TEST(AwsEventstreamParserConfigTest, HeaderRuleStopProcessingAfterMatchesExceedsMax) {
+  const std::string yaml = R"EOF(
+  response_rules:
+    content_parser:
+      name: envoy.content_parsers.json
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
+        rules:
+          - rule:
+              selectors:
+                - key: "usage"
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "tokens"
+    header_rules:
+      - header_name: ":event-type"
+        on_present:
+          metadata_namespace: "envoy.lb"
+          key: "event_type"
+        stop_processing_after_matches: 2
+  )EOF";
+
+  envoy::extensions::filters::http::aws_eventstream_parser::v3::AwsEventstreamParser proto_config;
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config), EnvoyException,
+                          "Proto constraint validation failed");
+}
+
 } // namespace
 } // namespace AwsEventstreamParser
 } // namespace HttpFilters

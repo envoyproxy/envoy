@@ -1101,8 +1101,8 @@ TEST_F(AwsEventstreamParserFilterTest, HeaderRuleOnPresentOverrideValue) {
   EXPECT_TRUE(metadata.fields().at("has_event_type").bool_value());
 }
 
-// Test header rule preserve_existing.
-TEST_F(AwsEventstreamParserFilterTest, HeaderRulePreserveExisting) {
+// Test header rule stop_processing_after_matches: first match wins, second is skipped.
+TEST_F(AwsEventstreamParserFilterTest, HeaderRuleStopProcessingAfterMatches) {
   const std::string config = R"EOF(
   response_rules:
     content_parser:
@@ -1123,28 +1123,118 @@ TEST_F(AwsEventstreamParserFilterTest, HeaderRulePreserveExisting) {
         on_present:
           metadata_namespace: "envoy.lb"
           key: "event_type"
-          preserve_existing_metadata_value: true
+        stop_processing_after_matches: 1
   )EOF";
 
   setupFilter(config);
-
-  // Pre-populate metadata
-  Protobuf::Struct existing;
-  (*existing.mutable_fields())["event_type"].set_string_value("pre-existing");
-  stream_info_.setDynamicMetadata("envoy.lb", existing);
 
   Http::TestResponseHeaderMapImpl headers{{":status", "200"},
                                           {"content-type", "application/vnd.amazon.eventstream"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
 
-  std::string es_headers = buildStringHeader(":event-type", "NewEvent");
-  Buffer::OwnedImpl data(buildEventstreamMessageWithHeaders(es_headers, R"({"text": "hi"})"));
+  // First message with matching header
+  std::string es_headers1 = buildStringHeader(":event-type", "FirstEvent");
+  Buffer::OwnedImpl data1(buildEventstreamMessageWithHeaders(es_headers1, R"({"text": "hi"})"));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data1, false));
+
+  // Second message with same header but different value (should be skipped)
+  std::string es_headers2 = buildStringHeader(":event-type", "SecondEvent");
+  Buffer::OwnedImpl data2(buildEventstreamMessageWithHeaders(es_headers2, R"({"text": "bye"})"));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data2, true));
+
+  // First value should win
+  const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
+  EXPECT_EQ("FirstEvent", metadata.fields().at("event_type").string_value());
+}
+
+// Test header rule default behavior (stop_processing_after_matches: 0): later matches overwrite.
+TEST_F(AwsEventstreamParserFilterTest, HeaderRuleDefaultOverwritesBehavior) {
+  const std::string config = R"EOF(
+  response_rules:
+    content_parser:
+      name: envoy.content_parsers.json
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
+        rules:
+          - rule:
+              selectors:
+                - key: "dummy"
+              on_missing:
+                metadata_namespace: "envoy.lb"
+                key: "dummy"
+                value:
+                  string_value: "x"
+    header_rules:
+      - header_name: ":event-type"
+        on_present:
+          metadata_namespace: "envoy.lb"
+          key: "event_type"
+  )EOF";
+
+  setupFilter(config);
+
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"},
+                                          {"content-type", "application/vnd.amazon.eventstream"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+
+  // First message
+  std::string es_headers1 = buildStringHeader(":event-type", "FirstEvent");
+  Buffer::OwnedImpl data1(buildEventstreamMessageWithHeaders(es_headers1, R"({"text": "hi"})"));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data1, false));
+
+  // Second message overwrites the first
+  std::string es_headers2 = buildStringHeader(":event-type", "SecondEvent");
+  Buffer::OwnedImpl data2(buildEventstreamMessageWithHeaders(es_headers2, R"({"text": "bye"})"));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data2, true));
+
+  // Second value should win (last-write-wins)
+  const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
+  EXPECT_EQ("SecondEvent", metadata.fields().at("event_type").string_value());
+}
+
+// Test header rule stop_processing_after_matches with on_missing: fires when header never appears.
+TEST_F(AwsEventstreamParserFilterTest, HeaderRuleStopProcessingOnMissingStillFires) {
+  const std::string config = R"EOF(
+  response_rules:
+    content_parser:
+      name: envoy.content_parsers.json
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
+        rules:
+          - rule:
+              selectors:
+                - key: "dummy"
+              on_missing:
+                metadata_namespace: "envoy.lb"
+                key: "dummy"
+                value:
+                  string_value: "x"
+    header_rules:
+      - header_name: ":event-type"
+        on_present:
+          metadata_namespace: "envoy.lb"
+          key: "event_type"
+        on_missing:
+          metadata_namespace: "envoy.lb"
+          key: "event_type"
+          value: "unknown"
+        stop_processing_after_matches: 1
+  )EOF";
+
+  setupFilter(config);
+
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"},
+                                          {"content-type", "application/vnd.amazon.eventstream"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+
+  // Message with no matching header
+  Buffer::OwnedImpl data(buildEventstreamMessage(R"({"text": "hello"})"));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, true));
 
-  // Pre-existing value should be preserved
+  // on_missing should fire at finalization
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ("pre-existing", metadata.fields().at("event_type").string_value());
-  EXPECT_EQ(1, findCounter("aws_eventstream_parser.resp.json.preserved_existing_metadata"));
+  EXPECT_EQ("unknown", metadata.fields().at("event_type").string_value());
+  EXPECT_EQ(2, findCounter("aws_eventstream_parser.resp.json.metadata_from_fallback"));
 }
 
 // Test no header_rules configured — backward compatible.

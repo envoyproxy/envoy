@@ -167,6 +167,10 @@ When using ``envoy.content_parsers.json``, configure rules within the typed_conf
     An optional ``value`` field can override the header's actual value.
   * **on_missing**: Metadata action when the header was not found in any message by end-of-stream.
     The ``value`` field must be set.
+  * **stop_processing_after_matches**: Controls how many times this rule should successfully match
+    before stopping evaluation. ``0`` (default) evaluates against all messages (last value wins).
+    ``1`` stops after the first match (first value wins). When all header rules and all content
+    parser rules have limits set and all are satisfied, the filter stops processing entirely.
 
   If ``metadata_namespace`` is empty, defaults to ``envoy.filters.http.aws_eventstream_parser``.
 
@@ -186,7 +190,7 @@ comes from the owning HTTP connection manager, and ``<parser_prefix>`` comes fro
   resp.<parser_prefix>.mismatched_content_type, Counter, Total number of responses with content types that don't match the expected type
   resp.<parser_prefix>.empty_payload, Counter, Total number of EventStream messages with empty payloads
   resp.<parser_prefix>.parse_error, Counter, Total number of messages where the content parser failed to parse the payload
-  resp.<parser_prefix>.preserved_existing_metadata, Counter, Total number of times metadata was not written due to preserve_existing_metadata_value being true
+  resp.<parser_prefix>.preserved_existing_metadata, Counter, Total number of times metadata was not written due to preserve_existing_metadata_value being true on a content parser rule
   resp.<parser_prefix>.eventstream_error, Counter, "Total number of EventStream protocol errors (CRC mismatch, invalid format)"
   resp.<parser_prefix>.type_conversion_error, Counter, Total number of times a value could not be converted to a valid Protobuf Value type
 

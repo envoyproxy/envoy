@@ -49,9 +49,6 @@ message AwsEventstreamParser {
     // When set for on_present, uses this value instead of the header value.
     // Required for on_missing (since there is no header value available).
     google.protobuf.Value value = 3;
-
-    // False if we want to overwrite the existing metadata value. Default to false.
-    bool preserve_existing_metadata_value = 4;
   }
 
   // A rule for extracting an EventStream message header to dynamic metadata.
@@ -65,6 +62,22 @@ message AwsEventstreamParser {
     // If the header was not found in any message by end-of-stream, apply this metadata action.
     // The value field in the HeaderKeyValuePair must be set (since there is no header value).
     HeaderKeyValuePair on_missing = 3;
+
+    // Controls how many times this rule should successfully match before stopping evaluation
+    // of this rule for subsequent messages.
+    //
+    // - If set to 0 (default): This rule is evaluated against all messages.
+    //   Later matches overwrite earlier values, effectively extracting the LAST occurrence.
+    //
+    // - If set to 1: Stop evaluating this rule after the first successful match.
+    //   This is useful for extracting header values that appear early in the stream
+    //   to avoid unnecessary processing of subsequent messages.
+    //
+    // - If set to N > 1: Reserved for future use. Values > 1 are currently rejected.
+    //
+    // When all header rules AND all content parser rules have stop_processing_after_matches
+    // limits set and all limits are satisfied, the filter stops processing the stream entirely.
+    uint32 stop_processing_after_matches = 4 [(validate.rules).uint32 = {lte: 1}];
   }
 
   // Rules for processing AWS EventStream streams and extracting metadata.

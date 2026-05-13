@@ -126,7 +126,8 @@ void Filter::processBuffer() {
     // Process EventStream headers against configured header rules.
     processMessageHeaders(message.headers);
 
-    if (processMessage(message.payload_bytes)) {
+    bool content_parser_stop = processMessage(message.payload_bytes);
+    if (content_parser_stop && allHeaderRulesSatisfied()) {
       processing_complete_ = true;
       break;
     }
@@ -170,6 +171,12 @@ void Filter::processMessageHeaders(
     const auto& rule = rules[i];
     auto& state = header_rule_states_[i];
 
+    // Skip rules that have already reached their match limit.
+    if (rule.stop_processing_after_matches() > 0 &&
+        state.match_count >= rule.stop_processing_after_matches()) {
+      continue;
+    }
+
     for (const auto& header : headers) {
       if (header.name == rule.header_name()) {
         if (rule.has_on_present()) {
@@ -179,7 +186,6 @@ void Filter::processMessageHeaders(
                                   ? std::string(FilterConfig::DefaultHeaderNamespace)
                                   : on_present.metadata_namespace();
           action.key = on_present.key();
-          action.preserve_existing = on_present.preserve_existing_metadata_value();
 
           if (on_present.has_value()) {
             action.value = on_present.value();
@@ -192,6 +198,7 @@ void Filter::processMessageHeaders(
           }
         }
         state.ever_matched = true;
+        state.match_count++;
         break;
       }
     }
@@ -271,7 +278,6 @@ void Filter::finalizeRules() {
                               ? std::string(FilterConfig::DefaultHeaderNamespace)
                               : on_missing.metadata_namespace();
       action.key = on_missing.key();
-      action.preserve_existing = on_missing.preserve_existing_metadata_value();
       if (on_missing.has_value()) {
         action.value = on_missing.value();
       }
@@ -341,6 +347,19 @@ void Filter::writeMetadata() {
     encoder_callbacks_->streamInfo().setDynamicMetadata(entry.first, entry.second);
   }
   structs_by_namespace_.clear();
+}
+
+bool Filter::allHeaderRulesSatisfied() const {
+  const auto& rules = config_->headerRules();
+  for (int i = 0; i < rules.size(); ++i) {
+    if (rules[i].stop_processing_after_matches() == 0) {
+      return false;
+    }
+    if (header_rule_states_[i].match_count < rules[i].stop_processing_after_matches()) {
+      return false;
+    }
+  }
+  return true;
 }
 
 } // namespace AwsEventstreamParser

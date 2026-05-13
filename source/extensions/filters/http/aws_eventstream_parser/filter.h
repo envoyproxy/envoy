@@ -148,9 +148,16 @@ private:
   // Pending metadata writes, batched by namespace.
   StructMap structs_by_namespace_;
 
-  // Per-header-rule state tracking (whether each rule has matched at least once).
+  /**
+   * Check if all header rules with stop_processing_after_matches limits have been satisfied.
+   * Returns true if there are no header rules or all limited rules have reached their limits.
+   */
+  bool allHeaderRulesSatisfied() const;
+
+  // Per-header-rule state tracking.
   struct HeaderRuleState {
     bool ever_matched{false};
+    uint32_t match_count{0};
   };
   std::vector<HeaderRuleState> header_rule_states_;
 };
