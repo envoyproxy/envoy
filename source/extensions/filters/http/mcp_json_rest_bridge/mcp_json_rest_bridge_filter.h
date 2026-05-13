@@ -42,6 +42,7 @@ public:
 
   uint32_t maxRequestBodySize() const { return max_request_body_size_; }
   uint32_t maxResponseBodySize() const { return max_response_body_size_; }
+  bool textContentStreamingEnabled() const;
 
 private:
   absl::flat_hash_map<std::string,
@@ -93,6 +94,9 @@ private:
   // fails. Otherwise, it returns OK status.
   absl::Status validateJsonRpcIdAndMethod(const nlohmann::json& json_rpc);
 
+  // Builds streaming_json_prefix_ and streaming_json_suffix_ for the tools/call streaming path.
+  void buildStreamingPrefixAndSuffix(bool is_error);
+
   enum class McpOperation {
     Unspecified = 0,
     // Received the "/mcp" URL but has not parsed the request body yet.
@@ -115,6 +119,13 @@ private:
   std::string request_body_str_;
   Buffer::OwnedImpl response_body_;
   std::string response_body_str_;
+
+  // Streaming state for text_content_streaming_enabled.
+  // prefix/suffix are pre-built once in encodeHeaders; an empty prefix signals
+  // that the non-streaming (buffered) path is active.
+  std::string streaming_json_prefix_;
+  std::string streaming_json_suffix_;
+  bool is_first_streaming_chunk_ = true;
 
   McpJsonRestBridgeFilterConfigSharedPtr config_;
 };

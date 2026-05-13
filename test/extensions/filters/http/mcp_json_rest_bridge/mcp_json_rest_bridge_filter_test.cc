@@ -1229,6 +1229,152 @@ TEST_F(McpJsonRestBridgeFilterTest, ResponseBodyExceedsLimitReturnsError) {
             Http::FilterDataStatus::StopIterationNoBuffer);
 }
 
+class McpJsonRestBridgeStreamingFilterTest : public testing::Test {
+public:
+  void SetUp() override {
+    envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config =
+        ParseTextProtoOrDie(R"pb(
+      tool_config {
+        tools {
+          name: "get_api_key"
+          http_rule: { get: "/v1/apiKeys" }
+        }
+        text_content_streaming_enabled: true
+      }
+    )pb");
+    config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
+    filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
+    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+    EXPECT_CALL(decoder_callbacks_, requestHeaders())
+        .WillRepeatedly(Return(Http::RequestHeaderMapOptRef(request_headers_)));
+    EXPECT_CALL(encoder_callbacks_, responseHeaders())
+        .WillRepeatedly(Return(Http::ResponseHeaderMapOptRef(response_headers_)));
+  }
+
+  void sendToolsCallRequest() {
+    request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
+    ASSERT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+              Http::FilterHeadersStatus::StopIteration);
+    EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+    Buffer::OwnedImpl req(
+        R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"get_api_key"}})json");
+    ASSERT_EQ(filter_->decodeData(req, /*end_stream=*/true), Http::FilterDataStatus::Continue);
+  }
+
+  McpJsonRestBridgeFilterConfigSharedPtr config_;
+  std::unique_ptr<McpJsonRestBridgeFilter> filter_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
+  Http::TestRequestHeaderMapImpl request_headers_;
+  Http::TestResponseHeaderMapImpl response_headers_;
+};
+
+TEST_F(McpJsonRestBridgeStreamingFilterTest, SingleChunkReturnsFullJsonRpcResponse) {
+  sendToolsCallRequest();
+
+  response_headers_ = {
+      {":status", "200"}, {"content-type", "text/plain"}, {"content-length", "11"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::Continue);
+  EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
+  EXPECT_FALSE(response_headers_.has(Http::Headers::get().ContentLength));
+
+  Buffer::OwnedImpl chunk("hello world");
+  EXPECT_EQ(filter_->encodeData(chunk, /*end_stream=*/true), Http::FilterDataStatus::Continue);
+  EXPECT_EQ(
+      nlohmann::json::parse(chunk.toString()),
+      nlohmann::json::parse(
+          R"json({"id":123,"jsonrpc":"2.0","result":{"content":[{"text":"hello world","type":"text"}],"isError":false}})json"));
+}
+
+TEST_F(McpJsonRestBridgeStreamingFilterTest, MultipleChunksAreStreamedCorrectly) {
+  sendToolsCallRequest();
+
+  response_headers_ = {{":status", "200"}, {"content-length", "100"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::Continue);
+
+  Buffer::OwnedImpl chunk1("part1");
+  EXPECT_EQ(filter_->encodeData(chunk1, /*end_stream=*/false), Http::FilterDataStatus::Continue);
+  // First chunk contains the prefix + escaped "part1".
+  EXPECT_THAT(chunk1.toString(), testing::StartsWith("{\"id\":"));
+
+  Buffer::OwnedImpl chunk2("part2");
+  EXPECT_EQ(filter_->encodeData(chunk2, /*end_stream=*/false), Http::FilterDataStatus::Continue);
+  // Middle chunk is just "part2" (no JSON wrapper).
+  EXPECT_THAT(chunk2.toString(), StrEq("part2"));
+
+  Buffer::OwnedImpl chunk3("part3");
+  EXPECT_EQ(filter_->encodeData(chunk3, /*end_stream=*/true), Http::FilterDataStatus::Continue);
+  // Last chunk contains "part3" + the closing suffix.
+  EXPECT_THAT(chunk3.toString(), testing::EndsWith("}}"));
+
+  // Reassemble and verify the full JSON-RPC response.
+  const std::string full = chunk1.toString() + chunk2.toString() + chunk3.toString();
+  EXPECT_EQ(
+      nlohmann::json::parse(full),
+      nlohmann::json::parse(
+          R"json({"id":123,"jsonrpc":"2.0","result":{"content":[{"text":"part1part2part3","type":"text"}],"isError":false}})json"));
+}
+
+TEST_F(McpJsonRestBridgeStreamingFilterTest, SpecialCharactersAreEscaped) {
+  sendToolsCallRequest();
+
+  response_headers_ = {{":status", "200"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::Continue);
+
+  // Content contains double-quotes, a backslash, a newline, and a tab.
+  Buffer::OwnedImpl chunk("{\"key\":\"val\\path\"\n\t}");
+  EXPECT_EQ(filter_->encodeData(chunk, /*end_stream=*/true), Http::FilterDataStatus::Continue);
+
+  const nlohmann::json response = nlohmann::json::parse(chunk.toString());
+  EXPECT_EQ(response["id"], 123);
+  EXPECT_EQ(response["result"]["isError"], false);
+  EXPECT_EQ(response["result"]["content"][0]["text"].get<std::string>(),
+            "{\"key\":\"val\\path\"\n\t}");
+}
+
+TEST_F(McpJsonRestBridgeStreamingFilterTest, ErrorResponseSetsIsErrorTrue) {
+  sendToolsCallRequest();
+
+  response_headers_ = {{":status", "500"}, {"content-length", "21"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::Continue);
+  EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
+  EXPECT_FALSE(response_headers_.has(Http::Headers::get().ContentLength));
+
+  Buffer::OwnedImpl chunk("Internal Server Error");
+  EXPECT_EQ(filter_->encodeData(chunk, /*end_stream=*/true), Http::FilterDataStatus::Continue);
+  EXPECT_EQ(
+      nlohmann::json::parse(chunk.toString()),
+      nlohmann::json::parse(
+          R"json({"id":123,"jsonrpc":"2.0","result":{"content":[{"text":"Internal Server Error","type":"text"}],"isError":true}})json"));
+}
+
+TEST_F(McpJsonRestBridgeStreamingFilterTest, EmptyIntermediateChunkIsSkipped) {
+  sendToolsCallRequest();
+
+  response_headers_ = {{":status", "200"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::Continue);
+
+  Buffer::OwnedImpl empty_chunk;
+  EXPECT_EQ(filter_->encodeData(empty_chunk, /*end_stream=*/false),
+            Http::FilterDataStatus::Continue);
+  EXPECT_TRUE(empty_chunk.toString().empty());
+
+  // The subsequent real chunk should still get the prefix.
+  Buffer::OwnedImpl final_chunk("content");
+  EXPECT_EQ(filter_->encodeData(final_chunk, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+  EXPECT_EQ(
+      nlohmann::json::parse(final_chunk.toString()),
+      nlohmann::json::parse(
+          R"json({"id":123,"jsonrpc":"2.0","result":{"content":[{"text":"content","type":"text"}],"isError":false}})json"));
+}
+
 class McpHttpMethodFilterTest : public testing::TestWithParam<std::string> {
 public:
   void SetUp() override {

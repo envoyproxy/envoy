@@ -168,6 +168,21 @@ message ServerToolConfig {
   // - If not provided: The ``tools/list`` request is passed through. This allows subsequent
   //   extension or the backend itself to handle the tools/list request if they support it.
   HttpRule tool_list_http_rule = 3;
+
+  // Enables streaming transcoding for unstructured text responses (``content`` field of a result).
+  //
+  // When enabled, the response body is streamed directly to the client without buffering. Each
+  // chunk is JSON escaped as it arrives and wrapped with a pre-built JSON-RPC prefix and suffix.
+  //
+  // Streaming flow:
+  //
+  // .. code-block:: text
+  //
+  //   input:  [chunk1] → [chunk2] → [chunk3]
+  //   output: [prefix+escaped_chunk1] → [escaped_chunk2] → [escaped_chunk3+suffix]
+  //
+  // Disabled by default.
+  bool text_content_streaming_enabled = 4;
 }
 
 // Configuration for a specific MCP tool.

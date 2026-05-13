@@ -6,6 +6,8 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/json_escape_string.h"
 #include "source/common/http/headers.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/common/mcp/constants.h"
@@ -61,7 +63,7 @@ json translateJsonRestResponseToJsonRpc(absl::string_view tool_call_response,
       {McpConstants::RESULT_FIELD,
        {
            {McpConstants::CONTENT_FIELD,
-            json::array({{{McpConstants::TYPE_FIELD, "text"},
+            json::array({{{McpConstants::TYPE_FIELD, McpConstants::TEXT_FIELD},
                           {McpConstants::TEXT_FIELD, tool_call_response}}})},
            {McpConstants::IS_ERROR_FIELD, is_error},
        }},
@@ -165,6 +167,10 @@ McpJsonRestBridgeFilterConfig::getToolsListHttpRule() const {
   return proto_config_.tool_config().tool_list_http_rule();
 }
 
+bool McpJsonRestBridgeFilterConfig::textContentStreamingEnabled() const {
+  return proto_config_.tool_config().text_content_streaming_enabled();
+}
+
 Http::FilterHeadersStatus
 McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, bool) {
   absl::string_view path = request_headers.getPathValue();
@@ -248,8 +254,8 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::decodeData(Buffer::Instance& dat
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterHeadersStatus McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap&,
-                                                                 bool end_stream) {
+Http::FilterHeadersStatus
+McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers, bool end_stream) {
   switch (mcp_operation_) {
   case McpOperation::Unspecified:
   case McpOperation::Undecided:
@@ -260,6 +266,17 @@ Http::FilterHeadersStatus McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseH
     return Http::FilterHeadersStatus::Continue;
   default:
     break;
+  }
+
+  // Streaming mode: pre-build the JSON-RPC prefix/suffix, strip Content-Length
+  // (final size is unknown), and let the headers flow through immediately so
+  // the client can start receiving data without waiting for the full body.
+  if (mcp_operation_ == McpOperation::ToolsCall && config_->textContentStreamingEnabled()) {
+    buildStreamingPrefixAndSuffix(getResponseCode(response_headers) >=
+                                  static_cast<int>(Http::Code::BadRequest));
+    response_headers.removeContentLength();
+    response_headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
+    return Http::FilterHeadersStatus::Continue;
   }
 
   // TODO(guoyilin42): Handle headers-only upstream responses (e.g., 204 No Content).
@@ -277,6 +294,36 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& dat
   if (mcp_operation_ == McpOperation::Unspecified ||
       mcp_operation_ == McpOperation::Initialization ||
       mcp_operation_ == McpOperation::InitializationAck) {
+    return Http::FilterDataStatus::Continue;
+  }
+
+  // Streaming fast-path for tools/call: JSON-escape each chunk on-the-fly without
+  // buffering the full response body.
+  if (!streaming_json_prefix_.empty()) {
+    uint64_t len = data.length();
+    if (len == 0 && !end_stream) {
+      ENVOY_STREAM_LOG(debug, "Streaming: skipping empty intermediate chunk.", *encoder_callbacks_);
+      return Http::FilterDataStatus::Continue;
+    }
+    absl::string_view chunk(static_cast<const char*>(data.linearize(len)), len);
+    std::string escaped_chunk = JsonEscaper::escapeString(chunk, JsonEscaper::extraSpace(chunk));
+
+    data.drain(len);
+    if (is_first_streaming_chunk_) {
+      ENVOY_STREAM_LOG(debug,
+                       "Streaming: emitting prefix + first chunk ({} raw bytes, {} escaped bytes).",
+                       *encoder_callbacks_, len, escaped_chunk.size());
+      data.add(streaming_json_prefix_);
+      is_first_streaming_chunk_ = false;
+    } else {
+      ENVOY_STREAM_LOG(debug, "Streaming: forwarding chunk ({} raw bytes, {} escaped bytes).",
+                       *encoder_callbacks_, len, escaped_chunk.size());
+    }
+    data.add(escaped_chunk);
+    if (end_stream) {
+      ENVOY_STREAM_LOG(debug, "Streaming: appending suffix, stream complete.", *encoder_callbacks_);
+      data.add(streaming_json_suffix_);
+    }
     return Http::FilterDataStatus::Continue;
   }
 
@@ -319,6 +366,28 @@ Http::FilterTrailersStatus McpJsonRestBridgeFilter::encodeTrailers(Http::Respons
   // standard REST/JSON APIs, trailers are a native part of the HTTP spec and need to be
   // handled properly.
   return Http::FilterTrailersStatus::Continue;
+}
+
+void McpJsonRestBridgeFilter::buildStreamingPrefixAndSuffix(bool is_error) {
+  // Build a reference JSON-RPC envelope with an empty text placeholder.
+  json ref = {
+      {McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
+      {McpConstants::ID_FIELD, *session_id_},
+      {McpConstants::RESULT_FIELD,
+       {
+           {McpConstants::CONTENT_FIELD,
+            json::array({{{McpConstants::TYPE_FIELD, McpConstants::TEXT_FIELD},
+                          {McpConstants::TEXT_FIELD, ""}}})},
+           {McpConstants::IS_ERROR_FIELD, is_error},
+       }},
+  };
+  std::string ref_json = ref.dump();
+
+  // Locate the empty-string placeholder for the text value: `"text":""`.
+  std::string marker = absl::StrCat("\"", McpConstants::TEXT_FIELD, "\":\"\"");
+  size_t pos = ref_json.find(marker);
+  streaming_json_prefix_ = ref_json.substr(0, pos + marker.size() - 1);
+  streaming_json_suffix_ = ref_json.substr(pos + marker.size() - 1);
 }
 
 void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc,
