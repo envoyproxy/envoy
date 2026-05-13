@@ -652,6 +652,9 @@ TEST_F(AsyncClientImplTracingTest, Basic) {
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().NetworkProtocolName), Eq(Tracing::Tags::get().Http)));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().NetworkProtocolVersion), Eq("1.1")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq("10.0.0.1:443")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
@@ -706,6 +709,9 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().NetworkProtocolName), Eq(Tracing::Tags::get().Http)));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().NetworkProtocolVersion), Eq("1.1")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq("10.0.0.1:443")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
@@ -758,6 +764,9 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpanKeepParentSampling) {
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().NetworkProtocolName), Eq(Tracing::Tags::get().Http)));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().NetworkProtocolVersion), Eq("1.1")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq("10.0.0.1:443")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
@@ -1906,6 +1915,9 @@ TEST_F(AsyncClientImplTracingTest, CancelRequest) {
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().NetworkProtocolName), Eq(Tracing::Tags::get().Http)));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().NetworkProtocolVersion), Eq("1.1")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq("10.0.0.1:443")));
 
@@ -1951,6 +1963,9 @@ TEST_F(AsyncClientImplTracingTest, CancelRequestAfterComplete) {
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().NetworkProtocolName), Eq(Tracing::Tags::get().Http)));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().NetworkProtocolVersion), Eq("1.1")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq("10.0.0.1:443")));
 
@@ -2042,6 +2057,9 @@ TEST_F(AsyncClientImplTracingTest, DestroyWithActiveRequest) {
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().NetworkProtocolName), Eq(Tracing::Tags::get().Http)));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().NetworkProtocolVersion), Eq("1.1")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq("10.0.0.1:443")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
@@ -2237,6 +2255,9 @@ TEST_F(AsyncClientImplTracingTest, RequestTimeout) {
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().NetworkProtocolName), Eq(Tracing::Tags::get().Http)));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().NetworkProtocolVersion), Eq("1.1")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq("10.0.0.1:443")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
