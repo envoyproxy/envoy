@@ -4512,7 +4512,7 @@ TEST_F(Http1ClientConnectionImplTest, DecoderDestroyedBeforeMessageComplete) {
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   EXPECT_CALL(*response_decoder, decodeHeaders_(_, false));
-  EXPECT_CALL(*response_decoder, decodeData(BufferStringEqual("hello"), false));
+  EXPECT_CALL(*response_decoder, decodeData(BufferString("hello"), false));
 
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n"
                              "5\r\nhello\r\n");
