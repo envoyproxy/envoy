@@ -69,6 +69,7 @@ envoy_cc_test(
         ":test_utils_lib",
         "//source/common/quic:envoy_quic_proof_source_lib",
         "//source/common/quic:envoy_quic_proof_verifier_lib",
+        "//source/common/quic:envoy_tls_server_handshaker",
         "//source/common/tls:context_config_lib",
         "//source/common/tls:server_context_lib",
         "//test/mocks/network:network_mocks",

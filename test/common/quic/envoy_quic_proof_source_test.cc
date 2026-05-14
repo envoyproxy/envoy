@@ -7,6 +7,7 @@
 #include "source/common/quic/envoy_quic_proof_source.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_tls_server_handshaker.h"
 #include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/default_tls_certificate_selector.h"
