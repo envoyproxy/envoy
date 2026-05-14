@@ -24,13 +24,8 @@ EnvoyQuicCryptoServerStreamFactoryImpl::createEnvoyQuicCryptoServerStream(
   // tolerates a null sslCtx() (e.g. before init completes), see its ctor.
   auto& factory = static_cast<const QuicServerTransportSocketFactory&>(*transport_socket_factory);
 
-  auto ticket_config = factory.getSessionTicketConfig();
-  const bool disable_resumption = ticket_config.disable_stateless_resumption ||
-                                  !ticket_config.has_keys ||
-                                  ticket_config.handles_session_resumption;
-
   return std::make_unique<EnvoyTlsServerHandshaker>(session, crypto_config, factory.sslCtx(),
-                                                    disable_resumption);
+                                                    factory.getSessionTicketConfig());
 }
 
 REGISTER_FACTORY(EnvoyQuicCryptoServerStreamFactoryImpl,

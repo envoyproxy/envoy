@@ -3,6 +3,7 @@
 #include <openssl/ssl.h>
 
 #include "source/common/common/assert.h"
+#include "source/common/quic/quic_session_ticket_config.h"
 #include "source/common/tls/server_context_impl.h"
 
 #include "quiche/quic/core/tls_server_handshaker.h"
@@ -27,14 +28,17 @@ class EnvoyTlsServerHandshaker : public quic::TlsServerHandshaker {
 public:
   EnvoyTlsServerHandshaker(quic::QuicSession* session,
                            const quic::QuicCryptoServerConfig* crypto_config,
-                           Ssl::ServerContextSharedPtr pinned_ssl_ctx, bool disable_resumption);
+                           Ssl::ServerContextSharedPtr pinned_ssl_ctx,
+                           QuicSessionTicketConfig ticket_config);
 
   // Session ticket key callback installed on the QUICHE ssl context.
   // Retrieves the handshaker from ssl ex_data and delegates to the pinned
-  // ServerContextImpl::sessionTicketProcess(). BoringSSL only invokes this
-  // when SSL_OP_NO_TICKET is not set on the SSL; the constructor calls
-  // DisableResumption() to set that flag when this connection should not
-  // process Envoy-managed tickets.
+  // ServerContextImpl::sessionTicketProcess(). BoringSSL invokes this when
+  // SSL_OP_NO_TICKET is not set on the SSL. The constructor sets
+  // SSL_OP_NO_TICKET only for explicit resumption disable or when
+  // Envoy-owned ticket processing was selected but the pinned context
+  // cannot serve keys. Other non-Envoy-ticket cases decline inside the
+  // callback.
   static int ticketKeyCallback(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
                                HMAC_CTX* hmac_ctx, int encrypt);
 
@@ -59,6 +63,12 @@ private:
   static EnvoyTlsServerHandshaker* handshakerFromSsl(const SSL* ssl);
 
   Ssl::ServerContextSharedPtr pinned_ssl_ctx_;
+  // Snapshot of "Envoy owns ticket processing for this connection" computed
+  // at ctor time: has_keys && !handles_session_resumption. ticketKeyCallback
+  // reads it to mirror the TCP gating (TCP avoids installing the callback at
+  // all when handles_session_resumption is set; QUIC shares one SSL_CTX
+  // across filter chains, so the gate has to live per-connection).
+  const bool process_envoy_session_tickets_;
 };
 
 } // namespace Quic

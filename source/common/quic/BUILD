@@ -123,14 +123,21 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quic_session_ticket_config_lib",
+    hdrs = envoy_select_enable_http3(["quic_session_ticket_config.h"]),
+)
+
+envoy_cc_library(
     name = "envoy_tls_server_handshaker",
     srcs = envoy_select_enable_http3(["envoy_tls_server_handshaker.cc"]),
     hdrs = envoy_select_enable_http3(["envoy_tls_server_handshaker.h"]),
     external_deps = ["ssl"],
     deps = envoy_select_enable_http3([
         ":envoy_quic_server_session_lib",
+        ":quic_session_ticket_config_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:macros",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/tls:server_context_lib",
         "@quiche//:quic_server_session_lib",
     ]),
@@ -149,6 +156,7 @@ envoy_cc_library(
         ":quic_transport_socket_factory_lib",
         "//envoy/ssl:tls_certificate_config_interface",
         "//source/common/quic:quic_server_transport_socket_factory_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/server:listener_stats",
         "@quiche//:quic_core_crypto_certificate_view_lib",
@@ -576,6 +584,7 @@ envoy_cc_library(
     ]),
     deps = envoy_select_enable_http3([
         ":envoy_quic_proof_verifier_lib",
+        ":quic_session_ticket_config_lib",
         ":quic_transport_socket_factory_lib",
         "//envoy/network:transport_socket_interface",
         "//envoy/server:transport_socket_config_interface",
