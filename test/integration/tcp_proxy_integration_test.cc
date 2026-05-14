@@ -3153,7 +3153,6 @@ typed_config:
 
   initialize();
 
-
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
 
   // Wait to ensure no connection is established without data.
