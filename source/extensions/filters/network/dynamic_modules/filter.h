@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <string>
 #include <vector>
 
@@ -145,12 +146,10 @@ public:
   void onScheduled(uint64_t event_id);
 
   /**
-   * Get the dispatcher for the worker thread this filter is running on.
-   * Returns nullptr if callbacks are not set.
+   * Returns the worker dispatcher this filter is running on; safe to call from any thread.
+   * Returns nullptr until callbacks are wired and after the filter is destroyed.
    */
-  Event::Dispatcher* dispatcher() {
-    return read_callbacks_ != nullptr ? &read_callbacks_->connection().dispatcher() : nullptr;
-  }
+  Event::Dispatcher* dispatcher() { return cached_dispatcher_.load(std::memory_order_acquire); }
 
   /**
    * Returns the worker index assigned to this filter.
@@ -177,6 +176,7 @@ private:
   const DynamicModuleNetworkFilterConfigSharedPtr config_;
   envoy_dynamic_module_type_network_filter_module_ptr in_module_filter_ = nullptr;
 
+  // Worker-thread only; foreign threads must use `dispatcher()`.
   Network::ReadFilterCallbacks* read_callbacks_ = nullptr;
   Network::WriteFilterCallbacks* write_callbacks_ = nullptr;
 
@@ -186,6 +186,9 @@ private:
   Buffer::Instance* current_write_buffer_ = nullptr;
 
   bool destroyed_ = false;
+
+  // Worker dispatcher published at callback-init, cleared on destroy. Read via `dispatcher()`.
+  std::atomic<Event::Dispatcher*> cached_dispatcher_{nullptr};
 
   uint32_t worker_index_;
 
@@ -244,10 +247,11 @@ public:
   explicit DynamicModuleNetworkFilterScheduler(DynamicModuleNetworkFilterWeakPtr filter)
       : filter_(std::move(filter)) {}
 
+  // Safe to call from any thread. Reads only the weak_ptr and the atomic dispatcher cache (see
+  // `DynamicModuleNetworkFilter::dispatcher()`); it never dereferences `read_callbacks_` from a
+  // foreign thread.
   void commit(uint64_t event_id) {
-    // Lock the filter so the dispatcher reference obtained via its callbacks stays valid across
-    // `post`.
-    auto filter_shared = filter_.lock();
+    DynamicModuleNetworkFilterSharedPtr filter_shared = filter_.lock();
     if (!filter_shared) {
       return;
     }

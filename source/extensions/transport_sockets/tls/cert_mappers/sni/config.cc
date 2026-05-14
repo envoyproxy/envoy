@@ -13,7 +13,7 @@ namespace {
 class SNIMapper : public Ssl::TlsCertificateMapper {
 public:
   explicit SNIMapper(const std::string& default_value) : default_value_(default_value) {}
-  std::string deriveFromClientHello(const SSL_CLIENT_HELLO& ssl_client_hello) {
+  std::string deriveFromClientHello(const SSL_CLIENT_HELLO& ssl_client_hello) override {
     absl::string_view sni = absl::NullSafeStringView(
         SSL_get_servername(ssl_client_hello.ssl, TLSEXT_NAMETYPE_host_name));
     return sni.empty() ? default_value_ : std::string(sni);

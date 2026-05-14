@@ -50,8 +50,8 @@ public:
     transport_socket_->onConnected();
   }
 
-  void closeSocket(Network::ConnectionEvent event) override {
-    transport_socket_->closeSocket(event);
+  void closeSocket(Network::ConnectionEvent event, bool abort_reset) override {
+    transport_socket_->closeSocket(event, abort_reset);
   }
 
   Network::TransportSocketCallbacks* callbacks_{};

@@ -30,7 +30,7 @@ class UpstreamKafkaClientTest : public testing::Test {
 protected:
   Event::MockDispatcher dispatcher_;
   Thread::ThreadFactory& thread_factory_ = Thread::threadFactoryForTest();
-  NiceMock<MockLibRdKafkaUtils> kafka_utils_{};
+  NiceMock<MockLibRdKafkaUtils> kafka_utils_;
   RawKafkaConfig config_ = {{"key1", "value1"}, {"key2", "value2"}};
 
   std::unique_ptr<MockKafkaProducer> producer_ptr_ = std::make_unique<MockKafkaProducer>();

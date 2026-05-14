@@ -14,7 +14,6 @@
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -98,7 +97,8 @@ public:
     // We can continue the test once we're sure that Envoy's ClusterManager has made use of
     // the DiscoveryResponse describing cluster_1 that we sent.
     // 2 because the statically specified CDS server itself counts as a cluster.
-    test_server_->waitForGaugeGe("cluster_manager.active_clusters", initial_clusters_num + 1);
+    test_server_->waitForGauge("cluster_manager.active_clusters",
+                               testing::Ge(initial_clusters_num + 1));
 
     // Wait for our statically specified listener to become ready, and register its port in the
     // test framework's downstream listener port map.

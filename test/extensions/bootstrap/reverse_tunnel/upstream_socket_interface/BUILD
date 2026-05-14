@@ -22,7 +22,6 @@ envoy_extension_cc_test(
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:factory_context_mocks",
-        "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3:pkg_cc_proto",
     ],
@@ -37,10 +36,28 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/reverse_tunnel_reporting_service:reporter_mocks",
         "//test/mocks/server:factory_context_mocks",
-        "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
+        "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "reverse_tunnel_upstream_lifecycle_test",
+    size = "medium",
+    srcs = ["reverse_tunnel_upstream_lifecycle_test.cc"],
+    deps = [
+        "//envoy/router:string_accessor_interface",
+        "//envoy/stream_info:uint64_accessor_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/network:utility_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
+        "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
         "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3:pkg_cc_proto",
     ],
 )
@@ -50,12 +67,14 @@ envoy_cc_test(
     size = "large",
     srcs = ["upstream_socket_manager_test.cc"],
     deps = [
+        "//envoy/router:string_accessor_interface",
+        "//envoy/stream_info:uint64_accessor_interface",
         "//source/common/network:utility_lib",
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
+        "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/reverse_tunnel_reporting_service:reporter_mocks",
         "//test/mocks/server:factory_context_mocks",
-        "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
@@ -72,10 +91,8 @@ envoy_cc_test(
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
-        "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:logging_lib",
-        "//test/test_common:registry_lib",
     ],
 )
 
@@ -84,8 +101,11 @@ envoy_cc_test(
     size = "small",
     srcs = ["config_validation_test.cc"],
     deps = [
+        "//source/extensions/access_loggers/stream:config",
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/access_loggers/stream/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3:pkg_cc_proto",
     ],
 )

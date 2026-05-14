@@ -1,44 +1,33 @@
-abstracts>=0.0.12
-aio.api.bazel
-aio.api.github>=0.2.5
-aio.core>=0.10.2
-aiodocker>=0.22.2
+aio.api.bazel>=0.1.0
+aio.api.github>=0.3.0
+aio.core>=0.11.0
 aiohttp>=3.13.3
 aioquic>=0.9.21
-cffi>=1.15.0
-colorama
-coloredlogs
-cryptography
-dependatool>=0.2.2
-envoy.base.utils>=0.5.10
-envoy.ci.report>=0.0.3
-envoy.code.check>=0.5.12
-envoy.dependency.check>=0.1.10
-envoy.distribution.distrotest>=0.0.11
+dependatool>=0.3.0
+envoy.base.utils>=0.6.0
+envoy.ci.report>=0.1.0
+envoy.code.check>=0.6.0
+envoy.dependency.check>=0.2.0
+# 0.0.13 pins envoy-base-utils==0.5.11 (old-style strict pin) conflicting with >=0.6.0 era
+envoy.distribution.distrotest>=0.0.12
+# 0.1.0 has a contradictory envoy-github-release==0.1.0 / envoy.github.release==0.1.1.dev dep
 envoy.distribution.release>=0.0.9
+# 0.0.10 pins envoy-base-utils==0.5.11 (old-style strict pin) conflicting with >=0.6.0 era
 envoy.distribution.repo>=0.0.8
-envoy.distribution.verify>=0.0.11
-envoy.gpg.identity>=0.1.1
-envoy.gpg.sign>=0.2.0
+envoy.distribution.verify>=0.1.0
+envoy.gpg.identity>=0.1.2
+envoy.gpg.sign>=0.3.0
 flake8>=6
 frozendict>=2.3.7
 gitpython
 icalendar>=6.1.1
-jinja2
-
-multidict>=6.0.2
 orjson>=3.10.15
 pep8-naming
-ply
 # Upgrading beyond 4.21.x doesnt currently work. 4.23+ might work when the following is resolved
 # `MessageFactory class is deprecated. Please use GetMessageClass() instead of MessageFactory.GetPrototype`
 protobuf<7.35.0
+ply
 pygithub
-pyopenssl>=24.2.1
-pyreadline
 pyyaml
 setuptools
 slack_sdk
-thrift
-verboselogs
-yarl>=1.17.2

@@ -124,23 +124,12 @@ void ValidationInstance::initialize(const Options& options,
       stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
       options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
-  overload_manager_ = THROW_OR_RETURN_VALUE(
-      OverloadManagerImpl::create(
-          dispatcher(), *stats().rootScope(), threadLocal(), bootstrap_.overload_manager(),
-          messageValidationContext().staticValidationVisitor(), *api_, options_),
-      std::unique_ptr<OverloadManagerImpl>);
-  null_overload_manager_ = std::make_unique<NullOverloadManager>(threadLocal(), false);
   absl::Status creation_status = absl::OkStatus();
   Configuration::InitialImpl initial_config(bootstrap_, creation_status);
   THROW_IF_NOT_OK_REF(creation_status);
   AdminFactoryContext factory_context(*this, std::make_shared<ListenerInfoImpl>());
   initial_config.initAdminAccessLog(bootstrap_, factory_context);
   admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
-  auto& validation_factory = Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
-      Config::ServerExtensionValues::get().VALIDATION_LISTENER);
-  auto empty_config = validation_factory.createEmptyConfigProto();
-  listener_manager_ = validation_factory.createListenerManager(*empty_config, *this, nullptr, *this,
-                                                               false, quic_stat_names_);
   thread_local_.registerThread(*dispatcher_, true);
 
   // Create bootstrap extensions to validate their configs and register any providers
@@ -160,6 +149,24 @@ void ValidationInstance::initialize(const Options& options,
   runtime_ = component_factory.createRuntime(*this, initial_config);
   ENVOY_BUG(runtime_ != nullptr,
             "Component factory should not return nullptr from createRuntime()");
+  validation_context_.setRuntime(runtime());
+
+  overload_manager_ = THROW_OR_RETURN_VALUE(
+      OverloadManagerImpl::create(
+          dispatcher(), *stats().rootScope(), threadLocal(), bootstrap_.overload_manager(),
+          messageValidationContext().staticValidationVisitor(), *api_, options_, *runtime_),
+      std::unique_ptr<OverloadManagerImpl>);
+  null_overload_manager_ = std::make_unique<NullOverloadManager>(threadLocal(), false);
+
+  auto& listener_manager_factory =
+      Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
+          Config::ServerExtensionValues::get().VALIDATION_LISTENER);
+  listener_manager_ = listener_manager_factory.createListenerManager(
+      *listener_manager_factory.createEmptyConfigProto(), *this, nullptr, *this, false,
+      quic_stat_names_);
+
+  THROW_IF_NOT_OK(runtime().onWorkerThreadsRegistered());
+
   drain_manager_ = component_factory.createDrainManager(*this);
   ENVOY_BUG(drain_manager_ != nullptr,
             "Component factory should not return nullptr from createDrainManager()");
@@ -181,6 +188,7 @@ void ValidationInstance::initialize(const Options& options,
       quic_stat_names_);
   THROW_IF_NOT_OK(config_.initialize(bootstrap_, *this, *cluster_manager_factory_));
   THROW_IF_NOT_OK(runtime().initialize(clusterManager()));
+
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });
 }
 

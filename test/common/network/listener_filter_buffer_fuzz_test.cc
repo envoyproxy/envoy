@@ -1,5 +1,4 @@
 #include "source/common/common/assert.h"
-#include "source/common/common/logger.h"
 #include "source/common/network/listener_filter_buffer_impl.h"
 
 #include "test/common/network/listener_filter_buffer_fuzz.pb.h"

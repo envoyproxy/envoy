@@ -118,12 +118,6 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStr
   return stream;
 }
 
-quic::QuicSpdyStream*
-EnvoyQuicServerSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
-  IS_ENVOY_BUG("Unexpected disallowed server push call");
-  return nullptr;
-}
-
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateOutgoingBidirectionalStream() {
   IS_ENVOY_BUG("Unexpected disallowed server initiated stream");
   return nullptr;
@@ -318,6 +312,7 @@ void EnvoyQuicServerSession::OnStreamClosed(quic::QuicStreamId id) {
   }
 }
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 void EnvoyQuicServerSession::TerminateIdleSession() {
   ENVOY_BUG(!on_connection_closed_called_,
             "TerminateIdleSession called after session on close called.");
@@ -325,8 +320,10 @@ void EnvoyQuicServerSession::TerminateIdleSession() {
                                 quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
 }
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 void EnvoyQuicServerSession::OnLastActiveStreamClosed() { MaybeAddSessionToIdleList(); }
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 void EnvoyQuicServerSession::MaybeAddSessionToIdleList() {
   if (session_idle_list_ == nullptr || is_in_idle_list_) {
     return;
@@ -335,6 +332,7 @@ void EnvoyQuicServerSession::MaybeAddSessionToIdleList() {
   session_idle_list_->AddSession(*this);
 }
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 void EnvoyQuicServerSession::MaybeRemoveSessionFromIdleList() {
   if (session_idle_list_ == nullptr || !is_in_idle_list_) {
     return;

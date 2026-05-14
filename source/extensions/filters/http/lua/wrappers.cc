@@ -532,7 +532,7 @@ int RouteWrapper::luaMetadata(lua_State* state) {
 }
 
 int CounterWrapper::luaInc(lua_State*) {
-  counter_.inc();
+  counter().inc();
   return 0;
 }
 
@@ -541,22 +541,22 @@ int CounterWrapper::luaAdd(lua_State* state) {
   if (amount < 0) {
     luaL_error(state, "counter add amount must be non-negative");
   }
-  counter_.add(static_cast<uint64_t>(amount));
+  counter().add(static_cast<uint64_t>(amount));
   return 0;
 }
 
 int CounterWrapper::luaValue(lua_State* state) {
-  lua_pushnumber(state, static_cast<lua_Number>(counter_.value()));
+  lua_pushnumber(state, static_cast<lua_Number>(counter().value()));
   return 1;
 }
 
 int GaugeWrapper::luaInc(lua_State*) {
-  gauge_.inc();
+  gauge().inc();
   return 0;
 }
 
 int GaugeWrapper::luaDec(lua_State*) {
-  gauge_.dec();
+  gauge().dec();
   return 0;
 }
 
@@ -565,7 +565,7 @@ int GaugeWrapper::luaAdd(lua_State* state) {
   if (amount < 0) {
     luaL_error(state, "gauge add amount must be non-negative");
   }
-  gauge_.add(static_cast<uint64_t>(amount));
+  gauge().add(static_cast<uint64_t>(amount));
   return 0;
 }
 
@@ -574,7 +574,7 @@ int GaugeWrapper::luaSub(lua_State* state) {
   if (amount < 0) {
     luaL_error(state, "gauge sub amount must be non-negative");
   }
-  gauge_.sub(static_cast<uint64_t>(amount));
+  gauge().sub(static_cast<uint64_t>(amount));
   return 0;
 }
 
@@ -583,12 +583,12 @@ int GaugeWrapper::luaSet(lua_State* state) {
   if (value < 0) {
     luaL_error(state, "gauge set value must be non-negative");
   }
-  gauge_.set(static_cast<uint64_t>(value));
+  gauge().set(static_cast<uint64_t>(value));
   return 0;
 }
 
 int GaugeWrapper::luaValue(lua_State* state) {
-  lua_pushnumber(state, static_cast<lua_Number>(gauge_.value()));
+  lua_pushnumber(state, static_cast<lua_Number>(gauge().value()));
   return 1;
 }
 
@@ -597,24 +597,19 @@ int HistogramWrapper::luaRecordValue(lua_State* state) {
   if (value < 0) {
     luaL_error(state, "histogram value must be non-negative");
   }
-  histogram_.recordValue(static_cast<uint64_t>(value));
+  histogram().recordValue(static_cast<uint64_t>(value));
   return 0;
 }
 
 int StatsScopeWrapper::luaCounter(lua_State* state) {
   const char* name = luaL_checkstring(state, 2);
-  Stats::Counter& counter = Stats::Utility::counterFromElements(scope_, {Stats::DynamicName(name)});
-  CounterWrapper::create(state, counter);
+  CounterWrapper::create(state, scope_, std::string(name));
   return 1;
 }
 
 int StatsScopeWrapper::luaGauge(lua_State* state) {
   const char* name = luaL_checkstring(state, 2);
-  // Use NeverImport mode - Lua gauges track local state and should not be
-  // accumulated across hot restarts.
-  Stats::Gauge& gauge = Stats::Utility::gaugeFromElements(scope_, {Stats::DynamicName(name)},
-                                                          Stats::Gauge::ImportMode::NeverImport);
-  GaugeWrapper::create(state, gauge);
+  GaugeWrapper::create(state, scope_, std::string(name));
   return 1;
 }
 
@@ -641,9 +636,7 @@ int StatsScopeWrapper::luaHistogram(lua_State* state) {
     }
   }
 
-  Stats::Histogram& histogram =
-      Stats::Utility::histogramFromElements(scope_, {Stats::DynamicName(name)}, unit);
-  HistogramWrapper::create(state, histogram);
+  HistogramWrapper::create(state, scope_, std::string(name), unit);
   return 1;
 }
 

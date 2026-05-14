@@ -13,6 +13,54 @@ namespace Extensions {
 namespace HttpFilters {
 namespace SetMetadataFilter {
 
+namespace {
+
+void applyConfigToMetadata(const Config& config,
+                           envoy::config::core::v3::Metadata& dynamic_metadata) {
+
+  // Add configured untyped metadata.
+  if (!config.untyped().empty()) {
+    auto& mut_untyped_metadata = *dynamic_metadata.mutable_filter_metadata();
+
+    for (const auto& entry : config.untyped()) {
+      if (!mut_untyped_metadata.contains(entry.metadata_namespace)) {
+        // Insert the new entry.
+        mut_untyped_metadata[entry.metadata_namespace] = entry.value;
+      } else if (entry.allow_overwrite) {
+        // Get the existing metadata at this key for merging.
+        Protobuf::Struct& orig_fields = mut_untyped_metadata[entry.metadata_namespace];
+        const auto& to_merge = entry.value;
+
+        // Merge the new metadata into the existing metadata.
+        StructUtil::update(orig_fields, to_merge);
+      } else {
+        // The entry exists, and we are not allowed to overwrite -- emit a stat.
+        config.stats().overwrite_denied_.inc();
+      }
+    }
+  }
+
+  // Add configured typed metadata.
+  if (!config.typed().empty()) {
+    auto& mut_typed_metadata = *dynamic_metadata.mutable_typed_filter_metadata();
+
+    for (const auto& entry : config.typed()) {
+      if (!mut_typed_metadata.contains(entry.metadata_namespace)) {
+        // Insert the new entry.
+        mut_typed_metadata[entry.metadata_namespace] = entry.value;
+      } else if (entry.allow_overwrite) {
+        // Overwrite the existing typed metadata at this key.
+        mut_typed_metadata[entry.metadata_namespace] = entry.value;
+      } else {
+        // The entry exists, and we are not allowed to overwrite -- emit a stat.
+        config.stats().overwrite_denied_.inc();
+      }
+    }
+  }
+}
+
+} // namespace
+
 Config::Config(const envoy::extensions::filters::http::set_metadata::v3::Config& proto_config,
                Stats::Scope& scope, const std::string& stats_prefix)
     : stats_(generateStats(stats_prefix, scope)) {
@@ -48,47 +96,14 @@ SetMetadataFilter::SetMetadataFilter(const ConfigSharedPtr config) : config_(con
 SetMetadataFilter::~SetMetadataFilter() = default;
 
 Http::FilterHeadersStatus SetMetadataFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
+  // Apply global config first.
+  applyConfigToMetadata(*config_, decoder_callbacks_->streamInfo().dynamicMetadata());
 
-  // Add configured untyped metadata.
-  if (!config_->untyped().empty()) {
-    auto& mut_untyped_metadata =
-        *decoder_callbacks_->streamInfo().dynamicMetadata().mutable_filter_metadata();
-
-    for (const auto& entry : config_->untyped()) {
-      if (!mut_untyped_metadata.contains(entry.metadata_namespace)) {
-        // Insert the new entry.
-        mut_untyped_metadata[entry.metadata_namespace] = entry.value;
-      } else if (entry.allow_overwrite) {
-        // Get the existing metadata at this key for merging.
-        Protobuf::Struct& orig_fields = mut_untyped_metadata[entry.metadata_namespace];
-        const auto& to_merge = entry.value;
-
-        // Merge the new metadata into the existing metadata.
-        StructUtil::update(orig_fields, to_merge);
-      } else {
-        // The entry exists, and we are not allowed to overwrite -- emit a stat.
-        config_->stats().overwrite_denied_.inc();
-      }
-    }
-  }
-
-  // Add configured typed metadata.
-  if (!config_->typed().empty()) {
-    auto& mut_typed_metadata =
-        *decoder_callbacks_->streamInfo().dynamicMetadata().mutable_typed_filter_metadata();
-
-    for (const auto& entry : config_->typed()) {
-      if (!mut_typed_metadata.contains(entry.metadata_namespace)) {
-        // Insert the new entry.
-        mut_typed_metadata[entry.metadata_namespace] = entry.value;
-      } else if (entry.allow_overwrite) {
-        // Overwrite the existing typed metadata at this key.
-        mut_typed_metadata[entry.metadata_namespace] = entry.value;
-      } else {
-        // The entry exists, and we are not allowed to overwrite -- emit a stat.
-        config_->stats().overwrite_denied_.inc();
-      }
-    }
+  // Apply route-specific config if present.
+  const Config* route_specific_cfg =
+      dynamic_cast<const Config*>(decoder_callbacks_->mostSpecificPerFilterConfig());
+  if (route_specific_cfg) {
+    applyConfigToMetadata(*route_specific_cfg, decoder_callbacks_->streamInfo().dynamicMetadata());
   }
 
   return Http::FilterHeadersStatus::Continue;

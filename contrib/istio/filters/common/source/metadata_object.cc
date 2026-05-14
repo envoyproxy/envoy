@@ -505,7 +505,7 @@ convertBaggageToWorkloadMetadata(absl::string_view data, absl::string_view ident
         break;
       case BaggageToken::WorkloadName: {
         workload = parts.second;
-        std::vector<absl::string_view> splitWorkloadKey = absl::StrSplit(parts.first, ".");
+        std::vector<absl::string_view> splitWorkloadKey = absl::StrSplit(parts.first, '.');
         if (splitWorkloadKey.size() >= 2 && splitWorkloadKey[0] == "k8s") {
           workload_type = fromSuffix(splitWorkloadKey[1]);
         }

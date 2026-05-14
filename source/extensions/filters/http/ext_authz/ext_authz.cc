@@ -75,6 +75,11 @@ bool headersWithinLimits(const Http::HeaderMap& headers) {
          headers.byteSize() <= headers.maxHeadersKb() * 1024;
 }
 
+Http::Code zeroHttpCode() {
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
+  return static_cast<Http::Code>(0);
+}
+
 } // namespace
 
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
@@ -1111,7 +1116,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     } else {
       // Use custom status code from error_response if provided, otherwise use status_on_error.
       // Status code 0 means not set.
-      const Http::Code status_code = response->status_code != static_cast<Http::Code>(0)
+      const Http::Code status_code = response->status_code != zeroHttpCode()
                                          ? response->status_code
                                          : config_->statusOnError();
       ENVOY_STREAM_LOG(
@@ -1222,7 +1227,7 @@ bool Filter::validateAndClearInvalidErrorResponseAttributes(
       response->headers_to_set.clear();
       response->headers_to_append.clear();
       response->body.clear();
-      response->status_code = static_cast<Http::Code>(0); // Clear custom status.
+      response->status_code = zeroHttpCode(); // Clear custom status.
       return false;
     }
   }
@@ -1241,7 +1246,7 @@ bool Filter::validateAndClearInvalidErrorResponseAttributes(
       response->headers_to_set.clear();
       response->headers_to_append.clear();
       response->body.clear();
-      response->status_code = static_cast<Http::Code>(0); // Clear custom status.
+      response->status_code = zeroHttpCode(); // Clear custom status.
       return false;
     }
   }
@@ -1291,7 +1296,7 @@ void Filter::addErrorResponseHeaders(
 
 void ShadowDecisionObject::populateProto(ShadowDecisionProto& msg) const {
   msg.set_check_result(check_result_);
-  if (status_code_ != static_cast<Http::Code>(0)) {
+  if (status_code_ != zeroHttpCode()) {
     msg.set_status_code(static_cast<uint32_t>(status_code_));
   }
   for (const auto& [key, value] : response_headers_) {
@@ -1318,7 +1323,7 @@ void Filter::setShadowFilterState(Filters::Common::ExtAuthz::Response& response)
   using ShadowDecisionProto = envoy::extensions::filters::http::ext_authz::v3::ShadowDecision;
 
   ShadowDecisionProto::CheckResult check_result = ShadowDecisionProto::UNSPECIFIED;
-  Http::Code status_code = static_cast<Http::Code>(0);
+  Http::Code status_code{};
   Filters::Common::ExtAuthz::UnsafeHeaderVector response_headers;
 
   switch (response.status) {
@@ -1334,8 +1339,8 @@ void Filter::setShadowFilterState(Filters::Common::ExtAuthz::Response& response)
     break;
   case CheckStatus::Error:
     check_result = ShadowDecisionProto::ERROR;
-    status_code = response.status_code != static_cast<Http::Code>(0) ? response.status_code
-                                                                     : config_->statusOnError();
+    status_code =
+        response.status_code != zeroHttpCode() ? response.status_code : config_->statusOnError();
     stats_.shadow_error_.inc();
     break;
   default:

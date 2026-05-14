@@ -73,7 +73,7 @@ public:
     EXPECT_EQ("503", response->headers().getStatusValue());
     codec_client_->close();
 
-    test_server_->waitForCounterEq("cluster.cluster_0.ssl.fail_verify_san", 1);
+    test_server_->waitForCounter("cluster.cluster_0.ssl.fail_verify_san", testing::Eq(1));
   }
 
   void expectCertValidationSuccess() { testSni(); }

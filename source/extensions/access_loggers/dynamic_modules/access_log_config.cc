@@ -77,6 +77,7 @@ absl::StatusOr<DynamicModuleAccessLogConfigSharedPtr> newDynamicModuleAccessLogC
   if (config->in_module_config_ == nullptr) {
     return absl::InvalidArgumentError("Failed to initialize dynamic module access logger config");
   }
+  config->stat_creation_frozen_ = true;
   return config;
 }
 

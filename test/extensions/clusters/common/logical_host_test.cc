@@ -3,7 +3,6 @@
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/clusters/common/logical_host.h"
 
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/network/transport_socket.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
