@@ -24,7 +24,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
-#include "source/common/config/subscription_base.h"
+#include "source/common/config/resource_type_helper.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/target_impl.h"
 #include "source/common/singleton/threadsafe_singleton.h"
@@ -172,7 +172,7 @@ private:
 
 class LoaderImpl;
 
-struct RtdsSubscription : Envoy::Config::SubscriptionBase<envoy::service::runtime::v3::Runtime>,
+struct RtdsSubscription : public Config::SubscriptionCallbacks,
                           Logger::Loggable<Logger::Id::runtime> {
   RtdsSubscription(LoaderImpl& parent,
                    const envoy::config::bootstrap::v3::RuntimeLayer::RtdsLayer& rtds_layer,
@@ -200,6 +200,7 @@ struct RtdsSubscription : Envoy::Config::SubscriptionBase<envoy::service::runtim
   Config::SubscriptionPtr subscription_;
   std::string resource_name_;
   Init::TargetImpl init_target_;
+  const Config::ResourceTypeHelper<envoy::service::runtime::v3::Runtime> resource_type_helper_;
   Protobuf::Struct proto_;
 };
 
@@ -228,6 +229,7 @@ public:
   void startRtdsSubscriptions(ReadyCallback on_done) override;
   Stats::Scope& getRootScope() override;
   void countDeprecatedFeatureUse() const override;
+  absl::Status onWorkerThreadsRegistered() override;
 
 private:
   friend RtdsSubscription;

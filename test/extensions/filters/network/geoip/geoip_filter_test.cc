@@ -7,9 +7,7 @@
 #include "source/extensions/filters/network/geoip/geoip_filter.h"
 
 #include "test/extensions/filters/http/geoip/mocks.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"

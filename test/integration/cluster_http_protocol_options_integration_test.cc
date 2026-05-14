@@ -10,6 +10,7 @@
 #include "test/integration/http_integration.h"
 #include "test/test_common/test_runtime.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -106,7 +107,7 @@ public:
     EXPECT_EQ(10U, response->body().size());
 
     // Wait for mirror request to complete.
-    test_server_->waitForCounterGe("cluster.cluster_1.internal.upstream_rq_completed", 1);
+    test_server_->waitForCounter("cluster.cluster_1.internal.upstream_rq_completed", Ge(1));
 
     // Verify both clusters received requests.
     upstream_headers_ =
@@ -232,7 +233,7 @@ TEST_P(ClusterHttpProtocolOptionsIntegrationTest, ClusterMirroringWithHeaderMuta
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
-  test_server_->waitForCounterGe("cluster.cluster_1.internal.upstream_rq_completed", 1);
+  test_server_->waitForCounter("cluster.cluster_1.internal.upstream_rq_completed", Ge(1));
 
   upstream_headers_ =
       reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
@@ -311,7 +312,7 @@ TEST_P(ClusterHttpProtocolOptionsIntegrationTest, ClusterMirroringDisabledShadow
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
-  test_server_->waitForCounterGe("cluster.cluster_1.internal.upstream_rq_completed", 1);
+  test_server_->waitForCounter("cluster.cluster_1.internal.upstream_rq_completed", Ge(1));
 
   upstream_headers_ =
       reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
@@ -358,7 +359,7 @@ TEST_P(ClusterHttpProtocolOptionsIntegrationTest, PrecedenceRouteOnlyMirroring) 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
-  test_server_->waitForCounterGe("cluster.cluster_1.internal.upstream_rq_completed", 1);
+  test_server_->waitForCounter("cluster.cluster_1.internal.upstream_rq_completed", Ge(1));
 
   cleanupUpstreamAndDownstream();
 
@@ -398,7 +399,7 @@ TEST_P(ClusterHttpProtocolOptionsIntegrationTest, PrecedenceClusterOnlyMirroring
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
-  test_server_->waitForCounterGe("cluster.cluster_1.internal.upstream_rq_completed", 1);
+  test_server_->waitForCounter("cluster.cluster_1.internal.upstream_rq_completed", Ge(1));
 
   cleanupUpstreamAndDownstream();
 
@@ -458,7 +459,7 @@ TEST_P(ClusterHttpProtocolOptionsIntegrationTest, PrecedenceClusterOverridesRout
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
-  test_server_->waitForCounterGe("cluster.cluster_2.internal.upstream_rq_completed", 1);
+  test_server_->waitForCounter("cluster.cluster_2.internal.upstream_rq_completed", Ge(1));
 
   cleanupUpstreamAndDownstream();
 
@@ -524,8 +525,8 @@ TEST_P(ClusterHttpProtocolOptionsIntegrationTest,
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
-  test_server_->waitForCounterGe("cluster.cluster_3.internal.upstream_rq_completed", 1);
-  test_server_->waitForCounterGe("cluster.cluster_4.internal.upstream_rq_completed", 1);
+  test_server_->waitForCounter("cluster.cluster_3.internal.upstream_rq_completed", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_4.internal.upstream_rq_completed", Ge(1));
 
   cleanupUpstreamAndDownstream();
 

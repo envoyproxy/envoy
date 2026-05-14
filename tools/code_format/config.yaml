@@ -383,6 +383,9 @@ paths:
     - source/extensions/common/wasm/context.h
     - source/extensions/common/wasm/context.cc
     - source/extensions/common/wasm/foreign.cc
+    - contrib/stat_sinks/wasm_filter/source/wasm_filter_stat_sink_impl.cc
+    - contrib/stat_sinks/wasm_filter/test/test_data/stats_filter_plugin.cc
+    - contrib/stat_sinks/wasm_filter/test/wasm_filter_stat_sink_integration_test.cc
     - source/extensions/common/wasm/wasm.h
     - source/extensions/common/wasm/wasm.cc
     - source/extensions/common/wasm/wasm_vm.h
@@ -392,6 +395,7 @@ paths:
     - test/extensions/common/wasm/wasm_test.cc
     - test/extensions/dynamic_modules/test_data/cpp/http_integration_test.cc
     - test/extensions/dynamic_modules/test_data/cpp/http.cc
+    - test/extensions/dynamic_modules/test_data/cpp/network_integration_test.cc
     - test/extensions/stats_sinks/wasm/wasm_stat_sink_test.cc
     - test/test_common/wasm_base.h
 

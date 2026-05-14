@@ -176,6 +176,7 @@ std::string JA4Fingerprinter::getJA4CipherHash(const SSL_CLIENT_HELLO* ssl_clien
   }
 
   if (ciphers.empty()) {
+    // NOLINTNEXTLINE(modernize-return-braced-init-list)
     return std::string(JA4_HASH_LENGTH, '0');
   }
 
@@ -239,6 +240,7 @@ std::string JA4Fingerprinter::getJA4ExtensionHash(const SSL_CLIENT_HELLO* ssl_cl
   }
 
   if (extensions.empty()) {
+    // NOLINTNEXTLINE(modernize-return-braced-init-list)
     return std::string(JA4_HASH_LENGTH, '0');
   }
 

@@ -542,6 +542,8 @@ absl::Status LoaderImpl::initialize(Upstream::ClusterManager& cm) {
   return absl::OkStatus();
 }
 
+absl::Status LoaderImpl::onWorkerThreadsRegistered() { return loadNewSnapshot(); }
+
 void LoaderImpl::startRtdsSubscriptions(ReadyCallback on_done) {
   on_rtds_initialized_ = on_done;
   init_manager_.initialize(init_watcher_);
@@ -555,17 +557,16 @@ void LoaderImpl::onRtdsReady() {
 RtdsSubscription::RtdsSubscription(
     LoaderImpl& parent, const envoy::config::bootstrap::v3::RuntimeLayer::RtdsLayer& rtds_layer,
     Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor)
-    : Envoy::Config::SubscriptionBase<envoy::service::runtime::v3::Runtime>(validation_visitor,
-                                                                            "name"),
-      parent_(parent), config_source_(rtds_layer.rtds_config()), store_(store),
+    : parent_(parent), config_source_(rtds_layer.rtds_config()), store_(store),
       stats_scope_(store_.createScope("runtime")), resource_name_(rtds_layer.name()),
-      init_target_("RTDS " + resource_name_, [this]() { start(); }) {}
+      init_target_("RTDS " + resource_name_, [this]() { start(); }),
+      resource_type_helper_(validation_visitor, "name") {}
 
 absl::Status RtdsSubscription::createSubscription() {
-  const auto resource_name = getResourceName();
+  const auto resource_name = resource_type_helper_.getResourceName();
   auto subscription_or_error = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
-      config_source_, Grpc::Common::typeUrl(resource_name), *stats_scope_, *this, resource_decoder_,
-      {});
+      config_source_, Grpc::Common::typeUrl(resource_name), *stats_scope_, *this,
+      resource_type_helper_.resourceDecoder(), {});
   RETURN_IF_NOT_OK(subscription_or_error.status());
   subscription_ = std::move(*subscription_or_error);
   return absl::OkStatus();

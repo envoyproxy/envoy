@@ -9,7 +9,7 @@
 #include "test/common/router/route_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 
 namespace Envoy {
 namespace Router {

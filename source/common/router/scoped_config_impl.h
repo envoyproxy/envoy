@@ -123,7 +123,10 @@ public:
 
 private:
   // From scope name to cached ScopedRouteInfo.
-  absl::flat_hash_map<std::string, ScopedRouteInfoConstSharedPtr> scoped_route_info_by_name_;
+  // WARNING: The absl::string_view keys point to strings owned by the ScopedRouteInfo
+  // objects stored as values. To avoid dangling pointers, any update to this map MUST
+  // first erase the old entry before inserting a new one.
+  absl::flat_hash_map<absl::string_view, ScopedRouteInfoConstSharedPtr> scoped_route_info_by_name_;
   // Hash by ScopeKey hash to lookup in constant time.
   absl::flat_hash_map<uint64_t, ScopedRouteInfoConstSharedPtr> scoped_route_info_by_key_;
 };

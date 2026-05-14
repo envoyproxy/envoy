@@ -154,13 +154,13 @@ private:
                            std::string hostname)
         : context_(context), cluster_(cluster), hostname_(hostname) {};
 
-    virtual void cancel() {
+    void cancel() override {
       // Cancels the DNS callback.
       handle_.reset();
     }
 
-    virtual void
-    onLoadDnsCacheComplete(const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& info) {
+    void
+    onLoadDnsCacheComplete(const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& info) override {
       Upstream::HostConstSharedPtr host = cluster_.findHostByName(hostname_);
       std::string details = info->details();
       context_->onAsyncHostSelection(std::move(host), std::move(details));

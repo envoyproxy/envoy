@@ -15,7 +15,7 @@ MetricHelper::~MetricHelper() {
 }
 
 MetricHelper::MetricHelper(StatName name, StatName tag_extracted_name,
-                           const StatNameTagVector& stat_name_tags, SymbolTable& symbol_table) {
+                           StatNameTagSpan stat_name_tags, SymbolTable& symbol_table) {
   // Encode all the names and tags into transient storage so we can count the
   // required bytes. 2 is added to account for the name and tag_extracted_name,
   // and we multiply the number of tags by 2 to account for the name and value
@@ -32,33 +32,9 @@ MetricHelper::MetricHelper(StatName name, StatName tag_extracted_name,
   symbol_table.populateList(names.begin(), num_names, stat_names_);
 }
 
-StatName MetricHelper::statName() const {
-  StatName stat_name;
-  stat_names_.iterate([&stat_name](StatName s) -> bool {
-    stat_name = s;
-    return false; // Returning 'false' stops the iteration.
-  });
-  return stat_name;
-}
+StatName MetricHelper::statName() const { return stat_names_.at(0); }
 
-StatName MetricHelper::tagExtractedStatName() const {
-  // The name is the first element in stat_names_. The second is the
-  // tag-extracted-name. We don't have random access in that format,
-  // so we iterate through them, skipping the first element (name),
-  // and terminating the iteration after capturing the tag-extracted
-  // name by returning false from the lambda.
-  StatName tag_extracted_stat_name;
-  bool skip = true;
-  stat_names_.iterate([&tag_extracted_stat_name, &skip](StatName s) -> bool {
-    if (skip) {
-      skip = false;
-      return true;
-    }
-    tag_extracted_stat_name = s;
-    return false; // Returning 'false' stops the iteration.
-  });
-  return tag_extracted_stat_name;
-}
+StatName MetricHelper::tagExtractedStatName() const { return stat_names_.at(1); }
 
 void MetricHelper::iterateTagStatNames(const Metric::TagStatNameIterFn& fn) const {
   enum { Name, TagExtractedName, TagName, TagValue } state = Name;

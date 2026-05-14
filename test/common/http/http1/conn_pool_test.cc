@@ -16,7 +16,6 @@
 
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
-#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"

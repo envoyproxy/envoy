@@ -592,6 +592,28 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, BridgeConfigParseFailure) {
   EXPECT_EQ(pool, nullptr);
 }
 
+// Smoke test that a ``google.protobuf.Struct`` ``bridge_config`` is accepted by the factory.
+// See https://github.com/envoyproxy/envoy/issues/44733. The previous ``MessageUtil::anyToBytes``
+// implementation did not handle ``Struct`` per the API contract; ``knownAnyToBytes`` unpacks the
+// ``Struct`` and serializes it to a JSON string before handing it to the bridge module. Note
+// that the ``upstream_bridge_no_op`` test module deliberately ignores the config bytes, so this
+// test only locks in that the ``Struct`` unpack and JSON serialization path does not surface as
+// an error to the factory; the byte-level semantics are covered by the HTTP per-route
+// integration test which exercises the same ``knownAnyToBytes`` helper.
+TEST_F(DynamicModuleGenericConnPoolFactoryTest, BridgeConfigWithStruct) {
+  auto config = createProtoConfig();
+  config.set_bridge_name("struct_test_bridge");
+
+  Protobuf::Struct struct_value;
+  (*struct_value.mutable_fields())["key"].set_string_value("value");
+  config.mutable_bridge_config()->PackFrom(struct_value);
+
+  auto pool = factory_.createGenericConnPool(
+      host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
+      Upstream::ResourcePriority::Default, absl::nullopt, nullptr, config);
+  EXPECT_NE(pool, nullptr);
+}
+
 TEST_F(DynamicModuleGenericConnPoolFactoryTest, NameAndCategory) {
   EXPECT_EQ("envoy.upstreams.http.dynamic_modules", factory_.name());
   EXPECT_EQ("envoy.upstreams", factory_.category());

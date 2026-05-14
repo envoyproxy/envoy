@@ -31,7 +31,6 @@ using testing::AtLeast;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Extensions {

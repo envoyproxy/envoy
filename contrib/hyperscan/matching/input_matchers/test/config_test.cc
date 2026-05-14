@@ -1,4 +1,4 @@
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 
 #include "contrib/hyperscan/matching/input_matchers/source/config.h"
 #include "gtest/gtest.h"

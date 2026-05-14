@@ -109,23 +109,25 @@ public:
       const std::string& stats_prefix, Stats::Scope& scope,
       Server::Configuration::FactoryContext& context);
 
-  const std::vector<McpBackendConfig>& backends() const { return backends_; }
-  bool isMultiplexing() const { return backends_.size() > 1; }
-  const std::string& defaultBackendName() const { return default_backend_name_; }
-  Server::Configuration::FactoryContext& factoryContext() const { return factory_context_; }
-  const McpBackendConfig* findBackend(const std::string& name) const;
+  const std::vector<McpBackendConfig>& backends() const override { return backends_; }
+  bool isMultiplexing() const override { return backends_.size() > 1; }
+  const std::string& defaultBackendName() const override { return default_backend_name_; }
+  Server::Configuration::FactoryContext& factoryContext() const override {
+    return factory_context_;
+  }
+  const McpBackendConfig* findBackend(const std::string& name) const override;
 
-  bool hasSessionIdentity() const {
+  bool hasSessionIdentity() const override {
     return !absl::holds_alternative<absl::monostate>(session_identity_.subject_source);
   }
-  const SubjectSource& subjectSource() const { return session_identity_.subject_source; }
-  ValidationMode validationMode() const { return session_identity_.validation_mode; }
-  bool shouldEnforceValidation() const {
+  const SubjectSource& subjectSource() const override { return session_identity_.subject_source; }
+  ValidationMode validationMode() const override { return session_identity_.validation_mode; }
+  bool shouldEnforceValidation() const override {
     return session_identity_.validation_mode == ValidationMode::Enforce;
   }
-  const std::string& metadataNamespace() const { return metadata_namespace_; }
+  const std::string& metadataNamespace() const override { return metadata_namespace_; }
 
-  McpRouterStats& stats() { return stats_; }
+  McpRouterStats& stats() override { return stats_; }
 
 private:
   std::vector<McpBackendConfig> backends_;

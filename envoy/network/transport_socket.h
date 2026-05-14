@@ -161,8 +161,11 @@ public:
   /**
    * Closes the transport socket.
    * @param event supplies the connection event that is closing the socket.
+   * @param abort_reset if true, the connection is being torn down with a TCP RST and the
+   *        transport socket should skip any graceful shutdown (e.g. TLS close_notify) so the
+   *        peer reliably observes the reset rather than racing it against a clean close.
    */
-  virtual void closeSocket(Network::ConnectionEvent event) PURE;
+  virtual void closeSocket(Network::ConnectionEvent event, bool abort_reset = false) PURE;
 
   /**
    * @param buffer supplies the buffer to read to.

@@ -1,10 +1,13 @@
 #include "source/extensions/filters/http/dynamic_modules/factory.h"
 
 #include <filesystem>
+#include <system_error>
 
+#include "source/common/common/logger.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/common/wasm/remote_async_datasource.h"
 #include "source/extensions/dynamic_modules/background_fetch_manager.h"
+#include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 #include "source/extensions/filters/http/dynamic_modules/filter_config.h"
 
@@ -95,18 +98,38 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
       // filesystem itself acts as the cache.
       auto cached_path = Extensions::DynamicModules::moduleTempPath(sha256);
       if (std::filesystem::exists(cached_path)) {
-        dynamic_module = Extensions::DynamicModules::newDynamicModule(
-            cached_path, module_config.do_not_close(), module_config.load_globally());
-        if (dynamic_module.ok()) {
-          Extensions::DynamicModules::BackgroundFetchManager::singleton(context.singletonManager())
-              ->erase(sha256);
-          return buildFilterFactoryCallback(std::move(dynamic_module.value()), proto_config,
-                                            module_config, context, scope);
+        // Re-verify SHA256 of the cached file before dlopen. The cache path is in /tmp, which
+        // may be writable by other processes (co-tenant containers, shared hosts); without this
+        // check, an attacker who pre-populates ``/tmp/envoy_dynamic_module_<expected_sha>.so``
+        // with a malicious shared object turns the cache-hit fast path into arbitrary code
+        // execution. The fetch path that wrote the cached file already verified the hash, but
+        // we cannot trust that the file was not replaced between writes.
+        const auto verify_status =
+            Extensions::DynamicModules::verifyFileSha256(cached_path, sha256);
+        if (!verify_status.ok()) {
+          // Tampered or corrupted cache entry — remove it and fall through to the fetch path
+          // below so the legitimate remote source can re-supply correct bytes.
+          std::error_code ec;
+          std::filesystem::remove(cached_path, ec);
+          ENVOY_LOG_MISC(warn,
+                         "dynamic_modules: removed cached file failing SHA256 verification: {}",
+                         verify_status.message());
+          // Fall through to the fetch logic below.
+        } else {
+          dynamic_module = Extensions::DynamicModules::newDynamicModule(
+              cached_path, module_config.do_not_close(), module_config.load_globally());
+          if (dynamic_module.ok()) {
+            Extensions::DynamicModules::BackgroundFetchManager::singleton(
+                context.singletonManager())
+                ->erase(sha256);
+            return buildFilterFactoryCallback(std::move(dynamic_module.value()), proto_config,
+                                              module_config, context, scope);
+          }
+          // File exists, hash matches, but failed to load — re-fetching the same SHA256 would
+          // produce identical bytes, so there is no point in falling through.
+          return absl::InvalidArgumentError("Cached remote module failed to load: " +
+                                            std::string(dynamic_module.status().message()));
         }
-        // File exists but failed to load — re-fetching the same SHA256 would produce
-        // identical bytes, so there is no point in falling through to the remote path.
-        return absl::InvalidArgumentError("Cached remote module failed to load: " +
-                                          std::string(dynamic_module.status().message()));
       }
 
       // In NACK mode, reject the config and kick off a background fetch. The control
@@ -165,10 +188,6 @@ DynamicModuleConfigFactory::createFilterFactoryFromRemoteSource(
   };
   auto async_state = std::make_shared<AsyncState>();
 
-  // Copies for use in the callback — the originals may not outlive the async fetch.
-  const FilterConfig proto_config_copy = proto_config;
-  const auto module_config_copy = module_config;
-
   // Use a weak_ptr in the callback to break the reference cycle:
   // async_state -> remote_provider -> callback -> async_state.
   std::weak_ptr<AsyncState> weak_state = async_state;
@@ -177,7 +196,7 @@ DynamicModuleConfigFactory::createFilterFactoryFromRemoteSource(
       context.clusterManager(), init_manager, module_config.module().remote(),
       context.mainThreadDispatcher(), context.api().randomGenerator(),
       /*allow_empty=*/true,
-      [weak_state, proto_config_copy, module_config_copy, &context,
+      [weak_state, proto_config_copy = proto_config, module_config_copy = module_config, &context,
        &scope](const std::string& data) {
         auto state = weak_state.lock();
         if (!state) {
@@ -245,7 +264,7 @@ DynamicModuleConfigFactory::createRouteSpecificFilterConfigTyped(
 
   std::string config;
   if (proto_config.has_filter_config()) {
-    auto config_or_error = MessageUtil::anyToBytes(proto_config.filter_config());
+    auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.filter_config());
     RETURN_IF_NOT_OK_REF(config_or_error.status());
     config = std::move(config_or_error.value());
   }
