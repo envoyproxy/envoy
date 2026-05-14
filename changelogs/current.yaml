@@ -43,6 +43,11 @@ minor_behavior_changes:
     graceful close against the reset.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.ssl_socket_report_connection_reset`` to ``false``.
+- area: http2
+  change: |
+    The GOAWAY load shed point is fixed to use a graceful two-phase shutdown sequence, to avoid
+    risk to client traffic. This behavioral change can be temporarily reverted by setting runtime
+    guard ``envoy.reloadable_features.http2_fix_goaway_loadshed_point`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
