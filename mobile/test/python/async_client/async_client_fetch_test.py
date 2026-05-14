@@ -26,7 +26,11 @@ class TestAsyncClientFetch(unittest.TestCase):
 
     def _make_client_builder(self):
         # factory to keep constructor logic consistent without sharing instances
-        builder = EngineBuilder().set_log_level(LogLevel.trace)
+        builder = (
+            EngineBuilder()
+            .set_log_level(LogLevel.trace)
+            .add_runtime_guard("getaddrinfo_no_ai_flags", True)
+        )
         return builder
 
     def test_simple_get_request(self):

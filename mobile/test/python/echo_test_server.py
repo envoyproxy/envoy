@@ -75,20 +75,17 @@ class HTTPServerV6(HTTPServer):
 
 def is_ipv4_supported():
     try:
-        socket.getaddrinfo("127.0.0.1", None, family=socket.AF_INET, flags=socket.AI_ADDRCONFIG)
+        socket.getaddrinfo("127.0.0.1", None, family=socket.AF_INET)
         return True
-    except socket.gaierror as e:
-        print(f"Error: {e}, errno {e.errno}, details {e.strerror}")
-    except OSError as e:
-        print(f"Error: {e}")
-    return False
+    except socket.gaierror:
+        return False
 
 
 def is_ipv6_supported():
     try:
-        socket.getaddrinfo("::1", None, family=socket.AF_INET6, flags=socket.AI_ADDRCONFIG)
+        socket.getaddrinfo("::1", None, family=socket.AF_INET6)
         return True
-    except Exception:
+    except socket.gaierror:
         return False
 
 
