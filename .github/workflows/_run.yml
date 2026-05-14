@@ -403,6 +403,7 @@ jobs:
       with:
         username: ${{ vars.DOCKERHUB_USERNAME }}
         password: ${{ secrets.dockerhub-token }}
+      continue-on-error: true
 
     # NOTE: This is where untrusted code can be run!!!
     #  Only post-failure notification steps (which don't use any repo code) should follow this step.
