@@ -51,7 +51,6 @@ Network::ClientConnectionPtr SslSPIFFECertValidatorIntegrationTest::makeSslClien
     StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
     filter_state.setData("envoy.tls.cert_validator.spiffe.workload_trust_domain",
                          std::make_shared<Router::StringAccessorImpl>(*workload_trust_domain),
-                         StreamInfo::FilterState::StateType::ReadOnly,
                          StreamInfo::FilterState::LifeSpan::Connection,
                          StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
     socket_options = Network::TransportSocketOptionsUtility::fromFilterState(filter_state);

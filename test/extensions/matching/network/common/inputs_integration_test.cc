@@ -209,7 +209,6 @@ TEST_F(InputsIntegrationTest, FilterStateInput) {
 
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(key, std::make_shared<Router::StringAccessorImpl>(value),
-                       StreamInfo::FilterState::StateType::Mutable,
                        StreamInfo::FilterState::LifeSpan::Connection);
 
   Network::MockConnectionSocket socket;
@@ -294,7 +293,7 @@ TEST_F(InputsIntegrationTest, FilterStateInputWithField) {
       key,
       std::make_shared<TestFieldFilterStateObject>(absl::flat_hash_map<std::string, std::string>{
           {"my_field", "field_value"}, {"other_field", "other_value"}}),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   Network::MockConnectionSocket socket;
   envoy::config::core::v3::Metadata metadata;
@@ -318,7 +317,7 @@ TEST_F(InputsIntegrationTest, FilterStateInputWithFieldNoMatch) {
       key,
       std::make_shared<TestFieldFilterStateObject>(
           absl::flat_hash_map<std::string, std::string>{{"my_field", "field_value"}}),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   Network::MockConnectionSocket socket;
   envoy::config::core::v3::Metadata metadata;
@@ -343,7 +342,7 @@ TEST_F(InputsIntegrationTest, FilterStateInputWithFieldMissing) {
       key,
       std::make_shared<TestFieldFilterStateObject>(
           absl::flat_hash_map<std::string, std::string>{{"my_field", "field_value"}}),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   Network::MockConnectionSocket socket;
   envoy::config::core::v3::Metadata metadata;
@@ -367,14 +366,12 @@ TEST_F(InputsIntegrationTest, FilterStateInputFailure) {
   EXPECT_THAT(match_tree_()->match(data), HasNoMatch());
 
   filter_state.setData("unknown_key", std::make_shared<Router::StringAccessorImpl>(value),
-                       StreamInfo::FilterState::StateType::Mutable,
                        StreamInfo::FilterState::LifeSpan::Connection);
 
   // Unknown key in filter state - no match
   EXPECT_THAT(match_tree_()->match(data), HasNoMatch());
 
   filter_state.setData(key, std::make_shared<Router::StringAccessorImpl>("unknown_value"),
-                       StreamInfo::FilterState::StateType::Mutable,
                        StreamInfo::FilterState::LifeSpan::Connection);
 
   // Known key in filter state but unknown value - no match

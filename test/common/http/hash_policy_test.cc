@@ -246,8 +246,7 @@ TEST_F(HashPolicyImplTest, FilterStateHashForExistingKey) {
 
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request);
-  filter_state->setData("test-key", std::make_unique<HashableObj>(),
-                        StreamInfo::FilterState::StateType::ReadOnly);
+  filter_state->setData("test-key", std::make_unique<HashableObj>());
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info;
   stream_info.filter_state_ = filter_state;
 
@@ -265,8 +264,7 @@ TEST_F(HashPolicyImplTest, FilterStateHashForAbsentKey) {
 
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request);
-  filter_state->setData("another-key", std::make_unique<HashableObj>(),
-                        StreamInfo::FilterState::StateType::ReadOnly);
+  filter_state->setData("another-key", std::make_unique<HashableObj>());
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info;
   stream_info.filter_state_ = filter_state;
 
@@ -283,7 +281,7 @@ TEST_F(HashPolicyImplTest, FilterStateHashForNullFilterState) {
 
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request);
-  filter_state->setData("test-key", nullptr, StreamInfo::FilterState::StateType::ReadOnly);
+  filter_state->setData("test-key", nullptr);
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info;
   stream_info.filter_state_ = filter_state;
 

@@ -90,8 +90,7 @@ public:
     auto filter_state = std::make_shared<StreamInfo::FilterStateImpl>(
         StreamInfo::FilterState::LifeSpan::Connection);
     auto string_accessor = std::make_shared<Router::StringAccessorImpl>(value);
-    filter_state->setData(key, string_accessor, StreamInfo::FilterState::StateType::ReadOnly,
-                          StreamInfo::FilterState::LifeSpan::Connection,
+    filter_state->setData(key, string_accessor, StreamInfo::FilterState::LifeSpan::Connection,
                           StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
     auto shared_objects = filter_state->objectsSharedWithUpstreamConnection();
     return std::make_shared<Network::TransportSocketOptionsImpl>(

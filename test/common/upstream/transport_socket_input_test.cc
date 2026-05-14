@@ -285,10 +285,10 @@ TEST_F(TransportSocketInputTest, FilterStateInput_NoFilterState) {
 TEST_F(TransportSocketInputTest, FilterStateInput_WithValue) {
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state->setData(
-      "envoy.network.namespace", std::make_shared<TestFilterStateObject>("namespace-1"),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection,
-      StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+  filter_state->setData("envoy.network.namespace",
+                        std::make_shared<TestFilterStateObject>("namespace-1"),
+                        StreamInfo::FilterState::LifeSpan::Connection,
+                        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
 
   FilterStateInput input("envoy.network.namespace");
   TransportSocketMatchingData data(nullptr, nullptr, filter_state.get());
@@ -301,7 +301,6 @@ TEST_F(TransportSocketInputTest, FilterStateInput_MissingKey) {
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state->setData("some.other.key", std::make_shared<TestFilterStateObject>("value"),
-                        StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::Connection,
                         StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
 
@@ -317,7 +316,6 @@ TEST_F(TransportSocketInputTest, FilterStateInput_NonSerializable) {
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state->setData("test.key", std::make_shared<NonSerializableFilterStateObject>(),
-                        StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::Connection,
                         StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
 
@@ -333,7 +331,6 @@ TEST_F(TransportSocketInputTest, FilterStateInput_EmptyString) {
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state->setData("test.key", std::make_shared<EmptySerializableFilterStateObject>(),
-                        StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::Connection,
                         StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
 
@@ -360,10 +357,10 @@ TEST_F(TransportSocketInputTest, FilterStateInputFactory) {
   // Test with filter state.
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state->setData(
-      "envoy.network.namespace", std::make_shared<TestFilterStateObject>("test-namespace"),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection,
-      StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+  filter_state->setData("envoy.network.namespace",
+                        std::make_shared<TestFilterStateObject>("test-namespace"),
+                        StreamInfo::FilterState::LifeSpan::Connection,
+                        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
 
   TransportSocketMatchingData data(nullptr, nullptr, filter_state.get());
   auto result = input->get(data);

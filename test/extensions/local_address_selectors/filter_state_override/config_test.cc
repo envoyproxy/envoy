@@ -54,7 +54,6 @@ constexpr absl::string_view FilterStateKey =
 Network::TransportSocketOptionsConstSharedPtr optionsWithOverride(absl::string_view netns) {
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(FilterStateKey, std::make_shared<TestObject>(netns),
-                       StreamInfo::FilterState::StateType::ReadOnly,
                        StreamInfo::FilterState::LifeSpan::Connection,
                        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnectionOnce);
   return Network::TransportSocketOptionsUtility::fromFilterState(filter_state);
