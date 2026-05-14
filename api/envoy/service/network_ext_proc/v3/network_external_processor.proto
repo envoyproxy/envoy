@@ -162,7 +162,8 @@ message ProcessingResponse {
   // after applying this response. Subsequent data will bypass the ext_proc filter
   // as if it were configured in SKIP mode.
   //
-  // WARNING: This should only be used when there is a strong protocol guarantee
+  // .. note ::
+  //   This should only be used when there is a strong protocol guarantee
   // that no additional data chunks are in-flight on the wire. Because Envoy
   // immediately drains its local buffer when forwarding bytes to the external
   // processor, if Envoy has already dispatched subsequent data chunks before this
@@ -172,5 +173,5 @@ message ProcessingResponse {
   // This feature is primarily designed for tightly-coupled synchronous protocols,
   // such as reading the ClientHello during a TLS handshake, where the sender
   // naturally halts transmission while awaiting the receiver's response.
-  bool close_sidestream = 6;
+  bool close_stream_to_ext_proc_server = 6;
 }

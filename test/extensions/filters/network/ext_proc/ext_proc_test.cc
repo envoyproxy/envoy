@@ -946,7 +946,7 @@ TEST_F(NetworkExtProcFilterTest, WriteMessageTimeout) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data, false));
 
   // Simulate timeout
-  EXPECT_CALL(write_callbacks_, disableClose(false)).Times(2);
+  EXPECT_CALL(write_callbacks_, disableClose(false));
   EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
   EXPECT_CALL(connection_,
               close(Network::ConnectionCloseType::FlushWrite, "ext_proc_message_timeout"))
@@ -993,9 +993,9 @@ TEST_F(NetworkExtProcFilterTest, TimeoutWithBothOperationsPending) {
   Buffer::OwnedImpl write_data("write_test");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(write_data, false));
 
-  // Simulate timeout - should clean up both directions
-  EXPECT_CALL(read_callbacks_, disableClose(false)).Times(2);
-  EXPECT_CALL(write_callbacks_, disableClose(false)).Times(2);
+  // Simulate timeout - should clean up both directions exactly once
+  EXPECT_CALL(read_callbacks_, disableClose(false));
+  EXPECT_CALL(write_callbacks_, disableClose(false));
   EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
   EXPECT_CALL(connection_,
               close(Network::ConnectionCloseType::FlushWrite, "ext_proc_message_timeout"))
@@ -1329,7 +1329,7 @@ TEST_F(NetworkExtProcFilterTest, LoggingInfoOnError) {
   EXPECT_EQ(logging_info->lastCallStatus(), Grpc::Status::WellKnownGrpcStatus::ResourceExhausted);
 }
 
-// Test close_sidestream functionality
+// Test close_stream_to_ext_proc_server functionality
 TEST_F(NetworkExtProcFilterTest, CloseSidestream) {
   auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
   auto* stream_ptr = stream.get();
@@ -1348,9 +1348,9 @@ TEST_F(NetworkExtProcFilterTest, CloseSidestream) {
   Buffer::OwnedImpl data("test");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
 
-  // Simulate response with close_sidestream = true
+  // Simulate response with close_stream_to_ext_proc_server = true
   envoy::service::network_ext_proc::v3::ProcessingResponse response;
-  response.set_close_sidestream(true);
+  response.set_close_stream_to_ext_proc_server(true);
 
   // Expect the stream to be gracefully closed
   EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
@@ -1367,7 +1367,7 @@ TEST_F(NetworkExtProcFilterTest, CloseSidestream) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(more_data, false));
 }
 
-// Test that close callbacks are correctly balanced when close_sidestream is received
+// Test that close callbacks are correctly balanced when close_stream_to_ext_proc_server is received
 TEST_F(NetworkExtProcFilterTest, CloseSidestreamBalancedCallbacks) {
   auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
   auto* stream_ptr = stream.get();
@@ -1387,11 +1387,51 @@ TEST_F(NetworkExtProcFilterTest, CloseSidestreamBalancedCallbacks) {
   Buffer::OwnedImpl data("test");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
 
-  // Simulate response with close_sidestream = true
+  // Simulate response with close_stream_to_ext_proc_server = true
   envoy::service::network_ext_proc::v3::ProcessingResponse response;
-  response.set_close_sidestream(true);
+  response.set_close_stream_to_ext_proc_server(true);
 
-  // When processing the close_sidestream response, the close callbacks should be re-enabled
+  // When processing the close_stream_to_ext_proc_server response, the close callbacks should be
+  // re-enabled
+  EXPECT_CALL(read_callbacks_, disableClose(false));
+  EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
+
+  filter_->onReceiveMessage(
+      std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>(response));
+
+  // Verify stream closed counter
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_closed"));
+}
+
+// Test that close callbacks are correctly balanced when close_stream_to_ext_proc_server is received
+// with multiple outstanding requests
+TEST_F(NetworkExtProcFilterTest, CloseSidestreamMultipleOutstandingBalancedCallbacks) {
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false)).Times(3);
+
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  // 3 initial calls should disable close callbacks each time
+  EXPECT_CALL(read_callbacks_, disableClose(true)).Times(3);
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Simulate response with close_stream_to_ext_proc_server = true
+  envoy::service::network_ext_proc::v3::ProcessingResponse response;
+  response.set_close_stream_to_ext_proc_server(true);
+
+  // When processing the close_stream_to_ext_proc_server response, the close callbacks should be
+  // re-enabled regardless of outstanding count
   EXPECT_CALL(read_callbacks_, disableClose(false));
   EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
 
