@@ -1,5 +1,4 @@
 #include "source/common/buffer/buffer_impl.h"
-#include "source/common/stats/isolated_store_impl.h"
 #include "source/server/admin/admin.h"
 #include "source/server/admin/admin_filter.h"
 
@@ -28,7 +27,6 @@ public:
   }
 
   NiceMock<MockAdmin> admin_;
-  Stats::IsolatedStoreImpl listener_scope_;
   AdminFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   Http::TestRequestHeaderMapImpl request_headers_;

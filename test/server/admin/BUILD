@@ -79,7 +79,6 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/buffer:buffer_lib",
-        "//source/common/stats:isolated_store_lib",
         "//source/server/admin:admin_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:admin_mocks",
