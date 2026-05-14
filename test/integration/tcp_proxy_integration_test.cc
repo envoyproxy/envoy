@@ -3169,12 +3169,10 @@ typed_config:
   ASSERT_TRUE(fake_upstream_connection->waitForData(4));
 
   tcp_client->close();
-  test_server_->waitForCounterGe("cluster.cluster_1.upstream_cx_total", 1);
-  test_server_->waitForCounterGe("tcp.tcpproxy_stats.route_delayed_total", 1);
-  uint32_t cluster_0_cx_total =
-      test_server_->counter("cluster.cluster_0.upstream_cx_total")
-          ->value();
-  EXPECT_EQ(cluster_0_cx_total, 0);
+
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_cx_total")->value());
+  EXPECT_EQ(1, test_server_->counter("tcp.tcpproxy_stats.route_delayed_total")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
 }
 
 } // namespace Envoy
