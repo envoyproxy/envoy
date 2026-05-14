@@ -77,8 +77,11 @@ def is_ipv4_supported():
     try:
         socket.getaddrinfo("127.0.0.1", None, family=socket.AF_INET, flags=socket.AI_ADDRCONFIG)
         return True
-    except Exception:
-        return False
+    except socket.gaierror as e:
+        print(f"Error: {e}, errno {e.errno}, details {e.strerror}")
+    except OSError as e:
+        print(f"Error: {e}")
+    return False
 
 
 def is_ipv6_supported():
