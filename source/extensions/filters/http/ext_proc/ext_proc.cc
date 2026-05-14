@@ -720,7 +720,7 @@ void Filter::sendRequest(const ProcessorState& state, ProcessingRequest&& req, b
 
 void Filter::onComplete(ProcessingResponse& response) {
   ENVOY_STREAM_LOG(debug, "Received successful response from server", *decoder_callbacks_);
-  std::unique_ptr<ProcessingResponse> resp_ptr = std::make_unique<ProcessingResponse>(response);
+  auto resp_ptr = std::make_unique<ProcessingResponse>(response);
   onReceiveMessage(std::move(resp_ptr));
 }
 
