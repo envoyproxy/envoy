@@ -114,17 +114,17 @@ Security Considerations
 
 .. attention::
 
-   **Route Cache Clearing and Authorization Bypass Risk**: When using per-route authorization filters
-   (such as :ref:`ExtAuthZ <config_http_filters_ext_authz>`, :ref:`RBAC <config_http_filters_rbac>`,
-   or :ref:`JWT <config_http_filters_jwt_authn>`), be aware that subsequent filters in the filter
-   chain may clear the route cache, potentially leading to privilege escalation vulnerabilities.
+   **Route cache clearing and route-dependent authorization**: Clearing the route cache can cause
+   Envoy to recompute route matching after earlier HTTP filters have already processed the request.
+   This can be security-sensitive when filters that make route-dependent authorization decisions
+   run before filters that mutate route-matching inputs.
 
-   **The Problem**: If a request initially matches **Route A** with certain authorization settings,
-   gets authorized, but then a subsequent filter clears the route cache causing the request
-   to match **Route B** with different authorization requirements, the request will bypass Route B's
-   authorization since the authorization filter has already executed.
+   Route matching may depend on request headers, dynamic metadata, filter state, the request path,
+   or other request attributes. If one of these inputs is modified by a later filter and that filter
+   clears the route cache, subsequent filters and the router may observe a different route than the
+   one seen by earlier filters.
 
-   **Filters That Can Clear Route Cache**:
+   Filters that may clear the route cache include:
 
    * :ref:`Lua filter <config_http_filters_lua>` - via ``clearRouteCache()`` method
    * :ref:`ext_proc filter <config_http_filters_ext_proc>` - when configured with ``CLEAR`` route cache action or when response contains ``clear_route_cache`` directive
@@ -134,12 +134,11 @@ Security Considerations
    * :ref:`IP tagging filter <config_http_filters_ip_tagging>` - when sanitizing headers
    * Custom filters that call ``clearRouteCache()`` on the decoder callbacks
 
-   **Mitigation Strategies**:
-
-   * Carefully review the order of filters in your HTTP filter chain when using per-route authorization filters.
-   * Avoid placing filters that clear route cache after authorization filters unless absolutely necessary.
-   * Consider using global authorization configuration at the HTTP connection manager level instead of per-route configs whenever possible.
-   * If route cache clearing is required after authorization, consider re-running authorization checks or using alternative authorization mechanisms.
+   Operators should carefully review HTTP filter ordering when using route-dependent authorization
+   filters such as :ref:`RBAC <config_http_filters_rbac>`, :ref:`ExtAuthZ <config_http_filters_ext_authz>`,
+   or :ref:`JWT <config_http_filters_jwt_authn>`. Avoid enabling route cache clearing for untrusted
+   mutation sources, and consider placing route-dependent authorization filters after filters that
+   mutate route-matching inputs when possible.
 
 .. _arch_overview_http_filters_per_filter_config:
 
