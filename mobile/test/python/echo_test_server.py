@@ -92,23 +92,18 @@ def is_ipv6_supported():
 class EchoTestServer:
 
     def __init__(self):
+        use_v4 = is_ipv4_supported()
+        if not (use_v4 or is_ipv6_supported()):
+            raise RuntimeError("Neither IPv4 nor IPv6 is supported by the environment")
+
         port = random.randint(2**14, 2**16)
-        v4_supported = is_ipv4_supported()
-
         server = None
-        if v4_supported:
-            try:
-                server = HTTPServer(("127.0.0.1", port), EchoServerHandler)
-                self.url = f"127.0.0.1:{port}"
-            except Exception:
-                v4_supported = False
-
-        if not v4_supported:
-            if is_ipv6_supported():
-                server = HTTPServerV6(("::1", port), EchoServerHandler)
-                self.url = f"[::1]:{port}"
-            else:
-                raise RuntimeError("Neither IPv4 nor IPv6 is supported by the environment")
+        if use_v4:
+            server = HTTPServer(("127.0.0.1", port), EchoServerHandler)
+            self.url = f"127.0.0.1:{port}"
+        else:
+            server = HTTPServerV6(("::1", port), EchoServerHandler)
+            self.url = f"[::1]:{port}"
 
         self._server = server
         assert self._server is not None
