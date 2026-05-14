@@ -31,6 +31,9 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    extra_visibility = [
+        "//test/integration:__subpackages__",
+    ],
     deps = [
         "//envoy/registry",
         "//source/extensions/filters/http/common:factory_base_lib",

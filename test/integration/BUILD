@@ -1863,12 +1863,12 @@ envoy_cc_test(
     deps = [
         ":base_overload_integration_test_lib",
         ":http_protocol_integration_lib",
+        "//source/extensions/filters/http/priority_load_shed:config",
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/integration/filters:block_filter_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/priority_load_shed/v3:pkg_cc_proto_descriptor",
     ] + envoy_select_enable_http3([
         "//test/extensions/quic/proof_source:pending_proof_source_factory_impl_lib",
     ]),
