@@ -58,7 +58,7 @@ jobs:
     - name: Generate manifest configuration (dev)
       id: dev-config
       if: ${{ inputs.dev && inputs.target-branch == 'main' }}
-      uses: envoyproxy/toolshed/actions/jq@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
+      uses: envoyproxy/toolshed/actions/jq@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       with:
         input-format: yaml
         filter: >-
@@ -137,7 +137,7 @@ jobs:
             - tools-dev-${{ github.sha }}
 
     - name: Generate manifest configuration (release)
-      uses: envoyproxy/toolshed/actions/jq@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
+      uses: envoyproxy/toolshed/actions/jq@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       id: release-config
       if: ${{ ! inputs.dev || ! inputs.target-branch != 'main' }}
       with:
@@ -227,7 +227,7 @@ jobs:
             - tools-v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
 
     - name: Collect and push OCI artifacts
-      uses: envoyproxy/toolshed/actions/oci/collector@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
+      uses: envoyproxy/toolshed/actions/oci/collector@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       with:
         artifacts-pattern: oci.*
         manifest-config: ${{ steps.dev-config.outputs.value || steps.release-config.outputs.value }}
