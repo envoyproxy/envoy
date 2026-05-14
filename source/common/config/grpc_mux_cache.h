@@ -45,9 +45,9 @@ class GrpcMuxCache {
 public:
   GrpcMuxCache() = default;
 
-  std::shared_ptr<GrpcMux> getOrCreateMux(
-      const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
-      std::function<std::shared_ptr<GrpcMux>()> mux_creator);
+  std::shared_ptr<GrpcMux> getOrCreateMux(const envoy::config::core::v3::ConfigSource& config,
+                                          absl::string_view type_url,
+                                          std::function<std::shared_ptr<GrpcMux>()> mux_creator);
 
   void clear();
 

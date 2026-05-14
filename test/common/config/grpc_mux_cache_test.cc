@@ -122,7 +122,8 @@ TEST_F(GrpcMuxCacheTest, DifferentTypeUrlNoCacheHit) {
 TEST_F(GrpcMuxCacheTest, DifferentConfigSourceNoCacheHit) {
   envoy::config::core::v3::ConfigSource config1;
   config1.mutable_api_config_source()->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-  config1.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("cluster_1");
+  config1.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+      "cluster_1");
 
   auto mock_mux1 = std::make_shared<NiceMock<MockGrpcMux>>();
   bool creator_called1 = false;
@@ -135,7 +136,8 @@ TEST_F(GrpcMuxCacheTest, DifferentConfigSourceNoCacheHit) {
 
   envoy::config::core::v3::ConfigSource config2;
   config2.mutable_api_config_source()->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-  config2.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("cluster_2");
+  config2.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+      "cluster_2");
 
   auto mock_mux2 = std::make_shared<NiceMock<MockGrpcMux>>();
   bool creator_called2 = false;

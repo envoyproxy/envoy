@@ -5,9 +5,10 @@
 namespace Envoy {
 namespace Config {
 
-std::shared_ptr<GrpcMux> GrpcMuxCache::getOrCreateMux(
-    const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
-    std::function<std::shared_ptr<GrpcMux>()> mux_creator) {
+std::shared_ptr<GrpcMux>
+GrpcMuxCache::getOrCreateMux(const envoy::config::core::v3::ConfigSource& config,
+                             absl::string_view type_url,
+                             std::function<std::shared_ptr<GrpcMux>()> mux_creator) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   GrpcMuxKey key(config, type_url);
   auto it = cache_.find(key);
