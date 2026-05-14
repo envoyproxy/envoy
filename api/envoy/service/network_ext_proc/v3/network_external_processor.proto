@@ -162,7 +162,7 @@ message ProcessingResponse {
   // after applying this response. Subsequent data will bypass the ext_proc filter
   // as if it were configured in SKIP mode.
   //
-  // .. note ::
+  // .. note::
   //   This should only be used when there is a strong protocol guarantee
   // that no additional data chunks are in-flight on the wire. Because Envoy
   // immediately drains its local buffer when forwarding bytes to the external
