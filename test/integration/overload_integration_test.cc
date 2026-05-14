@@ -1247,11 +1247,18 @@ TEST_P(LoadShedPointIntegrationTest, Http2ServerDispatchSendsGoAwayCompletingPen
   // This waits for the final GOAWAY, with a real stream ID.
   test_server_->waitForCounter("http2.goaway_sent", Eq(1));
 
-  // Because the load shed operation uses a two-phase GOAWAY, a request initiated before the drain
-  // timer fires will be processed as usual.
-  EXPECT_TRUE(second_request_decoder->waitForEndStream());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_fix_goaway_loadshed_point")) {
+    // Because the load shed operation uses a two-phase GOAWAY, a request initiated before the drain
+    // timer fires will be processed as usual.
+    EXPECT_TRUE(second_request_decoder->waitForEndStream());
 
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    // The GOAWAY gets submitted with the first created stream as the last stream
+    // that will be processed on this connection, so the second stream's frames
+    // are ignored.
+    EXPECT_FALSE(second_request_decoder->complete());
+  }
 
   updateResource(0.80);
   test_server_->waitForGauge(

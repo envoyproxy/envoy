@@ -525,16 +525,18 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
     createCodec(data);
   }
 
-  if (should_send_go_away_and_close_on_dispatch_ != nullptr &&
-      should_send_go_away_and_close_on_dispatch_->shouldShedLoad()) {
-    sendGoAwayAndClose(/*graceful=*/false);
-    handleCodecOverloadError(
-        "Load shed point http2_server_go_away_and_close_on_dispatch triggered");
-    return Network::FilterStatus::StopIteration;
-  }
-  if (should_send_go_away_on_dispatch_ != nullptr &&
-      should_send_go_away_on_dispatch_->shouldShedLoad()) {
-    sendGoAwayAndClose(/*graceful=*/true);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_fix_goaway_loadshed_point")) {
+    if (should_send_go_away_and_close_on_dispatch_ != nullptr &&
+        should_send_go_away_and_close_on_dispatch_->shouldShedLoad()) {
+      sendGoAwayAndClose(/*graceful=*/false);
+      handleCodecOverloadError(
+          "Load shed point http2_server_go_away_and_close_on_dispatch triggered");
+      return Network::FilterStatus::StopIteration;
+    }
+    if (should_send_go_away_on_dispatch_ != nullptr &&
+        should_send_go_away_on_dispatch_->shouldShedLoad()) {
+      sendGoAwayAndClose(/*graceful=*/true);
+    }
   }
 
   bool redispatch;

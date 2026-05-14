@@ -957,6 +957,10 @@ TEST_F(HttpConnectionManagerImplTest, DecodeHeaderLoadShedPointCanRejectNewStrea
 }
 
 TEST_F(HttpConnectionManagerImplTest, GoAwayLoadShedPoint) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_fix_goaway_loadshed_point")) {
+    GTEST_SKIP();
+  }
   Server::MockLoadShedPoint goaway_point;
   EXPECT_CALL(overload_manager_,
               getLoadShedPoint(Server::LoadShedPointName::get().HcmDecodeHeaders))
@@ -999,6 +1003,10 @@ TEST_F(HttpConnectionManagerImplTest, GoAwayLoadShedPoint) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, GoAwayAndCloseLoadShedPoint) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_fix_goaway_loadshed_point")) {
+    GTEST_SKIP();
+  }
   Server::MockLoadShedPoint goaway_and_close_point;
   EXPECT_CALL(overload_manager_,
               getLoadShedPoint(Server::LoadShedPointName::get().HcmDecodeHeaders))

@@ -858,7 +858,8 @@ public:
                        const uint32_t max_request_headers_kb,
                        const uint32_t max_request_headers_count,
                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-                           headers_with_underscores_action);
+                           headers_with_underscores_action,
+                       Server::OverloadManager& overload_manager);
 
 private:
   // ConnectionImpl
@@ -884,6 +885,10 @@ private:
   // The action to take when a request header name contains underscore characters.
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
+  // Remove when removing runtime feature `http2_fix_goaway_loadshed_point`.
+  Server::LoadShedPoint* should_send_go_away_on_dispatch_{nullptr};
+  Server::LoadShedPoint* should_send_go_away_and_close_on_dispatch_{nullptr};
+  bool sent_go_away_on_dispatch_{false};
 };
 
 } // namespace Http2
