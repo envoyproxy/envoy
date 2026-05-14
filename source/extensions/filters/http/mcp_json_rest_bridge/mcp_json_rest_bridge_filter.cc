@@ -189,7 +189,7 @@ McpJsonRestBridgeFilter::getTools() const {
 
 const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*
 McpJsonRestBridgeFilter::getTool(absl::string_view tool_name) const {
-  // TODO(mkbehr): Preprocess or cache a lookup table if we ever need to check many tools per
+  // TODO(mkbehr): Pre-process or cache a lookup table if we ever need to check many tools per
   // request.
   const auto* per_route_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<McpJsonRestBridgePerRouteConfig>(
