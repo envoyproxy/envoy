@@ -2,7 +2,6 @@
 
 #include "source/common/quic/envoy_tls_server_handshaker.h"
 #include "source/common/quic/quic_server_transport_socket_factory.h"
-#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Quic {
@@ -26,20 +25,12 @@ EnvoyQuicCryptoServerStreamFactoryImpl::createEnvoyQuicCryptoServerStream(
   auto& factory = static_cast<const QuicServerTransportSocketFactory&>(*transport_socket_factory);
 
   auto ticket_config = factory.getSessionTicketConfig();
-  // The runtime flag gates only Envoy's ticket key callback. When off, we
-  // leave SSL_OP_NO_TICKET alone and let QUICHE/BoringSSL issue tickets via
-  // the default path. disable_stateless_resumption is operator-set and
-  // always wins. has_keys/handles_session_resumption are only meaningful
-  // when Envoy's callback is in play.
-  const bool envoy_ticket_key_cb_enabled =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_session_ticket_support");
-  const bool disable_resumption =
-      ticket_config.disable_stateless_resumption ||
-      (envoy_ticket_key_cb_enabled &&
-       (!ticket_config.has_keys || ticket_config.handles_session_resumption));
+  const bool disable_resumption = ticket_config.disable_stateless_resumption ||
+                                  !ticket_config.has_keys ||
+                                  ticket_config.handles_session_resumption;
 
-  return std::make_unique<EnvoyTlsServerHandshaker>(
-      session, crypto_config, factory.sslCtx(), disable_resumption, envoy_ticket_key_cb_enabled);
+  return std::make_unique<EnvoyTlsServerHandshaker>(session, crypto_config, factory.sslCtx(),
+                                                    disable_resumption);
 }
 
 REGISTER_FACTORY(EnvoyQuicCryptoServerStreamFactoryImpl,
