@@ -74,7 +74,6 @@ bug_fixes:
     principal extension where if an invalid SAN matcher was configured, it would incorrectly match any
     certificate in the allowed trust chain. Known bad configurations are an invalid ``OID`` when using
     an ``OTHER_NAME``, or specifying a ``StringMatcher`` with an invalid configuration.
->>>>>>> upstream/main
 - area: build
   change: |
     Fixed ``Illegal ambiguous match`` error when building contrib targets with ``--config=aws-lc-fips``
