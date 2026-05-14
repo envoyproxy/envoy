@@ -5,6 +5,11 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: dns
+  change: |
+    Share DNSResolver if c-ares config is the same. This is so that qcache can be enabled and shared
+    across clusters. This behavior can be reverted by setting the runtime guard
+    ``envoy.restart_features.shared_cares_dns_resolver`` to ``false``.
 - area: router
   change: |
     The upstream transport failure reason (e.g. TLS certificate validation errors) is no longer included
@@ -43,11 +48,6 @@ minor_behavior_changes:
     graceful close against the reset.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.ssl_socket_report_connection_reset`` to ``false``.
-- area: dns
-  change: |
-    Share DNSResolver if c-ares config is the same. This is so that qcache can be enabled and shared
-    across clusters. This behavior can be reverted by setting the runtime guard
-    ``envoy.restart_features.shared_cares_dns_resolver`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -107,6 +107,9 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: cares
+  change: |
+    Made qcache_max_ttl configurable.
 - area: router
   change: |
     Added support for ``refreshRouteCluster`` on weighted cluster routes. When a filter calls
@@ -205,8 +208,15 @@ new_features:
   change: |
     Added substitution commands ``%DOWNSTREAM_TLS_GROUP%`` and ``%UPSTREAM_TLS_GROUP%``. The TLS group may be used
     to discern if a TLS connection used a post quantum safe key exchange (e.g. X25519MLKEM768).
-- area: cares
+- area: http_inspector
   change: |
-    Made qcache_max_ttl configurable.
+    Enabled Balsa parser for HTTP inspector by default. This behavior can be temporarily
+    reverted by setting the runtime guard ``envoy.reloadable_features.http_inspector_use_balsa_parser``
+    to ``false``. This runtime guard will be removed in a future release of Envoy.
+- area: http_inspector
+  change: |
+    Enabled Balsa parser for HTTP inspector by default. This behavior can be temporarily
+    reverted by setting the runtime guard ``envoy.reloadable_features.http_inspector_use_balsa_parser``
+    to ``false``. This runtime guard will be removed in a future release of Envoy.
 
 deprecated:

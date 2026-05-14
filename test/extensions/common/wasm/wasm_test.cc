@@ -11,7 +11,9 @@
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/local_reply/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/overload_manager.h"
+#include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/server/server_lifecycle_notifier.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"

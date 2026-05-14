@@ -28,7 +28,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.content_parsers.json"],
     deps = [
         "//source/extensions/content_parsers/json:config",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
     ],
 )

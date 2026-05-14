@@ -18,7 +18,7 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/path/match/uri_template:config",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -30,6 +30,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/path/match/uri_template:config",
         "//source/extensions/path/match/uri_template:uri_template_match_lib",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:utility_lib",
     ],
 )

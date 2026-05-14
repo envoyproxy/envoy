@@ -4,7 +4,7 @@
 
 #include "source/extensions/load_balancing_policies/ring_hash/config.h"
 
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/priority_set.h"
 

@@ -102,7 +102,7 @@ jobs:
     # Handle any failure in triggering job
     # Remove any `checks` we dont care about
     # Prepare a check request
-    - uses: envoyproxy/toolshed/actions/github/env/load@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
+    - uses: envoyproxy/toolshed/actions/github/env/load@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       name: Load env
       id: data
       with:
@@ -113,13 +113,13 @@ jobs:
         GH_TOKEN: ${{ github.token }}
 
     #  Update the check
-    - uses: envoyproxy/toolshed/actions/appauth@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
+    - uses: envoyproxy/toolshed/actions/appauth@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       name: Appauth
       id: appauth
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
-    - uses: envoyproxy/toolshed/actions/github/checks@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
+    - uses: envoyproxy/toolshed/actions/github/checks@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       name: Update check
       if: ${{ fromJSON(steps.data.outputs.data).data.check.action == 'RUN' }}
       with:
@@ -127,7 +127,7 @@ jobs:
         checks: ${{ toJSON(fromJSON(steps.data.outputs.data).checks) }}
         token: ${{ steps.appauth.outputs.token }}
 
-    - uses: envoyproxy/toolshed/actions/jq@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
+    - uses: envoyproxy/toolshed/actions/jq@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       name: Print request summary
       with:
         input: |
@@ -147,7 +147,7 @@ jobs:
           | $summary.summary as $summary
           | "${{ inputs.template-request-summary }}"
 
-    - uses: envoyproxy/toolshed/actions/jq@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
+    - uses: envoyproxy/toolshed/actions/jq@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       id: request-output
       name: Load request
       with:

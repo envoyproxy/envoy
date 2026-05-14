@@ -17,8 +17,6 @@
 #include "test/mocks/common.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/router/router_filter_interface.h"
-#include "test/mocks/server/factory_context.h"
-#include "test/mocks/server/instance.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 

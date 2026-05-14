@@ -5,7 +5,7 @@
 #include "source/common/config/utility.h"
 #include "source/extensions/tracers/opentelemetry/resource_detectors/static/config.h"
 
-#include "test/mocks/server/tracer_factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
