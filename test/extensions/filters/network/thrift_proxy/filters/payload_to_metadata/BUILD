@@ -20,7 +20,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/thrift_proxy/filters/payload_to_metadata:config",
         "//source/extensions/filters/network/thrift_proxy/filters/payload_to_metadata:payload_to_metadata_filter_lib",
         "//test/extensions/filters/network/thrift_proxy:mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "@envoy_api//envoy/extensions/filters/network/thrift_proxy/filters/payload_to_metadata/v3:pkg_cc_proto",
     ],
 )

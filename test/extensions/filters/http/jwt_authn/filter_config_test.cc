@@ -6,7 +6,6 @@
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/server/instance.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
