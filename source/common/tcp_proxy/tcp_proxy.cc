@@ -1159,6 +1159,7 @@ Network::FilterStatus Filter::onNewConnection() {
     // Pre-pick the route so it's available when connection is triggered.
     route_ = pickRoute();
   } else {
+    config_->stats().route_delayed_total_.inc();
     ENVOY_CONN_LOG(debug, "Delaying picking route until upstream connection establishement",
                    read_callbacks_->connection());
   }
