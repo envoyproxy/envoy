@@ -34,7 +34,8 @@ class AdminResponse;
 //
 // The lifecycle of an AdminResponse is rendered as a finite state machine
 // bubble diagram:
-// https://docs.google.com/drawings/d/1njUl1twApEMoxmjaG4b7optTh5fcb_YNcfSnkHbdfq0/view
+
+// https://docs.google.com/drawings/d/16kRs5rwi0k7G5d8PgF3B6gcbymiEnafYEoinRSxodtg/view
 class AdminResponse : public std::enable_shared_from_this<AdminResponse> {
 public:
   // AdminResponse can outlive MainCommonBase. But AdminResponse needs a
