@@ -19,7 +19,7 @@ ExpressionManager::initExpressions(const Protobuf::RepeatedPtrField<std::string>
     if (expressions.contains(matcher)) {
       continue;
     }
-    const absl::StatusOr<cel::expr::ParsedExpr>& parse_status =
+    const absl::StatusOr<cel::expr::ParsedExpr> parse_status =
         google::api::expr::parser::Parse(matcher);
     if (!parse_status.ok()) {
       throw EnvoyException("Unable to parse descriptor expression: " +
