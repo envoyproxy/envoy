@@ -8,17 +8,24 @@ namespace Quic {
 
 EnvoyTlsServerHandshaker::EnvoyTlsServerHandshaker(
     quic::QuicSession* session, const quic::QuicCryptoServerConfig* crypto_config,
-    Ssl::ServerContextSharedPtr pinned_ssl_ctx, bool disable_resumption)
+    Ssl::ServerContextSharedPtr pinned_ssl_ctx, bool disable_resumption,
+    bool envoy_ticket_key_cb_enabled)
     : TlsServerHandshaker(session, crypto_config), pinned_ssl_ctx_(std::move(pinned_ssl_ctx)) {
   RELEASE_ASSERT(SSL_set_ex_data(ssl(), handshakerExDataIndex(), this) == 1,
                  "Failed to set SSL ex_data for QUIC handshaker");
-  // Refuse resumption for this connection if the caller already decided to
-  // disable it or the pinned context lost its ticket keys (the latter can
-  // happen when SDS leaves the factory config ahead of ssl_ctx_ on the worker).
+  // Defensive guard: only relevant when Envoy's ticket key callback is
+  // installed on the SSL_CTX. If this connection's pinned context can't
+  // actually serve Envoy tickets (null, or SDS rotated keys out from under
+  // us before ssl_ctx_ caught up on this worker), refuse resumption rather
+  // than dispatch into a broken callback. When the runtime flag is off the
+  // callback isn't installed, so QUICHE/BoringSSL manage tickets via the
+  // default path and this clause must not fire.
+  const bool cannot_process_envoy_tickets =
+      envoy_ticket_key_cb_enabled &&
+      (pinnedServerContext() == nullptr || !pinnedServerContext()->hasSessionTicketKeys());
   // DisableResumption sets SSL_OP_NO_TICKET on the SSL, which is what gates
   // the QUIC/TLS 1.3 ticket paths in BoringSSL.
-  if (disable_resumption || pinnedServerContext() == nullptr ||
-      !pinnedServerContext()->hasSessionTicketKeys()) {
+  if (disable_resumption || cannot_process_envoy_tickets) {
     const bool disabled = DisableResumption();
     ASSERT(disabled);
   }
