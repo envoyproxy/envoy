@@ -126,10 +126,12 @@ public:
                                      const Http::RequestHeaderMap& headers);
 
   /**
-   * Format the given metric name, and prefixed with "envoy_" if it does not have a custom
-   * stat namespace. If it has a custom stat namespace AND the name without the custom namespace
-   * has a valid prometheus namespace, the trimmed name is returned.
-   * Otherwise, return nullopt.
+   * Format a tag-extracted name for Prometheus output:
+   *   - leading registered custom namespace -> stripped, no "envoy_" prefix.
+   *   - inner registered custom namespace   -> stripped, "envoy_" prefix kept.
+   *     Gated by "envoy.reloadable_features.strip_scoped_custom_stat_namespace".
+   *   - otherwise                           -> "envoy_" prefix added.
+   * Returns nullopt if the result would not be a valid Prometheus name.
    */
   static absl::optional<std::string>
   metricName(std::string&& extracted_name,

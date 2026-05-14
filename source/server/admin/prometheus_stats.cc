@@ -8,6 +8,7 @@
 #include "source/common/common/macros.h"
 #include "source/common/common/regex.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/histogram_impl.h"
 #include "source/common/upstream/host_utility.h"
 
@@ -954,6 +955,17 @@ PrometheusStatsFormatter::metricName(std::string&& extracted_name,
       return absl::nullopt;
     }
     return sanitized_name;
+  }
+
+  // Inner-segment custom namespace (e.g. upstream Wasm under a cluster scope).
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.strip_scoped_custom_stat_namespace")) {
+    absl::optional<std::string> inner_namespace_stripped =
+        custom_namespaces.stripRegisteredInnerNamespace(extracted_name);
+    if (inner_namespace_stripped.has_value()) {
+      sanitizeNameInPlace(inner_namespace_stripped.value());
+      return absl::StrCat("envoy_", inner_namespace_stripped.value());
+    }
   }
 
   // If it does not have a custom namespace, add namespacing prefix to avoid conflicts, as per best

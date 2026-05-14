@@ -16,6 +16,8 @@ public:
   void registerStatNamespace(const absl::string_view name) override;
   absl::optional<absl::string_view>
   stripRegisteredPrefix(const absl::string_view stat_name) const override;
+  absl::optional<std::string>
+  stripRegisteredInnerNamespace(absl::string_view stat_name) const override;
 
 private:
   absl::flat_hash_set<std::string> namespaces_;

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/common/pure.h"
 
 #include "absl/strings/string_view.h"
@@ -46,6 +48,15 @@ public:
    */
   virtual absl::optional<absl::string_view>
   stripRegisteredPrefix(const absl::string_view stat_name) const PURE;
+
+  /**
+   * Like stripRegisteredPrefix, but for a registered namespace appearing as a non-leading,
+   * non-trailing segment of the dotted stat name (e.g. "cluster.wasmcustom.<m>"). Returns
+   * std::string rather than string_view because the result spans both sides of the removed
+   * segment.
+   */
+  virtual absl::optional<std::string>
+  stripRegisteredInnerNamespace(absl::string_view stat_name) const PURE;
 };
 
 } // namespace Stats

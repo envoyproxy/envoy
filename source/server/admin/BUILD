@@ -224,6 +224,7 @@ envoy_cc_library(
         ":utils_lib",
         "//envoy/stats:custom_stat_namespaces_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/runtime:runtime_lib",
         "//source/common/stats:histogram_lib",
         "//source/common/upstream:host_utility_lib",
         "@prometheus_metrics_model//:client_model_cc_proto",

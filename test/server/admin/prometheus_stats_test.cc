@@ -18,6 +18,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/stats_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 using testing::NiceMock;
@@ -179,6 +180,67 @@ TEST_F(PrometheusStatsFormatterTest, CustomNamespace) {
   EXPECT_EQ(expected, actual.value());
 }
 
+TEST_F(PrometheusStatsFormatterTest, ScopedCustomNamespace) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  custom_namespaces.registerStatNamespace("wasmcustom");
+  std::string raw = "cluster.wasmcustom.upstream_rq_2xx";
+  std::string expected = "envoy_cluster_upstream_rq_2xx";
+  auto actual = PrometheusStatsFormatter::metricName(std::move(raw), custom_namespaces);
+  EXPECT_TRUE(actual.has_value());
+  EXPECT_EQ(expected, actual.value());
+}
+
+TEST_F(PrometheusStatsFormatterTest, ScopedCustomNamespaceDeeperNesting) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  custom_namespaces.registerStatNamespace("wasmcustom");
+  std::string raw = "scope.subscope.wasmcustom.metric";
+  std::string expected = "envoy_scope_subscope_metric";
+  auto actual = PrometheusStatsFormatter::metricName(std::move(raw), custom_namespaces);
+  EXPECT_TRUE(actual.has_value());
+  EXPECT_EQ(expected, actual.value());
+}
+
+TEST_F(PrometheusStatsFormatterTest, ScopedCustomNamespaceRuntimeGuardDisabled) {
+  // Guard off: inner namespace is preserved verbatim.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.strip_scoped_custom_stat_namespace", "false"}});
+
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  custom_namespaces.registerStatNamespace("wasmcustom");
+  std::string raw = "cluster.wasmcustom.upstream_rq_2xx";
+  std::string expected = "envoy_cluster_wasmcustom_upstream_rq_2xx";
+  auto actual = PrometheusStatsFormatter::metricName(std::move(raw), custom_namespaces);
+  EXPECT_TRUE(actual.has_value());
+  EXPECT_EQ(expected, actual.value());
+}
+
+TEST_F(PrometheusStatsFormatterTest, LeadingCustomNamespaceUnaffectedByGuard) {
+  // Prefix stripping (used by listener Wasm) must keep working when the inner-segment guard is
+  // off.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.strip_scoped_custom_stat_namespace", "false"}});
+
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  custom_namespaces.registerStatNamespace("wasmcustom");
+  std::string raw = "wasmcustom.user_metric";
+  std::string expected = "user_metric";
+  auto actual = PrometheusStatsFormatter::metricName(std::move(raw), custom_namespaces);
+  EXPECT_TRUE(actual.has_value());
+  EXPECT_EQ(expected, actual.value());
+}
+
+TEST_F(PrometheusStatsFormatterTest, ScopedUnregisteredCustomNamespace) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  custom_namespaces.registerStatNamespace("promstattest");
+  std::string raw = "cluster.wasmcustom.upstream_rq_2xx";
+  std::string expected = "envoy_cluster_wasmcustom_upstream_rq_2xx";
+  auto actual = PrometheusStatsFormatter::metricName(std::move(raw), custom_namespaces);
+  EXPECT_TRUE(actual.has_value());
+  EXPECT_EQ(expected, actual.value());
+}
+
 TEST_F(PrometheusStatsFormatterTest, CustomNamespaceWithInvalidPromnamespace) {
   Stats::CustomStatNamespacesImpl custom_namespaces;
   custom_namespaces.registerStatNamespace("promstattest");
@@ -200,6 +262,30 @@ TEST_F(PrometheusStatsFormatterTest, FormattedTags) {
                          "replace_problematic=\"val\\\"ue with\\\\ some\\n issues\"";
   auto actual = PrometheusStatsFormatter::formattedTags(std::move(tags));
   EXPECT_EQ(expected, actual);
+}
+
+// End-to-end: cluster-scoped custom namespace counter renders with namespace stripped and
+// cluster_name preserved as a label.
+TEST_F(PrometheusStatsFormatterTest, ScopedCustomNamespaceFullPipeline) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  custom_namespaces.registerStatNamespace("wasmcustom");
+
+  addCounter("cluster.wasmcustom.upstream_rq_2xx",
+             {{makeStat("envoy.cluster_name"), makeStat("test_cluster_1")}});
+
+  Buffer::OwnedImpl response;
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
+      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
+      StatsParams(), custom_namespaces);
+  EXPECT_EQ(1UL, size);
+
+  const std::string output = response.toString();
+  EXPECT_NE(output.find("# TYPE envoy_cluster_upstream_rq_2xx counter"), std::string::npos)
+      << output;
+  EXPECT_NE(output.find("envoy_cluster_upstream_rq_2xx{envoy_cluster_name=\"test_cluster_1\"}"),
+            std::string::npos)
+      << output;
+  EXPECT_EQ(output.find("wasmcustom"), std::string::npos) << output;
 }
 
 TEST_F(PrometheusStatsFormatterTest, MetricNameCollison) {
