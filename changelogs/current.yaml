@@ -99,6 +99,11 @@ bug_fixes:
     resulting binary "plaintext" was written back into the ``Cookie:`` request header and tripped a
     ``HeaderString`` validation assert. Such plaintexts are now rejected and the original cookie value
     is preserved, matching the behavior already documented for the explicit decryption-failure case.
+- area: build
+  change: |
+    Fixed ``Illegal ambiguous match`` error when building contrib targets with ``--config=boringssl-fips``
+    on aarch64 by restricting the ``using_boringssl_fips`` branch of ``SELECTED_CONTRIB_EXTENSIONS`` to
+    ``linux_x86_64``. Mirrors the approach taken by #44661 for ``aws-lc``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -202,5 +207,15 @@ new_features:
   change: |
     Added substitution commands ``%DOWNSTREAM_TLS_GROUP%`` and ``%UPSTREAM_TLS_GROUP%``. The TLS group may be used
     to discern if a TLS connection used a post quantum safe key exchange (e.g. X25519MLKEM768).
+- area: http_inspector
+  change: |
+    Enabled Balsa parser for HTTP inspector by default. This behavior can be temporarily
+    reverted by setting the runtime guard ``envoy.reloadable_features.http_inspector_use_balsa_parser``
+    to ``false``. This runtime guard will be removed in a future release of Envoy.
+- area: http_inspector
+  change: |
+    Enabled Balsa parser for HTTP inspector by default. This behavior can be temporarily
+    reverted by setting the runtime guard ``envoy.reloadable_features.http_inspector_use_balsa_parser``
+    to ``false``. This runtime guard will be removed in a future release of Envoy.
 
 deprecated:
