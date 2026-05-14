@@ -4000,7 +4000,7 @@ TEST_P(Http2FrameIntegrationTest, UpstreamCompleteResponseFollowedByRstStreamNoE
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->write(std::string(Http2Frame::makeEmptySettingsFrame())));
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
 
   const auto response_headers = Http2Frame::makeHeadersFrameWithStatus(
       "200", stream_idx, Http2Frame::HeadersFlags::EndHeaders);
@@ -4059,7 +4059,7 @@ TEST_P(Http2FrameIntegrationTest, UpstreamTrailersAndRstStreamNoErrorWithHalfClo
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->write(std::string(Http2Frame::makeEmptySettingsFrame())));
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
 
   // HEADERS (200, EndHeaders, no EndStream)
   const auto response_headers = Http2Frame::makeHeadersFrameWithStatus(
@@ -4143,7 +4143,7 @@ TEST_P(Http2FrameIntegrationTest, UpstreamTrailersAndSeparateRstStreamNoError) {
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->write(std::string(Http2Frame::makeEmptySettingsFrame())));
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
 
   // HEADERS (200, EndHeaders, no EndStream)
   const auto response_headers = Http2Frame::makeHeadersFrameWithStatus(
