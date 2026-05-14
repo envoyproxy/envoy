@@ -1514,6 +1514,7 @@ typed_config:
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("400", response->headers().getStatusValue());
   EXPECT_EQ("missing priority header", response->body());
+  codec_client->close();
 }
 
 TEST_P(LoadShedPointIntegrationTest, PriorityLoadShedFilterRejectsInvalidHeaderWhenConfigured) {
@@ -1568,6 +1569,7 @@ typed_config:
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("400", response->headers().getStatusValue());
   EXPECT_EQ("invalid priority header", response->body());
+  codec_client->close();
 }
 
 TEST_P(LoadShedPointIntegrationTest, ConnectionPoolNewConnectionLoadShed) {
