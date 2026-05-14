@@ -107,7 +107,10 @@ class TestAsyncClientFetch(unittest.TestCase):
                     ),
                     client.get(f"{self._echo_server_url}/"),
                 ]
-                responses = await asyncio.gather(*tasks)
+                responses = await asyncio.wait_for(
+                    asyncio.gather(*tasks),
+                    timeout=30,
+                )
 
                 for resp in responses:
                     async with resp:

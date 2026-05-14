@@ -34,14 +34,39 @@ minor_behavior_changes:
     Optimized prometheus stats endpoint. Users should see a roughly 30-40% latency improvement in calls to the endpoint
     for cases where the scrape results in lots of cluster stats.
     There should be no visible changes to users, or incompatibilities.
+- area: tls
+  change: |
+    ``SslSocket`` now reports ``ECONNRESET`` as ``ConnectionReset`` by reading the system error
+    code from BoringSSL's error queue, matching ``RawBufferSocket`` behavior. When a connection
+    is closed with ``ConnectionCloseType::AbortReset``, ``SslSocket`` also skips the TLS
+    ``close_notify`` shutdown so the peer reliably observes a TCP RST instead of racing a
+    graceful close against the reset.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.ssl_socket_report_connection_reset`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: wasm
+  change: |
+    Fixed a bug where Envoy did not recreate the Wasm VM when only
+    :ref:`environment_variables <envoy_v3_api_field_extensions.wasm.v3.VmConfig.environment_variables>`
+    changed in ``vm_config``. The VM was previously reused from the cache because environment variables
+    were not included in the vm_key computation.
 - area: load_report
   change: |
     Fixed a bug in load stats reporting where reports were dropped if only custom metrics or completed
     requests were present in a reporting interval. This behavioral change can be reverted by setting
     the runtime guard ``envoy.reloadable_features.report_load_for_non_zero_stats`` to ``false``.
+- area: spiffe_validator
+  change: |
+    Fixed a bug where if an invalid custom SAN matcher was configured it would later lead to a crash
+    when validating a certificate.
+- area: rbac
+  change: |
+    Fixed a bug in the :ref:`mTLS Authenticated <envoy_v3_api_msg_extensions.rbac.principals.mtls_authenticated.v3.Config>`
+    principal extension where if an invalid SAN matcher was configured, it would incorrectly match any
+    certificate in the allowed trust chain. Known bad configurations are an invalid ``OID`` when using
+    an ``OTHER_NAME``, or specifying a ``StringMatcher`` with an invalid configuration.
 - area: build
   change: |
     Fixed ``Illegal ambiguous match`` error when building contrib targets with ``--config=aws-lc-fips``
@@ -67,11 +92,24 @@ bug_fixes:
     resulting binary "plaintext" was written back into the ``Cookie:`` request header and tripped a
     ``HeaderString`` validation assert. Such plaintexts are now rejected and the original cookie value
     is preserved, matching the behavior already documented for the explicit decryption-failure case.
+- area: build
+  change: |
+    Fixed ``Illegal ambiguous match`` error when building contrib targets with ``--config=boringssl-fips``
+    on aarch64 by restricting the ``using_boringssl_fips`` branch of ``SELECTED_CONTRIB_EXTENSIONS`` to
+    ``linux_x86_64``. Mirrors the approach taken by #44661 for ``aws-lc``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: router
+  change: |
+    Added support for ``refreshRouteCluster`` on weighted cluster routes. When a filter calls
+    ``refreshRouteCluster()``, the weighted cluster entry will select a different cluster from the
+    configured pool, avoiding previously-tried clusters within the same request. Once all clusters
+    have been tried, the selection pool resets so that any cluster may be chosen again. This enables
+    filters to implement per-attempt cluster failover across weighted clusters without replacing the
+    entire route.
 - area: tcp_proxy
   change: |
     Added :ref:`check_drain_close

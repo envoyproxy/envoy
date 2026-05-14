@@ -69,7 +69,7 @@ public:
   OnLbDestroyType on_lb_destroy_;
 
   // The in-module configuration pointer.
-  envoy_dynamic_module_type_lb_config_module_ptr in_module_config_;
+  envoy_dynamic_module_type_lb_config_module_ptr in_module_config_{nullptr};
 
   // ----------------------------- Metrics Support -----------------------------
 

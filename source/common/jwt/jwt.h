@@ -62,7 +62,7 @@ struct Jwt {
   /**
    * Standard constructor.
    */
-  Jwt() {}
+  Jwt() = default;
   /**
    * Copy constructor. The copy constructor is marked as explicit as the caller
    * should understand the copy operation is non-trivial as a complete

@@ -5,6 +5,8 @@ permissions:
 
 on:
   workflow_call:
+    secrets:
+      dockerhub-token:
     inputs:
       request:
         type: string
@@ -20,6 +22,8 @@ concurrency:
 
 jobs:
   runtime:
+    secrets:
+      dockerhub-token: ${{ secrets.dockerhub-token }}
     permissions:
       actions: read
       contents: read

@@ -387,7 +387,7 @@ Config::SharedConfig::parseTLVs(absl::Span<const envoy::config::core::v3::TlvEnt
 
     if (has_value) {
       // Static TLV value must be at least one byte long.
-      if (tlv->value().size() < 1) {
+      if (tlv->value().empty()) {
         throw EnvoyException("Invalid TLV configuration: 'value' must be at least one byte long.");
       }
       tlv_vector.push_back(

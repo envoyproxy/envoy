@@ -27,7 +27,6 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 namespace {
 
-using envoy::config::common::mutation_rules::v3::HeaderMutationRules;
 using envoy::config::core::v3::TrafficDirection;
 using envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor;
 using envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute;
@@ -38,7 +37,6 @@ using envoy::service::ext_proc::v3::ImmediateResponse;
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 
-using Filters::Common::MutationRules::Checker;
 using Filters::Common::ProcessingEffect::Effect;
 using Http::FilterDataStatus;
 using Http::FilterHeadersStatus;
@@ -261,25 +259,7 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
                            const std::string& stats_prefix, bool is_upstream,
                            Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
                            Server::Configuration::CommonFactoryContext& context)
-    : failure_mode_allow_(config.failure_mode_allow()),
-      observability_mode_(config.observability_mode()),
-      route_cache_action_(config.route_cache_action()),
-      deferred_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, deferred_close_timeout,
-                                                         DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS)),
-      message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
-      grpc_service_(getFilterGrpcService(config)),
-      send_body_without_waiting_for_header_response_(
-          config.send_body_without_waiting_for_header_response()),
-      stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
-      processing_mode_(config.processing_mode()),
-      mutation_checker_(config.mutation_rules(), context.regexEngine()),
-      filter_metadata_(config.filter_metadata()),
-      allow_mode_override_(config.allow_mode_override()),
-      disable_immediate_response_(config.disable_immediate_response()),
-      allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers(), context)),
-      disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers(), context)),
-      is_upstream_(is_upstream), graceful_grpc_close_(Runtime::runtimeFeatureEnabled(
-                                     "envoy.reloadable_features.ext_proc_graceful_grpc_close")),
+    : stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
       untyped_forwarding_namespaces_(
           config.metadata_options().forwarding_namespaces().untyped().begin(),
           config.metadata_options().forwarding_namespaces().untyped().end()),
@@ -295,7 +275,12 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       typed_cluster_metadata_forwarding_namespaces_(
           config.metadata_options().cluster_metadata_forwarding_namespaces().typed().begin(),
           config.metadata_options().cluster_metadata_forwarding_namespaces().typed().end()),
+      allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers(), context)),
+      disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers(), context)),
       allowed_override_modes_(config.allowed_override_modes()),
+      grpc_service_(getFilterGrpcService(config)),
+      mutation_checker_(config.mutation_rules(), context.regexEngine()),
+      filter_metadata_(config.filter_metadata()),
       expression_manager_(builder, context.localInfo(), config.request_attributes(),
                           config.response_attributes()),
       processing_request_modifier_factory_cb_(
@@ -303,9 +288,22 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       on_processing_response_factory_cb_(
           createOnProcessingResponseCb(config, context, stats_prefix)),
       thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()),
+      route_cache_action_(config.route_cache_action()), processing_mode_(config.processing_mode()),
+      deferred_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, deferred_close_timeout,
+                                                         DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS)),
+      message_timeout_(message_timeout),
       remote_close_timeout_(context.runtime().snapshot().getInteger(
           RemoteCloseTimeout, DefaultRemoteCloseTimeoutMilliseconds)),
+      max_message_timeout_ms_(max_message_timeout_ms),
       status_on_error_(toErrorCode(config.status_on_error().code())),
+      failure_mode_allow_(config.failure_mode_allow()),
+      observability_mode_(config.observability_mode()),
+      send_body_without_waiting_for_header_response_(
+          config.send_body_without_waiting_for_header_response()),
+      allow_mode_override_(config.allow_mode_override()),
+      disable_immediate_response_(config.disable_immediate_response()), is_upstream_(is_upstream),
+      graceful_grpc_close_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.ext_proc_graceful_grpc_close")),
       allow_content_length_header_(config.allow_content_length_header()) {
   if (config.disable_clear_route_cache()) {
     route_cache_action_ = ExternalProcessor::RETAIN;

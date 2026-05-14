@@ -33,6 +33,7 @@ std::string certToPem(X509& cert) {
   const uint8_t* output;
   size_t length;
   RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
+  // NOLINTNEXTLINE(modernize-return-braced-init-list)
   return std::string(reinterpret_cast<const char*>(output), length);
 }
 

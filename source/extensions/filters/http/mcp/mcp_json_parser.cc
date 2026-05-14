@@ -650,7 +650,7 @@ void McpFieldExtractor::copySelectedFields() {
 }
 
 void McpFieldExtractor::copyFieldByPath(const std::string& path) {
-  std::vector<std::string> segments = absl::StrSplit(path, '.');
+  std::vector<absl::string_view> segments = absl::StrSplit(path, '.');
 
   // Navigate source to find value
   const Protobuf::Struct* current_source = &temp_storage_;
@@ -753,7 +753,7 @@ const Protobuf::Value* McpJsonParser::getNestedValue(const std::string& dotted_p
     return nullptr;
   }
 
-  std::vector<std::string> path = absl::StrSplit(dotted_path, '.');
+  std::vector<absl::string_view> path = absl::StrSplit(dotted_path, '.');
   const Protobuf::Struct* current = &metadata_;
 
   for (size_t i = 0; i < path.size(); ++i) {

@@ -184,15 +184,15 @@ void UpstreamRequestImpl::sendHeaders(Http::RequestHeaderMapPtr request_headers)
   }
 }
 
-template <class... Ts> struct overloaded : Ts... {
+template <class... Ts> struct Overloaded : Ts... {
   using Ts::operator()...;
 };
-template <class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+template <class... Ts> Overloaded(Ts...) -> Overloaded<Ts...>;
 
 void UpstreamRequestImpl::onReset() {
   ASSERT(dispatcher_.isThreadSafe());
   stream_ = nullptr;
-  absl::visit(overloaded{
+  absl::visit(Overloaded{
                   [](absl::monostate&&) {},
                   [](GetHeadersCallback&& cb) { cb(nullptr, EndStream::Reset); },
                   [](GetBodyCallback&& cb) { cb(nullptr, EndStream::Reset); },

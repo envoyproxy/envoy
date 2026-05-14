@@ -62,7 +62,7 @@ EventReporterStats EventReporter::generateStats(const std::string& prefix, Stats
 }
 
 void EventReporter::notifyClients(ReverseTunnelEvent::TunnelUpdates&& updates) {
-  ASSERT(clients_.size() > 0, "Need atleast one client. Enforced via the protos.");
+  ASSERT(!clients_.empty(), "Need at least one client. Enforced via the protos.");
 
   for (size_t i = 0; i < clients_.size() - 1; i++) {
     clients_[i]->receiveEvents(updates);

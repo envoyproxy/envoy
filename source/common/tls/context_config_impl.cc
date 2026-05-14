@@ -136,7 +136,7 @@ getCertificateValidationContextConfigProvider(
       const std::string hash_id =
           generateCertificateHash(validation_context.trusted_ca().inline_bytes());
       if (!hash_id.empty()) {
-        ca_cert_id = absl::StrCat(ca_cert_id, "_", hash_id);
+        absl::StrAppend(&ca_cert_id, "_", hash_id);
       }
     }
     return CertificateValidationContextConfigProviderSharedPtrWithName{

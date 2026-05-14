@@ -21,9 +21,6 @@ namespace TapSinks {
 namespace UDP {
 
 // Test Udp sink
-using ::testing::_;
-using ::testing::AtLeast;
-using ::testing::Return;
 
 namespace TapCommon = Extensions::Common::Tap;
 
