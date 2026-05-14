@@ -289,6 +289,7 @@ TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
       format_string:
         text_format_source:
           inline_string: "%REQ(jwt_selector)%"
+      read_only: true
 )");
   initialize();
 
