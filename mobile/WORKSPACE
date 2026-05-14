@@ -73,11 +73,16 @@ load("@envoy_mobile//bazel:platforms.bzl", "envoy_mobile_platforms")
 
 envoy_mobile_platforms()
 
-load("//bazel:python.bzl", "declare_python_abi")
+load("@rules_python//python:repositories.bzl", "python_register_toolchains")
 
-declare_python_abi(
-    name = "python_abi",
-    python_version = "3",
+python_register_toolchains(
+    name = "python3_13",
+    python_version = "3.13.0",
+)
+
+python_register_toolchains(
+    name = "python3_14",
+    python_version = "3.14.0",
 )
 
 load("@mobile_pip3//:requirements.bzl", pip_dependencies = "install_deps")
