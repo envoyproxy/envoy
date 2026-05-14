@@ -42,11 +42,12 @@ XdsTestServer::XdsTestServer()
       api_->allocateDispatcher("test_thread", Buffer::WatermarkFactoryPtr{mock_buffer_factory_});
 
   ON_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
-      .WillByDefault(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
-                               std::function<void()> above_overflow) -> Buffer::Instance* {
-        return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
-                                           std::move(above_overflow));
-      }));
+      .WillByDefault(
+          Invoke([](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                    absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+            return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
+                                               std::move(above_overflow));
+          }));
   ON_CALL(factory_context_.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
   ON_CALL(factory_context_, statsScope())
       .WillByDefault(testing::ReturnRef(*stats_store_.rootScope()));

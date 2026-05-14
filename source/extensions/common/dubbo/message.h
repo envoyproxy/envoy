@@ -252,7 +252,7 @@ public:
   ResponseContent& content() const { return content_; }
 
 private:
-  absl::optional<RpcResponseType> response_type_{};
+  absl::optional<RpcResponseType> response_type_;
   mutable ResponseContent content_;
 };
 

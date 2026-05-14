@@ -205,23 +205,23 @@ void UpstreamRequest::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_s
     if (filter_) {
       ENVOY_STREAM_LOG(debug, "UpstreamRequest::onHeaders inserting headers",
                        *filter_->decoder_callbacks_);
-    }
-    auto insert_context =
-        cache_->makeInsertContext(std::move(lookup_), *filter_->encoder_callbacks_);
-    lookup_ = nullptr;
-    if (insert_context != nullptr) {
-      // The callbacks passed to CacheInsertQueue are all called through the dispatcher,
-      // so they're thread-safe. During CacheFilter::onDestroy the queue is given ownership
-      // of itself and all the callbacks are cancelled, so they are also filter-destruction-safe.
-      insert_queue_ = std::make_unique<CacheInsertQueue>(cache_, *filter_->encoder_callbacks_,
-                                                         std::move(insert_context), *this);
-      // Add metadata associated with the cached response. Right now this is only response_time;
-      const ResponseMetadata metadata = {config_->timeSource().systemTime()};
-      insert_queue_->insertHeaders(*headers, metadata, end_stream);
-      // insert_status_ remains absl::nullopt if end_stream == false, as we have not completed the
-      // insertion yet.
-      if (end_stream) {
-        setInsertStatus(InsertStatus::InsertSucceeded);
+      auto insert_context =
+          cache_->makeInsertContext(std::move(lookup_), *filter_->encoder_callbacks_);
+      lookup_ = nullptr;
+      if (insert_context != nullptr) {
+        // The callbacks passed to CacheInsertQueue are all called through the dispatcher,
+        // so they're thread-safe. During CacheFilter::onDestroy the queue is given ownership
+        // of itself and all the callbacks are cancelled, so they are also filter-destruction-safe.
+        insert_queue_ = std::make_unique<CacheInsertQueue>(cache_, *filter_->encoder_callbacks_,
+                                                           std::move(insert_context), *this);
+        // Add metadata associated with the cached response. Right now this is only response_time;
+        const ResponseMetadata metadata = {config_->timeSource().systemTime()};
+        insert_queue_->insertHeaders(*headers, metadata, end_stream);
+        // insert_status_ remains absl::nullopt if end_stream == false, as we have not completed the
+        // insertion yet.
+        if (end_stream) {
+          setInsertStatus(InsertStatus::InsertSucceeded);
+        }
       }
     }
   } else {
