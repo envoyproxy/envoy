@@ -36,6 +36,7 @@ public:
     return false;
   }
 
+private:
   envoy::config::core::v3::ConfigSource config_;
   std::string type_url_;
   std::size_t pre_computed_hash_{0};
