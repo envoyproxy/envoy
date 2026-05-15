@@ -301,3 +301,15 @@ envoy_cc_test(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "singleton_subscription_adapter_test",
+    srcs = ["singleton_subscription_adapter_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/config:decoded_resource_lib",
+        "//source/common/config:singleton_subscription_adapter_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)

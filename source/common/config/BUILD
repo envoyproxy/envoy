@@ -170,6 +170,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "singleton_subscription_adapter_lib",
+    hdrs = ["singleton_subscription_adapter.h"],
+    deps = [
+        "//envoy/config:subscription_interface",
+        "//source/common/common:assert_lib",
+        "@abseil-cpp//absl/status:status",
+        "@abseil-cpp//absl/strings:string_view",
+    ],
+)
+
+envoy_cc_library(
     name = "subscription_factory_lib",
     srcs = ["subscription_factory_impl.cc"],
     hdrs = ["subscription_factory_impl.h"],
