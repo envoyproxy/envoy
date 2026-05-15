@@ -77,7 +77,7 @@ void GcpAuthnClientImpl::fetchToken(
 }
 
 void GcpAuthnClientImpl::onSuccess(const Http::AsyncClient::Request&,
-                                      Http::ResponseMessagePtr&& response) {
+                                   Http::ResponseMessagePtr&& response) {
   auto status = Envoy::Http::Utility::getResponseStatusOrNullopt(response->headers());
   active_request_ = nullptr;
   if (status.has_value()) {
@@ -96,7 +96,7 @@ void GcpAuthnClientImpl::onSuccess(const Http::AsyncClient::Request&,
 }
 
 void GcpAuthnClientImpl::onFailure(const Http::AsyncClient::Request&,
-                                      Http::AsyncClient::FailureReason reason) {
+                                   Http::AsyncClient::FailureReason reason) {
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset ||
          reason == Http::AsyncClient::FailureReason::ExceedResponseBufferLimit);
   active_request_ = nullptr;
