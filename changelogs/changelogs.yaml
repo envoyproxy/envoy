@@ -96,6 +96,8 @@ areas:
     title: stat_sinks
   stats:
     title: stats
+  tap:
+    title: tap
   tcp_proxy:
     title: tcp_proxy
   tls:
