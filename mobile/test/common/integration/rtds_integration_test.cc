@@ -11,10 +11,21 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include "library/common/api/external.h"
+#include "library/common/network/proxy_api.h"
 
 using testing::Ge;
 namespace Envoy {
 namespace {
+
+class DummyProxyResolver : public Network::ProxyResolver {
+public:
+  Network::ProxyResolutionResult resolveProxy(const std::string&, std::vector<Network::ProxySettings>&,
+                                              Network::ProxySettingsResolvedCallback) override {
+    return Network::ProxyResolutionResult::NoProxyConfigured;
+  }
+  void setDispatcher(Event::Dispatcher*) override {}
+};
 
 class RtdsIntegrationTest : public XdsIntegrationTest {
 public:
@@ -121,6 +132,10 @@ TEST_P(RtdsIntegrationTest, RtdsReloadWithoutDfpMixedScheme) {
 }
 
 TEST_P(RtdsIntegrationTest, RtdsReloadWithWorkerThread) {
+  auto proxy_resolver_api = std::make_unique<Network::ProxyResolverApi>();
+  proxy_resolver_api->resolver = std::make_unique<DummyProxyResolver>();
+  Api::External::registerApi("envoy_proxy_resolver", proxy_resolver_api.release());
+
   builder_.enableWorkerThread(true);
   runReloadTest();
 }

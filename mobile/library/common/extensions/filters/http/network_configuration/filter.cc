@@ -87,7 +87,11 @@ NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_header
   auto* proxy_resolver = static_cast<Network::ProxyResolverApi*>(
       Api::External::retrieveApi("envoy_proxy_resolver", /*allow_absent=*/true));
   if (proxy_resolver != nullptr) {
-    return resolveProxy(request_headers, proxy_resolver);
+    if (Thread::MainThread::isMainOrTestThread()) {
+      return resolveProxy(request_headers, proxy_resolver);
+    } else {
+      ENVOY_LOG(debug, "Skipping proxy resolution as not on main thread (likely running on worker thread)");
+    }
   }
 
   // For Android, proxy settings are pushed to the ConnectivityManager and synchronously handled
