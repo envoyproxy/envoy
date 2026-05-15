@@ -53,7 +53,11 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
           proto_config.output_config(), max_buffered_rx_bytes, DefaultMaxBufferedBytes)),
       max_buffered_tx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto_config.output_config(), max_buffered_tx_bytes, DefaultMaxBufferedBytes)),
-      streaming_(proto_config.output_config().streaming()) {
+      streaming_(proto_config.output_config().streaming()),
+      runtime_(context.serverFactoryContext().runtime()),
+      tap_enabled_(proto_config.has_tap_enabled()
+                       ? absl::make_optional(proto_config.tap_enabled())
+                       : absl::nullopt) {
 
   using ProtoOutputSink = envoy::config::tap::v3::OutputSink;
   auto& sinks = proto_config.output_config().sinks();
@@ -140,6 +144,11 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
   }
 
   buildMatcher(match, matchers_, context.serverFactoryContext());
+}
+
+bool TapConfigBaseImpl::shouldRecord() {
+  // Backwards-compat: tap every request when sampling is not configured.
+  return true;
 }
 
 const Matcher& TapConfigBaseImpl::rootMatcher() const {

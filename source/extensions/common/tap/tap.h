@@ -5,6 +5,7 @@
 #include "envoy/data/tap/v3/wrapper.pb.h"
 #include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
 #include "envoy/http/header_map.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "source/extensions/common/matcher/matcher.h"
 
@@ -180,6 +181,26 @@ public:
    * Return whether the tap session should run in streaming or buffering mode.
    */
   virtual bool streaming() const PURE;
+
+  /**
+   * Per request/connection sampling gate. Called once at filter setup. If false, the
+   * tapper is not created and no match state is allocated.
+   *
+   * @return true if the request/connection should be admitted to matching.
+   */
+  virtual bool shouldRecord() PURE;
+
+  /**
+   * @return true if TapConfig.tap_enabled was set in the proto config.
+   */
+  virtual bool samplingConfigured() const PURE;
+
+  /**
+   * @return the configured sampling fraction. Stamped onto the first segment of each
+   * emitted stream when sampling is configured. Undefined when samplingConfigured() is
+   * false.
+   */
+  virtual const envoy::type::v3::FractionalPercent& appliedSampleRate() const PURE;
 };
 
 using TapConfigSharedPtr = std::shared_ptr<TapConfig>;
