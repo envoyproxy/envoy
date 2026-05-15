@@ -50,9 +50,15 @@ message TapConfig {
   // a tap will occur and the data will be written to the configured output.
   OutputConfig output_config = 2 [(validate.rules).message = {required: true}];
 
-  // [#not-implemented-hide:] Specify if Tap matching is enabled. The % of requests\connections for
-  // which the tap matching is enabled. When not enabled, the request\connection will not be
-  // recorded.
+  // Specifies the fraction of requests or connections for which the tap match
+  // predicate is evaluated. When unset, every request or connection is matched. When
+  // set, only the configured fraction is matched; the remainder is not tapped. The
+  // value can be overridden at runtime via :ref:`runtime_key
+  // <envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>`. Each
+  // emitted :ref:`TraceWrapper <envoy_v3_api_msg_data.tap.v3.TraceWrapper>` records
+  // the :ref:`applied_sample_rate
+  // <envoy_v3_api_field_data.tap.v3.TraceWrapper.applied_sample_rate>` so consumers
+  // can recover the rate at which a given trace was admitted.
   //
   // .. note::
   //
