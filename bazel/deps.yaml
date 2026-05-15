@@ -854,7 +854,7 @@ fips_go_linux_amd64:
   project_name: "Go (Linux amd64)"
   project_desc: "Go programming language (Linux amd64)"
   project_url: "https://golang.org/"
-  release_date: "2025-06-05"
+  release_date: "2025-05-07"
   use_category:
   - build
   - dataplane_core
@@ -867,7 +867,7 @@ fips_go_linux_arm64:
   project_name: "Go (Linux arm64)"
   project_desc: "Go programming language (Linux arm64)"
   project_url: "https://golang.org/"
-  release_date: "2025-06-05"
+  release_date: "2025-05-07"
   use_category:
   - build
   - dataplane_core
@@ -906,7 +906,7 @@ fips_go_ppc64le:
   project_name: "Go (Linux ppc64le)"
   project_desc: "Go programming language (Linux ppc64le)"
   project_url: "https://golang.org/"
-  release_date: "2026-04-07"
+  release_date: "2025-05-07"
   use_category:
   - build
   - dataplane_core
