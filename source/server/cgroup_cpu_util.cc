@@ -75,7 +75,7 @@ absl::optional<uint32_t> CgroupCpuUtil::getCpuLimit(Filesystem::Instance& fs) {
 // Returns string_view without trailing newline on success, absl::nullopt on validation failure.
 absl::optional<absl::string_view>
 CgroupCpuUtil::validateCgroupFileContent(const std::string& content, const std::string& file_path) {
-  // ✅ Newline Validation: Require trailing newline
+  // Newline Validation: Require trailing newline
   if (content.empty() || content.back() != '\n') {
     ENVOY_LOG_MISC(warn, "Malformed `cgroup` file {}: missing trailing newline", file_path);
     return absl::nullopt;
@@ -107,14 +107,14 @@ absl::optional<CgroupPathInfo> CgroupCpuUtil::getCurrentCgroupPath(Filesystem::I
     return absl::nullopt;
   }
 
-  const std::string content = result.value();
-  const std::vector<std::string> lines = absl::StrSplit(content, '\n');
+  const std::string& content = result.value();
+  const std::vector<absl::string_view> lines = absl::StrSplit(content, '\n');
 
   std::string v2_path;   // Save v2 path in case no v1 found
   bool found_v2 = false; // Track if we found any v2 hierarchy
 
   // Parse /proc/self/cgroup line by line
-  for (const std::string& line : lines) {
+  for (absl::string_view line : lines) {
     if (line.empty()) {
       continue;
     }
@@ -302,7 +302,7 @@ absl::optional<double> CgroupCpuUtil::readActualLimitsV2(const CpuFiles& cpu_fil
   const std::string content = std::string(absl::StripAsciiWhitespace(cpu_files.quota_content));
 
   // Parse "quota period" format
-  const std::vector<std::string> parts = absl::StrSplit(content, ' ');
+  const std::vector<absl::string_view> parts = absl::StrSplit(content, ' ');
 
   if (parts.size() != 2) {
     ENVOY_LOG_MISC(warn, "Malformed cgroup v2 cpu.max: expected 'quota period', got '{}'", content);
@@ -381,18 +381,16 @@ absl::optional<std::string> CgroupCpuUtil::discoverCgroupMount(Filesystem::Insta
     return absl::nullopt;
   }
 
-  const std::string content = result.value();
-  const std::vector<std::string> lines = absl::StrSplit(content, '\n');
+  const std::string& content = result.value();
+  const std::vector<absl::string_view> lines = absl::StrSplit(content, '\n');
 
   std::string v2_mount_point; // Save v2 mount in case no v1 found
 
-  for (const std::string& line_str : lines) {
-    if (line_str.empty()) {
+  for (absl::string_view line : lines) {
+    if (line.empty()) {
       continue;
     }
 
-    // Work with string_view for efficient parsing
-    absl::string_view line = line_str;
     bool line_valid = true;
 
     // Skip first four fields
@@ -405,8 +403,9 @@ absl::optional<std::string> CgroupCpuUtil::discoverCgroupMount(Filesystem::Insta
       }
       line = line.substr(space_pos + 1);
     }
-    if (!line_valid)
+    if (!line_valid) {
       continue;
+    }
 
     // (5) mount point: extract mount point
     size_t mount_end = line.find(' ');
@@ -441,8 +440,9 @@ absl::optional<std::string> CgroupCpuUtil::discoverCgroupMount(Filesystem::Insta
       }
       line = line.substr(space_pos + 1);
     }
-    if (!line_valid || !separator_found)
+    if (!line_valid || !separator_found) {
       continue;
+    }
 
     // (9) filesystem type: extract filesystem type
     size_t fs_type_end = line.find(' ');
@@ -507,7 +507,7 @@ absl::optional<std::string> CgroupCpuUtil::discoverCgroupMount(Filesystem::Insta
 //
 // This matches the Go runtime implementation:
 // https://github.com/golang/go/blob/master/src/internal/runtime/cgroup/cgroup_linux.go
-std::string CgroupCpuUtil::unescapePath(const std::string& path) {
+std::string CgroupCpuUtil::unescapePath(absl::string_view path) {
   std::string result;
   result.reserve(path.length()); // Pre-allocate to avoid `reallocations`
 
@@ -538,7 +538,7 @@ std::string CgroupCpuUtil::unescapePath(const std::string& path) {
       continue;
     }
 
-    std::string octal_str = path.substr(i + 1, 3);
+    absl::string_view octal_str = path.substr(i + 1, 3);
 
     // Validate all characters are valid octal digits (0-7)
     bool valid = std::all_of(octal_str.begin(), octal_str.end(),
@@ -553,10 +553,10 @@ std::string CgroupCpuUtil::unescapePath(const std::string& path) {
 
     // Convert octal string to integer
     char* end;
-    long decoded = std::strtol(octal_str.c_str(), &end, 8);
+    long decoded = std::strtol(octal_str.data(), &end, 8);
 
     // Verify conversion was successful and complete
-    if (end != octal_str.c_str() + 3 || decoded > 255) {
+    if (end != octal_str.data() + 3 || decoded > 255) {
       ENVOY_LOG_MISC(warn, "Invalid octal escape sequence in path '{}' at position {}", path, i);
       result += c; // Keep the backslash as-is
       continue;
@@ -582,7 +582,7 @@ std::string CgroupCpuUtil::unescapePath(const std::string& path) {
 // NOTE: Mount points may contain escaped characters (\040 for space, \134 for backslash, etc.)
 // and must be unescaped before use.
 absl::optional<std::string> CgroupCpuUtil::parseMountInfoLine(const std::string& line) {
-  const std::vector<std::string> fields = absl::StrSplit(line, ' ');
+  const std::vector<absl::string_view> fields = absl::StrSplit(line, ' ');
 
   // Find the separator "-" to locate filesystem type field
   size_t separator_pos = 0;
@@ -609,8 +609,8 @@ absl::optional<std::string> CgroupCpuUtil::parseMountInfoLine(const std::string&
     return absl::nullopt;
   }
 
-  const std::string& mount_point_escaped = fields[4];
-  const std::string& fs_type = fields[separator_pos + 1];
+  absl::string_view mount_point_escaped = fields[4];
+  absl::string_view fs_type = fields[separator_pos + 1];
 
   // Check if this is a cgroup filesystem
   if (fs_type != "cgroup" && fs_type != "cgroup2") {

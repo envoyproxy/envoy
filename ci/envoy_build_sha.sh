@@ -45,7 +45,7 @@ if [[ -n "$BUILD_SHA" && ! "$BUILD_SHA" =~ ^[a-fA-F0-9]+$ ]]; then
     echo "Error: build-image.sha contains invalid characters"
     exit 1
 fi
-if [[ -n "$BUILD_TAG" && ! "$BUILD_TAG" =~ ^[a-fA-F0-9]+$ ]]; then
+if [[ -n "$BUILD_TAG" && ! "$BUILD_TAG" =~ ^[a-zA-Z0-9._-]+$ ]]; then
     echo "Error: build-image.tag contains invalid characters"
     exit 1
 fi

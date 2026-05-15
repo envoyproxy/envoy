@@ -14,7 +14,7 @@
 
 #include "test/common/matcher/test_utility.h"
 #include "test/mocks/matcher/mocks.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 

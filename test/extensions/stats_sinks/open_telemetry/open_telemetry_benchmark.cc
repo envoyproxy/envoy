@@ -8,7 +8,7 @@
 #include "source/common/stats/histogram_impl.h"
 #include "source/extensions/stat_sinks/open_telemetry/open_telemetry_impl.h"
 
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 
 #include "absl/container/inlined_vector.h"

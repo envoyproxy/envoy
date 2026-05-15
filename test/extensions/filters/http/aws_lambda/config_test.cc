@@ -5,7 +5,6 @@
 #include "source/extensions/filters/http/aws_lambda/config.h"
 
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/server/instance.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 

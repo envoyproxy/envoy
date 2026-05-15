@@ -59,7 +59,7 @@ public:
   std::string protocol() const override;
   absl::string_view failureReason() const override;
   bool canFlushClose() override { return info_->state() == Ssl::SocketState::HandshakeComplete; }
-  void closeSocket(Network::ConnectionEvent close_type) override;
+  void closeSocket(Network::ConnectionEvent close_type, bool abort_reset) override;
   Network::IoResult doRead(Buffer::Instance& read_buffer) override;
   Network::IoResult doWrite(Buffer::Instance& write_buffer, bool end_stream) override;
   void onConnected() override;
@@ -104,6 +104,7 @@ private:
   ContextImplSharedPtr ctx_;
   uint64_t bytes_to_retry_{};
   std::string failure_reason_;
+  absl::optional<Api::IoError::IoErrorCode> detected_io_error_;
 
   SslHandshakerImplSharedPtr info_;
 };
@@ -114,7 +115,7 @@ public:
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks&) override {}
   std::string protocol() const override { return EMPTY_STRING; }
   bool canFlushClose() override { return true; }
-  void closeSocket(Network::ConnectionEvent) override {}
+  void closeSocket(Network::ConnectionEvent, bool) override {}
   Network::IoResult doRead(Buffer::Instance&) override {
     return {Network::PostIoAction::Close, 0, false};
   }

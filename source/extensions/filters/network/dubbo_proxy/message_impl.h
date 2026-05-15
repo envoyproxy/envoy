@@ -123,8 +123,8 @@ private:
   AttachmentLazyCallback attachment_lazy_callback_;
   ParametersLazyCallback parameters_lazy_callback_;
 
-  mutable ParametersPtr parameters_{};
-  mutable AttachmentPtr attachment_{};
+  mutable ParametersPtr parameters_;
+  mutable AttachmentPtr attachment_;
 };
 
 class RpcResultImpl : public RpcResult {

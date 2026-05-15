@@ -1,3 +1,6 @@
+#include <atomic>
+#include <thread>
+
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/tracers/dynamic_modules/tracer_config.h"
 
@@ -6,6 +9,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -35,6 +39,8 @@ public:
                                                   std::move(module.value()), *store_.rootScope());
     EXPECT_TRUE(config_or.ok());
     config_ = config_or.value();
+    // Re-open stat creation so tests can call `define_*` from the test thread.
+    config_->stat_creation_frozen_ = false;
     driver_ = std::make_shared<DynamicModuleDriver>(config_);
   }
 
@@ -516,6 +522,80 @@ TEST_F(AbiImplTest, RecordHistogramVecNotFound) {
   auto result = envoy_dynamic_module_callback_tracer_record_histogram_value(
       static_cast<void*>(config_.get()), 999, label_values, 1, 1);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+}
+
+// Verifies the factory auto-freezes stat creation so `define_*` returns `Frozen` after init.
+TEST_F(AbiImplTest, MetricsFrozenAfterInit) {
+  config_->stat_creation_frozen_ = true;
+  envoy_dynamic_module_type_module_buffer name = {.ptr = "frozen_counter", .length = 14};
+  envoy_dynamic_module_type_module_buffer label_name = {.ptr = "label", .length = 5};
+  size_t out_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_tracer_define_counter(static_cast<void*>(config_.get()),
+                                                                name, nullptr, 0, &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_tracer_define_counter(static_cast<void*>(config_.get()),
+                                                                name, &label_name, 1, &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_tracer_define_gauge(static_cast<void*>(config_.get()),
+                                                              name, nullptr, 0, &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_tracer_define_histogram(static_cast<void*>(config_.get()),
+                                                                  name, nullptr, 0, &out_id));
+}
+
+// Drives concurrent labeled increments from multiple threads to verify no data race in the
+// shared `stat_name_pool_`. Run under `--config=tsan` to verify.
+TEST_F(AbiImplTest, MetricsConcurrentIncrementCounterVecNoRace) {
+  envoy_dynamic_module_type_module_buffer name = {.ptr = "race_counter", .length = 12};
+  std::string label_name_str = "status";
+  envoy_dynamic_module_type_module_buffer label_names[1] = {
+      {.ptr = const_cast<char*>(label_name_str.data()), .length = label_name_str.size()}};
+  size_t counter_id = 0;
+  ASSERT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_tracer_define_counter(static_cast<void*>(config_.get()),
+                                                                name, label_names, 1, &counter_id));
+
+  constexpr int kNumThreads = 8;
+  constexpr int kIncrementsPerThread = 2000;
+
+  // Pre-warm the test scope's counter cache so workers only hit the cache. `TestScope` uses an
+  // unsynchronized map for counter caching that would otherwise race independently of the path
+  // under test.
+  for (int t = 0; t < kNumThreads; ++t) {
+    const std::string label_value_str = absl::StrCat("worker_", t);
+    envoy_dynamic_module_type_module_buffer label_value = {
+        .ptr = const_cast<char*>(label_value_str.data()), .length = label_value_str.size()};
+    ASSERT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+              envoy_dynamic_module_callback_tracer_increment_counter(
+                  static_cast<void*>(config_.get()), counter_id, &label_value, 1, 0));
+  }
+
+  std::vector<std::thread> threads;
+  threads.reserve(kNumThreads);
+  std::atomic<int> ready{0};
+  std::atomic<bool> go{false};
+  for (int t = 0; t < kNumThreads; ++t) {
+    threads.emplace_back([&, t]() {
+      const std::string label_value_str = absl::StrCat("worker_", t);
+      envoy_dynamic_module_type_module_buffer label_value = {
+          .ptr = const_cast<char*>(label_value_str.data()), .length = label_value_str.size()};
+      ready.fetch_add(1, std::memory_order_relaxed);
+      while (!go.load(std::memory_order_acquire)) {
+      }
+      for (int i = 0; i < kIncrementsPerThread; ++i) {
+        ASSERT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+                  envoy_dynamic_module_callback_tracer_increment_counter(
+                      static_cast<void*>(config_.get()), counter_id, &label_value, 1, 1));
+      }
+    });
+  }
+  while (ready.load(std::memory_order_acquire) < kNumThreads) {
+  }
+  go.store(true, std::memory_order_release);
+  for (auto& th : threads) {
+    th.join();
+  }
 }
 
 } // namespace

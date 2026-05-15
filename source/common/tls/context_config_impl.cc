@@ -13,6 +13,7 @@
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/secret/sds_api.h"
+#include "source/common/shared_pool/shared_pool.h"
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
 #include "source/common/tls/ssl_handshaker.h"
 
@@ -23,6 +24,8 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
+
+SINGLETON_MANAGER_REGISTRATION(cipher_suites_pool);
 
 namespace {
 
@@ -133,7 +136,7 @@ getCertificateValidationContextConfigProvider(
       const std::string hash_id =
           generateCertificateHash(validation_context.trusted_ca().inline_bytes());
       if (!hash_id.empty()) {
-        ca_cert_id = absl::StrCat(ca_cert_id, "_", hash_id);
+        absl::StrAppend(&ca_cert_id, "_", hash_id);
       }
     }
     return CertificateValidationContextConfigProviderSharedPtrWithName{
@@ -179,6 +182,14 @@ compliancePolicyFromProto(
   }
 }
 
+std::shared_ptr<SharedPool::ObjectSharedPool<std::string>>
+getCipherSuitesPool(Singleton::Manager& singleton_manager, Event::Dispatcher& dispatcher) {
+  return singleton_manager.getTyped<SharedPool::ObjectSharedPool<std::string>>(
+      SINGLETON_MANAGER_REGISTERED_NAME(cipher_suites_pool), [&dispatcher] {
+        return std::make_shared<SharedPool::ObjectSharedPool<std::string>>(dispatcher);
+      });
+}
+
 } // namespace
 
 ContextConfigImpl::ContextConfigImpl(
@@ -194,8 +205,12 @@ ContextConfigImpl::ContextConfigImpl(
       lifecycle_notifier_(factory_context.serverFactoryContext().lifecycleNotifier()),
       auto_sni_san_match_(auto_sni_san_match),
       alpn_protocols_(RepeatedPtrUtil::join(config.alpn_protocols(), ",")),
-      cipher_suites_(StringUtil::nonEmptyStringOrDefault(
-          RepeatedPtrUtil::join(config.tls_params().cipher_suites(), ":"), default_cipher_suites)),
+      cipher_suites_(
+          getCipherSuitesPool(factory_context.serverFactoryContext().singletonManager(),
+                              factory_context.serverFactoryContext().mainThreadDispatcher())
+              ->getObject(StringUtil::nonEmptyStringOrDefault(
+                  RepeatedPtrUtil::join(config.tls_params().cipher_suites(), ":"),
+                  default_cipher_suites))),
       ecdh_curves_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().ecdh_curves(), ":"), default_curves)),
       signature_algorithms_(RepeatedPtrUtil::join(config.tls_params().signature_algorithms(), ":")),

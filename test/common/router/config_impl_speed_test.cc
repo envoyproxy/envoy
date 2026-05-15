@@ -4,7 +4,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/router/config_impl.h"
 
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 

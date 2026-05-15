@@ -27,6 +27,12 @@ message DownstreamReverseConnectionSocketInterface {
 
     // Additional headers to include in the HTTP handshake request.
     repeated config.core.v3.HeaderValueOption additional_headers = 2;
+
+    // Perform the handshake as an HTTP/1.1 ``Upgrade`` exchange (``Upgrade: reverse-tunnel``,
+    // success on ``101``) so HTTP proxies can route the handshake and splice the tunnel
+    // afterward. The responder must set this flag to the same value.
+    // Defaults to ``false``.
+    bool use_http_upgrade = 3;
   }
 
   // Stat prefix to be used for downstream reverse connection socket interface stats.

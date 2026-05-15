@@ -99,7 +99,7 @@ public:
                  grpc_stream_.get())
           ->currentStreamForTest();
     }
-    return *grpc_stream_.get();
+    return *grpc_stream_;
   }
 
   struct SubscriptionStuff {
@@ -117,7 +117,7 @@ public:
 
     WatchMap watch_map_;
     DeltaSubscriptionState sub_state_;
-    std::string control_plane_identifier_{};
+    std::string control_plane_identifier_;
 
     SubscriptionStuff(const SubscriptionStuff&) = delete;
     SubscriptionStuff& operator=(const SubscriptionStuff&) = delete;

@@ -86,6 +86,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "udp_packet_writer_factory_factory_interface",
+    hdrs = ["udp_packet_writer_factory_factory.h"],
+    deps = [
+        ":udp_packet_writer_handler_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:factory_context_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "dns_interface",
     hdrs = ["dns.h"],
     deps = [

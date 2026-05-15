@@ -40,7 +40,7 @@ envoy_extension_cc_test(
         "//source/extensions/matching/actions/transform_stat:config",
         "//test/common/memory:memory_test_utility_lib",
         "//test/mocks/config:config_mocks",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:status_utility_lib",
@@ -78,7 +78,7 @@ envoy_cc_benchmark_binary(
     deps = [
         "//source/common/stats:thread_local_store_lib",
         "//source/extensions/access_loggers/stats:stats_lib",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
         "@benchmark",

@@ -53,7 +53,7 @@ public:
     bssl::UniquePtr<BIO> bio_;
     bssl::UniquePtr<X509> x509_;
   };
-  typedef std::unique_ptr<Pubkey> PubkeyPtr;
+  using PubkeyPtr = std::unique_ptr<Pubkey>;
 
   // Access to list of Jwks
   const std::vector<PubkeyPtr>& keys() const { return keys_; }
@@ -68,7 +68,7 @@ private:
   std::vector<PubkeyPtr> keys_;
 };
 
-typedef std::unique_ptr<Jwks> JwksPtr;
+using JwksPtr = std::unique_ptr<Jwks>;
 
 } // namespace JwtVerify
 } // namespace Envoy

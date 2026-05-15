@@ -2,7 +2,6 @@
 
 #include "source/common/protobuf/protobuf.h"
 
-#include "test/mocks/server/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "contrib/envoy/extensions/stat_sinks/wasm_filter/v3/wasm_filter.pb.validate.h"

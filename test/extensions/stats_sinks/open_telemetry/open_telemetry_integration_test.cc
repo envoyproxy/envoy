@@ -17,6 +17,8 @@
 #include "opentelemetry/proto/resource/v1/resource.pb.h"
 
 using testing::AssertionResult;
+using testing::Eq;
+using testing::Ge;
 
 namespace Envoy {
 namespace {
@@ -228,9 +230,9 @@ private:
             // GoogleGrpc uses its own stream tracking; EnvoyGrpc uses Envoy's cluster stats.
             [client_type](IntegrationTestServer& server) {
               if (client_type == Grpc::ClientType::GoogleGrpc) {
-                server.waitForCounterGe("grpc.otlp_collector.streams_closed_0", 1);
+                server.waitForCounter("grpc.otlp_collector.streams_closed_0", Ge(1));
               } else {
-                server.waitForGaugeEq("cluster.otlp_collector.upstream_rq_active", 0);
+                server.waitForGauge("cluster.otlp_collector.upstream_rq_active", Eq(0));
               }
             }};
   }
@@ -259,7 +261,7 @@ private:
             },
             // HTTP uses standard cluster request tracking.
             [](IntegrationTestServer& server) {
-              server.waitForGaugeEq("cluster.otlp_collector.upstream_rq_active", 0);
+              server.waitForGauge("cluster.otlp_collector.upstream_rq_active", Eq(0));
             }};
   }
 

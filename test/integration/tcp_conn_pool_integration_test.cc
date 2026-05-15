@@ -8,6 +8,7 @@
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
+using testing::Eq;
 namespace Envoy {
 namespace {
 
@@ -222,7 +223,7 @@ TEST_P(TcpConnPoolIntegrationTest, PoolCleanupEnabled) {
     ASSERT_TRUE(fake_upstream_connection2->waitForData(request2.size(), &data));
     EXPECT_EQ(request2, data);
 
-    test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 2);
+    test_server_->waitForGauge("cluster.cluster_0.upstream_cx_active", Eq(2));
 
     // Send response 2.
     ASSERT_TRUE(fake_upstream_connection2->write(response2));
@@ -233,7 +234,7 @@ TEST_P(TcpConnPoolIntegrationTest, PoolCleanupEnabled) {
     ASSERT_TRUE(fake_upstream_connection1->write(response1));
     ASSERT_TRUE(fake_upstream_connection1->close());
     tcp_client->waitForData(response1, false);
-    test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 0);
+    test_server_->waitForGauge("cluster.cluster_0.upstream_cx_active", Eq(0));
 
     // After both requests were completed, the pool went idle and was cleaned up. Request 3 causes a
     // new pool to be created. Seeing a new pool created is a proxy for directly observing that an
@@ -246,7 +247,7 @@ TEST_P(TcpConnPoolIntegrationTest, PoolCleanupEnabled) {
     ASSERT_TRUE(tcp_client->write(request3));
     FakeRawConnectionPtr fake_upstream_connection3;
     ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection3));
-    test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 1);
+    test_server_->waitForGauge("cluster.cluster_0.upstream_cx_active", Eq(1));
     ASSERT_TRUE(fake_upstream_connection3->waitForData(request3.size(), &data));
     EXPECT_EQ(request3, data);
 
@@ -254,7 +255,7 @@ TEST_P(TcpConnPoolIntegrationTest, PoolCleanupEnabled) {
     ASSERT_TRUE(fake_upstream_connection3->close());
     tcp_client->waitForData(response3, false);
 
-    test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 0);
+    test_server_->waitForGauge("cluster.cluster_0.upstream_cx_active", Eq(0));
 
     tcp_client->close();
   });
