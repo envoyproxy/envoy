@@ -107,7 +107,8 @@ def validate_area(area: str, valid_areas: Iterable[str]) -> None:
 def validate_area_name(area: str) -> None:
     if not AREA_RE.match(area):
         raise UsageError(
-            f"Invalid area '{area}'. Area names must match {AREA_RE.pattern}.")
+            f"Invalid area '{area}'. Area names must start with a lowercase letter and "
+            "contain only lowercase letters, numbers, and underscores.")
 
 
 def normalize_change(change: str) -> str:

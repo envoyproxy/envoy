@@ -158,7 +158,8 @@ versioning guidelines:
   that applies. For instance, a bug fix that introduces incompatible behavior should be noted in
   `Incompatible Behavior Changes` but not in `Bug Fixes`.
 * Branches that use the per-entry changelog layout under `changelogs/current/` can use the helper
-  commands below instead of hand-writing filenames:
+  commands below instead of hand-writing filenames. `changelog-add` accepts either `--change`
+  or `--message` for the changelog body:
 
   ```
   ./ci/do_ci.sh changelog-add

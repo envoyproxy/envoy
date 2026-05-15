@@ -51,6 +51,10 @@ tls:
             _lib.slugify("Fixed a bug where the HTTP filter per-route configuration regressed."),
             "fixed-a-bug-where-the-http-filter-per",
         )
+        self.assertEqual(
+            _lib.slugify("Fixed something more complicated.", max_length=15),
+            "fixed-something",
+        )
 
     def test_add_non_interactive_writes_expected_file(self):
         stdout = io.StringIO()
