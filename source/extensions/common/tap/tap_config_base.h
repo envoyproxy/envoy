@@ -106,7 +106,7 @@ public:
   }
   const Matcher& rootMatcher() const override;
   bool streaming() const override { return streaming_; }
-  bool shouldRecord() override;
+  bool shouldRecord() const override;
   bool samplingConfigured() const override { return tap_enabled_.has_value(); }
   const envoy::type::v3::FractionalPercent& appliedSampleRate() const override {
     ASSERT(tap_enabled_.has_value());

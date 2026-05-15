@@ -55,9 +55,8 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
           proto_config.output_config(), max_buffered_tx_bytes, DefaultMaxBufferedBytes)),
       streaming_(proto_config.output_config().streaming()),
       runtime_(context.serverFactoryContext().runtime()),
-      tap_enabled_(proto_config.has_tap_enabled()
-                       ? absl::make_optional(proto_config.tap_enabled())
-                       : absl::nullopt) {
+      tap_enabled_(proto_config.has_tap_enabled() ? absl::make_optional(proto_config.tap_enabled())
+                                                  : absl::nullopt) {
 
   using ProtoOutputSink = envoy::config::tap::v3::OutputSink;
   auto& sinks = proto_config.output_config().sinks();
@@ -146,7 +145,7 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
   buildMatcher(match, matchers_, context.serverFactoryContext());
 }
 
-bool TapConfigBaseImpl::shouldRecord() {
+bool TapConfigBaseImpl::shouldRecord() const {
   if (!tap_enabled_.has_value()) {
     return true;
   }

@@ -36,7 +36,7 @@ public:
   MOCK_METHOD(const Extensions::Common::Tap::Matcher&, rootMatcher, (), (const));
   MOCK_METHOD(bool, streaming, (), (const));
   MOCK_METHOD(TimeSource&, timeSource, (), (const));
-  MOCK_METHOD(bool, shouldRecord, ());
+  MOCK_METHOD(bool, shouldRecord, (), (const));
   MOCK_METHOD(bool, samplingConfigured, (), (const));
   MOCK_METHOD(const envoy::type::v3::FractionalPercent&, appliedSampleRate, (), (const));
 };

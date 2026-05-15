@@ -184,11 +184,13 @@ public:
 
   /**
    * Per request/connection sampling gate. Called once at filter setup. If false, the
-   * tapper is not created and no match state is allocated.
+   * tapper is not created and no match state is allocated. Read-only: the dice roll is
+   * performed by the runtime layer's internal RNG (thread-safe), not by mutating
+   * state here.
    *
    * @return true if the request/connection should be admitted to matching.
    */
-  virtual bool shouldRecord() PURE;
+  virtual bool shouldRecord() const PURE;
 
   /**
    * @return true if TapConfig.tap_enabled was set in the proto config.

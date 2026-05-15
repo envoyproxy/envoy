@@ -297,8 +297,7 @@ public:
 private:
   struct Handle : public PerTapSinkHandle {
     Handle(CapturingSink& parent) : parent_(parent) {}
-    void submitTrace(TraceWrapperPtr&& trace,
-                     envoy::config::tap::v3::OutputSink::Format) override {
+    void submitTrace(TraceWrapperPtr&& trace, envoy::config::tap::v3::OutputSink::Format) override {
       parent_.captured.push_back(*trace);
     }
     CapturingSink& parent_;
@@ -309,8 +308,7 @@ private:
 // used in tests without spinning up real admin infrastructure.
 class TestableTapConfigBaseWithSink : public TapConfigBaseImpl {
 public:
-  TestableTapConfigBaseWithSink(const envoy::config::tap::v3::TapConfig& proto,
-                                Sink* sink,
+  TestableTapConfigBaseWithSink(const envoy::config::tap::v3::TapConfig& proto, Sink* sink,
                                 Server::Configuration::GenericFactoryContext& ctx)
       : TapConfigBaseImpl(proto, sink, ctx) {}
 };
