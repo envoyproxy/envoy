@@ -651,6 +651,68 @@ TEST(ZoneAwareLbCoalesceDisabledTest, FallbackPathExercised) {
   EXPECT_FALSE(lb.lifetimeCallbacks().has_value());
 }
 
+TEST(LoadBalancerBaseCoalesceEnabledTest, LiveHealthFlagsTakePrecedenceOverStaleSnapshot) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update", "true"}});
+
+  Stats::IsolatedStoreImpl stats_store;
+  ClusterLbStatNames stat_names(stats_store.symbolTable());
+  ClusterLbStats stats(stat_names, *stats_store.rootScope());
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<MockPrioritySet> priority_set;
+  auto info = std::make_shared<NiceMock<MockClusterInfo>>();
+
+  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config;
+  TestLb lb(priority_set, stats, runtime, random, common_config);
+
+  MockHostSet& host_set = *priority_set.getMockHostSet(0);
+  auto host = makeTestHost(info, "tcp://127.0.0.1:80");
+
+  // simulate the race: the host is actually healthy, but healthy_hosts_ is empty, 
+  // as if the FAIL snapshot arrived after the PASS snapshot
+  // and overwrote the pre-partitioned vector before MemberUpdateCb fired.
+  host_set.hosts_ = {host};
+  host_set.healthy_hosts_ = {}; 
+
+  ASSERT_EQ(Host::Health::Healthy, host->coarseHealth());
+
+  host_set.runCallbacks({}, {});
+
+  EXPECT_FALSE(lb.isInPanic(0));
+  EXPECT_EQ(100, lb.percentageLoad(0));
+}
+
+TEST(LoadBalancerBaseCoalesceDisabledTest, StaleSnapshotUsedWhenCoalesceDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update", "false"}});
+
+  Stats::IsolatedStoreImpl stats_store;
+  ClusterLbStatNames stat_names(stats_store.symbolTable());
+  ClusterLbStats stats(stat_names, *stats_store.rootScope());
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<MockPrioritySet> priority_set;
+  auto info = std::make_shared<NiceMock<MockClusterInfo>>();
+
+  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config;
+  TestLb lb(priority_set, stats, runtime, random, common_config);
+
+  MockHostSet& host_set = *priority_set.getMockHostSet(0);
+  auto host = makeTestHost(info, "tcp://127.0.0.1:80");
+
+  host_set.hosts_ = {host};
+  host_set.healthy_hosts_ = {}; // stale FAIL snapshot
+
+  host_set.runCallbacks({}, {});
+
+  // the stale snapshot causes per_priority_health = 0, which is below the
+  // default 50% panic threshold.
+  EXPECT_TRUE(lb.isInPanic(0));
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

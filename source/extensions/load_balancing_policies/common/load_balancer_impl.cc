@@ -180,27 +180,60 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
     uint64_t degraded_weight = 0;
     uint64_t total_weight = 0;
     if (host_set.weightedPriorityHealth()) {
-      for (const auto& host : host_set.healthyHosts()) {
-        healthy_weight += host->weight();
-      }
+      // When coalescing is enabled, read healthy/degraded status from live host->coarseHealth()
+      // flags rather than from the pre-partitioned healthyHosts()/degradedHosts() vectors.
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update")) {
+        uint64_t excluded_weight = 0;
+        for (const auto& host : host_set.hosts()) {
+          const auto health = host->coarseHealth();
+          total_weight += host->weight();
+          if (health == Host::Health::Healthy) {
+            healthy_weight += host->weight();
+          } else if (health == Host::Health::Degraded) {
+            degraded_weight += host->weight();
+          }
+        }
+        for (const auto& host : host_set.excludedHosts()) {
+          excluded_weight += host->weight();
+        }
+        ASSERT(total_weight >= excluded_weight);
+        total_weight -= excluded_weight;
+      } else {
+        for (const auto& host : host_set.healthyHosts()) {
+          healthy_weight += host->weight();
+        }
 
-      for (const auto& host : host_set.degradedHosts()) {
-        degraded_weight += host->weight();
-      }
+        for (const auto& host : host_set.degradedHosts()) {
+          degraded_weight += host->weight();
+        }
 
-      for (const auto& host : host_set.hosts()) {
-        total_weight += host->weight();
-      }
+        for (const auto& host : host_set.hosts()) {
+          total_weight += host->weight();
+        }
 
-      uint64_t excluded_weight = 0;
-      for (const auto& host : host_set.excludedHosts()) {
-        excluded_weight += host->weight();
+        uint64_t excluded_weight = 0;
+        for (const auto& host : host_set.excludedHosts()) {
+          excluded_weight += host->weight();
+        }
+        ASSERT(total_weight >= excluded_weight);
+        total_weight -= excluded_weight;
       }
-      ASSERT(total_weight >= excluded_weight);
-      total_weight -= excluded_weight;
     } else {
-      healthy_weight = host_set.healthyHosts().size();
-      degraded_weight = host_set.degradedHosts().size();
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update")) {
+        for (const auto& host : host_set.hosts()) {
+          const auto health = host->coarseHealth();
+          if (health == Host::Health::Healthy) {
+            ++healthy_weight;
+          } else if (health == Host::Health::Degraded) {
+            ++degraded_weight;
+          }
+        }
+      } else {
+        healthy_weight = host_set.healthyHosts().size();
+        degraded_weight = host_set.degradedHosts().size();
+      }
       total_weight = host_count;
     }
     // Each priority level's health is ratio of healthy hosts to total number of hosts in a
@@ -283,8 +316,20 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
                     std::accumulate(per_priority_load.degraded_priority_load_.get().begin(),
                                     per_priority_load.degraded_priority_load_.get().end(), 0));
 
-  for (auto& host_set : priority_set.hostSetsPerPriority()) {
-    total_healthy_hosts += host_set->healthyHosts().size();
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update")) {
+    // Count total healthy hosts from live flags, consistent with the live-flag counts above.
+    for (auto& hs : priority_set.hostSetsPerPriority()) {
+      for (const auto& host : hs->hosts()) {
+        if (host->coarseHealth() == Host::Health::Healthy) {
+          ++total_healthy_hosts;
+        }
+      }
+    }
+  } else {
+    for (auto& host_set : priority_set.hostSetsPerPriority()) {
+      total_healthy_hosts += host_set->healthyHosts().size();
+    }
   }
 }
 
