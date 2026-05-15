@@ -3432,7 +3432,8 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_stat_sink_snapshot_get_
   return false;
 }
 
-__attribute__((weak)) size_t envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_count(
+__attribute__((weak)) size_t
+envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_count(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_count: "
                "not implemented in this context");
