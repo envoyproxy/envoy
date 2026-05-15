@@ -39,7 +39,8 @@ public:
       return absl::OkStatus();
     }
     RELEASE_ASSERT(!added_resources.empty(), "Delta xDS update with no additions or removals");
-    return callbacks_.onResourceUpdate(added_resources[0].get(), added_resources[0].get().version());
+    return callbacks_.onResourceUpdate(added_resources[0].get(),
+                                       added_resources[0].get().version());
   }
 
   void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) override {
@@ -56,9 +57,7 @@ public:
                             std::unique_ptr<SingletonSubscriptionCallbacksAdapter> adapter)
       : adapter_(std::move(adapter)), sub_(std::move(sub)), resource_name_(resource_name) {}
 
-  void start() override {
-    sub_->start({resource_name_});
-  }
+  void start() override { sub_->start({resource_name_}); }
 
 private:
   // adapter_ must outlive sub_ because sub_ holds a reference to *adapter_.
