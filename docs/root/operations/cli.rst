@@ -138,6 +138,7 @@ following are the command line options that Envoy supports.
    :%v:	The actual message to log ("some user text")
    :%_:	The actual message to log, but with escaped newlines (from (if using ``%v``) "some user text\nbelow", to "some user text\\nbelow")
    :%j:	The actual message to log as JSON escaped string (https://tools.ietf.org/html/rfc7159#page-8).
+   :%N:	The Envoy version string: ``{revision}/{version}/{status}/{build_type}/{ssl_version}`` (e.g. "c93f9f6c1e5adddd10a3e3646c7e049c649ae177/1.38.0/Clean/RELEASE/BoringSSL"), matching the output of :option:`--version`.
    :%t:	Thread id ("1232")
    :%P:	Process id ("3456")
    :%n:	Logger's name ("filter")

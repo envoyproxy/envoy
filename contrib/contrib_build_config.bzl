@@ -52,6 +52,7 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.stat_sinks.kafka":                            "//contrib/kafka/stat_sinks/source:config_lib",
+    "envoy.stat_sinks.wasm_filter":                      "//contrib/stat_sinks/wasm_filter/source:config_lib",
 
     #
     # Tap sinks
@@ -118,4 +119,10 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.upstreams.http.tcp.golang":                          "//contrib/golang/upstreams/http/tcp/source:config",
+
+    #
+    # Reverse tunnel reporters
+    #
+
+    "envoy.bootstrap.reverse_tunnel.reverse_tunnel_reporting_service": "//contrib/reverse_tunnel_reporter/source:config",
 }

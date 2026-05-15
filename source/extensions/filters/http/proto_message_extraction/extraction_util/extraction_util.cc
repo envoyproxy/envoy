@@ -126,6 +126,7 @@ void GetMonitoredResourceLabels(absl::string_view label_extractor,
 
 WireFormatLite::WireType getWireType(const Field& field_desc) {
   static WireFormatLite::WireType field_kind_to_wire_type[] = {
+      // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
       static_cast<WireFormatLite::WireType>(-1), // TYPE_UNKNOWN
       WireFormatLite::WIRETYPE_FIXED64,          // TYPE_DOUBLE
       WireFormatLite::WIRETYPE_FIXED32,          // TYPE_FLOAT
@@ -172,6 +173,7 @@ ExtractRepeatedFieldSizeHelper(const FieldExtractor& field_extractor, const std:
         if (field->number() != WireFormatLite::GetTagFieldNumber(tag)) {
           WireFormatLite::SkipField(input_stream, tag);
         } else {
+          // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
           DCHECK_EQ(WireFormatLite::WIRETYPE_LENGTH_DELIMITED, WireFormatLite::GetTagWireType(tag));
 
           uint32_t length;
@@ -224,6 +226,7 @@ int64_t ExtractRepeatedFieldSize(const Type& type,
 
   // SCRUB directive should only be applied to one field. Tools
   // framework validation should check this case.
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
   DCHECK_EQ(1, field_mask->paths_size());
 
   FieldExtractor field_extractor(&type, std::move(type_finder));
@@ -269,6 +272,7 @@ void RedactPath(std::vector<std::string>::const_iterator path_begin,
     auto* repeated_values = field_value.mutable_list_value()->mutable_values();
     for (int i = 0; i < repeated_values->size(); ++i) {
       Value* value = repeated_values->Mutable(i);
+      // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
       CHECK(value->has_struct_value()) << "Cannot redact non-message-type field " << field;
       RedactPath(path_begin, path_end, value->mutable_struct_value());
     }
@@ -281,6 +285,7 @@ void RedactPath(std::vector<std::string>::const_iterator path_begin,
 void RedactPaths(absl::Span<const std::string> paths_to_redact, Struct* proto_struct) {
   for (const std::string& path : paths_to_redact) {
     std::vector<std::string> path_pieces = absl::StrSplit(path, '.', absl::SkipEmpty());
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
     CHECK(path_pieces.size() < kMaxRedactedPathDepth)
         << "Attempting to redact path with depth >= " << kMaxRedactedPathDepth << ": " << path;
     RedactPath(path_pieces.begin(), path_pieces.end(), proto_struct);
@@ -335,12 +340,20 @@ absl::StatusOr<std::string> ExtractStringFieldValue(
                          CodedInputStream* input_stream) -> absl::StatusOr<std::string> {
     if (field->kind() != Field::TYPE_STRING) {
       return absl::InvalidArgumentError(
-          absl::Substitute("Field '$0' is not a singular string field.", field->name()));
+          absl::Substitute("Field '$0' is not a string field.", field->name()));
     } else if (field->cardinality() == Field::CARDINALITY_REPEATED) {
-      return absl::InvalidArgumentError(
-          absl::Substitute("Field '$0' is a repeated string field, only singular "
-                           "string field is accepted.",
-                           field->name()));
+      std::string result;
+      uint32_t tag = 0;
+      while ((tag = input_stream->ReadTag()) != 0) {
+        if (field->number() == WireFormatLite::GetTagFieldNumber(tag)) {
+          uint32_t length;
+          input_stream->ReadVarint32(&length);
+          input_stream->ReadString(&result, length);
+        } else {
+          WireFormatLite::SkipField(input_stream, tag);
+        }
+      }
+      return result;
     } else { // singular string field
       std::string result;
       if (FieldExtractor::SearchField(*field, input_stream)) {

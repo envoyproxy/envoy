@@ -29,7 +29,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/listener/http_inspector:http_inspector_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/stats:stats_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
     ],
@@ -46,7 +45,6 @@ envoy_extension_cc_test(
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:listener_factory_context_mocks",
-        "//test/mocks/stats:stats_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
@@ -59,7 +57,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/listener/http_inspector:http_inspector_lib",
         "//test/mocks/api:api_mocks",
-        "//test/mocks/stats:stats_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
@@ -90,6 +87,7 @@ envoy_extension_cc_test(
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/integration:base_integration_test_lib",
         "//test/integration:common_extensions_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",

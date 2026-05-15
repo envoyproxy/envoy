@@ -53,6 +53,7 @@ RUNTIME_GUARD(envoy_reloadable_features_ext_authz_http_client_retries_respect_us
 // @yanjunxiang-google before removing.
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_inject_data_with_state_update);
+RUNTIME_GUARD(envoy_reloadable_features_ext_proc_return_stop_iteration);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_stream_close_optimization);
 RUNTIME_GUARD(envoy_reloadable_features_fix_http3_early_data_timing);
 RUNTIME_GUARD(envoy_reloadable_features_generic_proxy_codec_buffer_limit);
@@ -61,11 +62,14 @@ RUNTIME_GUARD(envoy_reloadable_features_grpc_side_stream_flow_control);
 RUNTIME_GUARD(envoy_reloadable_features_happy_eyeballs_sort_non_ip_addresses);
 RUNTIME_GUARD(envoy_reloadable_features_header_mutation_url_encode_query_params);
 RUNTIME_GUARD(envoy_reloadable_features_health_check_after_cluster_warming);
+RUNTIME_GUARD(envoy_reloadable_features_hide_transport_failure_reason_in_response_body);
 RUNTIME_GUARD(envoy_reloadable_features_http1_close_connection_on_zombie_stream_complete);
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_http_async_client_retry_respect_buffer_limits);
+RUNTIME_GUARD(envoy_reloadable_features_http_inspector_use_balsa_parser);
 // Delay deprecation and decommission until UHV is enabled.
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
+RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_add_verification_status_header);
 RUNTIME_GUARD(envoy_reloadable_features_map_http_stream_reset_to_tcp_rst);
 RUNTIME_GUARD(envoy_reloadable_features_mcp_filter_use_new_metadata_namespace);
 RUNTIME_GUARD(envoy_reloadable_features_mobile_use_network_observer_registry);
@@ -90,11 +94,14 @@ RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_reads_fixed_number_packets
 RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_socket_use_address_cache_for_read);
 RUNTIME_GUARD(envoy_reloadable_features_rbac_match_headers_individually);
 RUNTIME_GUARD(envoy_reloadable_features_reject_empty_trusted_ca_file);
+RUNTIME_GUARD(envoy_reloadable_features_report_load_for_non_zero_stats);
 RUNTIME_GUARD(envoy_reloadable_features_report_load_when_rq_active_is_non_zero);
 RUNTIME_GUARD(envoy_reloadable_features_reset_ignore_upstream_reason);
 RUNTIME_GUARD(envoy_reloadable_features_reset_with_error);
 RUNTIME_GUARD(envoy_reloadable_features_safe_http2_options);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
+RUNTIME_GUARD(envoy_reloadable_features_skip_pending_overflow_count_on_active_rq);
+RUNTIME_GUARD(envoy_reloadable_features_ssl_socket_report_connection_reset);
 RUNTIME_GUARD(envoy_reloadable_features_strict_stats_matcher_unpacked);
 RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_odcds_over_ads_fix);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
@@ -112,13 +119,10 @@ RUNTIME_GUARD(envoy_reloadable_features_websocket_allow_4xx_5xx_through_filter_c
 RUNTIME_GUARD(envoy_reloadable_features_websocket_enable_timeout_on_upgrade_response);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_xds_legacy_delta_skip_subsequent_node);
-
 RUNTIME_GUARD(envoy_restart_features_move_locality_schedulers_to_lb);
 RUNTIME_GUARD(envoy_restart_features_raise_file_limits);
-RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 RUNTIME_GUARD(envoy_restart_features_validate_http3_pseudo_headers);
 RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
-
 // Begin false flags. Most of them should come with a TODO to flip true.
 
 // Sentinel and test flag.
@@ -142,6 +146,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
 FALSE_RUNTIME_GUARD(envoy_restart_features_upstream_http_filters_with_tcp_proxy);
 // TODO(danzh) false deprecate it once QUICHE has its own enable/disable flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_reject_all);
+// TODO(doogie): Flip to true once QUIC session ticket support is stable.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_session_ticket_support);
 // TODO(#10646) change to true when UHV is sufficiently tested
 // For more information about Universal Header Validation, please see
 // https://github.com/envoyproxy/envoy/issues/10646
@@ -156,8 +162,6 @@ FALSE_RUNTIME_GUARD(envoy_restart_features_xds_failover_support);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_dns_cache_set_ip_version_to_remove);
 // TODO(fredyw): evaluate and either make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_no_tcp_delay);
-// Adding runtime flag to use balsa_parser for http_inspector.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_http_inspector_use_balsa_parser);
 // TODO(danzh) re-enable it when the issue of preferring TCP over v6 rather than QUIC over v4 is
 // fixed.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http3_happy_eyeballs);
@@ -229,6 +233,11 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_dynamic_modules_strip_custom_stat_prefix);
 // TODO(haoyuewang): Flip true after prod testing.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_disable_data_read_immediately);
+// TODO(yavlasov): Flip to true after prod testing.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_strict_chunk_parsing);
+
+// Delay route selection in tcp_proxy until just before the upstream connection is established
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_delay_route_selection);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

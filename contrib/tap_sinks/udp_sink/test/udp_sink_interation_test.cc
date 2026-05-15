@@ -160,11 +160,11 @@ typed_config:
       sockaddr_in server_addr;
       memset(&server_addr, 0, sizeof(server_addr));
       server_addr.sin_family = AF_INET;
-      if (inet_pton(AF_INET, UDP_SERVER_IP_, &server_addr.sin_addr) <= 0) {
+      if (inet_pton(AF_INET, udp_server_ip_, &server_addr.sin_addr) <= 0) {
         close(server_socket_);
         return false;
       }
-      server_addr.sin_port = htons(UDP_PORT_);
+      server_addr.sin_port = htons(udp_port_);
       if (bind(server_socket_, reinterpret_cast<struct sockaddr*>(&server_addr),
                sizeof(server_addr)) < 0) {
         close(server_socket_);
@@ -186,13 +186,13 @@ typed_config:
         // Return false because there is no any message.
         // Consider other logical if EWOULDBLOCK is occurred, and
         // shouldn't occur in UT env
-        isRcvMatchedUDPMsg_ = false;
+        is_rcv_matched_udp_msg_ = false;
       } else {
         // Go the message.
         std::string rcv_msg{buffer};
-        if (rcv_msg.find(MATCHED_TAP_REQ_STR_) != std::string::npos &&
-            rcv_msg.find(MATCHED_TAP_RESP_STR_) != std::string::npos) {
-          isRcvMatchedUDPMsg_ = true;
+        if (rcv_msg.find(matched_tap_req_str_) != std::string::npos &&
+            rcv_msg.find(matched_tap_resp_str_) != std::string::npos) {
+          is_rcv_matched_udp_msg_ = true;
         }
       }
     }
@@ -202,15 +202,15 @@ typed_config:
       server_socket_ = -1;
     }
 
-    bool isUDPServerRcvMatchedUDPMsg(void) { return isRcvMatchedUDPMsg_; }
+    bool isUDPServerRcvMatchedUDPMsg(void) { return is_rcv_matched_udp_msg_; }
 
   private:
-    const int UDP_PORT_ = 8089;
-    const char* UDP_SERVER_IP_ = "127.0.0.1";
-    const char* MATCHED_TAP_REQ_STR_ = "tapudp";
-    const char* MATCHED_TAP_RESP_STR_ = "200";
+    const int udp_port_ = 8089;
+    const char* udp_server_ip_ = "127.0.0.1";
+    const char* matched_tap_req_str_ = "tapudp";
+    const char* matched_tap_resp_str_ = "200";
     int server_socket_ = -1;
-    bool isRcvMatchedUDPMsg_ = false;
+    bool is_rcv_matched_udp_msg_ = false;
   };
 
   // Start UDP server firstly.
@@ -224,7 +224,7 @@ typed_config:
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   makeRequest(request_headers_udp_tap_, {}, nullptr, response_headers_udp_tap_, {}, nullptr);
   codec_client_->close();
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", testing::Ge(1));
 
   // Verify whether get the expect message
   tap_server.checkRcvedUDPMsg();

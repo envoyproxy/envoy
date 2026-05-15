@@ -2113,6 +2113,26 @@ envoy_quic_cc_library(
 )
 
 envoy_quic_cc_library(
+    name = "quic_core_congestion_control_bbr3_sender_lib",
+    srcs = ["quiche/quic/core/congestion_control/bbr3_sender.cc"],
+    hdrs = ["quiche/quic/core/congestion_control/bbr3_sender.h"],
+    deps = [
+        ":quic_core_bandwidth_lib",
+        ":quic_core_congestion_control_bandwidth_sampler_lib",
+        ":quic_core_congestion_control_bbr2_lib",
+        ":quic_core_congestion_control_bbr_lib",
+        ":quic_core_congestion_control_congestion_control_interface_lib",
+        ":quic_core_congestion_control_rtt_stats_lib",
+        ":quic_core_congestion_control_windowed_filter_lib",
+        ":quic_core_crypto_encryption_lib",
+        ":quic_core_tag_lib",
+        ":quic_core_types_lib",
+        ":quic_platform_base",
+        ":quiche_common_print_elements_lib",
+    ],
+)
+
+envoy_quic_cc_library(
     name = "quic_core_congestion_control_general_loss_algorithm_lib",
     srcs = ["quiche/quic/core/congestion_control/general_loss_algorithm.cc"],
     hdrs = ["quiche/quic/core/congestion_control/general_loss_algorithm.h"],
@@ -2159,6 +2179,7 @@ envoy_quic_cc_library(
         ":quic_core_bandwidth_lib",
         ":quic_core_config_lib",
         ":quic_core_congestion_control_bbr2_lib",
+        ":quic_core_congestion_control_bbr3_sender_lib",
         ":quic_core_congestion_control_bbr_lib",
         ":quic_core_congestion_control_prague_sender_lib",
         ":quic_core_congestion_control_tcp_cubic_bytes_lib",
@@ -3986,7 +4007,6 @@ envoy_quic_cc_library(
         ":quic_core_server_id_lib",
         ":quic_core_session_notifier_interface_lib",
         ":quic_core_stream_frame_data_producer_lib",
-        ":quic_core_stream_send_buffer_base_lib",
         ":quic_core_stream_send_buffer_inlining_lib",
         ":quic_core_stream_sequencer_buffer_lib",
         ":quic_core_types_lib",
@@ -4065,22 +4085,6 @@ envoy_quic_cc_library(
 )
 
 envoy_quic_cc_library(
-    name = "quic_core_stream_send_buffer_base_lib",
-    srcs = ["quiche/quic/core/quic_stream_send_buffer_base.cc"],
-    hdrs = ["quiche/quic/core/quic_stream_send_buffer_base.h"],
-    deps = [
-        ":quic_core_interval_lib",
-        ":quic_core_interval_set_lib",
-        ":quic_core_types_lib",
-        ":quic_platform_base",
-        ":quic_platform_bug_tracker",
-        ":quiche_common_mem_slice",
-        "@abseil-cpp//absl/strings",
-        "@abseil-cpp//absl/types:span",
-    ],
-)
-
-envoy_quic_cc_library(
     name = "quic_core_inlined_string_view_lib",
     hdrs = ["quiche/quic/core/quic_inlined_string_view.h"],
     deps = [
@@ -4100,7 +4104,6 @@ envoy_quic_cc_library(
         ":quic_core_interval_deque_lib",
         ":quic_core_interval_lib",
         ":quic_core_interval_set_lib",
-        ":quic_core_stream_send_buffer_base_lib",
         ":quic_core_types_lib",
         ":quic_platform_base",
         ":quic_platform_bug_tracker",

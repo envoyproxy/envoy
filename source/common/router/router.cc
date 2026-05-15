@@ -833,13 +833,27 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
   // Ensure an http transport scheme is selected before continuing with decoding.
   ASSERT(headers.Scheme());
 
+  const auto* effective_retry_policy = getEffectiveRetryPolicy();
   retry_state_ =
-      createRetryState(*getEffectiveRetryPolicy(), headers, *cluster_, config_->factory_context_,
+      createRetryState(*effective_retry_policy, headers, *cluster_, config_->factory_context_,
                        callbacks_->dispatcher(), route_entry_->priority());
+  if (retry_state_ != nullptr) {
+    // Cross-cluster retry is enabled only if the retry policy requests cluster refresh and hedging
+    // is not active (hedging with cross-cluster retry is not supported).
+    //
+    // If the hedging policy is enabled, there would be multiple request attempts in parallel and
+    // different clusters may be selected for different attempts. It would make the retry logic more
+    // complicated.
+    cross_cluster_retry_ = effective_retry_policy->refreshClusterOnRetry() &&
+                           !hedging_params_.hedge_on_per_try_timeout_ &&
+                           callbacks_->downstreamCallbacks().has_value();
+  }
+
+  absl::InlinedVector<std::reference_wrapper<const ShadowPolicy>, 2> active_shadow_policies;
 
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
   // runtime keys. Also the method CONNECT doesn't support shadowing.
-  auto method = headers.getMethodValue();
+  const absl::string_view method = headers.getMethodValue();
   if (method != Http::Headers::get().MethodValues.Connect) {
     // Use cluster-level shadow policies if they are available (most specific wins).
     // If no cluster-level policies are configured, fall back to route-level policies.
@@ -850,10 +864,17 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
     for (const auto& shadow_policy : policies_to_evaluate) {
       const auto& policy_ref = *shadow_policy;
       if (FilterUtility::shouldShadow(policy_ref, config_->runtime_, callbacks_->streamId())) {
-        active_shadow_policies_.push_back(std::cref(policy_ref));
-        shadow_headers_ = Http::createHeaderMap<Http::RequestHeaderMapImpl>(*downstream_headers_);
+        active_shadow_policies.push_back(std::cref(policy_ref));
       }
     }
+  }
+
+  std::unique_ptr<Http::RequestHeaderMapImpl> original_shadow_headers;
+  if (!active_shadow_policies.empty()) {
+    // We need to make a copy of the original request headers to avoid the content of the headers
+    // being changed by UpstreamRequest::acceptHeadersFromRouter() and then being sent to the
+    // shadow clusters.
+    original_shadow_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(headers);
   }
 
   ENVOY_STREAM_LOG(debug, "router decoding headers:\n{}", *callbacks_, headers);
@@ -873,15 +894,32 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
       allow_multiplexed_upstream_half_close_ /*enable_half_close*/);
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->acceptHeadersFromRouter(end_stream);
+
+  // If the upstream HTTP filters dropped this request by sending a local reply, we should not
+  // start any shadow streams since the request won't be proxied upstream.
+  if (saw_local_reply_) {
+    active_shadow_policies.clear();
+  }
+
   // Start the shadow streams.
-  for (const auto& shadow_policy_wrapper : active_shadow_policies_) {
-    const auto& shadow_policy = shadow_policy_wrapper.get();
+  const size_t num_shadow_policies = active_shadow_policies.size();
+  for (size_t i = 0; i < num_shadow_policies; ++i) {
+    const auto& shadow_policy = active_shadow_policies[i].get();
     const absl::optional<absl::string_view> shadow_cluster_name =
         getShadowCluster(shadow_policy, *downstream_headers_);
     if (!shadow_cluster_name.has_value()) {
       continue;
     }
-    auto shadow_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(*shadow_headers_);
+    std::unique_ptr<Http::RequestHeaderMapImpl> shadow_headers;
+    if (i == num_shadow_policies - 1) {
+      // For the last shadow policy, we can reuse the original headers to save a copy because
+      // copy whole headers map is not cheap.
+      shadow_headers = std::move(original_shadow_headers);
+    } else {
+      ASSERT(original_shadow_headers != nullptr);
+      // NOLINTNEXTLINE(bugprone-use-after-move)
+      shadow_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(*original_shadow_headers);
+    }
     applyShadowPolicyHeaders(shadow_policy, *shadow_headers);
     const auto options =
         Http::AsyncClient::RequestOptions()
@@ -905,18 +943,18 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
     if (end_stream) {
       // This is a header-only request, and can be dispatched immediately to the shadow
       // without waiting.
-      Http::RequestMessagePtr request(new Http::RequestMessageImpl(
-          Http::createHeaderMap<Http::RequestHeaderMapImpl>(*shadow_headers_)));
-      applyShadowPolicyHeaders(shadow_policy, request->headers());
+      Http::RequestMessagePtr request(new Http::RequestMessageImpl(std::move(shadow_headers)));
       config_->shadowWriter().shadow(std::string(shadow_cluster_name.value()), std::move(request),
                                      options);
     } else {
       Http::AsyncClient::OngoingRequest* shadow_stream = config_->shadowWriter().streamingShadow(
           std::string(shadow_cluster_name.value()), std::move(shadow_headers), options);
       if (shadow_stream != nullptr) {
-        shadow_streams_.insert(shadow_stream);
+        ASSERT(std::find(shadow_streams_.begin(), shadow_streams_.end(), shadow_stream) ==
+               shadow_streams_.end());
+        shadow_streams_.push_back(shadow_stream);
         shadow_stream->setDestructorCallback(
-            [this, shadow_stream]() { shadow_streams_.erase(shadow_stream); });
+            [this, shadow_stream]() { removeShadowStream(shadow_stream); });
         shadow_stream->setWatermarkCallbacks(watermark_callbacks_);
       }
     }
@@ -925,8 +963,9 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
     onRequestComplete();
   }
 
-  // If this was called due to asynchronous host selection, the caller should continueDecoding.
-  return true;
+  // If this was called due to asynchronous host selection, the caller should continueDecoding
+  // if and only if we did not send a local reply.
+  return !saw_local_reply_;
 }
 
 std::unique_ptr<GenericConnPool> Filter::createConnPool(Upstream::ThreadLocalCluster& cluster,
@@ -972,6 +1011,14 @@ std::unique_ptr<GenericConnPool> Filter::createConnPool(Upstream::ThreadLocalClu
 
   return factory->createGenericConnPool(host, cluster, upstream_protocol, route_entry_->priority(),
                                         callbacks_->streamInfo().protocol(), this, *message);
+}
+
+void Filter::removeShadowStream(Http::AsyncClient::OngoingRequest* shadow_stream) {
+  auto it = std::find(shadow_streams_.begin(), shadow_streams_.end(), shadow_stream);
+  if (it != shadow_streams_.end()) {
+    *it = shadow_streams_.back();
+    shadow_streams_.pop_back();
+  }
 }
 
 void Filter::sendNoHealthyUpstreamResponse(absl::string_view optional_details,
@@ -1119,8 +1166,9 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trailers) {
   ENVOY_STREAM_LOG(debug, "router decoding trailers:\n{}", *callbacks_, trailers);
 
-  if (shadow_headers_) {
-    shadow_trailers_ = Http::createHeaderMap<Http::RequestTrailerMapImpl>(trailers);
+  std::unique_ptr<Http::RequestTrailerMapImpl> original_shadow_trailer;
+  if (!shadow_streams_.empty()) {
+    original_shadow_trailer = Http::createHeaderMap<Http::RequestTrailerMapImpl>(trailers);
   }
 
   // upstream_requests_.size() cannot be > 1 because that only happens when a per
@@ -1133,11 +1181,26 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trail
   if (!upstream_requests_.empty()) {
     upstream_requests_.front()->acceptTrailersFromRouter(trailers);
   }
-  for (auto* shadow_stream : shadow_streams_) {
+
+  const size_t shadow_count = shadow_streams_.size();
+  for (size_t i = 0; i < shadow_count; ++i) {
+    auto* shadow_stream = shadow_streams_[i];
+
     shadow_stream->removeDestructorCallback();
     shadow_stream->removeWatermarkCallbacks();
-    shadow_stream->captureAndSendTrailers(
-        Http::createHeaderMap<Http::RequestTrailerMapImpl>(*shadow_trailers_));
+
+    std::unique_ptr<Http::RequestTrailerMapImpl> shadow_trailer;
+    if (i == shadow_count - 1) {
+      // For the last shadow stream, we can reuse the original trailers to save a copy because
+      // copy whole trailers map is not cheap.
+      shadow_trailer = std::move(original_shadow_trailer);
+    } else {
+      ASSERT(original_shadow_trailer != nullptr);
+      // NOLINTNEXTLINE(bugprone-use-after-move)
+      shadow_trailer = Http::createHeaderMap<Http::RequestTrailerMapImpl>(*original_shadow_trailer);
+    }
+    ASSERT(shadow_trailer != nullptr);
+    shadow_stream->captureAndSendTrailers(std::move(shadow_trailer));
   }
   shadow_streams_.clear();
 
@@ -1583,12 +1646,16 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
 
   const StreamInfo::CoreResponseFlag response_flags = streamResetReasonToResponseFlag(reset_reason);
 
+  const bool show_transport_failure =
+      !transport_failure_reason.empty() &&
+      !Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.hide_transport_failure_reason_in_response_body");
   const std::string body =
       absl::StrCat("upstream connect error or disconnect/reset before headers. ",
                    (is_retry_ ? "retried and the latest " : ""),
                    "reset reason: ", Http::Utility::resetReasonToString(reset_reason),
-                   !transport_failure_reason.empty() ? ", transport failure reason: " : "",
-                   transport_failure_reason);
+                   show_transport_failure ? ", transport failure reason: " : "",
+                   show_transport_failure ? transport_failure_reason : "");
   const std::string& basic_details =
       downstream_response_started_ ? StreamInfo::ResponseCodeDetails::get().LateUpstreamReset
                                    : StreamInfo::ResponseCodeDetails::get().EarlyUpstreamReset;
@@ -1931,7 +1998,7 @@ void Filter::onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_re
   // When route retry policy is configured and an upstream filter is returning StopIteration
   // in it's encodeHeaders() method, upstream_requests_.size() is equal to 0 in this case,
   // and we should just return.
-  if (upstream_requests_.size() == 0) {
+  if (upstream_requests_.empty()) {
     return;
   }
 
@@ -1955,7 +2022,7 @@ void Filter::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
   // When route retry policy is configured and an upstream filter is returning StopIteration
   // in it's encodeHeaders() method, upstream_requests_.size() is equal to 0 in this case,
   // and we should just return.
-  if (upstream_requests_.size() == 0) {
+  if (upstream_requests_.empty()) {
     return;
   }
 
@@ -2255,6 +2322,16 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
     host_selection_cancelable_.reset();
   }
 
+  if (cross_cluster_retry_) {
+    // If the cross cluster retry is enabled, we need to refresh the route cluster for this attempt.
+    //
+    // TODO(wbpcode): In current implementation, although we will refresh the target upstream
+    // cluster for this retry attempt. But part of initial cluster's configuration like circuit
+    // breaking, retry policy and so on will still be used for this request because it will bring
+    // lots of complexity to refresh all these state and bring limited benefit.
+    callbacks_->downstreamCallbacks()->refreshRouteCluster();
+  }
+
   // Clusters can technically get removed by CDS during a retry. Make sure it still exists.
   const auto cluster = config_->cm_.getThreadLocalCluster(route_entry_->clusterName());
   std::unique_ptr<GenericConnPool> generic_conn_pool;
@@ -2262,6 +2339,13 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
     sendNoHealthyUpstreamResponse({});
     cleanup();
     return;
+  }
+
+  if (auto cluster_info = cluster->info(); cluster_info != cluster_) {
+    ENVOY_STREAM_LOG(debug, "cross cluster retry from {} to {}", *callbacks_, cluster_->name(),
+                     cluster_info->name());
+    expired_clusters_.emplace_back(std::move(cluster_));
+    cluster_ = std::move(cluster_info);
   }
 
   // Update retry stats for the retry attempt before doing host selection, so that the stats are

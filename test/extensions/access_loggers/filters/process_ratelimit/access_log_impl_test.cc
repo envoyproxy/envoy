@@ -18,7 +18,6 @@
 #include "test/common/stream_info/test_util.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/config/mocks.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/printers.h"

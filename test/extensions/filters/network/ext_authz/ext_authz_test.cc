@@ -16,9 +16,7 @@
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
-#include "test/mocks/tracing/mocks.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/printers.h"
 
@@ -183,6 +181,32 @@ stat_prefix: name
 TEST_F(ExtAuthzFilterTest, OKWithOnData) {
   initialize(default_yaml_string_);
   expectOKWithOnData();
+}
+
+// Verifies that labels are correctly extracted from the bootstrap metadata.
+TEST_F(ExtAuthzFilterTest, BootstrapLabelsExtraction) {
+  const std::string yaml = R"EOF(
+grpc_service:
+  envoy_grpc:
+    cluster_name: ext_authz_server
+stat_prefix: name
+bootstrap_metadata_labels_key: "labels_key"
+)EOF";
+
+  Protobuf::Struct labels_struct;
+  auto& fields = *labels_struct.mutable_fields();
+  fields["label1"] = ValueUtil::stringValue("value1");
+  fields["label2"] = ValueUtil::stringValue("value2");
+
+  auto& node_metadata_fields =
+      *context_.bootstrap_.mutable_node()->mutable_metadata()->mutable_fields();
+  node_metadata_fields["labels_key"].mutable_struct_value()->CopyFrom(labels_struct);
+
+  initialize(yaml);
+
+  EXPECT_EQ(2, config_->destinationLabels().size());
+  EXPECT_EQ("value1", config_->destinationLabels().at("label1"));
+  EXPECT_EQ("value2", config_->destinationLabels().at("label2"));
 }
 
 TEST_F(ExtAuthzFilterTest, DeniedWithOnData) {

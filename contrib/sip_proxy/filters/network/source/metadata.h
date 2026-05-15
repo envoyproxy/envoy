@@ -192,23 +192,23 @@ private:
   std::vector<std::vector<SipHeader>> headers_{HeaderType::HeaderMaxNum};
 
   std::vector<Operation> operation_list_;
-  absl::optional<absl::string_view> ep_{};
-  absl::optional<absl::string_view> opaque_{};
+  absl::optional<absl::string_view> ep_;
+  absl::optional<absl::string_view> opaque_;
 
-  absl::optional<std::pair<std::string, std::string>> p_cookie_ip_map_{};
+  absl::optional<std::pair<std::string, std::string>> p_cookie_ip_map_;
 
-  absl::optional<absl::string_view> transaction_id_{};
+  absl::optional<absl::string_view> transaction_id_;
 
-  std::string destination_{};
+  std::string destination_;
 
-  std::vector<AffinityEntry> affinity_{};
+  std::vector<AffinityEntry> affinity_;
   std::vector<AffinityEntry>::iterator affinity_iteration_{affinity_.begin()};
 
-  std::string raw_msg_{};
+  std::string raw_msg_;
   State state_{State::TransportBegin};
   bool stop_load_balance_{};
 
-  TraContextMap tra_context_map_{};
+  TraContextMap tra_context_map_;
 
   bool isDomainMatched(
       HeaderType type,

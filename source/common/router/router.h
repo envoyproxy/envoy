@@ -37,6 +37,7 @@
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_factory_context_impl.h"
 
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/match.h"
 #include "absl/types/optional.h"
 
@@ -321,7 +322,7 @@ public:
       host_selection_cancelable_->cancel();
       host_selection_cancelable_.reset();
     }
-
+    saw_local_reply_ = true;
     // Clean up the upstream_requests_.
     resetAll();
     return Http::LocalErrorStatus::Continue;
@@ -638,12 +639,16 @@ private:
   void maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or_trailers,
                                   UpstreamRequest& upstream_request);
   bool isEarlyConnectData();
+  void removeShadowStream(Http::AsyncClient::OngoingRequest* shadow_stream);
 
   RetryStatePtr retry_state_;
   const FilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   RouteConstSharedPtr route_;
   const RouteEntry* route_entry_{};
+  // Expired clusters that we tried. Keep track of them to ensure they stay alive until the request
+  // is complete.
+  absl::InlinedVector<Upstream::ClusterInfoConstSharedPtr, 4> expired_clusters_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
   std::unique_ptr<Stats::StatNameDynamicStorage> alt_stat_prefix_;
   const VirtualCluster* request_vcluster_{};
@@ -664,9 +669,6 @@ private:
   MetadataMatchCriteriaConstPtr metadata_match_;
   std::function<void(Http::ResponseHeaderMap&)> modify_headers_;
   std::function<void(Http::ResponseHeaderMap&)> modify_headers_from_upstream_lb_;
-  std::vector<std::reference_wrapper<const ShadowPolicy>> active_shadow_policies_;
-  std::unique_ptr<Http::RequestHeaderMap> shadow_headers_;
-  std::unique_ptr<Http::RequestTrailerMap> shadow_trailers_;
   // The stream lifetime configured by request header.
   absl::optional<std::chrono::milliseconds> dynamic_max_stream_duration_;
   // list of cookies to add to upstream headers
@@ -674,8 +676,10 @@ private:
 
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Network::Socket::OptionsSharedPtr upstream_options_;
-  // Set of ongoing shadow streams which have not yet received end stream.
-  absl::flat_hash_set<Http::AsyncClient::OngoingRequest*> shadow_streams_;
+  // Ongoing shadow streams which have not yet received end stream.
+  // Inlined vector is used here under the assumption that most cases will have only single or
+  // double stream, and this avoids heap allocation in that case.
+  absl::InlinedVector<Http::AsyncClient::OngoingRequest*, 2> shadow_streams_;
 
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   uint64_t request_body_buffer_limit_{std::numeric_limits<uint64_t>::max()};
@@ -694,12 +698,16 @@ private:
   bool request_buffer_overflowed_ : 1 = false;
   const bool allow_multiplexed_upstream_half_close_ : 1 = false;
   bool upstream_request_started_ : 1 = false;
+  // True if cross-cluster retry is enabled: refreshClusterOnRetry is set in the effective retry
+  // policy and there is no hedge policy (hedging is incompatible with cross-cluster retry).
+  bool cross_cluster_retry_ : 1 = false;
   // Indicate that ORCA report is received to process it only once in either response headers or
   // trailers.
   bool orca_load_report_received_ : 1 = false;
   // Cached runtime flag value for reject_early_connect_data to avoid evaluating it on every data
   // chunk.
   bool reject_early_connect_data_enabled_ : 1 = false;
+  bool saw_local_reply_ : 1 = false;
 };
 
 class ProdFilter : public Filter {

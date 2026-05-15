@@ -7,13 +7,14 @@
 #include "source/extensions/tracers/opentelemetry/resource_detectors/dynatrace/dynatrace_metadata_file_reader.h"
 #include "source/extensions/tracers/opentelemetry/resource_detectors/dynatrace/dynatrace_resource_detector.h"
 
-#include "test/mocks/server/tracer_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
+using testing::NiceMock;
 using testing::Return;
 
 namespace Envoy {

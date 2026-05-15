@@ -36,12 +36,12 @@ void TapSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
                 : nullptr;
 }
 
-void TapSocket::closeSocket(Network::ConnectionEvent event) {
+void TapSocket::closeSocket(Network::ConnectionEvent event, bool abort_reset) {
   if (tapper_ != nullptr) {
     tapper_->closeSocket(event);
   }
 
-  transport_socket_->closeSocket(event);
+  transport_socket_->closeSocket(event, abort_reset);
 }
 
 Network::IoResult TapSocket::doRead(Buffer::Instance& buffer) {

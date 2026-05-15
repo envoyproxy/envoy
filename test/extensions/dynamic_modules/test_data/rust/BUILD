@@ -59,3 +59,5 @@ test_program(name = "access_log_integration_test")
 test_program(name = "upstream_http_tcp_bridge")
 
 test_program(name = "cluster_integration_test")
+
+test_program(name = "cluster_filter_state_test")

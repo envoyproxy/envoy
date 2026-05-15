@@ -13,6 +13,7 @@
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 
+using testing::Eq;
 #if defined(ENVOY_CONFIG_COVERAGE)
 #define DISABLE_UNDER_COVERAGE return
 #else
@@ -103,8 +104,8 @@ TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   initialize();
   // Put envoy in overloaded state and check that it doesn't accept the new client connection.
   updateResource(file_updater_1_, 0.95);
-  test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_connections.active",
-                               1);
+  test_server_->waitForGauge("overload.envoy.overload_actions.stop_accepting_connections.active",
+                             Eq(1));
   IntegrationStreamDecoderPtr response;
   // For HTTP/2 and below, excess connection won't be accepted, but will hang out
   // in a pending state and resume below.
@@ -115,8 +116,8 @@ TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
 
   // Reduce load a little to allow the connection to be accepted.
   updateResource(file_updater_1_, 0.8);
-  test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_connections.active",
-                               0);
+  test_server_->waitForGauge("overload.envoy.overload_actions.stop_accepting_connections.active",
+                             Eq(0));
   EXPECT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   EXPECT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
@@ -147,7 +148,8 @@ TEST_P(OverloadIntegrationTest, NoNewStreamsWhenOverloaded) {
   // Enable the disable-keepalive overload action. This should send a shutdown notice before
   // encoding the headers.
   updateResource(file_updater_2_, 0.9);
-  test_server_->waitForGaugeEq("overload.envoy.overload_actions.disable_http_keepalive.active", 1);
+  test_server_->waitForGauge("overload.envoy.overload_actions.disable_http_keepalive.active",
+                             Eq(1));
 
   // The call to disable keep alive could take some time to be executed on the worker
   // even if the stat on the main thread is shows the action is enabled.
@@ -188,8 +190,8 @@ TEST_P(ListenerMaxConnectionPerSocketEventTest, AcceptsConnectionsUpToTheMaximum
   initialize();
   // Put envoy in overloaded state and check that it doesn't accept the new client connection.
   updateResource(file_updater_1_, 0.95);
-  test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_connections.active",
-                               1);
+  test_server_->waitForGauge("overload.envoy.overload_actions.stop_accepting_connections.active",
+                             Eq(1));
 
   // The TCP stack will accept the connections, but the Envoy listener will not
   // not yet acknowledge the connection.
@@ -202,14 +204,14 @@ TEST_P(ListenerMaxConnectionPerSocketEventTest, AcceptsConnectionsUpToTheMaximum
   const std::string downstream_cx_active = (version_ == Network::Address::IpVersion::v4)
                                                ? "listener.127.0.0.1_0.downstream_cx_active"
                                                : "listener.[__1]_0.downstream_cx_active";
-  test_server_->waitForGaugeEq(downstream_cx_active, 0);
+  test_server_->waitForGauge(downstream_cx_active, Eq(0));
 
   EXPECT_LOG_CONTAINS_N_TIMES("trace", "accepted 2 new connections", 5, {
     // Reduce load a little to allow the connection to be accepted.
     updateResource(file_updater_1_, 0.8);
 
     // As we are using level trigger for listeners, all new connections get recognized.
-    test_server_->waitForGaugeEq(downstream_cx_active, 10);
+    test_server_->waitForGauge(downstream_cx_active, Eq(10));
 
     // Wait for the histogram to be updated as that occurs after the logs we are
     // expecting.

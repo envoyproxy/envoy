@@ -11,7 +11,7 @@ namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 
-static constexpr int kFakeSocketFd = 42;
+static constexpr int kFakeSocketFd = 65534;
 
 class FakeConnectionSocket : public Network::MockConnectionSocket {
 public:

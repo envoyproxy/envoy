@@ -214,7 +214,12 @@ absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilte
   }
 
   config->terminal_filter_ = terminal_filter;
-  config->stat_creation_frozen_ = true;
+  // Release-store: pairs with the acquire-loads in the per-request ``define_*`` callbacks
+  // (in abi_impl.cc) so a worker thread that observes ``stat_creation_frozen_=true`` is
+  // guaranteed to also observe all preceding writes to ``config``. Defends against an
+  // adversarial module spawning a worker inside ``on_http_filter_config_new`` that reads the
+  // flag before the C++-side shared_ptr publication establishes happens-before.
+  config->stat_creation_frozen_.store(true, std::memory_order_release);
 
   config->in_module_config_ = filter_config_envoy_ptr;
   config->on_http_filter_config_destroy_ = on_config_destroy.value();

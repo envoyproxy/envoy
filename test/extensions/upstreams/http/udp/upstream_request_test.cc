@@ -17,8 +17,6 @@
 #include "test/mocks/common.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/router/router_filter_interface.h"
-#include "test/mocks/server/factory_context.h"
-#include "test/mocks/server/instance.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -107,7 +105,7 @@ TEST_F(UdpUpstreamTest, ExchangeCapsules) {
   Buffer::InstancePtr received_data =
       std::make_unique<Buffer::OwnedImpl>(absl::HexStringToBytes("b1b2b3b4b5b6b7"));
   EXPECT_CALL(mock_upstream_to_downstream_,
-              decodeData(BufferStringEqual(decoded_capsule_fragment), false));
+              decodeData(BufferString(decoded_capsule_fragment), false));
   Envoy::MonotonicTime timestamp;
   udp_upstream_->processPacket(nullptr, nullptr, std::move(received_data), timestamp, /*tos=*/0,
                                /*saved_cmsg=*/{});

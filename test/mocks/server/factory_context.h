@@ -5,6 +5,7 @@
 #include "source/common/router/context_impl.h"
 #include "source/common/tls/context_manager_impl.h"
 
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/drain_manager.h"
 #include "test/mocks/server/instance.h"
@@ -39,6 +40,7 @@ public:
   Stats::IsolatedStoreImpl listener_store_;
   Stats::Scope& listener_scope_{*listener_store_.rootScope()};
   testing::NiceMock<MockDrainManager> drain_manager_;
+  testing::NiceMock<Network::MockListenerInfo> listener_info_;
 };
 
 class MockUpstreamFactoryContext : public UpstreamFactoryContext {

@@ -26,8 +26,6 @@ envoy_extension_cc_test(
         "//source/extensions/tracers/xray:xray_lib",
         "//test/mocks:common_lib",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/server:tracer_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
@@ -47,7 +45,6 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/tracers/xray:config",
-        "//test/mocks/server:instance_mocks",
         "//test/mocks/server:tracer_factory_context_mocks",
         "//test/mocks/server:tracer_factory_mocks",
         "//test/test_common:environment_lib",

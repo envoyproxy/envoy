@@ -161,7 +161,6 @@ void AsyncFileManagerThreadPool::worker() {
     }
     if (action.action_ != nullptr) {
       executeAction(std::move(action));
-      action.action_ = nullptr;
     }
     if (cleanup_action != nullptr) {
       std::move(cleanup_action)->onCancelledBeforeCallback();

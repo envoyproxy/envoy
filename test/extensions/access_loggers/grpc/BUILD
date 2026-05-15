@@ -65,7 +65,6 @@ envoy_extension_cc_test(
         "//source/common/stream_info:uint32_accessor_lib",
         "//source/extensions/access_loggers/grpc:http_grpc_access_log_lib",
         "//test/mocks/access_log:access_log_mocks",
-        "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",

@@ -50,13 +50,62 @@ namespace ExtAuthz {
   COUNTER(filter_state_name_collision)                                                             \
   COUNTER(omitted_response_headers)                                                                \
   COUNTER(request_header_limits_reached)                                                           \
-  COUNTER(response_header_limits_reached)
+  COUNTER(response_header_limits_reached)                                                          \
+  COUNTER(shadow_denied)                                                                           \
+  COUNTER(shadow_error)
 
 /**
  * Wrapper struct for ext_authz filter stats. @see stats_macros.h
  */
 struct ExtAuthzFilterStats {
   ALL_EXT_AUTHZ_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
+ * Shadow-mode authorization decision carried in FilterState when
+ * ``shadow_mode`` is enabled. A downstream filter reads this object and
+ * decides whether to enforce the decision.
+ */
+class ShadowDecisionObject : public Envoy::StreamInfo::FilterState::Object {
+public:
+  using ShadowDecisionProto = envoy::extensions::filters::http::ext_authz::v3::ShadowDecision;
+
+  ShadowDecisionObject(ShadowDecisionProto::CheckResult check_result, Http::Code status_code,
+                       Filters::Common::ExtAuthz::UnsafeHeaderVector response_headers)
+      : check_result_(check_result), status_code_(status_code),
+        response_headers_(std::move(response_headers)) {}
+
+  ShadowDecisionProto::CheckResult checkResult() const { return check_result_; }
+  Http::Code statusCode() const { return status_code_; }
+  const Filters::Common::ExtAuthz::UnsafeHeaderVector& responseHeaders() const {
+    return response_headers_;
+  }
+
+  ProtobufTypes::MessagePtr serializeAsProto() const override;
+
+  absl::optional<std::string> serializeAsString() const override;
+
+  // Expose check_result and status_code as individual fields so access-log formatters
+  // and CEL expressions can read them without paying the cost of serializing the full
+  // ShadowDecision to JSON.
+  bool hasFieldSupport() const override { return true; }
+  Envoy::StreamInfo::FilterState::Object::FieldType
+  getField(absl::string_view field_name) const override {
+    if (field_name == "check_result") {
+      return absl::string_view(ShadowDecisionProto::CheckResult_Name(check_result_));
+    }
+    if (field_name == "status_code" && status_code_ != static_cast<Http::Code>(0)) {
+      return int64_t(static_cast<uint32_t>(status_code_));
+    }
+    return {};
+  }
+
+private:
+  void populateProto(ShadowDecisionProto& msg) const;
+
+  const ShadowDecisionProto::CheckResult check_result_;
+  const Http::Code status_code_;
+  const Filters::Common::ExtAuthz::UnsafeHeaderVector response_headers_;
 };
 
 class ExtAuthzLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
@@ -146,6 +195,8 @@ public:
   bool withRequestBody() const { return max_request_bytes_ > 0; }
 
   bool failureModeAllow() const { return failure_mode_allow_; }
+
+  bool shadowMode() const { return shadow_mode_; }
 
   bool failureModeAllowHeaderAdd() const { return failure_mode_allow_header_add_; }
 
@@ -264,6 +315,7 @@ private:
   const bool allow_partial_message_;
   const bool failure_mode_allow_;
   const bool failure_mode_allow_header_add_;
+  const bool shadow_mode_;
   const bool clear_route_cache_;
   const uint32_t max_request_bytes_;
   const uint32_t max_denied_response_body_bytes_;
@@ -475,6 +527,11 @@ private:
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
   void initiateCall(const Http::RequestHeaderMap& headers);
   void continueDecoding();
+  // In shadow mode, writes the authorization decision and response attributes into
+  // FilterState and increments the appropriate shadow stat counter. Takes the response
+  // by non-const reference so we can std::move ``headers_to_set`` into the object instead
+  // of copying.
+  void setShadowFilterState(Filters::Common::ExtAuthz::Response& response);
   bool isBufferFull(uint64_t num_bytes_processing) const;
   void updateLoggingInfo(const absl::optional<Grpc::Status::GrpcStatus>& grpc_status);
   void updateEffect(const Filters::Common::ProcessingEffect::Effect effect);
@@ -504,10 +561,10 @@ private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Http::RequestHeaderMap* request_headers_;
-  Http::HeaderVector response_headers_to_add_{};
-  Http::HeaderVector response_headers_to_set_{};
-  Http::HeaderVector response_headers_to_add_if_absent_{};
-  Http::HeaderVector response_headers_to_overwrite_if_exists_{};
+  Http::HeaderVector response_headers_to_add_;
+  Http::HeaderVector response_headers_to_set_;
+  Http::HeaderVector response_headers_to_add_if_absent_;
+  Http::HeaderVector response_headers_to_overwrite_if_exists_;
   State state_{State::NotStarted};
   FilterReturn filter_return_{FilterReturn::ContinueDecoding};
   Upstream::ClusterInfoConstSharedPtr cluster_;
@@ -523,7 +580,7 @@ private:
   bool initiating_call_{};
   bool buffer_data_{};
   bool skip_check_{false};
-  envoy::service::auth::v3::CheckRequest check_request_{};
+  envoy::service::auth::v3::CheckRequest check_request_;
 };
 
 } // namespace ExtAuthz

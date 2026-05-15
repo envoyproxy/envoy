@@ -15,10 +15,12 @@ envoy_cc_test(
     rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
+        "//source/common/singleton:manager_impl_lib",
         "//source/extensions/common/async_files",
         "//test/mocks/api:api_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/buffer:buffer_mocks",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/common/async_files/v3:pkg_cc_proto",
     ],
 )
@@ -32,9 +34,10 @@ envoy_cc_test(
     rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/singleton:manager_impl_lib",
         "//source/extensions/common/async_files",
         "//test/mocks/api:api_mocks",
-        "//test/mocks/server:server_mocks",
         "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/extensions/common/async_files/v3:pkg_cc_proto",
     ],
@@ -48,9 +51,9 @@ envoy_cc_test(
     rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
+        "//source/common/singleton:manager_impl_lib",
         "//source/extensions/common/async_files",
         "//test/mocks/api:api_mocks",
-        "//test/mocks/server:server_mocks",
         "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/extensions/common/async_files/v3:pkg_cc_proto",
     ],

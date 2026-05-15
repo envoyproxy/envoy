@@ -24,9 +24,7 @@ envoy_extension_cc_test(
         "//test/common/upstream:utility_lib",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
-        "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/service/metrics/v3:pkg_cc_proto",
     ],
 )

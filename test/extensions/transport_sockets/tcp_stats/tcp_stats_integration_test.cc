@@ -5,6 +5,7 @@
 
 #include "test/integration/integration.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -78,9 +79,9 @@ TEST_P(TcpStatsSocketIntegrationTest, Basic) {
   // before validating values and ranges. Gauges/counters and histograms go through slightly
   // different paths, so check each to avoid test flakes.
   test_server_->waitUntilHistogramHasSamples("cluster.cluster_0.tcp_stats.cx_rtt_us");
-  test_server_->waitForCounterGe("cluster.cluster_0.tcp_stats.cx_tx_segments", 1);
+  test_server_->waitForCounter("cluster.cluster_0.tcp_stats.cx_tx_segments", Ge(1));
   test_server_->waitUntilHistogramHasSamples("listener.test.tcp_stats.cx_rtt_us");
-  test_server_->waitForCounterGe("listener.test.tcp_stats.cx_tx_segments", 1);
+  test_server_->waitForCounter("listener.test.tcp_stats.cx_tx_segments", Ge(1));
 
   auto validateCounterRange = [this](const std::string& name, uint64_t lower, uint64_t upper) {
     auto counter = test_server_->counter(absl::StrCat("cluster.cluster_0.tcp_stats.", name));

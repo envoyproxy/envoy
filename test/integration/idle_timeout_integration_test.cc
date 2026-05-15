@@ -13,6 +13,7 @@
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
+using testing::Ge;
 using testing::HasSubstr;
 
 namespace Envoy {
@@ -125,7 +126,7 @@ public:
   }
 
   static constexpr uint64_t IdleTimeoutMs = 300 * TIMEOUT_FACTOR;
-  static constexpr uint64_t RequestTimeoutMs = 200;
+  static constexpr uint64_t RequestTimeoutMs = 200 * TIMEOUT_FACTOR;
   bool enable_global_idle_timeout_{false};
   bool enable_per_stream_idle_timeout_{false};
   bool enable_request_timeout_{false};
@@ -163,12 +164,12 @@ TEST_P(IdleTimeoutIntegrationTest, TimeoutBasic) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_200", Ge(1));
 
   // Do not send any requests and validate if idle time out kicks in.
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_idle_timeout", Ge(1));
 }
 
 // Tests idle timeout behaviour with multiple requests and validates that idle timer kicks in
@@ -199,8 +200,8 @@ TEST_P(IdleTimeoutIntegrationTest, IdleTimeoutWithTwoRequests) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_200", Ge(1));
 
   // Request 2.
   response = codec_client_->makeRequestWithBody(default_request_headers_, 512);
@@ -211,12 +212,12 @@ TEST_P(IdleTimeoutIntegrationTest, IdleTimeoutWithTwoRequests) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 2);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_200", Ge(2));
 
   // Do not send any requests and validate if idle time out kicks in.
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_idle_timeout", Ge(1));
 }
 
 // Max connection duration reached after a connection is created.
@@ -241,12 +242,12 @@ TEST_P(IdleTimeoutIntegrationTest, MaxConnectionDurationBasic) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_200", Ge(1));
 
   // Do not send any requests and validate that the max connection duration is reached.
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_max_duration_reached", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_max_duration_reached", Ge(1));
 }
 
 // Per-stream idle timeout after having sent downstream headers.
@@ -418,7 +419,7 @@ TEST_P(IdleTimeoutIntegrationTest, PerTryIdleTimeoutAfterUpstreamHeaders) {
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
 
   waitForTimeout(*response);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_per_try_idle_timeout", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_per_try_idle_timeout", Ge(1));
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
@@ -721,8 +722,8 @@ TEST_P(UpstreamHttpIdleTimeoutTest, UpstreamConnectionIdleTimeout) {
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
   // Wait for stat
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_idle_timeout_verifier.on_idle_timeout",
-                                 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_idle_timeout_verifier.on_idle_timeout",
+                               Ge(1));
 }
 
 } // namespace

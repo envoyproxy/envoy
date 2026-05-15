@@ -135,6 +135,15 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
       {{Http::Headers::get().Method, Http::Headers::get().MethodValues.Get},
        {Http::Headers::get().Path, parent_.requestPath()},
        {Http::Headers::get().Host, host_value}});
+  if (parent_.useHttpUpgrade()) {
+    // Negotiate the handshake as an HTTP/1.1 Upgrade so HCM `upgrade_configs` can splice
+    // the connection raw after `101 Switching Protocols`. Both ends must agree.
+    headers->setReferenceKey(Http::Headers::get().Connection,
+                             Http::Headers::get().ConnectionValues.Upgrade);
+    headers->setReferenceKey(Http::Headers::get().Upgrade,
+                             ::Envoy::Extensions::Bootstrap::ReverseConnection::
+                                 ReverseConnectionUtility::REVERSE_TUNNEL_UPGRADE_PROTOCOL);
+  }
   headers->addCopy(node_hdr, std::string(node_id));
   headers->addCopy(cluster_hdr, std::string(cluster_id));
   headers->addCopy(tenant_hdr, std::string(tenant_id));
@@ -178,11 +187,12 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
 
 void RCConnectionWrapper::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool) {
   const uint64_t status = Http::Utility::getResponseStatus(*headers);
-  if (status == 200) {
-    ENVOY_LOG(debug, "Received HTTP 200 OK response");
+  const uint64_t expected = parent_.useHttpUpgrade() ? 101 : 200;
+  if (status == expected) {
+    ENVOY_LOG(debug, "Received HTTP {} response", status);
     onHandshakeSuccess();
   } else {
-    ENVOY_LOG(error, "Received non-200 HTTP response: {}", status);
+    ENVOY_LOG(error, "Received unexpected HTTP response: {} (expected {})", status, expected);
     onHandshakeFailure(HandshakeFailureReason::httpStatusError(absl::StrCat(status)));
   }
 }
@@ -246,24 +256,7 @@ void RCConnectionWrapper::shutdown() {
   ENVOY_LOG(debug, "RCConnectionWrapper: Shutting down connection ID: {}, state: {}", connection_id,
             static_cast<int>(state));
 
-  // Remove connection callbacks first to prevent recursive calls during shutdown.
-  if (state != Network::Connection::State::Closed) {
-    connection_->removeConnectionCallbacks(*this);
-    ENVOY_LOG(debug, "Connection callbacks removed");
-  }
-
-  // Close the connection if it's still open.
-  state = connection_->state();
-  if (state == Network::Connection::State::Open) {
-    ENVOY_LOG(debug, "Closing open connection gracefully");
-    connection_->close(Network::ConnectionCloseType::FlushWrite);
-  } else if (state == Network::Connection::State::Closing) {
-    ENVOY_LOG(debug, "Connection already closing");
-  } else {
-    ENVOY_LOG(debug, "Connection already closed");
-  }
-
-  // Clear the connection pointer after shutdown.
+  connection_->removeConnectionCallbacks(*this);
   connection_.reset();
   ENVOY_LOG(debug, "RCConnectionWrapper: Connection cleared after shutdown");
   ENVOY_LOG(debug, "RCConnectionWrapper: Shutdown completed");
