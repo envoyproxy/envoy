@@ -162,6 +162,7 @@ public:
   const std::vector<ResetHeaderParserSharedPtr>& resetHeaders() const override {
     return reset_headers_;
   }
+  bool refreshClusterOnRetry() const override { return refresh_cluster_on_retry_; }
 
   std::chrono::milliseconds per_try_timeout_{0};
   std::chrono::milliseconds per_try_idle_timeout_{0};
@@ -175,6 +176,7 @@ public:
   absl::optional<std::chrono::milliseconds> max_interval_;
   std::vector<ResetHeaderParserSharedPtr> reset_headers_;
   std::chrono::milliseconds reset_max_interval_{300000};
+  bool refresh_cluster_on_retry_{false};
   std::vector<Upstream::RetryOptionsPredicateConstSharedPtr> retry_options_predicates_;
 };
 

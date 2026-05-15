@@ -7,7 +7,6 @@
 #include "source/extensions/filters/http/set_metadata/set_metadata_filter.h"
 
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/server/instance.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -82,6 +81,30 @@ metadata:
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
   cb(filter_callbacks);
+}
+
+TEST(SetMetadataFilterConfigTest, CreateRouteSpecificConfig) {
+  const std::string yaml = R"EOF(
+metadata:
+- metadata_namespace: thenamespace
+  value:
+    mynumber: 20
+    mylist: ["b"]
+    tags:
+      mytag1: 1
+  allow_overwrite: true
+  )EOF";
+
+  SetMetadataProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  SetMetadataConfig factory;
+
+  auto& validation_visitor = ProtobufMessage::getNullValidationVisitor();
+  const auto result =
+      factory.createRouteSpecificFilterConfig(proto_config, context, validation_visitor);
+  EXPECT_TRUE(result.ok());
 }
 
 } // namespace SetMetadataFilter

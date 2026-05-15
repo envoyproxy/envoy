@@ -73,19 +73,23 @@ public:
       Api::Api& api);
 
   // Takes the value of the path header of a gRPC request and returns its path descriptor.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   const Protobuf::MethodDescriptor* GetMethodDescriptor(absl::string_view path) const;
 
   // Checks if the request body field is of type `google.api.HttpBody`.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   bool IsRequestNestedHttpBody(const Protobuf::MethodDescriptor* method_descriptor,
                                const std::string& request_body_field) const;
 
   absl::StatusOr<std::unique_ptr<Transcoder>>
+  // NOLINTNEXTLINE(readability-identifier-naming)
   CreateTranscoder(const Protobuf::MethodDescriptor* method_descriptor,
                    TranscoderInputStream& request_input,
                    TranscoderInputStream& response_input) const;
 
   // Changes the body field to its `json_name` value or to camelCase if the filter
   // is not configured to preserve the proto field names.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   absl::StatusOr<std::string> ChangeBodyFieldName(absl::string_view path,
                                                   absl::string_view body_field) const;
 

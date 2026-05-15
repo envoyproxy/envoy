@@ -27,6 +27,7 @@
 #include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/formatter/substitution_format_string.h"
 #include "source/common/http/request_id_extension_impl.h"
 #include "source/common/network/application_protocol.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
@@ -39,6 +40,7 @@
 #include "source/common/stream_info/stream_id_provider_impl.h"
 #include "source/common/stream_info/uint64_accessor_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
+#include "source/server/generic_factory_context.h"
 
 #include "absl/container/flat_hash_set.h"
 
@@ -218,7 +220,13 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
       upstream_drain_manager_slot_(context.serverFactoryContext().threadLocal().allocateSlot()),
       shared_config_(std::make_shared<SharedConfig>(config, context)),
       random_generator_(context.serverFactoryContext().api().randomGenerator()),
-      regex_engine_(context.serverFactoryContext().regexEngine()) {
+      regex_engine_(context.serverFactoryContext().regexEngine()),
+      drain_decision_(context.drainDecision()),
+      drain_close_scope_(context.listenerInfo().direction() ==
+                                 envoy::config::core::v3::TrafficDirection::INBOUND
+                             ? Network::DrainDirection::InboundOnly
+                             : Network::DrainDirection::All),
+      check_drain_close_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, check_drain_close, false)) {
   upstream_drain_manager_slot_->set([](Event::Dispatcher&) {
     ThreadLocal::ThreadLocalObjectSharedPtr drain_manager =
         std::make_shared<UpstreamDrainManager>();
@@ -379,7 +387,7 @@ Config::SharedConfig::parseTLVs(absl::Span<const envoy::config::core::v3::TlvEnt
 
     if (has_value) {
       // Static TLV value must be at least one byte long.
-      if (tlv->value().size() < 1) {
+      if (tlv->value().empty()) {
         throw EnvoyException("Invalid TLV configuration: 'value' must be at least one byte long.");
       }
       tlv_vector.push_back(
@@ -432,6 +440,11 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
 
   // Initialize connection establishment mode.
   connect_mode_ = config_->upstreamConnectMode();
+
+  // Delay route selection needs to set on initialization since mid execution changes
+  // could lead to inconsistent behavior
+  delay_route_selection_ =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tcp_proxy_delay_route_selection");
 
   // Check if early data buffering is enabled.
   if (config_->maxEarlyDataBytes().has_value()) {
@@ -941,13 +954,31 @@ const std::string& TunnelResponseTrailers::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.propagate_response_trailers");
 }
 
+Router::HeaderParserPtr buildTunnelingHeaderParser(
+    const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::TunnelingConfig&
+        tunneling_config,
+    Server::Configuration::FactoryContext& context) {
+  if (tunneling_config.formatters().empty()) {
+    return THROW_OR_RETURN_VALUE(
+        Envoy::Router::HeaderParser::configure(tunneling_config.headers_to_add()),
+        Router::HeaderParserPtr);
+  }
+
+  Server::GenericFactoryContextImpl generic_context(context);
+  auto command_parsers =
+      THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::parseFormatters(
+                                tunneling_config.formatters(), generic_context),
+                            Formatter::CommandParserPtrVector);
+  return THROW_OR_RETURN_VALUE(
+      Envoy::Router::HeaderParser::configure(tunneling_config.headers_to_add(), command_parsers),
+      Router::HeaderParserPtr);
+}
+
 TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
     Stats::Scope& stats_scope,
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config_message,
     Server::Configuration::FactoryContext& context)
-    : header_parser_(THROW_OR_RETURN_VALUE(Envoy::Router::HeaderParser::configure(
-                                               config_message.tunneling_config().headers_to_add()),
-                                           Router::HeaderParserPtr)),
+    : header_parser_(buildTunnelingHeaderParser(config_message.tunneling_config(), context)),
       propagate_response_headers_(config_message.tunneling_config().propagate_response_headers()),
       propagate_response_trailers_(config_message.tunneling_config().propagate_response_trailers()),
       post_path_(config_message.tunneling_config().post_path()),
@@ -1066,7 +1097,10 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
                        "Initial data received, establishing upstream connection. "
                        "early_data_buffer_.length()={}",
                        read_callbacks_->connection(), early_data_buffer_.length());
-        // Route should already be set in onNewConnection().
+        if (delay_route_selection_) {
+          route_ = pickRoute();
+        }
+        // If delay_route_selection_ is unset, route should already be set in onNewConnection().
         ASSERT(route_ != nullptr);
         establishUpstreamConnection();
       }
@@ -1092,6 +1126,7 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
   // Before there is an upstream the connection should be readDisabled. If the upstream is
   // destroyed, there should be no further reads as well.
   ASSERT(0 == data.length());
+  maybeCloseDownstreamForDrainClose();
   return Network::FilterStatus::StopIteration;
 }
 
@@ -1146,9 +1181,15 @@ Network::FilterStatus Filter::onNewConnection() {
     return establishUpstreamConnection();
   }
 
-  // For ON_DOWNSTREAM_DATA or ON_DOWNSTREAM_TLS_HANDSHAKE modes, delay the connection.
-  // Pre-pick the route so it's available when connection is triggered.
-  route_ = pickRoute();
+  if (!delay_route_selection_) {
+    // For ON_DOWNSTREAM_DATA or ON_DOWNSTREAM_TLS_HANDSHAKE modes, delay the connection.
+    // Pre-pick the route so it's available when connection is triggered.
+    route_ = pickRoute();
+  } else {
+    config_->stats().route_delayed_total_.inc();
+    ENVOY_CONN_LOG(debug, "Delaying picking route until upstream connection establishement",
+                   read_callbacks_->connection());
+  }
 
   // Log the specific delay reason.
   if (connect_mode_ == UpstreamConnectMode::ON_DOWNSTREAM_DATA) {
@@ -1228,6 +1269,20 @@ void Filter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   read_callbacks_->connection().write(data, end_stream);
   ASSERT(0 == data.length());
   resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
+  maybeCloseDownstreamForDrainClose();
+}
+
+void Filter::maybeCloseDownstreamForDrainClose() {
+  if (!config_->checkDrainClose() || downstream_closed_ ||
+      read_callbacks_->connection().state() != Network::Connection::State::Open ||
+      !config_->drainDecision().drainClose(config_->drainCloseScope())) {
+    return;
+  }
+
+  ENVOY_CONN_LOG(debug, "drain closing tcp_proxy connection", read_callbacks_->connection());
+  config_->stats().downstream_cx_drain_close_.inc();
+  read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite,
+                                      StreamInfo::LocalCloseReasons::get().TcpProxyDrainClose);
 }
 
 void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
@@ -1464,7 +1519,10 @@ void Filter::onDownstreamTlsHandshakeComplete() {
 
   // For ON_DOWNSTREAM_TLS_HANDSHAKE mode, establish the upstream connection now.
   if (connect_mode_ == UpstreamConnectMode::ON_DOWNSTREAM_TLS_HANDSHAKE) {
-    // Route should already be set in onNewConnection().
+    if (delay_route_selection_) {
+      route_ = pickRoute();
+    }
+    // If delay_route_selection_ is unset, route should already be set in onNewConnection().
     ASSERT(route_ != nullptr);
     establishUpstreamConnection();
   }

@@ -9,7 +9,6 @@
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
-#include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/utility.h"
 #include "test/test_common/wasm_base.h"

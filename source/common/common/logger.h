@@ -480,6 +480,24 @@ public:
   constexpr static char Placeholder = '+';
 };
 
+/**
+ * When added to a formatter, this adds 'N' as a user defined flag in the log pattern that emits
+ * the Envoy version string set via setVersion(). Use %N in --log-format to include the running
+ * version in every log line. Call setVersion() once at server start-up (before any logs are
+ * written) with the result of VersionInfo::version().
+ */
+class EnvoyVersion : public spdlog::custom_flag_formatter {
+public:
+  void format(const spdlog::details::log_msg& msg, const std::tm& tm,
+              spdlog::memory_buf_t& dest) override;
+
+  std::unique_ptr<custom_flag_formatter> clone() const override {
+    return spdlog::details::make_unique<EnvoyVersion>();
+  }
+
+  constexpr static char Placeholder = 'N';
+};
+
 } // namespace CustomFlagFormatter
 } // namespace Logger
 

@@ -98,15 +98,15 @@ private:
   void writeFieldBeginInternal(Buffer::Instance& buffer, FieldType field_type, int16_t field_id,
                                absl::optional<CompactFieldType> field_type_override);
 
-  std::stack<int16_t> last_field_id_stack_{};
+  std::stack<int16_t> last_field_id_stack_;
   int16_t last_field_id_{0};
 
   // Compact protocol encodes boolean struct fields as true/false *types* with no data.
   // This tracks the last boolean struct field's value for readBool.
-  absl::optional<bool> bool_value_{};
+  absl::optional<bool> bool_value_;
 
   // Similarly, track the field id for writeBool.
-  absl::optional<int16_t> bool_field_id_{};
+  absl::optional<int16_t> bool_field_id_;
 
   const static uint16_t Magic;
   const static uint16_t MagicMask;

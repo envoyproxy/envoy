@@ -32,8 +32,6 @@
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/grpc/utility.h"
 #include "test/integration/fake_upstream.h"
-#include "test/mocks/grpc/mocks.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"

@@ -3,11 +3,11 @@
 #include "source/common/http/header_map_impl.h"
 
 #include "test/integration/http_integration.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
 namespace Envoy {
 
 void AdaptiveConcurrencyIntegrationTest::sendRequests(uint32_t request_count,
@@ -45,7 +45,7 @@ void AdaptiveConcurrencyIntegrationTest::sendRequests(uint32_t request_count,
     auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
     responses_.push_back(std::move(response));
 
-    test_server_->waitForCounterEq(REQUEST_BLOCK_COUNTER_NAME, ++blocked_counter);
+    test_server_->waitForCounter(REQUEST_BLOCK_COUNTER_NAME, Eq(++blocked_counter));
 
     // These will remain nullptr.
     upstream_connections_.emplace_back();
@@ -114,7 +114,7 @@ TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrency1) {
   EXPECT_EQ(0, test_server_->counter(REQUEST_BLOCK_COUNTER_NAME)->value());
   sendRequests(2, 1);
   respondToAllRequests(1, std::chrono::milliseconds(5));
-  test_server_->waitForCounterEq(REQUEST_BLOCK_COUNTER_NAME, 1);
+  test_server_->waitForCounter(REQUEST_BLOCK_COUNTER_NAME, Eq(1));
 }
 
 // Test many requests, where only a single request returns 200 during the minRTT window.
@@ -124,7 +124,7 @@ TEST_P(AdaptiveConcurrencyIntegrationTest, TestManyConcurrency1) {
   EXPECT_EQ(0, test_server_->counter(REQUEST_BLOCK_COUNTER_NAME)->value());
   sendRequests(10, 1);
   respondToAllRequests(1, std::chrono::milliseconds(5));
-  test_server_->waitForCounterEq(REQUEST_BLOCK_COUNTER_NAME, 9);
+  test_server_->waitForCounter(REQUEST_BLOCK_COUNTER_NAME, Eq(9));
 }
 
 // Test many grpc requests, where only a single request returns 200 during the minRTT window.
@@ -135,7 +135,7 @@ TEST_P(AdaptiveConcurrencyIntegrationTest, TestManyConcurrencyGrpc) {
   EXPECT_EQ(0, test_server_->counter(REQUEST_BLOCK_COUNTER_NAME)->value());
   sendRequests(10, 1);
   respondToAllRequests(1, std::chrono::milliseconds(5));
-  test_server_->waitForCounterEq(REQUEST_BLOCK_COUNTER_NAME, 9);
+  test_server_->waitForCounter(REQUEST_BLOCK_COUNTER_NAME, Eq(9));
 }
 
 /**

@@ -4,7 +4,7 @@
 #include "source/extensions/filters/http/proto_message_extraction/filter_config.h"
 
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/proto/apikeys.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"

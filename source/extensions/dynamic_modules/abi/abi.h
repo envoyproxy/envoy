@@ -9439,6 +9439,48 @@ bool envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_
     envoy_dynamic_module_type_envoy_buffer* result_buffer);
 
 /**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes is called by the module
+ * to get the bytes value of the request's filter state with the given key. This lets a
+ * dynamic-module cluster consume filter state set by an upstream HTTP filter (or any other
+ * producer that stores a ``Router::StringAccessor``) when picking a host. If the filter state is
+ * not accessible, the key does not exist, or the value is not a ``Router::StringAccessor``, this
+ * returns false.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param key is the key of the filter state.
+ * @param result is the pointer to the pointer variable where the pointer to the buffer
+ * of the bytes value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note that the buffer pointed by the pointer stored in result is owned by Envoy, and
+ * is guaranteed to be valid for the duration of the current host-selection callback.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed is called by the module
+ * to get the serialized bytes value of a typed filter state object with the given key. It
+ * retrieves the object generically and calls serializeAsString to get the bytes representation,
+ * so it works with any filter state object type (e.g. one set by an upstream HTTP filter through
+ * a registered ``ObjectFactory``), not just ``Router::StringAccessor``.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param key is the key of the filter state.
+ * @param result is the pointer to the buffer where the serialized value will be stored.
+ * @return true if the operation is successful, false if the stream info is not available, the key
+ * does not exist, or the object does not support serialization.
+ *
+ * Note that the buffer pointed by the pointer stored in result is owned by Envoy, and is
+ * guaranteed to be valid until the next invocation of this callback on the same worker thread
+ * or until the end of the current host-selection callback, whichever comes first.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
  * envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete is called by the module
  * to deliver the result of an asynchronous host selection. This must be called exactly once for
  * each async handle returned from envoy_dynamic_module_on_cluster_lb_choose_host, unless

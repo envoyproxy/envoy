@@ -74,6 +74,7 @@ public:
     ENVOY_LOG_MISC(trace, "TestTracer setSampled: {}", do_sample);
     sampled_ = do_sample;
   }
+  bool exportedSpan() const override { return true; }
   bool useLocalDecision() const override {
     // NOTE: the trace decision from Envoy will be ignored in the startSpan() method
     // of this test implementation. So, the useLocalDecision() method is only for logging

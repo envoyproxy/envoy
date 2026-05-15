@@ -119,4 +119,10 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.upstreams.http.tcp.golang":                          "//contrib/golang/upstreams/http/tcp/source:config",
+
+    #
+    # Reverse tunnel reporters
+    #
+
+    "envoy.bootstrap.reverse_tunnel.reverse_tunnel_reporting_service": "//contrib/reverse_tunnel_reporter/source:config",
 }

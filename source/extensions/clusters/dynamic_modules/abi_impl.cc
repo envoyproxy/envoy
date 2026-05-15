@@ -3,7 +3,9 @@
 // This file provides host-side implementations for the cluster dynamic module ABI callbacks.
 
 #include "source/common/common/assert.h"
+#include "source/common/common/thread.h"
 #include "source/common/http/message_impl.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/clusters/dynamic_modules/cluster.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
@@ -64,16 +66,17 @@ getClusterHostMetadataValue(envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_en
   return &field_it->second;
 }
 
+// Builds the tag vector using a caller-owned stack-local pool so the shared `stat_name_pool_`
+// is not mutated from worker threads. Returned tags borrow storage from `dynamic_pool`.
 Envoy::Stats::StatNameTagVector buildTagsForClusterMetric(
-    Envoy::Extensions::Clusters::DynamicModules::DynamicModuleClusterConfig& config,
-    const Envoy::Stats::StatNameVec& label_names,
+    Envoy::Stats::StatNameDynamicPool& dynamic_pool, const Envoy::Stats::StatNameVec& label_names,
     envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length) {
   ASSERT(label_values_length == label_names.size());
   Envoy::Stats::StatNameTagVector tags;
   tags.reserve(label_values_length);
   for (size_t i = 0; i < label_values_length; i++) {
     absl::string_view label_value_view(label_values[i].ptr, label_values[i].length);
-    auto label_value = config.stat_name_pool_.add(label_value_view);
+    auto label_value = dynamic_pool.add(label_value_view);
     tags.push_back(Envoy::Stats::StatNameTag(label_names[i], label_value));
   }
   return tags;
@@ -91,6 +94,14 @@ bool envoy_dynamic_module_callback_cluster_add_hosts(
     const envoy_dynamic_module_type_module_buffer* sub_zones,
     const envoy_dynamic_module_type_module_buffer* metadata_pairs, size_t metadata_pairs_per_host,
     size_t count, envoy_dynamic_module_type_cluster_host_envoy_ptr* result_host_ptrs) {
+  // `cluster_add_hosts` mutates `priority_set_` and runs member-update callbacks; both are
+  // main-thread-only. The previous `ASSERT_IS_MAIN_OR_TEST_THREAD` is compiled out under NDEBUG,
+  // so guard explicitly and fail closed.
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(
+        "envoy_dynamic_module_callback_cluster_add_hosts must be called on the main thread");
+    return false;
+  }
   auto* cluster = getCluster(cluster_envoy_ptr);
   std::vector<std::string> address_strings;
   address_strings.reserve(count);
@@ -139,6 +150,11 @@ bool envoy_dynamic_module_callback_cluster_add_hosts(
 size_t envoy_dynamic_module_callback_cluster_remove_hosts(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
     const envoy_dynamic_module_type_cluster_host_envoy_ptr* host_envoy_ptrs, size_t count) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(
+        "envoy_dynamic_module_callback_cluster_remove_hosts must be called on the main thread");
+    return 0;
+  }
   auto* cluster = getCluster(cluster_envoy_ptr);
   std::vector<Envoy::Upstream::HostSharedPtr> hosts;
   hosts.reserve(count);
@@ -152,6 +168,11 @@ bool envoy_dynamic_module_callback_cluster_update_host_health(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
     envoy_dynamic_module_type_cluster_host_envoy_ptr host_envoy_ptr,
     envoy_dynamic_module_type_host_health health_status) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_update_host_health must be called on the "
+                 "main thread");
+    return false;
+  }
   auto* cluster = getCluster(cluster_envoy_ptr);
   auto host = cluster->findHost(host_envoy_ptr);
   return cluster->updateHostHealth(std::move(host), health_status);
@@ -172,6 +193,11 @@ envoy_dynamic_module_callback_cluster_find_host_by_address(
 
 void envoy_dynamic_module_callback_cluster_pre_init_complete(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_pre_init_complete must be called on the "
+                 "main thread");
+    return;
+  }
   getCluster(cluster_envoy_ptr)->preInitComplete();
 }
 
@@ -806,6 +832,70 @@ bool envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_
   return true;
 }
 
+bool envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result) {
+  if (context_envoy_ptr == nullptr || result == nullptr) {
+    return false;
+  }
+  auto* stream_info = getContext(context_envoy_ptr)->requestStreamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+  absl::string_view key_view(key.ptr, key.length);
+  auto filter_state =
+      stream_info->filterState()->getDataReadOnly<Envoy::Router::StringAccessor>(key_view);
+  if (!filter_state) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "key '{}' not found in filter state", key_view);
+    return false;
+  }
+  absl::string_view str = filter_state->asString();
+  *result = {const_cast<char*>(str.data()), str.size()};
+  return true;
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result) {
+  if (context_envoy_ptr == nullptr || result == nullptr) {
+    return false;
+  }
+  auto* stream_info = getContext(context_envoy_ptr)->requestStreamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+
+  absl::string_view key_view(key.ptr, key.length);
+  const auto* object = stream_info->filterState()->getDataReadOnlyGeneric(key_view);
+  if (object == nullptr) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "key '{}' not found in filter state", key_view);
+    return false;
+  }
+
+  auto serialized = object->serializeAsString();
+  if (!serialized.has_value()) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "filter state object for key '{}' does not support serialization",
+                        key_view);
+    return false;
+  }
+
+  // Cluster host selection runs on a worker thread serially per request. We stash the
+  // serialized buffer on a thread-local so its address survives until the next call to
+  // this function on the same thread (matching the documented lifetime in abi.h).
+  thread_local std::string last_serialized_filter_state;
+  last_serialized_filter_state = std::move(serialized.value());
+  result->ptr = const_cast<char*>(last_serialized_filter_state.data());
+  result->length = last_serialized_filter_state.size();
+  return true;
+}
+
 envoy_dynamic_module_type_cluster_scheduler_module_ptr
 envoy_dynamic_module_callback_cluster_scheduler_new(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr) {
@@ -839,6 +929,9 @@ envoy_dynamic_module_callback_cluster_config_define_counter(
     envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
     size_t* counter_id_ptr) {
   auto* config = getConfig(cluster_config_envoy_ptr);
+  if (config->stat_creation_frozen_) {
+    return envoy_dynamic_module_type_metrics_result_Frozen;
+  }
   absl::string_view name_view(name.ptr, name.length);
   Envoy::Stats::StatName main_stat_name = config->stat_name_pool_.add(name_view);
 
@@ -885,7 +978,8 @@ envoy_dynamic_module_callback_cluster_config_increment_counter(
   if (label_values_length != counter->getLabelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
-  auto tags = buildTagsForClusterMetric(*config, counter->getLabelNames(), label_values,
+  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->stats_scope_->symbolTable());
+  auto tags = buildTagsForClusterMetric(dynamic_pool, counter->getLabelNames(), label_values,
                                         label_values_length);
   counter->add(*config->stats_scope_, tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
@@ -897,6 +991,9 @@ envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_cluster_c
     envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
     size_t* gauge_id_ptr) {
   auto* config = getConfig(cluster_config_envoy_ptr);
+  if (config->stat_creation_frozen_) {
+    return envoy_dynamic_module_type_metrics_result_Frozen;
+  }
   absl::string_view name_view(name.ptr, name.length);
   Envoy::Stats::StatName main_stat_name = config->stat_name_pool_.add(name_view);
   Envoy::Stats::Gauge::ImportMode import_mode = Envoy::Stats::Gauge::ImportMode::Accumulate;
@@ -943,8 +1040,9 @@ envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_cluster_c
   if (label_values_length != gauge->getLabelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
-  auto tags =
-      buildTagsForClusterMetric(*config, gauge->getLabelNames(), label_values, label_values_length);
+  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->stats_scope_->symbolTable());
+  auto tags = buildTagsForClusterMetric(dynamic_pool, gauge->getLabelNames(), label_values,
+                                        label_values_length);
   gauge->set(*config->stats_scope_, tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
@@ -975,8 +1073,9 @@ envoy_dynamic_module_callback_cluster_config_increment_gauge(
   if (label_values_length != gauge->getLabelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
-  auto tags =
-      buildTagsForClusterMetric(*config, gauge->getLabelNames(), label_values, label_values_length);
+  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->stats_scope_->symbolTable());
+  auto tags = buildTagsForClusterMetric(dynamic_pool, gauge->getLabelNames(), label_values,
+                                        label_values_length);
   gauge->add(*config->stats_scope_, tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
@@ -1007,8 +1106,9 @@ envoy_dynamic_module_callback_cluster_config_decrement_gauge(
   if (label_values_length != gauge->getLabelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
-  auto tags =
-      buildTagsForClusterMetric(*config, gauge->getLabelNames(), label_values, label_values_length);
+  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->stats_scope_->symbolTable());
+  auto tags = buildTagsForClusterMetric(dynamic_pool, gauge->getLabelNames(), label_values,
+                                        label_values_length);
   gauge->sub(*config->stats_scope_, tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
@@ -1020,6 +1120,9 @@ envoy_dynamic_module_callback_cluster_config_define_histogram(
     envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
     size_t* histogram_id_ptr) {
   auto* config = getConfig(cluster_config_envoy_ptr);
+  if (config->stat_creation_frozen_) {
+    return envoy_dynamic_module_type_metrics_result_Frozen;
+  }
   absl::string_view name_view(name.ptr, name.length);
   Envoy::Stats::StatName main_stat_name = config->stat_name_pool_.add(name_view);
   Envoy::Stats::Histogram::Unit unit = Envoy::Stats::Histogram::Unit::Unspecified;
@@ -1067,7 +1170,8 @@ envoy_dynamic_module_callback_cluster_config_record_histogram_value(
   if (label_values_length != histogram->getLabelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
-  auto tags = buildTagsForClusterMetric(*config, histogram->getLabelNames(), label_values,
+  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->stats_scope_->symbolTable());
+  auto tags = buildTagsForClusterMetric(dynamic_pool, histogram->getLabelNames(), label_values,
                                         label_values_length);
   histogram->recordValue(*config->stats_scope_, tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;

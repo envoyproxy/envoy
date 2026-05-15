@@ -83,11 +83,11 @@ private:
 
   Thread::MainThread main_thread_;
   std::vector<Slot*> slots_;
-  // A list of index of freed slots.
-  std::list<uint32_t> free_slot_indexes_;
+  // A collection of indices of freed slots.
+  std::vector<uint32_t> free_slot_indexes_;
   std::list<std::reference_wrapper<Event::Dispatcher>> registered_threads_;
   Event::Dispatcher* main_thread_dispatcher_{};
-  std::atomic<bool> shutdown_{};
+  std::atomic<bool> shutdown_{false};
 
   // Test only.
   friend class ThreadLocalInstanceImplTest;

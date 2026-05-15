@@ -8,7 +8,6 @@
 #include "test/integration/ads_integration.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -148,7 +147,7 @@ public:
     EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "1",
                                         {"route_config_0"}, {}, {}));
 
-    test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+    test_server_->waitForCounter("listener_manager.listener_create_success", testing::Ge(1));
 
     // Make a request to verify listener_0 is working.
     makeSingleRequest();

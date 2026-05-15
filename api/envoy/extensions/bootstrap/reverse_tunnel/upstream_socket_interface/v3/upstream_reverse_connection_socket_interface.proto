@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3;
 
+import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/extension.proto";
 
 import "google/protobuf/wrappers.proto";
@@ -19,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.bootstrap.reverse_tunnel.upstream_socket_interface]
 
 // Configuration for the upstream reverse connection socket interface.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message UpstreamReverseConnectionSocketInterface {
   // Stat prefix for upstream reverse connection socket interface stats.
   string stat_prefix = 1;
@@ -44,4 +45,8 @@ message UpstreamReverseConnectionSocketInterface {
   // containing the ``:`` delimiter are rejected to avoid ambiguity.
   // Defaults to ``false`` for backwards compatibility.
   google.protobuf.BoolValue enable_tenant_isolation = 5;
+
+  // Access logs emitted for reverse tunnel lifecycle events. Entries are generated for tunnel setup,
+  // socket handoff, tunnel close, and post-handoff HTTP/2 keepalive timeout observations.
+  repeated config.accesslog.v3.AccessLog access_log = 6;
 }
