@@ -20,7 +20,8 @@ namespace {
 
 class DummyProxyResolver : public Network::ProxyResolver {
 public:
-  Network::ProxyResolutionResult resolveProxy(const std::string&, std::vector<Network::ProxySettings>&,
+  Network::ProxyResolutionResult resolveProxy(const std::string&,
+                                              std::vector<Network::ProxySettings>&,
                                               Network::ProxySettingsResolvedCallback) override {
     return Network::ProxyResolutionResult::NoProxyConfigured;
   }

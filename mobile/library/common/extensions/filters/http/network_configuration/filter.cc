@@ -90,7 +90,9 @@ NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_header
     if (Thread::MainThread::isMainOrTestThread()) {
       return resolveProxy(request_headers, proxy_resolver);
     } else {
-      ENVOY_LOG(debug, "Skipping proxy resolution as not on main thread (likely running on worker thread)");
+      ENVOY_LOG(
+          debug,
+          "Skipping proxy resolution as not on main thread (likely running on worker thread)");
     }
   }
 
