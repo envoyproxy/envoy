@@ -91,7 +91,7 @@ public:
   private:
     TapConfigBaseImpl& parent_;
     PerTapSinkHandlePtr handle_;
-    [[maybe_unused]] bool stamped_{false};
+    bool stamped_{false};
   };
 
   // TapConfig

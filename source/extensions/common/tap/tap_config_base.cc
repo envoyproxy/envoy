@@ -236,6 +236,12 @@ void Utility::bodyBytesToString(envoy::data::tap::v3::TraceWrapper& trace,
 }
 
 void TapConfigBaseImpl::PerTapSinkHandleManagerImpl::submitTrace(TraceWrapperPtr&& trace) {
+  if (parent_.tap_enabled_.has_value() && !stamped_) {
+    // Stamp the configured default_value. When runtime_key is active the effective
+    // rate may differ; this is documented on the applied_sample_rate field.
+    trace->mutable_applied_sample_rate()->MergeFrom(parent_.tap_enabled_->default_value());
+    stamped_ = true;
+  }
   Utility::bodyBytesToString(*trace, parent_.sink_format_);
   handle_->submitTrace(std::move(trace), parent_.sink_format_);
 }

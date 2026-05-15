@@ -41,7 +41,9 @@ message TraceWrapper {
     SocketStreamedTraceSegment socket_streamed_trace_segment = 4;
   }
 
-  // The fractional sample rate that admitted this trace, as configured by
+  // The fractional sample rate that admitted this trace, sourced from the configured
+  // :ref:`default_value
+  // <envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.default_value>` of
   // :ref:`tap_enabled <envoy_v3_api_field_config.tap.v3.TapConfig.tap_enabled>`. For
   // buffered output (where each ``TraceWrapper`` carries a complete trace) the rate is
   // always present when sampling is configured. For streamed output (where a trace is
@@ -49,5 +51,14 @@ message TraceWrapper {
   // emitted segment only; subsequent segments belonging to the same trace can be
   // joined to it via the ``trace_id`` carried on each inner segment message. Absent
   // when sampling is unconfigured.
+  //
+  // .. note::
+  //
+  //   When :ref:`runtime_key
+  //   <envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` is
+  //   configured and an active runtime override is in effect, the effective sampling
+  //   rate used to admit the trace may differ from this value; the runtime layer is
+  //   authoritative for the actual admit decision. Consumers that need the resolved
+  //   rate should consult the runtime layer directly.
   type.v3.FractionalPercent applied_sample_rate = 5;
 }
