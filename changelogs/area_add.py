@@ -30,7 +30,7 @@ def resolve_area(args: argparse.Namespace, stdin: TextIO) -> str:
             print(error)
 
 
-def resolve_title(args: argparse.Namespace, area: str, stdin: TextIO) -> str:
+def resolve_title(args: argparse.Namespace, area: str) -> str:
     if args.title is not None:
         return args.title
     return area
@@ -61,7 +61,7 @@ def main(
         args = parse_args(argv)
         root = _lib.repo_root(environ)
         area = resolve_area(args, stdin)
-        path = add_area(root, area, resolve_title(args, area, stdin))
+        path = add_area(root, area, resolve_title(args, area))
         print(path.relative_to(root), file=stdout)
         return 0
     except _lib.UsageError as error:

@@ -5,6 +5,8 @@ from typing import Dict, Iterable, List, Mapping, Optional, TextIO, Tuple
 import yaml
 
 AREA_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+# Keep slugs short but aligned with the per-entry filenames introduced by the
+# changelog migration (for example, "...http-filter-per" and "...match-error").
 DEFAULT_SLUG_MAX_LENGTH = 39
 
 

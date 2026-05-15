@@ -7,6 +7,23 @@ from changelogs import _lib
 from changelogs import add
 from changelogs import area_add
 
+TEST_SECTIONS_YAML = """\
+bug_fixes:
+  title: Bug fixes
+new_features:
+  title: New features
+"""
+
+TEST_AREAS_YAML = """\
+# NB: areas listed here are the canonical set accepted by per-entry changelog
+#     filenames in changelogs/current/
+
+build:
+  title: build
+tls:
+  title: tls
+"""
+
 
 class FakeStdinStream(io.StringIO):
 
@@ -25,21 +42,8 @@ class ChangelogHelpersTest(unittest.TestCase):
         self.repo_root = Path(self._tmp.name)
         changelogs = self.repo_root / "changelogs"
         changelogs.mkdir()
-        (changelogs / "sections.yaml").write_text("""\
-bug_fixes:
-  title: Bug fixes
-new_features:
-  title: New features
-""")
-        (changelogs / "areas.yaml").write_text("""\
-# NB: areas listed here are the canonical set accepted by per-entry changelog
-#     filenames in changelogs/current/
-
-build:
-  title: build
-tls:
-  title: tls
-""")
+        (changelogs / "sections.yaml").write_text(TEST_SECTIONS_YAML)
+        (changelogs / "areas.yaml").write_text(TEST_AREAS_YAML)
         self.environ = {"BUILD_WORKSPACE_DIRECTORY": str(self.repo_root)}
 
     def tearDown(self):
