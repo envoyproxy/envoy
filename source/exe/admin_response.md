@@ -1,11 +1,26 @@
 ```mermaid
-  stateDiagram-v2 direction TB [*] --> Uninit: Created Uninit --> GetChunks: nextChunk() state
-  GetChunks { [*] --> Ready Ready --> Ready: nextChunk(): Sync chunk, more to come Ready -->
-  WaitingAsync: nextChunk(): Async operation started Ready --> [*]: nextChunk(): Final sync chunk }
-  GetChunks --> Continue: Async op started Continue --> GetChunks: onChunk(): Async data received
-  Continue --> Done: onDrained(): Async finished Uninit --> Done: Cancel / Failure / Shutdown
-  GetChunks --> Done: Cancel / Failure / Shutdown / Error Continue --> Done: Cancel / Failure /
-  Shutdown / Error state Done <<choice>> GetChunks -down-> Done
+stateDiagram-v2
+    direction TB
+
+    [*] --> Uninit: Created
+
+    Uninit --> GetChunks: nextChunk()
+    Uninit --> Done: Cancel / Failure / Shutdown
+
+    GetChunks --> GetChunks: nextChunk(): Sync, more data
+    GetChunks --> Continue: nextChunk(): Async op started
+    GetChunks --> Done: nextChunk(): Final sync chunk
+    GetChunks --> Done: Error in nextChunk()
+    GetChunks --> Done: Cancel / Failure / Shutdown
+
+    Continue --> GetChunks: onChunk(): Async data received
+    Continue --> Done: onDrained(): Async finished
+    Continue --> Done: Error in callback
+    Continue --> Done: Cancel / Failure / Shutdown
+
+    state Done {
+        description: Terminal State
+    }
 ```
 
 Explanation of Mermaid Syntax:
