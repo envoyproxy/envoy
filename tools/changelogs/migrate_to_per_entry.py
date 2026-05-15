@@ -29,8 +29,11 @@ def _base_slug(change: str) -> str:
     if not text:
         return "entry"
     first_sentence = text.split(". ", 1)[0]
-    slug_source = first_sentence if len(first_sentence) <= SLUG_SOURCE_LENGTH else text[
-        :SLUG_SOURCE_LENGTH]
+    slug_source = (
+        first_sentence
+        if len(first_sentence) <= SLUG_SOURCE_LENGTH
+        else first_sentence[:SLUG_SOURCE_LENGTH]
+    )
     normalized = re.sub(r"[^a-z0-9]+", "-", slug_source.lower()).strip("-")
     if not normalized:
         normalized = "entry"
@@ -43,7 +46,7 @@ def _encode_area(area: str) -> str:
 
 def _write_area_file(path: pathlib.Path, change: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(f"{change.rstrip(chr(10))}\n")
+    path.write_text(change.rstrip("\n") + "\n")
 
 
 def _area_metadata(areas: Iterable[str]) -> str:
@@ -64,6 +67,11 @@ def migrate(project_root: pathlib.Path) -> None:
     current_entries_dir = changelogs_dir / "current"
     areas_yaml_path = changelogs_dir / "areas.yaml"
 
+    if not current_yaml_path.exists():
+        raise FileNotFoundError(f"Missing required changelog file: {current_yaml_path}")
+    if not sections_yaml_path.exists():
+        raise FileNotFoundError(f"Missing required changelog file: {sections_yaml_path}")
+
     current_data = yaml.safe_load(current_yaml_path.read_text()) or {}
     sections_data = yaml.safe_load(sections_yaml_path.read_text()) or {}
 
@@ -79,8 +87,13 @@ def migrate(project_root: pathlib.Path) -> None:
         if not section_entries:
             continue
         for entry in section_entries:
-            area = entry["area"]
-            change = entry["change"]
+            area = entry.get("area", "")
+            change = entry.get("change", "")
+            if not area:
+                raise ValueError(f"Entry in section '{section}' is missing a non-empty 'area' value")
+            if not change or not change.strip():
+                raise ValueError(
+                    f"Entry in section '{section}' and area '{area}' is missing a non-empty 'change' value")
             if area not in areas:
                 areas.append(area)
             area_encoded = _encode_area(area)

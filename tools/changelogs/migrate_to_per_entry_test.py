@@ -15,7 +15,7 @@ SCRIPT_PATH = pathlib.Path(__file__).with_name("migrate_to_per_entry.py")
 
 class MigrateToPerEntryTest(unittest.TestCase):
 
-    def _write_repo_files(self, root: pathlib.Path, date_value: str = "Pending") -> None:
+    def _write_test_changelog_files(self, root: pathlib.Path, date_value: str = "Pending") -> None:
         changelogs_dir = root / "changelogs"
         changelogs_dir.mkdir(parents=True, exist_ok=True)
         (changelogs_dir / "sections.yaml").write_text(textwrap.dedent("""\
@@ -44,7 +44,7 @@ class MigrateToPerEntryTest(unittest.TestCase):
     def test_migration_generates_entry_files_and_rewrites_yaml(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = pathlib.Path(tmpdir)
-            self._write_repo_files(root)
+            self._write_test_changelog_files(root)
 
             subprocess.run(
                 [sys.executable, str(SCRIPT_PATH), "--root", str(root)],
@@ -87,7 +87,7 @@ class MigrateToPerEntryTest(unittest.TestCase):
     def test_migration_preserves_non_pending_date(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = pathlib.Path(tmpdir)
-            self._write_repo_files(root, date_value="January 1, 2026")
+            self._write_test_changelog_files(root, date_value="January 1, 2026")
 
             subprocess.run(
                 [sys.executable, str(SCRIPT_PATH), "--root", str(root)],
