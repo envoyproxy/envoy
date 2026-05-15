@@ -89,7 +89,7 @@ def load_sections(root: Path) -> Dict[str, Dict[str, str]]:
 def load_areas(root: Path) -> Dict[str, Dict[str, str]]:
     return load_yaml_mapping(
         areas_path(root),
-        "Run this helper on a branch that includes the per-entry changelog migration (#45093).",
+        "Ensure your branch includes the per-entry changelog structure.",
     )
 
 

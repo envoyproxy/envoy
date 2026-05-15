@@ -13,7 +13,12 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Add a per-entry changelog file.")
     parser.add_argument("--section")
     parser.add_argument("--area")
-    parser.add_argument("--change", "--message", dest="change")
+    parser.add_argument(
+        "--change",
+        "--message",
+        dest="change",
+        help="Changelog body text (alias: --message).",
+    )
     parser.add_argument("--change-file")
     return parser.parse_args(argv)
 
