@@ -224,6 +224,7 @@ envoy_cc_library(
     deps = [
         ":custom_config_validators_lib",
         ":dependent_type_pausing_subscription_lib",
+        ":singleton_subscription_adapter_lib",
         ":type_to_endpoint_lib",
         ":utility_lib",
         ":xds_resource_lib",

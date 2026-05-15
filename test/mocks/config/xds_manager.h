@@ -26,6 +26,12 @@ public:
                absl::string_view type_url, Stats::Scope& scope, SubscriptionCallbacks& callbacks,
                OpaqueResourceDecoderSharedPtr resource_decoder,
                const SubscriptionOptions& options));
+  MOCK_METHOD(absl::StatusOr<std::unique_ptr<SingletonSubscription>>, subscribeToSingletonResource,
+              (absl::string_view resource_name,
+               OptRef<const envoy::config::core::v3::ConfigSource> config,
+               absl::string_view type_url, Stats::Scope& scope, SingletonSubscriptionCallbacks& callbacks,
+               OpaqueResourceDecoderSharedPtr resource_decoder,
+               const SubscriptionOptions& options));
   MOCK_METHOD(void, shutdown, ());
   MOCK_METHOD(absl::Status, setAdsConfigSource,
               (const envoy::config::core::v3::ApiConfigSource& config_source));

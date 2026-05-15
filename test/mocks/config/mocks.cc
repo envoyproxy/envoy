@@ -22,6 +22,16 @@ MockSubscriptionFactory::MockSubscriptionFactory() {
         callbacks_ = &callbacks;
         return ret;
       }));
+  ON_CALL(*this, subscriptionFromConfigSource(_, _, _, _, _, _, _))
+      .WillByDefault(Invoke([this](const envoy::config::core::v3::ConfigSource&, absl::string_view,
+                                   Stats::Scope&, absl::string_view, SingletonSubscriptionCallbacks& callbacks,
+                                   OpaqueResourceDecoderSharedPtr,
+                                   const SubscriptionOptions&) -> absl::StatusOr<std::unique_ptr<SingletonSubscription>> {
+        auto ret = std::make_unique<NiceMock<MockSingletonSubscription>>();
+        singleton_subscription_ = ret.get();
+        singleton_callbacks_ = &callbacks;
+        return ret;
+      }));
   ON_CALL(*this, subscriptionOverAdsGrpcMux(_, _, _, _, _, _, _))
       .WillByDefault(Invoke([this](GrpcMuxSharedPtr&, const envoy::config::core::v3::ConfigSource&,
                                    absl::string_view, Stats::Scope&,
@@ -30,6 +40,16 @@ MockSubscriptionFactory::MockSubscriptionFactory() {
         auto ret = std::make_unique<NiceMock<MockSubscription>>();
         subscription_ = ret.get();
         callbacks_ = &callbacks;
+        return ret;
+      }));
+  ON_CALL(*this, subscriptionOverAdsGrpcMux(_, _, _, _, _, _, _, _))
+      .WillByDefault(Invoke([this](GrpcMuxSharedPtr&, const envoy::config::core::v3::ConfigSource&,
+                                   absl::string_view, Stats::Scope&, absl::string_view,
+                                   SingletonSubscriptionCallbacks& callbacks, OpaqueResourceDecoderSharedPtr,
+                                   const SubscriptionOptions&) -> absl::StatusOr<std::unique_ptr<SingletonSubscription>> {
+        auto ret = std::make_unique<NiceMock<MockSingletonSubscription>>();
+        singleton_subscription_ = ret.get();
+        singleton_callbacks_ = &callbacks;
         return ret;
       }));
   ON_CALL(*this, collectionSubscriptionFromUrl(_, _, _, _, _, _))

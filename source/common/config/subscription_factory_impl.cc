@@ -6,6 +6,7 @@
 #include "source/common/config/custom_config_validators_impl.h"
 #include "source/common/config/dependent_type_pausing_subscription.h"
 #include "source/common/config/resource_name.h"
+#include "source/common/config/singleton_subscription_adapter.h"
 #include "source/common/config/type_to_endpoint.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_resource.h"
@@ -126,6 +127,21 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionFromConfigS
   return factory->create(data);
 }
 
+absl::StatusOr<std::unique_ptr<SingletonSubscription>>
+SubscriptionFactoryImpl::subscriptionFromConfigSource(
+    const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
+    Stats::Scope& scope, absl::string_view resource_name, SingletonSubscriptionCallbacks& callbacks,
+    OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) {
+  auto adapter = std::make_unique<SingletonSubscriptionCallbacksAdapter>(callbacks);
+  absl::StatusOr<SubscriptionPtr> sub_or_error = subscriptionFromConfigSource(
+      config, type_url, scope, *adapter, resource_decoder, options);
+  if (!sub_or_error.ok()) {
+    return sub_or_error.status();
+  }
+  return std::make_unique<SingletonSubscriptionImpl>(std::move(sub_or_error.value()), resource_name,
+                                                     std::move(adapter));
+}
+
 absl::StatusOr<SubscriptionPtr> createFromFactory(ConfigSubscriptionFactory::SubscriptionData& data,
                                                   absl::string_view subscription_type) {
   ConfigSubscriptionFactory* factory =
@@ -181,6 +197,22 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionOverAdsGrpc
         subscription_type));
   }
   return factory->create(data);
+}
+
+absl::StatusOr<std::unique_ptr<SingletonSubscription>>
+SubscriptionFactoryImpl::subscriptionOverAdsGrpcMux(
+    GrpcMuxSharedPtr& ads_grpc_mux, const envoy::config::core::v3::ConfigSource& config,
+    absl::string_view type_url, Stats::Scope& scope, absl::string_view resource_name,
+    SingletonSubscriptionCallbacks& callbacks, OpaqueResourceDecoderSharedPtr resource_decoder,
+    const SubscriptionOptions& options) {
+  auto adapter = std::make_unique<SingletonSubscriptionCallbacksAdapter>(callbacks);
+  absl::StatusOr<SubscriptionPtr> sub_or_error = subscriptionOverAdsGrpcMux(
+      ads_grpc_mux, config, type_url, scope, *adapter, resource_decoder, options);
+  if (!sub_or_error.ok()) {
+    return sub_or_error.status();
+  }
+  return std::make_unique<SingletonSubscriptionImpl>(std::move(sub_or_error.value()), resource_name,
+                                                     std::move(adapter));
 }
 
 absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::collectionSubscriptionFromUrl(

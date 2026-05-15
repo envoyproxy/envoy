@@ -64,6 +64,25 @@ public:
       OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) PURE;
 
   /**
+   * Subscription factory interface for a singleton subscription.
+   *
+   * @param config envoy::config::core::v3::ConfigSource to construct from.
+   * @param type_url type URL for the resource being subscribed to.
+   * @param scope stats scope for any stats tracked by the subscription.
+   * @param resource_name absl::string_view the resource to subscribe to.
+   * @param callbacks the callbacks needed by all SingletonSubscription objects, to deliver config updates.
+   *                  The callbacks must not result in the deletion of the SingletonSubscription object.
+   * @param resource_decoder how incoming opaque resource objects are to be decoded.
+   * @param options subscription options.
+   *
+   * @return std::unique_ptr<SingletonSubscription> subscription object corresponding for config and type_url or error status.
+   */
+  virtual absl::StatusOr<std::unique_ptr<SingletonSubscription>> subscriptionFromConfigSource(
+      const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
+      Stats::Scope& scope, absl::string_view resource_name, SingletonSubscriptionCallbacks& callbacks,
+      OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) PURE;
+
+  /**
    * Subscription factory for a given ADS grpc-mux.
    *
    * @param ads_grpc_mux the ADS GrpcMux this subscription should use.
@@ -81,6 +100,27 @@ public:
   virtual absl::StatusOr<SubscriptionPtr> subscriptionOverAdsGrpcMux(
       GrpcMuxSharedPtr& ads_grpc_mux, const envoy::config::core::v3::ConfigSource& config,
       absl::string_view type_url, Stats::Scope& scope, SubscriptionCallbacks& callbacks,
+      OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) PURE;
+
+  /**
+   * Subscription factory for a given ADS grpc-mux and singleton subscription.
+   *
+   * @param ads_grpc_mux the ADS GrpcMux this subscription should use.
+   * @param config envoy::config::core::v3::ConfigSource to construct from.
+   * @param type_url type URL for the resource being subscribed to.
+   * @param scope stats scope for any stats tracked by the subscription.
+   * @param resource_name absl::string_view the resource to subscribe to.
+   * @param callbacks the callbacks needed by all SingletonSubscription objects, to deliver config updates.
+   *                  The callbacks must not result in the deletion of the SingletonSubscription object.
+   * @param resource_decoder how incoming opaque resource objects are to be decoded.
+   * @param options subscription options.
+   *
+   * @return std::unique_ptr<SingletonSubscription> subscription object corresponding for config and type_url or error status.
+   */
+  virtual absl::StatusOr<std::unique_ptr<SingletonSubscription>> subscriptionOverAdsGrpcMux(
+      GrpcMuxSharedPtr& ads_grpc_mux, const envoy::config::core::v3::ConfigSource& config,
+      absl::string_view type_url, Stats::Scope& scope, absl::string_view resource_name,
+      SingletonSubscriptionCallbacks& callbacks,
       OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) PURE;
 
   /**
