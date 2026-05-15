@@ -670,7 +670,7 @@ TEST_F(HickoryDnsImplTest, ResolveSrvNotImplemented) {
         dispatcher_->exit();
       });
 
-  EXPECT_NE(query, nullptr);
+  EXPECT_EQ(query, nullptr);
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
   EXPECT_FALSE(callback_called);
 }
