@@ -155,5 +155,5 @@ def split_leading_comment_block(text: str) -> Tuple[str, str]:
 
 
 def dump_areas(areas: Mapping[str, Mapping[str, str]]) -> str:
-    ordered = {name: {"title": data["title"]} for name, data in sorted(areas.items())}
+    ordered = {name: dict(data) for name, data in sorted(areas.items())}
     return yaml.safe_dump(ordered, sort_keys=False)

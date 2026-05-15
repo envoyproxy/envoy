@@ -8,7 +8,7 @@ from changelogs import add
 from changelogs import area_add
 
 
-class FakeInput(io.StringIO):
+class FakeStdinStream(io.StringIO):
 
     def __init__(self, value: str = "", tty: bool = False):
         super().__init__(value)
@@ -60,7 +60,7 @@ tls:
                 "--area=tls",
                 "--change=Fixed something.",
             ],
-            stdin=FakeInput(),
+            stdin=FakeStdinStream(),
             stdout=stdout,
             stderr=io.StringIO(),
             environ=self.environ,
@@ -79,7 +79,7 @@ tls:
                 "--area=unknown_area",
                 "--change=Fixed something.",
             ],
-            stdin=FakeInput(),
+            stdin=FakeStdinStream(),
             stdout=io.StringIO(),
             stderr=stderr,
             environ=self.environ,
@@ -99,7 +99,7 @@ tls:
                 "--area=tls",
                 "--change=Fixed something.",
             ],
-            stdin=FakeInput(),
+            stdin=FakeStdinStream(),
             stdout=io.StringIO(),
             stderr=io.StringIO(),
             environ=self.environ,
@@ -114,7 +114,7 @@ tls:
     def test_area_add_inserts_in_sorted_order(self):
         exit_code = area_add.main(
             ["--area=access_log"],
-            stdin=FakeInput(),
+            stdin=FakeStdinStream(),
             stdout=io.StringIO(),
             stderr=io.StringIO(),
             environ=self.environ,
@@ -140,7 +140,7 @@ tls:
         stderr = io.StringIO()
         exit_code = area_add.main(
             ["--area=tls"],
-            stdin=FakeInput(),
+            stdin=FakeStdinStream(),
             stdout=io.StringIO(),
             stderr=stderr,
             environ=self.environ,

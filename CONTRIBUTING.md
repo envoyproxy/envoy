@@ -164,7 +164,7 @@ versioning guidelines:
   ./ci/do_ci.sh changelog-add
   ./ci/do_ci.sh changelog-add --section=bug_fixes --area=tls --change='Fixed foo.'
   ./ci/do_ci.sh changelog-area-add
-  ./ci/do_ci.sh changelog-area-add --area=new_area --title='new_area'
+  ./ci/do_ci.sh changelog-area-add --area=new_area
   ```
 * All code comments and documentation are expected to have proper English grammar and punctuation.
   If you are not a fluent English speaker (or a bad writer ;-)) please let us know and we will try
