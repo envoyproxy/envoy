@@ -115,6 +115,13 @@ public:
   virtual Api::IoCallUint64Result write(Buffer::Instance& buffer) PURE;
 
   /**
+   * Set the write buffer limit used by IoHandle implementations that stage asynchronous writes
+   * internally. Implementations that do not stage write data may ignore this.
+   * @param limit supplies the connection write buffer limit in bytes, or 0 to disable the limit.
+   */
+  virtual void setWriteBufferLimits(uint32_t limit) { UNREFERENCED_PARAMETER(limit); }
+
+  /**
    * Send a message to the address.
    * @param slices points to the location of data to be sent.
    * @param num_slice indicates number of slices |slices| contains.

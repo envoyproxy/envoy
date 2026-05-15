@@ -278,6 +278,12 @@ public:
   virtual uint64_t write(const Buffer::RawSlice* slices, uint64_t num_slice) PURE;
 
   /**
+   * Set the high watermark for the socket's internal write buffer.
+   * @param high_watermark supplies the limit in bytes, or 0 to disable the limit.
+   */
+  virtual void setWriteBufferHighWatermark(uint32_t high_watermark) PURE;
+
+  /**
    * Shutdown the socket.
    * @param how is SHUT_RD, SHUT_WR and SHUT_RDWR.
    */

@@ -59,6 +59,12 @@ bug_fixes:
     definition requires. Both factories now serialize the ``Struct`` to a JSON string and pass the
     string to the dynamic module side as the configuration, matching the behavior already in place
     for every other dynamic module extension factory.
+- area: io_uring
+  change: |
+    Fixed io_uring sockets to bound their internal asynchronous write buffer with the existing
+    connection write buffer limit. This lets Envoy's normal connection-level back-pressure and
+    overload protections engage when io_uring writes are staged faster than the kernel completes
+    them.
 - area: oauth2
   change: |
     Fixed a crash in the OAuth2 filter where AES-CBC decryption of token cookies could spuriously
@@ -72,14 +78,6 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
-- area: io_uring
-  change: |
-    Added :ref:`write_buffer_high_watermark
-    <envoy_v3_api_field_extensions.network.socket_interface.v3.IoUringOptions.write_buffer_high_watermark>`
-    to bound the io_uring socket's internal write buffer. When set, the socket returns a short
-    write to the upper layer once the configured size is reached, which lets connection-level
-    back-pressure (and overload protections like HTTP flood protection that depend on it) engage.
-    The default of 0 disables the cap and preserves the previous (uncapped) behavior.
 - area: stat_sinks
   change: |
     Added :ref:`max_data_points_per_request

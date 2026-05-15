@@ -32,9 +32,9 @@ class IoUringWorkerImpl : public IoUringWorker, private Logger::Loggable<Logger:
 public:
   IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
                     uint32_t read_buffer_size, uint32_t write_timeout_ms,
-                    uint32_t write_buffer_high_watermark, Event::Dispatcher& dispatcher);
+                    Event::Dispatcher& dispatcher);
   IoUringWorkerImpl(IoUringPtr&& io_uring, uint32_t read_buffer_size, uint32_t write_timeout_ms,
-                    uint32_t write_buffer_high_watermark, Event::Dispatcher& dispatcher);
+                    Event::Dispatcher& dispatcher);
   ~IoUringWorkerImpl() override;
 
   // IoUringWorker
@@ -74,8 +74,6 @@ protected:
   IoUringPtr io_uring_;
   const uint32_t read_buffer_size_;
   const uint32_t write_timeout_ms_;
-  // High watermark in bytes for ``IoUringServerSocket::write_buf_``. 0 disables the cap.
-  const uint32_t write_buffer_high_watermark_;
   // The dispatcher of this worker is running on.
   Event::Dispatcher& dispatcher_;
   // The file event of iouring's eventfd.
@@ -108,6 +106,7 @@ public:
   void disableRead() override { status_ = ReadDisabled; }
   void enableCloseEvent(bool enable) override { enable_close_event_ = enable; }
   void connect(const Network::Address::InstanceConstSharedPtr&) override { PANIC("not implement"); }
+  void setWriteBufferHighWatermark(uint32_t) override {}
 
   void onAccept(Request*, int32_t, bool injected) override {
     if (injected && (injected_completions_ & static_cast<uint8_t>(Request::RequestType::Accept))) {
@@ -185,11 +184,9 @@ protected:
 class IoUringServerSocket : public IoUringSocketEntry {
 public:
   IoUringServerSocket(os_fd_t fd, IoUringWorkerImpl& parent, Event::FileReadyCb cb,
-                      uint32_t write_timeout_ms, bool enable_close_event,
-                      uint32_t write_buffer_high_watermark = 0);
+                      uint32_t write_timeout_ms, bool enable_close_event);
   IoUringServerSocket(os_fd_t fd, Buffer::Instance& read_buf, IoUringWorkerImpl& parent,
-                      Event::FileReadyCb cb, uint32_t write_timeout_ms, bool enable_close_event,
-                      uint32_t write_buffer_high_watermark = 0);
+                      Event::FileReadyCb cb, uint32_t write_timeout_ms, bool enable_close_event);
   ~IoUringServerSocket() override;
 
   // IoUringSocket
@@ -198,6 +195,9 @@ public:
   void disableRead() override;
   void write(Buffer::Instance& data) override;
   uint64_t write(const Buffer::RawSlice* slices, uint64_t num_slice) override;
+  void setWriteBufferHighWatermark(uint32_t high_watermark) override {
+    write_buffer_high_watermark_ = high_watermark;
+  }
   void shutdown(int how) override;
   void onClose(Request* req, int32_t result, bool injected) override;
   void onRead(Request* req, int32_t result, bool injected) override;
@@ -227,7 +227,7 @@ protected:
   // ``write_buf_`` reaches the configured size, so connection-level back-pressure (and overload
   // protections that depend on it, like HTTP flood protection) engages. With the default of 0 the
   // cap is disabled and the upper layer always sees its writes as fully accepted.
-  const uint32_t write_buffer_high_watermark_;
+  uint32_t write_buffer_high_watermark_{0};
   // True when a previous ``write()`` was unable to fully accept the offered bytes because the
   // internal write buffer hit the high watermark. When set, an injected Write completion is
   // delivered to the upper layer after the buffer drains, so the upper layer retries.
@@ -263,8 +263,7 @@ protected:
 class IoUringClientSocket : public IoUringServerSocket {
 public:
   IoUringClientSocket(os_fd_t fd, IoUringWorkerImpl& parent, Event::FileReadyCb cb,
-                      uint32_t write_timeout_ms, bool enable_close_event,
-                      uint32_t write_buffer_high_watermark = 0);
+                      uint32_t write_timeout_ms, bool enable_close_event);
 
   void connect(const Network::Address::InstanceConstSharedPtr& address) override;
   void onConnect(Request* req, int32_t result, bool injected) override;

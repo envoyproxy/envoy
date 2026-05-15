@@ -43,18 +43,4 @@ message IoUringOptions {
   // asynchronously. If the remote stops reading, the io_uring write operation may never complete.
   // The operation is canceled and the socket is closed after the timeout. The default is 1000.
   google.protobuf.UInt32Value write_timeout_ms = 4;
-  // High watermark in bytes for the io_uring socket's internal write buffer. Because io_uring
-  // writes are asynchronous, data the upper layer hands to ``writev``/``write`` is staged in an
-  // internal per-socket buffer until the kernel reports the completion. Without a cap, that buffer
-  // can grow without bound — the upper layer always sees the write as fully accepted, so
-  // connection-level flow control (and overload protections that depend on it, such as HTTP flood
-  // protection) never engages.
-  //
-  // When this field is set to a non-zero value, the io_uring socket refuses to stage more bytes
-  // once the internal write buffer reaches the configured size, returning a short write to the
-  // upper layer. The data the upper layer was unable to hand off then accumulates in its own
-  // write buffer (e.g. ``ConnectionImpl::write_buffer_``), which has its own watermarks, so the
-  // existing connection-level back-pressure mechanism kicks in. The default is 0, which disables
-  // the cap and preserves the previous (uncapped) behavior.
-  google.protobuf.UInt32Value write_buffer_high_watermark = 5;
 }

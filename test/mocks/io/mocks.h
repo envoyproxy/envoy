@@ -44,6 +44,7 @@ public:
   MOCK_METHOD(void, connect, (const Network::Address::InstanceConstSharedPtr& address));
   MOCK_METHOD(void, write, (Buffer::Instance & data));
   MOCK_METHOD(uint64_t, write, (const Buffer::RawSlice* slices, uint64_t num_slice));
+  MOCK_METHOD(void, setWriteBufferHighWatermark, (uint32_t high_watermark));
   MOCK_METHOD(void, onAccept, (Request * req, int32_t result, bool injected));
   MOCK_METHOD(void, onConnect, (Request * req, int32_t result, bool injected));
   MOCK_METHOD(void, onRead, (Request * req, int32_t result, bool injected));

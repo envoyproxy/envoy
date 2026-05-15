@@ -642,6 +642,7 @@ void ConnectionImpl::write(Buffer::Instance& data, bool end_stream, bool through
 
 void ConnectionImpl::setBufferLimits(uint32_t limit) {
   read_buffer_limit_ = limit;
+  ioHandle().setWriteBufferLimits(limit);
 
   // Due to the fact that writes to the connection and flushing data from the connection are done
   // asynchronously, we have the option of either setting the watermarks aggressively, and regularly

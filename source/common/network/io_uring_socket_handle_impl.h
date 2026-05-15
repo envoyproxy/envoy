@@ -42,6 +42,7 @@ public:
                                absl::optional<uint64_t> max_length_opt) override;
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
   Api::IoCallUint64Result write(Buffer::Instance& buffer) override;
+  void setWriteBufferLimits(uint32_t limit) override;
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
                                   const Address::Ip* self_ip,
                                   const Address::Instance& peer_address) override;
@@ -84,6 +85,7 @@ protected:
   Io::IoUringWorkerFactory& io_uring_worker_factory_;
   IoUringSocketType io_uring_socket_type_;
   OptRef<Io::IoUringSocket> io_uring_socket_{absl::nullopt};
+  uint32_t write_buffer_high_watermark_{0};
 
   Event::FileEventPtr file_event_{nullptr};
 

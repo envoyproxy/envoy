@@ -128,6 +128,13 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer)
   return {before - after, IoSocketError::none()};
 }
 
+void IoUringSocketHandleImpl::setWriteBufferLimits(uint32_t limit) {
+  write_buffer_high_watermark_ = limit;
+  if (io_uring_socket_.has_value()) {
+    io_uring_socket_->setWriteBufferHighWatermark(limit);
+  }
+}
+
 Api::IoCallUint64Result IoUringSocketHandleImpl::sendmsg(const Buffer::RawSlice*, uint64_t, int,
                                                          const Address::Ip*,
                                                          const Address::Instance&) {
@@ -246,6 +253,7 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
       io_uring_socket_->setFileReadyCb(std::move(cb));
       io_uring_socket_->enableRead();
       io_uring_socket_->enableCloseEvent(events & Event::FileReadyType::Closed);
+      io_uring_socket_->setWriteBufferHighWatermark(write_buffer_high_watermark_);
     } else {
       ENVOY_LOG(trace, "initialize file event from another thread, fd = {}, type = {}", fd_,
                 ioUringSocketTypeStr());
@@ -272,6 +280,7 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
       // Move the temporary buf to the newly created one.
       io_uring_socket_ = io_uring_worker_factory_.getIoUringWorker()->addServerSocket(
           fd, buf, std::move(cb), events & Event::FileReadyType::Closed);
+      io_uring_socket_->setWriteBufferHighWatermark(write_buffer_high_watermark_);
     }
     return;
   }
@@ -283,12 +292,14 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
   case IoUringSocketType::Server:
     io_uring_socket_ = io_uring_worker_factory_.getIoUringWorker()->addServerSocket(
         fd_, std::move(cb), events & Event::FileReadyType::Closed);
+    io_uring_socket_->setWriteBufferHighWatermark(write_buffer_high_watermark_);
     break;
   case IoUringSocketType::Unknown:
   case IoUringSocketType::Client:
     io_uring_socket_type_ = IoUringSocketType::Client;
     io_uring_socket_ = io_uring_worker_factory_.getIoUringWorker()->addClientSocket(
         fd_, std::move(cb), events & Event::FileReadyType::Closed);
+    io_uring_socket_->setWriteBufferHighWatermark(write_buffer_high_watermark_);
     break;
   }
 }

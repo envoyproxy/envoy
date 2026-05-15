@@ -62,19 +62,14 @@ void IoUringSocketEntry::onRemoteClose() {
 
 IoUringWorkerImpl::IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
                                      uint32_t read_buffer_size, uint32_t write_timeout_ms,
-                                     uint32_t write_buffer_high_watermark,
                                      Event::Dispatcher& dispatcher)
     : IoUringWorkerImpl(std::make_unique<IoUringImpl>(io_uring_size, use_submission_queue_polling),
-                        read_buffer_size, write_timeout_ms, write_buffer_high_watermark,
-                        dispatcher) {}
+                        read_buffer_size, write_timeout_ms, dispatcher) {}
 
 IoUringWorkerImpl::IoUringWorkerImpl(IoUringPtr&& io_uring, uint32_t read_buffer_size,
-                                     uint32_t write_timeout_ms,
-                                     uint32_t write_buffer_high_watermark,
-                                     Event::Dispatcher& dispatcher)
+                                     uint32_t write_timeout_ms, Event::Dispatcher& dispatcher)
     : io_uring_(std::move(io_uring)), read_buffer_size_(read_buffer_size),
-      write_timeout_ms_(write_timeout_ms),
-      write_buffer_high_watermark_(write_buffer_high_watermark), dispatcher_(dispatcher) {
+      write_timeout_ms_(write_timeout_ms), dispatcher_(dispatcher) {
   const os_fd_t event_fd = io_uring_->registerEventfd();
   // We only care about the read event of Eventfd, since we only receive the
   // event here.
@@ -111,8 +106,7 @@ IoUringSocket& IoUringWorkerImpl::addServerSocket(os_fd_t fd, Event::FileReadyCb
                                                   bool enable_close_event) {
   ENVOY_LOG(trace, "add server socket, fd = {}", fd);
   std::unique_ptr<IoUringServerSocket> socket = std::make_unique<IoUringServerSocket>(
-      fd, *this, std::move(cb), write_timeout_ms_, enable_close_event,
-      write_buffer_high_watermark_);
+      fd, *this, std::move(cb), write_timeout_ms_, enable_close_event);
   socket->enableRead();
   return addSocket(std::move(socket));
 }
@@ -121,8 +115,7 @@ IoUringSocket& IoUringWorkerImpl::addServerSocket(os_fd_t fd, Buffer::Instance& 
                                                   Event::FileReadyCb cb, bool enable_close_event) {
   ENVOY_LOG(trace, "add server socket through existing socket, fd = {}", fd);
   std::unique_ptr<IoUringServerSocket> socket = std::make_unique<IoUringServerSocket>(
-      fd, read_buf, *this, std::move(cb), write_timeout_ms_, enable_close_event,
-      write_buffer_high_watermark_);
+      fd, read_buf, *this, std::move(cb), write_timeout_ms_, enable_close_event);
   socket->enableRead();
   return addSocket(std::move(socket));
 }
@@ -132,8 +125,7 @@ IoUringSocket& IoUringWorkerImpl::addClientSocket(os_fd_t fd, Event::FileReadyCb
   ENVOY_LOG(trace, "add client socket, fd = {}", fd);
   // The client socket should not be read enabled until it is connected.
   std::unique_ptr<IoUringClientSocket> socket = std::make_unique<IoUringClientSocket>(
-      fd, *this, std::move(cb), write_timeout_ms_, enable_close_event,
-      write_buffer_high_watermark_);
+      fd, *this, std::move(cb), write_timeout_ms_, enable_close_event);
   return addSocket(std::move(socket));
 }
 
@@ -318,19 +310,15 @@ void IoUringWorkerImpl::submit() {
 
 IoUringServerSocket::IoUringServerSocket(os_fd_t fd, IoUringWorkerImpl& parent,
                                          Event::FileReadyCb cb, uint32_t write_timeout_ms,
-                                         bool enable_close_event,
-                                         uint32_t write_buffer_high_watermark)
+                                         bool enable_close_event)
     : IoUringSocketEntry(fd, parent, std::move(cb), enable_close_event),
-      write_timeout_ms_(write_timeout_ms),
-      write_buffer_high_watermark_(write_buffer_high_watermark) {}
+      write_timeout_ms_(write_timeout_ms) {}
 
 IoUringServerSocket::IoUringServerSocket(os_fd_t fd, Buffer::Instance& read_buf,
                                          IoUringWorkerImpl& parent, Event::FileReadyCb cb,
-                                         uint32_t write_timeout_ms, bool enable_close_event,
-                                         uint32_t write_buffer_high_watermark)
+                                         uint32_t write_timeout_ms, bool enable_close_event)
     : IoUringSocketEntry(fd, parent, std::move(cb), enable_close_event),
-      write_timeout_ms_(write_timeout_ms),
-      write_buffer_high_watermark_(write_buffer_high_watermark) {
+      write_timeout_ms_(write_timeout_ms) {
   read_buf_.move(read_buf);
 }
 
@@ -706,10 +694,8 @@ void IoUringServerSocket::submitWriteOrShutdownRequest() {
 
 IoUringClientSocket::IoUringClientSocket(os_fd_t fd, IoUringWorkerImpl& parent,
                                          Event::FileReadyCb cb, uint32_t write_timeout_ms,
-                                         bool enable_close_event,
-                                         uint32_t write_buffer_high_watermark)
-    : IoUringServerSocket(fd, parent, cb, write_timeout_ms, enable_close_event,
-                          write_buffer_high_watermark) {}
+                                         bool enable_close_event)
+    : IoUringServerSocket(fd, parent, cb, write_timeout_ms, enable_close_event) {}
 
 void IoUringClientSocket::connect(const Network::Address::InstanceConstSharedPtr& address) {
   // Reuse read request since there is no read on connecting and connect is cancellable.

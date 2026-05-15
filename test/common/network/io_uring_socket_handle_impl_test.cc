@@ -41,6 +41,22 @@ TEST_F(IoUringSocketHandleTest, CreateClientSocket) {
   EXPECT_EQ(IoUringSocketType::Client, impl.ioUringSocketType());
 }
 
+TEST_F(IoUringSocketHandleTest, AppliesWriteBufferLimit) {
+  IoUringSocketHandleTestImpl impl(factory_, false);
+  impl.setWriteBufferLimits(123);
+
+  EXPECT_CALL(worker_, addClientSocket(_, _, _)).WillOnce(testing::ReturnRef(socket_));
+  EXPECT_CALL(factory_, getIoUringWorker())
+      .WillOnce(testing::Return(OptRef<Io::IoUringWorker>(worker_)));
+  EXPECT_CALL(socket_, setWriteBufferHighWatermark(123));
+  impl.initializeFileEvent(
+      dispatcher_, [](uint32_t) { return absl::OkStatus(); }, Event::PlatformDefaultTriggerType,
+      Event::FileReadyType::Read);
+
+  EXPECT_CALL(socket_, setWriteBufferHighWatermark(456));
+  impl.setWriteBufferLimits(456);
+}
+
 TEST_F(IoUringSocketHandleTest, ReadError) {
   IoUringSocketHandleTestImpl impl(factory_, false);
   EXPECT_CALL(worker_, addClientSocket(_, _, _)).WillOnce(testing::ReturnRef(socket_));

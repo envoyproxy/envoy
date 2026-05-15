@@ -34,7 +34,7 @@ public:
 class IoUringWorkerTestImpl : public IoUringWorkerImpl {
 public:
   IoUringWorkerTestImpl(IoUringPtr io_uring_instance, Event::Dispatcher& dispatcher)
-      : IoUringWorkerImpl(std::move(io_uring_instance), 8192, 1000, 0, dispatcher) {}
+      : IoUringWorkerImpl(std::move(io_uring_instance), 8192, 1000, dispatcher) {}
 
   IoUringSocket& addTestSocket(os_fd_t fd) {
     return addSocket(std::make_unique<IoUringSocketTestImpl>(fd, *this));
@@ -693,10 +693,10 @@ TEST(IoUringWorkerImplTest, NoEnableReadOnConnectError) {
   delete static_cast<Request*>(connect_req);
 }
 
-// When ``write_buffer_high_watermark`` is set, ``IoUringServerSocket::write`` must refuse to stage
-// more bytes than the cap so that the upper layer's connection-level back-pressure can engage.
-// Once the in-flight write completes and the buffer drops below the watermark, an injected Write
-// completion is delivered so the upper layer retries.
+// When the connection write buffer limit is applied, ``IoUringServerSocket::write`` must refuse to
+// stage more bytes than the cap so that the upper layer's connection-level back-pressure can
+// engage. Once the in-flight write completes and the buffer drops below the watermark, an injected
+// Write completion is delivered so the upper layer retries.
 TEST(IoUringWorkerImplTest, WriteBufferHighWatermark) {
   Event::MockDispatcher dispatcher;
   IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
@@ -709,7 +709,8 @@ TEST(IoUringWorkerImplTest, WriteBufferHighWatermark) {
   IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
 
   // Watermark = 100 bytes.
-  IoUringServerSocket socket(0, worker, [](uint32_t) { return absl::OkStatus(); }, 0, false, 100);
+  IoUringServerSocket socket(0, worker, [](uint32_t) { return absl::OkStatus(); }, 0, false);
+  socket.setWriteBufferHighWatermark(100);
 
   // First write of 80 bytes fits under the watermark and is fully accepted.
   Request* write_req = nullptr;
@@ -765,7 +766,8 @@ TEST(IoUringWorkerImplTest, WriteSliceBufferHighWatermark) {
               createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
       .WillOnce(ReturnNew<NiceMock<Event::MockFileEvent>>());
   IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
-  IoUringServerSocket socket(0, worker, [](uint32_t) { return absl::OkStatus(); }, 0, false, 50);
+  IoUringServerSocket socket(0, worker, [](uint32_t) { return absl::OkStatus(); }, 0, false);
+  socket.setWriteBufferHighWatermark(50);
 
   Request* write_req = nullptr;
   EXPECT_CALL(mock_io_uring, prepareWritev(_, _, _, _, _))
