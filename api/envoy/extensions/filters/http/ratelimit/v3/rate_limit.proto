@@ -188,7 +188,7 @@ message RateLimit {
   repeated config.route.v3.RateLimit rate_limits = 17;
 
   // The namespace where dynamic metadata from rate limit response is saved.
-  // If not set, the default is "envoy.extensions.filters.http.ratelimit".
+  // If not set, the default is "envoy.filters.http.ratelimit".
   string metadata_namespace = 18;
 }
 
