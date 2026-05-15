@@ -39,19 +39,26 @@ public:
   // Delta xDS Overload
   absl::Status onConfigUpdate(const std::vector<DecodedResourceRef>& added_resources,
                               const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                              const std::string& /*system_version_info*/) override {
+                              const std::string& system_version_info) override {
+    if (!added_resources.empty()) {
+      if (added_resources.size() > 1) {
+        return absl::InvalidArgumentError(
+            fmt::format("Unexpected multiple added resources ({} resources) in singleton Delta update",
+                        added_resources.size()));
+      }
+      return callbacks_.onResourceUpdate(added_resources[0].get(), system_version_info);
+    }
     if (!removed_resources.empty()) {
+      if (removed_resources.size() > 1) {
+        return absl::InvalidArgumentError(
+            fmt::format("Unexpected multiple removed resources ({} resources) in singleton Delta update",
+                        removed_resources.size()));
+      }
       callbacks_.onResourceRemoved();
       return absl::OkStatus();
     }
-    RELEASE_ASSERT(!added_resources.empty(), "Delta xDS update with no additions or removals");
-    if (added_resources.size() > 1) {
-      return absl::InvalidArgumentError(
-          fmt::format("Unexpected multiple added resources ({} resources) in singleton Delta update",
-                      added_resources.size()));
-    }
-    return callbacks_.onResourceUpdate(added_resources[0].get(),
-                                       added_resources[0].get().version());
+    // Both added_resources and removed_resources are empty (heartbeat / no-op update).
+    return absl::OkStatus();
   }
 
   void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) override {

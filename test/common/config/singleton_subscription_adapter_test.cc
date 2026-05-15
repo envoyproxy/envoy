@@ -99,6 +99,27 @@ TEST(SingletonSubscriptionAdapterTest, DeltaMultipleResources) {
   EXPECT_FALSE(adapter.onConfigUpdate(added_resources, removed_resources, "v1").ok());
 }
 
+TEST(SingletonSubscriptionAdapterTest, DeltaEmptyUpdate) {
+  MockSingletonSubscriptionCallbacks callbacks;
+  SingletonSubscriptionCallbacksAdapter adapter(callbacks);
+
+  EXPECT_CALL(callbacks, onResourceUpdate(_, _)).Times(0);
+  EXPECT_CALL(callbacks, onResourceRemoved()).Times(0);
+  EXPECT_TRUE(adapter.onConfigUpdate({}, {}, "v1").ok());
+}
+
+TEST(SingletonSubscriptionAdapterTest, DeltaMultipleRemovals) {
+  MockSingletonSubscriptionCallbacks callbacks;
+  SingletonSubscriptionCallbacksAdapter adapter(callbacks);
+
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+  removed_resources.Add("my_resource1");
+  removed_resources.Add("my_resource2");
+
+  EXPECT_CALL(callbacks, onResourceRemoved()).Times(0);
+  EXPECT_FALSE(adapter.onConfigUpdate({}, removed_resources, "v1").ok());
+}
+
 TEST(SingletonSubscriptionAdapterTest, OnConfigUpdateFailed) {
   MockSingletonSubscriptionCallbacks callbacks;
   SingletonSubscriptionCallbacksAdapter adapter(callbacks);
