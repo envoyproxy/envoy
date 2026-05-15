@@ -3,10 +3,15 @@
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/common/tap/tap_config_base.h"
 
+#include "test/mocks/server/server_factory_context.h"
+
+#include "absl/strings/string_view.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -14,6 +19,24 @@ namespace Extensions {
 namespace Common {
 namespace Tap {
 namespace {
+
+// Concrete subclass that exposes the protected constructor for direct test
+// instantiation.
+class TestableTapConfigBase : public TapConfigBaseImpl {
+public:
+  TestableTapConfigBase(const envoy::config::tap::v3::TapConfig& proto_config,
+                        Server::Configuration::GenericFactoryContext& context)
+      : TapConfigBaseImpl(proto_config, /*admin_streamer=*/nullptr, context) {}
+};
+
+// Minimal valid TapConfig that uses file_per_tap so no admin streamer is needed.
+envoy::config::tap::v3::TapConfig minimalTapConfig() {
+  envoy::config::tap::v3::TapConfig proto_config;
+  proto_config.mutable_match()->set_any_match(true);
+  auto* sink = proto_config.mutable_output_config()->mutable_sinks()->Add();
+  sink->mutable_file_per_tap()->set_path_prefix("/tmp/test_tap");
+  return proto_config;
+}
 
 TEST(BodyBytesToString, All) {
   {
@@ -190,6 +213,73 @@ TEST(TrimSlice, All) {
                                                  {static_cast<void*>(&slice_mem[0]), 0}};
     EXPECT_EQ(expected, slices);
   }
+}
+
+TEST(TapConfigBaseImplSampling, ShouldRecordWhenUnset) {
+  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  auto proto = minimalTapConfig();
+  // tap_enabled not set
+  TestableTapConfigBase config(proto, context);
+
+  EXPECT_FALSE(config.samplingConfigured());
+  // Unconfigured short-circuits to true without touching the runtime layer.
+  EXPECT_TRUE(config.shouldRecord());
+}
+
+TEST(TapConfigBaseImplSampling, ShouldRecordZeroPercent) {
+  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  // 0% sample rate: runtime layer consulted with the (empty) runtime_key and the
+  // configured default; mock returns false.
+  ON_CALL(context.server_context_.runtime_loader_.snapshot_,
+          featureEnabled(absl::string_view(""),
+                         testing::Matcher<const envoy::type::v3::FractionalPercent&>(testing::_)))
+      .WillByDefault(testing::Return(false));
+  auto proto = minimalTapConfig();
+  proto.mutable_tap_enabled()->mutable_default_value()->set_numerator(0);
+  proto.mutable_tap_enabled()->mutable_default_value()->set_denominator(
+      envoy::type::v3::FractionalPercent::HUNDRED);
+  TestableTapConfigBase config(proto, context);
+
+  EXPECT_TRUE(config.samplingConfigured());
+  EXPECT_FALSE(config.shouldRecord());
+}
+
+TEST(TapConfigBaseImplSampling, ShouldRecordFullPercent) {
+  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  // 100% sample rate: runtime layer consulted with the (empty) runtime_key and
+  // the configured default; mock returns true.
+  ON_CALL(context.server_context_.runtime_loader_.snapshot_,
+          featureEnabled(absl::string_view(""),
+                         testing::Matcher<const envoy::type::v3::FractionalPercent&>(testing::_)))
+      .WillByDefault(testing::Return(true));
+  auto proto = minimalTapConfig();
+  proto.mutable_tap_enabled()->mutable_default_value()->set_numerator(100);
+  proto.mutable_tap_enabled()->mutable_default_value()->set_denominator(
+      envoy::type::v3::FractionalPercent::HUNDRED);
+  TestableTapConfigBase config(proto, context);
+
+  EXPECT_TRUE(config.samplingConfigured());
+  EXPECT_TRUE(config.shouldRecord());
+}
+
+TEST(TapConfigBaseImplSampling, ShouldRecordHonorsRuntimeOverride) {
+  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  // Verify the runtime key is forwarded as-is and the runtime decision is honored.
+  // Default value is 0%, but the runtime layer "override" returns true (simulating an
+  // operator setting tap.sampling.test_key to 100).
+  ON_CALL(context.server_context_.runtime_loader_.snapshot_,
+          featureEnabled("tap.sampling.test_key",
+                         testing::Matcher<const envoy::type::v3::FractionalPercent&>(testing::_)))
+      .WillByDefault(testing::Return(true));
+  auto proto = minimalTapConfig();
+  proto.mutable_tap_enabled()->set_runtime_key("tap.sampling.test_key");
+  proto.mutable_tap_enabled()->mutable_default_value()->set_numerator(0);
+  proto.mutable_tap_enabled()->mutable_default_value()->set_denominator(
+      envoy::type::v3::FractionalPercent::HUNDRED);
+  TestableTapConfigBase config(proto, context);
+
+  // Runtime override wins over default (0%).
+  EXPECT_TRUE(config.shouldRecord());
 }
 
 } // namespace

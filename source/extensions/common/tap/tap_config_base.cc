@@ -147,8 +147,11 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
 }
 
 bool TapConfigBaseImpl::shouldRecord() {
-  // Backwards-compat: tap every request when sampling is not configured.
-  return true;
+  if (!tap_enabled_.has_value()) {
+    return true;
+  }
+  return runtime_.snapshot().featureEnabled(tap_enabled_->runtime_key(),
+                                            tap_enabled_->default_value());
 }
 
 const Matcher& TapConfigBaseImpl::rootMatcher() const {
