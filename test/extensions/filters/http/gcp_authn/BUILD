@@ -46,9 +46,9 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "jwt_gcp_authn_client_impl_test",
+    name = "gcp_authn_client_impl_test",
     size = "small",
-    srcs = ["jwt_gcp_authn_client_impl_test.cc"],
+    srcs = ["gcp_authn_client_impl_test.cc"],
     extension_names = ["envoy.filters.http.gcp_authn"],
     deps = [
         ":gcp_authn_mocks",

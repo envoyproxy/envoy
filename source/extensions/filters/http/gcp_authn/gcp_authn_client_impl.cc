@@ -1,4 +1,4 @@
-#include "source/extensions/filters/http/gcp_authn/jwt_gcp_authn_client_impl.h"
+#include "source/extensions/filters/http/gcp_authn/gcp_authn_client_impl.h"
 
 #include "source/common/common/enum_to_int.h"
 #include "source/common/http/header_map_impl.h"
@@ -34,7 +34,7 @@ Http::RequestMessagePtr buildRequest(absl::string_view url) {
 }
 } // namespace
 
-void JwtGcpAuthnClientImpl::fetchToken(
+void GcpAuthnClientImpl::fetchToken(
     const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
     GcpAuthnClient::Callbacks& callbacks) {
   // Cancel any active requests.
@@ -76,7 +76,7 @@ void JwtGcpAuthnClientImpl::fetchToken(
       thread_local_cluster->httpAsyncClient().send(buildRequest(final_url), *this, options);
 }
 
-void JwtGcpAuthnClientImpl::onSuccess(const Http::AsyncClient::Request&,
+void GcpAuthnClientImpl::onSuccess(const Http::AsyncClient::Request&,
                                       Http::ResponseMessagePtr&& response) {
   auto status = Envoy::Http::Utility::getResponseStatusOrNullopt(response->headers());
   active_request_ = nullptr;
@@ -95,7 +95,7 @@ void JwtGcpAuthnClientImpl::onSuccess(const Http::AsyncClient::Request&,
   }
 }
 
-void JwtGcpAuthnClientImpl::onFailure(const Http::AsyncClient::Request&,
+void GcpAuthnClientImpl::onFailure(const Http::AsyncClient::Request&,
                                       Http::AsyncClient::FailureReason reason) {
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset ||
          reason == Http::AsyncClient::FailureReason::ExceedResponseBufferLimit);
@@ -103,14 +103,14 @@ void JwtGcpAuthnClientImpl::onFailure(const Http::AsyncClient::Request&,
   onError(absl::StrFormat("Request failed with reason: %d", enumToInt(reason)));
 }
 
-void JwtGcpAuthnClientImpl::cancel() {
+void GcpAuthnClientImpl::cancel() {
   if (active_request_) {
     active_request_->cancel();
     active_request_ = nullptr;
   }
 }
 
-void JwtGcpAuthnClientImpl::onError(absl::string_view error_msg) {
+void GcpAuthnClientImpl::onError(absl::string_view error_msg) {
   ENVOY_LOG(error, "{}", error_msg);
 
   // Cancel if the request is active.

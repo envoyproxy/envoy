@@ -14,16 +14,16 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GcpAuthn {
 
-class JwtGcpAuthnClientImpl : public GcpAuthnClient,
-                              public Http::AsyncClient::Callbacks,
-                              public Logger::Loggable<Logger::Id::filter> {
+class GcpAuthnClientImpl : public GcpAuthnClient,
+                           public Http::AsyncClient::Callbacks,
+                           public Logger::Loggable<Logger::Id::filter> {
 public:
-  JwtGcpAuthnClientImpl(
+  GcpAuthnClientImpl(
       const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config,
       Server::Configuration::FactoryContext& context)
       : config_(config), context_(context) {}
 
-  ~JwtGcpAuthnClientImpl() override { cancel(); }
+  ~GcpAuthnClientImpl() override { cancel(); }
 
   void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 

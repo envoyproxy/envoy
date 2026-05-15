@@ -7,7 +7,7 @@
 
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_client.h"
-#include "source/extensions/filters/http/gcp_authn/jwt_gcp_authn_client_impl.h"
+#include "source/extensions/filters/http/gcp_authn/gcp_authn_client_impl.h"
 #include "source/extensions/filters/http/gcp_authn/token_cache.h"
 
 namespace Envoy {
@@ -47,10 +47,7 @@ public:
                  Server::Configuration::FactoryContext& context, const std::string& stats_prefix,
                  TokenCacheImpl<JwtToken>* token_cache)
       : filter_config_(std::move(filter_config)), context_(context),
-        // TODO: When a second GcpAuthnClient implementation is added, introduce
-        // a GcpAuthnClientFactory to instantiate the appropriate client
-        // dynamically.
-        client_(std::make_unique<JwtGcpAuthnClientImpl>(*filter_config_, context_)),
+        client_(std::make_unique<GcpAuthnClientImpl>(*filter_config_, context_)),
         stats_(generateStats(stats_prefix, context_.scope())), jwt_token_cache_(token_cache) {}
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,

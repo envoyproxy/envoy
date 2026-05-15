@@ -1,6 +1,6 @@
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.h"
 
-#include "source/extensions/filters/http/gcp_authn/jwt_gcp_authn_client_impl.h"
+#include "source/extensions/filters/http/gcp_authn/gcp_authn_client_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/gcp_authn/mocks.h"
@@ -39,9 +39,9 @@ constexpr char DefaultConfig[] = R"EOF(
       num_retries: 5
   )EOF";
 
-class JwtGcpAuthnClientImplTest : public testing::Test {
+class GcpAuthnClientImplTest : public testing::Test {
 public:
-  JwtGcpAuthnClientImplTest() {
+  GcpAuthnClientImplTest() {
     // Initialize the default configuration.
     TestUtility::loadFromYaml(DefaultConfig, config_);
   }
@@ -61,7 +61,7 @@ public:
         }));
   }
 
-  void createClient() { client_ = std::make_unique<JwtGcpAuthnClientImpl>(config_, context_); }
+  void createClient() { client_ = std::make_unique<GcpAuthnClientImpl>(config_, context_); }
 
   NiceMock<MockFactoryContext> context_;
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
@@ -74,11 +74,11 @@ public:
   Envoy::Http::RequestMessagePtr message_;
   Envoy::Http::AsyncClient::RequestOptions options_;
 
-  std::unique_ptr<JwtGcpAuthnClientImpl> client_;
+  std::unique_ptr<GcpAuthnClientImpl> client_;
   GcpAuthnFilterConfig config_;
 };
 
-TEST_F(JwtGcpAuthnClientImplTest, Success) {
+TEST_F(GcpAuthnClientImplTest, Success) {
   setupMockObjects();
   createClient();
 
@@ -106,7 +106,7 @@ TEST_F(JwtGcpAuthnClientImplTest, Success) {
   client_callback_->onSuccess(client_request_, std::move(response));
 }
 
-TEST_F(JwtGcpAuthnClientImplTest, NoCluster) {
+TEST_F(GcpAuthnClientImplTest, NoCluster) {
   std::string no_cluster_config = R"EOF(
     http_uri:
       uri: http://testhost/path/test
@@ -135,7 +135,7 @@ TEST_F(JwtGcpAuthnClientImplTest, NoCluster) {
   client_->fetchToken(audience, request_callbacks_);
 }
 
-TEST_F(JwtGcpAuthnClientImplTest, Failure) {
+TEST_F(GcpAuthnClientImplTest, Failure) {
   setupMockObjects();
   createClient();
   EXPECT_CALL(request_callbacks_, onComplete(_));
@@ -145,7 +145,7 @@ TEST_F(JwtGcpAuthnClientImplTest, Failure) {
   client_callback_->onFailure(client_request_, Http::AsyncClient::FailureReason::Reset);
 }
 
-TEST_F(JwtGcpAuthnClientImplTest, NotOkResponse) {
+TEST_F(GcpAuthnClientImplTest, NotOkResponse) {
   setupMockObjects();
   createClient();
 
@@ -162,7 +162,7 @@ TEST_F(JwtGcpAuthnClientImplTest, NotOkResponse) {
   client_callback_->onSuccess(client_request_, std::move(response));
 }
 
-TEST_F(JwtGcpAuthnClientImplTest, EmptyResponseHeader) {
+TEST_F(GcpAuthnClientImplTest, EmptyResponseHeader) {
   setupMockObjects();
   createClient();
 
@@ -178,7 +178,7 @@ TEST_F(JwtGcpAuthnClientImplTest, EmptyResponseHeader) {
   client_callback_->onSuccess(client_request_, std::move(empty_response));
 }
 
-TEST_F(JwtGcpAuthnClientImplTest, Cancel) {
+TEST_F(GcpAuthnClientImplTest, Cancel) {
   setupMockObjects();
   createClient();
 
@@ -190,7 +190,7 @@ TEST_F(JwtGcpAuthnClientImplTest, Cancel) {
   client_->cancel();
 }
 
-TEST_F(JwtGcpAuthnClientImplTest, NoRetryPolicy) {
+TEST_F(GcpAuthnClientImplTest, NoRetryPolicy) {
   std::string no_retry_config = R"EOF(
     http_uri:
       uri: http://testhost/path/test

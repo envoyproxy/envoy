@@ -15,7 +15,7 @@ envoy_cc_library(
     hdrs = ["gcp_authn_filter.h"],
     deps = [
         "token_cache",
-        ":jwt_gcp_authn_client_impl",
+        ":gcp_authn_client_impl",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
@@ -37,9 +37,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "jwt_gcp_authn_client_impl",
-    srcs = ["jwt_gcp_authn_client_impl.cc"],
-    hdrs = ["jwt_gcp_authn_client_impl.h"],
+    name = "gcp_authn_client_impl",
+    srcs = ["gcp_authn_client_impl.cc"],
+    hdrs = ["gcp_authn_client_impl.h"],
     deps = [
         ":gcp_authn_client_interface",
         "//source/common/http:headers_lib",

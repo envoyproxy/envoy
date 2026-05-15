@@ -2,7 +2,7 @@
 
 #include "source/common/http/header_map_impl.h"
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_filter.h"
-#include "source/extensions/filters/http/gcp_authn/jwt_gcp_authn_client_impl.h"
+#include "source/extensions/filters/http/gcp_authn/gcp_authn_client_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/gcp_authn/mocks.h"
@@ -91,7 +91,7 @@ public:
             config);
   }
 
-  void createClient() { client_ = std::make_unique<JwtGcpAuthnClientImpl>(config_, context_); }
+  void createClient() { client_ = std::make_unique<GcpAuthnClientImpl>(config_, context_); }
 
   NiceMock<MockFactoryContext> context_;
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
@@ -106,7 +106,7 @@ public:
   Envoy::Http::RequestMessagePtr message_;
   Envoy::Http::AsyncClient::RequestOptions options_;
 
-  std::unique_ptr<JwtGcpAuthnClientImpl> client_;
+  std::unique_ptr<GcpAuthnClientImpl> client_;
   std::unique_ptr<GcpAuthnFilter> filter_;
   GcpAuthnFilterConfig config_;
   FilterConfigSharedPtr filter_config_;
