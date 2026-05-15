@@ -34,8 +34,18 @@ class AdminResponse;
 //
 // The lifecycle of an AdminResponse is rendered as a finite state machine
 // bubble diagram:
+/*
+```mermaid
+  stateDiagram-v2 direction TB [*] --> Uninit: Created Uninit --> GetChunks: nextChunk() state
+  GetChunks { [*] --> Ready Ready --> Ready: nextChunk(): Sync chunk, more to come Ready -->
+  WaitingAsync: nextChunk(): Async operation started Ready --> [*]: nextChunk(): Final sync chunk }
+  GetChunks --> Continue: Async op started Continue --> GetChunks: onChunk(): Async data received
+  Continue --> Done: onDrained(): Async finished Uninit --> Done: Cancel / Failure / Shutdown
+  GetChunks --> Done: Cancel / Failure / Shutdown / Error Continue --> Done: Cancel / Failure /
+  Shutdown / Error state Done <<choice>> GetChunks -down-> Done
+```
+*/
 
-// https://docs.google.com/drawings/d/16kRs5rwi0k7G5d8PgF3B6gcbymiEnafYEoinRSxodtg/view
 class AdminResponse : public std::enable_shared_from_this<AdminResponse> {
 public:
   // AdminResponse can outlive MainCommonBase. But AdminResponse needs a
