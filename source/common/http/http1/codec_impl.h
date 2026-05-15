@@ -475,7 +475,7 @@ protected:
 
     void dumpState(std::ostream& os, int indent_level) const;
     HeaderString request_url_;
-    RequestDecoder* request_decoder_{};
+    RequestDecoderHandlePtr request_decoder_handle_;
     ResponseEncoderImpl response_encoder_;
     bool remote_complete_{};
   };
@@ -588,10 +588,11 @@ public:
 private:
   struct PendingResponse {
     PendingResponse(ConnectionImpl& connection, StreamInfo::BytesMeterSharedPtr&& bytes_meter,
-                    ResponseDecoder* decoder)
-        : encoder_(connection, std::move(bytes_meter)), decoder_(decoder) {}
+                    ResponseDecoderHandlePtr&& decoder_handle)
+        : encoder_(connection, std::move(bytes_meter)), decoder_handle_(std::move(decoder_handle)) {
+    }
     RequestEncoderImpl encoder_;
-    ResponseDecoder* decoder_;
+    ResponseDecoderHandlePtr decoder_handle_;
   };
 
   bool cannotHaveBody();

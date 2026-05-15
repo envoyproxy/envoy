@@ -71,7 +71,7 @@ envoy_cc_test(
     }),
     rbe_pool = "6gig",
     deps = [
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ] + select({

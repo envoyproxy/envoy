@@ -30,6 +30,7 @@ envoy_cc_library(
         "//envoy/config:typed_metadata_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:listener_interface",
+        "//envoy/network:udp_packet_writer_factory_factory_interface",
         "//envoy/server:api_listener_interface",
         "//envoy/server:filter_config_interface",
         "//envoy/server:listener_manager_interface",

@@ -5,7 +5,6 @@
 
 #include "source/extensions/tracers/xray/config.h"
 
-#include "test/mocks/server/instance.h"
 #include "test/mocks/server/tracer_factory.h"
 #include "test/mocks/server/tracer_factory_context.h"
 #include "test/test_common/environment.h"

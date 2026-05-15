@@ -3,7 +3,6 @@
 #include "source/common/router/router.h"
 
 #include "test/common/router/router_test_base.h"
-#include "test/mocks/server/factory_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

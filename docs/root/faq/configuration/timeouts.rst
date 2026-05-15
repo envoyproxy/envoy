@@ -126,9 +126,21 @@ stream timeouts already introduced above.
 
   .. attention::
 
-    This timeout defaults to *15 seconds*, however, it is not compatible with streaming responses
-    (responses that never end), and will need to be disabled. Stream idle timeouts should be used
-    in the case of streaming APIs as described elsewhere on this page.
+    This timeout defaults to *15 seconds*. This is typically a problem for streaming responses
+    (or any responses that are not expected to end within 15 seconds), and will need to be
+    disabled by setting to 0, or set to a long enough value. Typically
+    :ref:`idle_timeout <envoy_v3_api_field_config.route.v3.RouteAction.idle_timeout>`
+    should be used in the case of streaming APIs as described elsewhere on this page.
+
+  .. attention::
+
+    This timeout will not be triggered by streaming *requests*, as it only begins when the
+    request is complete. If you wish to have a timeout that applies to streaming requests,
+    it is recommended to set ``timeout`` to 0 to disable it, and use
+    :ref:`max_stream_duration <envoy_v3_api_field_config.route.v3.RouteAction.max_stream_duration>`
+    and/or :ref:`idle_timeout <envoy_v3_api_field_config.route.v3.RouteAction.idle_timeout>`,
+    whose timers start when the request begins.
+
 * The route :ref:`idle_timeout <envoy_v3_api_field_config.route.v3.RouteAction.idle_timeout>` allows overriding
   of the HTTP connection manager :ref:`stream_idle_timeout
   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_idle_timeout>`

@@ -22,7 +22,7 @@ envoy_extension_cc_test(
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/common/upstream:utility_lib",
         "//test/mocks/server:admin_mocks",
-        "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:load_balancer_mocks",
         "//test/mocks/upstream:priority_set_mocks",

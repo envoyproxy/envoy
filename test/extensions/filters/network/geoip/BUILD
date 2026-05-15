@@ -21,7 +21,6 @@ envoy_cc_test(
         "//source/extensions/filters/network/geoip:geoip_filter_lib",
         "//test/extensions/filters/http/geoip:geoip_mocks",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",

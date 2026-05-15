@@ -7,13 +7,13 @@
 
 #include "envoy/extensions/common/async_files/v3/async_file_manager.pb.h"
 
+#include "source/common/singleton/manager_impl.h"
 #include "source/extensions/common/async_files/async_file_action.h"
 #include "source/extensions/common/async_files/async_file_handle.h"
 #include "source/extensions/common/async_files/async_file_manager.h"
 #include "source/extensions/common/async_files/async_file_manager_factory.h"
 
 #include "test/mocks/api/mocks.h"
-#include "test/mocks/server/mocks.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 

@@ -8,7 +8,7 @@
 #include "source/common/protobuf/utility.h"
 
 #include "test/common/config/dummy_config.pb.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
