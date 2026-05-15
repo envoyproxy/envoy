@@ -4484,6 +4484,24 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_downstrea
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_http_callout(
   _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
   _callout_id_out: *mut u64,

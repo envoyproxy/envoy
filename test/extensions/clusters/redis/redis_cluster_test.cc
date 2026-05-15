@@ -23,7 +23,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/mocks/upstream/health_check_event_logger.h"

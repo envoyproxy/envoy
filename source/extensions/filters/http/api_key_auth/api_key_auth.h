@@ -189,7 +189,7 @@ private:
 struct AuthResult {
   bool authenticated{};
   bool authorized{};
-  absl::string_view response_code_details{};
+  absl::string_view response_code_details;
 };
 
 class FilterConfig {

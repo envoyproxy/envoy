@@ -51,11 +51,27 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: wasm
+  change: |
+    Fixed a bug where Envoy did not recreate the Wasm VM when only
+    :ref:`environment_variables <envoy_v3_api_field_extensions.wasm.v3.VmConfig.environment_variables>`
+    changed in ``vm_config``. The VM was previously reused from the cache because environment variables
+    were not included in the vm_key computation.
 - area: load_report
   change: |
     Fixed a bug in load stats reporting where reports were dropped if only custom metrics or completed
     requests were present in a reporting interval. This behavioral change can be reverted by setting
     the runtime guard ``envoy.reloadable_features.report_load_for_non_zero_stats`` to ``false``.
+- area: spiffe_validator
+  change: |
+    Fixed a bug where if an invalid custom SAN matcher was configured it would later lead to a crash
+    when validating a certificate.
+- area: rbac
+  change: |
+    Fixed a bug in the :ref:`mTLS Authenticated <envoy_v3_api_msg_extensions.rbac.principals.mtls_authenticated.v3.Config>`
+    principal extension where if an invalid SAN matcher was configured, it would incorrectly match any
+    certificate in the allowed trust chain. Known bad configurations are an invalid ``OID`` when using
+    an ``OTHER_NAME``, or specifying a ``StringMatcher`` with an invalid configuration.
 - area: build
   change: |
     Fixed ``Illegal ambiguous match`` error when building contrib targets with ``--config=aws-lc-fips``
@@ -81,11 +97,24 @@ bug_fixes:
     resulting binary "plaintext" was written back into the ``Cookie:`` request header and tripped a
     ``HeaderString`` validation assert. Such plaintexts are now rejected and the original cookie value
     is preserved, matching the behavior already documented for the explicit decryption-failure case.
+- area: build
+  change: |
+    Fixed ``Illegal ambiguous match`` error when building contrib targets with ``--config=boringssl-fips``
+    on aarch64 by restricting the ``using_boringssl_fips`` branch of ``SELECTED_CONTRIB_EXTENSIONS`` to
+    ``linux_x86_64``. Mirrors the approach taken by #44661 for ``aws-lc``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: router
+  change: |
+    Added support for ``refreshRouteCluster`` on weighted cluster routes. When a filter calls
+    ``refreshRouteCluster()``, the weighted cluster entry will select a different cluster from the
+    configured pool, avoiding previously-tried clusters within the same request. Once all clusters
+    have been tried, the selection pool resets so that any cluster may be chosen again. This enables
+    filters to implement per-attempt cluster failover across weighted clusters without replacing the
+    entire route.
 - area: tcp_proxy
   change: |
     Added :ref:`check_drain_close
@@ -110,6 +139,13 @@ new_features:
   change: |
     Added ``envoy_dynamic_module_callback_is_validation_mode`` ABI callback that allows dynamic
     modules to check if the server is running in config validation mode.
+- area: dynamic_modules
+  change: |
+    Added ``envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes`` and
+    ``envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed`` ABI callbacks so
+    that a dynamic-module cluster's load balancer can read filter state set by an upstream HTTP
+    filter (or any other producer) when picking a host. The Rust SDK exposes these as
+    ``ClusterLbContext::get_filter_state_bytes`` and ``ClusterLbContext::get_filter_state_typed``.
 - area: access_log
   change: |
     Supported the singleton stats scope in the :ref:`stats access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>`.
@@ -125,6 +161,13 @@ new_features:
     metric processing logic (tag enrichment, name rewriting, custom metric injection)
     into the proxy itself. Configured via
     :ref:`WasmFilterStatsSinkConfig <envoy_v3_api_msg_extensions.stat_sinks.wasm_filter.v3.WasmFilterStatsSinkConfig>`.
+- area: router
+  change: |
+    Added :ref:`refresh_cluster_on_retry <envoy_v3_api_field_config.route.v3.RetryPolicy.refresh_cluster_on_retry>`
+    to :ref:`retry policies <envoy_v3_api_msg_config.route.v3.RetryPolicy>` so retry attempts can
+    refresh the route-selected upstream cluster before being sent. This enables cross-cluster
+    retries for dynamic cluster selection such as the :ref:`matcher cluster specifier
+    <envoy_v3_api_msg_extensions.router.cluster_specifiers.matcher.v3.MatcherClusterSpecifier>`.
 - area: mysql_proxy
   change: |
     Added SSL termination support to the MySQL proxy filter with RSA-mediated ``caching_sha2_password``
@@ -176,5 +219,21 @@ new_features:
   change: |
     Added substitution commands ``%DOWNSTREAM_TLS_GROUP%`` and ``%UPSTREAM_TLS_GROUP%``. The TLS group may be used
     to discern if a TLS connection used a post quantum safe key exchange (e.g. X25519MLKEM768).
+- area: http_inspector
+  change: |
+    Enabled Balsa parser for HTTP inspector by default. This behavior can be temporarily
+    reverted by setting the runtime guard ``envoy.reloadable_features.http_inspector_use_balsa_parser``
+    to ``false``. This runtime guard will be removed in a future release of Envoy.
+- area: http_inspector
+  change: |
+    Enabled Balsa parser for HTTP inspector by default. This behavior can be temporarily
+    reverted by setting the runtime guard ``envoy.reloadable_features.http_inspector_use_balsa_parser``
+    to ``false``. This runtime guard will be removed in a future release of Envoy.
+
+- area: tcp_proxy
+  change: |
+    Added ``envoy.reloadable_features.tcp_proxy_delay_route_selection`` to delay selecting a route until just before the upstream
+    connection is established. The selection moment depends on the value of
+    :ref:`upstream_connect_mode<envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_mode>`.
 
 deprecated:

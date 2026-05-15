@@ -173,7 +173,7 @@ private:
 
     Grpc::AsyncStream<
         envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceRequest>
-        stream_{};
+        stream_;
     GrpcClientImpl& parent_;
   };
 

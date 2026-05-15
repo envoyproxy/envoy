@@ -104,6 +104,23 @@ Example configuration:
   The ``ON_DOWNSTREAM_DATA`` mode is not suitable for server-first protocols where the server sends the initial
   greeting (e.g., SMTP, MySQL, POP3). For such protocols, use ``IMMEDIATE`` mode.
 
+Delay Route Selection
+^^^^^^^^^^^^^^^^^^^^^
+
+The ``envoy.reloadable_features.tcp_proxy_delay_route_selection`` runtime guard controls whether we delay the
+route selection until the filter needs to establish the upstream connection. When unset, the filter will select a
+route on new connection.
+
+The moment the selection occurs depends on the connection mode:
+
+* ``IMMEDIATE`` with route selection delay: It has no effect. Route selection still happens on a new connection
+* ``ON_DOWNSTREAM_DATA`` with route selection delay: Route selection will happen when the filter first receives
+  data from downstream
+* ``ON_DOWNSTREAM_TLS_HANDSHAKE`` with route selection delay: Route selection will happen when the downstream TLS
+  handshake completes
+
+This will also delay updates to any statistics that are dependent on route selection (e.g. ``downstream_cx_no_route``).
+
 Filter state configuration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -226,3 +243,4 @@ The downstream statistics are rooted at *tcp.<stat_prefix>.* with the following 
   on_demand_cluster_timeout, Counter, Total number of connections closed due to on demand cluster lookup timeout
   upstream_flush_total, Counter, Total number of connections that continued to flush upstream data after the downstream connection was closed
   upstream_flush_active, Gauge, Total connections currently continuing to flush upstream data after the downstream connection was closed
+  route_delayed_total, Counter, Total number of route selections that were delayed until the filter needs to establish the downstream connection

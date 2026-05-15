@@ -1,7 +1,7 @@
 #include "source/common/io/io_uring_impl.h"
 #include "source/common/io/io_uring_worker_factory_impl.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 

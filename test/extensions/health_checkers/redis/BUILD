@@ -47,7 +47,6 @@ envoy_extension_cc_test(
         "//source/common/upstream:health_checker_lib",
         "//source/extensions/health_checkers/redis:config",
         "//test/common/upstream:utility_lib",
-        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:health_checker_factory_context_mocks",
         "//test/mocks/upstream:health_checker_mocks",
         "//test/mocks/upstream:priority_set_mocks",

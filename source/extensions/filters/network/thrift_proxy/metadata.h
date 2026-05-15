@@ -256,13 +256,13 @@ private:
       copy->setSampled(sampled_opt.value());
     }
   }
-  absl::optional<uint32_t> frame_size_{};
-  absl::optional<ProtocolType> proto_{};
-  absl::optional<std::string> method_name_{};
-  absl::optional<int16_t> header_flags_{};
-  absl::optional<int32_t> seq_id_{};
-  absl::optional<MessageType> msg_type_{};
-  absl::optional<ReplyType> reply_type_{};
+  absl::optional<uint32_t> frame_size_;
+  absl::optional<ProtocolType> proto_;
+  absl::optional<std::string> method_name_;
+  absl::optional<int16_t> header_flags_;
+  absl::optional<int32_t> seq_id_;
+  absl::optional<MessageType> msg_type_;
+  absl::optional<ReplyType> reply_type_;
   Http::RequestHeaderMapPtr request_headers_{nullptr};
   Http::ResponseHeaderMapPtr response_headers_{nullptr};
   absl::optional<AppExceptionType> app_ex_type_;

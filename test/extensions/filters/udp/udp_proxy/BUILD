@@ -85,7 +85,7 @@ envoy_extension_cc_test(
         "//source/common/network:utility_lib",
         "//source/extensions/filters/udp/udp_proxy/router:router_lib",
         "//source/extensions/matching/network/common:inputs_lib",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/udp/udp_proxy/v3:pkg_cc_proto",
     ],

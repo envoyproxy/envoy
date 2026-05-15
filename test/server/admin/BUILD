@@ -78,9 +78,12 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality(["admin_filter_test.cc"]),
     rbe_pool = "6gig",
     deps = [
+        "//source/common/buffer:buffer_lib",
         "//source/server/admin:admin_lib",
-        "//test/mocks/server:instance_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/server:admin_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

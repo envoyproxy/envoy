@@ -817,7 +817,6 @@ TEST_P(AdsIntegrationTest, CdsKeepEdsAfterWarmingFailure) {
 
 TEST_P(AdsIntegrationTest, CdsKeepEdsDropOverloadAfterWarmingFailure) {
   // This test should be kept after the runtime guard is deprecated
-  config_helper_.addRuntimeOverride("envoy.restart_features.use_eds_cache_for_ads", "true");
   initialize();
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
   envoy::config::cluster::v3::Cluster cluster = buildCluster("cluster_0");

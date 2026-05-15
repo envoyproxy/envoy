@@ -26,7 +26,7 @@ using ResourceAttributes = absl::flat_hash_map<std::string, std::string>;
  */
 struct Resource {
   std::string schema_url_{""};
-  ResourceAttributes attributes_{};
+  ResourceAttributes attributes_;
 
   virtual ~Resource() = default;
 };

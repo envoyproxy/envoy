@@ -20,7 +20,7 @@ envoy_extension_cc_test(
         "//source/extensions/router/cluster_specifiers/matcher:config",
         "//source/extensions/router/cluster_specifiers/matcher:matcher_cluster_specifier_lib",
         "//test/mocks/router:router_mocks",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
@@ -33,7 +33,7 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/router/cluster_specifiers/matcher:config",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
     ],
 )

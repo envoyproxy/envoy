@@ -5,6 +5,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/thread.h"
 #include "source/common/http/message_impl.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/clusters/dynamic_modules/cluster.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
@@ -828,6 +829,70 @@ bool envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_
   }
   result_buffer->ptr = const_cast<char*>(sni.data());
   result_buffer->length = sni.size();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result) {
+  if (context_envoy_ptr == nullptr || result == nullptr) {
+    return false;
+  }
+  auto* stream_info = getContext(context_envoy_ptr)->requestStreamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+  absl::string_view key_view(key.ptr, key.length);
+  auto filter_state =
+      stream_info->filterState()->getDataReadOnly<Envoy::Router::StringAccessor>(key_view);
+  if (!filter_state) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "key '{}' not found in filter state", key_view);
+    return false;
+  }
+  absl::string_view str = filter_state->asString();
+  *result = {const_cast<char*>(str.data()), str.size()};
+  return true;
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result) {
+  if (context_envoy_ptr == nullptr || result == nullptr) {
+    return false;
+  }
+  auto* stream_info = getContext(context_envoy_ptr)->requestStreamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+
+  absl::string_view key_view(key.ptr, key.length);
+  const auto* object = stream_info->filterState()->getDataReadOnlyGeneric(key_view);
+  if (object == nullptr) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "key '{}' not found in filter state", key_view);
+    return false;
+  }
+
+  auto serialized = object->serializeAsString();
+  if (!serialized.has_value()) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "filter state object for key '{}' does not support serialization",
+                        key_view);
+    return false;
+  }
+
+  // Cluster host selection runs on a worker thread serially per request. We stash the
+  // serialized buffer on a thread-local so its address survives until the next call to
+  // this function on the same thread (matching the documented lifetime in abi.h).
+  thread_local std::string last_serialized_filter_state;
+  last_serialized_filter_state = std::move(serialized.value());
+  result->ptr = const_cast<char*>(last_serialized_filter_state.data());
+  result->length = last_serialized_filter_state.size();
   return true;
 }
 

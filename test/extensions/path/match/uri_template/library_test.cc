@@ -2,8 +2,8 @@
 #include "source/extensions/path/match/uri_template/config.h"
 #include "source/extensions/path/match/uri_template/uri_template_match.h"
 
-#include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 

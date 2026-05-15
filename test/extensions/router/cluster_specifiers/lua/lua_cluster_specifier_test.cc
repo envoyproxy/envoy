@@ -1,7 +1,7 @@
 #include "source/extensions/router/cluster_specifiers/lua/lua_cluster_specifier.h"
 
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"

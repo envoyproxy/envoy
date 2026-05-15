@@ -19,7 +19,7 @@ MockRequestDecoder::MockRequestDecoder() {
         ASSERT_NE(nullptr, headers->Method());
       }));
   ON_CALL(*this, getRequestDecoderHandle()).WillByDefault(Invoke([this]() {
-    auto handle = std::make_unique<MockRequestDecoderHandle>();
+    auto handle = std::make_unique<testing::NiceMock<MockRequestDecoderHandle>>();
     ON_CALL(*handle, get()).WillByDefault(Return(OptRef<RequestDecoder>(*this)));
     return handle;
   }));

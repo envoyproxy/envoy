@@ -886,7 +886,7 @@ typed_config:
           });
     }
 
-    if (add_endpoint != "") {
+    if (!add_endpoint.empty()) {
       config_helper_.addConfigModifier(
           [add_endpoint](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
             auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
@@ -924,7 +924,7 @@ typed_config:
     ASSERT_TRUE(response->waitForEndStream(std::chrono::milliseconds(100000)));
 
     EXPECT_EQ(expected_status_code, response->headers().getStatusValue());
-    if (expected_upstream_host != "") {
+    if (!expected_upstream_host.empty()) {
       EXPECT_TRUE(absl::StrContains(getHeader(response->headers(), "rsp-upstream-host"),
                                     expected_upstream_host));
     }

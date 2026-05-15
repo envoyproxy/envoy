@@ -67,6 +67,7 @@ envoy_cc_library(
         "//bazel:using_openssl": ["-DENVOY_SSL_VERSION=\\\"OpenSSL\\\""],
         "//conditions:default": ["-DENVOY_SSL_VERSION=\\\"BoringSSL\\\""],
     }),
+    tags = ["notidy"],
     deps = [
         ":version_string_interface_lib",
         ":version_suffix_default",

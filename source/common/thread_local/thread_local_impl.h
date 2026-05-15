@@ -87,7 +87,7 @@ private:
   std::vector<uint32_t> free_slot_indexes_;
   std::list<std::reference_wrapper<Event::Dispatcher>> registered_threads_;
   Event::Dispatcher* main_thread_dispatcher_{};
-  std::atomic<bool> shutdown_{};
+  std::atomic<bool> shutdown_{false};
 
   // Test only.
   friend class ThreadLocalInstanceImplTest;

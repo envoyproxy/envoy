@@ -25,7 +25,8 @@ envoy_cc_test(
         "//source/extensions/access_loggers/dynamic_modules:config",
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/access_log:access_log_mocks",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:options_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
     ],
 )
