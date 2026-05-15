@@ -70,6 +70,35 @@ TEST(SingletonSubscriptionAdapterTest, DeltaAddedResources) {
   EXPECT_TRUE(adapter.onConfigUpdate(added_resources, removed_resources, "v1").ok());
 }
 
+TEST(SingletonSubscriptionAdapterTest, SotWMultipleResources) {
+  MockSingletonSubscriptionCallbacks callbacks;
+  SingletonSubscriptionCallbacksAdapter adapter(callbacks);
+
+  auto message1 = std::make_unique<Protobuf::Empty>();
+  DecodedResourceImpl decoded_resource1(std::move(message1), "my_resource1", {}, "v1");
+  auto message2 = std::make_unique<Protobuf::Empty>();
+  DecodedResourceImpl decoded_resource2(std::move(message2), "my_resource2", {}, "v1");
+  std::vector<DecodedResourceRef> resources{decoded_resource1, decoded_resource2};
+
+  EXPECT_CALL(callbacks, onResourceUpdate(_, _)).Times(0);
+  EXPECT_FALSE(adapter.onConfigUpdate(resources, "v1").ok());
+}
+
+TEST(SingletonSubscriptionAdapterTest, DeltaMultipleResources) {
+  MockSingletonSubscriptionCallbacks callbacks;
+  SingletonSubscriptionCallbacksAdapter adapter(callbacks);
+
+  auto message1 = std::make_unique<Protobuf::Empty>();
+  DecodedResourceImpl decoded_resource1(std::move(message1), "my_resource1", {}, "v1");
+  auto message2 = std::make_unique<Protobuf::Empty>();
+  DecodedResourceImpl decoded_resource2(std::move(message2), "my_resource2", {}, "v1");
+  std::vector<DecodedResourceRef> added_resources{decoded_resource1, decoded_resource2};
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+
+  EXPECT_CALL(callbacks, onResourceUpdate(_, _)).Times(0);
+  EXPECT_FALSE(adapter.onConfigUpdate(added_resources, removed_resources, "v1").ok());
+}
+
 TEST(SingletonSubscriptionAdapterTest, OnConfigUpdateFailed) {
   MockSingletonSubscriptionCallbacks callbacks;
   SingletonSubscriptionCallbacksAdapter adapter(callbacks);

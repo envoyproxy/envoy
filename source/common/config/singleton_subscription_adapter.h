@@ -8,6 +8,7 @@
 #include "envoy/config/subscription.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
 
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
@@ -27,6 +28,11 @@ public:
       callbacks_.onResourceRemoved();
       return absl::OkStatus();
     }
+    if (resources.size() > 1) {
+      return absl::InvalidArgumentError(
+          fmt::format("Unexpected multiple resources ({} resources) in singleton SotW update",
+                      resources.size()));
+    }
     return callbacks_.onResourceUpdate(resources[0].get(), version_info);
   }
 
@@ -39,6 +45,11 @@ public:
       return absl::OkStatus();
     }
     RELEASE_ASSERT(!added_resources.empty(), "Delta xDS update with no additions or removals");
+    if (added_resources.size() > 1) {
+      return absl::InvalidArgumentError(
+          fmt::format("Unexpected multiple added resources ({} resources) in singleton Delta update",
+                      added_resources.size()));
+    }
     return callbacks_.onResourceUpdate(added_resources[0].get(),
                                        added_resources[0].get().version());
   }
