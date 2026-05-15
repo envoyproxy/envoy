@@ -42,17 +42,17 @@ public:
                               const std::string& system_version_info) override {
     if (!added_resources.empty()) {
       if (added_resources.size() > 1) {
-        return absl::InvalidArgumentError(
-            fmt::format("Unexpected multiple added resources ({} resources) in singleton Delta update",
-                        added_resources.size()));
+        return absl::InvalidArgumentError(fmt::format(
+            "Unexpected multiple added resources ({} resources) in singleton Delta update",
+            added_resources.size()));
       }
       return callbacks_.onResourceUpdate(added_resources[0].get(), system_version_info);
     }
     if (!removed_resources.empty()) {
       if (removed_resources.size() > 1) {
-        return absl::InvalidArgumentError(
-            fmt::format("Unexpected multiple removed resources ({} resources) in singleton Delta update",
-                        removed_resources.size()));
+        return absl::InvalidArgumentError(fmt::format(
+            "Unexpected multiple removed resources ({} resources) in singleton Delta update",
+            removed_resources.size()));
       }
       callbacks_.onResourceRemoved();
       return absl::OkStatus();
