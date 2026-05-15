@@ -729,6 +729,16 @@ case $CI_TARGET in
               //tools/distribution:update_dockerhub_repository
         ;;
 
+    changelog-add)
+        setup_clang_toolchain
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" //changelogs:add -- "$@"
+        ;;
+
+    changelog-area-add)
+        setup_clang_toolchain
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" //changelogs:area-add -- "$@"
+        ;;
+
     dockerhub-readme)
         setup_clang_toolchain
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \

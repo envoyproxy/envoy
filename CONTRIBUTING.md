@@ -157,6 +157,15 @@ versioning guidelines:
   to multiple sections of the release notes, it should be noted in the first (most important) section
   that applies. For instance, a bug fix that introduces incompatible behavior should be noted in
   `Incompatible Behavior Changes` but not in `Bug Fixes`.
+* Branches that use the per-entry changelog layout under `changelogs/current/` can use the helper
+  commands below instead of hand-writing filenames:
+
+  ```
+  ./ci/do_ci.sh changelog-add
+  ./ci/do_ci.sh changelog-add --section=bug_fixes --area=tls --change='Fixed foo.'
+  ./ci/do_ci.sh changelog-area-add
+  ./ci/do_ci.sh changelog-area-add --area=new_area --title='new_area'
+  ```
 * All code comments and documentation are expected to have proper English grammar and punctuation.
   If you are not a fluent English speaker (or a bad writer ;-)) please let us know and we will try
   to find some help but there are no guarantees.
