@@ -2,17 +2,13 @@
 
 #include "envoy/stats/sink.h"
 
-#include "source/extensions/dynamic_modules/stat_sink_flush_context.h"
 #include "source/extensions/stat_sinks/dynamic_modules/sink_config.h"
+#include "source/extensions/stat_sinks/dynamic_modules/stat_sink_flush_context.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
 namespace DynamicModules {
-
-// Re-exported for convenience; the struct itself lives in core so the ABI
-// callbacks that consume it are provided by every Envoy binary.
-using ::Envoy::Extensions::DynamicModules::StatSinkFlushContext;
 
 /**
  * Stats sink that delegates to a dynamic module. A single config is shared across all
@@ -33,6 +29,7 @@ public:
 
 private:
   DynamicModuleStatsSinkConfigSharedPtr config_;
+  StatSinkFlushContext ctx_;
 };
 
 } // namespace DynamicModules

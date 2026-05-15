@@ -11,7 +11,6 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
-#include "source/extensions/dynamic_modules/stat_sink_flush_context.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/synchronization/mutex.h"
@@ -3398,88 +3397,54 @@ __attribute__((weak)) void envoy_dynamic_module_callback_transport_socket_flush_
                "not implemented in this context");
 }
 
-// --------------------------------------------------------------------------
-// Stats Sink snapshot callbacks
-//
-// These live alongside the other common dynamic_modules callbacks so that any
-// module referencing them resolves its undefined symbols at dlopen time
-// regardless of which extensions the hosting Envoy binary links.
-// The snapshot_envoy_ptr parameter is a pointer to an
-// Envoy::Extensions::DynamicModules::StatSinkFlushContext built by the sink
-// wrapper in source/extensions/stat_sinks/dynamic_modules/sink.cc.
-// --------------------------------------------------------------------------
+// ----------------------- Stats Sink Snapshot ---------------------------------
+// Real implementations are provided in
+// source/extensions/stat_sinks/dynamic_modules/abi_impl.cc when the stats sink
+// extension is linked.
 
-namespace {
-
-const Envoy::Extensions::DynamicModules::StatSinkFlushContext*
-toStatSinkFlushContext(envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr ptr) {
-  return static_cast<const Envoy::Extensions::DynamicModules::StatSinkFlushContext*>(ptr);
+__attribute__((weak)) size_t envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_count: "
+               "not implemented in this context");
+  return 0;
 }
 
-} // namespace
-
-size_t envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_count(
-    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr) {
-  return toStatSinkFlushContext(snapshot_envoy_ptr)->snapshot->counters().size();
+__attribute__((weak)) bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t,
+    envoy_dynamic_module_type_envoy_buffer*, uint64_t*, uint64_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_counter: "
+               "not implemented in this context");
+  return false;
 }
 
-bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter(
-    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
-    envoy_dynamic_module_type_envoy_buffer* name_out, uint64_t* value_out, uint64_t* delta_out) {
-  const auto* ctx = toStatSinkFlushContext(snapshot_envoy_ptr);
-  const auto& counters = ctx->snapshot->counters();
-  if (index >= counters.size()) {
-    return false;
-  }
-  const auto& snap = counters[index];
-  const std::string& name = ctx->counter_names[index];
-  *name_out = {.ptr = name.data(), .length = name.size()};
-  *value_out = snap.counter_.get().value();
-  *delta_out = snap.delta_;
-  return true;
+__attribute__((weak)) size_t envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_count: "
+               "not implemented in this context");
+  return 0;
 }
 
-size_t envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_count(
-    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr) {
-  return toStatSinkFlushContext(snapshot_envoy_ptr)->snapshot->gauges().size();
+__attribute__((weak)) bool envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t,
+    envoy_dynamic_module_type_envoy_buffer*, uint64_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge: "
+               "not implemented in this context");
+  return false;
 }
 
-bool envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge(
-    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
-    envoy_dynamic_module_type_envoy_buffer* name_out, uint64_t* value_out) {
-  const auto* ctx = toStatSinkFlushContext(snapshot_envoy_ptr);
-  const auto& gauges = ctx->snapshot->gauges();
-  if (index >= gauges.size()) {
-    return false;
-  }
-  const Envoy::Stats::Gauge& gauge = gauges[index].get();
-  const std::string& name = ctx->gauge_names[index];
-  *name_out = {.ptr = name.data(), .length = name.size()};
-  *value_out = gauge.value();
-  return true;
+__attribute__((weak)) size_t envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_count: "
+               "not implemented in this context");
+  return 0;
 }
 
-size_t envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_count(
-    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr) {
-  return toStatSinkFlushContext(snapshot_envoy_ptr)->snapshot->textReadouts().size();
-}
-
-bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(
-    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
-    envoy_dynamic_module_type_envoy_buffer* name_out,
-    envoy_dynamic_module_type_envoy_buffer* value_out) {
-  const auto* ctx = toStatSinkFlushContext(snapshot_envoy_ptr);
-  const auto& readouts = ctx->snapshot->textReadouts();
-  if (index >= readouts.size()) {
-    return false;
-  }
-  // Both name and value are served from the pre-cached strings; std::string
-  // returned by value means the raw metric pointers would dangle otherwise.
-  const std::string& name = ctx->text_readout_names[index];
-  const std::string& value = ctx->text_readout_values[index];
-  *name_out = {.ptr = name.data(), .length = name.size()};
-  *value_out = {.ptr = value.data(), .length = value.size()};
-  return true;
+__attribute__((weak)) bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t,
+    envoy_dynamic_module_type_envoy_buffer*, envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout: "
+               "not implemented in this context");
+  return false;
 }
 
 } // extern "C"

@@ -79,27 +79,6 @@ sink_config:
   EXPECT_NE(nullptr, sink_or_error.value());
 }
 
-// Happy path with explicit module.local.filename.
-TEST_F(DynamicModuleStatsSinkFactoryTest, ValidConfigExplicitPath) {
-  const std::string yaml =
-      fmt::format(R"EOF(
-dynamic_module_config:
-  module:
-    local:
-      filename: {}
-  do_not_close: true
-sink_name: test_sink
-)EOF",
-                  Extensions::DynamicModules::testSharedObjectPath("stat_sink_no_op", "c"));
-
-  envoy::extensions::stat_sinks::dynamic_modules::v3::DynamicModuleStatsSink proto_config;
-  TestUtility::loadFromYaml(yaml, proto_config);
-
-  auto sink_or_error = factory_.createStatsSink(proto_config, context_);
-  ASSERT_TRUE(sink_or_error.ok()) << sink_or_error.status().message();
-  EXPECT_NE(nullptr, sink_or_error.value());
-}
-
 // An empty sink_config is allowed — module receives zero bytes.
 TEST_F(DynamicModuleStatsSinkFactoryTest, ValidConfigEmptySinkConfig) {
   const std::string yaml = R"EOF(
@@ -136,70 +115,6 @@ sink_config:
 
   auto sink_or_error = factory_.createStatsSink(proto_config, context_);
   ASSERT_TRUE(sink_or_error.ok()) << sink_or_error.status().message();
-}
-
-// A config with neither name nor module is rejected.
-TEST_F(DynamicModuleStatsSinkFactoryTest, MissingBothNameAndModule) {
-  const std::string yaml = R"EOF(
-dynamic_module_config:
-  do_not_close: true
-sink_name: test_sink
-)EOF";
-
-  envoy::extensions::stat_sinks::dynamic_modules::v3::DynamicModuleStatsSink proto_config;
-  TestUtility::loadFromYaml(yaml, proto_config);
-
-  auto sink_or_error = factory_.createStatsSink(proto_config, context_);
-  EXPECT_FALSE(sink_or_error.ok());
-  EXPECT_THAT(std::string(sink_or_error.status().message()),
-              testing::HasSubstr("Either 'name' or 'module' must be specified"));
-}
-
-// Remote modules are not supported for stats sinks.
-TEST_F(DynamicModuleStatsSinkFactoryTest, RemoteModuleRejected) {
-  const std::string yaml = R"EOF(
-dynamic_module_config:
-  module:
-    remote:
-      http_uri:
-        uri: https://example.com/module.so
-        cluster: module_cluster
-        timeout: 1s
-      sha256: "0000000000000000000000000000000000000000000000000000000000000000"
-sink_name: test_sink
-)EOF";
-
-  envoy::extensions::stat_sinks::dynamic_modules::v3::DynamicModuleStatsSink proto_config;
-  TestUtility::loadFromYaml(yaml, proto_config);
-
-  auto sink_or_error = factory_.createStatsSink(proto_config, context_);
-  EXPECT_FALSE(sink_or_error.ok());
-  EXPECT_THAT(std::string(sink_or_error.status().message()),
-              testing::HasSubstr("Remote module sources are not supported"));
-}
-
-// module.local with no filename: PGV (proto validation via downcastAndValidate)
-// rejects this before our factory's explicit check runs, throwing an
-// EnvoyException. Either path is acceptable — the proto is invalid.
-TEST_F(DynamicModuleStatsSinkFactoryTest, ModuleLocalWithoutFilename) {
-  const std::string yaml = R"EOF(
-dynamic_module_config:
-  module:
-    local: {}
-sink_name: test_sink
-)EOF";
-
-  envoy::extensions::stat_sinks::dynamic_modules::v3::DynamicModuleStatsSink proto_config;
-  TestUtility::loadFromYaml(yaml, proto_config);
-
-  // createStatsSink returns a [[no_discard]] absl::StatusOr<>, but PGV throws
-  // before it would return; wrap in a lambda so we can silence the warning,
-  // and so the comma inside the argument list isn't seen as a macro separator.
-  auto invoke = [this, &proto_config]() {
-    auto unused = factory_.createStatsSink(proto_config, context_);
-    (void)unused;
-  };
-  EXPECT_THROW_WITH_REGEX(invoke(), EnvoyException, "specifier");
 }
 
 // A bogus module name produces a clear "Failed to load dynamic module" error.

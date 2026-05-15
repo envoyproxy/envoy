@@ -12325,7 +12325,8 @@ size_t envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_count(
  * @param snapshot_envoy_ptr is the pointer to the MetricSnapshot.
  * @param index is the index of the counter (0-based).
  * @param name_out is the output buffer for the counter name. The buffer is owned by Envoy and
- *        valid only during this call.
+ *        is guaranteed to be valid until the end of the envoy_dynamic_module_on_stat_sink_flush
+ *        event hook.
  * @param value_out is the output for the current accumulated counter value.
  * @param delta_out is the output for the counter delta since the last flush.
  * @return true if the index is valid, false otherwise.
@@ -12351,7 +12352,8 @@ size_t envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_count(
  * @param snapshot_envoy_ptr is the pointer to the MetricSnapshot.
  * @param index is the index of the gauge (0-based).
  * @param name_out is the output buffer for the gauge name. The buffer is owned by Envoy and
- *        valid only during this call.
+ *        is guaranteed to be valid until the end of the envoy_dynamic_module_on_stat_sink_flush
+ *        event hook.
  * @param value_out is the output for the current gauge value.
  * @return true if the index is valid, false otherwise.
  */
@@ -12376,9 +12378,11 @@ size_t envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_count(
  * @param snapshot_envoy_ptr is the pointer to the MetricSnapshot.
  * @param index is the index of the text readout (0-based).
  * @param name_out is the output buffer for the text readout name. The buffer is owned by Envoy
- *        and valid only during this call.
+ *        and is guaranteed to be valid until the end of the
+ *        envoy_dynamic_module_on_stat_sink_flush event hook.
  * @param value_out is the output buffer for the text readout value. The buffer is owned by Envoy
- *        and valid only during this call.
+ *        and is guaranteed to be valid until the end of the
+ *        envoy_dynamic_module_on_stat_sink_flush event hook.
  * @return true if the index is valid, false otherwise.
  */
 bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(

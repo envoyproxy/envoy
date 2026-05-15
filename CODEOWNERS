@@ -156,7 +156,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/grpc_credentials/file_based_metadata @wozz @yanavlasov
 /*/extensions/internal_redirect @botengyao @penguingao
 /*/extensions/stat_sinks/dog_statsd @taiki45 @paul-r-gall
-/*/extensions/stat_sinks/dynamic_modules @prashanthjos @mattklein123
+/*/extensions/stat_sinks/dynamic_modules @prashanthjos @mathetake @agrawroh @wbpcode
 /*/extensions/stat_sinks/graphite_statsd @vaccarium @mattklein123
 /*/extensions/stat_sinks/hystrix @trabetti @paul-r-gall
 /*/extensions/stat_sinks/metrics_service @ramaraochavali @paul-r-gall

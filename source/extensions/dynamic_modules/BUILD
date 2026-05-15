@@ -38,11 +38,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "abi_impl",
     srcs = ["abi_impl.cc"],
-    hdrs = ["stat_sink_flush_context.h"],
     deps = [
         ":dynamic_modules_lib",
         "//envoy/server:factory_context_interface",
-        "//envoy/stats:sink_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "@abseil-cpp//absl/container:flat_hash_map",

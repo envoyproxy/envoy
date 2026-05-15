@@ -13,6 +13,18 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "abi_impl",
+    srcs = ["abi_impl.cc"],
+    hdrs = ["stat_sink_flush_context.h"],
+    deps = [
+        "//envoy/stats:sink_interface",
+        "//source/extensions/dynamic_modules:abi_impl",
+        "//source/extensions/dynamic_modules/abi",
+    ],
+    alwayslink = True,
+)
+
+envoy_cc_library(
     name = "sink_config_lib",
     srcs = ["sink_config.cc"],
     hdrs = ["sink_config.h"],
@@ -30,9 +42,9 @@ envoy_cc_library(
     srcs = ["sink.cc"],
     hdrs = ["sink.h"],
     deps = [
+        ":abi_impl",
         ":sink_config_lib",
         "//envoy/stats:sink_interface",
-        "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
     ],
 )
