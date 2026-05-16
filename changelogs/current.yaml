@@ -102,6 +102,12 @@ bug_fixes:
     Fixed ``Illegal ambiguous match`` error when building contrib targets with ``--config=boringssl-fips``
     on aarch64 by restricting the ``using_boringssl_fips`` branch of ``SELECTED_CONTRIB_EXTENSIONS`` to
     ``linux_x86_64``. Mirrors the approach taken by #44661 for ``aws-lc``.
+- area: dns_resolver
+  change: |
+    Fixed macOS build failure (#45061) for the Hickory DNS resolver by linking
+    Apple's ``SystemConfiguration`` framework. The framework is required by the
+    ``system-configuration`` crate that ``hickory-resolver`` pulls in via its
+    ``system-config`` feature.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
