@@ -97,6 +97,18 @@ bug_fixes:
     resulting binary "plaintext" was written back into the ``Cookie:`` request header and tripped a
     ``HeaderString`` validation assert. Such plaintexts are now rejected and the original cookie value
     is preserved, matching the behavior already documented for the explicit decryption-failure case.
+- area: dns_resolver
+  change: |
+    Fixed a memory leak in the Hickory DNS resolver where ``ActiveDnsQuery::cancel()``
+    did not free the pending query state or decrement the ``pending_resolutions`` gauge. Cancelled
+    queries now release their shell object, Rust-side query box, and gauge tick synchronously,
+    matching the contract followed by the c-ares and Apple DNS resolvers.
+- area: dns_resolver
+  change: |
+    Fixed a UAF in the Hickory DNS resolver where the dispatcher lambda posted by the
+    Rust-thread completion callback captured a raw pointer to the resolver. If the resolver was
+    destroyed before the dispatcher drained the lambda, dereferencing the pointer was undefined
+    behavior. The lambda now captures a ``std::weak_ptr`` and locks it before touching the resolver.
 - area: build
   change: |
     Fixed ``Illegal ambiguous match`` error when building contrib targets with ``--config=boringssl-fips``
