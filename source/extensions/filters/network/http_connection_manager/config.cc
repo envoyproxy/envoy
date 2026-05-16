@@ -392,6 +392,15 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), idle_timeout)),
       max_connection_duration_(
           PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_connection_duration)),
+      max_connection_duration_jitter_percentage_(
+          config.common_http_protocol_options().has_max_connection_duration_jitter()
+              ? absl::optional<double>(
+                    config.common_http_protocol_options().max_connection_duration_jitter().value())
+              : absl::nullopt),
+      drain_percentage_(
+          config.has_drain_percentage()
+              ? absl::optional<double>(config.drain_percentage().value())
+              : absl::nullopt),
       http1_safe_max_connection_duration_(config.http1_safe_max_connection_duration()),
       max_stream_duration_(
           PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_stream_duration)),
@@ -403,6 +412,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       request_headers_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, request_headers_timeout, RequestHeaderTimeoutMs)),
       drain_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, drain_timeout, 5000)),
+      drain_timeout_jitter_percentage_(
+          config.has_drain_timeout_jitter()
+              ? absl::optional<double>(config.drain_timeout_jitter().value())
+              : absl::nullopt),
       generate_request_id_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, generate_request_id, true)),
       preserve_external_request_id_(config.preserve_external_request_id()),
       always_set_request_id_in_response_(config.always_set_request_id_in_response()),

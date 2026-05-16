@@ -146,6 +146,7 @@ public:
                                         Server::OverloadManager& overload_manager) override;
   Http::DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() const override { return std::chrono::milliseconds(100); }
+  absl::optional<double> drainTimeoutJitterPercentage() const override { return absl::nullopt; }
   Http::FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() const override { return false; }
   bool preserveExternalRequestId() const override { return false; }
@@ -155,6 +156,10 @@ public:
   absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
     return max_connection_duration_;
   }
+  absl::optional<double> maxConnectionDurationJitterPercentage() const override {
+    return absl::nullopt;
+  }
+  absl::optional<double> drainPercentage() const override { return absl::nullopt; }
   bool http1SafeMaxConnectionDuration() const override { return false; }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }

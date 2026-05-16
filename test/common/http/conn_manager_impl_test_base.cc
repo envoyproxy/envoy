@@ -40,6 +40,9 @@ public:
   }
   DateProvider& dateProvider() override { return parent_.dateProvider(); }
   std::chrono::milliseconds drainTimeout() const override { return parent_.drainTimeout(); }
+  absl::optional<double> drainTimeoutJitterPercentage() const override {
+    return parent_.drainTimeoutJitterPercentage();
+  }
   FilterChainFactory& filterFactory() override { return parent_.filterFactory(); }
   bool generateRequestId() const override { return parent_.generateRequestId(); }
   bool preserveExternalRequestId() const override { return parent_.preserveExternalRequestId(); }
@@ -53,6 +56,10 @@ public:
   absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
     return parent_.maxConnectionDuration();
   }
+  absl::optional<double> maxConnectionDurationJitterPercentage() const override {
+    return parent_.maxConnectionDurationJitterPercentage();
+  }
+  absl::optional<double> drainPercentage() const override { return parent_.drainPercentage(); }
   bool http1SafeMaxConnectionDuration() const override {
     return parent_.http1SafeMaxConnectionDuration();
   }

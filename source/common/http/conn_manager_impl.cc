@@ -1,6 +1,7 @@
 #include "source/common/http/conn_manager_impl.h"
 
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <functional>
 #include <iterator>
@@ -215,7 +216,7 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
     connection_duration_timer_ =
         dispatcher_->createScaledTimer(Event::ScaledTimerType::HttpDownstreamMaxConnectionTimeout,
                                        [this]() -> void { onConnectionDurationTimeout(); });
-    connection_duration_timer_->enableTimer(config_->maxConnectionDuration().value());
+    connection_duration_timer_->enableTimer(computeJitteredConnectionDuration());
   }
 
   read_callbacks_->connection().setDelayedCloseTimeout(config_->delayedCloseTimeout());
@@ -793,6 +794,24 @@ void ConnectionManagerImpl::onIdleTimeout() {
 void ConnectionManagerImpl::onConnectionDurationTimeout() {
   ENVOY_CONN_LOG(debug, "max connection duration reached", read_callbacks_->connection());
   stats_.named_.downstream_cx_max_duration_reached_.inc();
+  // drain_percentage: only drain this fraction of connections per cycle. For the rest, reset
+  // the duration timer and wait for the next round.
+  // Semantics: 100 (or unset) = drain all (current behavior); 0 = never drain (always reset);
+  // intermediate values give probabilistic per-connection draining.
+  const auto& drain_pct = config_->drainPercentage();
+  if (drain_pct.has_value() && drain_pct.value() < 100 && codec_ &&
+      drain_state_ == DrainState::NotDraining) {
+    // Roll a uniform integer in [0, 99] and drain only when roll < drain_percentage.
+    // the rest reset their timer.
+    const uint64_t roll = random_generator_.random() % 100;
+    if (roll >= static_cast<uint64_t>(drain_pct.value())) {
+      ENVOY_CONN_LOG(debug, "drain_percentage skip: resetting duration timer",
+                     read_callbacks_->connection());
+      stats_.named_.downstream_cx_max_duration_drain_skipped_.inc();
+      connection_duration_timer_->enableTimer(computeJitteredConnectionDuration());
+      return;
+    }
+  }
   if (!codec_) {
     // Attempt to write out buffered data one last time and issue a local close if successful.
     doConnectionClose(Network::ConnectionCloseType::FlushWrite,
@@ -809,6 +828,24 @@ void ConnectionManagerImpl::onConnectionDurationTimeout() {
       startDrainSequence();
     }
   }
+}
+
+std::chrono::milliseconds ConnectionManagerImpl::computeJitteredConnectionDuration() {
+  std::chrono::milliseconds duration = config_->maxConnectionDuration().value();
+  // Apply jitter: extend the base duration by a random amount up to
+  // base_duration * jitter_percentage / 100. Follows the same pattern as TCP proxy's
+  // max_downstream_connection_duration_jitter_percentage.
+  const auto& jitter_pct = config_->maxConnectionDurationJitterPercentage();
+  if (jitter_pct.has_value() && jitter_pct.value() > 0) {
+    const uint64_t max_jitter_ms =
+        static_cast<uint64_t>(std::ceil(duration.count() * (jitter_pct.value() / 100.0)));
+    if (max_jitter_ms > 0) {
+      const uint64_t jitter_ms = random_generator_.random() % max_jitter_ms;
+      duration =
+          std::chrono::milliseconds(static_cast<uint64_t>(duration.count()) + jitter_ms);
+    }
+  }
+  return duration;
 }
 
 void ConnectionManagerImpl::onDrainTimeout() {
@@ -1692,7 +1729,21 @@ void ConnectionManagerImpl::startDrainSequence() {
   drain_state_ = DrainState::Draining;
   codec_->shutdownNotice();
   drain_timer_ = dispatcher_->createTimer([this]() -> void { onDrainTimeout(); });
-  drain_timer_->enableTimer(config_->drainTimeout());
+  std::chrono::milliseconds drain_timeout = config_->drainTimeout();
+  // Apply jitter: extend the drain grace period by a random amount up to
+  // drain_timeout * jitter_percentage / 100. Staggers the final GOAWAY across
+  // simultaneously-draining connections to mitigate thundering-herd reconnects.
+  const auto& jitter_pct = config_->drainTimeoutJitterPercentage();
+  if (jitter_pct.has_value() && jitter_pct.value() > 0) {
+    const uint64_t max_jitter_ms =
+        static_cast<uint64_t>(std::ceil(drain_timeout.count() * (jitter_pct.value() / 100.0)));
+    if (max_jitter_ms > 0) {
+      const uint64_t jitter_ms = random_generator_.random() % max_jitter_ms;
+      drain_timeout = std::chrono::milliseconds(
+          static_cast<uint64_t>(drain_timeout.count()) + jitter_ms);
+    }
+  }
+  drain_timer_->enableTimer(drain_timeout);
 }
 
 void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {

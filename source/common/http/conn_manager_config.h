@@ -43,6 +43,7 @@ namespace Http {
   COUNTER(downstream_cx_http3_total)                                                               \
   COUNTER(downstream_cx_idle_timeout)                                                              \
   COUNTER(downstream_cx_max_duration_reached)                                                      \
+  COUNTER(downstream_cx_max_duration_drain_skipped)                                                \
   COUNTER(downstream_cx_max_requests_reached)                                                      \
   COUNTER(downstream_cx_overload_disable_keepalive)                                                \
   COUNTER(downstream_cx_protocol_error)                                                            \
@@ -258,6 +259,19 @@ public:
   virtual std::chrono::milliseconds drainTimeout() const PURE;
 
   /**
+   * @return optional jitter percentage for drainTimeout. When set, the actual drain grace
+   *         period is extended by a random amount up to drainTimeout * jitter / 100.
+   */
+  virtual absl::optional<double> drainTimeoutJitterPercentage() const PURE;
+
+  /**
+   * @return optional drain percentage. When set, only this fraction of connections are drained
+   *         per max_connection_duration cycle; the rest have their duration timer reset and
+   *         wait for the next round. Bounds the number of simultaneous reconnects.
+   */
+  virtual absl::optional<double> drainPercentage() const PURE;
+
+  /**
    * @return FilterChainFactory& the HTTP level filter factory to build the connection's filter
    *         chain.
    */
@@ -294,6 +308,13 @@ public:
    * @return optional maximum connection duration timeout for manager connections.
    */
   virtual absl::optional<std::chrono::milliseconds> maxConnectionDuration() const PURE;
+
+  /**
+   * @return optional jitter percentage for max_connection_duration. When set, the actual
+   *         connection duration is extended by a random amount up to
+   *         max_connection_duration * jitter / 100.
+   */
+  virtual absl::optional<double> maxConnectionDurationJitterPercentage() const PURE;
 
   /**
    * @return whether maxConnectionDuration allows HTTP1 clients to choose when to close connection

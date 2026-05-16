@@ -609,6 +609,8 @@ private:
                        absl::string_view details);
   void onIdleTimeout();
   void onConnectionDurationTimeout();
+  // Returns the configured max_connection_duration with jitter applied (if configured).
+  std::chrono::milliseconds computeJitteredConnectionDuration();
   void onDrainTimeout();
   void startDrainSequence();
   Tracing::Tracer& tracer() { return *config_->tracer(); }

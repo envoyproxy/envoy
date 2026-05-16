@@ -107,6 +107,9 @@ public:
   }
   DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() const override { return std::chrono::milliseconds(100); }
+  absl::optional<double> drainTimeoutJitterPercentage() const override {
+    return drain_timeout_jitter_percentage_;
+  }
   FilterChainFactory& filterFactory() override { return filter_factory_; }
   bool generateRequestId() const override { return true; }
   bool preserveExternalRequestId() const override { return false; }
@@ -118,6 +121,10 @@ public:
   absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
     return max_connection_duration_;
   }
+  absl::optional<double> maxConnectionDurationJitterPercentage() const override {
+    return max_connection_duration_jitter_percentage_;
+  }
+  absl::optional<double> drainPercentage() const override { return drain_percentage_; }
   bool http1SafeMaxConnectionDuration() const override {
     return http1_safe_max_connection_duration_;
   }
@@ -298,6 +305,9 @@ public:
   uint32_t max_requests_per_connection_{};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
+  absl::optional<double> max_connection_duration_jitter_percentage_;
+  absl::optional<double> drain_percentage_;
+  absl::optional<double> drain_timeout_jitter_percentage_;
   bool http1_safe_max_connection_duration_{false};
   std::chrono::milliseconds stream_idle_timeout_{};
   absl::optional<std::chrono::milliseconds> stream_flush_timeout_;
