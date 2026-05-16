@@ -57,7 +57,7 @@ using OnDnsResolverResetNetworkingType =
  */
 class HickoryDnsResolverConfig {
 public:
-  static std::shared_ptr<HickoryDnsResolverConfig>
+  static absl::StatusOr<std::shared_ptr<HickoryDnsResolverConfig>>
   create(const envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig&
              proto_config);
 

@@ -522,10 +522,68 @@ TEST_F(HickoryDnsImplTest, RepeatedCancelDoesNotLeakGauge) {
   EXPECT_EQ(0, stats_store_.counter("dns.hickory.resolve_total").value());
 }
 
-// Regression test for a use-after-free in the ABI callback. If the resolver is destroyed
+// Test-only stub that simulates a Rust panic propagating across the FFI boundary
+// by returning a null query pointer from `on_dns_resolve`.
+envoy_dynamic_module_type_dns_query_module_ptr
+stubOnDnsResolveReturningNull(envoy_dynamic_module_type_dns_resolver_module_ptr,
+                              envoy_dynamic_module_type_envoy_buffer,
+                              envoy_dynamic_module_type_dns_lookup_family, uint64_t) {
+  return nullptr;
+}
+
+// Regression test for null returns from the Rust resolve FFI. If the Rust module
+// panics or `DnsResolverInstance::resolve` returns `None`, the SDK returns null.
+// The C++ shell must invoke the user callback synchronously with `Failure` rather
+// than asserting or leaking the `pending_resolutions` gauge tick.
+TEST_F(HickoryDnsImplTest, ResolveFailsSynchronouslyWhenFfiReturnsNull) {
+  envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig proto_config;
+  auto config_or = HickoryDnsResolverConfig::create(proto_config);
+  ASSERT_TRUE(config_or.ok()) << config_or.status().message();
+  auto config = std::move(*config_or);
+
+  config->on_dns_resolve_ = stubOnDnsResolveReturningNull;
+
+  auto resolver = std::make_shared<HickoryDnsResolver>(config, *dispatcher_, api_->rootScope());
+
+  bool callback_called = false;
+  auto* query = resolver->resolve("example.com", DnsLookupFamily::All,
+                                  [&callback_called](DnsResolver::ResolutionStatus status,
+                                                     absl::string_view details,
+                                                     std::list<DnsResponse>&& responses) {
+                                    callback_called = true;
+                                    EXPECT_EQ(status, DnsResolver::ResolutionStatus::Failure);
+                                    EXPECT_EQ(details, "hickory_dns_dispatch_failure");
+                                    EXPECT_TRUE(responses.empty());
+                                  });
+
+  EXPECT_EQ(query, nullptr);
+  EXPECT_TRUE(callback_called);
+  EXPECT_EQ(1, stats_store_.counter("dns.hickory.resolve_total").value());
+  EXPECT_EQ(1, stats_store_.counter("dns.hickory.get_addr_failure").value());
+  EXPECT_EQ(0, stats_store_
+                   .gauge("dns.hickory.pending_resolutions", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
+}
+
+// Verify the `HickoryDnsResolverConfig` destructor's null-guard.
+TEST_F(HickoryDnsImplTest, ConfigDestructorTolerantOfPartialState) {
+  envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig proto_config;
+  auto config_or = HickoryDnsResolverConfig::create(proto_config);
+  ASSERT_TRUE(config_or.ok()) << config_or.status().message();
+  auto config = std::move(*config_or);
+
+  // Force both destructor inputs to null to simulate the field shapes left behind by a
+  // failed `create()`. This exercises the guard without requiring a real Rust failure.
+  config->in_module_config_ = nullptr;
+  config->on_dns_resolver_config_destroy_ = nullptr;
+
+  config.reset();
+}
+
+// Regression test for a UAF in the ABI callback. If the resolver is destroyed
 // after the callback has copied response data and posted a lambda to the dispatcher but
 // before the dispatcher runs that lambda, the lambda must not dereference a freed
-// resolver. The fix uses `std::weak_ptr` to detect destruction inside the lambda.
+// resolver.
 TEST_F(HickoryDnsImplTest, ResolverDestroyedBeforePostedCallbackRuns) {
   initialize();
   auto* hickory_resolver = dynamic_cast<HickoryDnsResolver*>(resolver_.get());
