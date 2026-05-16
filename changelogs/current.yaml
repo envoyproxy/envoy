@@ -84,6 +84,12 @@ bug_fixes:
     definition requires. Both factories now serialize the ``Struct`` to a JSON string and pass the
     string to the dynamic module side as the configuration, matching the behavior already in place
     for every other dynamic module extension factory.
+- area: io_uring
+  change: |
+    Bounded the number of injected io_uring completions processed per dispatcher tick to keep a
+    steady stream of injected completions (or completion callbacks that inject more completions)
+    from starving other work on the dispatcher thread. Any completions left over after the cap is
+    reached stay queued and are processed on subsequent ticks via an eventfd self-poke.
 - area: oauth2
   change: |
     Fixed a crash in the OAuth2 filter where AES-CBC decryption of token cookies could spuriously

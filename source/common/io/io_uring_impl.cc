@@ -6,7 +6,7 @@ namespace Envoy {
 namespace Io {
 
 bool isIoUringSupported() {
-  struct io_uring_params p {};
+  struct io_uring_params p{};
   struct io_uring ring;
 
   bool is_supported = io_uring_queue_init_params(2, &ring, &p) == 0;
@@ -17,9 +17,13 @@ bool isIoUringSupported() {
   return is_supported;
 }
 
-IoUringImpl::IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling)
-    : cqes_(io_uring_size, nullptr) {
-  struct io_uring_params p {};
+IoUringImpl::IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
+                         uint32_t max_injected_completions_per_event)
+    : cqes_(io_uring_size, nullptr),
+      max_injected_completions_per_event_(max_injected_completions_per_event) {
+  RELEASE_ASSERT(max_injected_completions_per_event_ > 0,
+                 "max_injected_completions_per_event must be > 0");
+  struct io_uring_params p{};
   if (use_submission_queue_polling) {
     p.flags |= IORING_SETUP_SQPOLL;
   }
@@ -75,13 +79,28 @@ void IoUringImpl::forEveryCompletion(const CompletionCb& completion_cb) {
   io_uring_cq_advance(&ring_, count);
 
   ENVOY_LOG(trace, "the num of injected completion is {}", injected_completions_.size());
-  // TODO(soulxu): Add bound here to avoid too many completion to stuck the thread too
-  // long.
-  // Iterate the injected completion.
-  while (!injected_completions_.empty()) {
+  // Drain at most `max_injected_completions_per_event_` injected completions per event-loop tick
+  // so a steady stream of injections (or completion callbacks that inject more completions) can
+  // never starve other work on the dispatcher thread. Any completions left over are processed on
+  // the next tick after the eventfd is re-armed below.
+  uint32_t processed = 0;
+  while (!injected_completions_.empty() && processed < max_injected_completions_per_event_) {
     auto completion = injected_completions_.front();
     injected_completions_.pop_front();
     completion_cb(completion.user_data_, completion.result_, true);
+    ++processed;
+  }
+
+  // If we hit the cap with work still queued, write to the eventfd so this callback fires again
+  // on the next dispatcher tick. The eventfd is non-blocking and we drain it at the top of this
+  // method, so this is just a self-poke.
+  if (!injected_completions_.empty()) {
+    ENVOY_LOG(trace, "injected completion cap reached, {} remaining; re-arming eventfd",
+              injected_completions_.size());
+    const eventfd_t v = 1;
+    int ret = eventfd_write(event_fd_, v);
+    RELEASE_ASSERT(ret == 0,
+                   fmt::format("failed to re-arm io_uring eventfd: {}", errorDetails(errno)));
   }
 }
 

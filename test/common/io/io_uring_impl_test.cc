@@ -276,6 +276,55 @@ TEST_F(IoUringImplTest, NestRemoveInjectCompletion) {
   waitForCondition(*dispatcher, [&completions_nr]() { return completions_nr == 2; });
 }
 
+TEST_F(IoUringImplTest, BoundedInjectedCompletionsPerEvent) {
+  // Recreate io_uring_ with a small per-tick cap so we can observe the bound.
+  io_uring_ = std::make_unique<IoUringImpl>(2, false, /*max_injected_completions_per_event=*/3);
+
+  auto dispatcher = api_->allocateDispatcher("test_thread");
+
+  os_fd_t event_fd = io_uring_->registerEventfd();
+  const Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
+
+  int32_t total_completions = 0;
+  int32_t event_callback_invocations = 0;
+  std::vector<int32_t> per_invocation_counts;
+
+  auto file_event = dispatcher->createFileEvent(
+      event_fd,
+      [this, &total_completions, &event_callback_invocations, &per_invocation_counts](uint32_t) {
+        int32_t before = total_completions;
+        io_uring_->forEveryCompletion([&total_completions](Request*, int32_t, bool injected) {
+          EXPECT_TRUE(injected);
+          total_completions++;
+        });
+        per_invocation_counts.push_back(total_completions - before);
+        event_callback_invocations++;
+        return absl::OkStatus();
+      },
+      trigger, Event::FileReadyType::Read);
+
+  // Inject 7 completions: with cap=3 we expect 3 + 3 + 1 across three event ticks.
+  std::array<int, 7> data{1, 2, 3, 4, 5, 6, 7};
+  std::vector<std::unique_ptr<TestRequest>> requests;
+  for (int& d : data) {
+    requests.push_back(std::make_unique<TestRequest>(d));
+    io_uring_->injectCompletion(/*fd=*/42, requests.back().get(), -1);
+  }
+
+  file_event->activate(Event::FileReadyType::Read);
+  waitForCondition(*dispatcher, [&total_completions]() { return total_completions == 7; });
+
+  // Each tick after the first must have been driven by the eventfd self-poke since we never
+  // called activate() again — proving the re-arm path works. With cap=3 and 7 injected
+  // completions the drain must split exactly 3 + 3 + 1 across three ticks, and the eventfd
+  // is only written by IoUring itself, so the callback is invoked exactly 3 times.
+  EXPECT_EQ(7, total_completions);
+  EXPECT_EQ(3, event_callback_invocations);
+  EXPECT_EQ(3, per_invocation_counts[0]);
+  EXPECT_EQ(3, per_invocation_counts[1]);
+  EXPECT_EQ(1, per_invocation_counts[2]);
+}
+
 TEST_F(IoUringImplTest, RegisterEventfd) {
   EXPECT_FALSE(io_uring_->isEventfdRegistered());
   io_uring_->registerEventfd();

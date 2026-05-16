@@ -25,7 +25,15 @@ class IoUringImpl : public IoUring,
                     public ThreadLocal::ThreadLocalObject,
                     protected Logger::Loggable<Logger::Id::io> {
 public:
-  IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling);
+  // Cap on the number of injected completions processed per event-loop tick.
+  // Without this cap, a steady stream of injected completions whose callbacks inject more
+  // completions can stall the dispatcher thread indefinitely. When the cap is reached, the
+  // remaining injected completions stay queued and the eventfd is re-armed so processing
+  // resumes on the next tick.
+  static constexpr uint32_t DefaultMaxInjectedCompletionsPerEvent = 1024;
+
+  IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
+              uint32_t max_injected_completions_per_event = DefaultMaxInjectedCompletionsPerEvent);
   ~IoUringImpl() override;
 
   os_fd_t registerEventfd() override;
@@ -48,10 +56,11 @@ public:
   void removeInjectedCompletion(os_fd_t fd) override;
 
 private:
-  struct io_uring ring_ {};
+  struct io_uring ring_{};
   std::vector<struct io_uring_cqe*> cqes_;
   os_fd_t event_fd_{INVALID_SOCKET};
   std::list<InjectedCompletion> injected_completions_;
+  const uint32_t max_injected_completions_per_event_;
 };
 
 } // namespace Io
