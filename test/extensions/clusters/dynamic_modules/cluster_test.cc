@@ -9,6 +9,7 @@
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/clusters/dynamic_modules/cluster.h"
+#include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/extensions/dynamic_modules/util.h"
@@ -1182,6 +1183,104 @@ TEST_F(DynamicModuleClusterTest, OnScheduledDirect) {
 
   // Call onScheduled directly - this should call the in-module hook.
   cluster->onScheduled(789);
+}
+
+// Test run_on_all_workers is safe to call with no payload published and allocates the slot
+// lazily.
+TEST_F(DynamicModuleClusterTest, RunOnAllWorkersIsSafeOnUnpopulatedSlot) {
+  auto result = createCluster(makeYamlConfig("cluster_run_on_all_workers"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  envoy_dynamic_module_callback_cluster_run_on_all_workers(cluster.get(), /*event_id=*/42);
+  envoy_dynamic_module_callback_cluster_run_on_all_workers(cluster.get(), /*event_id=*/7);
+
+  cluster.reset();
+  result = absl::InternalError("cleanup");
+}
+
+// Test worker_slot_set / worker_slot_get round-trip and destroy on overwrite and teardown.
+TEST_F(DynamicModuleClusterTest, WorkerSlotSetGetAndDestroy) {
+  auto result = createCluster(makeYamlConfig("cluster_run_on_all_workers"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  auto module_handle = Envoy::Extensions::DynamicModules::newDynamicModule(
+      Envoy::Extensions::DynamicModules::testSharedObjectPath("cluster_run_on_all_workers", "c"),
+      /*do_not_close=*/true);
+  ASSERT_TRUE(module_handle.ok()) << module_handle.status().message();
+  using GetCountFn = size_t (*)();
+  auto get_destroy_count = module_handle.value()->getFunctionPointer<GetCountFn>(
+      "cluster_run_on_all_workers_test_get_destroy_count");
+  ASSERT_TRUE(get_destroy_count.ok()) << get_destroy_count.status().message();
+
+  // Publish payload1; the module's destroy hook will free() it.
+  uint64_t* payload1 = static_cast<uint64_t*>(std::malloc(sizeof(uint64_t)));
+  *payload1 = 0xABCD;
+  envoy_dynamic_module_callback_cluster_worker_slot_set(cluster.get(), payload1);
+  EXPECT_EQ(0u, (*get_destroy_count.value())());
+
+  void* observed = envoy_dynamic_module_callback_cluster_worker_slot_get(cluster.get());
+  ASSERT_NE(nullptr, observed);
+  EXPECT_EQ(0xABCDu, *static_cast<uint64_t*>(observed));
+
+  // Overwrite fires the destroy hook for payload1.
+  uint64_t* payload2 = static_cast<uint64_t*>(std::malloc(sizeof(uint64_t)));
+  *payload2 = 0xBEEF;
+  envoy_dynamic_module_callback_cluster_worker_slot_set(cluster.get(), payload2);
+  EXPECT_EQ(1u, (*get_destroy_count.value())());
+
+  observed = envoy_dynamic_module_callback_cluster_worker_slot_get(cluster.get());
+  ASSERT_NE(nullptr, observed);
+  EXPECT_EQ(0xBEEFu, *static_cast<uint64_t*>(observed));
+
+  // Teardown fires the destroy hook for payload2.
+  cluster.reset();
+  result = absl::InternalError("cleanup");
+  EXPECT_EQ(2u, (*get_destroy_count.value())());
+}
+
+// Test run_on_all_workers is a no-op when the module does not implement the worker event hook.
+// The cluster_no_op fixture intentionally omits envoy_dynamic_module_on_cluster_worker_event, so
+// on_cluster_worker_event_ is nullptr and the fan-out must early-return without allocating the
+// slot or scheduling any work.
+TEST_F(DynamicModuleClusterTest, RunOnAllWorkersIsNoOpWithoutWorkerEventHook) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  envoy_dynamic_module_callback_cluster_run_on_all_workers(cluster.get(), /*event_id=*/42);
+
+  // Slot must remain unallocated when no worker event hook was registered.
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_worker_slot_get(cluster.get()));
+}
+
+// Test worker_slot_get returns nullptr when the slot has never been allocated (no prior
+// worker_slot_set or run_on_all_workers call).
+TEST_F(DynamicModuleClusterTest, WorkerSlotGetReturnsNullptrBeforeAllocation) {
+  auto result = createCluster(makeYamlConfig("cluster_run_on_all_workers"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_worker_slot_get(cluster.get()));
+}
+
+// Test worker_slot_get returns nullptr when the slot has been allocated (by run_on_all_workers)
+// but no payload has been published via worker_slot_set.
+TEST_F(DynamicModuleClusterTest, WorkerSlotGetReturnsNullptrWhenSlotAllocatedButEmpty) {
+  auto result = createCluster(makeYamlConfig("cluster_run_on_all_workers"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // Allocates the slot via ensureWorkerSlot() but seeds it with a null-payload factory.
+  envoy_dynamic_module_callback_cluster_run_on_all_workers(cluster.get(), /*event_id=*/1);
+
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_worker_slot_get(cluster.get()));
 }
 
 // Test the DynamicModuleClusterHandle destructor dispatches to main thread.

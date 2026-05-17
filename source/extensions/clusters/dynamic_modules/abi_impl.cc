@@ -918,6 +918,23 @@ void envoy_dynamic_module_callback_cluster_scheduler_commit(
   scheduler->commit(event_id);
 }
 
+void envoy_dynamic_module_callback_cluster_run_on_all_workers(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uint64_t event_id) {
+  getCluster(cluster_envoy_ptr)->runOnAllWorkers(event_id);
+}
+
+void envoy_dynamic_module_callback_cluster_worker_slot_set(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr data_module_ptr) {
+  getCluster(cluster_envoy_ptr)->workerSlotSet(data_module_ptr);
+}
+
+envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr
+envoy_dynamic_module_callback_cluster_worker_slot_get(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr) {
+  return getCluster(cluster_envoy_ptr)->workerSlotGet();
+}
+
 // =============================================================================
 // Metrics Callbacks
 // =============================================================================
