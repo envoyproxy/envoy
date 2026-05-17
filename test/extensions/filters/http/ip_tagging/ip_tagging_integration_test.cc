@@ -164,9 +164,9 @@ ip_tags:
           listener->mutable_listener_filters_timeout()->set_seconds(10);
         });
     new_config_helper.setLds("1");
-    test_server_->waitForGaugeEq("listener_manager.total_listeners_active", 1);
-    test_server_->waitForCounterEq("listener_manager.lds.update_success", 1);
-    test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", 0);
+    test_server_->waitForGauge("listener_manager.total_listeners_active", testing::Eq(1));
+    test_server_->waitForCounter("listener_manager.lds.update_success", testing::Eq(1));
+    test_server_->waitForGauge("listener_manager.total_listeners_draining", testing::Eq(0));
   }
 
   // Simulate file update.
