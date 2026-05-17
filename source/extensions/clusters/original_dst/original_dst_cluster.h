@@ -10,6 +10,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "envoy/extensions/clusters/original_dst/v3/original_dst.pb.h"
+
 #include "source/common/common/empty_string.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/metadata.h"
@@ -128,8 +130,10 @@ public:
   const absl::optional<uint32_t> portOverride() { return port_override_; }
 
 protected:
-  OriginalDstCluster(const envoy::config::cluster::v3::Cluster& config,
-                     ClusterFactoryContext& context, absl::Status& creation_status);
+  OriginalDstCluster(
+      const envoy::config::cluster::v3::Cluster& config,
+      const envoy::extensions::clusters::original_dst::v3::OriginalDstCluster& original_dst_config,
+      ClusterFactoryContext& context, absl::Status& creation_status);
 
 private:
   friend class OriginalDstClusterFactory;
@@ -190,16 +194,25 @@ private:
 constexpr absl::string_view OriginalDstClusterFilterStateKey =
     "envoy.network.transport_socket.original_dst_address";
 
-class OriginalDstClusterFactory : public ClusterFactoryImplBase {
+class OriginalDstClusterFactory
+    : public ConfigurableClusterFactoryBase<
+          envoy::extensions::clusters::original_dst::v3::OriginalDstCluster> {
 public:
-  OriginalDstClusterFactory() : ClusterFactoryImplBase("envoy.cluster.original_dst") {}
+  OriginalDstClusterFactory() : ConfigurableClusterFactoryBase("envoy.cluster.original_dst") {}
 
+private:
+  friend class OriginalDstClusterTest;
+
+  // Override to handle both legacy type: ORIGINAL_DST and new cluster_type paths.
   absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
   createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context) override;
 
-private:
-  friend class OriginalDstClusterTest;
+  absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
+  createClusterWithConfig(
+      const envoy::config::cluster::v3::Cluster& cluster,
+      const envoy::extensions::clusters::original_dst::v3::OriginalDstCluster& proto_config,
+      ClusterFactoryContext& context) override;
 };
 
 DECLARE_FACTORY(OriginalDstClusterFactory);

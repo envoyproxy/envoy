@@ -209,6 +209,8 @@ envoy.clusters.original_dst:
   - envoy.clusters
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
+  type_urls:
+  - envoy.extensions.clusters.original_dst.v3.OriginalDstCluster
 envoy.clusters.eds:
   categories:
   - envoy.clusters
@@ -2106,13 +2108,6 @@ envoy.load_balancing_policies.cluster_provided:
   status: stable
   type_urls:
   - envoy.extensions.load_balancing_policies.cluster_provided.v3.ClusterProvided
-envoy.load_balancing_policies.original_dst:
-  categories:
-  - envoy.load_balancing_policies
-  security_posture: robust_to_untrusted_downstream_and_upstream
-  status: stable
-  type_urls:
-  - envoy.extensions.load_balancing_policies.original_dst.v3.OriginalDst
 envoy.load_balancing_policies.client_side_weighted_round_robin:
   categories:
   - envoy.load_balancing_policies
