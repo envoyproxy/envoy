@@ -151,7 +151,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 27]
+// [#next-free-field: 28]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -292,10 +292,32 @@ message OAuth2Config {
   // This option should only be used in secure environments where token encryption is not required.
   // Default is false (tokens are encrypted).
   bool disable_token_encryption = 26;
+
+  // Any request that matches any of the provided matchers will be allowed to continue to upstream
+  // even if OAuth validation fails (missing, invalid, or expired credentials).
+  // This is useful for services that can handle both authenticated and unauthenticated requests,
+  // enabling graceful degradation patterns.
+  //
+  // When triggered, all OAuth cookies are stripped from the request and the request proceeds as unauthenticated.
+  // Context headers ``x-envoy-oauth-status: failed`` and ``x-envoy-oauth-failure-reason`` are added to inform upstream.
+  //
+  // Note: If a request matches pass_through_matcher, it bypasses OAuth validation and this matcher won't be evaluated.
+  // This matcher takes precedence over deny_redirect_matcher.
+  repeated config.route.v3.HeaderMatcher allow_failed_matcher = 27;
+}
+
+// Per-route OAuth2 config.
+//
+// This message supplies an OAuth2Config for the matched route.
+// It overrides the filter-level config for requests matching the route.
+// If neither the global config nor a per-route config is specified, OAuth2 is disabled for the route.
+message OAuth2PerRoute {
+  // Full OAuth2 config for this route.
+  OAuth2Config config = 1 [(validate.rules).message = {required: true}];
 }
 
 // Filter config.
 message OAuth2 {
-  // Leave this empty to disable OAuth2 for a specific route, using per filter config.
+  // The OAuth2 filter config.
   OAuth2Config config = 1;
 }

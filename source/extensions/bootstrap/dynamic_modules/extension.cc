@@ -24,10 +24,11 @@ void DynamicModuleBootstrapExtension::destroy() {
   destroyed_ = true;
 }
 
-void DynamicModuleBootstrapExtension::onServerInitialized(Server::Instance&) {
+void DynamicModuleBootstrapExtension::onServerInitialized(Server::Instance& server) {
   if (in_module_extension_ == nullptr) {
     return;
   }
+  config_->setListenerManager(server.listenerManager());
   config_->on_bootstrap_extension_server_initialized_(thisAsVoidPtr(), in_module_extension_);
   registerLifecycleCallbacks();
 }

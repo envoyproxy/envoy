@@ -168,11 +168,11 @@ ClusterMetadataFormatter::ClusterMetadataFormatter(absl::string_view filter_name
     : MetadataFormatter(filter_namespace, path, max_length,
                         [](const StreamInfo::StreamInfo& stream_info)
                             -> const envoy::config::core::v3::Metadata* {
-                          auto cluster_info = stream_info.upstreamClusterInfo();
-                          if (!cluster_info.has_value() || cluster_info.value() == nullptr) {
+                          const auto cluster_info = stream_info.upstreamClusterInfo();
+                          if (!cluster_info) {
                             return nullptr;
                           }
-                          return &cluster_info.value()->metadata();
+                          return &cluster_info->metadata();
                         }) {}
 
 UpstreamHostMetadataFormatter::UpstreamHostMetadataFormatter(
@@ -1504,11 +1504,9 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                  return std::make_unique<StreamInfoStringFormatterProvider>(
                                      [](const StreamInfo::StreamInfo& stream_info) {
                                        std::string upstream_cluster_name;
-                                       if (stream_info.upstreamClusterInfo().has_value() &&
-                                           stream_info.upstreamClusterInfo().value() != nullptr) {
-                                         upstream_cluster_name = stream_info.upstreamClusterInfo()
-                                                                     .value()
-                                                                     ->observabilityName();
+                                       if (const auto cluster_info =
+                                               stream_info.upstreamClusterInfo()) {
+                                         upstream_cluster_name = cluster_info->observabilityName();
                                        }
 
                                        return upstream_cluster_name.empty()
@@ -1523,10 +1521,9 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                  return std::make_unique<StreamInfoStringFormatterProvider>(
                                      [](const StreamInfo::StreamInfo& stream_info) {
                                        std::string upstream_cluster_name;
-                                       if (stream_info.upstreamClusterInfo().has_value() &&
-                                           stream_info.upstreamClusterInfo().value() != nullptr) {
-                                         upstream_cluster_name =
-                                             stream_info.upstreamClusterInfo().value()->name();
+                                       if (const auto cluster_info =
+                                               stream_info.upstreamClusterInfo()) {
+                                         upstream_cluster_name = cluster_info->name();
                                        }
 
                                        return upstream_cluster_name.empty()
@@ -1649,6 +1646,16 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                        return connection_info.ciphersuiteString();
                                      });
                                }}},
+                             {"UPSTREAM_TLS_GROUP",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return absl::make_optional<std::string>(
+                                           connection_info.tlsGroupString());
+                                     });
+                               }}},
                              {"UPSTREAM_TLS_VERSION",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, absl::optional<size_t>) {
@@ -1665,6 +1672,25 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                      StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
                                      [](const Ssl::ConnectionInfo& connection_info) {
                                        return connection_info.sessionId();
+                                     });
+                               }}},
+                             {"UPSTREAM_SERVER_NAME",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> absl::optional<std::string> {
+                                       if (stream_info.upstreamInfo() &&
+                                           stream_info.upstreamInfo()->upstreamSslConnection() !=
+                                               nullptr) {
+                                         auto sni = stream_info.upstreamInfo()
+                                                        ->upstreamSslConnection()
+                                                        ->sni();
+                                         if (!sni.empty()) {
+                                           return std::string(sni);
+                                         }
+                                       }
+                                       return absl::nullopt;
                                      });
                                }}},
                              {"UPSTREAM_PEER_ISSUER",
@@ -2091,6 +2117,16 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                        return connection_info.ciphersuiteString();
                                      });
                                }}},
+                             {"DOWNSTREAM_TLS_GROUP",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return absl::make_optional<std::string>(
+                                           connection_info.tlsGroupString());
+                                     });
+                               }}},
                              {"DOWNSTREAM_TLS_VERSION",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, absl::optional<size_t>) {
@@ -2165,6 +2201,24 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                      StreamInfoSslConnectionInfoFormatterProvider>(
                                      [](const Ssl::ConnectionInfo& connection_info) {
                                        return connection_info.issuerPeerCertificate();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_PEER_ISSUER_FINGERPRINT_256",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return connection_info.sha256PeerCertificateIssuerDigest();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_PEER_ISSUER_SERIAL",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return connection_info.serialNumberPeerCertificateIssuer();
                                      });
                                }}},
                              {"DOWNSTREAM_PEER_CERT",

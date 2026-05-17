@@ -127,6 +127,42 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(const absl::string_vi
                                                            const bool do_not_close,
                                                            const bool load_globally = false);
 
+/**
+ * Writes module bytes to disk at the canonical cache path for the given SHA256.
+ * Uses a staging file with atomic rename for crash safety.
+ * The caller is responsible for verifying the hash before calling this function.
+ * @param module_bytes the content of the shared object file.
+ * @param sha256 the hex-encoded SHA256 hash of the module bytes.
+ */
+absl::Status writeDynamicModuleBytesToDisk(absl::string_view module_bytes,
+                                           absl::string_view sha256);
+
+/**
+ * Returns the canonical temporary file path for a remote module identified by its SHA256 hash.
+ * This is the path where newDynamicModuleFromBytes writes the module and where the cache looks
+ * it up.
+ * @param sha256 the hex-encoded SHA256 hash of the module bytes.
+ */
+std::filesystem::path moduleTempPath(absl::string_view sha256);
+
+/**
+ * Verifies that the file at ``path`` has SHA256 digest equal to ``expected_sha256_hex``.
+ *
+ * This is used to defend the cache-hit fast path in remote-module loading: ``moduleTempPath``
+ * is a deterministic location under ``/tmp`` derived from the expected hash. Without this
+ * check, an attacker who can write to ``/tmp`` (a co-tenant container or shared host) can
+ * pre-populate the path with a malicious shared object that Envoy will then dlopen, yielding
+ * attacker-controlled code execution.
+ *
+ * @param path absolute path to the file to verify.
+ * @param expected_sha256_hex the hex-encoded expected SHA256 digest (64 chars). The
+ *        comparison is case-insensitive.
+ * @return OkStatus when the on-disk SHA256 matches; FailedPreconditionError on mismatch;
+ *         InternalError on any I/O failure.
+ */
+absl::Status verifyFileSha256(const std::filesystem::path& path,
+                              absl::string_view expected_sha256_hex);
+
 } // namespace DynamicModules
 } // namespace Extensions
 } // namespace Envoy

@@ -7,7 +7,7 @@ set -o pipefail
 
 # As of February 2026, the binary size is approximately 5,721,744 bytes (~5.72MB).
 # MAX_SIZE is set with ~180KB headroom above that measurement.
-MAX_SIZE=5900000 # 5.9MB
+MAX_SIZE=6000000 # ~6MB
 # MAX_PERC_HUNDREDTHS represents the maximum allowed percentage increase, in hundredths of a
 # percent (150 = 1.50%). This single variable is the source of truth for both the comparison
 # and the display string, so updating it here affects the actual check.

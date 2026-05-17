@@ -15,6 +15,11 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+#ifdef ENVOY_SSL_OPENSSL
+void CertCompression::registerBrotli(SSL_CTX*) {}
+void CertCompression::registerZlib(SSL_CTX*) {}
+#else // ENVOY_SSL_OPENSSL
+
 void CertCompression::registerBrotli(SSL_CTX* ssl_ctx) {
   auto ret = SSL_CTX_add_cert_compression_alg(ssl_ctx, TLSEXT_cert_compression_brotli,
                                               compressBrotli, decompressBrotli);
@@ -201,6 +206,7 @@ int CertCompression::decompressZlib(SSL*, CRYPTO_BUFFER** out, size_t uncompress
   *out = decompressed_data.release();
   return SUCCESS;
 }
+#endif // ENVOY_SSL_OPENSSL
 
 } // namespace Tls
 } // namespace TransportSockets

@@ -157,7 +157,7 @@ public:
          ThreadLocal::SlotAllocator& slot_allocator,
          const envoy::config::overload::v3::OverloadManager& config,
          ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-         const Server::Options& options);
+         const Server::Options& options, Runtime::Loader& runtime);
 
   // Server::OverloadManager
   void start() override;
@@ -167,13 +167,18 @@ public:
   LoadShedPoint* getLoadShedPoint(absl::string_view point_name) override;
   Event::ScaledRangeTimerManagerFactory scaledTimerFactory() override;
   void stop() override;
+  absl::optional<envoy::config::overload::v3::ShrinkHeapConfig>
+  getShrinkHeapConfig() const override {
+    return shrink_heap_config_;
+  }
 
 protected:
   OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
                       ThreadLocal::SlotAllocator& slot_allocator,
                       const envoy::config::overload::v3::OverloadManager& config,
                       ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-                      const Server::Options& options, absl::Status& creation_status);
+                      const Server::Options& options, Runtime::Loader& runtime,
+                      absl::Status& creation_status);
 
   // Factory for timer managers. This allows test-only subclasses to inject a mock implementation.
   virtual Event::ScaledRangeTimerManagerPtr createScaledRangeTimerManager(
@@ -253,6 +258,8 @@ private:
       std::unordered_multimap<NamedOverloadActionSymbolTable::Symbol, ActionCallback,
                               absl::Hash<NamedOverloadActionSymbolTable::Symbol>>;
   ActionToCallbackMap action_to_callbacks_;
+
+  absl::optional<envoy::config::overload::v3::ShrinkHeapConfig> shrink_heap_config_;
 };
 
 } // namespace Server

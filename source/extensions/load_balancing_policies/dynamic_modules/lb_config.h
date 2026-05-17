@@ -69,7 +69,7 @@ public:
   OnLbDestroyType on_lb_destroy_;
 
   // The in-module configuration pointer.
-  envoy_dynamic_module_type_lb_config_module_ptr in_module_config_;
+  envoy_dynamic_module_type_lb_config_module_ptr in_module_config_{nullptr};
 
   // ----------------------------- Metrics Support -----------------------------
 
@@ -234,6 +234,10 @@ public:
 
   const Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNamePool stat_name_pool_;
+  // We only allow the module to create stats during on_lb_config_new, and not later from worker
+  // threads, so that we don't have to wrap stat_name_pool_ in a lock. Per-request label values
+  // use a stack-local Stats::StatNameDynamicPool in the increment callbacks (see abi_impl.cc).
+  bool stat_creation_frozen_ = false;
 
 private:
   DynamicModuleLbConfig(const std::string& lb_policy_name, const std::string& lb_config,

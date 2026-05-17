@@ -1,0 +1,50 @@
+goo.gle/debugproto
+config {
+  virtual_hosts {
+    name: "regex"
+    domains: "idle.lyft.com"
+    routes {
+      match {
+        safe_regex {
+          regex: "/regex"
+        }
+      }
+      route {
+        cluster: "some-cluster"
+        retry_policy {
+          retriable_headers {
+            name: ":status"
+            string_match {
+              exact: "500"
+            }
+          }
+          retriable_headers {
+            name: "X-Upstream-Pushback"
+          }
+        }
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "idle.lyft.com"
+  }
+  headers {
+    key: ":path"
+    value: "/regex"
+  }
+  headers {
+    key: ":scheme"
+    value: "https"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "https"
+  }
+  headers {
+    key: "x-envoy-internal"
+    value: "false"
+  }
+}

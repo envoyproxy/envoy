@@ -27,7 +27,7 @@ namespace {
 Secret::GenericSecretConfigProviderSharedPtr
 secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
                 Server::Configuration::ServerFactoryContext& server_context,
-                Init::Manager& init_manager) {
+                OptRef<Init::Manager> init_manager) {
   if (config.has_sds_config()) {
     return server_context.secretManager().findOrCreateGenericSecretProvider(
         config.sds_config(), config.name(), server_context, init_manager);
@@ -35,24 +35,14 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
     return server_context.secretManager().findStaticGenericSecretProvider(config.name());
   }
 }
-} // namespace
 
-absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::oauth2::v3::OAuth2& proto,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  if (!proto.has_config()) {
-    return absl::InvalidArgumentError("config must be present for global config");
-  }
-
-  const auto& proto_config = proto.config();
+absl::StatusOr<FilterConfigSharedPtr>
+createFilterConfig(const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config,
+                   Server::Configuration::ServerFactoryContext& server_context,
+                   OptRef<Init::Manager> init_manager, Stats::Scope& scope,
+                   const std::string& stats_prefix) {
   const auto& credentials = proto_config.credentials();
-
-  const auto& client_secret = credentials.token_secret();
-  const auto& hmac_secret = credentials.hmac_secret();
   const auto auth_type = proto_config.auth_type();
-
-  auto& server_context = context.serverFactoryContext();
-  auto& cluster_manager = context.serverFactoryContext().clusterManager();
 
   // token_secret is required unless auth_type is TLS_CLIENT_AUTH
   if (auth_type !=
@@ -68,18 +58,20 @@ absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createFilterFactoryFromProto
     ENVOY_LOG_MISC(debug,
                    "OAuth2 filter: token_secret is ignored when auth_type is TLS_CLIENT_AUTH");
   }
+
   Secret::GenericSecretConfigProviderSharedPtr secret_provider_client_secret = nullptr;
   if (credentials.has_token_secret() &&
       auth_type !=
           envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType_TLS_CLIENT_AUTH) {
     secret_provider_client_secret =
-        secretsProvider(client_secret, server_context, context.initManager());
+        secretsProvider(credentials.token_secret(), server_context, init_manager);
     if (secret_provider_client_secret == nullptr) {
       return absl::InvalidArgumentError("invalid token secret configuration");
     }
   }
+
   auto secret_provider_hmac_secret =
-      secretsProvider(hmac_secret, server_context, context.initManager());
+      secretsProvider(credentials.hmac_secret(), server_context, init_manager);
   if (secret_provider_hmac_secret == nullptr) {
     return absl::InvalidArgumentError("invalid HMAC secret configuration");
   }
@@ -93,19 +85,56 @@ absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createFilterFactoryFromProto
 
   auto secret_reader = std::make_shared<SDSSecretReader>(
       std::move(secret_provider_client_secret), std::move(secret_provider_hmac_secret),
-      context.serverFactoryContext().threadLocal(), context.serverFactoryContext().api());
-  auto config = std::make_shared<FilterConfig>(proto_config, context.serverFactoryContext(),
-                                               secret_reader, context.scope(), stats_prefix);
+      server_context.threadLocal(), server_context.api());
+  return std::make_shared<FilterConfig>(proto_config, server_context, secret_reader, scope,
+                                        stats_prefix);
+}
+} // namespace
+
+absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::oauth2::v3::OAuth2& proto,
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+  auto& server_context = context.serverFactoryContext();
+  auto& cluster_manager = context.serverFactoryContext().clusterManager();
+  FilterConfigSharedPtr config = nullptr;
+  if (proto.has_config()) {
+    auto config_or_error = createFilterConfig(proto.config(), server_context, context.initManager(),
+                                              context.scope(), stats_prefix);
+    if (!config_or_error.ok()) {
+      return config_or_error.status();
+    }
+    config = config_or_error.value();
+  }
 
   return
       [&context, config, &cluster_manager](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-        std::unique_ptr<OAuth2Client> oauth_client =
-            std::make_unique<OAuth2ClientImpl>(cluster_manager, config->oauthTokenEndpoint(),
-                                               config->retryPolicy(), config->defaultExpiresIn());
         callbacks.addStreamFilter(std::make_shared<OAuth2Filter>(
-            config, std::move(oauth_client), context.serverFactoryContext().timeSource(),
+            config,
+            [&cluster_manager](const FilterConfig& active_config) -> std::shared_ptr<OAuth2Client> {
+              return std::make_shared<OAuth2ClientImpl>(
+                  cluster_manager, active_config.oauthTokenEndpoint(), active_config.retryPolicy(),
+                  active_config.defaultExpiresIn());
+            },
+            [](TimeSource& time_source,
+               const FilterConfig& active_config) -> std::shared_ptr<CookieValidator> {
+              return std::make_shared<OAuth2CookieValidator>(
+                  time_source, active_config.cookieNames(), active_config.cookieDomain());
+            },
+            context.serverFactoryContext().timeSource(),
             context.serverFactoryContext().api().randomGenerator()));
       };
+}
+
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+OAuth2Config::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::oauth2::v3::OAuth2PerRoute& proto,
+    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
+  auto config_or_error =
+      createFilterConfig(proto.config(), context, absl::nullopt, context.scope(), "");
+  if (!config_or_error.ok()) {
+    return config_or_error.status();
+  }
+  return config_or_error.value();
 }
 
 /*

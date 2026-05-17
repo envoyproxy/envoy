@@ -8,9 +8,11 @@
 #include "source/server/config_validation/server.h"
 #include "source/server/process_context_impl.h"
 
+#include "test/common/config/dummy_config.pb.h"
 #include "test/integration/server.h"
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/bootstrap_extension_factory.h"
 #include "test/mocks/server/options.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
@@ -19,6 +21,7 @@
 #include "test/test_common/test_time.h"
 
 using testing::HasSubstr;
+using testing::Invoke;
 using testing::Return;
 
 namespace Envoy {
@@ -438,6 +441,132 @@ TEST_P(TextApplicationLogsValidationServerTest, TextApplicationLogs) {
 INSTANTIATE_TEST_SUITE_P(
     AllConfigs, TextApplicationLogsValidationServerTest,
     ::testing::ValuesIn(TextApplicationLogsValidationServerTest::getAllConfigFiles()));
+
+class BootstrapExtensionValidationServerTest : public ValidationServerTest {
+public:
+  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
+    setupTestDirectory();
+  }
+
+  static void setupTestDirectory() {
+    directory_ =
+        TestEnvironment::runfilesDirectory("envoy/test/server/config_validation/test_data/");
+  }
+
+  static const std::vector<std::string> getAllConfigFiles() {
+    setupTestDirectory();
+    return {"bootstrap_extensions.yaml"};
+  }
+};
+
+// Verify that bootstrap extensions are created during validation mode.
+TEST_P(BootstrapExtensionValidationServerTest, BootstrapExtensionsCreatedDuringValidation) {
+  testing::NiceMock<Configuration::MockBootstrapExtensionFactory> mock_factory;
+  EXPECT_CALL(mock_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+    return std::make_unique<test::common::config::DummyConfig>();
+  }));
+  EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
+
+  auto mock_extension = std::make_unique<MockBootstrapExtension>();
+  // Lifecycle callbacks must NOT be invoked during validation.
+  EXPECT_CALL(*mock_extension, onServerInitialized(_)).Times(0);
+  EXPECT_CALL(*mock_extension, onWorkerThreadInitialized()).Times(0);
+
+  EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
+      .WillOnce(Invoke([&](const Protobuf::Message& config,
+                           Configuration::ServerFactoryContext&) -> BootstrapExtensionPtr {
+        const auto* proto = dynamic_cast<const test::common::config::DummyConfig*>(&config);
+        EXPECT_NE(nullptr, proto);
+        EXPECT_EQ(proto->a(), "foo");
+        return std::move(mock_extension);
+      }));
+
+  Registry::InjectFactory<Configuration::BootstrapExtensionFactory> registered_factory(
+      mock_factory);
+
+  Thread::MutexBasicLockable access_log_lock;
+  Stats::IsolatedStoreImpl stats_store;
+  DangerousDeprecatedTestTime time_system;
+  ValidationInstance server(options_, time_system.timeSystem(),
+                            Network::Address::InstanceConstSharedPtr(), stats_store,
+                            access_log_lock, component_factory_, Thread::threadFactoryForTest(),
+                            Filesystem::fileSystemForTest());
+  server.shutdown();
+}
+
+// Verify that a bootstrap extension factory throwing an error causes validation to fail.
+TEST_P(BootstrapExtensionValidationServerTest, BootstrapExtensionThrowingFailsValidation) {
+  testing::NiceMock<Configuration::MockBootstrapExtensionFactory> mock_factory;
+  EXPECT_CALL(mock_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+    return std::make_unique<test::common::config::DummyConfig>();
+  }));
+  EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
+  EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
+      .WillOnce(Invoke([](const Protobuf::Message&,
+                          Configuration::ServerFactoryContext&) -> BootstrapExtensionPtr {
+        throw EnvoyException("Unable to initiate mock_bootstrap_extension.");
+      }));
+
+  Registry::InjectFactory<Configuration::BootstrapExtensionFactory> registered_factory(
+      mock_factory);
+
+  Thread::MutexBasicLockable access_log_lock;
+  Stats::IsolatedStoreImpl stats_store;
+  DangerousDeprecatedTestTime time_system;
+  EXPECT_THROW_WITH_MESSAGE(
+      ValidationInstance server(options_, time_system.timeSystem(),
+                                Network::Address::InstanceConstSharedPtr(), stats_store,
+                                access_log_lock, component_factory_, Thread::threadFactoryForTest(),
+                                Filesystem::fileSystemForTest()),
+      EnvoyException, "Unable to initiate mock_bootstrap_extension.");
+}
+
+// Verify that an unknown bootstrap extension factory causes validation to fail.
+TEST_P(BootstrapExtensionValidationServerTest, UnknownBootstrapExtensionFailsValidation) {
+  Thread::MutexBasicLockable access_log_lock;
+  Stats::IsolatedStoreImpl stats_store;
+  DangerousDeprecatedTestTime time_system;
+  EXPECT_THROW_WITH_REGEX(
+      ValidationInstance server(options_, time_system.timeSystem(),
+                                Network::Address::InstanceConstSharedPtr(), stats_store,
+                                access_log_lock, component_factory_, Thread::threadFactoryForTest(),
+                                Filesystem::fileSystemForTest()),
+      EnvoyException,
+      "Didn't find a registered implementation for 'envoy_test.bootstrap.foo' "
+      "with type URL: 'test.common.config.DummyConfig'");
+}
+
+// Verify that validateConfig returns false when a bootstrap extension factory is unknown.
+TEST_P(BootstrapExtensionValidationServerTest, ValidateConfigReturnsFalseForBadExtension) {
+  EXPECT_FALSE(validateConfig(options_, Network::Address::InstanceConstSharedPtr(),
+                              component_factory_, Thread::threadFactoryForTest(),
+                              Filesystem::fileSystemForTest()));
+}
+
+// Verify that validateConfig returns true when bootstrap extensions are valid.
+TEST_P(BootstrapExtensionValidationServerTest, ValidateConfigReturnsTrueForValidExtension) {
+  testing::NiceMock<Configuration::MockBootstrapExtensionFactory> mock_factory;
+  EXPECT_CALL(mock_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+    return std::make_unique<test::common::config::DummyConfig>();
+  }));
+  EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
+  EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
+      .WillOnce(Invoke([](const Protobuf::Message&,
+                          Configuration::ServerFactoryContext&) -> BootstrapExtensionPtr {
+        return std::make_unique<MockBootstrapExtension>();
+      }));
+
+  Registry::InjectFactory<Configuration::BootstrapExtensionFactory> registered_factory(
+      mock_factory);
+
+  EXPECT_TRUE(validateConfig(options_, Network::Address::InstanceConstSharedPtr(),
+                             component_factory_, Thread::threadFactoryForTest(),
+                             Filesystem::fileSystemForTest()));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    AllConfigs, BootstrapExtensionValidationServerTest,
+    ::testing::ValuesIn(BootstrapExtensionValidationServerTest::getAllConfigFiles()));
 
 } // namespace
 } // namespace Server

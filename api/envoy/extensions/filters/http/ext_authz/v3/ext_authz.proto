@@ -30,7 +30,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 32]
+// [#next-free-field: 33]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v3.ExtAuthz";
@@ -359,6 +359,64 @@ message ExtAuthz {
   //
   // Defaults to ``false``.
   bool enforce_response_header_limits = 31;
+
+  // When set to ``true``, the filter operates in shadow mode. In shadow mode the
+  // filter still calls the external authorization service and processes the response,
+  // but never terminates the request. Instead of sending a local reply on a denied or
+  // error response, the filter writes the authorization decision (engine result, status
+  // code, response headers) into the request's
+  // :ref:`FilterState <arch_overview_data_sharing_between_filters>` as a
+  // :ref:`ShadowDecision
+  // <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ShadowDecision>` object so
+  // that subsequent filters can read and optionally enforce it.
+  //
+  // The FilterState key is the filter's configured ``name`` in the filter chain with a
+  // ``.shadow`` suffix (``envoy.filters.http.ext_authz.shadow`` by default). Multiple ext_authz
+  // filters in the same chain must already have distinct names and therefore write to distinct
+  // keys automatically.
+  //
+  // The auth server's denied-response body is intentionally **not** carried on the
+  // ShadowDecision: bodies can be arbitrarily large and no downstream consumer in the
+  // shadow-comparison flow needs them. A consumer that wants to reproduce the auth
+  // server's full denied response must read it from its own source of truth rather
+  // than replaying it from FilterState.
+  //
+  // Header and query-parameter mutations from an OK response are still applied to the
+  // request as usual.
+  //
+  // Defaults to ``false``.
+  bool shadow_mode = 32;
+}
+
+// Serialized form of the shadow-mode authorization decision written to FilterState
+// when :ref:`shadow_mode
+// <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.shadow_mode>` is
+// enabled. Consumed by a downstream filter that decides whether to enforce the
+// decision.
+message ShadowDecision {
+  // The decision the auth server returned.
+  enum CheckResult {
+    UNSPECIFIED = 0;
+    OK = 1;
+    DENIED = 2;
+    ERROR = 3;
+  }
+
+  // The decision the auth server returned.
+  CheckResult check_result = 1;
+
+  // Response status code associated with the decision. For ``DENIED`` and ``ERROR`` this is
+  // the code the filter would have set on termination (the auth server's code for ``DENIED``,
+  // or :ref:`status_on_error
+  // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.status_on_error>` fallback
+  // for ``ERROR``). For ``OK`` this defaults to ``200`` so consumers always see a populated
+  // value — the upstream response code is not known at shadow-decision time.
+  uint32 status_code = 2 [(validate.rules).uint32 = {lte: 599 gte: 100 ignore_empty: true}];
+
+  // Response headers the auth server asked to set on a denied response
+  // (e.g. ``WWW-Authenticate``, ``Set-Cookie``). Populated for ``DENIED`` only.
+  // Preserves ordering and duplicate header names.
+  repeated config.core.v3.HeaderValue response_headers = 3;
 }
 
 // Configuration for buffering the request data.

@@ -263,6 +263,7 @@ envoy_cc_library(
         "//source/common/common:key_value_store_lib",
         "//source/common/common:logger_lib",
         "//source/common/config:utility_lib",
+        "@abseil-cpp//absl/container:linked_hash_map",
         "@envoy_api//envoy/config/common/key_value/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@quiche//:http2_core_alt_svc_wire_format_lib",
@@ -417,6 +418,7 @@ envoy_cc_library(
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/http/matching:data_impl_lib",
+        "//source/common/json:json_streamer_lib",
         "//source/common/matcher:matcher_lib",
         "//source/common/network:proxy_protocol_filter_state_lib",
         "//source/common/network:utility_lib",
@@ -516,6 +518,22 @@ envoy_cc_library(
         "//envoy/http:message_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:non_copyable",
+    ],
+)
+
+envoy_cc_library(
+    name = "http_service_headers_lib",
+    srcs = ["http_service_headers.cc"],
+    hdrs = ["http_service_headers.h"],
+    deps = [
+        ":headers_lib",
+        "//envoy/formatter:substitution_formatter_interface",
+        "//envoy/http:header_map_interface",
+        "//source/common/formatter:substitution_format_string_lib",
+        "//source/common/formatter:substitution_formatter_lib",
+        "//source/common/stream_info:stream_info_lib",
+        "//source/server:generic_factory_context_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

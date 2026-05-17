@@ -1,9 +1,14 @@
 <!--
 !!!ATTENTION!!!
 
-If you are fixing *any* crash or *any* potential security issue, *do not*
-open a pull request in this repo. Please report the issue via emailing
-envoy-security@googlegroups.com where the issue will be triaged appropriately.
+If you are fixing **any** crash or **any** potential security issue, **do not
+open a pull request**.
+
+Instead, please
+[open a GitHub Security Advisory](https://github.com/envoyproxy/envoy/security/advisories/new)
+(preferred). Alternatively, you may email
+envoy-security@googlegroups.com.
+
 Thank you in advance for helping to keep Envoy secure.
 
 !!!ATTENTION!!!

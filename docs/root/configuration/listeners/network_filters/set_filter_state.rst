@@ -17,6 +17,7 @@ The filter can apply values at different points in the connection lifecycle:
 * ``on_downstream_tls_handshake``: applied when the downstream TLS handshake is complete. For
   non-TLS downstream connections (where there is no TLS handshake), this list is applied when the
   new connection is accepted.
+* ``on_downstream_data``: applied when data is first received from the downstream connection.
 
 .. warning::
     This filter allows overriding the behavior of other extensions and
@@ -85,6 +86,20 @@ TLS handshake completes (e.g., downstream peer certificate SANs), use
     format_string:
       text_format_source:
         inline_string: "%DOWNSTREAM_PEER_URI_SAN%"
+
+When you need to populate filter state using information that is only available after receiving
+data from downstream (e.g., dynamic metadata set by another filter when data is received), use
+``on_downstream_data``:
+
+.. validated-code-block:: yaml
+  :type-name: envoy.extensions.filters.network.set_filter_state.v3.Config
+
+  on_downstream_data:
+  - object_key: my.custom.filter_state
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: "%DYNAMIC_METADATA(envoy.filters.network.ext_authz:key)%"
 
 
 Statistics

@@ -20,7 +20,7 @@ fn new_network_filter_config_fn<EC: EnvoyNetworkFilterConfig, ENF: EnvoyNetworkF
     "connection_state" => Some(Box::new(ConnectionStateFilterConfig)),
     "half_close" => Some(Box::new(HalfCloseFilterConfig)),
     "buffer_limits" => Some(Box::new(BufferLimitsFilterConfig)),
-    _ => panic!("unknown filter name: {}", name),
+    _ => panic!("unknown filter name: {name}"),
   }
 }
 

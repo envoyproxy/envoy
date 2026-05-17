@@ -6,25 +6,12 @@ def abi_tag():
     return "{abi_tag}"
 """
 
-# we reuse the PYTHON_BIN_PATH environment variable from pybind11 so that the
-# ABI tag we detect is always compatible with the version of python that was
-# used for the build
-_PYTHON_BIN_PATH_ENV = "PYTHON_BIN_PATH"
-
 def _get_python_bin(rctx):
-    python_version = rctx.attr.python_version
-    if python_version != "2" and python_version != "3":
-        fail("python_version must be one of: '2', '3'")
-
-    python_bin = rctx.os.environ.get(_PYTHON_BIN_PATH_ENV)
-    if python_bin != None:
-        return python_bin
-
-    python_bin = rctx.which("python" + python_version)
-    if python_bin != None:
-        return python_bin
-
-    fail("cannot find python binary")
+    python_label = Label("@python3_12_host//:bin/python3")
+    python_bin = str(rctx.path(python_label))
+    if not python_bin:
+        fail("failed to get python bin")
+    return python_bin
 
 def _get_python_tag(rctx, python_bin):
     result = rctx.execute([
@@ -35,6 +22,8 @@ def _get_python_tag(rctx, python_bin):
         "version = platform.python_version_tuple();" +
         "print(f'cp{version[0]}{version[1]}')",
     ])
+    if result.return_code != 0:
+        fail("Failed to get python tag: " + result.stderr)
     return result.stdout.splitlines()[0]
 
 def _get_abi_tag(rctx, python_bin):
@@ -47,6 +36,8 @@ def _get_abi_tag(rctx, python_bin):
         "version = platform.python_version_tuple();" +
         "print(f'cp{version[0]}{version[1]}{sys.abiflags}')",
     ])
+    if result.return_code != 0:
+        fail("Failed to get abi tag: " + result.stderr)
     return result.stdout.splitlines()[0]
 
 def _declare_python_abi_impl(rctx):

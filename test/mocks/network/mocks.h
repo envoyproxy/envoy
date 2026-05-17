@@ -193,6 +193,8 @@ public:
   MOCK_METHOD(const ConnectionSocket&, socket, ());
   MOCK_METHOD(void, injectWriteDataToFilterChain, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(void, disableClose, (bool disable));
+  MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
+  MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
 
   testing::NiceMock<MockConnection> connection_;
   testing::NiceMock<MockConnectionSocket> socket_;
@@ -514,6 +516,7 @@ public:
   MOCK_METHOD(bool, bindToPort, (), (const));
   MOCK_METHOD(bool, handOffRestoredDestinationConnections, (), (const));
   MOCK_METHOD(uint32_t, perConnectionBufferLimitBytes, (), (const));
+  MOCK_METHOD(std::chrono::milliseconds, perConnectionBufferHighWatermarkTimeout, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, listenerFiltersTimeout, (), (const));
   MOCK_METHOD(bool, continueOnListenerFiltersTimeout, (), (const));
   MOCK_METHOD(Stats::Scope&, listenerScope, ());
@@ -579,6 +582,7 @@ public:
   MOCK_METHOD(void, enableListeners, ());
   MOCK_METHOD(void, setListenerRejectFraction, (UnitFloat), (override));
   MOCK_METHOD(const std::string&, statPrefix, (), (const));
+  MOCK_METHOD(void, closeIdleHttpConnections, (bool), (override));
 
   uint64_t num_handler_connections_{};
 };

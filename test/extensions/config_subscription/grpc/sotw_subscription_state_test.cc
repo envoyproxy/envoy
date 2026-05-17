@@ -8,7 +8,6 @@
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "absl/container/flat_hash_set.h"

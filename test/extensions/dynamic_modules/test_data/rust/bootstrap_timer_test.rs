@@ -105,7 +105,7 @@ impl BootstrapExtensionConfig for TimerTestBootstrapExtensionConfig {
       let mut guard = self.timer_b.lock().unwrap();
       *guard = None;
     } else {
-      panic!("Unknown timer fired with id: {}", fired_id);
+      panic!("Unknown timer fired with id: {fired_id}");
     }
 
     // Signal init complete and log success once both timers have fired.

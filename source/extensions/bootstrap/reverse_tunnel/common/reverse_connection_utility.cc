@@ -3,8 +3,10 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
+#include "source/common/tls/ssl_handshaker.h"
 
 #include "absl/strings/str_cat.h"
+#include "openssl/ssl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -91,6 +93,25 @@ bool PingMessageHandler::processPingMessage(absl::string_view data,
     return ReverseConnectionUtility::sendPingResponse(connection);
   }
   return false;
+}
+
+void ReverseConnectionUtility::applySslQuietClose(Network::Connection& connection) {
+  auto ssl_conn = connection.ssl();
+
+  if (ssl_conn) {
+    ENVOY_CONN_LOG(
+        trace,
+        "reverse_tunnel: Setting quiet shutdown on SSL connection to prevent close_notify alert",
+        connection);
+    const auto* ssl_handshaker =
+        dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(ssl_conn.get());
+    if (ssl_handshaker && ssl_handshaker->ssl()) {
+      SSL_set_quiet_shutdown(ssl_handshaker->ssl(), 1);
+      ENVOY_CONN_LOG(trace, "reverse_tunnel: Quiet shutdown enabled for connection", connection);
+    } else {
+      ENVOY_LOG(warn, "reverse_tunnel: Failed to cast to SslHandshakerImpl or ssl() returned null");
+    }
+  }
 }
 
 } // namespace ReverseConnection

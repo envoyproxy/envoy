@@ -112,7 +112,6 @@ envoy_extension_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:stream_encoder_mock",
         "//test/mocks/http:stream_mock",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:overload_manager_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/proto:helloworld_proto_cc_proto",
@@ -224,6 +223,7 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         ":filter_test_common_lib",
@@ -299,7 +299,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ext_proc",
         "//test/common/http:common_lib",
         "//test/mocks/event:event_mocks",
-        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -340,7 +339,6 @@ envoy_extension_cc_test(
     deps = [
         ":utils_lib",
         "//source/extensions/filters/http/ext_proc:matching_utils_lib",
-        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
@@ -471,7 +469,7 @@ envoy_extension_cc_test(
         "envoy.filters.http.set_metadata",
     ],
     rbe_pool = "4core",
-    shard_count = 8,
+    shard_count = 4,
     tags = [
         "cpu:3",
         "skip_on_windows",
@@ -582,7 +580,6 @@ envoy_extension_cc_test(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
-        "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",

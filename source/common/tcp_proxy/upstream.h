@@ -50,7 +50,7 @@ public:
                    Upstream::HostDescriptionConstSharedPtr host) override;
 
 private:
-  absl::optional<Upstream::TcpPoolData> conn_pool_data_{};
+  absl::optional<Upstream::TcpPoolData> conn_pool_data_;
   Tcp::ConnectionPool::Cancellable* upstream_handle_{};
   GenericConnectionPoolCallbacks* callbacks_{};
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
@@ -155,7 +155,7 @@ private:
                           Ssl::ConnectionInfoConstSharedPtr ssl_info);
   const TunnelingConfigHelper& config_;
   Http::CodecType type_;
-  absl::optional<Upstream::HttpPoolData> conn_pool_data_{};
+  absl::optional<Upstream::HttpPoolData> conn_pool_data_;
   Http::ConnectionPool::Cancellable* upstream_handle_{};
   GenericConnectionPoolCallbacks* callbacks_{};
   Http::StreamDecoderFilterCallbacks* decoder_filter_callbacks_;
@@ -233,6 +233,7 @@ protected:
   // The downstream info that is owned by the downstream connection.
   StreamInfo::StreamInfo& downstream_info_;
   std::unique_ptr<Http::RequestHeaderMapImpl> downstream_headers_;
+  StreamInfo::DetectedCloseType detected_close_type_{StreamInfo::DetectedCloseType::Normal};
 
 private:
   class DecoderShim : public Http::ResponseDecoderImplBase {
@@ -332,7 +333,7 @@ public:
   void disableRouteTimeoutForWebsocketUpgrade() override {}
   Http::StreamDecoderFilterCallbacks* callbacks() override { return &decoder_filter_callbacks_; }
   Upstream::ClusterInfoConstSharedPtr cluster() override {
-    return decoder_filter_callbacks_.clusterInfo();
+    return decoder_filter_callbacks_.clusterInfoSharedPtr();
   }
   Router::FilterConfig& config() override {
     return const_cast<Router::FilterConfig&>(config_.routerFilterConfig());

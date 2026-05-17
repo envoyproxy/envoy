@@ -165,6 +165,7 @@ def envoy_dependencies(skip_targets = []):
     _boringssl()
     _boringssl_fips()
     _aws_lc()
+    _openssl()
 
     _aws_c_auth_testdata()
     _liburing()
@@ -182,6 +183,7 @@ def envoy_dependencies(skip_targets = []):
     _libsxg()
     _tcmalloc()
     _gperftools()
+    _jemalloc()
     _com_github_grpc_grpc()
     _rules_proto_grpc()
     _icu()
@@ -271,7 +273,13 @@ def envoy_dependencies(skip_targets = []):
     )
 
 def _boringssl():
-    external_http_archive(name = "boringssl")
+    external_http_archive(
+        name = "boringssl",
+        patches = [
+            "@envoy//bazel:boringssl-bssl-compat.patch",
+        ],
+        patch_args = ["-p1"],
+    )
 
 def _boringssl_fips():
     external_http_archive(
@@ -308,6 +316,27 @@ def _aws_lc():
     external_http_archive(
         name = "aws_lc",
         build_file = "@envoy//bazel/external:aws_lc.BUILD",
+    )
+    CMAKE_SOURCE_BUILD_CONTENT = "%s\nexports_files([\"bootstrap\"])" % BUILD_ALL_CONTENT
+    external_http_archive(
+        name = "fips_cmake_src",
+        build_file_content = CMAKE_SOURCE_BUILD_CONTENT,
+    )
+    CLANG_BUILD_CONTENT = "%s\nexports_files([\"bin/clang\", \"bin/clang++\"])" % BUILD_ALL_CONTENT
+    external_http_archive(
+        name = "fips_clang_ppc64le",
+        build_file_content = CLANG_BUILD_CONTENT,
+    )
+    GO_BUILD_CONTENT = "%s\nexports_files([\"bin/go\"])" % _build_all_content(["test/**"])
+    external_http_archive(
+        name = "fips_go_ppc64le",
+        build_file_content = GO_BUILD_CONTENT,
+    )
+
+def _openssl():
+    external_http_archive(
+        name = "openssl",
+        build_file = "@envoy//bazel/external:openssl.BUILD",
     )
 
 def _com_github_openhistogram_libcircllhist():
@@ -595,6 +624,10 @@ def _nghttp2():
             "@envoy//bazel/foreign_cc:nghttp2.patch",
             "@envoy//bazel/foreign_cc:nghttp2_huffman.patch",
             "@envoy//bazel/foreign_cc:nghttp2_max_hd_nv.patch",
+            "@envoy//bazel/foreign_cc:nghttp2-CVE-2026-27135_part1.diff",
+            "@envoy//bazel/foreign_cc:nghttp2-CVE-2026-27135_part2.diff",
+            "@envoy//bazel/foreign_cc:nghttp2-CVE-2026-27135_part3.diff",
+            "@envoy//bazel/foreign_cc:nghttp2-CVE-2026-27135_part4.diff",
         ],
     )
 
@@ -737,10 +770,11 @@ def _v8():
             "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/fast_float/src/include/fast_float/!#include \"fast_float/!' {} \\;",
             # TODO(jwendell): Remove the atomic_ref polyfill injection once the LLVM toolchain is
             # bumped to a version whose libc++ provides std::atomic_ref (LLVM 19+).
-            "grep -rl 'std::atomic_ref' src/ include/ --include='*.h' --include='*.cc' | grep -v atomic_ref_polyfill | xargs -r sed -i '1s!^!#include \"src/base/atomic_ref_polyfill.h\"\\n!'",
+            "grep -rl 'std::atomic_ref' src/ include/ --include='*.h' --include='*.cc' | grep -v atomic_ref_polyfill | while IFS= read -r f; do { echo '#include \"src/base/atomic_ref_polyfill.h\"'; cat \"$f\"; } > \"$f.tmp\" && mv \"$f.tmp\" \"$f\"; done",
             # TODO(jwendell): Remove consteval->constexpr workaround once the LLVM toolchain is
             # bumped. Clang 18 has bugs with consteval in template contexts (fixed in clang 19+).
-            "find ./src -type f \\( -name '*.h' -o -name '*.cc' \\) -exec sed -i 's/consteval/constexpr/g' {} \\;",
+            "find ./src -type f \\( -name '*.h' -o -name '*.cc' \\) -exec sed -i.bak 's/consteval/constexpr/g' {} \\;",
+            "find ./src -type f -name '*.bak' -delete",
         ],
     )
 
@@ -806,7 +840,7 @@ template <typename T> atomic_ref(T&) -> atomic_ref<T>;
 #endif
 #endif
 EOF""",
-            "sed -i '1s!^!#include \"atomic_ref_polyfill.h\"\\n!' simdutf.cpp",
+            "{ echo '#include \"atomic_ref_polyfill.h\"'; cat simdutf.cpp; } > simdutf.cpp.tmp && mv simdutf.cpp.tmp simdutf.cpp",
         ],
     )
 
@@ -901,6 +935,12 @@ def _tcmalloc():
 def _gperftools():
     external_http_archive(
         name = "gperftools",
+    )
+
+def _jemalloc():
+    external_http_archive(
+        name = "jemalloc",
+        build_file_content = BUILD_ALL_CONTENT,
     )
 
 def _wamr():

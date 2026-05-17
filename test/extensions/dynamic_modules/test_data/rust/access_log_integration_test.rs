@@ -1,13 +1,19 @@
 //! Integration test module for access logger dynamic modules.
 //!
-//! This module implements a simple access logger that records log events and flush calls.
+//! This module exercises the unified `declare_all_init_functions!` registration: a single
+//! `.so` registers both an HTTP filter factory and an access-logger factory that dispatches
+//! to different implementations by `logger_name`. The C++ side rejects unknown logger names
+//! at config load time when the factory returns `None`.
 
 use envoy_proxy_dynamic_modules_rust_sdk::access_log::*;
 use envoy_proxy_dynamic_modules_rust_sdk::*;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-declare_init_functions!(init, new_nop_http_filter_config_fn);
-declare_access_logger!(TestAccessLoggerConfig);
+declare_all_init_functions!(
+  init,
+  http: new_nop_http_filter_config_fn,
+  access_logger: new_access_logger_config_fn,
+);
 
 /// Global counter for log events.
 static LOG_COUNT: AtomicU32 = AtomicU32::new(0);
@@ -21,13 +27,29 @@ fn init() -> bool {
   true
 }
 
-/// Dummy HTTP filter config function (required by declare_init_functions).
+/// Dummy HTTP filter config function (required by declare_all_init_functions).
 fn new_nop_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
   _envoy_filter_config: &mut EC,
   _name: &str,
   _config: &[u8],
 ) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
   None
+}
+
+/// Access logger factory function: dispatches to the correct config implementation based on
+/// `logger_name`. Returning `None` for an unknown name causes Envoy to reject the access-log
+/// configuration at config load time.
+fn new_access_logger_config_fn(
+  ctx: &ConfigContext,
+  name: &str,
+  config: &[u8],
+) -> Option<Box<dyn AccessLoggerConfig>> {
+  match name {
+    "test_logger" => TestAccessLoggerConfig::new(ctx, name, config)
+      .ok()
+      .map(|c| Box::new(c) as Box<dyn AccessLoggerConfig>),
+    _ => None,
+  }
 }
 
 /// Access logger configuration.
@@ -180,6 +202,18 @@ impl AccessLogger for TestAccessLogger {
       ctx.get_all_headers(abi::envoy_dynamic_module_type_http_header_type::ResponseHeader);
     let _response_trailers =
       ctx.get_all_headers(abi::envoy_dynamic_module_type_http_header_type::ResponseTrailer);
+
+    // Test generic attribute accessors.
+    let _attr_protocol =
+      ctx.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::RequestProtocol);
+    let _attr_route =
+      ctx.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::XdsRouteName);
+    let _attr_resp_code =
+      ctx.get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ResponseCode);
+    let _attr_conn_id =
+      ctx.get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ConnectionId);
+    let _attr_mtls =
+      ctx.get_attribute_bool(abi::envoy_dynamic_module_type_attribute_id::ConnectionMtls);
 
     // Test access log type.
     let log_type = ctx.log_type();

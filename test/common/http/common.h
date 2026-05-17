@@ -7,7 +7,6 @@
 #include "source/common/http/codec_client.h"
 
 #include "test/mocks/common.h"
-#include "test/mocks/event/mocks.h"
 
 namespace Envoy {
 /**

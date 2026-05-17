@@ -8,7 +8,7 @@
 
 #include "test/mocks/config/xds_manager.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/missing_cluster_notifier.h"
 #include "test/test_common/test_runtime.h"
@@ -180,6 +180,23 @@ TEST_F(XdstpOdCdsApiImplTest, SubscriptionFailure) {
   EnvoyException e("rejecting update");
   odcds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
                                          &e);
+}
+
+// Tests that a config update failure with a null exception pointer is handled correctly.
+TEST_F(XdstpOdCdsApiImplTest, SubscriptionFailureNullException) {
+  InSequence s;
+
+  const std::string cluster_name = "fake_cluster";
+  expectSingletonSubscription(cluster_name);
+  odcds_->updateOnDemand(cluster_name);
+
+  ASSERT_NE(odcds_callbacks_, nullptr);
+
+  EXPECT_CALL(cm_, addOrUpdateCluster(_, _, _)).Times(0);
+  EXPECT_CALL(notifier_, notifyMissingCluster(cluster_name));
+
+  odcds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
+                                         nullptr);
 }
 
 // Tests that an existing cluster is updated.

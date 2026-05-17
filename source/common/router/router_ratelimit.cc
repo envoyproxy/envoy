@@ -94,10 +94,11 @@ bool SourceClusterAction::populateDescriptor(RateLimit::DescriptorEntry& descrip
 bool DestinationClusterAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                                                   const std::string&, const Http::RequestHeaderMap&,
                                                   const StreamInfo::StreamInfo& info) const {
-  if (info.route() == nullptr || info.route()->routeEntry() == nullptr) {
+  const auto route = info.route();
+  if (!route || route->routeEntry() == nullptr) {
     return false;
   }
-  descriptor_entry = {"destination_cluster", info.route()->routeEntry()->clusterName()};
+  descriptor_entry = {"destination_cluster", route->routeEntry()->clusterName()};
   return true;
 }
 
@@ -206,9 +207,29 @@ bool MetaDataAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_e
   case envoy::config::route::v3::RateLimit::Action::MetaData::DYNAMIC:
     metadata_source = &info.dynamicMetadata();
     break;
-  case envoy::config::route::v3::RateLimit::Action::MetaData::ROUTE_ENTRY:
-    metadata_source = &info.route()->metadata();
+  case envoy::config::route::v3::RateLimit::Action::MetaData::ROUTE_ENTRY: {
+    const auto route = info.route();
+    metadata_source = route ? &route->metadata() : nullptr;
     break;
+  }
+  case envoy::config::route::v3::RateLimit::Action::MetaData::CLUSTER_ENTRY: {
+    OptRef<const Upstream::ClusterInfo> cluster_info = info.upstreamClusterInfo();
+    metadata_source = cluster_info.has_value() ? &cluster_info.ref().metadata() : nullptr;
+    break;
+  }
+  case envoy::config::route::v3::RateLimit::Action::MetaData::CLUSTER_LOCALITY_ENTRY: {
+    const auto upstream_info = info.upstreamInfo();
+    // Upstream host is only available after upstream host selection.
+    // This means that the cluster locality metadata can only be used on the
+    // response path (apply_on_stream_done is set to true) or in a scenario where host selection is
+    // done before the rate limit action is executed.
+    if (upstream_info.has_value() && upstream_info->upstreamHost()) {
+      metadata_source = upstream_info->upstreamHost()->localityMetadata().get();
+    } else {
+      metadata_source = nullptr;
+    }
+    break;
+  }
   }
 
   const std::string metadata_string_value =

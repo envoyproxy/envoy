@@ -6,6 +6,7 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/hex.h"
 #include "source/common/http/headers.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/tls/io_handle_bio.h"
 #include "source/common/tls/ssl_handshaker.h"
 #include "source/common/tls/utility.h"
@@ -169,7 +170,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
 
   ENVOY_CONN_LOG(trace, "ssl read {} bytes", callbacks_->connection(), bytes_read);
 
-  return {action, bytes_read, end_stream};
+  return {action, bytes_read, end_stream, detected_io_error_};
 }
 
 void SslSocket::onPrivateKeyMethodComplete() { resumeHandshake(); }
@@ -224,6 +225,11 @@ void SslSocket::drainErrorQueue() {
         saw_cert_verify_failed = true;
       }
     } else if (ERR_GET_LIB(err) == ERR_LIB_SYS) {
+      if (ERR_GET_REASON(err) == ECONNRESET &&
+          Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.ssl_socket_report_connection_reset")) {
+        detected_io_error_ = Api::IoError::IoErrorCode::ConnectionReset;
+      }
       // Any syscall errors that result in connection closure are already tracked in other
       // connection related stats. We will still retain the specific syscall failure for
       // transport failure reasons.
@@ -320,7 +326,7 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
       // Renegotiation has started. We don't handle renegotiation so just fall through.
       default:
         drainErrorQueue();
-        return {PostIoAction::Close, total_bytes_written, false};
+        return {PostIoAction::Close, total_bytes_written, false, detected_io_error_};
       }
 
       break;
@@ -369,10 +375,20 @@ void SslSocket::shutdownBasic() {
   }
 }
 
-void SslSocket::closeSocket(Network::ConnectionEvent) {
+void SslSocket::closeSocket(Network::ConnectionEvent, bool abort_reset) {
   // Unregister the SSL connection object from private key method providers.
   for (auto const& provider : ctx_->getPrivateKeyMethodProviders()) {
     provider->unregisterPrivateKeyMethod(rawSsl());
+  }
+
+  // When the connection is being torn down with a TCP RST, skip the TLS shutdown
+  // (close_notify). Sending close_notify alongside a RST sends contradictory signals
+  // to the peer (graceful close vs. reset) and races the alert against the RST,
+  // making peer-side reset detection unreliable. Skipping close_notify ensures the
+  // peer reliably observes a connection reset.
+  if (abort_reset && Runtime::runtimeFeatureEnabled(
+                         "envoy.reloadable_features.ssl_socket_report_connection_reset")) {
+    return;
   }
 
   // Attempt to send a shutdown before closing the socket. It's possible this won't go out if

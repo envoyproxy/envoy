@@ -10,6 +10,7 @@
 
 #include "fmt/printf.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -110,10 +111,10 @@ typed_config:
   ASSERT_TRUE(tcp_client->connected());
   tcp_client->close();
 
-  test_server_->waitForCounterGe("tcp.rbac.allowed", 1);
+  test_server_->waitForCounter("tcp.rbac.allowed", Ge(1));
   EXPECT_EQ(0U, test_server_->counter("tcp.rbac.denied")->value());
   EXPECT_EQ(0U, test_server_->counter("tcp.rbac.shadow_allowed")->value());
-  test_server_->waitForCounterGe("tcp.rbac.shadow_denied", 1);
+  test_server_->waitForCounter("tcp.rbac.shadow_denied", Ge(1));
 }
 
 TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, Denied) {
@@ -233,10 +234,10 @@ typed_config:
   ASSERT_TRUE(tcp_client->connected());
   tcp_client->close();
 
-  test_server_->waitForCounterGe("tcp.rbac.allowed", 1);
+  test_server_->waitForCounter("tcp.rbac.allowed", Ge(1));
   EXPECT_EQ(0U, test_server_->counter("tcp.rbac.denied")->value());
   EXPECT_EQ(0U, test_server_->counter("tcp.rbac.shadow_allowed")->value());
-  test_server_->waitForCounterGe("tcp.rbac.shadow_denied", 1);
+  test_server_->waitForCounter("tcp.rbac.shadow_denied", Ge(1));
 }
 
 TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, MatcherDenied) {

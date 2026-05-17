@@ -26,14 +26,13 @@ impl Default for EnvoyBuffer<'_> {
 }
 
 impl EnvoyBuffer<'_> {
-  /// This is a helper function to create an [`EnvoyBuffer`] from a static string.
+  /// This is a helper function to create an [`EnvoyBuffer`] from a byte slice.
   ///
   /// This is meant for use by the end users in unit tests.
-  // TODO: relax the lifetime constraint to 'static, so that it becomes more flexible.
-  pub fn new(static_str: &'static str) -> Self {
+  pub fn new(s: &[u8]) -> Self {
     Self {
-      raw_ptr: static_str.as_ptr(),
-      length: static_str.len(),
+      raw_ptr: s.as_ptr(),
+      length: s.len(),
       _marker: std::marker::PhantomData,
     }
   }
@@ -53,6 +52,15 @@ impl EnvoyBuffer<'_> {
   }
 
   pub fn as_slice(&self) -> &[u8] {
+    // The null guard is inlined here rather than going through `ffi_helpers` so that this
+    // method does not transitively reference `envoy_log_*`. `as_slice` is reached by SDK
+    // doc tests, which compile without `#[cfg(test)]` and so cannot link the host-provided
+    // `envoy_dynamic_module_callback_log` symbols that the logging macros expand to.
+    if self.raw_ptr.is_null() {
+      return &[];
+    }
+    // Safety: caller invariant from `new` / `new_from_raw` that `(raw_ptr, length)` describes
+    // a live region of `length` bytes for the buffer's lifetime.
     unsafe { std::slice::from_raw_parts(self.raw_ptr, self.length) }
   }
 }
@@ -103,13 +111,24 @@ impl EnvoyMutBuffer<'_> {
     }
   }
 
-  /// This returns a immutable slice to the underlying memory region managed by Envoy.
+  /// This returns an immutable slice to the underlying memory region managed by Envoy.
   pub fn as_slice(&self) -> &[u8] {
+    // See `EnvoyBuffer::as_slice` for why the null guard is inlined here.
+    if self.raw_ptr.is_null() {
+      return &[];
+    }
+    // Safety: caller invariant from `new` / `new_from_raw`.
     unsafe { std::slice::from_raw_parts(self.raw_ptr, self.length) }
   }
 
   /// This returns a mutable slice to the underlying memory region managed by Envoy.
   pub fn as_mut_slice(&mut self) -> &mut [u8] {
+    // See `EnvoyBuffer::as_slice` for why the null guard is inlined here.
+    if self.raw_ptr.is_null() {
+      return &mut [];
+    }
+    // Safety: caller invariant from `new` / `new_from_raw`, plus exclusive borrow on
+    // the underlying memory for the duration of the returned slice.
     unsafe { std::slice::from_raw_parts_mut(self.raw_ptr, self.length) }
   }
 }

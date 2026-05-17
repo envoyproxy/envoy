@@ -31,7 +31,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // the ABI is stabilized, this restriction will be revisited. Until then, Envoy checks the hash of
 // the ABI header files to ensure that the dynamic modules are built against the same version of the
 // ABI.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message DynamicModuleConfig {
   // The name of the dynamic module.
   //
@@ -94,4 +94,22 @@ message DynamicModuleConfig {
   //
   // When both ``name`` and ``module`` are set, ``module`` takes precedence.
   config.core.v3.AsyncDataSource module = 6;
+
+  // Controls how a cache miss for a remote module is handled.
+  //
+  // When true (NACK mode), a cache miss causes an immediate NACK of the xDS config update.
+  // A background fetch is started and the module will be available on the next config push if
+  // the fetch succeeds.
+  //
+  // When false (default, warming mode), the server blocks during initialization until the fetch
+  // completes or exhausts retries. This mode requires an init manager and is not available in
+  // ECDS or per-route configurations.
+  //
+  // When using ``module.remote`` with ECDS or per-route configurations, this must be set to
+  // ``true``.
+  //
+  // Only applies when ``module.remote`` is set.
+  //
+  // Defaults to ``false``.
+  bool nack_on_cache_miss = 7;
 }

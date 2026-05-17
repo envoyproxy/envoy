@@ -1,10 +1,12 @@
 #pragma once
 
 #include "envoy/config/core/v3/http_service.pb.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/async_client_utility.h"
+#include "source/common/http/http_service_headers.h"
 #include "source/extensions/stat_sinks/open_telemetry/open_telemetry_impl.h"
 
 namespace Envoy {
@@ -21,7 +23,8 @@ class OpenTelemetryHttpMetricsExporter : public OtlpMetricsExporter,
                                          public Logger::Loggable<Logger::Id::stats> {
 public:
   OpenTelemetryHttpMetricsExporter(Upstream::ClusterManager& cluster_manager,
-                                   const envoy::config::core::v3::HttpService& http_service);
+                                   const envoy::config::core::v3::HttpService& http_service,
+                                   Server::Configuration::ServerFactoryContext& server_context);
 
   // OtlpMetricsExporter
   void send(MetricsExportRequestPtr&& metrics) override;
@@ -36,7 +39,7 @@ private:
   envoy::config::core::v3::HttpService http_service_;
   // Track active HTTP requests to cancel them on destruction.
   Http::AsyncClientRequestTracker active_requests_;
-  std::vector<std::pair<const Http::LowerCaseString, const std::string>> parsed_headers_to_add_;
+  std::unique_ptr<Http::HttpServiceHeadersApplicator> headers_applicator_;
 };
 
 } // namespace OpenTelemetry

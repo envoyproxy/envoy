@@ -12,7 +12,7 @@
 #include "envoy/server/hot_restart.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/allocator.h"
 #include "source/server/hot_restarting_child.h"
 #include "source/server/hot_restarting_parent.h"
 

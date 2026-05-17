@@ -136,6 +136,7 @@ impl<'a> From<&[(&'a str, &'a [u8])]> for HeaderPairSlice {
 }
 
 #[cfg(test)]
+#[allow(static_mut_refs)]
 mod tests {
   use super::*;
   use crate::{EnvoyMutBuffer, MockEnvoyHttpFilter};

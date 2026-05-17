@@ -144,8 +144,9 @@ Http::FilterDataStatus A2aFilter::decodeData(Buffer::Instance& data, bool end_st
       }
     }
 
-    if (max_size > 0 && bytes_parsed_ == max_size)
+    if (max_size > 0 && bytes_parsed_ == max_size) {
       break;
+    }
   }
 
   // If we are here, we haven't collected all fields yet.
@@ -187,6 +188,16 @@ Http::FilterDataStatus A2aFilter::completeParsing() {
                                        "request must be a valid JSON-RPC 2.0 message for A2A",
                                        nullptr, absl::nullopt, "a2a_filter_not_valid_jsonrpc");
     return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+
+  const auto& metadata = parser_->metadata();
+  if (!metadata.fields().empty()) {
+    // TODO(tyxia): Use the filter config name from the config for now. It can be customized and
+    // controlled by the configuration. Also, the behavior of setting dynamic metadata can be
+    // controlled by the configuration.
+    decoder_callbacks_->streamInfo().setDynamicMetadata(
+        std::string(decoder_callbacks_->filterConfigName()), metadata);
+    ENVOY_LOG(debug, "A2A filter set dynamic metadata: {}", metadata.DebugString());
   }
 
   return Http::FilterDataStatus::Continue;

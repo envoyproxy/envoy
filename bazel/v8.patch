@@ -158,6 +158,37 @@ index 78e62abb..d7edf951 100644
  }  // extern "C"
 +
 +#endif
+diff --git a/src/objects/objects-inl.h b/src/objects/objects-inl.h
+--- a/src/objects/objects-inl.h
++++ b/src/objects/objects-inl.h
+@@ -1618,11 +1618,13 @@
+ #ifndef V8_DISABLE_WRITE_BARRIERS
+   if (emit_write_barrier == EmitWriteBarrier::kYes) {
+     WriteBarrier::ForValue(*this, MaybeObjectSlot(map_slot()), value,
+                            UPDATE_WRITE_BARRIER);
+   } else {
+     DCHECK_EQ(emit_write_barrier, EmitWriteBarrier::kNo);
++#if V8_VERIFY_WRITE_BARRIERS
+     DCHECK(!WriteBarrier::IsRequired(*this, value));
++#endif
+   }
+ #endif
+ }
+@@ -1641,10 +1643,12 @@
+ #ifndef V8_DISABLE_WRITE_BARRIERS
+   if (mode != SKIP_WRITE_BARRIER) {
+     DCHECK(!value.is_null());
+     WriteBarrier::ForValue(*this, MaybeObjectSlot(map_slot()), value, mode);
+   } else {
++#if V8_VERIFY_WRITE_BARRIERS
+     SLOW_DCHECK(
+         // We allow writes of a null map before root initialisation.
+         value.is_null() ? !isolate->read_only_heap()->roots_init_complete()
+                         : !WriteBarrier::IsRequired(*this, value));
++#endif
+   }
+ #endif
+ }
 diff --git a/third_party/inspector_protocol/code_generator.py b/third_party/inspector_protocol/code_generator.py
 index 49952dda..268af813 100755
 --- a/third_party/inspector_protocol/code_generator.py

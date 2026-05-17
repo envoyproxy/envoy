@@ -13,6 +13,8 @@
 #include "absl/strings/numbers.h"
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolicies {
@@ -267,7 +269,7 @@ public:
     // Wait for the server initialization to be done.
     server_initialized.WaitForNotification();
 
-    test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+    test_server_->waitForGauge("cluster_manager.active_clusters", Ge(2));
 
     // Wait for our statically specified listener to become ready, and register
     // its port in the test framework's downstream listener port map.
@@ -398,7 +400,7 @@ TEST_P(ClientSideWeightedRoundRobinXdsIntegrationTest, ClusterUpDownUp) {
                                                              {}, {FirstClusterName}, "42");
   // We can continue the test once we're sure that Envoy's ClusterManager has
   // made use of the DiscoveryResponse that says cluster_1 is gone.
-  test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+  test_server_->waitForCounter("cluster_manager.cluster_removed", Ge(1));
 
   // Now that cluster_1 is gone, the listener (with its routing to cluster_1)
   // should 503.
@@ -414,7 +416,7 @@ TEST_P(ClientSideWeightedRoundRobinXdsIntegrationTest, ClusterUpDownUp) {
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
                                                              {cluster1_}, {cluster1_}, {}, "413");
 
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(2));
   waitFor200("/cluster1");
 
   cleanupUpstreamAndDownstream();
@@ -440,7 +442,7 @@ TEST_P(ClientSideWeightedRoundRobinXdsIntegrationTest, TwoClusters) {
       Config::TestTypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster2_}, {}, "42");
   // Wait for the cluster to be active (two upstream clusters plus the CDS
   // cluster).
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(3));
 
   // A request for the second cluster should be fine.
   waitFor200("/cluster2");
@@ -453,7 +455,7 @@ TEST_P(ClientSideWeightedRoundRobinXdsIntegrationTest, TwoClusters) {
       Config::TestTypeUrl::get().Cluster, {cluster2_}, {}, {FirstClusterName}, "43");
   // We can continue the test once we're sure that Envoy's ClusterManager has
   // made use of the DiscoveryResponse that says cluster_1 is gone.
-  test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+  test_server_->waitForCounter("cluster_manager.cluster_removed", Ge(1));
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/cluster2", "",
                                                 downstream_protocol_, version_, "foo.com");
@@ -466,7 +468,7 @@ TEST_P(ClientSideWeightedRoundRobinXdsIntegrationTest, TwoClusters) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "43", {}, {}, {}));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TestTypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster1_}, {}, "413");
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(3));
   waitFor200("/cluster1");
 
   cleanupUpstreamAndDownstream();
@@ -542,8 +544,8 @@ public:
                                                                {cluster1_}, {cluster1_}, {}, "55");
 
     // Wait for EDS request.
-    test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
-    test_server_->waitForGaugeEq("cluster.cluster_1.warming_state", 1);
+    test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(1));
+    test_server_->waitForGauge("cluster.cluster_1.warming_state", Eq(1));
     EXPECT_TRUE(compareDiscoveryRequest(
         Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(), "",
         {FirstClusterName}, {FirstClusterName}, {}));
@@ -592,7 +594,7 @@ public:
                                         {FirstClusterName}, {}, {}));
 
     // Cluster should become active.
-    test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+    test_server_->waitForGauge("cluster_manager.active_clusters", Ge(2));
 
     // Wait for our statically specified listener to become ready, and register
     // its port in the test framework's downstream listener port map.
@@ -749,7 +751,7 @@ TEST_P(ClientSideWeightedRoundRobinEdsIntegrationTest, UpdateLocalityPriority) {
     sendRequestsAndTrackUpstreamUsage(upstream_qps, 10, initial_usage);
     ENVOY_LOG(trace, "initial_usage {}", initial_usage);
 
-    test_server_->waitForCounterEq("cluster.cluster_1.membership_change", i * 2 + 1);
+    test_server_->waitForCounter("cluster.cluster_1.membership_change", Eq(i * 2 + 1));
 
     // Send another 100 requests to cluster1, expecting weights to be used.
     std::vector<uint64_t> upstream_usage;
@@ -798,7 +800,7 @@ TEST_P(ClientSideWeightedRoundRobinEdsIntegrationTest, AddRemoveLocality) {
     sendRequestsAndTrackUpstreamUsage(upstream_qps, 10, initial_usage);
     ENVOY_LOG(trace, "initial_usage {}", initial_usage);
 
-    test_server_->waitForCounterEq("cluster.cluster_1.membership_change", i + 1);
+    test_server_->waitForCounter("cluster.cluster_1.membership_change", Eq(i + 1));
 
     // Send another 100 requests to cluster1, expecting weights to be used.
     std::vector<uint64_t> upstream_usage;

@@ -27,7 +27,6 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 namespace {
 
-using envoy::config::common::mutation_rules::v3::HeaderMutationRules;
 using envoy::config::core::v3::TrafficDirection;
 using envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor;
 using envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute;
@@ -38,7 +37,6 @@ using envoy::service::ext_proc::v3::ImmediateResponse;
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 
-using Filters::Common::MutationRules::Checker;
 using Filters::Common::ProcessingEffect::Effect;
 using Http::FilterDataStatus;
 using Http::FilterHeadersStatus;
@@ -261,25 +259,7 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
                            const std::string& stats_prefix, bool is_upstream,
                            Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
                            Server::Configuration::CommonFactoryContext& context)
-    : failure_mode_allow_(config.failure_mode_allow()),
-      observability_mode_(config.observability_mode()),
-      route_cache_action_(config.route_cache_action()),
-      deferred_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, deferred_close_timeout,
-                                                         DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS)),
-      message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
-      grpc_service_(getFilterGrpcService(config)),
-      send_body_without_waiting_for_header_response_(
-          config.send_body_without_waiting_for_header_response()),
-      stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
-      processing_mode_(config.processing_mode()),
-      mutation_checker_(config.mutation_rules(), context.regexEngine()),
-      filter_metadata_(config.filter_metadata()),
-      allow_mode_override_(config.allow_mode_override()),
-      disable_immediate_response_(config.disable_immediate_response()),
-      allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers(), context)),
-      disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers(), context)),
-      is_upstream_(is_upstream), graceful_grpc_close_(Runtime::runtimeFeatureEnabled(
-                                     "envoy.reloadable_features.ext_proc_graceful_grpc_close")),
+    : stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
       untyped_forwarding_namespaces_(
           config.metadata_options().forwarding_namespaces().untyped().begin(),
           config.metadata_options().forwarding_namespaces().untyped().end()),
@@ -295,7 +275,12 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       typed_cluster_metadata_forwarding_namespaces_(
           config.metadata_options().cluster_metadata_forwarding_namespaces().typed().begin(),
           config.metadata_options().cluster_metadata_forwarding_namespaces().typed().end()),
+      allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers(), context)),
+      disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers(), context)),
       allowed_override_modes_(config.allowed_override_modes()),
+      grpc_service_(getFilterGrpcService(config)),
+      mutation_checker_(config.mutation_rules(), context.regexEngine()),
+      filter_metadata_(config.filter_metadata()),
       expression_manager_(builder, context.localInfo(), config.request_attributes(),
                           config.response_attributes()),
       processing_request_modifier_factory_cb_(
@@ -303,9 +288,22 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       on_processing_response_factory_cb_(
           createOnProcessingResponseCb(config, context, stats_prefix)),
       thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()),
+      route_cache_action_(config.route_cache_action()), processing_mode_(config.processing_mode()),
+      deferred_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, deferred_close_timeout,
+                                                         DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS)),
+      message_timeout_(message_timeout),
       remote_close_timeout_(context.runtime().snapshot().getInteger(
           RemoteCloseTimeout, DefaultRemoteCloseTimeoutMilliseconds)),
+      max_message_timeout_ms_(max_message_timeout_ms),
       status_on_error_(toErrorCode(config.status_on_error().code())),
+      failure_mode_allow_(config.failure_mode_allow()),
+      observability_mode_(config.observability_mode()),
+      send_body_without_waiting_for_header_response_(
+          config.send_body_without_waiting_for_header_response()),
+      allow_mode_override_(config.allow_mode_override()),
+      disable_immediate_response_(config.disable_immediate_response()), is_upstream_(is_upstream),
+      graceful_grpc_close_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.ext_proc_graceful_grpc_close")),
       allow_content_length_header_(config.allow_content_length_header()) {
   if (config.disable_clear_route_cache()) {
     route_cache_action_ = ExternalProcessor::RETAIN;
@@ -707,7 +705,7 @@ void Filter::sendRequest(const ProcessorState& state, ProcessingRequest&& req, b
   if (processing_request_modifier_) {
     ProcessingRequestModifier::Params params = {
         .traffic_direction = state.trafficDirection(),
-        .callbacks = state.callbacks(),
+        .callbacks = state.filterCallbacks(),
         .request_headers = state.requestHeaders(),
         .response_headers = state.responseHeaders(),
         .response_trailers = state.responseTrailers(),
@@ -720,7 +718,7 @@ void Filter::sendRequest(const ProcessorState& state, ProcessingRequest&& req, b
 
 void Filter::onComplete(ProcessingResponse& response) {
   ENVOY_STREAM_LOG(debug, "Received successful response from server", *decoder_callbacks_);
-  std::unique_ptr<ProcessingResponse> resp_ptr = std::make_unique<ProcessingResponse>(response);
+  auto resp_ptr = std::make_unique<ProcessingResponse>(response);
   onReceiveMessage(std::move(resp_ptr));
 }
 
@@ -896,7 +894,7 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   ProcessingRequest req =
       buildHeaderRequest(state, headers, end_stream, /*observability_mode=*/false);
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
-                             ProcessorState::CallbackState::HeadersCallback);
+                             ProcessorState::CallbackState::HeadersCallback, false);
   ENVOY_STREAM_LOG(debug, "Sending headers message", *decoder_callbacks_);
   sendRequest(state, std::move(req), false);
   stats_.stream_msgs_sent_.inc();
@@ -1425,7 +1423,7 @@ ProcessingRequest Filter::setupBodyChunk(ProcessorState& state, const Buffer::In
 void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState new_state,
                            ProcessingRequest& req) {
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
-                             new_state);
+                             new_state, true);
   sendRequest(state, std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 }
@@ -1453,7 +1451,7 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
       callback_state = ProcessorState::CallbackState::TrailersCallback;
     }
     state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this),
-                               config_->messageTimeout(), callback_state);
+                               config_->messageTimeout(), callback_state, false);
     ENVOY_STREAM_LOG(debug, "Sending trailers message", *decoder_callbacks_);
   }
   encodeProtocolConfig(req);
@@ -1479,7 +1477,7 @@ void Filter::logStreamInfoBase(const Envoy::StreamInfo::StreamInfo* stream_info)
 
   // Only set cluster info in logging info once.
   if (logging_info_->clusterInfo() == nullptr) {
-    logging_info_->setClusterInfo(stream_info->upstreamClusterInfo());
+    logging_info_->setClusterInfo(stream_info->upstreamClusterInfoSharedPtr());
   }
 
   // Response code details should actually be set as many times as possible, since it's
@@ -1536,14 +1534,13 @@ void Filter::onNewTimeout(const Protobuf::Duration& override_message_timeout) {
 void Filter::addDynamicMetadata(const ProcessorState& state, ProcessingRequest& req) {
   // get the callbacks from the ProcessorState. This will be the appropriate
   // callbacks for the current state of the filter
-  auto* cb = state.callbacks();
+  auto* cb = state.filterCallbacks();
   envoy::config::core::v3::Metadata forwarding_metadata;
 
   // Forward cluster metadata if so configured.
-  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
-      cb->streamInfo().upstreamClusterInfo();
-  if (cluster_info.has_value() && cluster_info.value() != nullptr) {
-    const auto& cluster_metadata = cluster_info.value()->metadata().filter_metadata();
+  const auto& cluster_info = cb->streamInfo().upstreamClusterInfo();
+  if (cluster_info) {
+    const auto& cluster_metadata = cluster_info->metadata().filter_metadata();
     for (const auto& context_key : state.untypedClusterMetadataForwardingNamespaces()) {
       if (const auto metadata_it = cluster_metadata.find(context_key);
           metadata_it != cluster_metadata.end()) {
@@ -1551,7 +1548,7 @@ void Filter::addDynamicMetadata(const ProcessorState& state, ProcessingRequest& 
       }
     }
 
-    const auto& cluster_typed_metadata = cluster_info.value()->metadata().typed_filter_metadata();
+    const auto& cluster_typed_metadata = cluster_info->metadata().typed_filter_metadata();
     for (const auto& context_key : state.typedClusterMetadataForwardingNamespaces()) {
       if (const auto metadata_it = cluster_typed_metadata.find(context_key);
           metadata_it != cluster_typed_metadata.end()) {
@@ -1602,7 +1599,7 @@ void Filter::addDynamicMetadata(const ProcessorState& state, ProcessingRequest& 
     }
   }
 
-  *req.mutable_metadata_context() = forwarding_metadata;
+  *req.mutable_metadata_context() = std::move(forwarding_metadata);
 }
 
 void Filter::addAttributes(ProcessorState& state, ProcessingRequest& req) {
@@ -1611,14 +1608,14 @@ void Filter::addAttributes(ProcessorState& state, ProcessingRequest& req) {
   }
 
   auto activation_ptr = Filters::Common::Expr::createActivation(
-      &config_->expressionManager().localInfo(), state.callbacks()->streamInfo(),
-      state.callbacks()->streamInfo().getRequestHeaders(),
+      &config_->expressionManager().localInfo(), state.filterCallbacks()->streamInfo(),
+      state.filterCallbacks()->streamInfo().getRequestHeaders(),
       dynamic_cast<const Http::ResponseHeaderMap*>(state.responseHeaders()),
       dynamic_cast<const Http::ResponseTrailerMap*>(state.responseTrailers()));
   auto attributes = state.evaluateAttributes(config_->expressionManager(), *activation_ptr);
 
   state.setSentAttributes(true);
-  (*req.mutable_attributes())[FilterName] = attributes;
+  (*req.mutable_attributes())[FilterName] = std::move(attributes);
 }
 
 void Filter::setDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
@@ -1633,8 +1630,8 @@ void Filter::setDynamicMetadata(Http::StreamFilterCallbacks* cb, const Processor
     return;
   }
 
-  auto response_metadata = response.dynamic_metadata().fields();
-  auto receiving_namespaces = state.untypedReceivingMetadataNamespaces();
+  const auto& response_metadata = response.dynamic_metadata().fields();
+  const auto& receiving_namespaces = state.untypedReceivingMetadataNamespaces();
   for (const auto& context_key : response_metadata) {
     bool found_allowed_namespace = false;
     if (auto metadata_it =
@@ -1711,7 +1708,7 @@ bool eosSeenInBody(ProcessorState& state,
     return false;
   case ProcessingMode::STREAMED:
     if (!state.chunkQueue().empty()) {
-      return state.chunkQueue().queue().front()->end_stream;
+      return state.chunkQueue().queue().front().end_stream;
     }
     return false;
   case ProcessingMode::FULL_DUPLEX_STREAMED: {
@@ -2008,6 +2005,14 @@ void Filter::onGrpcCloseWithStatus(Grpc::Status::GrpcStatus status) {
   processing_complete_ = true;
   stats_.streams_closed_.inc();
   stats_.server_half_closed_.inc();
+
+  // In observability mode, capture logging info before closing the stream.
+  // encodeComplete() also calls logStreamInfo(), but the ordering is
+  // nondeterministic: if closeStream() nullifies stream_ first, that
+  // call becomes a no-op.
+  if (config_->observabilityMode()) {
+    logStreamInfo();
+  }
   // Successful close. We can ignore the stream for the rest of our request
   // and response processing.
   closeStream();

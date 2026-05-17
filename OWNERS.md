@@ -41,7 +41,7 @@ routing PRs, questions, etc. to the right place.
 * Raven Black ([ravenblackx](https://github.com/ravenblackx)) (ravenblack@dropbox.com)
   * Caches, file filters, and file I/O.
 * Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (kateryna.nezdolii@gmail.com)
-  * Load balancing, GeoIP, overload manager, security.
+  * Load balancing, data plane, overload manager.
 * Tianyu Xia ([tyxia](https://github.com/tyxia)) (tyxia@google.com)
   * ext_proc, data plane, flow control, CEL.
 * Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
@@ -101,6 +101,10 @@ without further review.
 * Rohit Agrawal ([agrawroh](https://github.com/agrawroh)) (rohit.agrawal@databricks.com)
 * Antonio Leonti ([antoniovleonti](https://github.com/antoniovleonti)) (leonti@google.com)
 * Takeshi Yoneda ([mathetake](https://github.com/mathetake)) (tyoneda@netflix.com)
+* Reuben Tanner ([reubent-goog](https://github.com/reubent-goog)) (reubent@google.com)
+* Paul Ogilby ([paul-r-gall](https://github.com/paul-r-gall)) (pgal@google.com)
+* Peng Gao ([penguingao](https://github.com/penguingao)) (pengg@google.com)
+* Jonh Wendell ([jwendell](https://github.com/jwendell)) (jwendell@redhat.com)
 
 # Emeritus maintainers
 

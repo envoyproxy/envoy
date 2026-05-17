@@ -181,8 +181,7 @@ envoy_cc_library(
         "//envoy/filesystem:filesystem_interface",
         "//source/common/config:ttl_lib",
         "@abseil-cpp//absl/cleanup",
-        "@quiche//:quic_platform",
-        "@quiche//:quiche_common_lib",
+        "@abseil-cpp//absl/container:linked_hash_map",
     ],
 )
 
@@ -223,6 +222,11 @@ envoy_cc_library(
         ":macros",
         ":non_copyable",
         "//source/common/protobuf",
+        # Depend on the header-only interface, not the implementation lib, so that every commit to
+        # main does not invalidate the build cache of minimal_logger_lib (and everything that
+        # transitively depends on it). The implementation is linked by the final binary via
+        # version_linkstamp (production) / test_version_linkstamp (tests).
+        "//source/common/version:version_string_interface_lib",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/synchronization",
     ] + select({

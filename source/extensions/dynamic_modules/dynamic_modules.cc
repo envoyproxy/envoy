@@ -4,14 +4,19 @@
 #include <unistd.h>
 
 #include <cerrno>
+#include <fstream>
 #include <string>
 
 #include "envoy/common/exception.h"
 
+#include "source/common/common/hex.h"
 #include "source/common/common/utility.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
+#include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
+#include "openssl/evp.h"
+#include "openssl/sha.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -151,16 +156,58 @@ void* DynamicModule::getSymbol(const absl::string_view symbol_ref) const {
   return dlsym(handle_, std::string(symbol_ref).c_str());
 }
 
-absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(const absl::string_view module_bytes,
-                                                           const absl::string_view sha256,
-                                                           const bool do_not_close,
-                                                           const bool load_globally) {
-  std::filesystem::path temp_file_path =
-      std::filesystem::temp_directory_path() / fmt::format("envoy_dynamic_module_{}.so", sha256);
+std::filesystem::path moduleTempPath(const absl::string_view sha256) {
+  return std::filesystem::temp_directory_path() / fmt::format("envoy_dynamic_module_{}.so", sha256);
+}
+
+absl::Status verifyFileSha256(const std::filesystem::path& path,
+                              absl::string_view expected_sha256_hex) {
+  std::ifstream file(path, std::ios::binary);
+  if (!file.is_open()) {
+    return absl::InternalError(absl::StrCat(
+        "Failed to open file for SHA256 verification: ", path.string(), ": ", errorDetails(errno)));
+  }
+  bssl::ScopedEVP_MD_CTX ctx;
+  if (EVP_DigestInit(ctx.get(), EVP_sha256()) != 1) {
+    return absl::InternalError("Failed to initialize SHA256 digest context");
+  }
+  // 64 KiB chunks: large enough to keep syscall overhead low, small enough to keep stack clean.
+  std::array<char, 65536> buf;
+  while (file) {
+    file.read(buf.data(), buf.size());
+    const std::streamsize got = file.gcount();
+    if (got > 0 && EVP_DigestUpdate(ctx.get(), buf.data(), static_cast<size_t>(got)) != 1) {
+      return absl::InternalError("Failed to update SHA256 digest");
+    }
+    if (file.bad()) {
+      return absl::InternalError(
+          absl::StrCat("I/O error reading file for SHA256 verification: ", path.string()));
+    }
+  }
+  std::array<uint8_t, SHA256_DIGEST_LENGTH> digest;
+  if (EVP_DigestFinal(ctx.get(), digest.data(), nullptr) != 1) {
+    return absl::InternalError("Failed to finalize SHA256 digest");
+  }
+  std::string actual_hex = Hex::encode(digest.data(), digest.size());
+  // The expected hash is operator-supplied (proto config, not user input) and the actual digest
+  // is computed from a file the attacker may control; the only information leaked by an
+  // early-exit comparison is "wrong remote module", which carries no secret. A constant-time
+  // compare is therefore not warranted here.
+  std::string expected_normalised{expected_sha256_hex};
+  absl::AsciiStrToLower(&expected_normalised);
+  if (actual_hex != expected_normalised) {
+    return absl::FailedPreconditionError(
+        absl::StrCat("SHA256 mismatch for cached dynamic module at ", path.string(), ": expected ",
+                     expected_normalised, " got ", actual_hex));
+  }
+  return absl::OkStatus();
+}
+
+absl::Status writeDynamicModuleBytesToDisk(const absl::string_view module_bytes,
+                                           const absl::string_view sha256) {
+  std::filesystem::path temp_file_path = moduleTempPath(sha256);
 
   // Write the (already SHA256-verified) bytes to a staging file, then atomically rename.
-  // If the module was already loaded at this path, newDynamicModule's RTLD_NOLOAD check
-  // returns the existing handle without re-init.
   std::string staging_template = temp_file_path.string() + ".XXXXXX";
   int fd = mkstemp(staging_template.data());
   if (fd == -1) {
@@ -190,6 +237,20 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(const absl::string_vi
   std::filesystem::permissions(staging_path, std::filesystem::perms::owner_all,
                                std::filesystem::perm_options::replace);
   std::filesystem::rename(staging_path, temp_file_path);
+  return absl::OkStatus();
+}
+
+absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(const absl::string_view module_bytes,
+                                                           const absl::string_view sha256,
+                                                           const bool do_not_close,
+                                                           const bool load_globally) {
+  auto status = writeDynamicModuleBytesToDisk(module_bytes, sha256);
+  if (!status.ok()) {
+    return status;
+  }
+  auto temp_file_path = moduleTempPath(sha256);
+  // If the module was already loaded at this path, newDynamicModule's RTLD_NOLOAD check
+  // returns the existing handle without re-init.
   auto result = newDynamicModule(temp_file_path, do_not_close, load_globally);
   if (!result.ok()) {
     // Clean up the invalid file.

@@ -162,6 +162,7 @@ public:
   const std::vector<ResetHeaderParserSharedPtr>& resetHeaders() const override {
     return reset_headers_;
   }
+  bool refreshClusterOnRetry() const override { return refresh_cluster_on_retry_; }
 
   std::chrono::milliseconds per_try_timeout_{0};
   std::chrono::milliseconds per_try_idle_timeout_{0};
@@ -175,6 +176,7 @@ public:
   absl::optional<std::chrono::milliseconds> max_interval_;
   std::vector<ResetHeaderParserSharedPtr> reset_headers_;
   std::chrono::milliseconds reset_max_interval_{300000};
+  bool refresh_cluster_on_retry_{false};
   std::vector<Upstream::RetryOptionsPredicateConstSharedPtr> retry_options_predicates_;
 };
 
@@ -241,6 +243,7 @@ public:
                const Upstream::RetryPriority::PriorityMappingFunc&));
   MOCK_METHOD(uint32_t, hostSelectionMaxAttempts, (), (const));
   MOCK_METHOD(bool, wouldRetryFromRetriableStatusCode, (Http::Code code), (const));
+  MOCK_METHOD(DoRetryType, doRetryType, (), (const));
 
   DoRetryCallback callback_;
 };
@@ -547,7 +550,8 @@ public:
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
   MOCK_METHOD(const std::string&, routeName, (), (const));
-  MOCK_METHOD(const VirtualHostConstSharedPtr&, virtualHost, (), (const));
+  MOCK_METHOD(const VirtualHost&, virtualHost, (), (const));
+  MOCK_METHOD(VirtualHostConstSharedPtr, virtualHostSharedPtr, (), (const));
 
   // Router::RouteEntry
   MOCK_METHOD(const std::string&, clusterName, (), (const));
@@ -612,8 +616,6 @@ public:
   std::string route_name_{"fake_route_name"};
   std::shared_ptr<testing::NiceMock<MockVirtualHost>> virtual_host_ =
       std::make_shared<testing::NiceMock<MockVirtualHost>>();
-  // Same with virtual_host_ but this could be returned as VirtualHostConstSharedPtr reference.
-  VirtualHostConstSharedPtr virtual_host_copy_ = virtual_host_;
 };
 
 class MockConfig : public Config {

@@ -45,7 +45,6 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/registry.h"
 
 #include "absl/time/time.h"
 #include "base_integration_test.h"
@@ -54,6 +53,7 @@
 namespace Envoy {
 namespace {
 
+using testing::Eq;
 using testing::HasSubstr;
 
 envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::CodecType
@@ -787,15 +787,15 @@ void HttpIntegrationTest::testRouterVirtualClusters() {
   auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
   checkSimpleRequestSuccess(0, 0, response.get());
 
-  test_server_->waitForCounterEq("vhost.integration.vcluster.test_vcluster.upstream_rq_total", 1);
-  test_server_->waitForCounterEq("vhost.integration.vcluster.other.upstream_rq_total", 0);
+  test_server_->waitForCounter("vhost.integration.vcluster.test_vcluster.upstream_rq_total", Eq(1));
+  test_server_->waitForCounter("vhost.integration.vcluster.other.upstream_rq_total", Eq(0));
 
   auto response2 =
       sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
   checkSimpleRequestSuccess(0, 0, response2.get());
 
-  test_server_->waitForCounterEq("vhost.integration.vcluster.test_vcluster.upstream_rq_total", 1);
-  test_server_->waitForCounterEq("vhost.integration.vcluster.other.upstream_rq_total", 1);
+  test_server_->waitForCounter("vhost.integration.vcluster.test_vcluster.upstream_rq_total", Eq(1));
+  test_server_->waitForCounter("vhost.integration.vcluster.other.upstream_rq_total", Eq(1));
 }
 
 // Make sure route level stats are generated correctly.
@@ -820,8 +820,8 @@ void HttpIntegrationTest::testRouteStats() {
   auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
   checkSimpleRequestSuccess(0, 0, response.get());
 
-  test_server_->waitForCounterEq("vhost.integration.route.test_route.upstream_rq_total", 1);
-  test_server_->waitForCounterEq("vhost.integration.route.test_route.upstream_rq_completed", 1);
+  test_server_->waitForCounter("vhost.integration.route.test_route.upstream_rq_total", Eq(1));
+  test_server_->waitForCounter("vhost.integration.route.test_route.upstream_rq_completed", Eq(1));
 }
 
 void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
@@ -1464,6 +1464,14 @@ void HttpIntegrationTest::testLargeResponseHeaders(uint32_t size, uint32_t count
   // exceed `size` due to the keys and other headers. The actual request header count will exceed
   // `count` by four due to default headers.
 
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3::HttpConnectionManager& hcm) -> void {
+    // Disable route timeout to prevent 504 on slow CI (#44416).
+    auto* route =
+        hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
+    route->mutable_timeout()->set_seconds(0);
+  });
+
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     ConfigHelper::HttpProtocolOptions protocol_options;
     auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
@@ -1711,7 +1719,7 @@ void HttpIntegrationTest::testAdminDrain(Http::CodecType admin_request_type) {
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
 
   // Validate that the listeners have been stopped.
-  test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
+  test_server_->waitForCounter("listener_manager.listener_stopped", Eq(1));
 
   // Validate that port is closed and can be bound by other sockets.
   // This does not work for HTTP/3 because the port is not closed until the listener is completely

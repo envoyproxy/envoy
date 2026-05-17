@@ -376,7 +376,14 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
     return nullptr;
   }
 
-  return Address::addressFromSockAddrOrDie(orig_addr, 0, -1, true /* default for v6 constructor */);
+  auto address_or_status =
+      Address::addressFromSockAddr(orig_addr, 0, true /* default for v6 constructor */);
+  if (!address_or_status.ok()) {
+    ENVOY_LOG_MISC(debug, "Failed to get address from sockaddr for getOriginalDst: {}",
+                   address_or_status.status().message());
+    return nullptr;
+  }
+  return *address_or_status;
 
 #else
   // TODO(zuercher): determine if connection redirection is possible under macOS (c.f. pfctl and

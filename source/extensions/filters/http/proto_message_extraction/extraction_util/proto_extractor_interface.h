@@ -16,9 +16,9 @@ namespace ProtoMessageExtraction {
 
 // All valid field extraction directives.
 enum class ExtractedMessageDirective {
-  EXTRACT_REDACT,
+  EXTRACT_REDACT, // NOLINT(readability-identifier-naming)
   EXTRACT,
-  EXTRACT_REPEATED_CARDINALITY,
+  EXTRACT_REPEATED_CARDINALITY, // NOLINT(readability-identifier-naming)
 };
 
 using FieldPathToExtractType =
@@ -41,6 +41,7 @@ public:
   // that contains the extracted message and other extracted message metadata obtained during
   // extraction.
   virtual ExtractedMessageMetadata
+  // NOLINTNEXTLINE(readability-identifier-naming)
   ExtractMessage(const Protobuf::field_extraction::MessageData& message) const = 0;
 
   virtual ~ProtoExtractorInterface() = default;

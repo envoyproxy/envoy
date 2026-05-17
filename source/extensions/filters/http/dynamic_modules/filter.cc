@@ -13,7 +13,18 @@ namespace HttpFilters {
 DynamicModuleHttpFilter::~DynamicModuleHttpFilter() { destroy(); }
 
 void DynamicModuleHttpFilter::initializeInModuleFilter() {
+  ASSERT(in_module_filter_ == nullptr);
   in_module_filter_ = config_->on_http_filter_new_(config_->in_module_config_, thisAsVoidPtr());
+  maybeRegisterDownstreamWatermarkCallbacks();
+}
+
+void DynamicModuleHttpFilter::maybeRegisterDownstreamWatermarkCallbacks() {
+  if (downstream_watermark_callbacks_registered_ || decoder_callbacks_ == nullptr ||
+      in_module_filter_ == nullptr) {
+    return;
+  }
+  decoder_callbacks_->addDownstreamWatermarkCallbacks(*this);
+  downstream_watermark_callbacks_registered_ = true;
 }
 
 void DynamicModuleHttpFilter::onStreamComplete() {
@@ -22,9 +33,13 @@ void DynamicModuleHttpFilter::onStreamComplete() {
 
 void DynamicModuleHttpFilter::onDestroy() {
   destroyed_ = true;
-  // Remove watermark callbacks before destroying.
-  if (decoder_callbacks_ != nullptr) {
+  // Clear the cached dispatcher so any concurrent foreign-thread `commit()` short-circuits.
+  cached_dispatcher_.store(nullptr, std::memory_order_release);
+  // Pair with the register in maybeRegisterDownstreamWatermarkCallbacks(); the underlying
+  // removeDownstreamWatermarkCallbacks() asserts the callback was previously added.
+  if (decoder_callbacks_ != nullptr && downstream_watermark_callbacks_registered_) {
     decoder_callbacks_->removeDownstreamWatermarkCallbacks(*this);
+    downstream_watermark_callbacks_registered_ = false;
   }
   destroy();
 };
@@ -63,6 +78,7 @@ void DynamicModuleHttpFilter::destroy() {
 
   decoder_callbacks_ = nullptr;
   encoder_callbacks_ = nullptr;
+  downstream_watermark_callbacks_registered_ = false;
 }
 
 FilterHeadersStatus DynamicModuleHttpFilter::decodeHeaders(RequestHeaderMap&, bool end_of_stream) {
@@ -73,11 +89,6 @@ FilterHeadersStatus DynamicModuleHttpFilter::decodeHeaders(RequestHeaderMap&, bo
 };
 
 FilterDataStatus DynamicModuleHttpFilter::decodeData(Buffer::Instance& chunk, bool end_of_stream) {
-  if (end_of_stream && decoder_callbacks_->decodingBuffer()) {
-    // To make the very last chunk of the body available to the filter when buffering is enabled,
-    // we need to call addDecodedData. See the code comment there for more details.
-    decoder_callbacks_->addDecodedData(chunk, false);
-  }
   current_request_body_ = &chunk;
   const envoy_dynamic_module_type_on_http_filter_request_body_status status =
       config_->on_http_filter_request_body_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
@@ -120,11 +131,6 @@ FilterHeadersStatus DynamicModuleHttpFilter::encodeHeaders(ResponseHeaderMap&, b
 FilterDataStatus DynamicModuleHttpFilter::encodeData(Buffer::Instance& chunk, bool end_of_stream) {
   if (sent_local_reply_) { // See the comment on the flag.
     return FilterDataStatus::Continue;
-  }
-  if (end_of_stream && encoder_callbacks_->encodingBuffer()) {
-    // To make the very last chunk of the body available to the filter when buffering is enabled,
-    // we need to call addEncodedData. See the code comment there for more details.
-    encoder_callbacks_->addEncodedData(chunk, false);
   }
   current_response_body_ = &chunk;
   const envoy_dynamic_module_type_on_http_filter_response_body_status status =
@@ -289,11 +295,13 @@ void DynamicModuleHttpFilter::continueEncoding() {
 }
 
 void DynamicModuleHttpFilter::onAboveWriteBufferHighWatermark() {
+  ASSERT(in_module_filter_ != nullptr);
   config_->on_http_filter_downstream_above_write_buffer_high_watermark_(thisAsVoidPtr(),
                                                                         in_module_filter_);
 }
 
 void DynamicModuleHttpFilter::onBelowWriteBufferLowWatermark() {
+  ASSERT(in_module_filter_ != nullptr);
   config_->on_http_filter_downstream_below_write_buffer_low_watermark_(thisAsVoidPtr(),
                                                                        in_module_filter_);
 }

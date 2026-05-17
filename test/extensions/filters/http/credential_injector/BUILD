@@ -41,7 +41,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/credential_injector:credential_injector_lib",
         "//source/extensions/http/injected_credentials/generic:config",
         "//source/extensions/http/injected_credentials/oauth2:client_credentials_lib",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",

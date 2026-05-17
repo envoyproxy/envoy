@@ -1,13 +1,104 @@
+#include <thread>
+
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+
+using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
 namespace {
+
+// =============================================================================
+// Validation Mode Tests
+// =============================================================================
+
+TEST(CommonAbiImplTest, IsValidationModeReturnsTrueInValidateMode) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context.options_, mode()).WillByDefault(Return(Server::Mode::Validate));
+
+  ScopedThreadLocalServerContextSetter setter(context);
+  EXPECT_TRUE(envoy_dynamic_module_callback_is_validation_mode());
+}
+
+TEST(CommonAbiImplTest, IsValidationModeReturnsFalseInServeMode) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context.options_, mode()).WillByDefault(Return(Server::Mode::Serve));
+
+  ScopedThreadLocalServerContextSetter setter(context);
+  EXPECT_FALSE(envoy_dynamic_module_callback_is_validation_mode());
+}
+
+TEST(CommonAbiImplTest, IsValidationModeReturnsFalseInInitOnlyMode) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context.options_, mode()).WillByDefault(Return(Server::Mode::InitOnly));
+
+  ScopedThreadLocalServerContextSetter setter(context);
+  EXPECT_FALSE(envoy_dynamic_module_callback_is_validation_mode());
+}
+
+// Verifies that `is_validation_mode` is fail-closed when called off the main thread.
+TEST(CommonAbiImplTest, IsValidationModeOffMainThreadFailsClosed) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context.options_, mode()).WillByDefault(Return(Server::Mode::Validate));
+  ScopedThreadLocalServerContextSetter setter(context);
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t([] { EXPECT_FALSE(envoy_dynamic_module_callback_is_validation_mode()); });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_is_validation_mode must be called on the main thread");
+}
+
+// Verifies that `is_validation_mode` is fail-closed when called before the server context is
+// installed.
+TEST(CommonAbiImplTest, IsValidationModeBeforeServerContextFailsClosed) {
+  EXPECT_ENVOY_BUG(EXPECT_FALSE(envoy_dynamic_module_callback_is_validation_mode()),
+                   "envoy_dynamic_module_callback_is_validation_mode called before the server "
+                   "context was initialized");
+}
+
+// =============================================================================
+// Concurrency Tests
+// =============================================================================
+
+TEST(CommonAbiImplTest, GetConcurrencyReturnsConfiguredValue) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context.options_, concurrency()).WillByDefault(Return(4));
+
+  ScopedThreadLocalServerContextSetter setter(context);
+  EXPECT_EQ(4u, envoy_dynamic_module_callback_get_concurrency());
+}
+
+// Verifies that `get_concurrency` is fail-closed when called off the main thread.
+TEST(CommonAbiImplTest, GetConcurrencyOffMainThreadFailsClosed) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context.options_, concurrency()).WillByDefault(Return(4));
+  ScopedThreadLocalServerContextSetter setter(context);
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t([] { EXPECT_EQ(0u, envoy_dynamic_module_callback_get_concurrency()); });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_get_concurrency must be called on the main thread");
+}
+
+// Verifies that `get_concurrency` is fail-closed when called before the server context is
+// installed.
+TEST(CommonAbiImplTest, GetConcurrencyBeforeServerContextFailsClosed) {
+  EXPECT_ENVOY_BUG(EXPECT_EQ(0u, envoy_dynamic_module_callback_get_concurrency()),
+                   "envoy_dynamic_module_callback_get_concurrency called before the server "
+                   "context was initialized");
+}
+
+// =============================================================================
+// Function Registry Tests
+// =============================================================================
 
 // Test registering and retrieving a function.
 TEST(CommonAbiImplTest, FunctionRegistryRegisterAndGet) {
@@ -82,6 +173,82 @@ TEST(CommonAbiImplTest, FunctionRegistryMultipleKeys) {
   auto resolved_b = reinterpret_cast<int (*)(int)>(out_b);
   EXPECT_EQ(resolved_a(0), 10);
   EXPECT_EQ(resolved_b(0), 20);
+}
+
+// =============================================================================
+// Shared Data Registry Tests
+// =============================================================================
+
+// Test registering and retrieving shared data.
+TEST(CommonAbiImplTest, SharedDataRegistryRegisterAndGet) {
+  int data = 42;
+  envoy_dynamic_module_type_module_buffer key = {"sd_basic", 8};
+
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_register_shared_data(key, reinterpret_cast<void*>(&data)));
+
+  void* out = nullptr;
+  EXPECT_TRUE(envoy_dynamic_module_callback_get_shared_data(key, &out));
+  EXPECT_NE(out, nullptr);
+  EXPECT_EQ(*reinterpret_cast<int*>(out), 42);
+}
+
+// Test that getting a non-existent key returns false.
+TEST(CommonAbiImplTest, SharedDataRegistryGetNonExistent) {
+  envoy_dynamic_module_type_module_buffer key = {"sd_nonexistent", 14};
+  void* out = nullptr;
+  EXPECT_FALSE(envoy_dynamic_module_callback_get_shared_data(key, &out));
+  EXPECT_EQ(out, nullptr);
+}
+
+// Test that registering nullptr returns false.
+TEST(CommonAbiImplTest, SharedDataRegistryRegisterNull) {
+  envoy_dynamic_module_type_module_buffer key = {"sd_null", 7};
+  EXPECT_FALSE(envoy_dynamic_module_callback_register_shared_data(key, nullptr));
+
+  // Key should not exist in the registry.
+  void* out = nullptr;
+  EXPECT_FALSE(envoy_dynamic_module_callback_get_shared_data(key, &out));
+}
+
+// Test that overwriting an existing key succeeds and updates the pointer.
+TEST(CommonAbiImplTest, SharedDataRegistryOverwrite) {
+  int data1 = 100;
+  int data2 = 200;
+  envoy_dynamic_module_type_module_buffer key = {"sd_overwrite", 12};
+
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_register_shared_data(key, reinterpret_cast<void*>(&data1)));
+
+  // Overwrite with a new pointer.
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_register_shared_data(key, reinterpret_cast<void*>(&data2)));
+
+  // The new pointer should be returned.
+  void* out = nullptr;
+  EXPECT_TRUE(envoy_dynamic_module_callback_get_shared_data(key, &out));
+  EXPECT_EQ(*reinterpret_cast<int*>(out), 200);
+}
+
+// Test multiple independent keys.
+TEST(CommonAbiImplTest, SharedDataRegistryMultipleKeys) {
+  int data_a = 10;
+  int data_b = 20;
+  envoy_dynamic_module_type_module_buffer key_a = {"sd_multi_a", 10};
+  envoy_dynamic_module_type_module_buffer key_b = {"sd_multi_b", 10};
+
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_register_shared_data(key_a, reinterpret_cast<void*>(&data_a)));
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_register_shared_data(key_b, reinterpret_cast<void*>(&data_b)));
+
+  void* out_a = nullptr;
+  void* out_b = nullptr;
+  EXPECT_TRUE(envoy_dynamic_module_callback_get_shared_data(key_a, &out_a));
+  EXPECT_TRUE(envoy_dynamic_module_callback_get_shared_data(key_b, &out_b));
+
+  EXPECT_EQ(*reinterpret_cast<int*>(out_a), 10);
+  EXPECT_EQ(*reinterpret_cast<int*>(out_b), 20);
 }
 
 // =============================================================================
@@ -785,6 +952,15 @@ WEAK_STUB(NetworkGetSocketOptionsSize,
           envoy_dynamic_module_callback_network_get_socket_options_size(nullptr))
 WEAK_STUB(AccessLoggerGetAttemptCount,
           envoy_dynamic_module_callback_access_logger_get_attempt_count(nullptr))
+WEAK_STUB(AccessLoggerGetAttributeBool,
+          envoy_dynamic_module_callback_access_logger_get_attribute_bool(
+              nullptr, envoy_dynamic_module_type_attribute_id_ConnectionMtls, nullptr))
+WEAK_STUB(AccessLoggerGetAttributeInt,
+          envoy_dynamic_module_callback_access_logger_get_attribute_int(
+              nullptr, envoy_dynamic_module_type_attribute_id_ResponseCode, nullptr))
+WEAK_STUB(AccessLoggerGetAttributeString,
+          envoy_dynamic_module_callback_access_logger_get_attribute_string(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestProtocol, nullptr))
 WEAK_STUB(AccessLoggerGetConnectionId,
           envoy_dynamic_module_callback_access_logger_get_connection_id(nullptr))
 WEAK_STUB(AccessLoggerGetDownstreamLocalDnsSanSize,
@@ -957,6 +1133,41 @@ WEAK_STUB(NetworkFilterGetConnectionState,
 WEAK_STUB(NetworkFilterReadDisable,
           envoy_dynamic_module_callback_network_filter_read_disable(nullptr, true))
 
+WEAK_STUB(UpstreamBridgeGetRequestHeader,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_header(
+              nullptr, {nullptr, 0}, nullptr, 0, nullptr))
+WEAK_STUB(UpstreamBridgeGetRequestHeadersSize,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers_size(nullptr))
+WEAK_STUB(UpstreamBridgeGetRequestHeaders,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers(nullptr,
+                                                                                     nullptr))
+WEAK_STUB(UpstreamBridgeGetRequestBuffer,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer(nullptr,
+                                                                                    nullptr,
+                                                                                    nullptr))
+WEAK_STUB(UpstreamBridgeGetResponseBuffer,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer(nullptr,
+                                                                                     nullptr,
+                                                                                     nullptr))
+WEAK_STUB(UpstreamBridgeSendUpstreamData,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_upstream_data(nullptr,
+                                                                                    {nullptr, 0},
+                                                                                    false))
+WEAK_STUB(UpstreamBridgeSendResponse,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response(nullptr, 0, nullptr,
+                                                                               0, {nullptr, 0}))
+WEAK_STUB(UpstreamBridgeSendResponseHeaders,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_headers(nullptr, 0,
+                                                                                       nullptr, 0,
+                                                                                       false))
+WEAK_STUB(UpstreamBridgeSendResponseData,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_data(nullptr,
+                                                                                    {nullptr, 0},
+                                                                                    false))
+WEAK_STUB(UpstreamBridgeSendResponseTrailers,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_trailers(nullptr,
+                                                                                        nullptr, 0))
+
 WEAK_STUB(NetworkSetDynamicMetadataBool,
           envoy_dynamic_module_callback_network_set_dynamic_metadata_bool(nullptr, {nullptr, 0},
                                                                           {nullptr, 0}, true))
@@ -996,6 +1207,98 @@ WEAK_STUB(HttpGetMetadataListString, envoy_dynamic_module_callback_http_get_meta
 WEAK_STUB(HttpGetMetadataListBool, envoy_dynamic_module_callback_http_get_metadata_list_bool(
                                        nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
                                        {nullptr, 0}, {nullptr, 0}, 0, nullptr))
+
+WEAK_STUB(TracerGetTraceContextValue,
+          envoy_dynamic_module_callback_tracer_get_trace_context_value(nullptr, {nullptr, 0},
+                                                                       nullptr))
+WEAK_STUB(TracerSetTraceContextValue,
+          envoy_dynamic_module_callback_tracer_set_trace_context_value(nullptr, {nullptr, 0},
+                                                                       {nullptr, 0}))
+WEAK_STUB(TracerRemoveTraceContextValue,
+          envoy_dynamic_module_callback_tracer_remove_trace_context_value(nullptr, {nullptr, 0}))
+WEAK_STUB(TracerGetTraceContextProtocol,
+          envoy_dynamic_module_callback_tracer_get_trace_context_protocol(nullptr, nullptr))
+WEAK_STUB(TracerGetTraceContextHost,
+          envoy_dynamic_module_callback_tracer_get_trace_context_host(nullptr, nullptr))
+WEAK_STUB(TracerGetTraceContextPath,
+          envoy_dynamic_module_callback_tracer_get_trace_context_path(nullptr, nullptr))
+WEAK_STUB(TracerGetTraceContextMethod,
+          envoy_dynamic_module_callback_tracer_get_trace_context_method(nullptr, nullptr))
+WEAK_STUB(TracerDefineCounter,
+          envoy_dynamic_module_callback_tracer_define_counter(nullptr, {nullptr, 0}, nullptr, 0,
+                                                              nullptr))
+WEAK_STUB(TracerDefineGauge,
+          envoy_dynamic_module_callback_tracer_define_gauge(nullptr, {nullptr, 0}, nullptr, 0,
+                                                            nullptr))
+WEAK_STUB(TracerDefineHistogram,
+          envoy_dynamic_module_callback_tracer_define_histogram(nullptr, {nullptr, 0}, nullptr, 0,
+                                                                nullptr))
+WEAK_STUB(TracerIncrementCounter,
+          envoy_dynamic_module_callback_tracer_increment_counter(nullptr, 0, nullptr, 0, 0))
+WEAK_STUB(TracerRecordHistogramValue,
+          envoy_dynamic_module_callback_tracer_record_histogram_value(nullptr, 0, nullptr, 0, 0))
+WEAK_STUB(TracerSetGauge, envoy_dynamic_module_callback_tracer_set_gauge(nullptr, 0, nullptr, 0, 0))
+
+WEAK_STUB(DnsResolveComplete,
+          envoy_dynamic_module_callback_dns_resolve_complete(
+              nullptr, 0, envoy_dynamic_module_type_dns_resolution_status_Completed, {nullptr, 0},
+              nullptr, 0))
+WEAK_STUB(DnsResolverConfigDefineCounter,
+          envoy_dynamic_module_callback_dns_resolver_config_define_counter(nullptr, {nullptr, 0},
+                                                                           nullptr, 0, nullptr))
+WEAK_STUB(DnsResolverConfigIncrementCounter,
+          envoy_dynamic_module_callback_dns_resolver_config_increment_counter(nullptr, 0, nullptr,
+                                                                              0, 0))
+WEAK_STUB(DnsResolverConfigDefineGauge,
+          envoy_dynamic_module_callback_dns_resolver_config_define_gauge(nullptr, {nullptr, 0},
+                                                                         nullptr, 0, nullptr))
+WEAK_STUB(DnsResolverConfigSetGauge,
+          envoy_dynamic_module_callback_dns_resolver_config_set_gauge(nullptr, 0, nullptr, 0, 0))
+WEAK_STUB(DnsResolverConfigIncrementGauge,
+          envoy_dynamic_module_callback_dns_resolver_config_increment_gauge(nullptr, 0, nullptr, 0,
+                                                                            0))
+WEAK_STUB(DnsResolverConfigDecrementGauge,
+          envoy_dynamic_module_callback_dns_resolver_config_decrement_gauge(nullptr, 0, nullptr, 0,
+                                                                            0))
+WEAK_STUB(DnsResolverConfigDefineHistogram,
+          envoy_dynamic_module_callback_dns_resolver_config_define_histogram(nullptr, {nullptr, 0},
+                                                                             nullptr, 0, nullptr))
+WEAK_STUB(DnsResolverConfigRecordHistogramValue,
+          envoy_dynamic_module_callback_dns_resolver_config_record_histogram_value(nullptr, 0,
+                                                                                   nullptr, 0, 0))
+
+WEAK_STUB(TransportSocketGetIoHandle,
+          envoy_dynamic_module_callback_transport_socket_get_io_handle(nullptr))
+WEAK_STUB(TransportSocketIoHandleRead,
+          envoy_dynamic_module_callback_transport_socket_io_handle_read(nullptr, nullptr, 0,
+                                                                        nullptr))
+WEAK_STUB(TransportSocketIoHandleWrite,
+          envoy_dynamic_module_callback_transport_socket_io_handle_write(nullptr, nullptr, 0,
+                                                                         nullptr))
+WEAK_STUB(TransportSocketIoHandleFd,
+          envoy_dynamic_module_callback_transport_socket_io_handle_fd(nullptr))
+WEAK_STUB(TransportSocketReadBufferDrain,
+          envoy_dynamic_module_callback_transport_socket_read_buffer_drain(nullptr, 0))
+WEAK_STUB(TransportSocketReadBufferAdd,
+          envoy_dynamic_module_callback_transport_socket_read_buffer_add(nullptr, nullptr, 0))
+WEAK_STUB(TransportSocketReadBufferLength,
+          envoy_dynamic_module_callback_transport_socket_read_buffer_length(nullptr))
+WEAK_STUB(TransportSocketWriteBufferDrain,
+          envoy_dynamic_module_callback_transport_socket_write_buffer_drain(nullptr, 0))
+WEAK_STUB(TransportSocketWriteBufferGetSlices,
+          envoy_dynamic_module_callback_transport_socket_write_buffer_get_slices(nullptr, nullptr,
+                                                                                 nullptr))
+WEAK_STUB(TransportSocketWriteBufferLength,
+          envoy_dynamic_module_callback_transport_socket_write_buffer_length(nullptr))
+WEAK_STUB(TransportSocketRaiseEvent,
+          envoy_dynamic_module_callback_transport_socket_raise_event(
+              nullptr, envoy_dynamic_module_type_network_connection_event_Connected))
+WEAK_STUB(TransportSocketShouldDrainReadBuffer,
+          envoy_dynamic_module_callback_transport_socket_should_drain_read_buffer(nullptr))
+WEAK_STUB(TransportSocketSetIsReadable,
+          envoy_dynamic_module_callback_transport_socket_set_is_readable(nullptr))
+WEAK_STUB(TransportSocketFlushWriteBuffer,
+          envoy_dynamic_module_callback_transport_socket_flush_write_buffer(nullptr))
 
 } // namespace
 } // namespace DynamicModules

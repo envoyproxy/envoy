@@ -545,6 +545,43 @@ TEST_P(ExtProcHttpClientIntegrationTest, StatsTestOnFailure) {
   verifyDownstreamResponse(*response, 500);
 }
 
+// Verifies that request_headers_to_add with a substitution formatter is applied to HTTP requests
+// sent to the ext_proc side stream server.
+TEST_P(ExtProcHttpClientIntegrationTest, RequestWithFormatterHeader) {
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
+  initializeConfig();
+
+  // Add a formatter-based custom header to the ext_proc HTTP service configuration.
+  auto* header =
+      proto_config_.mutable_http_service()->mutable_http_service()->add_request_headers_to_add();
+  header->mutable_header()->set_key("x-custom-formatter");
+  header->mutable_header()->set_value("%HOSTNAME%");
+
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(
+      [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("foo"), "yes"); });
+
+  // Verify the side stream request includes the custom formatter header.
+  ASSERT_TRUE(http_side_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_));
+  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+  ASSERT_TRUE(processor_stream_->waitForEndStream(*dispatcher_));
+
+  auto values = processor_stream_->headers().get(Http::LowerCaseString("x-custom-formatter"));
+  EXPECT_FALSE(values.empty());
+  EXPECT_FALSE(values[0]->value().empty());
+  EXPECT_NE(values[0]->value(), "%HOSTNAME%");
+
+  // Send back the processing response.
+  ProcessingResponse processing_response;
+  processing_response.mutable_request_headers();
+  sendHttpResponse(processing_response);
+
+  handleUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  verifyDownstreamResponse(*response, 200);
+}
+
 } // namespace
 } // namespace ExternalProcessing
 } // namespace HttpFilters

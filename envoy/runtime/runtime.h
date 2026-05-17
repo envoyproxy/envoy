@@ -232,6 +232,14 @@ public:
   virtual absl::Status initialize(Upstream::ClusterManager& cm) PURE;
 
   /**
+   * Called from server initialization once worker dispatchers are registered with ThreadLocal
+   * (ListenerManager construction), before those worker threads start running their event loops.
+   * Implementations may use this for any setup that depends on worker threads being registered
+   * (e.g. publishing thread-local state to all registered dispatchers).
+   */
+  virtual absl::Status onWorkerThreadsRegistered() PURE;
+
+  /**
    * @return const Snapshot& the current snapshot. This reference is safe to use for the duration of
    *         the calling routine, but may be overwritten on a future event loop cycle so should be
    *         fetched again when needed. This may only be called from worker threads.

@@ -122,3 +122,21 @@ func TestReadWholeResponseBody_EmptyBuffered(t *testing.T) {
 		t.Errorf("expected %q, got %q", "world", string(result))
 	}
 }
+
+func TestRefreshRouteCluster_MockIsCalled(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	handle := mocks.NewMockHttpFilterHandle(ctrl)
+	handle.EXPECT().RefreshRouteCluster().Times(1)
+	handle.RefreshRouteCluster()
+}
+
+func TestClearRouteCache_MockIsCalled(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	handle := mocks.NewMockHttpFilterHandle(ctrl)
+	handle.EXPECT().ClearRouteCache().Times(1)
+	handle.ClearRouteCache()
+}

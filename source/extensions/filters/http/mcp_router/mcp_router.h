@@ -153,6 +153,8 @@ private:
   void sendHttpError(uint64_t status_code, const std::string& message);
   Http::RequestHeaderMapPtr createUpstreamHeaders(const McpBackendConfig& backend,
                                                   const std::string& backend_session_id = "");
+  absl::StatusOr<envoy::extensions::clusters::mcp_multicluster::v3::ClusterConfig>
+  getClusterConfig();
 
   McpRouterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};

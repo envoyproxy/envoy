@@ -111,6 +111,8 @@ public:
 
   // RateLimitTokenBucket
   bool consume(double factor = 1.0, uint64_t tokens = 1);
+  // Refill tokens back to the bucket, capped at max_tokens.
+  void refill(uint64_t tokens);
   double fillRate() const { return token_bucket_.fillRate(); }
   std::chrono::milliseconds fillInterval() const { return fill_interval_; }
 

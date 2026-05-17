@@ -213,7 +213,7 @@ using OnHeaderResult = http2::adapter::Http2VisitorInterface::OnHeaderResult;
 enum Settings {
   // SETTINGS_HEADER_TABLE_SIZE = 0x01,
   // SETTINGS_ENABLE_PUSH = 0x02,
-  SETTINGS_MAX_CONCURRENT_STREAMS = 0x03,
+  SETTINGS_MAX_CONCURRENT_STREAMS = 0x03, // NOLINT(readability-identifier-naming)
   // SETTINGS_INITIAL_WINDOW_SIZE = 0x04,
   // SETTINGS_MAX_FRAME_SIZE = 0x05,
   // SETTINGS_MAX_HEADER_LIST_SIZE = 0x06,
@@ -223,9 +223,9 @@ enum Settings {
 
 enum Flags {
   // FLAG_NONE = 0,
-  FLAG_END_STREAM = 0x01,
+  FLAG_END_STREAM = 0x01, // NOLINT(readability-identifier-naming)
   // FLAG_END_HEADERS = 0x04,
-  FLAG_ACK = 0x01,
+  FLAG_ACK = 0x01, // NOLINT(readability-identifier-naming)
   // FLAG_PADDED = 0x08,
   // FLAG_PRIORITY = 0x20
 };
@@ -301,12 +301,7 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
       pending_send_data_(parent_.connection_.dispatcher().getWatermarkFactory().createBuffer(
           [this]() -> void { this->pendingSendBufferLowWatermark(); },
           [this]() -> void { this->pendingSendBufferHighWatermark(); },
-          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
-      local_end_stream_sent_(false), remote_end_stream_(false), remote_rst_(false),
-      data_deferred_(false), received_noninformational_headers_(false),
-      pending_receive_buffer_high_watermark_called_(false),
-      pending_send_buffer_high_watermark_called_(false), reset_due_to_messaging_error_(false),
-      extend_stream_lifetime_flag_(false) {
+          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })) {
   parent_.stats_.streams_active_.inc();
   if (buffer_limit > 0) {
     setWriteBufferWatermarks(buffer_limit);
@@ -983,8 +978,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       per_stream_buffer_limit_(http2_options.initial_stream_window_size().value()),
       stream_error_on_invalid_http_messaging_(
           http2_options.override_stream_error_on_invalid_http_message().value()),
-      protocol_constraints_(stats, http2_options), dispatching_(false), raised_goaway_(false),
-      random_(random_generator),
+      protocol_constraints_(stats, http2_options), random_(random_generator),
       last_received_data_time_(connection_.dispatcher().timeSource().monotonicTime()) {
   if (http2_options.has_use_oghttp2_codec()) {
     use_oghttp2_library_ = http2_options.use_oghttp2_codec().value();
@@ -1818,6 +1812,7 @@ void ConnectionImpl::onProtocolConstraintViolation() {
 
 void ConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
   // Notify the streams based on least recently encoding to the connection.
+  // NOLINTNEXTLINE(modernize-loop-convert)
   for (auto it = active_streams_.rbegin(); it != active_streams_.rend(); ++it) {
     (*it)->runLowWatermarkCallbacks();
   }
@@ -2082,6 +2077,8 @@ ConnectionImpl::Http2Options::Http2Options(
   og_options_.max_header_field_size = max_headers_kb * 1024;
   og_options_.allow_extended_connect = http2_options.allow_connect();
   og_options_.allow_different_host_and_authority = true;
+  og_options_.allow_obs_text =
+      !PROTOBUF_GET_WRAPPED_OR_DEFAULT(http2_options, disallow_obs_text, false);
   if (!PROTOBUF_GET_WRAPPED_OR_DEFAULT(http2_options, enable_huffman_encoding, true)) {
     if (http2_options.has_hpack_table_size() && http2_options.hpack_table_size().value() == 0) {
       og_options_.compression_option = http2::adapter::OgHttp2Session::Options::DISABLE_COMPRESSION;
@@ -2450,17 +2447,20 @@ int ServerConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, Heade
 Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   // Make sure downstream outbound queue was not flooded by the upstream frames.
   RETURN_IF_ERROR(protocol_constraints_.checkOutboundFrameLimits());
-  if (should_send_go_away_and_close_on_dispatch_ != nullptr &&
-      should_send_go_away_and_close_on_dispatch_->shouldShedLoad()) {
-    ConnectionImpl::goAway();
-    sent_go_away_on_dispatch_ = true;
-    return envoyOverloadError(
-        "Load shed point http2_server_go_away_and_close_on_dispatch triggered");
-  }
-  if (should_send_go_away_on_dispatch_ != nullptr && !sent_go_away_on_dispatch_ &&
-      should_send_go_away_on_dispatch_->shouldShedLoad()) {
-    ConnectionImpl::goAway();
-    sent_go_away_on_dispatch_ = true;
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_fix_goaway_loadshed_point")) {
+    if (should_send_go_away_and_close_on_dispatch_ != nullptr &&
+        should_send_go_away_and_close_on_dispatch_->shouldShedLoad()) {
+      ConnectionImpl::goAway();
+      sent_go_away_on_dispatch_ = true;
+      return envoyOverloadError(
+          "Load shed point http2_server_go_away_and_close_on_dispatch triggered");
+    }
+    if (should_send_go_away_on_dispatch_ != nullptr && !sent_go_away_on_dispatch_ &&
+        should_send_go_away_on_dispatch_->shouldShedLoad()) {
+      ConnectionImpl::goAway();
+      sent_go_away_on_dispatch_ = true;
+    }
   }
   return ConnectionImpl::dispatch(data);
 }

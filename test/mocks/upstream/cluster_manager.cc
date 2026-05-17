@@ -32,6 +32,12 @@ MockClusterManager::MockClusterManager()
                     OptRef<xds::core::v3::ResourceLocator>,
                     ProtobufMessage::ValidationVisitor&) { return MockOdCdsApiHandle::create(); }));
   ON_CALL(*this, addOrUpdateCluster(_, _, _)).WillByDefault(Return(false));
+  ON_CALL(*this, forEachActiveCluster(_))
+      .WillByDefault(Invoke([this](std::function<void(const Cluster&)> cb) {
+        for (const auto& [unused_name, cluster_ref] : clusters().active_clusters_) {
+          cb(cluster_ref.get());
+        }
+      }));
   ON_CALL(*this, hasActiveClusters()).WillByDefault(Return(false));
 }
 
@@ -56,6 +62,12 @@ void MockClusterManager::initializeClusters(const std::vector<std::string>& acti
   }
 
   ON_CALL(*this, clusters()).WillByDefault(Return(info_map));
+  ON_CALL(*this, forEachActiveCluster(_))
+      .WillByDefault(Invoke([this](std::function<void(const Cluster&)> cb) {
+        for (const auto& [unused_name, cluster] : active_clusters_) {
+          cb(*cluster);
+        }
+      }));
   ON_CALL(*this, getActiveCluster(_))
       .WillByDefault(Invoke([this](const std::string& cluster_name) -> OptRef<const Cluster> {
         if (const auto& it = active_clusters_.find(cluster_name); it != active_clusters_.end()) {
