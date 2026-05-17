@@ -96,7 +96,7 @@ ip_tags:
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml"),
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"));
 
-  test_server_->waitForCounterGe("http.config_test.ip_tagging.reload_success", 2);
+  test_server_->waitForCounter("http.config_test.ip_tagging.reload_success", testing::Ge(2));
 
   response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
@@ -187,7 +187,7 @@ ip_tags:
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml"),
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"));
 
-  test_server_->waitForCounterGe("http.config_test.ip_tagging.reload_success", 2);
+  test_server_->waitForCounter("http.config_test.ip_tagging.reload_success", testing::Ge(2));
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(
