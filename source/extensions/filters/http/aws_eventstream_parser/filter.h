@@ -98,6 +98,14 @@ private:
   void processBuffer();
 
   /**
+   * Unwrap AWS Bedrock InvokeModelWithResponseStream envelope if present.
+   * Bedrock wraps the actual payload as: {"bytes": "<base64>", "p": "..."}.
+   * If detected, base64-decodes the "bytes" field and returns the inner payload.
+   * Otherwise returns absl::nullopt and the caller should use the original payload.
+   */
+  absl::optional<std::string> unwrapBedrockEnvelope(absl::string_view payload);
+
+  /**
    * Process a single complete EventStream message.
    * @param payload the message payload bytes.
    * @return true if processing should stop (all rules have reached their match limits).

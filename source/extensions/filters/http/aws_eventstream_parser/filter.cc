@@ -3,10 +3,12 @@
 #include <functional>
 #include <string>
 
+#include "source/common/common/base64.h"
 #include "source/common/common/hex.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
+#include "source/common/json/json_loader.h"
 #include "source/extensions/common/aws/eventstream/eventstream_parser.h"
 
 #include "absl/strings/match.h"
@@ -139,6 +141,25 @@ void Filter::processBuffer() {
   buffer_.drain(length - buffer_view.size());
 }
 
+absl::optional<std::string> Filter::unwrapBedrockEnvelope(absl::string_view payload) {
+  auto json_or = Json::Factory::loadFromString(std::string(payload));
+  if (!json_or.ok()) {
+    return absl::nullopt;
+  }
+
+  auto bytes_or = json_or.value()->getString("bytes");
+  if (!bytes_or.ok()) {
+    return absl::nullopt;
+  }
+
+  std::string decoded = Base64::decode(bytes_or.value());
+  if (decoded.empty()) {
+    return absl::nullopt;
+  }
+
+  return decoded;
+}
+
 bool Filter::processMessage(absl::string_view payload) {
   if (payload.empty()) {
     ENVOY_LOG(debug, "Message has empty payload");
@@ -146,7 +167,14 @@ bool Filter::processMessage(absl::string_view payload) {
     return false;
   }
 
-  auto result = parser_->parse(payload);
+  // Auto-detect and unwrap Bedrock InvokeModelWithResponseStream envelope.
+  absl::string_view effective_payload = payload;
+  absl::optional<std::string> unwrapped = unwrapBedrockEnvelope(payload);
+  if (unwrapped.has_value()) {
+    effective_payload = unwrapped.value();
+  }
+
+  auto result = parser_->parse(effective_payload);
 
   if (result.error_message.has_value()) {
     ENVOY_LOG(debug, "Parser reported error: {}", result.error_message.value());
@@ -245,6 +273,10 @@ Protobuf::Value Filter::headerValueToProtobufValue(
                     uuid[9], uuid[10], uuid[11], uuid[12], uuid[13], uuid[14], uuid[15]));
     break;
   }
+  default:
+    IS_ENVOY_BUG(fmt::format("unexpected EventStream header value type: {}",
+                             static_cast<int>(header_value.type)));
+    break;
   }
 
   return pb_value;
