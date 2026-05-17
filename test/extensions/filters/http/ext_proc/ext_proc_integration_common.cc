@@ -24,7 +24,6 @@ namespace ExternalProcessing {
 using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
 using Envoy::Protobuf::Any;
 using Envoy::Protobuf::MapPair;
-
 using namespace std::chrono_literals;
 
 // ExtProcIntegrationTest::
@@ -489,8 +488,8 @@ void ExtProcIntegrationTest::processRequestBodyMessage(
   if (check_downstream_flow_control) {
     // Check the flow control counter in downstream, which is triggered on the request
     // path to ext_proc server (i.e., from side stream).
-    test_server_->waitForCounterGe("http.config_test.downstream_flow_control_paused_reading_total",
-                                   1);
+    test_server_->waitForCounter("http.config_test.downstream_flow_control_paused_reading_total",
+                                 testing::Ge(1));
   }
 
   // Send back the response from ext_proc server.

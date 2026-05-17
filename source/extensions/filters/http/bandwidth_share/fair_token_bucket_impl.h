@@ -158,7 +158,7 @@ private:
   // The empty_at_ value is used to store how many tokens are in the bucket,
   // for example if empty_at_ is 100ms in the past, then there is 1/10 of
   // max_tokens_, or if 1000ms or more, then there is max_tokens_.
-  MonotonicTime empty_at_ ABSL_GUARDED_BY(mutex_){};
+  MonotonicTime empty_at_ ABSL_GUARDED_BY(mutex_);
   absl::flat_hash_set<Tenant, TenantHash, TenantHashEq> active_tenants_ ABSL_GUARDED_BY(mutex_);
   std::vector<std::pair<MonotonicTime, std::string>> draining_tenants_ ABSL_GUARDED_BY(mutex_);
   uint64_t active_tenants_total_weight_ = 0;

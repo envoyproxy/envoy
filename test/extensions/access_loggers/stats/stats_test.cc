@@ -9,7 +9,6 @@
 
 #include "test/common/memory/memory_test_utility.h"
 #include "test/mocks/config/mocks.h"
-#include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"

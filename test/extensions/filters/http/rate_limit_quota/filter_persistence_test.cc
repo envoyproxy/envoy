@@ -38,6 +38,7 @@ using envoy::service::rate_limit_quota::v3::BucketId;
 using envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse;
 using envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports;
 using Protobuf::util::MessageDifferencer;
+using testing::Eq;
 
 MATCHER_P2(ProtoEqIgnoringFieldAndOrdering, expected,
            /* const FieldDescriptor* */ ignored_field, "") {
@@ -162,19 +163,19 @@ protected:
 
   void updateConfigInPlace(std::function<void(envoy::config::bootstrap::v3::Bootstrap&)> modifier) {
     // update_success starts at 1 after the initial server configuration.
-    test_server_->waitForCounterEq("listener_manager.lds.update_success", config_updates_ + 1);
-    test_server_->waitForCounterEq("listener_manager.listener_modified", config_updates_);
-    test_server_->waitForCounterEq("listener_manager.listener_in_place_updated", config_updates_);
+    test_server_->waitForCounter("listener_manager.lds.update_success", Eq(config_updates_ + 1));
+    test_server_->waitForCounter("listener_manager.listener_modified", Eq(config_updates_));
+    test_server_->waitForCounter("listener_manager.listener_in_place_updated", Eq(config_updates_));
 
     ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
     new_config_helper.addConfigModifier(modifier);
     new_config_helper.setLds(absl::StrCat(config_updates_ + 1));
 
-    test_server_->waitForCounterEq("listener_manager.lds.update_success", config_updates_ + 2);
-    test_server_->waitForCounterEq("listener_manager.listener_modified", config_updates_ + 1);
-    test_server_->waitForCounterEq("listener_manager.listener_in_place_updated",
-                                   config_updates_ + 1);
-    test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
+    test_server_->waitForCounter("listener_manager.lds.update_success", Eq(config_updates_ + 2));
+    test_server_->waitForCounter("listener_manager.listener_modified", Eq(config_updates_ + 1));
+    test_server_->waitForCounter("listener_manager.listener_in_place_updated",
+                                 Eq(config_updates_ + 1));
+    test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
     config_updates_++;
   }
 

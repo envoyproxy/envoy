@@ -1,17 +1,21 @@
 load(
     "@envoy//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_mobile_package",
     "envoy_select_envoy_mobile_xds",
     "envoy_select_signal_trace",
+)
+load(
+    "//bazel:envoy_mobile_cc_test.bzl",
+    "envoy_cc_test_library_with_engine_builder",
+    "envoy_cc_test_with_engine_builder",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_mobile_package()
 
-envoy_cc_test(
+envoy_cc_test_with_engine_builder(
     name = "client_integration_test",
     srcs = ["client_integration_test.cc"],
     linkopts = select({
@@ -45,7 +49,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test_library(
+envoy_cc_test_library_with_engine_builder(
     name = "base_client_integration_test_lib",
     srcs = [
         "base_client_integration_test.cc",
@@ -55,7 +59,6 @@ envoy_cc_test_library(
     ],
     repository = "@envoy",
     deps = [
-        "//library/cc:engine_builder_lib",
         "//library/common/http:client_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/network:network_types_lib",
@@ -109,7 +112,7 @@ envoy_cc_test_library(
     ],
 )
 
-envoy_cc_test_library(
+envoy_cc_test_library_with_engine_builder(
     name = "engine_with_test_server",
     srcs = [
         "engine_with_test_server.cc",
@@ -120,11 +123,10 @@ envoy_cc_test_library(
     repository = "@envoy",
     deps = [
         ":test_server_lib",
-        "//library/cc:engine_builder_lib",
     ],
 )
 
-envoy_cc_test(
+envoy_cc_test_with_engine_builder(
     name = "rtds_integration_test",
     srcs = envoy_select_envoy_mobile_xds(
         ["rtds_integration_test.cc"],
@@ -147,7 +149,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_cc_test_with_engine_builder(
     name = "cds_integration_test",
     srcs = envoy_select_envoy_mobile_xds(
         ["cds_integration_test.cc"],
@@ -169,7 +171,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_cc_test_with_engine_builder(
     name = "sds_integration_test",
     srcs = envoy_select_envoy_mobile_xds(
         ["sds_integration_test.cc"],
@@ -194,7 +196,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test_library(
+envoy_cc_test_library_with_engine_builder(
     name = "xds_integration_test_lib",
     srcs = [
         "xds_integration_test.cc",
@@ -225,7 +227,6 @@ envoy_cc_test_library(
     ],
     repository = "@envoy",
     deps = [
-        ":base_client_integration_test_lib",
         "@envoy//source/common/event:libevent_lib",
         "@envoy//source/common/tls:context_config_lib",
         "@envoy//source/common/tls:context_lib",

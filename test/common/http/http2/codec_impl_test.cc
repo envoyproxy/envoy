@@ -4592,6 +4592,7 @@ TEST_P(Http2CodecImplTest, ChunkProcessingShouldNotScheduleIfReadDisabled) {
 }
 
 TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointCanCauseServerToSendGoAway) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.http2_fix_goaway_loadshed_point", false);
   initialize();
   ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
 
@@ -4613,6 +4614,7 @@ TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointCanCauseServerToSendGoAway
 }
 
 TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointSendGoAwayAndClose) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.http2_fix_goaway_loadshed_point", false);
   expect_buffered_data_on_teardown_ = true;
 
   initialize();
@@ -4633,6 +4635,8 @@ TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointSendGoAwayAndClose) {
 }
 
 TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointsAreOnlyConsultedOncePerDispatch) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.http2_fix_goaway_loadshed_point", false);
+
   initialize();
 
   int times_shed_load_goaway_invoked = 0;

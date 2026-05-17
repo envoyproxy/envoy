@@ -112,7 +112,7 @@ TEST_F(UpstreamRequestTest, BodyRequestedThenArrivedDeliversBody) {
   Buffer::OwnedImpl data{"hello"};
   MockFunction<void(Buffer::InstancePtr, EndStream)> body_cb;
   upstream_request_->getBody(AdjustedByteRange{0, 5}, body_cb.AsStdFunction());
-  EXPECT_CALL(body_cb, Call(Pointee(BufferStringEqual("hello")), EndStream::End));
+  EXPECT_CALL(body_cb, Call(Pointee(BufferString("hello")), EndStream::End));
   http_callbacks_->onData(data, true);
   http_callbacks_->onComplete();
 }
@@ -122,7 +122,7 @@ TEST_F(UpstreamRequestTest, BodyArrivedThenOversizedRequestedDeliversBody) {
   MockFunction<void(Buffer::InstancePtr, EndStream)> body_cb;
   http_callbacks_->onData(data, true);
   http_callbacks_->onComplete();
-  EXPECT_CALL(body_cb, Call(Pointee(BufferStringEqual("hello")), EndStream::End));
+  EXPECT_CALL(body_cb, Call(Pointee(BufferString("hello")), EndStream::End));
   upstream_request_->getBody(AdjustedByteRange{0, 99}, body_cb.AsStdFunction());
 }
 
@@ -132,9 +132,9 @@ TEST_F(UpstreamRequestTest, BodyArrivedThenRequestedInPiecesDeliversBody) {
   MockFunction<void(Buffer::InstancePtr, EndStream)> body_cb2;
   http_callbacks_->onData(data, true);
   http_callbacks_->onComplete();
-  EXPECT_CALL(body_cb1, Call(Pointee(BufferStringEqual("hel")), EndStream::More));
+  EXPECT_CALL(body_cb1, Call(Pointee(BufferString("hel")), EndStream::More));
   upstream_request_->getBody(AdjustedByteRange{0, 3}, body_cb1.AsStdFunction());
-  EXPECT_CALL(body_cb2, Call(Pointee(BufferStringEqual("lo")), EndStream::End));
+  EXPECT_CALL(body_cb2, Call(Pointee(BufferString("lo")), EndStream::End));
   upstream_request_->getBody(AdjustedByteRange{3, 5}, body_cb2.AsStdFunction());
 }
 
@@ -143,10 +143,10 @@ TEST_F(UpstreamRequestTest, BodyAlternatingActionsDeliversBody) {
   MockFunction<void(Buffer::InstancePtr, EndStream)> body_cb1;
   MockFunction<void(Buffer::InstancePtr, EndStream)> body_cb2;
   upstream_request_->getBody(AdjustedByteRange{0, 3}, body_cb1.AsStdFunction());
-  EXPECT_CALL(body_cb1, Call(Pointee(BufferStringEqual("hel")), EndStream::More));
+  EXPECT_CALL(body_cb1, Call(Pointee(BufferString("hel")), EndStream::More));
   http_callbacks_->onData(data, true);
   http_callbacks_->onComplete();
-  EXPECT_CALL(body_cb2, Call(Pointee(BufferStringEqual("lo")), EndStream::End));
+  EXPECT_CALL(body_cb2, Call(Pointee(BufferString("lo")), EndStream::End));
   upstream_request_->getBody(AdjustedByteRange{3, 5}, body_cb2.AsStdFunction());
 }
 
@@ -157,12 +157,12 @@ TEST_F(UpstreamRequestTest, BodyInMultiplePiecesDeliversBody) {
   MockFunction<void(Buffer::InstancePtr, EndStream)> body_cb1;
   MockFunction<void(Buffer::InstancePtr, EndStream)> body_cb2;
   upstream_request_->getBody(AdjustedByteRange{0, 99}, body_cb1.AsStdFunction());
-  EXPECT_CALL(body_cb1, Call(Pointee(BufferStringEqual("hello")), EndStream::More));
+  EXPECT_CALL(body_cb1, Call(Pointee(BufferString("hello")), EndStream::More));
   http_callbacks_->onData(data1, false);
   http_callbacks_->onData(data2, false);
   http_callbacks_->onData(data3, true);
   http_callbacks_->onComplete();
-  EXPECT_CALL(body_cb2, Call(Pointee(BufferStringEqual("therebanana")), EndStream::End));
+  EXPECT_CALL(body_cb2, Call(Pointee(BufferString("therebanana")), EndStream::End));
   upstream_request_->getBody(AdjustedByteRange{5, 99}, body_cb2.AsStdFunction());
 }
 
@@ -178,7 +178,7 @@ TEST_F(UpstreamRequestTest, RequestingMoreBodyAfterCompletionReturnsNull) {
   MockFunction<void(Buffer::InstancePtr, EndStream)> body_cb2;
   http_callbacks_->onData(data, true);
   http_callbacks_->onComplete();
-  EXPECT_CALL(body_cb1, Call(Pointee(BufferStringEqual("hello")), EndStream::End));
+  EXPECT_CALL(body_cb1, Call(Pointee(BufferString("hello")), EndStream::End));
   upstream_request_->getBody(AdjustedByteRange{0, 99}, body_cb1.AsStdFunction());
   EXPECT_CALL(body_cb2, Call(IsNull(), EndStream::End));
   upstream_request_->getBody(AdjustedByteRange{5, 99}, body_cb2.AsStdFunction());
@@ -194,9 +194,9 @@ TEST_F(UpstreamRequestTest, RequestingMoreBodyAfterTrailersResumesAndEventuallyR
   http_callbacks_->onTrailers(
       std::make_unique<Http::TestResponseTrailerMapImpl>(response_trailers_));
   http_callbacks_->onComplete();
-  EXPECT_CALL(body_cb1, Call(Pointee(BufferStringEqual("hel")), EndStream::More));
+  EXPECT_CALL(body_cb1, Call(Pointee(BufferString("hel")), EndStream::More));
   upstream_request_->getBody(AdjustedByteRange{0, 3}, body_cb1.AsStdFunction());
-  EXPECT_CALL(body_cb2, Call(Pointee(BufferStringEqual("lo")), EndStream::More));
+  EXPECT_CALL(body_cb2, Call(Pointee(BufferString("lo")), EndStream::More));
   upstream_request_->getBody(AdjustedByteRange{3, 99}, body_cb2.AsStdFunction());
   EXPECT_CALL(body_cb3, Call(IsNull(), EndStream::More));
   upstream_request_->getBody(AdjustedByteRange{5, 99}, body_cb3.AsStdFunction());
@@ -270,7 +270,7 @@ TEST_F(UpstreamRequestWithRangeHeaderTest, RangeHeaderSkipsToExpectedStreamPos) 
   Buffer::OwnedImpl data{"lo"};
   MockFunction<void(Buffer::InstancePtr, EndStream)> body_cb;
   upstream_request_->getBody(AdjustedByteRange{3, 5}, body_cb.AsStdFunction());
-  EXPECT_CALL(body_cb, Call(Pointee(BufferStringEqual("lo")), EndStream::End));
+  EXPECT_CALL(body_cb, Call(Pointee(BufferString("lo")), EndStream::End));
   http_callbacks_->onData(data, true);
   http_callbacks_->onComplete();
 }
@@ -291,7 +291,7 @@ TEST_F(UpstreamRequestWithSmallBuffersTest, WatermarksPauseTheUpstream) {
   // TODO(ravenblack): validate that onBelowHighWatermark actions
   // are performed during onData, once it's possible to pause flow
   // from upstream.
-  EXPECT_CALL(body_cb, Call(Pointee(BufferStringEqual("hello")), EndStream::End));
+  EXPECT_CALL(body_cb, Call(Pointee(BufferString("hello")), EndStream::End));
   upstream_request_->getBody(AdjustedByteRange{0, 5}, body_cb.AsStdFunction());
 }
 

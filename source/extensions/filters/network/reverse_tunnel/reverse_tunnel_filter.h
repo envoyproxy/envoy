@@ -62,6 +62,10 @@ public:
   // Returns the required cluster name for validation.
   const std::string& requiredClusterName() const { return required_cluster_name_; }
 
+  // Returns whether the handshake is negotiated as an HTTP/1.1 Upgrade exchange.
+  bool useHttpUpgrade() const { return use_http_upgrade_; }
+
+  // Returns whether worker-thread rebalancing should be skipped for accepted connections.
   bool skipRebalancing() const { return skip_rebalancing_; }
 
 private:
@@ -86,7 +90,10 @@ private:
   // Required cluster name for validation (empty means no validation).
   const std::string required_cluster_name_;
 
-  const bool skip_rebalancing_;
+  // When true, expect `Connection: Upgrade` + `Upgrade: reverse-tunnel` and respond `101`.
+  const bool use_http_upgrade_{false};
+
+  const bool skip_rebalancing_{false};
 };
 
 using ReverseTunnelFilterConfigSharedPtr = std::shared_ptr<ReverseTunnelFilterConfig>;

@@ -889,7 +889,7 @@ TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedReadWithTokens) {
 
   time_source_.advanceTimeWait(std::chrono::milliseconds(100));
   EXPECT_CALL(read_filter_callbacks_,
-              injectReadDataToFilterChain(BufferStringEqual("test data"), false));
+              injectReadDataToFilterChain(BufferString("test data"), false));
 
   filter_->onReadTokenTimer();
 
@@ -916,7 +916,7 @@ TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedWriteWithTokens) {
   time_source_.advanceTimeWait(std::chrono::milliseconds(100));
 
   EXPECT_CALL(write_filter_callbacks_,
-              injectWriteDataToFilterChain(BufferStringEqual("test data"), false));
+              injectWriteDataToFilterChain(BufferString("test data"), false));
   EXPECT_CALL(write_filter_callbacks_, onBelowWriteBufferLowWatermark());
 
   filter_->onWriteTokenTimer();

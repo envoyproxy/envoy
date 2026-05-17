@@ -53,7 +53,7 @@ struct TlsContext {
   // for "not an ECDSA context".
   CurveNID ec_group_curve_name_ = EC_CURVE_INVALID_NID;
   bool is_must_staple_{};
-  Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider_{};
+  Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider_;
 
 #ifdef ENVOY_ENABLE_QUIC
   quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain> quic_cert_;

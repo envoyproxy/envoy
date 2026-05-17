@@ -1297,6 +1297,45 @@ TEST(Context, UpstreamEdgeCases) {
   }
 }
 
+TEST(Context, UpstreamServerName) {
+  Protobuf::Arena arena;
+
+  {
+    // TLS connection with SNI set — returns actual SNI from connection.
+    NiceMock<StreamInfo::MockStreamInfo> info;
+    auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+    const std::string sni = "tls.example.com";
+    EXPECT_CALL(*ssl_info, sni()).WillRepeatedly(ReturnRef(sni));
+    info.upstreamInfo()->setUpstreamSslConnection(ssl_info);
+
+    UpstreamWrapper upstream(arena, info);
+    const auto value = upstream[CelValue::CreateStringView(UpstreamServerName)];
+    ASSERT_TRUE(value.has_value());
+    EXPECT_EQ("tls.example.com", value->StringOrDie().value());
+  }
+
+  {
+    // No TLS connection — returns empty.
+    NiceMock<StreamInfo::MockStreamInfo> info;
+    info.upstreamInfo()->setUpstreamSslConnection(nullptr);
+
+    UpstreamWrapper upstream(arena, info);
+    const auto value = upstream[CelValue::CreateStringView(UpstreamServerName)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    // No upstream info — returns empty.
+    NiceMock<StreamInfo::MockStreamInfo> info;
+    EXPECT_CALL(info, upstreamInfo())
+        .WillRepeatedly(Return(std::shared_ptr<StreamInfo::UpstreamInfo>(nullptr)));
+
+    UpstreamWrapper upstream(arena, info);
+    const auto value = upstream[CelValue::CreateStringView(UpstreamServerName)];
+    EXPECT_FALSE(value.has_value());
+  }
+}
+
 TEST(Context, ExtractSslInfoEmptyValues) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> upstream_host(
