@@ -28,5 +28,6 @@ envoy_cc_test(
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/clusters/original_dst/v3:pkg_cc_proto",
     ],
 )
