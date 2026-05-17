@@ -1738,8 +1738,8 @@ void ConnectionManagerImpl::startDrainSequence() {
         static_cast<uint64_t>(std::ceil(drain_timeout.count() * (jitter_pct.value() / 100.0)));
     if (max_jitter_ms > 0) {
       const uint64_t jitter_ms = random_generator_.random() % max_jitter_ms;
-      drain_timeout = std::chrono::milliseconds(
-          static_cast<uint64_t>(drain_timeout.count()) + jitter_ms);
+      drain_timeout =
+          std::chrono::milliseconds(static_cast<uint64_t>(drain_timeout.count()) + jitter_ms);
     }
   }
   drain_timer_->enableTimer(drain_timeout);
