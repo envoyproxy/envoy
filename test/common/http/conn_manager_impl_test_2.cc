@@ -2358,7 +2358,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainTimeoutJitter) {
 
   // random() returns 30 -> jitter_ms = 30 % 50 = 30 -> effective drain timeout = 130ms
   EXPECT_CALL(random_, random()).WillOnce(Return(30));
-  Event::MockTimer* drain_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  Event::MockTimer* drain_timer = setUpTimer();
   EXPECT_CALL(*codec_, shutdownNotice());
   EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(130), _));
   connection_duration_timer->invokeCallback();
@@ -2380,7 +2380,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainTimeoutJitterZeroPercent) {
   EXPECT_CALL(*connection_duration_timer, enableTimer(std::chrono::milliseconds(10000), _));
   setup();
 
-  Event::MockTimer* drain_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  Event::MockTimer* drain_timer = setUpTimer();
   EXPECT_CALL(*codec_, shutdownNotice());
   EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(100), _));
   connection_duration_timer->invokeCallback();
@@ -2402,7 +2402,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainTimeoutNoJitter) {
   EXPECT_CALL(*connection_duration_timer, enableTimer(std::chrono::milliseconds(10000), _));
   setup();
 
-  Event::MockTimer* drain_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  Event::MockTimer* drain_timer = setUpTimer();
   EXPECT_CALL(*codec_, shutdownNotice());
   EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(100), _));
   connection_duration_timer->invokeCallback();
@@ -2454,7 +2454,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainPercentageDrain) {
 
   // random() returns 10 -> 10 % 100 = 10 < 25 -> drain.
   EXPECT_CALL(random_, random()).WillOnce(Return(10));
-  Event::MockTimer* drain_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  Event::MockTimer* drain_timer = setUpTimer();
   EXPECT_CALL(*codec_, shutdownNotice());
   EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(100), _));
   connection_duration_timer->invokeCallback();

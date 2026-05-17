@@ -397,10 +397,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
               ? absl::optional<double>(
                     config.common_http_protocol_options().max_connection_duration_jitter().value())
               : absl::nullopt),
-      drain_percentage_(
-          config.has_drain_percentage()
-              ? absl::optional<double>(config.drain_percentage().value())
-              : absl::nullopt),
+      drain_percentage_(config.has_drain_percentage()
+                            ? absl::optional<double>(config.drain_percentage().value())
+                            : absl::nullopt),
       http1_safe_max_connection_duration_(config.http1_safe_max_connection_duration()),
       max_stream_duration_(
           PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_stream_duration)),
