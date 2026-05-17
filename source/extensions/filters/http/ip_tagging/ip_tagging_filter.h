@@ -15,6 +15,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/callback_impl.h"
+#include "source/common/common/thread.h"
 #include "source/common/common/thread_synchronizer.h"
 #include "source/common/config/datasource.h"
 #include "source/common/network/cidr_range.h"
@@ -83,12 +84,15 @@ public:
   void incTotal();
 
 private:
+  std::shared_ptr<IpTagsLoader> getTagsLoader();
+
   Api::Api& api_;
   Envoy::Config::DataSource::DataSourceProviderPtr<Network::LcTrie::LcTrie<std::string>>
       data_source_provider_;
   // A shared_ptr to keep the provider singleton alive as long as any of its providers are in use.
   const Singleton::InstanceSharedPtr owner_;
-  std::unique_ptr<IpTagsLoader> tags_loader_;
+  mutable absl::Mutex tags_loader_mu_;
+  std::shared_ptr<IpTagsLoader> tags_loader_ ABSL_GUARDED_BY(tags_loader_mu_);
 };
 
 using IpTagsProviderSharedPtr = std::shared_ptr<IpTagsProvider>;
@@ -149,15 +153,6 @@ public:
 
   void incNoHit();
   void incTotal();
-
-  /**
-   * Parses ip tags in a proto format into a trie structure.
-   * @param ip_tags Collection of ip tags in proto format.
-   * @return Valid LcTrieSharedPtr if parsing succeeded or error status otherwise.
-   */
-  absl::StatusOr<LcTrieSharedPtr>
-  parseIpTagsAsProto(const Protobuf::RepeatedPtrField<
-                     envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTag>& ip_tags);
 
 private:
   IpTaggingFilterConfig(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,

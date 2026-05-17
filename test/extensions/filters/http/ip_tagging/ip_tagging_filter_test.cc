@@ -397,6 +397,59 @@ ip_tags:
       "<ip>/<# mask bits>)");
 }
 
+TEST_F(IpTaggingFilterTest, InvalidCidrInYamlFile) {
+  const std::string config_yaml = R"EOF(
+request_type: external
+ip_tags_datasource:
+  filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_invalid_cidr.yaml"
+)EOF";
+  initializeFilter(config_yaml,
+                   "INVALID_ARGUMENT: unable to create data source 'invalid ip/mask combo "
+                   "'12345.12345.12345.12345/999999'");
+}
+
+TEST_F(IpTaggingFilterTest, InvalidCidrInJsonFile) {
+  const std::string config_yaml = R"EOF(
+request_type: external
+ip_tags_datasource:
+  filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_invalid_cidr.json"
+)EOF";
+  initializeFilter(config_yaml,
+                   "INVALID_ARGUMENT: unable to create data source 'invalid ip/mask combo "
+                   "'12345.12345.12345.12345/999999'");
+}
+
+TEST_F(IpTaggingFilterTest, RecreatesProviderWhenWeakPtrExpired) {
+  envoy::extensions::filters::http::ip_tagging::v3::IPTagging proto_config1;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(internal_request_with_json_file_config),
+                            proto_config1);
+  // Create first config to register a provider in the singleton registry.
+  absl::StatusOr<IpTaggingFilterConfigSharedPtr> config1_result =
+      IpTaggingFilterConfig::create(proto_config1, "prefix.", *singleton_manager_, *scope_,
+                                    runtime_, *api_, tls_, *dispatcher_, validation_visitor_);
+  EXPECT_TRUE(config1_result.ok());
+  auto config1 = config1_result.value();
+  auto provider1 = IpTaggingFilterConfigPeer::ipTagsProvider(*config1);
+  EXPECT_NE(nullptr, provider1);
+
+  // Destroy the first config, which releases the provider. The weak_ptr in the registry expires.
+  config1.reset();
+  provider1.reset();
+
+  // Create second config with the same filename. The registry should detect the expired weak_ptr
+  // and create a new provider.
+  envoy::extensions::filters::http::ip_tagging::v3::IPTagging proto_config2;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(internal_request_with_json_file_config),
+                            proto_config2);
+  absl::StatusOr<IpTaggingFilterConfigSharedPtr> config2_result =
+      IpTaggingFilterConfig::create(proto_config2, "prefix.", *singleton_manager_, *scope_,
+                                    runtime_, *api_, tls_, *dispatcher_, validation_visitor_);
+  EXPECT_TRUE(config2_result.ok());
+  auto config2 = config2_result.value();
+  auto provider2 = IpTaggingFilterConfigPeer::ipTagsProvider(*config2);
+  EXPECT_NE(nullptr, provider2);
+}
+
 TEST_F(IpTaggingFilterTest, ReusesIpTagsProviderInstanceForSameFilePath) {
   envoy::extensions::filters::http::ip_tagging::v3::IPTagging proto_config1;
   TestUtility::loadFromYaml(TestEnvironment::substitute(internal_request_with_json_file_config),

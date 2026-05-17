@@ -58,12 +58,17 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
                   return load_status;
                 }
               }
-              tags_loader_ = std::make_unique<IpTagsLoader>(stat_prefix, scope);
-              return tags_loader_->parseIpTagsAsProto(ip_tags_proto.ip_tags());
+              auto new_loader = std::make_shared<IpTagsLoader>(stat_prefix, scope);
+              auto result = new_loader->parseIpTagsAsProto(ip_tags_proto.ip_tags());
+              if (result.ok()) {
+                absl::MutexLock lock(&tags_loader_mu_);
+                tags_loader_ = std::move(new_loader);
+              }
+              return result;
             },
             0,
             // data_update_cb
-            absl::make_optional([this]() { tags_loader_->incIpTagsReloadSuccess(); }));
+            absl::make_optional([this]() { getTagsLoader()->incIpTagsReloadSuccess(); }));
     if (!provider_or_error.status().ok()) {
       creation_status = absl::InvalidArgumentError(
           fmt::format("unable to create data source '{}'", provider_or_error.status().message()));
@@ -84,21 +89,26 @@ LcTrieSharedPtr IpTagsProvider::ipTags() {
              : data_source_provider_->data();
 }
 
+std::shared_ptr<IpTagsLoader> IpTagsProvider::getTagsLoader() {
+  absl::MutexLock lock(&tags_loader_mu_);
+  return tags_loader_;
+}
+
 void IpTagsProvider::incHit(absl::string_view tag) {
-  if (tags_loader_) {
-    tags_loader_->incHit(tag);
+  if (auto loader = getTagsLoader()) {
+    loader->incHit(tag);
   }
 }
 
 void IpTagsProvider::incTotal() {
-  if (tags_loader_) {
-    tags_loader_->incTotal();
+  if (auto loader = getTagsLoader()) {
+    loader->incTotal();
   }
 }
 
 void IpTagsProvider::incNoHit() {
-  if (tags_loader_) {
-    tags_loader_->incNoHit();
+  if (auto loader = getTagsLoader()) {
+    loader->incNoHit();
   }
 }
 
@@ -289,18 +299,12 @@ void IpTaggingFilterConfig::incTotal() {
 
 const Network::LcTrie::LcTrie<std::string>& IpTaggingFilterConfig::trie() const {
   if (provider_) {
-    if (provider_->ipTags() == nullptr) {
-      return EMPTY_TRIE_;
-    } else {
-      return *provider_->ipTags();
-    }
-  } else {
-    if (trie_ != nullptr) {
-      return *trie_;
-    } else {
-      return EMPTY_TRIE_;
-    }
+    return *provider_->ipTags();
   }
+  if (trie_ != nullptr) {
+    return *trie_;
+  }
+  return EMPTY_TRIE_;
 }
 
 OptRef<const Http::LowerCaseString> IpTaggingFilterConfig::ipTagHeader() const {

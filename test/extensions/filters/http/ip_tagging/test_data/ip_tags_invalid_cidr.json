@@ -1,0 +1,13 @@
+{
+  "ip_tags": [
+    {
+      "ip_tag_name": "fooooooo",
+      "ip_list": [
+        {
+          "address_prefix": "12345.12345.12345.12345",
+          "prefix_len": 999999
+        }
+      ]
+    }
+  ]
+}
