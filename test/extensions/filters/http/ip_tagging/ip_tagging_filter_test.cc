@@ -1015,7 +1015,7 @@ ip_tags:
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   EXPECT_TRUE(
-      TestUtility::waitForCounterGe(stats_, "prefix.ip_tagging.reload_success", 1UL, time_system_));
+      TestUtility::waitForCounter(stats_, "prefix.ip_tagging.reload_success", testing::Ge(1UL), time_system_));
 
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
@@ -1217,7 +1217,7 @@ ip_tags:
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   EXPECT_TRUE(
-      TestUtility::waitForCounterGe(stats_, "prefix.ip_tagging.reload_success", 1UL, time_system_));
+      TestUtility::waitForCounter(stats_, "prefix.ip_tagging.reload_success", testing::Ge(1UL), time_system_));
 
   IpTaggingFilterPeer::synchronizer(filter_).signal(sync_point_name);
   t0.join();
