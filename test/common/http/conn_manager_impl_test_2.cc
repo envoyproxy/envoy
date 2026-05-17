@@ -2368,6 +2368,8 @@ TEST_F(HttpConnectionManagerImplTest, DrainTimeoutJitter) {
   EXPECT_CALL(*connection_duration_timer, disableTimer());
   EXPECT_CALL(*drain_timer, disableTimer());
   drain_timer->invokeCallback();
+
+  conn_manager_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 // Verify that 0% jitter means no jitter is added to the drain timer.
@@ -2388,6 +2390,8 @@ TEST_F(HttpConnectionManagerImplTest, DrainTimeoutJitterZeroPercent) {
   EXPECT_CALL(*connection_duration_timer, disableTimer());
   EXPECT_CALL(*drain_timer, disableTimer());
   drain_timer->invokeCallback();
+
+  conn_manager_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 // Verify that when drain jitter is not set, the base drain timeout is used unchanged.
@@ -2408,6 +2412,8 @@ TEST_F(HttpConnectionManagerImplTest, DrainTimeoutNoJitter) {
   EXPECT_CALL(*connection_duration_timer, disableTimer());
   EXPECT_CALL(*drain_timer, disableTimer());
   drain_timer->invokeCallback();
+
+  conn_manager_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 // Verify drain_percentage skips drain and re-arms the duration timer.
@@ -2433,6 +2439,8 @@ TEST_F(HttpConnectionManagerImplTest, DrainPercentageSkip) {
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite, _));
   EXPECT_CALL(*connection_duration_timer, disableTimer());
+
+  conn_manager_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 // Verify drain_percentage drains when the roll falls below the threshold.
@@ -2459,6 +2467,8 @@ TEST_F(HttpConnectionManagerImplTest, DrainPercentageDrain) {
   EXPECT_CALL(*connection_duration_timer, disableTimer());
   EXPECT_CALL(*drain_timer, disableTimer());
   drain_timer->invokeCallback();
+
+  conn_manager_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 } // namespace Http
