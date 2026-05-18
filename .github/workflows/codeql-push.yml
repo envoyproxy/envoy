@@ -101,7 +101,7 @@ jobs:
 
     - name: Initialize CodeQL
       if: env.CPP_CHANGED == 'true'
-      uses: github/codeql-action/init@95e58e9a2cdfd71adc6e0353d5c52f41a045d225  # codeql-bundle-v4.35.2
+      uses: github/codeql-action/init@9e0d7b8d25671d64c341c19c0152d693099fb5ba  # codeql-bundle-v4.35.5
       with:
         languages: cpp
         trap-caching: false
@@ -112,7 +112,7 @@ jobs:
     # requires to award full SAST score.
     - name: Initialize CodeQL (noop)
       if: env.CPP_CHANGED != 'true'
-      uses: github/codeql-action/init@95e58e9a2cdfd71adc6e0353d5c52f41a045d225  # codeql-bundle-v4.35.2
+      uses: github/codeql-action/init@9e0d7b8d25671d64c341c19c0152d693099fb5ba  # codeql-bundle-v4.35.5
       with:
         languages: javascript
         trap-caching: false
@@ -162,4 +162,4 @@ jobs:
         git clean -xdf
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@95e58e9a2cdfd71adc6e0353d5c52f41a045d225  # codeql-bundle-v4.35.2
+      uses: github/codeql-action/analyze@9e0d7b8d25671d64c341c19c0152d693099fb5ba  # codeql-bundle-v4.35.5
