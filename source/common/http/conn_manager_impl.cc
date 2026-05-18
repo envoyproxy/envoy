@@ -1302,25 +1302,35 @@ bool ConnectionManagerImpl::ActiveStream::validateTrailers(RequestTrailerMap& tr
     failure_details = std::string(transformation_result.details());
   }
 
+  Code response_code = Code::BadRequest;
   absl::optional<Grpc::Status::GrpcStatus> grpc_status;
   if (Grpc::Common::hasGrpcContentType(*request_headers_)) {
     grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
   }
 
+  filter_manager_.streamInfo().setResponseFlag(
+      StreamInfo::CoreResponseFlag::DownstreamProtocolError);
+
   // For underscore rejections on H/2, send a 400 instead of resetting when the runtime guard
-  // is enabled. See issue #24735. All other trailer rejections preserve the legacy reset
-  // behavior.
+  // is enabled (default). See issue #24735.
   const bool send_400_for_underscores =
       failure_details == UhvResponseCodeDetail::get().InvalidUnderscore &&
       connection_manager_.codec_->protocol() == Protocol::Http2 &&
       Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http2_h3_send_400_for_underscored_headers");
-  if (send_400_for_underscores) {
-    sendLocalReply(Code::BadRequest, "", nullptr, grpc_status, failure_details);
-  } else {
+  if (failure_details == UhvResponseCodeDetail::get().InvalidUnderscore &&
+      connection_manager_.codec_->protocol() == Protocol::Http2 && !send_400_for_underscores) {
+    // Legacy H/2 underscore behavior: reset only (no codec error).
     filter_manager_.streamInfo().setResponseCodeDetails(failure_details);
     resetStream();
-    if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
+  } else {
+    if (connection_manager_.codec_->protocol() < Protocol::Http2 || send_400_for_underscores) {
+      sendLocalReply(response_code, "", nullptr, grpc_status, failure_details);
+    } else {
+      filter_manager_.streamInfo().setResponseCodeDetails(failure_details);
+      resetStream();
+    }
+    if (!response_encoder_->streamErrorOnInvalidHttpMessage() && !send_400_for_underscores) {
       connection_manager_.handleCodecError(failure_details);
     }
   }
