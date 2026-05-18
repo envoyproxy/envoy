@@ -19,31 +19,7 @@ namespace {
 using Server::Configuration::MockFactoryContext;
 using ::testing::NiceMock;
 
-// A mock GCE Identity Token (JWT) used for unit testing.
-// Payload: {"iss":"https://example.com","sub":"test@example.com", "aud":"example_service", "exp":2001001001}
-// Expiration corresponds to Sun May 29 2033 13:36:41 GMT. Checked using simulated time.
-constexpr absl::string_view GoodTokenStr =
-    "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUu"
-    "Y29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiY"
-    "XVkIjoiZXhhbXBsZV9zZXJ2aWNlIn0.cuui_Syud76B0tqvjESE8IZbX7vzG6xA-M"
-    "Daof1qEFNIoCFT_YQPkseLSUSR2Od3TJcNKk-dKjvUEL1JW3kGnyC1dBx4f3-Xxro"
-    "yL23UbR2eS8TuxO9ZcNCGkjfvH5O4mDb6cVkFHRDEolGhA7XwNiuVgkGJ5Wkrvshi"
-    "h6nqKXcPNaRx9lOaRWg2PkE6ySNoyju7rNfunXYtVxPuUIkl0KMq3WXWRb_cb8a_Z"
-    "EprqSZUzi_ZzzYzqBNVhIJujcNWij7JRra2sXXiSAfKjtxHQoxrX8n4V1ySWJ3_1T"
-    "H_cJcdfS_RKP7YgXRWC0L16PNF5K7iqRqmjKALNe83ZFnFIw";
-// The value of exp time field in the token above.
 const time_t ExpTime = 2001001001;
-
-// Expired token
-constexpr absl::string_view ExpiredToken =
-    "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUu"
-    "Y29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImV4cCI6MTIwNTAwNTU4NywiY"
-    "XVkIjoiZXhhbXBsZV9zZXJ2aWNlIn0.izDa6aHNgbsbeRzucE0baXIP7SXOrgopYQ"
-    "ALLFAsKq_N0GvOyqpAZA9nwCAhqCkeKWcL-9gbQe3XJa0KN3FPa2NbW4ChenIjmf2"
-    "QYXOuOQaDu9QRTdHEY2Y4mRy6DiTZAsBHWGA71_cLX-rzTSO_8aC8eIqdHo898oJw"
-    "3E8ISKdryYjayb9X3wtF6KLgNomoD9_nqtOkliuLElD8grO0qHKI1xQurGZNaoeyi"
-    "V1AdwgX_5n3SmQTacVN0WcSgk6YJRZG6VE8PjxZP9bEameBmbSB0810giKRpdTU1-"
-    "RJtjq6aCSTD4CYXtW38T5uko4V-S4zifK3BXeituUTebkgoA";
 
 const char DefaultConfig[] = R"EOF(
     http_uri:
@@ -75,13 +51,13 @@ TEST_F(TokenCacheTest, ValidToken) {
   audience.set_url("http://example_service");
 
   auto token = std::make_unique<GcpToken>();
-  token->token_ = std::string(GoodTokenStr);
+  token->token_ = "foo";
   token->expires_at_ = ExpTime;
 
   token_cache_->insert(audience, std::move(token));
   auto found_token = token_cache_->lookUp(audience);
   EXPECT_TRUE(found_token.has_value());
-  EXPECT_EQ(found_token.value(), std::string(GoodTokenStr));
+  EXPECT_EQ(found_token.value(), "foo");
 }
 
 TEST_F(TokenCacheTest, ExpiredToken) {
@@ -89,7 +65,7 @@ TEST_F(TokenCacheTest, ExpiredToken) {
   audience.set_url("http://example_service");
 
   auto token = std::make_unique<GcpToken>();
-  token->token_ = std::string(ExpiredToken);
+  token->token_ = "foo";
   token->expires_at_ = 1205005587; // Sat Mar 08 2008 14:46:27 GMT-0500
 
   token_cache_->insert(audience, std::move(token));
@@ -103,13 +79,13 @@ TEST_F(TokenCacheTest, TokenWithClockSkew) {
   audience.set_url("http://example_service");
 
   // Set the time to exp_time + 1s.
-  // i.e., The expiration time in the token is `Sun May 29 2033 13:36:41 GMT-0400` and the time we
-  // set to is `Sun May 29 2033 13:35:42 GMT-0400`.
+  // i.e., The expiration time in the token is Sun May 29 2033 13:36:41 GMT and the time we
+  // set to is Sun May 29 2033 13:35:42 GMT.
   const time_t exp_time_with_skew = ExpTime - JwtVerify::kClockSkewInSecond;
   time_system_.setSystemTime(std::chrono::system_clock::from_time_t(exp_time_with_skew + 1));
 
   auto token = std::make_unique<GcpToken>();
-  token->token_ = std::string(GoodTokenStr);
+  token->token_ = "foo";
   token->expires_at_ = ExpTime;
 
   token_cache_->insert(audience, std::move(token));
@@ -119,13 +95,13 @@ TEST_F(TokenCacheTest, TokenWithClockSkew) {
   // Set the time to exp_time - 1s.
   time_system_.setSystemTime(std::chrono::system_clock::from_time_t(exp_time_with_skew));
   auto token2 = std::make_unique<GcpToken>();
-  token2->token_ = std::string(GoodTokenStr);
+  token2->token_ = "foo";
   token2->expires_at_ = ExpTime;
 
   token_cache_->insert(audience, std::move(token2));
   found_token = token_cache_->lookUp(audience);
   EXPECT_TRUE(found_token.has_value());
-  EXPECT_EQ(found_token.value(), std::string(GoodTokenStr));
+  EXPECT_EQ(found_token.value(), "foo");
 }
 
 } // namespace
