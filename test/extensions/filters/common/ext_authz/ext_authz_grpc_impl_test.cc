@@ -674,6 +674,29 @@ ok_response:
                      span_);
 }
 
+TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithKeepEmptyValueTrue) {
+  initialize();
+
+  envoy::service::auth::v3::CheckResponse check_response;
+
+  // keep_empty_value is true and value is empty, so the header should be kept.
+  auto expected_authz_response = Response{
+      .status = CheckStatus::OK,
+      .headers_to_set = UnsafeHeaderVector{{"x-keep-empty", ""}},
+      .status_code = Http::Code::OK,
+      .grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok,
+  };
+
+  // Build a response where keep_empty_value = true with an empty value
+  auto* header = check_response.mutable_ok_response()->mutable_response_headers_to_add()->Add();
+  header->mutable_header()->set_key("x-keep-empty");
+  header->mutable_header()->set_value("");
+  header->set_keep_empty_value(true);
+
+  // Assert the empty header IS present in the response
+  expectResponse(check_response, expected_authz_response);
+}
+
 } // namespace ExtAuthz
 } // namespace Common
 } // namespace Filters
