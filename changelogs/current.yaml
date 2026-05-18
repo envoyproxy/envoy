@@ -175,6 +175,12 @@ new_features:
     that a dynamic-module cluster's load balancer can read filter state set by an upstream HTTP
     filter (or any other producer) when picking a host. The Rust SDK exposes these as
     ``ClusterLbContext::get_filter_state_bytes`` and ``ClusterLbContext::get_filter_state_typed``.
+- area: mcp_router
+  change: |
+    Added :ref:`lazy_initialization <envoy_v3_api_field_extensions.filters.http.mcp_router.v3.McpRouter.lazy_initialization>`
+    option to the MCP router filter. When enabled, the ``initialize`` response is returned immediately
+    without contacting backends. Each backend is initialized on-demand when a request first routes to it,
+    avoiding slow or misbehaving backends from blocking client initialization.
 - area: access_log
   change: |
     Supported the singleton stats scope in the :ref:`stats access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>`.
