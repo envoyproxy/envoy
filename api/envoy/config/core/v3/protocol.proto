@@ -344,6 +344,10 @@ message HttpProtocolOptions {
   // when many connections are established at roughly the same time.
   // This field is ignored if ``max_connection_duration`` is not set. If not set, no jitter is added.
   //
+  // .. note::
+  //   This field is currently only honored for downstream connections by the HTTP connection
+  //   manager. It is not yet supported for upstream cluster connections.
+  //
   // This is analogous to
   // :ref:`max_downstream_connection_duration_jitter_percentage
   // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_downstream_connection_duration_jitter_percentage>`
