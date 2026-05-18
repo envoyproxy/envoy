@@ -638,6 +638,9 @@ ok_response:
 // This test ensures keep_empty_value is respected in ext_authz responses.
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithKeepEmptyValueRespected) {
   initialize();
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ext_authz_respect_keep_empty_value", "true"}});
 
   envoy::service::auth::v3::CheckResponse check_response;
   TestUtility::loadFromYaml(R"EOF(
@@ -676,6 +679,9 @@ ok_response:
 
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithKeepEmptyValueTrue) {
   initialize();
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ext_authz_respect_keep_empty_value", "true"}});
 
   envoy::service::auth::v3::CheckResponse check_response;
 

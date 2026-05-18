@@ -20,7 +20,9 @@ void copyHeaderFieldIntoResponse(
     ResponsePtr& response,
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers) {
   for (const auto& header : headers) {
-    if (header.header().value().empty() && !header.keep_empty_value()) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.ext_authz_respect_keep_empty_value") &&
+        header.header().value().empty() && !header.keep_empty_value()) {
       continue;
     }
     if (header.append().value()) {
@@ -36,7 +38,9 @@ void copyOkResponseMutations(ResponsePtr& response,
   copyHeaderFieldIntoResponse(response, ok_response.headers());
 
   for (const auto& header : ok_response.response_headers_to_add()) {
-    if (header.header().value().empty() && !header.keep_empty_value()) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.ext_authz_respect_keep_empty_value") &&
+        header.header().value().empty() && !header.keep_empty_value()) {
       continue;
     }
     if (header.has_append()) {
