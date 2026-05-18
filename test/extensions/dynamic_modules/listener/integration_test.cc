@@ -8,13 +8,12 @@
 
 namespace Envoy {
 
-class DynamicModulesListenerSdkIntegrationTest
-    : public testing::TestWithParam<std::string>,
-      public BaseIntegrationTest {
+class DynamicModulesListenerSdkIntegrationTest : public testing::TestWithParam<std::string>,
+                                                 public BaseIntegrationTest {
 public:
   DynamicModulesListenerSdkIntegrationTest()
       : BaseIntegrationTest(GetParam() == "cpp" ? Network::Address::IpVersion::v4
-                                                 : Network::Address::IpVersion::v6,
+                                                : Network::Address::IpVersion::v6,
                             ConfigHelper::baseConfig() + R"EOF(
     filter_chains:
       - filters:
@@ -31,18 +30,18 @@ protected:
                                     GetParam()),
         1);
 
-    config_helper_.addConfigModifier(
-        [filter_name](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-          auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-          auto* filter = listener->add_listener_filters();
-          filter->set_name("envoy.filters.listener.dynamic_modules");
+    config_helper_.addConfigModifier([filter_name](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+      auto* filter = listener->add_listener_filters();
+      filter->set_name("envoy.filters.listener.dynamic_modules");
 
-          envoy::extensions::filters::listener::dynamic_modules::v3::DynamicModuleListenerFilter
-              dynamic_module_config;
-          dynamic_module_config.mutable_dynamic_module_config()->set_name("listener_integration_test");
-          dynamic_module_config.set_filter_name(filter_name);
-          filter->mutable_typed_config()->PackFrom(dynamic_module_config);
-        });
+      envoy::extensions::filters::listener::dynamic_modules::v3::DynamicModuleListenerFilter
+          dynamic_module_config;
+      dynamic_module_config.mutable_dynamic_module_config()->set_name("listener_integration_test");
+      dynamic_module_config.set_filter_name(filter_name);
+      filter->mutable_typed_config()->PackFrom(dynamic_module_config);
+    });
 
     BaseIntegrationTest::initialize();
   }

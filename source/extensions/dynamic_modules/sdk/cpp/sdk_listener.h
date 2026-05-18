@@ -286,7 +286,8 @@ private:
 class ListenerFilterConfigFactoryRegister {
 public:
   /** Registers a listener filter config factory under name for the binary lifetime. */
-  ListenerFilterConfigFactoryRegister(std::string_view name, ListenerFilterConfigFactoryPtr factory);
+  ListenerFilterConfigFactoryRegister(std::string_view name,
+                                      ListenerFilterConfigFactoryPtr factory);
   ~ListenerFilterConfigFactoryRegister();
 
 private:
@@ -294,10 +295,10 @@ private:
 };
 
 /** Registers a listener filter config factory during static initialization. */
-#define REGISTER_LISTENER_FILTER_CONFIG_FACTORY(FACTORY_CLASS, NAME)                                \
-  static Envoy::DynamicModules::ListenerFilterConfigFactoryRegister                                 \
-      ListenerFilterConfigFactoryRegister_##FACTORY_CLASS##_register_NAME(                          \
-          NAME, std::unique_ptr<Envoy::DynamicModules::ListenerFilterConfigFactory>(                \
+#define REGISTER_LISTENER_FILTER_CONFIG_FACTORY(FACTORY_CLASS, NAME)                               \
+  static Envoy::DynamicModules::ListenerFilterConfigFactoryRegister                                \
+      ListenerFilterConfigFactoryRegister_##FACTORY_CLASS##_register_NAME(                         \
+          NAME, std::unique_ptr<Envoy::DynamicModules::ListenerFilterConfigFactory>(               \
                     new FACTORY_CLASS()));
 
 } // namespace DynamicModules

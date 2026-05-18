@@ -88,6 +88,7 @@ envoy_cc_test(
         "//source/extensions/filters/listener/dynamic_modules:config",
         "//source/extensions/filters/network/echo:config",
         "//test/integration:integration_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/listener/dynamic_modules/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/echo/v3:pkg_cc_proto",
     ],

@@ -20,8 +20,8 @@ ListenerFilterConfigFactory::~ListenerFilterConfigFactory() = default;
 ListenerFilterConfigFactoryRegister::ListenerFilterConfigFactoryRegister(
     std::string_view name, ListenerFilterConfigFactoryPtr factory)
     : name_(name) {
-  auto r = ListenerFilterConfigFactoryRegistry::getMutableRegistry().emplace(std::string_view(name_),
-                                                                              std::move(factory));
+  auto r = ListenerFilterConfigFactoryRegistry::getMutableRegistry().emplace(
+      std::string_view(name_), std::move(factory));
   if (!r.second) {
     const std::string error_msg =
         std::format("Factory with the same name {} already registered", name_);
