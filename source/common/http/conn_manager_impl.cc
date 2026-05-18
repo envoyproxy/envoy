@@ -1256,11 +1256,18 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
       filter_manager_.streamInfo().setResponseFlag(
           StreamInfo::CoreResponseFlag::DownstreamProtocolError);
 
-      // H/2 codec was resetting requests that were rejected due to headers with underscores,
-      // instead of sending 400. Preserving this behavior for now.
-      // TODO(#24466): Make H/2 behavior consistent with H/1 and H/3.
-      if (failure_details == UhvResponseCodeDetail::get().InvalidUnderscore &&
-          connection_manager_.codec_->protocol() == Protocol::Http2) {
+      // For backward compatibility, preserve the legacy behavior of resetting the stream
+      // (instead of sending 400) for requests rejected due to headers with underscores on H/2.
+      // The new send-400 behavior is gated behind a runtime guard so it can be disabled. H/3
+      // continues to reset because the QUIC stream lifecycle does not yet cleanly support a
+      // local-reply after a header validation failure (see issue #24735).
+      const bool use_legacy_reset_for_underscores =
+          failure_details == UhvResponseCodeDetail::get().InvalidUnderscore &&
+          (connection_manager_.codec_->protocol() == Protocol::Http3 ||
+           (connection_manager_.codec_->protocol() == Protocol::Http2 &&
+            !Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.http2_h3_send_400_for_underscored_headers")));
+      if (use_legacy_reset_for_underscores) {
         filter_manager_.streamInfo().setResponseCodeDetails(failure_details);
         resetStream();
       } else {
@@ -1292,33 +1299,27 @@ bool ConnectionManagerImpl::ActiveStream::validateTrailers(RequestTrailerMap& tr
     failure_details = std::string(transformation_result.details());
   }
 
-  Code response_code = Code::BadRequest;
   absl::optional<Grpc::Status::GrpcStatus> grpc_status;
   if (Grpc::Common::hasGrpcContentType(*request_headers_)) {
     grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
   }
 
-  filter_manager_.streamInfo().setResponseFlag(
-      StreamInfo::CoreResponseFlag::DownstreamProtocolError);
-
-  // H/2 codec was resetting requests that were rejected due to headers with underscores,
-  // instead of sending 400. Preserving this behavior for now.
-  // TODO(#24466): Make H/2 behavior consistent with H/1 and H/3.
-  if (failure_details == UhvResponseCodeDetail::get().InvalidUnderscore &&
-      connection_manager_.codec_->protocol() == Protocol::Http2) {
+  // Preserve legacy behavior of resetting the stream for trailer rejections on H/3, and on H/2
+  // when the runtime guard is disabled. See issue #24735.
+  const bool use_legacy_reset =
+      connection_manager_.codec_->protocol() == Protocol::Http3 ||
+      (connection_manager_.codec_->protocol() == Protocol::Http2 &&
+       !Runtime::runtimeFeatureEnabled(
+           "envoy.reloadable_features.http2_h3_send_400_for_underscored_headers"));
+  if (use_legacy_reset) {
     filter_manager_.streamInfo().setResponseCodeDetails(failure_details);
     resetStream();
   } else {
-    // TODO(#24735): Harmonize H/2 and H/3 behavior with H/1
-    if (connection_manager_.codec_->protocol() < Protocol::Http2) {
-      sendLocalReply(response_code, "", nullptr, grpc_status, failure_details);
-    } else {
-      filter_manager_.streamInfo().setResponseCodeDetails(failure_details);
-      resetStream();
-    }
-    if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
-      connection_manager_.handleCodecError(failure_details);
-    }
+    sendLocalReply(Code::BadRequest, "", nullptr, grpc_status, failure_details);
+  }
+
+  if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
+    connection_manager_.handleCodecError(failure_details);
   }
   return false;
 }

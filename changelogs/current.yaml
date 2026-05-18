@@ -51,6 +51,15 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: http
+  change: |
+    Fixed the HTTP/2 codec (when UHV is enabled) to send a 400 response instead of resetting the
+    stream when request headers or trailers contain underscores and the connection is configured
+    with ``REJECT_REQUEST`` for ``headers_with_underscores_action``. This makes the behavior
+    consistent with HTTP/1. Gated by the runtime guard
+    ``envoy.reloadable_features.http2_h3_send_400_for_underscored_headers`` (enabled by default);
+    disable it to restore the legacy stream-reset behavior. HTTP/3 still resets the stream pending
+    follow-up work for #24735. Partially fixes #24466 and #24735.
 - area: wasm
   change: |
     Fixed a bug where Envoy did not recreate the Wasm VM when only

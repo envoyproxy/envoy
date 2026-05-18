@@ -434,11 +434,14 @@ private:
     // Note: this method is a noop unless ENVOY_ENABLE_UHV is defined
     // Call header validator extension to validate the request trailer map after it was
     // deserialized. If the trailer map failed validation, this method does the following:
-    // 1. For H/1 it sends 400 response and returns false.
-    // 2. For H/2 and H/3 it resets the stream (without error response). Issue #24735 is filed to
-    //    harmonize this behavior with H/1.
-    // 3. If the `stream_error_on_invalid_http_message` is set to `false` (it is by default) in the
-    // HTTP connection manager configuration, then the entire connection is closed.
+    // 1. For H/1, it sends a 400 response and returns false.
+    // 2. For H/2, when the runtime guard
+    //    `envoy.reloadable_features.http2_h3_send_400_for_underscored_headers` is enabled
+    //    (the default), it sends a 400 response. When the guard is disabled it resets the
+    //    stream (without error response) to preserve the legacy behavior.
+    // 3. For H/3 it still resets the stream. Issue #24735 tracks harmonization with H/1.
+    // 4. If the `stream_error_on_invalid_http_message` is set to `false` (it is by default) in
+    //    the HTTP connection manager configuration, then the entire connection is closed.
     bool validateTrailers(RequestTrailerMap& trailers);
 
     std::weak_ptr<bool> stillAlive() { return {still_alive_}; }

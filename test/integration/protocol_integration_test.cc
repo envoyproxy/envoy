@@ -2078,8 +2078,17 @@ TEST_P(DownstreamProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestReje
                                      {":authority", "sni.lyft.com"},
                                      {"foo_bar", "baz"}});
 
-  if (downstream_protocol_ == Http::CodecType::HTTP1) {
-    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  if (downstream_protocol_ == Http::CodecType::HTTP1 ||
+      (downstream_protocol_ == Http::CodecType::HTTP2 &&
+       GetParam().use_universal_header_validator)) {
+    // H/1 always sends 400; H/2 with UHV now also sends 400 (gated by
+    // envoy.reloadable_features.http2_h3_send_400_for_underscored_headers, default true).
+    if (downstream_protocol_ == Http::CodecType::HTTP1) {
+      ASSERT_TRUE(codec_client_->waitForDisconnect());
+    } else {
+      ASSERT_TRUE(response->waitForEndStream());
+      codec_client_->close();
+    }
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
@@ -2121,8 +2130,17 @@ TEST_P(DownstreamProtocolIntegrationTest, TrailerWithUnderscoresCauseRequestReje
       *request_encoder_,
       Http::TestRequestTrailerMapImpl{{"trailer1", "value1"}, {"trailer_2", "value2"}});
 
-  if (downstream_protocol_ == Http::CodecType::HTTP1) {
-    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  if (downstream_protocol_ == Http::CodecType::HTTP1 ||
+      (downstream_protocol_ == Http::CodecType::HTTP2 &&
+       GetParam().use_universal_header_validator)) {
+    // H/1 always sends 400; H/2 with UHV now also sends 400 (gated by
+    // envoy.reloadable_features.http2_h3_send_400_for_underscored_headers, default true).
+    if (downstream_protocol_ == Http::CodecType::HTTP1) {
+      ASSERT_TRUE(codec_client_->waitForDisconnect());
+    } else {
+      ASSERT_TRUE(response->waitForEndStream());
+      codec_client_->close();
+    }
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
