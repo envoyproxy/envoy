@@ -39,10 +39,10 @@ public:
   /** Overrides the requested application protocols (ALPN). */
   virtual void setRequestedApplicationProtocols(std::span<const BufferView> protocols) = 0;
 
-  /** Overrides the JA3 TLS fingerprint. */
+  /** Overrides the `JA3` TLS fingerprint. */
   virtual void setJa3Hash(std::string_view hash) = 0;
 
-  /** Overrides the JA4 TLS fingerprint. */
+  /** Overrides the `JA4` TLS fingerprint. */
   virtual void setJa4Hash(std::string_view hash) = 0;
 
   /** Returns the requested server name (SNI) if present. */
@@ -54,10 +54,10 @@ public:
   /** Returns the requested application protocols (ALPN). */
   virtual std::vector<std::string_view> getRequestedApplicationProtocols() = 0;
 
-  /** Returns the JA3 TLS fingerprint if present. */
+  /** Returns the `JA3` TLS fingerprint if present. */
   virtual std::optional<std::string_view> getJa3Hash() = 0;
 
-  /** Returns the JA4 TLS fingerprint if present. */
+  /** Returns the `JA4` TLS fingerprint if present. */
   virtual std::optional<std::string_view> getJa4Hash() = 0;
 
   /** Returns true when the downstream connection is using SSL/TLS. */
