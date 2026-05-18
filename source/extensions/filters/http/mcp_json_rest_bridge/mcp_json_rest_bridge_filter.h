@@ -44,11 +44,14 @@ public:
 
   uint32_t maxRequestBodySize() const { return max_request_body_size_; }
   uint32_t maxResponseBodySize() const { return max_response_body_size_; }
-  bool textContentStreamingEnabled() const;
 
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge::RequestStorageMode
   requestStorageMode() const {
     return proto_config_.request_storage_mode();
+  }
+
+  bool textContentStreamingEnabled() const {
+    return proto_config_.tool_config().text_content_streaming_enabled();
   }
 
 private:

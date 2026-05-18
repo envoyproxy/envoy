@@ -167,10 +167,6 @@ McpJsonRestBridgeFilterConfig::getToolsListHttpRule() const {
   return proto_config_.tool_config().tool_list_http_rule();
 }
 
-bool McpJsonRestBridgeFilterConfig::textContentStreamingEnabled() const {
-  return proto_config_.tool_config().text_content_streaming_enabled();
-}
-
 Http::FilterHeadersStatus
 McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, bool) {
   absl::string_view path = request_headers.getPathValue();
@@ -306,6 +302,8 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& dat
       return Http::FilterDataStatus::Continue;
     }
     absl::string_view chunk(static_cast<const char*>(data.linearize(len)), len);
+    // TODO(guoyilin42): Consider adding text/event-stream backend response support and explore if
+    // it needs buffering.
     std::string escaped_chunk = JsonEscaper::escapeString(chunk, JsonEscaper::extraSpace(chunk));
 
     data.drain(len);
