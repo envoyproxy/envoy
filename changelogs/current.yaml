@@ -232,7 +232,6 @@ new_features:
   change: |
     Added ``upstream.server_name`` CEL attribute returning the SNI from the established upstream
     TLS connection.
-
 - area: tls
   change: |
     Added substitution commands ``%DOWNSTREAM_TLS_GROUP%`` and ``%UPSTREAM_TLS_GROUP%``. The TLS group may be used
@@ -247,6 +246,9 @@ new_features:
     Enabled Balsa parser for HTTP inspector by default. This behavior can be temporarily
     reverted by setting the runtime guard ``envoy.reloadable_features.http_inspector_use_balsa_parser``
     to ``false``. This runtime guard will be removed in a future release of Envoy.
+- area: ratelimit
+  change: |
+    Make namespace for storing rate limit service response metadata configurable.
 
 - area: tcp_proxy
   change: |
