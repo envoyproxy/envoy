@@ -12,6 +12,20 @@ MAX_SLUG_LENGTH = 40
 SLUG_SOURCE_LENGTH = 60
 ENTRY_SEPARATOR = "__"
 
+CHANGELOGS_CONFIG_HEADER = (
+    "# NB: this file is the canonical changelog config consumed by\n"
+    "#     envoy.base.utils / envoy.code.check.\n"
+    "#\n"
+    "# `sections:` lists the valid top-level changelog sections (e.g.\n"
+    "#     `bug_fixes`, `new_features`). Adding/removing a section requires\n"
+    "#     coordinated updates in toolshed.\n"
+    "#\n"
+    "# `areas:` lists the canonical set of areas accepted by per-entry\n"
+    "#     changelog filenames in changelogs/current/<section>/<area>__<slug>.rst.\n"
+    "#     In filenames, '/' MUST be encoded as '~'.\n"
+    "#     Adding a new area requires a PR updating this file.\n"
+)
+
 
 def _truncate_slug(slug: str, max_length: int = MAX_SLUG_LENGTH) -> str:
     if len(slug) <= max_length:
@@ -44,20 +58,21 @@ def _encode_area(area: str) -> str:
     return area.replace("/", "~")
 
 
-def _write_area_file(path: pathlib.Path, change: str) -> None:
+def _write_entry_file(path: pathlib.Path, change: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(change.rstrip("\n") + "\n")
 
 
-def _area_metadata(areas: Iterable[str]) -> str:
-    header = (
-        "# NB: areas listed here are the canonical set accepted by per-entry changelog\n"
-        "#     filenames in changelogs/current/\n"
-    )
-    area_dict = {area: {"title": area} for area in sorted(set(areas))}
-    if not area_dict:
-        return f"{header}\n"
-    return f"{header}\n{yaml.safe_dump(area_dict, sort_keys=False)}"
+def _render_changelogs_config(
+        sections_data: dict,
+        areas: Iterable[str]) -> str:
+    config = {
+        "sections": sections_data or {},
+        "areas": {area: {"title": area} for area in sorted(set(areas))},
+    }
+    return (
+        f"{CHANGELOGS_CONFIG_HEADER}\n"
+        f"{yaml.safe_dump(config, sort_keys=False, default_flow_style=False)}")
 
 
 def migrate(project_root: pathlib.Path) -> None:
@@ -65,7 +80,7 @@ def migrate(project_root: pathlib.Path) -> None:
     current_yaml_path = changelogs_dir / "current.yaml"
     sections_yaml_path = changelogs_dir / "sections.yaml"
     current_entries_dir = changelogs_dir / "current"
-    areas_yaml_path = changelogs_dir / "areas.yaml"
+    changelogs_config_path = changelogs_dir / "changelogs.yaml"
 
     if not current_yaml_path.exists():
         raise FileNotFoundError(f"Missing required changelog file: {current_yaml_path}")
@@ -104,10 +119,13 @@ def migrate(project_root: pathlib.Path) -> None:
             if count > 1:
                 slug = f"{slug}-{count}"
             entry_path = current_entries_dir / section / f"{area_encoded}{ENTRY_SEPARATOR}{slug}.rst"
-            _write_area_file(entry_path, change)
+            _write_entry_file(entry_path, change)
 
     current_yaml_path.write_text(yaml.safe_dump({"date": date}, sort_keys=False))
-    areas_yaml_path.write_text(_area_metadata(areas))
+    changelogs_config_path.write_text(_render_changelogs_config(sections_data, areas))
+    # `sections.yaml` is superseded by `changelogs.yaml` (which now contains
+    # both `sections:` and `areas:`).
+    sections_yaml_path.unlink()
 
 
 def main() -> None:

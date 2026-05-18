@@ -73,16 +73,30 @@ class MigrateToPerEntryTest(unittest.TestCase):
                 "Add nested area support for oauth2 filter feature and behavior that goes beyond sixty characters for slug input.\n"
                 "Keep second line as-is.\n")
 
-            expected_areas = textwrap.dedent("""\
-                # NB: areas listed here are the canonical set accepted by per-entry changelog
-                #     filenames in changelogs/current/
+            # The old `sections.yaml` is superseded by `changelogs.yaml`.
+            self.assertFalse((changelogs_dir / "sections.yaml").exists())
+            self.assertFalse((changelogs_dir / "areas.yaml").exists())
+            self.assertTrue((changelogs_dir / "changelogs.yaml").exists())
 
-                extensions/filters/http/oauth2:
-                  title: extensions/filters/http/oauth2
-                router:
-                  title: router
-                """)
-            self.assertEqual((changelogs_dir / "areas.yaml").read_text(), expected_areas)
+            config = yaml.safe_load((changelogs_dir / "changelogs.yaml").read_text())
+            self.assertEqual(
+                config,
+                {
+                    "sections": {
+                        "bug_fixes": {"title": "Bug fixes"},
+                        "new_features": {"title": "New features"},
+                    },
+                    "areas": {
+                        "extensions/filters/http/oauth2": {
+                            "title": "extensions/filters/http/oauth2",
+                        },
+                        "router": {"title": "router"},
+                    },
+                })
+            # Header comments are preserved.
+            self.assertIn(
+                "# NB: this file is the canonical changelog config",
+                (changelogs_dir / "changelogs.yaml").read_text())
 
     def test_migration_preserves_non_pending_date(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
