@@ -1790,6 +1790,245 @@ TEST_F(AwsEventstreamParserFilterTest, BedrockEnvelopeMixedWithPlainJson) {
   EXPECT_EQ(123, metadata.fields().at("tokens").number_value());
 }
 
+// Test that allHeaderRulesSatisfied() returns true when content parser stops AND header rules
+// with stop_processing_after_matches are all satisfied — full stop via both conditions.
+TEST_F(AwsEventstreamParserFilterTest, ContentParserStopWithSatisfiedHeaderRules) {
+  const std::string config = R"EOF(
+  response_rules:
+    content_parser:
+      name: envoy.content_parsers.json
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
+        rules:
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "total_tokens"
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "tokens"
+                type: NUMBER
+            stop_processing_after_matches: 1
+    header_rules:
+      - header_name: ":event-type"
+        on_present:
+          metadata_namespace: "envoy.lb"
+          key: "event_type"
+        stop_processing_after_matches: 1
+  )EOF";
+
+  setupFilter(config);
+
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"},
+                                          {"content-type", "application/vnd.amazon.eventstream"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+
+  // First message matches both content parser rule AND header rule.
+  std::string es_headers = buildStringHeader(":event-type", "MessageStop");
+  Buffer::OwnedImpl data1(
+      buildEventstreamMessageWithHeaders(es_headers, R"({"usage": {"total_tokens": 50}})"));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data1, false));
+
+  // processing_complete_ should be true; second message should be skipped entirely.
+  Buffer::OwnedImpl data2(buildEventstreamMessage(R"({"usage": {"total_tokens": 999}})"));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data2, true));
+
+  EXPECT_EQ(2, findCounter("aws_eventstream_parser.resp.json.metadata_added"));
+  const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
+  EXPECT_EQ(50, metadata.fields().at("tokens").number_value());
+  EXPECT_EQ("MessageStop", metadata.fields().at("event_type").string_value());
+}
+
+// Test that allHeaderRulesSatisfied() returns false when a header rule has
+// stop_processing_after_matches=0 (unlimited), preventing early stop.
+TEST_F(AwsEventstreamParserFilterTest, ContentParserStopButHeaderRuleUnlimited) {
+  const std::string config = R"EOF(
+  response_rules:
+    content_parser:
+      name: envoy.content_parsers.json
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
+        rules:
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "total_tokens"
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "tokens"
+                type: NUMBER
+            stop_processing_after_matches: 1
+    header_rules:
+      - header_name: ":event-type"
+        on_present:
+          metadata_namespace: "envoy.lb"
+          key: "event_type"
+  )EOF";
+
+  setupFilter(config);
+
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"},
+                                          {"content-type", "application/vnd.amazon.eventstream"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+
+  // First message matches content parser (which signals stop) and header rule.
+  // But header rule has stop_processing_after_matches=0 (unlimited), so
+  // allHeaderRulesSatisfied() returns false and processing_complete_ is NOT set.
+  std::string es_headers1 = buildStringHeader(":event-type", "FirstEvent");
+  Buffer::OwnedImpl data1(
+      buildEventstreamMessageWithHeaders(es_headers1, R"({"usage": {"total_tokens": 50}})"));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data1, false));
+
+  // Second message should still be processed (processing not stopped).
+  // The header rule continues to overwrite since it's unlimited.
+  std::string es_headers2 = buildStringHeader(":event-type", "SecondEvent");
+  Buffer::OwnedImpl data2(buildEventstreamMessageWithHeaders(es_headers2, R"({"text": "hi"})"));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data2, true));
+
+  const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
+  EXPECT_EQ("SecondEvent", metadata.fields().at("event_type").string_value());
+}
+
+// Test that allHeaderRulesSatisfied() returns false when header rule has
+// stop_processing_after_matches=1 but hasn't matched yet. Content parser signals stop
+// but processing continues because the header rule is unsatisfied.
+TEST_F(AwsEventstreamParserFilterTest, ContentParserStopButHeaderRuleNotYetSatisfied) {
+  const std::string config = R"EOF(
+  response_rules:
+    content_parser:
+      name: envoy.content_parsers.json
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
+        rules:
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "total_tokens"
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "tokens"
+                type: NUMBER
+            stop_processing_after_matches: 1
+    header_rules:
+      - header_name: ":event-type"
+        on_present:
+          metadata_namespace: "envoy.lb"
+          key: "event_type"
+        stop_processing_after_matches: 1
+  )EOF";
+
+  setupFilter(config);
+
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"},
+                                          {"content-type", "application/vnd.amazon.eventstream"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+
+  // First message: content parser matches (signals stop), but the header rule hasn't
+  // matched yet (no :event-type header). allHeaderRulesSatisfied() returns false
+  // (match_count=0 < 1), so processing continues.
+  Buffer::OwnedImpl data1(buildEventstreamMessage(R"({"usage": {"total_tokens": 10}})"));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data1, false));
+
+  // Second message: header matches (count reaches 1). Content parser already signaled stop,
+  // and now allHeaderRulesSatisfied() returns true — processing_complete_ is set.
+  std::string es_headers2 = buildStringHeader(":event-type", "Found");
+  Buffer::OwnedImpl data2(buildEventstreamMessageWithHeaders(es_headers2, R"({"text": "bye"})"));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data2, false));
+
+  // Third message should be completely skipped.
+  std::string es_headers3 = buildStringHeader(":event-type", "Third");
+  Buffer::OwnedImpl data3(buildEventstreamMessageWithHeaders(es_headers3, R"({"text": "x"})"));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data3, true));
+
+  const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
+  EXPECT_EQ(10, metadata.fields().at("tokens").number_value());
+  EXPECT_EQ("Found", metadata.fields().at("event_type").string_value());
+}
+
+// Test header on_missing with default (empty) namespace.
+TEST_F(AwsEventstreamParserFilterTest, HeaderRuleOnMissingDefaultNamespace) {
+  const std::string config = R"EOF(
+  response_rules:
+    content_parser:
+      name: envoy.content_parsers.json
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
+        rules:
+          - rule:
+              selectors:
+                - key: "dummy"
+              on_missing:
+                metadata_namespace: "envoy.lb"
+                key: "dummy"
+                value:
+                  string_value: "x"
+    header_rules:
+      - header_name: ":event-type"
+        on_missing:
+          key: "event_type"
+          value: "not_found"
+  )EOF";
+
+  setupFilter(config);
+
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"},
+                                          {"content-type", "application/vnd.amazon.eventstream"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+
+  // Message with no matching header.
+  Buffer::OwnedImpl data(buildEventstreamMessage(R"({"text": "hello"})"));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, true));
+
+  // on_missing should write to the default namespace
+  const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at(
+      "envoy.filters.http.aws_eventstream_parser");
+  EXPECT_EQ("not_found", metadata.fields().at("event_type").string_value());
+}
+
+// Test header on_missing without a value field — should not write metadata.
+TEST_F(AwsEventstreamParserFilterTest, HeaderRuleOnMissingWithoutValue) {
+  envoy::extensions::filters::http::aws_eventstream_parser::v3::AwsEventstreamParser proto_config;
+  auto* response_rules = proto_config.mutable_response_rules();
+  auto* content_parser = response_rules->mutable_content_parser();
+  content_parser->set_name("envoy.content_parsers.json");
+
+  envoy::extensions::content_parsers::json::v3::JsonContentParser json_config;
+  auto* rule = json_config.add_rules()->mutable_rule();
+  rule->add_selectors()->set_key("dummy");
+  auto* on_missing_content = rule->mutable_on_missing();
+  on_missing_content->set_metadata_namespace("envoy.lb");
+  on_missing_content->set_key("dummy");
+  on_missing_content->mutable_value()->set_string_value("x");
+
+  content_parser->mutable_typed_config()->PackFrom(json_config);
+
+  // Add a header rule with on_missing but NO value set
+  auto* header_rule = response_rules->add_header_rules();
+  header_rule->set_header_name(":event-type");
+  auto* on_missing_header = header_rule->mutable_on_missing();
+  on_missing_header->set_metadata_namespace("envoy.lb");
+  on_missing_header->set_key("event_type");
+  // Deliberately NOT setting value
+
+  config_ = std::make_shared<FilterConfig>(proto_config, context_);
+  filter_ = std::make_unique<Filter>(config_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+  ON_CALL(encoder_callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"},
+                                          {"content-type", "application/vnd.amazon.eventstream"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+
+  // Message with no matching header — on_missing fires but has no value.
+  Buffer::OwnedImpl data(buildEventstreamMessage(R"({"text": "hello"})"));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, true));
+
+  // Content parser on_missing writes "dummy"="x" (1 metadata_added + 1 fallback)
+  // Header on_missing fires but has no value, so addMetadata returns false — no additional write.
+  EXPECT_EQ(1, findCounter("aws_eventstream_parser.resp.json.metadata_added"));
+  EXPECT_EQ(1, findCounter("aws_eventstream_parser.resp.json.metadata_from_fallback"));
+}
+
 } // namespace
 } // namespace AwsEventstreamParser
 } // namespace HttpFilters
