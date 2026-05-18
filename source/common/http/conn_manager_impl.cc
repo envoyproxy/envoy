@@ -1307,21 +1307,22 @@ bool ConnectionManagerImpl::ActiveStream::validateTrailers(RequestTrailerMap& tr
     grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
   }
 
-  // Preserve legacy behavior of resetting the stream for trailer rejections on H/3, and on H/2
-  // when the runtime guard is disabled. See issue #24735.
-  const bool use_legacy_reset =
-      connection_manager_.codec_->protocol() == Protocol::Http3 ||
-      (connection_manager_.codec_->protocol() == Protocol::Http2 &&
-       !Runtime::runtimeFeatureEnabled(
-           "envoy.reloadable_features.http2_h3_send_400_for_underscored_headers"));
-  if (use_legacy_reset) {
+  // For underscore rejections on H/2, send a 400 instead of resetting when the runtime guard
+  // is enabled. See issue #24735. All other trailer rejections preserve the legacy reset
+  // behavior.
+  const bool send_400_for_underscores =
+      failure_details == UhvResponseCodeDetail::get().InvalidUnderscore &&
+      connection_manager_.codec_->protocol() == Protocol::Http2 &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_h3_send_400_for_underscored_headers");
+  if (send_400_for_underscores) {
+    sendLocalReply(Code::BadRequest, "", nullptr, grpc_status, failure_details);
+  } else {
     filter_manager_.streamInfo().setResponseCodeDetails(failure_details);
     resetStream();
     if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
       connection_manager_.handleCodecError(failure_details);
     }
-  } else {
-    sendLocalReply(Code::BadRequest, "", nullptr, grpc_status, failure_details);
   }
   return false;
 }
