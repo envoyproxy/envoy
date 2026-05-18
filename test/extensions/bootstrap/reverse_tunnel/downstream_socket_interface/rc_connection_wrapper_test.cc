@@ -13,7 +13,6 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
@@ -32,6 +31,14 @@ namespace Bootstrap {
 namespace ReverseConnection {
 
 // RCConnectionWrapper Tests.
+
+std::unique_ptr<NiceMock<Network::MockClientConnection>>
+getDeletableConn(Event::Dispatcher& dispatcher) {
+  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  EXPECT_CALL(*mock_connection, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+
+  return mock_connection;
+}
 
 class RCConnectionWrapperTest : public testing::Test {
 protected:
@@ -53,6 +60,9 @@ protected:
   void TearDown() override {
     io_handle_.reset();
     extension_.reset();
+    while (dispatcher_.to_delete_.size()) {
+      dispatcher_.to_delete_.pop_front();
+    }
   }
 
   void setupThreadLocalSlot() {
@@ -128,7 +138,7 @@ protected:
 
   // Helper method to set up mock connection with proper socket expectations.
   std::unique_ptr<NiceMock<Network::MockClientConnection>> setupMockConnection() {
-    auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+    auto mock_connection = getDeletableConn(dispatcher_);
 
     // Create a mock socket for the connection.
     auto mock_socket_ptr = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
@@ -180,7 +190,7 @@ protected:
 // Test RCConnectionWrapper::connect() method with HTTP/1.1 handshake success
 TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeSuccess) {
   // Create a mock connection.
-  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  auto mock_connection = getDeletableConn(dispatcher_);
 
   // Set up connection expectations.
   EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
@@ -218,7 +228,7 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeSuccess) {
 // Test RCConnectionWrapper::connect() method with HTTP proxy (internal address) scenario.
 TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeWithHttpProxy) {
   // Create a mock connection.
-  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  auto mock_connection = getDeletableConn(dispatcher_);
 
   // Set up connection expectations.
   EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
@@ -264,7 +274,7 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeWithHttpProxy) {
 
 // Test RCConnectionWrapper::connect() honors custom request paths.
 TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeWithCustomRequestPath) {
-  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  auto mock_connection = getDeletableConn(dispatcher_);
 
   EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
   EXPECT_CALL(*mock_connection, addReadFilter(_));
@@ -305,10 +315,225 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeWithCustomRequestPath) {
   EXPECT_NE(encoded_request.find("GET /custom/handshake HTTP/1.1"), std::string::npos);
 }
 
+// Test RCConnectionWrapper::connect() includes additional headers in the handshake request.
+TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeWithAdditionalHeaders) {
+  auto mock_connection = getDeletableConn(dispatcher_);
+
+  EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
+  EXPECT_CALL(*mock_connection, addReadFilter(_));
+  EXPECT_CALL(*mock_connection, connect());
+  EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(12345));
+  EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
+
+  auto mock_address = std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1", 8080);
+  auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12345);
+
+  EXPECT_CALL(*mock_connection, connectionInfoProvider())
+      .WillRepeatedly(Invoke([mock_address,
+                              mock_local_address]() -> const Network::ConnectionInfoProvider& {
+        static auto mock_provider =
+            std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local_address, mock_address);
+        return *mock_provider;
+      }));
+
+  Buffer::OwnedImpl captured_buffer;
+  EXPECT_CALL(*mock_connection, write(_, _))
+      .WillOnce(Invoke([&captured_buffer](Buffer::Instance& buffer, bool) {
+        captured_buffer.add(buffer);
+        buffer.drain(buffer.length());
+      }));
+
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+
+  ReverseConnectionSocketConfig custom_config = createDefaultTestConfig();
+  envoy::config::core::v3::HeaderValueOption hdr1;
+  hdr1.mutable_header()->set_key("x-custom-auth");
+  hdr1.mutable_header()->set_value("token123");
+  custom_config.additional_headers.push_back(hdr1);
+  envoy::config::core::v3::HeaderValueOption hdr2;
+  hdr2.mutable_header()->set_key("x-request-id");
+  hdr2.mutable_header()->set_value("abc-def");
+  custom_config.additional_headers.push_back(hdr2);
+  auto local_io_handle = createTestIOHandle(custom_config);
+
+  RCConnectionWrapper wrapper(*local_io_handle, std::move(mock_connection), mock_host,
+                              "test-cluster");
+
+  wrapper.connect("test-tenant", "test-cluster", "test-node");
+
+  const std::string encoded_request = captured_buffer.toString();
+  EXPECT_NE(encoded_request.find("x-custom-auth: token123"), std::string::npos);
+  EXPECT_NE(encoded_request.find("x-request-id: abc-def"), std::string::npos);
+}
+
+// Test that additional headers with OVERWRITE_IF_EXISTS_OR_ADD replace existing headers.
+TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeAdditionalHeadersOverwrite) {
+  auto mock_connection = getDeletableConn(dispatcher_);
+
+  EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
+  EXPECT_CALL(*mock_connection, addReadFilter(_));
+  EXPECT_CALL(*mock_connection, connect());
+  EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(12345));
+  EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
+
+  auto mock_address = std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1", 8080);
+  auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12345);
+
+  EXPECT_CALL(*mock_connection, connectionInfoProvider())
+      .WillRepeatedly(Invoke([mock_address,
+                              mock_local_address]() -> const Network::ConnectionInfoProvider& {
+        static auto mock_provider =
+            std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local_address, mock_address);
+        return *mock_provider;
+      }));
+
+  Buffer::OwnedImpl captured_buffer;
+  EXPECT_CALL(*mock_connection, write(_, _))
+      .WillOnce(Invoke([&captured_buffer](Buffer::Instance& buffer, bool) {
+        captured_buffer.add(buffer);
+        buffer.drain(buffer.length());
+      }));
+
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+
+  ReverseConnectionSocketConfig custom_config = createDefaultTestConfig();
+  envoy::config::core::v3::HeaderValueOption hdr;
+  hdr.mutable_header()->set_key("host");
+  hdr.mutable_header()->set_value("custom-host:9090");
+  hdr.set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+  custom_config.additional_headers.push_back(hdr);
+  auto local_io_handle = createTestIOHandle(custom_config);
+
+  RCConnectionWrapper wrapper(*local_io_handle, std::move(mock_connection), mock_host,
+                              "test-cluster");
+
+  wrapper.connect("test-tenant", "test-cluster", "test-node");
+
+  const std::string encoded_request = captured_buffer.toString();
+  // Verify the host was overwritten (not duplicated).
+  EXPECT_NE(encoded_request.find("host: custom-host:9090"), std::string::npos);
+  EXPECT_EQ(encoded_request.find("192.168.1.1:8080"), std::string::npos);
+}
+
+// Test ADD_IF_ABSENT: header is added when absent, skipped when present.
+TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeAdditionalHeadersAddIfAbsent) {
+  auto mock_connection = getDeletableConn(dispatcher_);
+
+  EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
+  EXPECT_CALL(*mock_connection, addReadFilter(_));
+  EXPECT_CALL(*mock_connection, connect());
+  EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(12345));
+  EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
+
+  auto mock_address = std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1", 8080);
+  auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12345);
+
+  EXPECT_CALL(*mock_connection, connectionInfoProvider())
+      .WillRepeatedly(Invoke([mock_address,
+                              mock_local_address]() -> const Network::ConnectionInfoProvider& {
+        static auto mock_provider =
+            std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local_address, mock_address);
+        return *mock_provider;
+      }));
+
+  Buffer::OwnedImpl captured_buffer;
+  EXPECT_CALL(*mock_connection, write(_, _))
+      .WillOnce(Invoke([&captured_buffer](Buffer::Instance& buffer, bool) {
+        captured_buffer.add(buffer);
+        buffer.drain(buffer.length());
+      }));
+
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+
+  ReverseConnectionSocketConfig custom_config = createDefaultTestConfig();
+  // Try to add "host" with ADD_IF_ABSENT — should be skipped since host already exists.
+  envoy::config::core::v3::HeaderValueOption hdr1;
+  hdr1.mutable_header()->set_key("host");
+  hdr1.mutable_header()->set_value("should-not-appear");
+  hdr1.set_append_action(envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT);
+  custom_config.additional_headers.push_back(hdr1);
+  // Add a new header with ADD_IF_ABSENT — should be added since it doesn't exist.
+  envoy::config::core::v3::HeaderValueOption hdr2;
+  hdr2.mutable_header()->set_key("x-new-header");
+  hdr2.mutable_header()->set_value("new-value");
+  hdr2.set_append_action(envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT);
+  custom_config.additional_headers.push_back(hdr2);
+  auto local_io_handle = createTestIOHandle(custom_config);
+
+  RCConnectionWrapper wrapper(*local_io_handle, std::move(mock_connection), mock_host,
+                              "test-cluster");
+
+  wrapper.connect("test-tenant", "test-cluster", "test-node");
+
+  const std::string encoded_request = captured_buffer.toString();
+  // "host" was already set, so ADD_IF_ABSENT should not add "should-not-appear".
+  EXPECT_EQ(encoded_request.find("should-not-appear"), std::string::npos);
+  // "x-new-header" was absent, so ADD_IF_ABSENT should add it.
+  EXPECT_NE(encoded_request.find("x-new-header: new-value"), std::string::npos);
+}
+
+// Test OVERWRITE_IF_EXISTS: overwrites existing header, does nothing for absent header.
+TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeAdditionalHeadersOverwriteIfExists) {
+  auto mock_connection = getDeletableConn(dispatcher_);
+
+  EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
+  EXPECT_CALL(*mock_connection, addReadFilter(_));
+  EXPECT_CALL(*mock_connection, connect());
+  EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(12345));
+  EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
+
+  auto mock_address = std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1", 8080);
+  auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12345);
+
+  EXPECT_CALL(*mock_connection, connectionInfoProvider())
+      .WillRepeatedly(Invoke([mock_address,
+                              mock_local_address]() -> const Network::ConnectionInfoProvider& {
+        static auto mock_provider =
+            std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local_address, mock_address);
+        return *mock_provider;
+      }));
+
+  Buffer::OwnedImpl captured_buffer;
+  EXPECT_CALL(*mock_connection, write(_, _))
+      .WillOnce(Invoke([&captured_buffer](Buffer::Instance& buffer, bool) {
+        captured_buffer.add(buffer);
+        buffer.drain(buffer.length());
+      }));
+
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+
+  ReverseConnectionSocketConfig custom_config = createDefaultTestConfig();
+  // Overwrite "host" which exists — should replace the value.
+  envoy::config::core::v3::HeaderValueOption hdr1;
+  hdr1.mutable_header()->set_key("host");
+  hdr1.mutable_header()->set_value("overwritten-host");
+  hdr1.set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
+  custom_config.additional_headers.push_back(hdr1);
+  // Try to overwrite "x-nonexistent" which doesn't exist — should be a no-op.
+  envoy::config::core::v3::HeaderValueOption hdr2;
+  hdr2.mutable_header()->set_key("x-nonexistent");
+  hdr2.mutable_header()->set_value("should-not-appear");
+  hdr2.set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
+  custom_config.additional_headers.push_back(hdr2);
+  auto local_io_handle = createTestIOHandle(custom_config);
+
+  RCConnectionWrapper wrapper(*local_io_handle, std::move(mock_connection), mock_host,
+                              "test-cluster");
+
+  wrapper.connect("test-tenant", "test-cluster", "test-node");
+
+  const std::string encoded_request = captured_buffer.toString();
+  // "host" existed, so OVERWRITE_IF_EXISTS should replace it.
+  EXPECT_NE(encoded_request.find("host: overwritten-host"), std::string::npos);
+  EXPECT_EQ(encoded_request.find("192.168.1.1:8080"), std::string::npos);
+  // "x-nonexistent" didn't exist, so OVERWRITE_IF_EXISTS should not add it.
+  EXPECT_EQ(encoded_request.find("should-not-appear"), std::string::npos);
+}
+
 // Test RCConnectionWrapper::connect() method with connection write failure.
 TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeWriteFailure) {
   // Create a mock connection that fails to write.
-  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  auto mock_connection = getDeletableConn(dispatcher_);
 
   // Set up connection expectations.
   EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
@@ -848,10 +1073,77 @@ TEST_F(RCConnectionWrapperTest, DecodeHeadersNonOk) {
   wrapper.decodeHeaders(std::move(headers), true);
 }
 
+// In upgrade mode, a 101 Switching Protocols response is treated as handshake success
+// and a 200 response is treated as a protocol mismatch.
+TEST_F(RCConnectionWrapperTest, DecodeHeadersUpgradeMode) {
+  ReverseConnectionSocketConfig upgrade_config = createDefaultTestConfig();
+  upgrade_config.use_http_upgrade = true;
+  auto upgrade_io_handle = createTestIOHandle(upgrade_config);
+
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+
+  // 101 -> success path.
+  {
+    auto mock_connection = setupMockConnection();
+    RCConnectionWrapper wrapper(*upgrade_io_handle, std::move(mock_connection), mock_host,
+                                "test-cluster");
+    Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
+    headers->setStatus(101);
+    wrapper.decodeHeaders(std::move(headers), true);
+  }
+  // 200 in upgrade mode -> failure path (server didn't switch protocols).
+  {
+    auto mock_connection = setupMockConnection();
+    RCConnectionWrapper wrapper(*upgrade_io_handle, std::move(mock_connection), mock_host,
+                                "test-cluster");
+    Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
+    headers->setStatus(200);
+    wrapper.decodeHeaders(std::move(headers), true);
+  }
+}
+
+// In upgrade mode, connect() emits `Connection: Upgrade` + `Upgrade: reverse-tunnel`
+// in the handshake request. Verifies by capturing the bytes written by the encoder.
+TEST_F(RCConnectionWrapperTest, ConnectEmitsUpgradeHeaders) {
+  ReverseConnectionSocketConfig upgrade_config = createDefaultTestConfig();
+  upgrade_config.use_http_upgrade = true;
+  auto upgrade_io_handle = createTestIOHandle(upgrade_config);
+
+  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  std::string written;
+  EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
+  EXPECT_CALL(*mock_connection, addReadFilter(_));
+  EXPECT_CALL(*mock_connection, connect());
+  EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(43));
+  EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
+  EXPECT_CALL(*mock_connection, write(_, _))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& buffer, bool) {
+        written.append(buffer.toString());
+        buffer.drain(buffer.length());
+      }));
+
+  auto mock_remote = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 80);
+  auto mock_local = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 10001);
+  EXPECT_CALL(*mock_connection, connectionInfoProvider())
+      .WillRepeatedly(Invoke([mock_remote, mock_local]() -> const Network::ConnectionInfoProvider& {
+        static auto provider =
+            std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local, mock_remote);
+        return *provider;
+      }));
+
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  RCConnectionWrapper wrapper(*upgrade_io_handle, std::move(mock_connection), mock_host,
+                              "test-cluster");
+  (void)wrapper.connect("tenant", "cluster", "node");
+
+  EXPECT_THAT(written, testing::HasSubstr("upgrade: reverse-tunnel"));
+  EXPECT_THAT(written, testing::HasSubstr("connection: upgrade"));
+}
+
 // Test dispatchHttp1 error path by initializing codec via connect() and
 // then feeding invalid bytes to the parser.
 TEST_F(RCConnectionWrapperTest, DispatchHttp1ErrorPath) {
-  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  auto mock_connection = getDeletableConn(dispatcher_);
 
   EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
   EXPECT_CALL(*mock_connection, addReadFilter(_));
@@ -891,7 +1183,6 @@ TEST_F(RCConnectionWrapperTest, DestructorInvokesShutdown) {
 
   EXPECT_CALL(*mock_connection, removeConnectionCallbacks(_));
   EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
-  EXPECT_CALL(*mock_connection, close(Network::ConnectionCloseType::FlushWrite));
   EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(777));
 
   {
@@ -992,7 +1283,6 @@ TEST_F(RCConnectionWrapperTest, Shutdown) {
     // Set up connection expectations for open connection.
     EXPECT_CALL(*mock_connection, removeConnectionCallbacks(_));
     EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
-    EXPECT_CALL(*mock_connection, close(Network::ConnectionCloseType::FlushWrite));
     EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(12345));
 
     RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
@@ -1052,13 +1342,12 @@ TEST_F(RCConnectionWrapperTest, Shutdown) {
   }
   // Test 5: Multiple shutdown calls (should be safe)
   {
-    auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+    auto mock_connection = getDeletableConn(dispatcher_);
     auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
     // Set up connection expectations.
     EXPECT_CALL(*mock_connection, removeConnectionCallbacks(_));
     EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
-    EXPECT_CALL(*mock_connection, close(Network::ConnectionCloseType::FlushWrite));
     EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(12348));
 
     RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
@@ -1090,11 +1379,14 @@ protected:
         *stats_scope_); // Use the created scope
   }
 
-  void TearDown() override { io_handle_.reset(); }
+  void TearDown() override {
+    io_handle_.reset();
+    dispatcher_.clearDeferredDeleteList();
+  }
 
   // Helper to create a mock RCConnectionWrapper.
   std::unique_ptr<RCConnectionWrapper> createMockWrapper() {
-    auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+    auto mock_connection = getDeletableConn(dispatcher_);
     auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
     return std::make_unique<RCConnectionWrapper>(*io_handle_, std::move(mock_connection), mock_host,
                                                  "test-cluster");
@@ -1109,6 +1401,7 @@ protected:
   Stats::IsolatedStoreImpl stats_store_;
   Stats::ScopeSharedPtr stats_scope_;
   std::unique_ptr<ReverseConnectionIOHandle> io_handle_;
+  NiceMock<Event::MockDispatcher> dispatcher_{"worker_0"};
 };
 
 TEST_F(SimpleConnReadFilterTest, OnDataWithNullParent) {
@@ -1250,6 +1543,24 @@ TEST_F(RCConnectionWrapperTest, NoOpMethods) {
 
   wrapper.onMaxStreamsChanged(0);
   wrapper.onMaxStreamsChanged(100);
+}
+
+// Verify shutdown with already-null connection doesn't crash.
+TEST_F(RCConnectionWrapperTest, ShutdownIsIdempotent) {
+  auto mock_connection = getDeletableConn(dispatcher_);
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(999));
+  EXPECT_CALL(*mock_connection, removeConnectionCallbacks(_));
+  auto wrapper = std::make_unique<RCConnectionWrapper>(*io_handle_, std::move(mock_connection),
+                                                       mock_host, "test-cluster");
+
+  wrapper->shutdown();
+  ASSERT_EQ(wrapper->getConnection(), nullptr);
+
+  wrapper->shutdown();
+  ASSERT_EQ(wrapper->getConnection(), nullptr);
+
+  wrapper.reset();
 }
 
 } // namespace ReverseConnection

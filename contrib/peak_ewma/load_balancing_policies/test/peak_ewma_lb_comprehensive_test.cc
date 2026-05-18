@@ -2,7 +2,6 @@
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/common.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -58,8 +57,7 @@ protected:
 
   void createLoadBalancer() {
     lb_ = std::make_unique<PeakEwmaLoadBalancer>(priority_set_, nullptr, *stats_, runtime_, random_,
-                                                 50, *cluster_info_, time_source_, config_,
-                                                 dispatcher_);
+                                                 50, *cluster_info_, time_source_, config_);
   }
 
   // Note: In a real test we would access host data, but for simplicity
@@ -76,7 +74,6 @@ protected:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<MockTimeSystem> time_source_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
 
   std::vector<Upstream::HostSharedPtr> hosts_;
   std::unique_ptr<PeakEwmaLoadBalancer> lb_;

@@ -1,5 +1,8 @@
 #include "source/common/router/weighted_cluster_specifier.h"
 
+#include <cstddef>
+#include <cstdint>
+
 #include "source/common/config/well_known_names.h"
 #include "source/common/router/config_utility.h"
 
@@ -18,20 +21,75 @@ absl::Status validateWeightedClusterSpecifier(const ClusterWeightProto& cluster)
   return absl::InvalidArgumentError(error);
 }
 
-absl::StatusOr<std::shared_ptr<WeightedClustersConfigEntry>> WeightedClustersConfigEntry::create(
-    const ClusterWeightProto& cluster, const MetadataMatchCriteria* parent_metadata_match,
-    std::string&& runtime_key, Server::Configuration::ServerFactoryContext& context) {
+template <class T>
+absl::optional<size_t> pickClusterIndex(absl::Span<T> weighed_clusters, uint64_t random_value,
+                                        uint64_t total_cluster_weight, Runtime::Loader& loader) {
+  // The total_cluster_weight can be cached and be used directly only in the case that all
+  // following conditions are met:
+  // * the runtime key prefix is not configured which means the cluster weight is static and will
+  //   not be changed through runtime.
+  // * all clusters are candidates for the selection which means this selection is not for refresh.
+  const bool need_recompute_total_weight = total_cluster_weight == 0;
+
+  absl::InlinedVector<uint32_t, 4> cluster_weights;
+  if (need_recompute_total_weight) {
+    cluster_weights.reserve(weighed_clusters.size());
+    for (const auto& cluster : weighed_clusters) {
+      auto cluster_weight = cluster->clusterWeight(loader);
+      cluster_weights.push_back(cluster_weight);
+      if (cluster_weight > std::numeric_limits<uint32_t>::max() - total_cluster_weight) {
+        IS_ENVOY_BUG("Sum of weight cannot overflow 2^32");
+        return absl::nullopt;
+      }
+      total_cluster_weight += cluster_weight;
+    }
+    if (total_cluster_weight == 0) {
+      IS_ENVOY_BUG("Sum of weight cannot be zero");
+      return absl::nullopt;
+    }
+  }
+
+  const uint64_t selected_value = random_value % total_cluster_weight;
+  uint64_t begin = 0;
+  uint64_t end = 0;
+
+  // Find the right cluster to route to based on the interval in which
+  // the selected value falls. The intervals are determined as
+  // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
+  for (size_t i = 0; i < weighed_clusters.size(); ++i) {
+    if (need_recompute_total_weight) {
+      end = begin + cluster_weights[i];
+    } else {
+      end = begin + weighed_clusters[i]->clusterWeight();
+    }
+    if (selected_value >= begin && selected_value < end) {
+      return weighed_clusters[i]->clusterIndex();
+    }
+    begin = end;
+  }
+
+  IS_ENVOY_BUG("unexpected");
+  return absl::nullopt;
+}
+
+absl::StatusOr<std::shared_ptr<WeightedClustersConfigEntry>>
+WeightedClustersConfigEntry::create(const ClusterWeightProto& cluster, uint64_t index,
+                                    const MetadataMatchCriteria* parent_metadata_match,
+                                    absl::string_view runtime_key_prefix,
+                                    Server::Configuration::ServerFactoryContext& context) {
   RETURN_IF_NOT_OK(validateWeightedClusterSpecifier(cluster));
   return std::unique_ptr<WeightedClustersConfigEntry>(new WeightedClustersConfigEntry(
-      cluster, parent_metadata_match, std::move(runtime_key), context));
+      cluster, index, parent_metadata_match, runtime_key_prefix, context));
 }
 
 WeightedClustersConfigEntry::WeightedClustersConfigEntry(
-    const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster,
-    const MetadataMatchCriteria* parent_metadata_match, std::string&& runtime_key,
+    const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster, uint64_t index,
+    const MetadataMatchCriteria* parent_metadata_match, absl::string_view runtime_key_prefix,
     Server::Configuration::ServerFactoryContext& context)
-    : runtime_key_(std::move(runtime_key)),
-      cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)),
+    : runtime_key_(runtime_key_prefix.empty()
+                       ? ""
+                       : fmt::format("{}.{}", runtime_key_prefix, cluster.name())),
+      cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)), cluster_index_(index),
       per_filter_configs_(
           THROW_OR_RETURN_VALUE(PerFilterConfigs::create(cluster.typed_per_filter_config(), context,
                                                          context.messageValidationVisitor()),
@@ -71,25 +129,26 @@ WeightedClusterSpecifierPlugin::WeightedClusterSpecifierPlugin(
     const MetadataMatchCriteria* parent_metadata_match, absl::string_view route_name,
     Server::Configuration::ServerFactoryContext& context, absl::Status& creation_status)
     : loader_(context.runtime()), random_value_header_(weighted_clusters.header_name()),
-      runtime_key_prefix_(weighted_clusters.runtime_key_prefix()),
       use_hash_policy_(weighted_clusters.random_value_specifier_case() ==
                                WeightedClusterProto::kUseHashPolicy
                            ? weighted_clusters.use_hash_policy().value()
                            : false) {
 
+  // The runtime key prefix is used to construct the runtime key for each cluster's weight. If the
+  // prefix is not provided, the runtime key will be empty, and the cluster weight will always be
+  // determined by the static weight in the config.
   absl::string_view runtime_key_prefix = weighted_clusters.runtime_key_prefix();
 
   weighted_clusters_.reserve(weighted_clusters.clusters().size());
-
+  uint64_t total_cluster_weight = 0;
   for (const ClusterWeightProto& cluster : weighted_clusters.clusters()) {
-    auto cluster_entry =
-        THROW_OR_RETURN_VALUE(WeightedClustersConfigEntry::create(
-                                  cluster, parent_metadata_match,
-                                  absl::StrCat(runtime_key_prefix, ".", cluster.name()), context),
-                              std::shared_ptr<WeightedClustersConfigEntry>);
+    auto cluster_entry = THROW_OR_RETURN_VALUE(
+        WeightedClustersConfigEntry::create(cluster, weighted_clusters_.size(),
+                                            parent_metadata_match, runtime_key_prefix, context),
+        std::shared_ptr<WeightedClustersConfigEntry>);
     weighted_clusters_.emplace_back(std::move(cluster_entry));
-    total_cluster_weight_ += weighted_clusters_.back()->clusterWeight(loader_);
-    if (total_cluster_weight_ > std::numeric_limits<uint32_t>::max()) {
+    total_cluster_weight += weighted_clusters_.back()->clusterWeight(loader_);
+    if (total_cluster_weight > std::numeric_limits<uint32_t>::max()) {
       creation_status = absl::InvalidArgumentError(
           fmt::format("The sum of weights of all weighted clusters of route {} exceeds {}",
                       route_name, std::numeric_limits<uint32_t>::max()));
@@ -98,10 +157,17 @@ WeightedClusterSpecifierPlugin::WeightedClusterSpecifierPlugin(
   }
 
   // Reject the config if the total_weight of all clusters is 0.
-  if (total_cluster_weight_ == 0) {
+  if (total_cluster_weight == 0) {
     creation_status = absl::InvalidArgumentError(
         "Sum of weights in the weighted_cluster must be greater than 0.");
     return;
+  }
+
+  // If runtime key prefix is not configured, the total cluster weight will be static and can be
+  // cached. Otherwise, the total cluster weight needs to be computed for every request since the
+  // cluster weight can be dynamically changed through runtime.
+  if (runtime_key_prefix.empty()) {
+    total_cluster_weight_ = total_cluster_weight;
   }
 }
 
@@ -111,12 +177,14 @@ WeightedClusterSpecifierPlugin::WeightedClusterSpecifierPlugin(
  * RouteEntryImplBase object. Almost all functions in this class forward calls back to the
  * parent, with the exception of clusterName, routeEntry, and metadataMatchCriteria.
  */
-class WeightedClusterEntry : public DynamicRouteEntry {
+class WeightedClusterEntry : public DynamicRouteEntry, public Logger::Loggable<Logger::Id::router> {
 public:
   WeightedClusterEntry(RouteConstSharedPtr route, std::string&& cluster_name,
-                       WeightedClustersConfigEntryConstSharedPtr config)
-      : DynamicRouteEntry(route, std::move(cluster_name)), config_(std::move(config)) {
-    ASSERT(config_ != nullptr);
+                       std::shared_ptr<const WeightedClusterSpecifierPlugin> plugin,
+                       const WeightedClustersConfigEntry* config, uint64_t random_value)
+      : DynamicRouteEntry(route, std::move(cluster_name)), plugin_(std::move(plugin)),
+        random_value_(random_value), config_(config) {
+    ASSERT(plugin_ != nullptr);
   }
 
   const std::string& clusterName() const override {
@@ -183,8 +251,70 @@ public:
     }
     return result;
   }
+  void refreshRouteCluster(const Http::RequestHeaderMap& headers,
+                           const StreamInfo::StreamInfo&) const override {
+    // Note this function will refresh the target cluster but the cluster specific
+    // metadata match criteria, header manipulation and so on may have been applied to the request
+    // based on the initially selected cluster configuration and won't be applied again.
+    // This is known limitation of the current implementation.
+    //
+    // Dynamic route entry is created for each request and only used for single request in single
+    // thread. So, it is safe to update the cluster config or state in the route entry without
+    // worrying about thread safety or affecting other requests.
+    const_cast<WeightedClusterEntry*>(this)->refreshRouteClusterInternal(headers);
+  }
 
 private:
+  void refreshRouteClusterInternal(const Http::RequestHeaderMap& headers) {
+    // Put the current cluster index in used_cluster_indices_ to avoid selecting the same cluster
+    // again in the next round of selection.
+    used_cluster_indices_.insert(config_->clusterIndex());
+    if (used_cluster_indices_.size() == plugin_->weighted_clusters_.size()) {
+      // All clusters have been used. Clear the used_cluster_indices_ to make all clusters eligible
+      // for selection again.
+      used_cluster_indices_.clear();
+    }
+
+    absl::optional<size_t> cluster_index;
+
+    if (used_cluster_indices_.empty()) {
+      // If all clusters are eligible for selection, we can directly pick cluster from the full list
+      // of clusters.
+      cluster_index =
+          pickClusterIndex(absl::MakeConstSpan(plugin_->weighted_clusters_), random_value_,
+                           plugin_->total_cluster_weight_, plugin_->loader_);
+    } else {
+      // If only part of the clusters are eligible for selection, we need to construct a temporary
+      // vector that only contains the eligible clusters and pick cluster from it.
+      absl::InlinedVector<const WeightedClustersConfigEntry*, 4> candidate_clusters;
+      for (const auto& cluster : plugin_->weighted_clusters_) {
+        if (used_cluster_indices_.find(cluster->clusterIndex()) == used_cluster_indices_.end()) {
+          candidate_clusters.push_back(cluster.get());
+        }
+      }
+      ASSERT(!candidate_clusters.empty());
+      // 0 is passed in as total_cluster_weight here because the weight of each cluster will be
+      // re-computed in pickClusterIndex.
+      cluster_index = pickClusterIndex(absl::MakeConstSpan(candidate_clusters), random_value_, 0,
+                                       plugin_->loader_);
+    }
+
+    if (!cluster_index.has_value()) {
+      ENVOY_LOG(warn, "Failed to pick a new cluster for route {}. No eligible cluster found.",
+                this->routeName());
+      return;
+    }
+
+    const auto* config = plugin_->weighted_clusters_[cluster_index.value()].get();
+    if (config->cluster_name_.empty()) {
+      ASSERT(!config->cluster_header_name_.get().empty());
+      const auto entries = headers.get(config->cluster_header_name_);
+      auto cluster = entries.empty() ? absl::string_view{} : entries[0]->value().getStringView();
+      cluster_name_.assign(cluster.data(), cluster.size());
+    }
+    config_ = config;
+  }
+
   const HeaderParser& requestHeaderParser() const {
     if (config_->request_headers_parser_ != nullptr) {
       return *config_->request_headers_parser_;
@@ -198,29 +328,27 @@ private:
     return HeaderParser::defaultParser();
   }
 
-  WeightedClustersConfigEntryConstSharedPtr config_;
+  std::shared_ptr<const WeightedClusterSpecifierPlugin> plugin_;
+  const uint64_t random_value_{0};
+
+  mutable std::set<size_t> used_cluster_indices_;
+  mutable const WeightedClustersConfigEntry* config_;
 };
 
-// Selects a cluster depending on weight parameters from configuration or from headers.
-// This function takes into account the weights set through configuration or through
-// runtime parameters.
-// Returns selected cluster, or nullptr if weighted configuration is invalid.
-RouteConstSharedPtr WeightedClusterSpecifierPlugin::pickWeightedCluster(
-    RouteEntryAndRouteConstSharedPtr parent, const Http::RequestHeaderMap& headers,
-    const StreamInfo::StreamInfo& stream_info, const uint64_t random_value) const {
-  absl::optional<uint64_t> hash_value;
-
-  // Only use hash policy if explicitly enabled via use_hash_policy field
+RouteConstSharedPtr WeightedClusterSpecifierPlugin::route(RouteEntryAndRouteConstSharedPtr parent,
+                                                          const Http::RequestHeaderMap& headers,
+                                                          const StreamInfo::StreamInfo& stream_info,
+                                                          uint64_t random) const {
+  absl::optional<uint64_t> random_value_from_hash;
+  // Only use hash policy if explicitly enabled via use_hash_policy field.
   if (use_hash_policy_) {
     const auto* route_hash_policy = parent->hashPolicy();
     if (route_hash_policy != nullptr) {
-      hash_value = route_hash_policy->generateHash(
+      random_value_from_hash = route_hash_policy->generateHash(
           OptRef<const Http::RequestHeaderMap>(headers),
           OptRef<const StreamInfo::StreamInfo>(stream_info), nullptr);
     }
   }
-
-  const uint64_t selection_value = hash_value.has_value() ? hash_value.value() : random_value;
 
   absl::optional<uint64_t> random_value_from_header;
   // Retrieve the random value from the header if corresponding header name is specified.
@@ -231,8 +359,8 @@ RouteConstSharedPtr WeightedClusterSpecifierPlugin::pickWeightedCluster(
     if (header_value.size() == 1) {
       // We expect single-valued header here, otherwise it will potentially cause inconsistent
       // weighted cluster picking throughout the process because different values are used to
-      // compute the selected value. So, we treat multi-valued header as invalid input and fall back
-      // to use internally generated random number.
+      // compute the selected value. So, we treat multi-valued header as invalid input and fall
+      // back to use internally generated random number.
       uint64_t random_value = 0;
       if (absl::SimpleAtoi(header_value[0]->value().getStringView(), &random_value)) {
         random_value_from_header = random_value;
@@ -247,78 +375,29 @@ RouteConstSharedPtr WeightedClusterSpecifierPlugin::pickWeightedCluster(
     }
   }
 
-  const bool runtime_key_prefix_configured = !runtime_key_prefix_.empty();
-  uint32_t total_cluster_weight = total_cluster_weight_;
-  absl::InlinedVector<uint32_t, 4> cluster_weights;
+  const uint64_t random_value =
+      random_value_from_header.has_value() ? random_value_from_header.value()
+      : random_value_from_hash.has_value() ? random_value_from_hash.value()
+                                           : random;
 
-  // if runtime config is used, we need to recompute total_weight.
-  if (runtime_key_prefix_configured) {
-    // Temporary storage to hold consistent cluster weights. Since cluster weight
-    // can be changed with runtime keys, we need a way to gather all the weight
-    // and aggregate the total without a change in between.
-    // The InlinedVector will be able to handle at least 4 cluster weights
-    // without allocation. For cases when more clusters are needed, it is
-    // reserved to ensure at most a single allocation.
-    cluster_weights.reserve(weighted_clusters_.size());
-
-    total_cluster_weight = 0;
-    for (const auto& cluster : weighted_clusters_) {
-      auto cluster_weight = cluster->clusterWeight(loader_);
-      cluster_weights.push_back(cluster_weight);
-      if (cluster_weight > std::numeric_limits<uint32_t>::max() - total_cluster_weight) {
-        IS_ENVOY_BUG("Sum of weight cannot overflow 2^32");
-        return nullptr;
-      }
-      total_cluster_weight += cluster_weight;
-    }
-  }
-
-  if (total_cluster_weight == 0) {
-    IS_ENVOY_BUG("Sum of weight cannot be zero");
+  absl::optional<size_t> cluster_index = pickClusterIndex(
+      absl::MakeConstSpan(weighted_clusters_), random_value, total_cluster_weight_, loader_);
+  if (!cluster_index.has_value()) {
     return nullptr;
   }
-  const uint64_t selected_value =
-      (random_value_from_header.has_value() ? random_value_from_header.value() : selection_value) %
-      total_cluster_weight;
-  uint64_t begin = 0;
-  uint64_t end = 0;
-  auto cluster_weight = cluster_weights.begin();
 
-  // Find the right cluster to route to based on the interval in which
-  // the selected value falls. The intervals are determined as
-  // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
-  for (const auto& cluster : weighted_clusters_) {
-
-    if (runtime_key_prefix_configured) {
-      end = begin + *cluster_weight++;
-    } else {
-      end = begin + cluster->clusterWeight(loader_);
-    }
-
-    if (selected_value >= begin && selected_value < end) {
-      if (!cluster->cluster_name_.empty()) {
-        return std::make_shared<WeightedClusterEntry>(std::move(parent), "", cluster);
-      }
-      ASSERT(!cluster->cluster_header_name_.get().empty());
-
-      const auto entries = headers.get(cluster->cluster_header_name_);
-      absl::string_view cluster_name =
-          entries.empty() ? absl::string_view{} : entries[0]->value().getStringView();
-      return std::make_shared<WeightedClusterEntry>(std::move(parent), std::string(cluster_name),
-                                                    cluster);
-    }
-    begin = end;
+  const auto* config = weighted_clusters_[cluster_index.value()].get();
+  if (!config->cluster_name_.empty()) {
+    return std::make_shared<WeightedClusterEntry>(std::move(parent), "", this->shared_from_this(),
+                                                  config, random_value);
   }
 
-  IS_ENVOY_BUG("unexpected");
-  return nullptr;
-}
-
-RouteConstSharedPtr WeightedClusterSpecifierPlugin::route(RouteEntryAndRouteConstSharedPtr parent,
-                                                          const Http::RequestHeaderMap& headers,
-                                                          const StreamInfo::StreamInfo& stream_info,
-                                                          uint64_t random) const {
-  return pickWeightedCluster(std::move(parent), headers, stream_info, random);
+  ASSERT(!config->cluster_header_name_.get().empty());
+  const auto entries = headers.get(config->cluster_header_name_);
+  absl::string_view cluster_name =
+      entries.empty() ? absl::string_view{} : entries[0]->value().getStringView();
+  return std::make_shared<WeightedClusterEntry>(std::move(parent), std::string(cluster_name),
+                                                this->shared_from_this(), config, random_value);
 }
 
 absl::Status

@@ -18,6 +18,8 @@
 #include "test/test_common/utility.h"
 
 using testing::AssertionResult;
+using testing::Eq;
+using testing::Ge;
 
 namespace Envoy {
 
@@ -233,7 +235,7 @@ void AdsIntegrationTestBase::testBasicFlow() {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "1",
                                       {"route_config_0"}, {}, {}));
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   makeSingleRequest();
   const Protobuf::Timestamp first_active_listener_ts_1 =
       getListenersConfigDump().dynamic_listeners(0).active_state().last_updated();
@@ -246,13 +248,13 @@ void AdsIntegrationTestBase::testBasicFlow() {
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TestTypeUrl::get().Cluster, {buildCluster("cluster_1"), buildCluster("cluster_2")},
       {buildCluster("cluster_1"), buildCluster("cluster_2")}, {"cluster_0"}, "2");
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 2);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(2));
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       Config::TestTypeUrl::get().ClusterLoadAssignment,
       {buildClusterLoadAssignment("cluster_1"), buildClusterLoadAssignment("cluster_2")},
       {buildClusterLoadAssignment("cluster_1"), buildClusterLoadAssignment("cluster_2")},
       {"cluster_0"}, "2");
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
                                       {"cluster_2", "cluster_1"}, {"cluster_2", "cluster_1"},
                                       {"cluster_0"}));
@@ -299,7 +301,7 @@ void AdsIntegrationTestBase::testBasicFlow() {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "3",
                                       {"route_config_2", "route_config_1"}, {}, {}));
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(2));
   makeSingleRequest();
   const Protobuf::Timestamp first_active_listener_ts_3 =
       getListenersConfigDump().dynamic_listeners(0).active_state().last_updated();

@@ -259,7 +259,8 @@ public:
   virtual void maybeCreateHeapShrinker() PURE;
   virtual absl::StatusOr<std::unique_ptr<OverloadManager>> createOverloadManager() PURE;
   virtual std::unique_ptr<OverloadManager> createNullOverloadManager() PURE;
-  virtual std::unique_ptr<Server::GuardDog> maybeCreateGuardDog(absl::string_view name) PURE;
+  virtual std::unique_ptr<Server::GuardDog>
+  maybeCreateGuardDog(absl::string_view name, const Server::Configuration::Watchdog& config) PURE;
   virtual std::unique_ptr<HdsDelegateApi>
   maybeCreateHdsDelegate(Configuration::ServerFactoryContext& server_context, Stats::Scope& scope,
                          Grpc::RawAsyncClientPtr&& async_client, Envoy::Stats::Store& stats,
@@ -343,13 +344,11 @@ public:
   ServerLifecycleNotifier::HandlePtr
   registerCallback(Stage stage, StageCallbackWithCompletion callback) override;
 
-protected:
-  const Configuration::MainImpl& config() { return config_; }
-
 private:
   Network::DnsResolverSharedPtr getOrCreateDnsResolver();
 
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
+  void flushStatsImpl();
   void flushStatsInternal();
   void updateServerStats();
   // This does most of the work of initialization, but can throw or return errors caught
@@ -441,9 +440,9 @@ private:
   ListenerHooks& hooks_;
   Quic::QuicStatNames quic_stat_names_;
   ServerFactoryContextImpl server_contexts_;
-  bool enable_reuse_port_default_{false};
+  bool enable_reuse_port_default_ = true;
   Regex::EnginePtr regex_engine_;
-  bool stats_flush_in_progress_ : 1;
+  bool stats_flush_in_progress_ = false;
   std::unique_ptr<Memory::AllocatorManager> memory_allocator_manager_;
 
   template <class T>

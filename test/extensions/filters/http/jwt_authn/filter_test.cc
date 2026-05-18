@@ -313,7 +313,7 @@ TEST_F(FilterTest, TestNoRequirementMatched) {
 // Test if route() return null, fallback to call config config.
 TEST_F(FilterTest, TestNoRoute) {
   // route() call return nullptr
-  EXPECT_CALL(filter_callbacks_, route()).WillOnce(Return(nullptr));
+  EXPECT_CALL(filter_callbacks_, route()).WillOnce(Return(OptRef<const Router::Route>()));
 
   // Calling the findVerifier from filter config.
   EXPECT_CALL(*mock_config_.get(), findVerifier(_, _)).WillOnce(Return(nullptr));
@@ -331,7 +331,8 @@ TEST_F(FilterTest, TestNoRoute) {
 
 // Test if no per-route config, fallback to call config config.
 TEST_F(FilterTest, TestNoPerRouteConfig) {
-  EXPECT_CALL(filter_callbacks_, route()).WillOnce(Return(mock_route_));
+  EXPECT_CALL(filter_callbacks_, route())
+      .WillOnce(Return(makeOptRefFromPtr<const Router::Route>(mock_route_.get())));
   // perFilterConfig return nullptr.
   EXPECT_CALL(*mock_route_, mostSpecificPerFilterConfig(_)).WillOnce(Return(nullptr));
 
@@ -351,7 +352,8 @@ TEST_F(FilterTest, TestNoPerRouteConfig) {
 
 // Test bypass requirement from per-route config
 TEST_F(FilterTest, TestPerRouteBypass) {
-  EXPECT_CALL(filter_callbacks_, route()).WillOnce(Return(mock_route_));
+  EXPECT_CALL(filter_callbacks_, route())
+      .WillOnce(Return(makeOptRefFromPtr<const Router::Route>(mock_route_.get())));
   EXPECT_CALL(*mock_route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(per_route_config_.get()));
 
@@ -372,7 +374,8 @@ TEST_F(FilterTest, TestPerRouteBypass) {
 
 // Test per-route config with wrong requirement_name
 TEST_F(FilterTest, TestPerRouteWrongRequirementName) {
-  EXPECT_CALL(filter_callbacks_, route()).WillOnce(Return(mock_route_));
+  EXPECT_CALL(filter_callbacks_, route())
+      .WillOnce(Return(makeOptRefFromPtr<const Router::Route>(mock_route_.get())));
   EXPECT_CALL(*mock_route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(per_route_config_.get()));
 
@@ -396,7 +399,8 @@ TEST_F(FilterTest, TestPerRouteWrongRequirementName) {
 
 // Test verifier from per-route config
 TEST_F(FilterTest, TestPerRouteVerifierOK) {
-  EXPECT_CALL(filter_callbacks_, route()).WillOnce(Return(mock_route_));
+  EXPECT_CALL(filter_callbacks_, route())
+      .WillOnce(Return(makeOptRefFromPtr<const Router::Route>(mock_route_.get())));
   EXPECT_CALL(*mock_route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(per_route_config_.get()));
 

@@ -4,6 +4,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/extensions/access_loggers/grpc/tcp_grpc_access_log_impl.h"
 
 #include "test/mocks/server/factory_context.h"
@@ -19,6 +20,17 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace TcpGrpc {
 namespace {
+
+class TestCustomCommandParser : public Formatter::CommandParser {
+public:
+  Formatter::FormatterProviderPtr parse(absl::string_view command, absl::string_view,
+                                        absl::optional<size_t>) const override {
+    if (command == "TEST_CUSTOM") {
+      return std::make_unique<Formatter::PlainStringFormatter>("custom-value");
+    }
+    return nullptr;
+  }
+};
 
 class TcpGrpcAccessLogConfigTest : public testing::Test {
 public:
@@ -66,6 +78,30 @@ public:
 
 // Normal OK configuration.
 TEST_F(TcpGrpcAccessLogConfigTest, Ok) { run("good_cluster"); }
+
+TEST_F(TcpGrpcAccessLogConfigTest, CustomTagFormatterRespectsCommandParsers) {
+  auto* common_config = tcp_grpc_access_log_.mutable_common_config();
+  common_config->set_log_name("foo");
+  common_config->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("good_cluster");
+  common_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+  auto* custom_tag = common_config->add_custom_tags();
+  custom_tag->set_tag("test-tag");
+  custom_tag->set_value("%TEST_CUSTOM%");
+  TestUtility::jsonConvert(tcp_grpc_access_log_, *message_);
+
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
+              factoryForGrpcService(_, _, _))
+      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+        return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+      }));
+
+  std::vector<Formatter::CommandParserPtr> command_parsers;
+  command_parsers.push_back(std::make_unique<TestCustomCommandParser>());
+  AccessLog::InstanceSharedPtr instance = factory_->createAccessLogInstance(
+      *message_, std::move(filter_), context_, std::move(command_parsers));
+  EXPECT_NE(nullptr, instance);
+  EXPECT_NE(nullptr, dynamic_cast<TcpGrpcAccessLog*>(instance.get()));
+}
 
 class MockGrpcAccessLoggerCache : public GrpcCommon::GrpcAccessLoggerCache {
 public:

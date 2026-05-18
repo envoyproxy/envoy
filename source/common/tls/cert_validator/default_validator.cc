@@ -33,7 +33,6 @@
 #include "source/common/tls/aws_lc_compat.h"
 #include "source/common/tls/cert_validator/cert_validator.h"
 #include "source/common/tls/cert_validator/factory.h"
-#include "source/common/tls/cert_validator/utility.h"
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
 
@@ -119,7 +118,7 @@ absl::StatusOr<int> DefaultCertValidator::initializeSslContexts(std::vector<SSL_
       verify_trusted_ca_ = true;
 
       if (config_->allowExpiredCertificate()) {
-        CertValidatorUtil::setIgnoreCertificateExpiration(store);
+        X509_STORE_set_flags(store, X509_V_FLAG_NO_CHECK_TIME);
       }
     }
   }
@@ -163,12 +162,9 @@ absl::StatusOr<int> DefaultCertValidator::initializeSslContexts(std::vector<SSL_
     if (!cert_validation_config->subjectAltNameMatchers().empty()) {
       for (const envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher& matcher :
            cert_validation_config->subjectAltNameMatchers()) {
-        auto san_matcher = createStringSanMatcher(matcher, context_);
-        if (san_matcher == nullptr) {
-          return absl::InvalidArgumentError(
-              absl::StrCat("Failed to create string SAN matcher of type ", matcher.san_type()));
-        }
-        subject_alt_name_matchers_.emplace_back(std::move(san_matcher));
+        auto status_or_san_matcher = createStringSanMatcher(matcher, context_);
+        RETURN_IF_NOT_OK_REF(status_or_san_matcher.status());
+        subject_alt_name_matchers_.emplace_back(std::move(*status_or_san_matcher));
       }
       verify_mode = verify_mode_validation_context;
     }
@@ -328,6 +324,7 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
   }
   Envoy::Ssl::ClientValidationStatus detailed_status =
       Envoy::Ssl::ClientValidationStatus::NotValidated;
+  std::vector<bssl::UniquePtr<X509>> validated_chain;
   X509* leaf_cert = sk_X509_value(&cert_chain, 0);
   ASSERT(leaf_cert);
   if (verify_trusted_ca_) {
@@ -365,6 +362,13 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
               Envoy::Ssl::ClientValidationStatus::Failed,
               SSL_alert_from_verify_result(X509_STORE_CTX_get_error(ctx.get())), error};
     }
+
+    STACK_OF(X509)* verified_chain = X509_STORE_CTX_get0_chain(ctx.get());
+    for (size_t i = 0; i < sk_X509_num(verified_chain); i++) {
+      X509* cert = sk_X509_value(verified_chain, i);
+      validated_chain.emplace_back(bssl::UpRef(cert));
+    }
+
     detailed_status = Envoy::Ssl::ClientValidationStatus::Validated;
   }
   std::string error_details;
@@ -372,10 +376,11 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
   const bool succeeded =
       verifyCertAndUpdateStatus(leaf_cert, host_name, transport_socket_options.get(), context,
                                 detailed_status, &error_details, &tls_alert);
-  return succeeded ? ValidationResults{ValidationResults::ValidationStatus::Successful,
-                                       detailed_status, absl::nullopt, absl::nullopt}
-                   : ValidationResults{ValidationResults::ValidationStatus::Failed, detailed_status,
-                                       tls_alert, error_details};
+  return succeeded
+             ? ValidationResults{ValidationResults::ValidationStatus::Successful, detailed_status,
+                                 absl::nullopt, absl::nullopt, std::move(validated_chain)}
+             : ValidationResults{ValidationResults::ValidationStatus::Failed, detailed_status,
+                                 tls_alert, error_details};
 }
 
 bool DefaultCertValidator::verifySubjectAltName(X509* cert,
@@ -388,7 +393,7 @@ bool DefaultCertValidator::verifySubjectAltName(X509* cert,
   for (const GENERAL_NAME* general_name : san_names.get()) {
     const std::string san = Utility::generalNameAsString(general_name);
     for (auto& config_san : subject_alt_names) {
-      if (general_name->type == GEN_DNS ? Utility::dnsNameMatch(config_san, san.c_str())
+      if (general_name->type == GEN_DNS ? Utility::dnsNameMatch(config_san, san)
                                         : config_san == san) {
         return true;
       }
@@ -552,7 +557,7 @@ absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
     if (cert == nullptr) {
       break;
     }
-    X509_NAME* name = X509_get_subject_name(cert.get());
+    const X509_NAME* name = X509_get_subject_name(cert.get());
     if (name == nullptr) {
       return absl::InvalidArgumentError(absl::StrCat(
           "Failed to load trusted client CA certificates from ", config_->caCertPath()));

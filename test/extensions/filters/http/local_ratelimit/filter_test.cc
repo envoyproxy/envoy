@@ -4,7 +4,7 @@
 #include "source/extensions/filters/http/local_ratelimit/local_ratelimit.h"
 
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/thread_factory_for_test.h"
 
@@ -613,7 +613,7 @@ TEST_F(DescriptorFilterTest, NoRouteEntry) {
 TEST_F(DescriptorFilterTest, NoCluster) {
   setUpTest(fmt::format(descriptor_config_yaml, "1", "\"OFF\"", "1", "0"));
 
-  EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillRepeatedly(testing::Return(nullptr));
+  decoder_callbacks_.cluster_info_ = nullptr;
 
   auto headers = Http::TestRequestHeaderMapImpl();
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));

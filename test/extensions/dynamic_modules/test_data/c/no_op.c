@@ -2,7 +2,6 @@
 
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
-
 static int some_variable = 0;
 static int current_load_id = 0;
 static int seen_load_id = -1;
@@ -142,3 +141,35 @@ void envoy_dynamic_module_on_http_filter_http_stream_reset(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint64_t stream_handle,
     envoy_dynamic_module_type_http_stream_reset_reason reset_reason) {}
+
+void envoy_dynamic_module_on_http_filter_config_http_callout_done(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t callout_id,
+    envoy_dynamic_module_type_http_callout_result result,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size) {}
+
+void envoy_dynamic_module_on_http_filter_config_http_stream_headers(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t stream_id,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size, bool end_stream) {}
+
+void envoy_dynamic_module_on_http_filter_config_http_stream_data(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t stream_id,
+    const envoy_dynamic_module_type_envoy_buffer* data, size_t data_count, bool end_stream) {}
+
+void envoy_dynamic_module_on_http_filter_config_http_stream_trailers(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t stream_id,
+    envoy_dynamic_module_type_envoy_http_header* trailers, size_t trailers_size) {}
+
+void envoy_dynamic_module_on_http_filter_config_http_stream_complete(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t stream_id) {
+}
+
+void envoy_dynamic_module_on_http_filter_config_http_stream_reset(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t stream_id,
+    envoy_dynamic_module_type_http_stream_reset_reason reason) {}

@@ -515,53 +515,53 @@ absl::Status GeoipProvider::mmdbReload(const MaxmindDbSharedPtr reloaded_db,
 }
 
 MaxmindDbSharedPtr GeoipProvider::getCityDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::ReaderMutexLock lock(&mmdb_mutex_);
+  absl::ReaderMutexLock lock(mmdb_mutex_);
   return city_db_;
 }
 
 void GeoipProvider::updateCityDb(MaxmindDbSharedPtr city_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::MutexLock lock(&mmdb_mutex_);
+  absl::MutexLock lock(mmdb_mutex_);
   city_db_ = city_db;
 }
 
 MaxmindDbSharedPtr GeoipProvider::getIspDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::ReaderMutexLock lock(&mmdb_mutex_);
+  absl::ReaderMutexLock lock(mmdb_mutex_);
   return isp_db_;
 }
 
 void GeoipProvider::updateIspDb(MaxmindDbSharedPtr isp_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::MutexLock lock(&mmdb_mutex_);
+  absl::MutexLock lock(mmdb_mutex_);
   isp_db_ = isp_db;
 }
 
 MaxmindDbSharedPtr GeoipProvider::getAsnDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::ReaderMutexLock lock(&mmdb_mutex_);
+  absl::ReaderMutexLock lock(mmdb_mutex_);
   return asn_db_;
 }
 
 void GeoipProvider::updateAsnDb(MaxmindDbSharedPtr asn_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::MutexLock lock(&mmdb_mutex_);
+  absl::MutexLock lock(mmdb_mutex_);
   asn_db_ = asn_db;
 }
 
 MaxmindDbSharedPtr GeoipProvider::getAnonDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::ReaderMutexLock lock(&mmdb_mutex_);
+  absl::ReaderMutexLock lock(mmdb_mutex_);
   return anon_db_;
 }
 
 void GeoipProvider::updateAnonDb(MaxmindDbSharedPtr anon_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::MutexLock lock(&mmdb_mutex_);
+  absl::MutexLock lock(mmdb_mutex_);
   anon_db_ = anon_db;
 }
 
 MaxmindDbSharedPtr GeoipProvider::getCountryDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::ReaderMutexLock lock(&mmdb_mutex_);
+  absl::ReaderMutexLock lock(mmdb_mutex_);
   return country_db_;
 }
 
 void GeoipProvider::updateCountryDb(MaxmindDbSharedPtr country_db)
     ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::MutexLock lock(&mmdb_mutex_);
+  absl::MutexLock lock(mmdb_mutex_);
   country_db_ = country_db;
 }
 

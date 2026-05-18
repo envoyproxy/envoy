@@ -49,8 +49,8 @@ HostSet& MockPrioritySet::getHostSet(uint32_t priority) {
 
 void MockPrioritySet::runUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
                                          const HostVector& hosts_removed) {
-  member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed);
   priority_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
+  member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed);
 }
 
 } // namespace Upstream

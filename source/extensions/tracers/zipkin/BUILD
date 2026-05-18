@@ -47,6 +47,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/http:async_client_utility_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http:http_service_headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/json:json_loader_lib",

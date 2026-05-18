@@ -8,6 +8,7 @@ exports_files([
 
 compile_pip_requirements(
     name = "requirements",
+    src = "requirements.in",
     extra_args = [
         "--allow-unsafe",
         "--generate-hashes",

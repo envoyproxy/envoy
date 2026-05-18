@@ -60,7 +60,7 @@ public:
                      const PerRouteConfig& per_route) {
     per_route_config_ = std::make_shared<PerRouteFilterConfig>(per_route);
     mock_route_ = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();
-    ON_CALL(mock_callback, route()).WillByDefault(Return(mock_route_));
+    mock_callback.route_ = mock_route_;
     ON_CALL(*mock_route_, mostSpecificPerFilterConfig(_))
         .WillByDefault(Return(per_route_config_.get()));
   }

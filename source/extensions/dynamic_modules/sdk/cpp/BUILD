@@ -5,15 +5,15 @@ licenses(["notice"])  # Apache 2
 # All necessary abstractions for creating plugins.
 cc_library(
     name = "sdk",
-    srcs = ["sdk.cc"],
-    hdrs = ["sdk.h"],
-    visibility = ["//visibility:public"],
-    deps = [
-        "@abseil-cpp//absl/container:flat_hash_map",
-        "@abseil-cpp//absl/strings:string_view",
-        "@abseil-cpp//absl/types:optional",
-        "@abseil-cpp//absl/types:span",
+    srcs = [
+        "sdk.cc",
+        "sdk_network.cc",
     ],
+    hdrs = [
+        "sdk.h",
+        "sdk_network.h",
+    ],
+    visibility = ["//visibility:public"],
     alwayslink = True,
 )
 
@@ -25,13 +25,17 @@ cc_library(
 # the plugins lib.
 cc_library(
     name = "sdk_abi",
-    srcs = ["sdk_internal.cc"],
+    srcs = [
+        "sdk_internal.cc",
+        "sdk_internal_network.cc",
+    ],
+    hdrs = [
+        "sdk_internal_common.h",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":sdk",
         "//source/extensions/dynamic_modules/abi",
-        "@abseil-cpp//absl/container:flat_hash_map",
-        "@abseil-cpp//absl/synchronization",
     ],
     alwayslink = True,
 )
@@ -44,6 +48,5 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":sdk",
-        "@abseil-cpp//absl/container:flat_hash_map",
     ],
 )

@@ -73,6 +73,7 @@ typed_config:
         parent: EXTRACT
       response_extraction_by_field:
         name: EXTRACT
+        repeated_string_field: EXTRACT
     apikeys.ApiKeys.CreateApiKeyInStream:
       request_extraction_by_field:
         parent: EXTRACT
@@ -308,6 +309,58 @@ TEST_P(IntegrationTest, ExtractRepeatedCardinality) {
     "first": {
       "@type": "type.googleapis.com/apikeys.ListApiKeysResponse",
       "numResponseItems": "2"
+    }
+  }
+})");
+}
+
+TEST_P(IntegrationTest, ExtractRepeatedStringField) {
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto request = makeCreateApiKeyRequest();
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  auto request_headers = Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                        {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                                                        {"content-type", "application/grpc"},
+                                                        {":authority", "host"},
+                                                        {":scheme", "http"}};
+
+  auto response = codec_client_->makeRequestWithBody(request_headers, request_data->toString());
+  waitForNextUpstreamRequest();
+
+  // Make sure that the body was properly propagated (with no modification).
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(upstream_request_->receivedData());
+  EXPECT_EQ(upstream_request_->body().toString(), request_data->toString());
+
+  // Send response.
+  ApiKey apikey_response = makeCreateApiKeyResponse(R"pb(
+    name: "apikey-name"
+    repeated_string_field: "one"
+    repeated_string_field: "two"
+    repeated_string_field: "three"
+  )pb");
+  Envoy::Buffer::InstancePtr response_data =
+      Envoy::Grpc::Common::serializeToGrpcFrame(apikey_response);
+  sendResponse(response.get(), response_data.get());
+
+  compareJson(waitForAccessLog(access_log_name_),
+              R"(
+{
+  "requests": {
+    "first": {
+      "@type": "type.googleapis.com/apikeys.CreateApiKeyRequest",
+      "parent": "project-id"
+    }
+  },
+  "responses": {
+    "first": {
+      "@type": "type.googleapis.com/apikeys.ApiKey",
+      "name": "apikey-name",
+      "repeatedStringField": [
+        "one",
+        "two",
+        "three"
+      ]
     }
   }
 })");

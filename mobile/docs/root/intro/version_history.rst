@@ -6,6 +6,7 @@ Pending Release
 
 Breaking changes:
 
+- api: remove ``setNetworkMonitoringMode`` API. Use ``enableNetworkChangeMonitor`` instead.
 - api: The ``enableGzip`` and ``enableBrotli`` APIs were renamed to ``enableGzipDecompression`` and ``enableBrotliDecompression`` (:issue:`#25352 <25352>`)
 - ios/android: remove ``addH2RawDomains`` method. (:issue: `#2590 <2590>`)
 - build: building on macOS now requires Xcode 14.1. (:issue:`#2664 <2664>`)
@@ -53,6 +54,7 @@ Features:
 - build: Add a build feature ``exclude_certificates`` to disable inclusion of the Envoy Mobile certificate list, for use when using platform certificate validation.
 - build: Add a build feature ``envoy_http_datagrams`` to allow disabling HTTP Datagram support. (:issue:`#23564 <23564>`)
 - android: log cleared JNI exceptions to platform layer as `jni_cleared_pending_exception` events (:issue:`#26133 <26133>`).
+- api: Add support for SCONE (Standardized Communication with Network Elements) via ``enableScone()`` in ``EngineBuilder``. SCONE data is propagated via new fields in ``envoy_stream_intel``. (#44543)
 
 0.5.0 (September 2, 2022)
 ===========================
@@ -65,7 +67,6 @@ Breaking changes:
 - net: enable happy eyeballs by default (:issue:`#2272 <2272>`)
 - iOS: remove support for installing via CocoaPods, which had not worked since 2020 (:issue:`#2215 <2215>`)
 - iOS: enable usage of ``NWPathMonitor`` by default (:issue:`#2329 <2329>`)
-- iOS: replace ``enableNetworkPathMonitor`` with a new ``setNetworkMonitoringMode`` API to allow disabling monitoring (:issue:`#2345 <2345>`)
 - iOS: release artifacts no longer embed bitcode
 - api: engines are no longer a singleton, you may need to update your code to only create engines once and hold on to them.
   You also cannot assume that an `envoy_engine_t` value of `1` will return the default engine.

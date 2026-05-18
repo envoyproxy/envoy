@@ -32,7 +32,8 @@ class HttpGrpcAccessLog : public Common::ImplBase {
 public:
   HttpGrpcAccessLog(AccessLog::FilterPtr&& filter, const HttpGrpcAccessLogConfig config,
                     ThreadLocal::SlotAllocator& tls,
-                    GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache);
+                    GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
+                    const Formatter::CommandParserPtrVector& command_parsers = {});
 
 private:
   /**

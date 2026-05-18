@@ -20,7 +20,7 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-using Envoy::Matcher::DataInputGetResult;
+using Envoy::Matcher::DataAvailability;
 
 using Extensions::Matching::CommonInputs::TransportSocket::EndpointMetadataInput;
 using Extensions::Matching::CommonInputs::TransportSocket::EndpointMetadataInputFactory;
@@ -40,8 +40,8 @@ TEST_F(TransportSocketInputTest, EndpointMetadataInput_NoEndpointMetadata) {
   EndpointMetadataInput input("envoy.lb", {"type"});
   TransportSocketMatchingData data(nullptr, nullptr);
   auto result = input.get(data);
-  EXPECT_EQ(result.data_availability_, DataInputGetResult::DataAvailability::AllDataAvailable);
-  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
+  EXPECT_EQ(result.availability(), DataAvailability::AllDataAvailable);
+  EXPECT_EQ(result.stringData(), absl::nullopt);
 }
 
 TEST_F(TransportSocketInputTest, EndpointMetadataInput_StringAndNonString) {
@@ -53,18 +53,16 @@ TEST_F(TransportSocketInputTest, EndpointMetadataInput_StringAndNonString) {
   EndpointMetadataInput input_string("envoy.lb", std::vector<std::string>{"type"});
   TransportSocketMatchingData data_with_md(&endpoint_md, nullptr);
   auto got_string = input_string.get(data_with_md);
-  EXPECT_EQ(got_string.data_availability_, DataInputGetResult::DataAvailability::AllDataAvailable);
-  ASSERT_TRUE(absl::holds_alternative<std::string>(got_string.data_));
-  EXPECT_EQ(absl::get<std::string>(got_string.data_), "tls");
+  EXPECT_EQ(got_string.availability(), DataAvailability::AllDataAvailable);
+  EXPECT_EQ(got_string.stringData().value(), "tls");
 
   // Overwrite to a non-string (number) and expect JSON conversion.
   auto& val_number = Config::Metadata::mutableMetadataValue(endpoint_md, "envoy.lb", "type");
   val_number.set_number_value(123);
 
   auto got_number = input_string.get(data_with_md);
-  EXPECT_EQ(got_number.data_availability_, DataInputGetResult::DataAvailability::AllDataAvailable);
-  ASSERT_TRUE(absl::holds_alternative<std::string>(got_number.data_));
-  EXPECT_EQ(absl::get<std::string>(got_number.data_), "123");
+  EXPECT_EQ(got_number.availability(), DataAvailability::AllDataAvailable);
+  EXPECT_EQ(got_number.stringData().value(), "123");
 }
 
 TEST_F(TransportSocketInputTest, EndpointMetadataInput_EmptyString) {
@@ -76,8 +74,8 @@ TEST_F(TransportSocketInputTest, EndpointMetadataInput_EmptyString) {
   EndpointMetadataInput input("envoy.lb", std::vector<std::string>{"type"});
   TransportSocketMatchingData data(&endpoint_md, nullptr);
   auto result = input.get(data);
-  EXPECT_EQ(result.data_availability_, DataInputGetResult::DataAvailability::AllDataAvailable);
-  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
+  EXPECT_EQ(result.availability(), DataAvailability::AllDataAvailable);
+  EXPECT_EQ(result.stringData(), absl::nullopt);
 }
 
 TEST_F(TransportSocketInputTest, EndpointMetadataInputFactory_WithFilterAndPath) {
@@ -102,9 +100,8 @@ TEST_F(TransportSocketInputTest, EndpointMetadataInputFactory_WithFilterAndPath)
 
   TransportSocketMatchingData data(&endpoint_md, nullptr);
   auto result = input->get(data);
-  EXPECT_EQ(result.data_availability_, DataInputGetResult::DataAvailability::AllDataAvailable);
-  ASSERT_TRUE(absl::holds_alternative<std::string>(result.data_));
-  EXPECT_EQ(absl::get<std::string>(result.data_), "us-west");
+  EXPECT_EQ(result.availability(), DataAvailability::AllDataAvailable);
+  EXPECT_EQ(result.stringData().value(), "us-west");
 }
 
 TEST_F(TransportSocketInputTest, EndpointMetadataInputFactory_DefaultFilter) {
@@ -128,17 +125,16 @@ TEST_F(TransportSocketInputTest, EndpointMetadataInputFactory_DefaultFilter) {
 
   TransportSocketMatchingData data(&endpoint_md, nullptr);
   auto result = input->get(data);
-  EXPECT_EQ(result.data_availability_, DataInputGetResult::DataAvailability::AllDataAvailable);
-  ASSERT_TRUE(absl::holds_alternative<std::string>(result.data_));
-  EXPECT_EQ(absl::get<std::string>(result.data_), "mtls");
+  EXPECT_EQ(result.availability(), DataAvailability::AllDataAvailable);
+  EXPECT_EQ(result.stringData().value(), "mtls");
 }
 
 TEST_F(TransportSocketInputTest, LocalityMetadataInput_NoLocalityMetadata) {
   LocalityMetadataInput input("envoy.lb", {"zone"});
   TransportSocketMatchingData data(nullptr, nullptr);
   auto result = input.get(data);
-  EXPECT_EQ(result.data_availability_, DataInputGetResult::DataAvailability::AllDataAvailable);
-  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
+  EXPECT_EQ(result.availability(), DataAvailability::AllDataAvailable);
+  EXPECT_EQ(result.stringData(), absl::nullopt);
 }
 
 TEST_F(TransportSocketInputTest, LocalityMetadataInput_StringValue) {
@@ -150,9 +146,8 @@ TEST_F(TransportSocketInputTest, LocalityMetadataInput_StringValue) {
   LocalityMetadataInput input("envoy.lb", std::vector<std::string>{"zone"});
   TransportSocketMatchingData data(nullptr, &locality_md);
   auto result = input.get(data);
-  EXPECT_EQ(result.data_availability_, DataInputGetResult::DataAvailability::AllDataAvailable);
-  ASSERT_TRUE(absl::holds_alternative<std::string>(result.data_));
-  EXPECT_EQ(absl::get<std::string>(result.data_), "zone-a");
+  EXPECT_EQ(result.availability(), DataAvailability::AllDataAvailable);
+  EXPECT_EQ(result.stringData().value(), "zone-a");
 }
 
 TEST_F(TransportSocketInputTest, LocalityMetadataInput_NonStringValue) {
@@ -164,9 +159,8 @@ TEST_F(TransportSocketInputTest, LocalityMetadataInput_NonStringValue) {
   LocalityMetadataInput input("envoy.lb", std::vector<std::string>{"priority"});
   TransportSocketMatchingData data(nullptr, &locality_md);
   auto result = input.get(data);
-  EXPECT_EQ(result.data_availability_, DataInputGetResult::DataAvailability::AllDataAvailable);
-  ASSERT_TRUE(absl::holds_alternative<std::string>(result.data_));
-  EXPECT_EQ(absl::get<std::string>(result.data_), "100");
+  EXPECT_EQ(result.availability(), DataAvailability::AllDataAvailable);
+  EXPECT_EQ(result.stringData().value(), "100");
 }
 
 TEST_F(TransportSocketInputTest, LocalityMetadataInput_EmptyString) {
@@ -178,8 +172,8 @@ TEST_F(TransportSocketInputTest, LocalityMetadataInput_EmptyString) {
   LocalityMetadataInput input("envoy.lb", std::vector<std::string>{"zone"});
   TransportSocketMatchingData data(nullptr, &locality_md);
   auto result = input.get(data);
-  EXPECT_EQ(result.data_availability_, DataInputGetResult::DataAvailability::AllDataAvailable);
-  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
+  EXPECT_EQ(result.availability(), DataAvailability::AllDataAvailable);
+  EXPECT_EQ(result.stringData(), absl::nullopt);
 }
 
 TEST_F(TransportSocketInputTest, LocalityMetadataInputFactory_WithFilterAndPath) {
@@ -204,9 +198,8 @@ TEST_F(TransportSocketInputTest, LocalityMetadataInputFactory_WithFilterAndPath)
 
   TransportSocketMatchingData data(nullptr, &locality_md);
   auto result = input->get(data);
-  EXPECT_EQ(result.data_availability_, DataInputGetResult::DataAvailability::AllDataAvailable);
-  ASSERT_TRUE(absl::holds_alternative<std::string>(result.data_));
-  EXPECT_EQ(absl::get<std::string>(result.data_), "production");
+  EXPECT_EQ(result.availability(), DataAvailability::AllDataAvailable);
+  EXPECT_EQ(result.stringData().value(), "production");
 }
 
 TEST_F(TransportSocketInputTest, LocalityMetadataInputFactory_DefaultFilter) {
@@ -230,9 +223,8 @@ TEST_F(TransportSocketInputTest, LocalityMetadataInputFactory_DefaultFilter) {
 
   TransportSocketMatchingData data(nullptr, &locality_md);
   auto result = input->get(data);
-  EXPECT_EQ(result.data_availability_, DataInputGetResult::DataAvailability::AllDataAvailable);
-  ASSERT_TRUE(absl::holds_alternative<std::string>(result.data_));
-  EXPECT_EQ(absl::get<std::string>(result.data_), "premium");
+  EXPECT_EQ(result.availability(), DataAvailability::AllDataAvailable);
+  EXPECT_EQ(result.stringData().value(), "premium");
 }
 
 TEST_F(TransportSocketInputTest, BothEndpointAndLocalityMetadata) {
@@ -250,16 +242,14 @@ TEST_F(TransportSocketInputTest, BothEndpointAndLocalityMetadata) {
   // Test endpoint metadata input.
   EndpointMetadataInput ep_input("envoy.lb", {"type"});
   auto ep_result = ep_input.get(data);
-  EXPECT_EQ(ep_result.data_availability_, DataInputGetResult::DataAvailability::AllDataAvailable);
-  ASSERT_TRUE(absl::holds_alternative<std::string>(ep_result.data_));
-  EXPECT_EQ(absl::get<std::string>(ep_result.data_), "secure");
+  EXPECT_EQ(ep_result.availability(), DataAvailability::AllDataAvailable);
+  EXPECT_EQ(ep_result.stringData().value(), "secure");
 
   // Test locality metadata input.
   LocalityMetadataInput loc_input("envoy.lb", {"zone"});
   auto loc_result = loc_input.get(data);
-  EXPECT_EQ(loc_result.data_availability_, DataInputGetResult::DataAvailability::AllDataAvailable);
-  ASSERT_TRUE(absl::holds_alternative<std::string>(loc_result.data_));
-  EXPECT_EQ(absl::get<std::string>(loc_result.data_), "zone-1");
+  EXPECT_EQ(loc_result.availability(), DataAvailability::AllDataAvailable);
+  EXPECT_EQ(loc_result.stringData().value(), "zone-1");
 }
 
 // Simple filter state object for testing.
@@ -288,8 +278,8 @@ TEST_F(TransportSocketInputTest, FilterStateInput_NoFilterState) {
   FilterStateInput input("test.key");
   TransportSocketMatchingData data(nullptr, nullptr, nullptr);
   auto result = input.get(data);
-  EXPECT_EQ(result.data_availability_, DataInputGetResult::DataAvailability::AllDataAvailable);
-  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
+  EXPECT_EQ(result.availability(), DataAvailability::AllDataAvailable);
+  EXPECT_EQ(result.stringData(), absl::nullopt);
 }
 
 TEST_F(TransportSocketInputTest, FilterStateInput_WithValue) {
@@ -303,9 +293,8 @@ TEST_F(TransportSocketInputTest, FilterStateInput_WithValue) {
   FilterStateInput input("envoy.network.namespace");
   TransportSocketMatchingData data(nullptr, nullptr, filter_state.get());
   auto result = input.get(data);
-  EXPECT_EQ(result.data_availability_, DataInputGetResult::DataAvailability::AllDataAvailable);
-  ASSERT_TRUE(absl::holds_alternative<std::string>(result.data_));
-  EXPECT_EQ(absl::get<std::string>(result.data_), "namespace-1");
+  EXPECT_EQ(result.availability(), DataAvailability::AllDataAvailable);
+  EXPECT_EQ(result.stringData().value(), "namespace-1");
 }
 
 TEST_F(TransportSocketInputTest, FilterStateInput_MissingKey) {
@@ -319,8 +308,8 @@ TEST_F(TransportSocketInputTest, FilterStateInput_MissingKey) {
   FilterStateInput input("envoy.network.namespace");
   TransportSocketMatchingData data(nullptr, nullptr, filter_state.get());
   auto result = input.get(data);
-  EXPECT_EQ(result.data_availability_, DataInputGetResult::DataAvailability::AllDataAvailable);
-  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
+  EXPECT_EQ(result.availability(), DataAvailability::AllDataAvailable);
+  EXPECT_EQ(result.stringData(), absl::nullopt);
 }
 
 TEST_F(TransportSocketInputTest, FilterStateInput_NonSerializable) {
@@ -335,8 +324,8 @@ TEST_F(TransportSocketInputTest, FilterStateInput_NonSerializable) {
   FilterStateInput input("test.key");
   TransportSocketMatchingData data(nullptr, nullptr, filter_state.get());
   auto result = input.get(data);
-  EXPECT_EQ(result.data_availability_, DataInputGetResult::DataAvailability::AllDataAvailable);
-  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
+  EXPECT_EQ(result.availability(), DataAvailability::AllDataAvailable);
+  EXPECT_EQ(result.stringData(), absl::nullopt);
 }
 
 TEST_F(TransportSocketInputTest, FilterStateInput_EmptyString) {
@@ -351,8 +340,8 @@ TEST_F(TransportSocketInputTest, FilterStateInput_EmptyString) {
   FilterStateInput input("test.key");
   TransportSocketMatchingData data(nullptr, nullptr, filter_state.get());
   auto result = input.get(data);
-  EXPECT_EQ(result.data_availability_, DataInputGetResult::DataAvailability::AllDataAvailable);
-  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
+  EXPECT_EQ(result.availability(), DataAvailability::AllDataAvailable);
+  EXPECT_EQ(result.stringData(), absl::nullopt);
 }
 
 TEST_F(TransportSocketInputTest, FilterStateInputFactory) {
@@ -378,9 +367,8 @@ TEST_F(TransportSocketInputTest, FilterStateInputFactory) {
 
   TransportSocketMatchingData data(nullptr, nullptr, filter_state.get());
   auto result = input->get(data);
-  EXPECT_EQ(result.data_availability_, DataInputGetResult::DataAvailability::AllDataAvailable);
-  ASSERT_TRUE(absl::holds_alternative<std::string>(result.data_));
-  EXPECT_EQ(absl::get<std::string>(result.data_), "test-namespace");
+  EXPECT_EQ(result.availability(), DataAvailability::AllDataAvailable);
+  EXPECT_EQ(result.stringData().value(), "test-namespace");
 }
 
 } // namespace

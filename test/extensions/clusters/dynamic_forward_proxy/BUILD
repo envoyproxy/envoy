@@ -26,7 +26,6 @@ envoy_extension_cc_test(
         "//source/extensions/transport_sockets/tls:config",
         "//test/common/upstream:utility_lib",
         "//test/extensions/common/dynamic_forward_proxy:mocks",
-        "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:admin_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/server:options_mocks",

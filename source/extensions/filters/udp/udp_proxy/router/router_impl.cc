@@ -65,7 +65,7 @@ RouterImpl::RouterImpl(const envoy::extensions::filters::udp::udp_proxy::v3::Udp
 const std::string RouterImpl::route(const Network::Address::Instance& destination_address,
                                     const Network::Address::Instance& source_address) const {
   Network::Matching::UdpMatchingDataImpl data(destination_address, source_address);
-  const Matcher::MatchResult result =
+  const Matcher::ActionMatchResult result =
       Matcher::evaluateMatch<Network::UdpMatchingData>(*matcher_, data);
   ASSERT(result.isComplete());
   if (result.isMatch()) {

@@ -92,7 +92,7 @@ envoy_cc_library(
         ":substitution_formatter_lib",
         "//envoy/access_log:access_log_interface",
         "//envoy/event:dispatcher_interface",
-        "//envoy/local_info:local_info_interface",
+        "//envoy/server:factory_context_interface",
         "//envoy/singleton:instance_interface",
         "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:cluster_manager_interface",
@@ -100,6 +100,7 @@ envoy_cc_library(
         "//source/common/http:async_client_lib",
         "//source/common/http:async_client_utility_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http:http_service_headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
@@ -129,6 +130,9 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    extra_visibility = [
+        "//test/integration:__subpackages__",
+    ],
     deps = [
         "//envoy/access_log:access_log_config_interface",
         "//source/common/common:assert_lib",

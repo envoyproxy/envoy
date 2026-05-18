@@ -12,6 +12,7 @@ import stat
 import sys
 import traceback
 import shutil
+import shlex
 from functools import cached_property
 from typing import Callable, Dict, Iterator, List, Pattern, Tuple, Union
 
@@ -881,8 +882,13 @@ class FormatChecker:
 
     def check_source_path(self, file_path):
         error_messages = []
-        if self.run_code_validation:
+        # This dynamic module SDK will be built into a shared library which we prefer to use
+        # standard library rather then the absl equivalents. We simply skip the content check
+        # for this directory to avoid false positives.
+        if self.run_code_validation and "dynamic_modules/sdk/cpp" not in file_path:
             error_messages = self.check_file_contents(file_path, self.check_source_line)
+        if file_path.endswith((".cc", ".h")):
+            error_messages += self.check_namespace(file_path)
         error_messages.extend(self.clang_format(file_path, check=True))
         return error_messages
 
@@ -911,16 +917,18 @@ class FormatChecker:
 
     def clang_format(self, file_path, check=False):
         result = []
-        command = (
-            f"{self.config.clang_format_path} {file_path} | diff {file_path} -"
-            if check else f"{self.config.clang_format_path} -i {file_path}")
-
+        quoted_path = shlex.quote(file_path)
         if check:
+            command = f"{self.config.clang_format_path} {quoted_path} | diff {quoted_path} -"
             result = self.execute_command(command, "clang-format check failed", file_path)
         else:
-            if os.system(command) != 0:
+            ret = subprocess.run(
+                [self.config.clang_format_path, "-i", file_path],
+                capture_output=True,
+                text=True
+            )
+            if ret.returncode != 0:
                 result = [f"clang-format rewrite error: {file_path}"]
-
         return result
 
     def check_format(self, file_path, fail_on_diff=False):

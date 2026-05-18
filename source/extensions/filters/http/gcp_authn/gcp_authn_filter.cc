@@ -33,8 +33,8 @@ using JwtVerify::Status;
 
 // TODO(tyxia) Handle the duplicated outstanding requests.
 Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& hdrs, bool) {
-  Envoy::Router::RouteConstSharedPtr route = decoder_callbacks_->route();
-  if (route == nullptr || route->routeEntry() == nullptr) {
+  const auto route = decoder_callbacks_->route();
+  if (!route || !route->routeEntry()) {
     // Nothing to do if no route, continue the filter chain iteration.
     return Envoy::Http::FilterHeadersStatus::Continue;
   }

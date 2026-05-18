@@ -10,12 +10,11 @@ namespace Network {
 namespace Matching {
 
 Matcher::DataInputGetResult TransportProtocolInput::get(const MatchingData& data) const {
-  const auto transport_protocol = data.socket().detectedTransportProtocol();
+  absl::string_view transport_protocol = data.socket().detectedTransportProtocol();
   if (!transport_protocol.empty()) {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            std::string(transport_protocol)};
+    return Matcher::DataInputGetResult::CreateStringView(transport_protocol);
   }
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+  return Matcher::DataInputGetResult::NoData();
 }
 
 class DestinationIPInputFactory : public DestinationIPInputBaseFactory<MatchingData> {};

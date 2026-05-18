@@ -18,6 +18,7 @@ envoy_cc_extension(
     ],
     external_deps = ["ssl"],
     deps = [
+        "//envoy/router:string_accessor_interface",
         "//envoy/ssl:context_config_interface",
         "//envoy/ssl:ssl_socket_extended_info_interface",
         "//source/common/common:assert_lib",

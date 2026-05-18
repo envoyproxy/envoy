@@ -68,6 +68,11 @@ public class AndroidEngineImpl implements EnvoyEngine {
   }
 
   @Override
+  public long getEngineHandle() {
+    return envoyEngine.getEngineHandle();
+  }
+
+  @Override
   public int recordCounterInc(String elements, Map<String, String> tags, int count) {
     return envoyEngine.recordCounterInc(elements, tags, count);
   }

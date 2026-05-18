@@ -35,14 +35,13 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& ssl = data.ssl();
     if (!ssl) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
+      return Matcher::DataInputGetResult::NoData(Matcher::DataAvailability::NotAvailable);
     }
     const auto& uri = ssl->uriSanPeerCertificate();
     if (!uri.empty()) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-              absl::StrJoin(uri, ",")};
+      return Matcher::DataInputGetResult::CreateString(absl::StrJoin(uri, ","));
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+    return Matcher::DataInputGetResult::NoData();
   }
 };
 
@@ -63,14 +62,13 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& ssl = data.ssl();
     if (!ssl) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
+      return Matcher::DataInputGetResult::NoData(Matcher::DataAvailability::NotAvailable);
     }
     const auto& dns = ssl->dnsSansPeerCertificate();
     if (!dns.empty()) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-              absl::StrJoin(dns, ",")};
+      return Matcher::DataInputGetResult::CreateString(absl::StrJoin(dns, ","));
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+    return Matcher::DataInputGetResult::NoData();
   }
 };
 
@@ -91,14 +89,13 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& ssl = data.ssl();
     if (!ssl) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
+      return Matcher::DataInputGetResult::NoData(Matcher::DataAvailability::NotAvailable);
     }
-    const auto& subject = ssl->subjectPeerCertificate();
+    const std::string& subject = ssl->subjectPeerCertificate();
     if (!subject.empty()) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-              std::string(subject)};
+      return Matcher::DataInputGetResult::CreateStringView(subject);
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+    return Matcher::DataInputGetResult::NoData();
   }
 };
 

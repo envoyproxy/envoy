@@ -336,6 +336,7 @@ envoy_cc_test(
         "//source/common/http:headers_lib",
         "//source/common/http/matching:data_impl_lib",
         "//source/common/http/matching:inputs_lib",
+        "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",
@@ -345,7 +346,7 @@ envoy_cc_test(
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:test_runtime_lib",
@@ -438,6 +439,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "http_service_headers_test",
+    srcs = ["http_service_headers_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/formatter:formatter_extension_lib",
+        "//source/common/http:http_service_headers_lib",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "user_agent_test",
     srcs = ["user_agent_test.cc"],
     rbe_pool = "6gig",
@@ -479,7 +492,7 @@ envoy_cc_test(
         "//source/common/http:utility_lib",
         "//source/common/network:address_lib",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
@@ -706,7 +719,7 @@ envoy_cc_fuzz_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:overload_manager_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/tracing:tracing_mocks",

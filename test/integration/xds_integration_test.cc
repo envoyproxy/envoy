@@ -11,6 +11,7 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/ssl_utility.h"
+#include "test/mocks/secret/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
@@ -21,6 +22,8 @@
 namespace Envoy {
 namespace {
 
+using testing::Eq;
+using testing::Ge;
 using testing::HasSubstr;
 
 // This is a minimal litmus test for the v3 xDS APIs.
@@ -261,7 +264,7 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigDeletingFilterChain)
         }
       });
   new_config_helper.setLds("1");
-  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Ge(1));
 
   while (!client_conn_1->closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -287,7 +290,7 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigDeletingFilterChain)
 TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
   setUpstreamCount(2);
   initialize();
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
 
   std::string response_0;
   auto client_conn_0 = createConnectionAndWrite("alpn0", "hello", response_0);
@@ -324,8 +327,8 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
         }
       });
   new_config_helper.setLds("1");
-  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Ge(1));
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(2));
 
   std::string response_2;
   auto client_conn_2 = createConnectionAndWrite("alpn2", "hello2", response_2);
@@ -528,16 +531,16 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigDeletingFilterChain) {
       });
 
   new_config_helper.setLds("1");
-  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
-  test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 1);
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Ge(1));
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Ge(1));
 
-  test_server_->waitForGaugeGe("http.hcm0.downstream_cx_active", 1);
-  test_server_->waitForGaugeGe("http.hcm1.downstream_cx_active", 1);
+  test_server_->waitForGauge("http.hcm0.downstream_cx_active", Ge(1));
+  test_server_->waitForGauge("http.hcm1.downstream_cx_active", Ge(1));
 
   expectResponseHeaderConnectionClose(*codec_client_1, true);
   expectResponseHeaderConnectionClose(*codec_client_default, true);
 
-  test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 0);
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Ge(0));
   expectResponseHeaderConnectionClose(*codec_client_0, false);
   expectConnectionServed();
 
@@ -551,11 +554,11 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigDeletingFilterChain) {
 // chain 2 and default filter chain.
 TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigAddingFilterChain) {
   inplaceInitialize();
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
 
   auto codec_client_0 = createHttpCodec("alpn0");
   Cleanup cleanup0([c0 = codec_client_0.get()]() { c0->close(); });
-  test_server_->waitForGaugeGe("http.hcm0.downstream_cx_active", 1);
+  test_server_->waitForGauge("http.hcm0.downstream_cx_active", Ge(1));
 
   ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
   new_config_helper.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap)
@@ -574,14 +577,14 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigAddingFilterChain) {
     default_filter_chain->set_name("default");
   });
   new_config_helper.setLds("1");
-  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Ge(1));
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(2));
 
   auto codec_client_2 = createHttpCodec("alpn2");
   auto codec_client_default = createHttpCodec("alpndefault");
 
   // 1 connection from filter chain 0 and 1 connection from filter chain 2.
-  test_server_->waitForGaugeGe("http.hcm0.downstream_cx_active", 2);
+  test_server_->waitForGauge("http.hcm0.downstream_cx_active", Ge(2));
 
   Cleanup cleanup2([c2 = codec_client_2.get(), c_default = codec_client_default.get()]() {
     c2->close();
@@ -597,7 +600,7 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigAddingFilterChain) {
 // chain updates.
 TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigUpdatingDefaultFilterChain) {
   inplaceInitialize(true);
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
 
   auto codec_client_default = createHttpCodec("alpndefault");
   Cleanup cleanup0([c_default = codec_client_default.get()]() { c_default->close(); });
@@ -609,8 +612,8 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigUpdatingDefaultFilterCha
     default_filter_chain->set_name("default_filter_chain_v3");
   });
   new_config_helper.setLds("1");
-  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Ge(1));
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(2));
 
   auto codec_client_default_v3 = createHttpCodec("alpndefaultv3");
 
@@ -636,7 +639,7 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, OverlappingFilterChainServesNewConne
       });
 
   new_config_helper.setLds("1");
-  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Ge(1));
   expectResponseHeaderConnectionClose(*codec_client_0, false);
   expectConnectionServed();
 }
@@ -685,8 +688,8 @@ TEST_P(LdsIntegrationTest, ReloadConfig) {
 
   // Create an LDS response with the new config, and reload config.
   new_config_helper.setLds("1");
-  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 2);
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Ge(1));
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(2));
 
   // HTTP 1.0 should now be enabled.
   std::string response2;
@@ -720,7 +723,7 @@ TEST_P(LdsIntegrationTest, NewListenerWithBadPostListenSocketOption) {
         socket_option->set_int_value(10000); // Invalid value.
       });
   new_config_helper.setLds("1");
-  test_server_->waitForCounterGe("listener_manager.listener_create_failure", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_failure", Ge(1));
 }
 
 // Sample test making sure our config framework informs on listener failure.
@@ -773,7 +776,7 @@ TEST_P(LdsStsIntegrationTest, DISABLED_TcpListenerRemoveFilterChainCalledAfterLi
   }
   // Wait for the filter chain removal at worker thread. When the value drops from 1, all pending
   // removal at the worker is completed. This is the end of the in place update.
-  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
 }
 
 constexpr char XDS_CLUSTER_NAME_1[] = "xds_cluster_1.lyft.com";
@@ -968,10 +971,10 @@ TEST_P(XdsSotwMultipleAuthoritiesTest, SameResourceNameAndTypeFromMultipleAuthor
   initialize();
 
   // Wait until the discovery responses have been processed.
-  test_server_->waitForCounterGe(
-      "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
-  test_server_->waitForCounterGe(
-      "cluster.cluster_1.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
+  test_server_->waitForCounter(
+      "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", Ge(1));
+  test_server_->waitForCounter(
+      "cluster.cluster_1.client_ssl_socket_factory.ssl_context_update_by_sds", Ge(1));
 
   auto config_dump = getSecretsFromConfigDump();
   // Two xDS resources with the same name and same type.

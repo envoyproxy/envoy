@@ -35,6 +35,7 @@ envoy_cc_library(
         "//envoy/http:message_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
+        "//envoy/registry",
         "//envoy/router:string_accessor_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",

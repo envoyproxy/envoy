@@ -354,6 +354,73 @@ TEST_F(JsonRpcFieldExtractorTest, InvalidJsonRpcMissingMethod) {
   EXPECT_FALSE(extractor.isValidJsonRpc());
 }
 
+TEST_F(JsonRpcFieldExtractorTest, ResponseWithResult) {
+  ExtractorTestJsonRpcParserConfig config;
+  Protobuf::Struct metadata;
+  TestJsonRpcFieldExtractor extractor(metadata, config);
+
+  extractor.StartObject("");
+  extractor.RenderString("jsonrpc", "2.0");
+  extractor.RenderString("result", "success");
+  extractor.RenderInt32("id", 1);
+  extractor.EndObject();
+  extractor.finalizeExtraction();
+
+  EXPECT_TRUE(extractor.isValidJsonRpc());
+  EXPECT_TRUE(metadata.fields().contains("result"));
+  EXPECT_EQ("success", metadata.fields().at("result").string_value());
+  EXPECT_TRUE(metadata.fields().contains("id"));
+  EXPECT_EQ(1, metadata.fields().at("id").number_value());
+  EXPECT_TRUE(metadata.fields().contains("jsonrpc"));
+  EXPECT_EQ("2.0", metadata.fields().at("jsonrpc").string_value());
+  EXPECT_FALSE(metadata.fields().contains("error"));
+  EXPECT_FALSE(metadata.fields().contains("method"));
+}
+
+TEST_F(JsonRpcFieldExtractorTest, ResponseWithError) {
+  ExtractorTestJsonRpcParserConfig config;
+  Protobuf::Struct metadata;
+  TestJsonRpcFieldExtractor extractor(metadata, config);
+
+  extractor.StartObject("");
+  extractor.RenderString("jsonrpc", "2.0");
+  extractor.StartObject("error");
+  extractor.RenderInt32("code", -32602);
+  extractor.RenderString("message", "Invalid parameters");
+  extractor.EndObject();
+  extractor.RenderInt32("id", 1);
+  extractor.EndObject();
+  extractor.finalizeExtraction();
+
+  EXPECT_TRUE(extractor.isValidJsonRpc());
+  EXPECT_FALSE(metadata.fields().contains("result"));
+  EXPECT_TRUE(metadata.fields().contains("error"));
+  EXPECT_TRUE(metadata.fields().at("error").has_struct_value());
+  EXPECT_EQ(-32602,
+            metadata.fields().at("error").struct_value().fields().at("code").number_value());
+  EXPECT_EQ("Invalid parameters",
+            metadata.fields().at("error").struct_value().fields().at("message").string_value());
+  EXPECT_TRUE(metadata.fields().contains("id"));
+  EXPECT_EQ(1, metadata.fields().at("id").number_value());
+  EXPECT_TRUE(metadata.fields().contains("jsonrpc"));
+  EXPECT_EQ("2.0", metadata.fields().at("jsonrpc").string_value());
+  EXPECT_FALSE(metadata.fields().contains("method"));
+}
+
+TEST_F(JsonRpcFieldExtractorTest, InvalidJsonRpcResponseMissingResultAndError) {
+  ExtractorTestJsonRpcParserConfig config;
+  Protobuf::Struct metadata;
+  TestJsonRpcFieldExtractor extractor(metadata, config);
+
+  extractor.StartObject("");
+  extractor.RenderString("jsonrpc", "2.0");
+  extractor.RenderInt32("id", 1);
+  extractor.EndObject();
+  extractor.finalizeExtraction();
+
+  EXPECT_FALSE(extractor.isValidJsonRpc());
+}
+
 } // namespace
 } // namespace Json
 } // namespace Envoy

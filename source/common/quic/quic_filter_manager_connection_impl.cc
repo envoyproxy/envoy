@@ -77,6 +77,11 @@ void QuicFilterManagerConnectionImpl::setBufferLimits(uint32_t /*limit*/) {
   IS_ENVOY_BUG("unexpected call to setBufferLimits");
 }
 
+void QuicFilterManagerConnectionImpl::setBufferHighWatermarkTimeout(
+    std::chrono::milliseconds /*timeout*/) {
+  IS_ENVOY_BUG("unexpected call to setBufferHighWatermarkTimeout");
+}
+
 bool QuicFilterManagerConnectionImpl::aboveHighWatermark() const {
   return write_buffer_watermark_simulation_.isAboveHighWatermark();
 }
@@ -230,16 +235,12 @@ void QuicFilterManagerConnectionImpl::closeConnectionImmediately() {
 
 void QuicFilterManagerConnectionImpl::onSendBufferHighWatermark() {
   ENVOY_CONN_LOG(trace, "onSendBufferHighWatermark", *this);
-  for (auto callback : callbacks_) {
-    callback->onAboveWriteBufferHighWatermark();
-  }
+  onFilterAboveHighWatermark();
 }
 
 void QuicFilterManagerConnectionImpl::onSendBufferLowWatermark() {
   ENVOY_CONN_LOG(trace, "onSendBufferLowWatermark", *this);
-  for (auto callback : callbacks_) {
-    callback->onBelowWriteBufferLowWatermark();
-  }
+  onFilterBelowLowWatermark();
 }
 
 absl::optional<std::chrono::milliseconds>

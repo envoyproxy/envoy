@@ -29,6 +29,8 @@ ActiveTcpSocket::ActiveTcpSocket(ActiveStreamListenerBase& listener,
         StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
   }
+
+  socket_->connectionInfoProvider().setListenerInfo(listener_.config_->listenerInfo());
 }
 
 ActiveTcpSocket::~ActiveTcpSocket() {

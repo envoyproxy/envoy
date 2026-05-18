@@ -164,6 +164,9 @@ type StreamInfo interface {
 	// For HTTP/1.x, this will add a "Connection: close" header to the response.
 	// For HTTP/2 and HTTP/3, this will send a GOAWAY frame after the response is sent.
 	DrainConnectionUponCompletion()
+	// DownstreamSslConnection returns SSL connection info for the downstream connection
+	// Returns nil if the connection is not secured with SSL/TLS
+	DownstreamSslConnection() SslConnection
 	// Some fields in stream info can be fetched via GetProperty
 	// For example, startTime() is equal to GetProperty("request.time")
 }
@@ -338,6 +341,72 @@ const (
 type FilterState interface {
 	SetString(key, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
 	GetString(key string) string
+}
+
+// SslConnection provides SSL/TLS connection information for the downstream connection.
+// This interface mirrors envoy/ssl/connection.h and provides access to peer certificate
+// details, TLS version, cipher suite, and other SSL/TLS connection properties.
+//
+// Note: Most methods that return certificate information will return empty values
+// (empty string, nil slice, or false for the bool return) when the information is not available.
+// Refer to https://github.com/envoyproxy/envoy/blob/main/envoy/ssl/connection.h
+type SslConnection interface {
+	// PeerCertificatePresented returns whether the peer certificate was presented
+	PeerCertificatePresented() bool
+	// PeerCertificateValidated returns whether the peer certificate was validated
+	PeerCertificateValidated() bool
+
+	// Sha256PeerCertificateDigest returns the SHA256 digest of the peer certificate.
+	// Returns empty string if not available.
+	Sha256PeerCertificateDigest() string
+	// SerialNumberPeerCertificate returns the serial number of the peer certificate.
+	// Returns empty string if not available.
+	SerialNumberPeerCertificate() string
+	// SubjectPeerCertificate returns the subject field of the peer certificate.
+	// Returns empty string if not available.
+	SubjectPeerCertificate() string
+	// IssuerPeerCertificate returns the issuer field of the peer certificate.
+	// Returns empty string if not available.
+	IssuerPeerCertificate() string
+	// SubjectLocalCertificate returns the subject field of the local certificate.
+	// Returns empty string if not available.
+	SubjectLocalCertificate() string
+
+	// UriSanPeerCertificate returns the URI SANs of the peer certificate.
+	// Returns nil if not available.
+	UriSanPeerCertificate() []string
+	// UriSanLocalCertificate returns the URI SANs of the local certificate.
+	// Returns nil if not available.
+	UriSanLocalCertificate() []string
+	// DnsSansPeerCertificate returns the DNS SANs of the peer certificate.
+	// Returns nil if not available.
+	DnsSansPeerCertificate() []string
+	// DnsSansLocalCertificate returns the DNS SANs of the local certificate.
+	// Returns nil if not available.
+	DnsSansLocalCertificate() []string
+
+	// ValidFromPeerCertificate returns the validity start time of the peer certificate as Unix timestamp
+	ValidFromPeerCertificate() (uint64, bool)
+	// ExpirationPeerCertificate returns the expiration time of the peer certificate as Unix timestamp
+	ExpirationPeerCertificate() (uint64, bool)
+
+	// TlsVersion returns the TLS version (e.g., "TLSv1.3")
+	TlsVersion() string
+	// CiphersuiteString returns the ciphersuite name (e.g., "AES128-SHA").
+	// Returns empty string if not available.
+	CiphersuiteString() string
+	// CiphersuiteId returns the ciphersuite ID
+	CiphersuiteId() (uint16, bool)
+	// SessionId returns the TLS session ID.
+	// The second return value indicates whether the value is available.
+	SessionId() (string, bool)
+
+	// UrlEncodedPemEncodedPeerCertificate returns the URL-encoded PEM-encoded peer certificate.
+	// Returns empty string if not available.
+	UrlEncodedPemEncodedPeerCertificate() string
+	// UrlEncodedPemEncodedPeerCertificateChain returns the URL-encoded PEM-encoded peer certificate chain.
+	// Returns empty string if not available.
+	UrlEncodedPemEncodedPeerCertificateChain() string
 }
 
 type SecretManager interface {

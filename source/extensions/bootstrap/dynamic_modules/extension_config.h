@@ -4,11 +4,14 @@
 
 #include "envoy/common/optref.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/filesystem/watcher.h"
 #include "envoy/http/async_client.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/http/message_impl.h"
@@ -23,6 +26,10 @@ namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
 namespace DynamicModules {
+
+// The default custom stat namespace which prepends all user-defined metrics.
+// This can be overridden via the ``metrics_namespace`` field in ``DynamicModuleConfig``.
+constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
 
 using OnBootstrapExtensionConfigDestroyType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_config_destroy);
@@ -43,6 +50,18 @@ using OnBootstrapExtensionHttpCalloutDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_http_callout_done);
 using OnBootstrapExtensionTimerFiredType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_timer_fired);
+using OnBootstrapExtensionFileChangedType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_file_changed);
+using OnBootstrapExtensionAdminRequestType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_admin_request);
+using OnBootstrapExtensionClusterAddOrUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update);
+using OnBootstrapExtensionClusterRemovalType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_cluster_removal);
+using OnBootstrapExtensionListenerAddOrUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update);
+using OnBootstrapExtensionListenerRemovalType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_removal);
 
 class DynamicModuleBootstrapExtension;
 
@@ -52,12 +71,15 @@ class DynamicModuleBootstrapExtension;
  */
 class DynamicModuleBootstrapExtensionConfig
     : public std::enable_shared_from_this<DynamicModuleBootstrapExtensionConfig>,
+      public Upstream::ClusterUpdateCallbacks,
+      public Server::ListenerUpdateCallbacks,
       public Logger::Loggable<Logger::Id::dynamic_modules> {
 public:
   /**
    * Constructor for the config.
    * @param extension_name the name of the extension.
    * @param extension_config the configuration for the module.
+   * @param metrics_namespace the namespace prefix for metrics emitted by this module.
    * @param dynamic_module the dynamic module to use.
    * @param main_thread_dispatcher the main thread dispatcher.
    * @param context the server factory context for accessing cluster manager lazily.
@@ -65,12 +87,13 @@ public:
    */
   DynamicModuleBootstrapExtensionConfig(const absl::string_view extension_name,
                                         const absl::string_view extension_config,
+                                        const absl::string_view metrics_namespace,
                                         Extensions::DynamicModules::DynamicModulePtr dynamic_module,
                                         Event::Dispatcher& main_thread_dispatcher,
                                         Server::Configuration::ServerFactoryContext& context,
                                         Stats::Store& stats_store);
 
-  ~DynamicModuleBootstrapExtensionConfig();
+  ~DynamicModuleBootstrapExtensionConfig() override;
 
   /**
    * This is called when an event is scheduled via
@@ -104,6 +127,48 @@ public:
    */
   void signalInitComplete();
 
+  /**
+   * Enables cluster lifecycle event notifications. When enabled, the module will receive
+   * on_bootstrap_extension_cluster_add_or_update and on_bootstrap_extension_cluster_removal
+   * callbacks when clusters are added, updated, or removed.
+   *
+   * This must be called on the main thread after the server is initialized, since the
+   * ClusterManager is not available during bootstrap extension creation.
+   *
+   * @return true if the callbacks were successfully registered, false if already registered.
+   */
+  bool enableClusterLifecycle();
+
+  // Upstream::ClusterUpdateCallbacks
+  void onClusterAddOrUpdate(absl::string_view cluster_name,
+                            Upstream::ThreadLocalClusterCommand& get_cluster) override;
+  void onClusterRemoval(const std::string& cluster_name) override;
+
+  /**
+   * Sets the listener manager reference. Must be called during onServerInitialized before
+   * the module can enable listener lifecycle events.
+   */
+  void setListenerManager(Server::ListenerManager& listener_manager) {
+    listener_manager_ = &listener_manager;
+  }
+
+  /**
+   * Enables listener lifecycle event notifications. When enabled, the module will receive
+   * on_bootstrap_extension_listener_add_or_update and on_bootstrap_extension_listener_removal
+   * callbacks when listeners are added, updated, or removed.
+   *
+   * This must be called on the main thread after the server is initialized, since the
+   * ListenerManager is not available during bootstrap extension creation.
+   *
+   * @return true if the callbacks were successfully registered, false if already registered.
+   */
+  bool enableListenerLifecycle();
+
+  // Server::ListenerUpdateCallbacks
+  void onListenerAddOrUpdate(absl::string_view listener_name,
+                             const Network::ListenerConfig& listener_config) override;
+  void onListenerRemoval(const std::string& listener_name) override;
+
   // The corresponding in-module configuration.
   envoy_dynamic_module_type_bootstrap_extension_config_module_ptr in_module_config_ = nullptr;
 
@@ -121,12 +186,25 @@ public:
   OnBootstrapExtensionConfigScheduledType on_bootstrap_extension_config_scheduled_ = nullptr;
   OnBootstrapExtensionHttpCalloutDoneType on_bootstrap_extension_http_callout_done_ = nullptr;
   OnBootstrapExtensionTimerFiredType on_bootstrap_extension_timer_fired_ = nullptr;
+  OnBootstrapExtensionFileChangedType on_bootstrap_extension_file_changed_ = nullptr;
+  OnBootstrapExtensionAdminRequestType on_bootstrap_extension_admin_request_ = nullptr;
+  OnBootstrapExtensionClusterAddOrUpdateType on_bootstrap_extension_cluster_add_or_update_ =
+      nullptr;
+  OnBootstrapExtensionClusterRemovalType on_bootstrap_extension_cluster_removal_ = nullptr;
+  OnBootstrapExtensionListenerAddOrUpdateType on_bootstrap_extension_listener_add_or_update_ =
+      nullptr;
+  OnBootstrapExtensionListenerRemovalType on_bootstrap_extension_listener_removal_ = nullptr;
 
   // The dynamic module.
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
 
   // The main thread dispatcher.
   Event::Dispatcher& main_thread_dispatcher_;
+
+  // File watchers created by
+  // envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch. Envoy owns the
+  // lifetime — watchers are destroyed when the config is destroyed.
+  std::vector<Filesystem::WatcherPtr> file_watchers_;
 
   // The server factory context for accessing cluster manager lazily. ClusterManager is not
   // available during bootstrap extension creation, so we store the context and access it when
@@ -236,87 +314,97 @@ public:
     Stats::Histogram::Unit unit_;
   };
 
+// We use 1-based IDs for the metrics in the ABI, so we need to convert them to 0-based indices
+// for our internal storage. These helper functions do that conversion.
+#define ID_TO_INDEX(id) ((id) - 1)
+
   size_t addCounter(ModuleCounterHandle&& counter) {
-    size_t id = counters_.size();
     counters_.push_back(std::move(counter));
-    return id;
+    return counters_.size();
   }
 
   size_t addCounterVec(ModuleCounterVecHandle&& counter_vec) {
-    size_t id = counter_vecs_.size();
     counter_vecs_.push_back(std::move(counter_vec));
-    return id;
+    return counter_vecs_.size();
   }
 
   size_t addGauge(ModuleGaugeHandle&& gauge) {
-    size_t id = gauges_.size();
     gauges_.push_back(std::move(gauge));
-    return id;
+    return gauges_.size();
   }
 
   size_t addGaugeVec(ModuleGaugeVecHandle&& gauge_vec) {
-    size_t id = gauge_vecs_.size();
     gauge_vecs_.push_back(std::move(gauge_vec));
-    return id;
+    return gauge_vecs_.size();
   }
 
   size_t addHistogram(ModuleHistogramHandle&& histogram) {
-    size_t id = histograms_.size();
     histograms_.push_back(std::move(histogram));
-    return id;
+    return histograms_.size();
   }
 
   size_t addHistogramVec(ModuleHistogramVecHandle&& histogram_vec) {
-    size_t id = histogram_vecs_.size();
     histogram_vecs_.push_back(std::move(histogram_vec));
-    return id;
+    return histogram_vecs_.size();
   }
 
   OptRef<const ModuleCounterHandle> getCounterById(size_t id) const {
-    if (id >= counters_.size()) {
+    if (id == 0 || id > counters_.size()) {
       return {};
     }
-    return counters_[id];
+    return counters_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleCounterVecHandle> getCounterVecById(size_t id) const {
-    if (id >= counter_vecs_.size()) {
+    if (id == 0 || id > counter_vecs_.size()) {
       return {};
     }
-    return counter_vecs_[id];
+    return counter_vecs_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleGaugeHandle> getGaugeById(size_t id) const {
-    if (id >= gauges_.size()) {
+    if (id == 0 || id > gauges_.size()) {
       return {};
     }
-    return gauges_[id];
+    return gauges_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleGaugeVecHandle> getGaugeVecById(size_t id) const {
-    if (id >= gauge_vecs_.size()) {
+    if (id == 0 || id > gauge_vecs_.size()) {
       return {};
     }
-    return gauge_vecs_[id];
+    return gauge_vecs_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleHistogramHandle> getHistogramById(size_t id) const {
-    if (id >= histograms_.size()) {
+    if (id == 0 || id > histograms_.size()) {
       return {};
     }
-    return histograms_[id];
+    return histograms_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleHistogramVecHandle> getHistogramVecById(size_t id) const {
-    if (id >= histogram_vecs_.size()) {
+    if (id == 0 || id > histogram_vecs_.size()) {
       return {};
     }
-    return histogram_vecs_[id];
+    return histogram_vecs_[ID_TO_INDEX(id)];
   }
+
+#undef ID_TO_INDEX
 
   // Stats scope for metric creation.
   const Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNamePool stat_name_pool_;
+  // We only allow the module to create stats during on_bootstrap_extension_config_new, and not
+  // later from worker threads, so that we don't have to wrap stat_name_pool_ in a lock.
+  // Per-request label values use a stack-local Stats::StatNameDynamicPool in the increment
+  // callbacks (see abi_impl.cc).
+  bool stat_creation_frozen_ = false;
+
+  // Temporary storage for the admin response body. Set by the
+  // envoy_dynamic_module_callback_bootstrap_extension_admin_set_response callback during
+  // on_bootstrap_extension_admin_request, then consumed by the admin handler lambda.
+  std::string admin_response_body_;
 
 private:
   /**
@@ -360,6 +448,26 @@ private:
   std::vector<ModuleGaugeVecHandle> gauge_vecs_;
   std::vector<ModuleHistogramHandle> histograms_;
   std::vector<ModuleHistogramVecHandle> histogram_vecs_;
+
+  // Cluster lifecycle callback handle. Set when the module enables cluster lifecycle events
+  // via enableClusterLifecycle(). Reset during shutdown to avoid use-after-free since the
+  // underlying TLS data is destroyed before the config.
+  Upstream::ClusterUpdateCallbacksHandlePtr cluster_update_callbacks_handle_;
+  // Handle for the shutdown lifecycle callback that cleans up cluster_update_callbacks_handle_.
+  Server::ServerLifecycleNotifier::HandlePtr cluster_lifecycle_shutdown_handle_;
+  bool cluster_lifecycle_enabled_ = false;
+
+  // Listener manager pointer. Set during onServerInitialized via setListenerManager().
+  // Not available during bootstrap extension creation.
+  Server::ListenerManager* listener_manager_ = nullptr;
+
+  // Listener lifecycle callback handle. Set when the module enables listener lifecycle events
+  // via enableListenerLifecycle(). Reset during shutdown to avoid use-after-free since the
+  // ListenerManager is destroyed before the config.
+  Server::ListenerUpdateCallbacksHandlePtr listener_update_callbacks_handle_;
+  // Handle for the shutdown lifecycle callback that cleans up listener_update_callbacks_handle_.
+  Server::ServerLifecycleNotifier::HandlePtr listener_lifecycle_shutdown_handle_;
+  bool listener_lifecycle_enabled_ = false;
 };
 
 using DynamicModuleBootstrapExtensionConfigSharedPtr =
@@ -373,14 +481,19 @@ using DynamicModuleBootstrapExtensionConfigSharedPtr =
  */
 class DynamicModuleBootstrapExtensionConfigScheduler {
 public:
-  DynamicModuleBootstrapExtensionConfigScheduler(
-      std::weak_ptr<DynamicModuleBootstrapExtensionConfig> config, Event::Dispatcher& dispatcher)
-      : config_(std::move(config)), dispatcher_(dispatcher) {}
+  explicit DynamicModuleBootstrapExtensionConfigScheduler(
+      std::weak_ptr<DynamicModuleBootstrapExtensionConfig> config)
+      : config_(std::move(config)) {}
 
   void commit(uint64_t event_id) {
-    dispatcher_.post([config = config_, event_id]() {
-      if (std::shared_ptr<DynamicModuleBootstrapExtensionConfig> config_shared = config.lock()) {
-        config_shared->onScheduled(event_id);
+    // Lock the config so its dispatcher member stays valid across `post`.
+    auto config_shared = config_.lock();
+    if (!config_shared) {
+      return;
+    }
+    config_shared->main_thread_dispatcher_.post([config = config_, event_id]() {
+      if (std::shared_ptr<DynamicModuleBootstrapExtensionConfig> cs = config.lock()) {
+        cs->onScheduled(event_id);
       }
     });
   }
@@ -389,8 +502,6 @@ private:
   // The config that this scheduler is associated with. Using a weak pointer to avoid unnecessarily
   // extending the lifetime of the config.
   std::weak_ptr<DynamicModuleBootstrapExtensionConfig> config_;
-  // The dispatcher is used to post the event to the main thread.
-  Event::Dispatcher& dispatcher_;
 };
 
 /**
@@ -427,6 +538,7 @@ private:
  * Creates a new DynamicModuleBootstrapExtensionConfig from the given module and configuration.
  * @param extension_name the name of the extension.
  * @param extension_config the configuration for the module.
+ * @param metrics_namespace the namespace prefix for metrics emitted by this module.
  * @param dynamic_module the dynamic module to use.
  * @param main_thread_dispatcher the main thread dispatcher.
  * @param context the server factory context for accessing cluster manager lazily.
@@ -437,6 +549,7 @@ private:
 absl::StatusOr<DynamicModuleBootstrapExtensionConfigSharedPtr>
 newDynamicModuleBootstrapExtensionConfig(
     const absl::string_view extension_name, const absl::string_view extension_config,
+    const absl::string_view metrics_namespace,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module,
     Event::Dispatcher& main_thread_dispatcher, Server::Configuration::ServerFactoryContext& context,
     Stats::Store& stats_store);

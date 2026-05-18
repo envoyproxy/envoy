@@ -216,7 +216,7 @@ TEST_F(EnvoyQuicClientStreamTest, GetRequestAndHeaderOnlyResponse) {
       .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& headers, bool) {
         EXPECT_EQ("200", headers->getStatusValue());
       }));
-  EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(""), /*end_stream=*/true));
+  EXPECT_CALL(stream_decoder_, decodeData(BufferString(""), /*end_stream=*/true));
   std::string payload = spdyHeaderToHttp3StreamPayload(spdy_response_headers_);
   quic::QuicStreamFrame frame(stream_id_, true, 0, payload);
   quic_stream_->OnStreamFrame(frame);
@@ -627,7 +627,7 @@ TEST_F(EnvoyQuicClientStreamTest, ReadDisabledBeforeClose) {
         EXPECT_EQ("200", headers->getStatusValue());
         quic_stream_->readDisable(true);
       }));
-  EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(""), /*end_stream=*/true));
+  EXPECT_CALL(stream_decoder_, decodeData(BufferString(""), /*end_stream=*/true));
   std::string payload = spdyHeaderToHttp3StreamPayload(spdy_response_headers_);
   quic::QuicStreamFrame frame(stream_id_, true, 0, payload);
   quic_stream_->OnStreamFrame(frame);
@@ -866,7 +866,7 @@ TEST_F(EnvoyQuicClientStreamTest, EncodeCapsule) {
 
 TEST_F(EnvoyQuicClientStreamTest, DecodeHttp3Datagram) {
   setUpCapsuleProtocol(true, false);
-  EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(capsule_fragment_), _));
+  EXPECT_CALL(stream_decoder_, decodeData(BufferString(capsule_fragment_), _));
   quic_session_.OnDatagramReceived(datagram_fragment_);
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }

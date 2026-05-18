@@ -14,13 +14,6 @@
 namespace Envoy {
 namespace Stats {
 
-// Masks used for variable-length encoding of arbitrary-sized integers into a
-// uint8-array. The integers are typically small, so we try to store them in as
-// few bytes as possible. The bottom 7 bits hold values, and the top bit is used
-// to determine whether another byte is needed for more data.
-static constexpr uint32_t SpilloverMask = 0x80;
-static constexpr uint32_t Low7Bits = 0x7f;
-
 // When storing Symbol arrays, we disallow Symbol 0, which is the only Symbol
 // that will decode into uint8_t array starting (and ending) with {0}. Thus we
 // can use a leading 0 in the first byte to indicate that what follows is
@@ -30,13 +23,6 @@ static constexpr uint32_t Low7Bits = 0x7f;
 // tokens as fully elaborated strings.
 static constexpr Symbol FirstValidSymbol = 1;
 static constexpr uint8_t LiteralStringIndicator = 0;
-
-size_t StatName::dataSize() const {
-  if (size_and_data_ == nullptr) {
-    return 0;
-  }
-  return SymbolTable::Encoding::decodeNumber(size_and_data_).first;
-}
 
 #ifndef ENVOY_CONFIG_COVERAGE
 void StatName::debugPrint() {
@@ -103,17 +89,6 @@ void SymbolTable::Encoding::addSymbols(const std::vector<Symbol>& symbols) {
   for (Symbol symbol : symbols) {
     appendEncoding(symbol, mem_block_);
   }
-}
-
-std::pair<uint64_t, size_t> SymbolTable::Encoding::decodeNumber(const uint8_t* encoding) {
-  uint64_t number = 0;
-  uint64_t uc = SpilloverMask;
-  const uint8_t* start = encoding;
-  for (uint32_t shift = 0; (uc & SpilloverMask) != 0; ++encoding, shift += 7) {
-    uc = static_cast<uint32_t>(*encoding);
-    number |= (uc & Low7Bits) << shift;
-  }
-  return std::make_pair(number, encoding - start);
 }
 
 SymbolVec SymbolTable::Encoding::decodeSymbols(StatName stat_name) {

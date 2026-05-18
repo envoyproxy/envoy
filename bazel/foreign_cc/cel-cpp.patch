@@ -1,3 +1,24 @@
+diff --git a/bazel/deps.bzl b/bazel/deps.bzl
+index 1f8801df..64ad71b5 100644
+--- a/bazel/deps.bzl
++++ b/bazel/deps.bzl
+@@ -96,11 +96,11 @@ cc_library(
+     defines = ["ANTLR4CPP_USING_ABSEIL"],
+     includes = ["runtime/Cpp/runtime/src"],
+     deps = [
+-        "@com_google_absl//absl/base",
+-        "@com_google_absl//absl/base:core_headers",
+-        "@com_google_absl//absl/container:flat_hash_map",
+-        "@com_google_absl//absl/container:flat_hash_set",
+-        "@com_google_absl//absl/synchronization",
++        "@abseil-cpp//absl/base",
++        "@abseil-cpp//absl/base:core_headers",
++        "@abseil-cpp//absl/container:flat_hash_map",
++        "@abseil-cpp//absl/container:flat_hash_set",
++        "@abseil-cpp//absl/synchronization",
+     ],
+ )
+   """,
 diff --git a/common/internal/byte_string.cc b/common/internal/byte_string.cc
 index b9f47922..9d096424 100644
 --- a/common/internal/byte_string.cc
@@ -60,23 +81,122 @@ index 06225796..18f56e59 100644
    ABSL_DCHECK(descriptor_pool != nullptr);
    ABSL_DCHECK(message_factory != nullptr);
    ABSL_DCHECK(arena != nullptr);
-
-
---- a/bazel/deps.bzl
-+++ b/bazel/deps.bzl
-@@ -85,10 +85,10 @@ cc_library(
-     defines = ["ANTLR4CPP_USING_ABSEIL"],
-     includes = ["runtime/Cpp/runtime/src"],
-     deps = [
--        "@com_google_absl//absl/base",
--        "@com_google_absl//absl/base:core_headers",
--        "@com_google_absl//absl/container:flat_hash_map",
--        "@com_google_absl//absl/container:flat_hash_set",
--        "@com_google_absl//absl/synchronization",
-+        "@abseil-cpp//absl/base",
-+        "@abseil-cpp//absl/base:core_headers",
-+        "@abseil-cpp//absl/container:flat_hash_map",
-+        "@abseil-cpp//absl/container:flat_hash_set",
-+        "@abseil-cpp//absl/synchronization",
-     ],
- )
+diff --git a/common/values/list_value.h b/common/values/list_value.h
+index 73aadf78..516d16dc 100644
+--- a/common/values/list_value.h
++++ b/common/values/list_value.h
+@@ -272,7 +272,7 @@ class ListValueBuilder {
+ 
+   virtual size_t Size() const = 0;
+ 
+-  virtual void Reserve(size_t capacity) {}
++  virtual void Reserve(size_t capacity [[maybe_unused]]) {}
+ 
+   virtual ListValue Build() && = 0;
+ };
+diff --git a/common/values/map_value.h b/common/values/map_value.h
+index 093100f9..ffbdea6c 100644
+--- a/common/values/map_value.h
++++ b/common/values/map_value.h
+@@ -294,7 +294,7 @@ class MapValueBuilder {
+ 
+   virtual size_t Size() const = 0;
+ 
+-  virtual void Reserve(size_t capacity) {}
++  virtual void Reserve(size_t capacity [[maybe_unused]]) {}
+ 
+   virtual MapValue Build() && = 0;
+ };
+diff --git a/eval/public/structs/legacy_type_adapter.h b/eval/public/structs/legacy_type_adapter.h
+index 795c5633..1c239bdb 100644
+--- a/eval/public/structs/legacy_type_adapter.h
++++ b/eval/public/structs/legacy_type_adapter.h
+@@ -65,9 +65,9 @@ class LegacyTypeMutationApis {
+       CelValue::MessageWrapper::Builder& instance) const = 0;
+ 
+   virtual absl::Status SetFieldByNumber(
+-      int64_t field_number, const CelValue& value,
+-      cel::MemoryManagerRef memory_manager,
+-      CelValue::MessageWrapper::Builder& instance) const {
++      int64_t field_number [[maybe_unused]], const CelValue& value [[maybe_unused]],
++      cel::MemoryManagerRef memory_manager [[maybe_unused]],
++      CelValue::MessageWrapper::Builder& instance [[maybe_unused]]) const {
+     return absl::UnimplementedError("SetFieldByNumber is not yet implemented");
+   }
+ };
+@@ -116,8 +116,8 @@ class LegacyTypeAccessApis {
+   //   whether the leaf field is set to a non-default value.
+   virtual absl::StatusOr<LegacyQualifyResult> Qualify(
+       absl::Span<const cel::SelectQualifier>,
+-      const CelValue::MessageWrapper& instance, bool presence_test,
+-      cel::MemoryManagerRef memory_manager) const {
++      const CelValue::MessageWrapper& instance [[maybe_unused]], bool presence_test [[maybe_unused]],
++      cel::MemoryManagerRef memory_manager [[maybe_unused]]) const {
+     return absl::UnimplementedError("Qualify unsupported.");
+   }
+ 
+diff --git a/eval/public/structs/legacy_type_info_apis.h b/eval/public/structs/legacy_type_info_apis.h
+index 7226b3b4..4f07470a 100644
+--- a/eval/public/structs/legacy_type_info_apis.h
++++ b/eval/public/structs/legacy_type_info_apis.h
+@@ -62,7 +62,7 @@ class LegacyTypeInfoApis {
+       const MessageWrapper& wrapped_message) const = 0;
+ 
+   virtual const google::protobuf::Descriptor* absl_nullable GetDescriptor(
+-      const MessageWrapper& wrapped_message) const {
++      const MessageWrapper& wrapped_message [[maybe_unused]]) const {
+     return nullptr;
+   }
+ 
+@@ -84,7 +84,7 @@ class LegacyTypeInfoApis {
+   //
+   // Nullptr signals that the value does not provide mutation apis.
+   virtual const LegacyTypeMutationApis* GetMutationApis(
+-      const MessageWrapper& wrapped_message) const {
++      const MessageWrapper& wrapped_message [[maybe_unused]]) const {
+     return nullptr;
+   }
+ 
+@@ -93,7 +93,7 @@ class LegacyTypeInfoApis {
+   // The underlying string is expected to remain valid as long as the
+   // LegacyTypeInfoApis instance.
+   virtual absl::optional<FieldDescription> FindFieldByName(
+-      absl::string_view name) const {
++      absl::string_view name [[maybe_unused]]) const {
+     return absl::nullopt;
+   }
+ };
+diff --git a/eval/public/structs/proto_message_type_adapter.h b/eval/public/structs/proto_message_type_adapter.h
+index e7b4a4c7..f2fc43a8 100644
+--- a/eval/public/structs/proto_message_type_adapter.h
++++ b/eval/public/structs/proto_message_type_adapter.h
+@@ -52,7 +52,7 @@ class ProtoMessageTypeAdapter : public LegacyTypeInfoApis,
+       const MessageWrapper& wrapped_message) const override;
+ 
+   const google::protobuf::Descriptor* absl_nullable GetDescriptor(
+-      const MessageWrapper& wrapped_message) const override {
++      const MessageWrapper& wrapped_message [[maybe_unused]]) const override {
+     return descriptor_;
+   }
+ 
+diff --git a/runtime/internal/attribute_matcher.h b/runtime/internal/attribute_matcher.h
+index 271749bf..5235f103 100644
+--- a/runtime/internal/attribute_matcher.h
++++ b/runtime/internal/attribute_matcher.h
+@@ -29,14 +29,14 @@ class AttributeMatcher {
+ 
+   // Checks whether the attribute trail matches any unknown patterns.
+   // Used to identify and collect referenced unknowns in an UnknownValue.
+-  virtual MatchResult CheckForUnknown(const Attribute& attr) const {
++  virtual MatchResult CheckForUnknown(const Attribute& attr [[maybe_unused]]) const {
+     return MatchResult::NONE;
+   };
+ 
+   // Checks whether the attribute trail matches any missing patterns.
+   // Used to identify missing attributes, and report an error if referenced
+   // directly.
+-  virtual MatchResult CheckForMissing(const Attribute& attr) const {
++  virtual MatchResult CheckForMissing(const Attribute& attr [[maybe_unused]]) const {
+     return MatchResult::NONE;
+   };
+ };

@@ -2,124 +2,124 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-- area: tcp_proxy
-  change: |
-    The TCP proxy filter now requires :ref:`max_early_data_bytes
-    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_early_data_bytes>` to be
-    explicitly set when using :ref:`upstream_connect_mode
-    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_mode>` modes
-    other than ``IMMEDIATE`` (i.e., ``ON_DOWNSTREAM_DATA`` or ``ON_DOWNSTREAM_TLS_HANDSHAKE``). The field
-    can be set to ``0`` to disable early data buffering while still using delayed connection modes.
-    Configurations using these modes without ``max_early_data_bytes`` will now fail validation at startup.
-- area: on_demand
-  change: |
-    The on_demand filter, when doing On Demand CDS, will no longer do internal redirects after CDS is
-    successful. Filters appearing in the filter chain before the On Demand Filter will no longer be
-    invoked twice. This behavior can be temporarily reverted by setting the runtime guard
-    ``envoy.reloadable_features.on_demand_cluster_no_recreate_stream`` to ``false``.
-- area: boringssl/fips
-  change: |
-    The previous flag for specifying FIPS builds (ie ``--define=boringssl=fips``) will no longer work and
-    has been replaced by ``--config=boringssl-fips``. This change will allow us to better support custom
-    SSL libraries, and will allow FIPS-compliant Envoy to be built with the imminent switch to Bazel bzlmod.
-- area: tls
-  change: |
-    Set
-    :ref:`enforce_rsa_key_usage <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.enforce_rsa_key_usage>`
-    to true by default. The handshake will fail if the keyUsage extension is present and incompatible with the TLS usage. In
-    the next version of Envoy, this option will be removed and the enforcing behavior will always be used.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
-- area: mcp
+- area: router
   change: |
-    Changed the default metadata namespace for the MCP filter from ``mcp_proxy`` to ``envoy.filters.http.mcp``.
-    This change can be reverted by setting the runtime guard
-    ``envoy.reloadable_features.mcp_filter_use_new_metadata_namespace`` to ``false``.
-- area: ext_authz
+    The upstream transport failure reason (e.g. TLS certificate validation errors) is no longer included
+    in the HTTP response body sent to downstream clients. It remains available in access logs via
+    ``%UPSTREAM_TRANSPORT_FAILURE_REASON%``. This behavioral change can be temporarily reverted by setting
+    runtime guard ``envoy.reloadable_features.hide_transport_failure_reason_in_response_body`` to ``false``.
+    This is being changed because in many cases the upstream failure details are inappropriate to send to
+    the downstream client as it discloses too many internal details.
+- area: golang
   change: |
-    Changed the behavior of ``timeout: 0s`` in the HTTP ext_authz filter to mean "no timeout" (infinite)
-    instead of immediate timeout. Previously, ``timeout: 0s`` would cause requests to fail immediately.
-    This aligns with other Envoy timeout configurations where ``0`` means disabled or infinite.
-- area: ratelimit
+    Reduced the per-cgo-call mutex acquisition on the Golang HTTP filter by making the
+    ``has_destroyed_`` flag a ``std::atomic<bool>``. CAPI methods whose only Envoy-side work is
+    Filter-owned or runs on the worker thread (``setHeader``, ``removeHeader``, ``setTrailer``,
+    ``removeTrailer``, ``addData``, ``injectData``, ``continueStatus``, ``sendLocalReply``,
+    ``setBufferHelper``, ``copyBuffer``, ``drainBuffer``, ``setUpstreamOverrideHost``,
+    ``clearRouteCache``, ``setDynamicMetadata``, ``setStringFilterState``) no longer take the
+    mutex, eliminating an uncontended atomic compare-and-swap pair on every such call. The
+    mutex is retained on the CAPI methods that inline-dereference Envoy-stream-owned objects
+    from off-thread (``getHeader``, ``copyHeaders``, ``copyTrailers``, ``getIntegerValue``,
+    ``setDrainConnectionUponCompletion``) where it serialises against ``onDestroy`` to prevent
+    the worker thread from freeing the underlying header map or ``StreamInfo`` mid-access, and
+    on the five methods that write to the per-request ``strValue`` scratch buffer
+    (``getStringValue``, ``getDynamicMetadata``, ``getStringFilterState``, ``getStringProperty``,
+    ``getSecret``).
+- area: stats
   change: |
-    Changed the behavior of ``timeout: 0s`` in the HTTP rate limit filter to mean "no timeout" (infinite)
-    instead of immediate timeout. Previously, ``timeout: 0s`` would cause requests to fail immediately.
-    This aligns with other Envoy timeout configurations where ``0`` means disabled or infinite.
-- area: histograms
+    Optimized prometheus stats endpoint. Users should see a roughly 30-40% latency improvement in calls to the endpoint
+    for cases where the scrape results in lots of cluster stats.
+    There should be no visible changes to users, or incompatibilities.
+- area: tls
   change: |
-    Updated libcircllhist to 0.3.2, which changes how bucket bounds are interpreted. This should not impact
-    production monitoring if the number of samples in the histograms is high. Affected tests were adjusted
-    to account for histogram changes.
-- area: stat_sinks
+    ``SslSocket`` now reports ``ECONNRESET`` as ``ConnectionReset`` by reading the system error
+    code from BoringSSL's error queue, matching ``RawBufferSocket`` behavior. When a connection
+    is closed with ``ConnectionCloseType::AbortReset``, ``SslSocket`` also skips the TLS
+    ``close_notify`` shutdown so the peer reliably observes a TCP RST instead of racing a
+    graceful close against the reset.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.ssl_socket_report_connection_reset`` to ``false``.
+- area: http2
   change: |
-    OpenTelemetry :ref:`SinkConfig <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig>`
-    stopped reporting empty delta counters and histograms.
+    The GOAWAY load shed point is fixed to use a graceful two-phase shutdown sequence, to avoid
+    risk to client traffic. This behavioral change can be temporarily reverted by setting runtime
+    guard ``envoy.reloadable_features.http2_fix_goaway_loadshed_point`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
-- area: tls
+- area: wasm
   change: |
-    Fix on-demand TLS selector to enforce session resumption settings.
+    Fixed a bug where Envoy did not recreate the Wasm VM when only
+    :ref:`environment_variables <envoy_v3_api_field_extensions.wasm.v3.VmConfig.environment_variables>`
+    changed in ``vm_config``. The VM was previously reused from the cache because environment variables
+    were not included in the vm_key computation.
 - area: load_report
   change: |
-    Fixed an issue upon load-report shutdown race with ADS stream. Introduced proper cleanup of the gRPC stream.
-- area: http
+    Fixed a bug in load stats reporting where reports were dropped if only custom metrics or completed
+    requests were present in a reporting interval. This behavioral change can be reverted by setting
+    the runtime guard ``envoy.reloadable_features.report_load_for_non_zero_stats`` to ``false``.
+- area: spiffe_validator
   change: |
-    Fixed a potential file descriptor leak where HTTP/1.1 connections with zombie streams (waiting for codec
-    completion) would not be properly closed when in draining state. This could occur when a response was
-    sent before the request was fully received, causing connections to remain open indefinitely. This change
-    can be reverted by setting the runtime guard
-    ``envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete`` to ``false``.
-- area: overload_manager
+    Fixed a bug where if an invalid custom SAN matcher was configured it would later lead to a crash
+    when validating a certificate.
+- area: rbac
   change: |
-    Fixed a resource leak in global connection limit tracking that caused permanent connection rejections
-    when using load shedding (e.g., ``envoy.load_shed_points.tcp_listener_accept``). When connections were
-    rejected due to load shedding after passing the global connection limit check, the allocated connection
-    limit resource was not released, causing the connection counter to become incorrect and leading to
-    ``failed_updates`` in the resource monitor. This resulted in permanent connection rejections even after
-    load subsided. The fix ensures that connection limit resources are properly released when connections
-    are rejected due to load shedding. Also added defensive resource cleanup for edge cases where address
-    processing fails (e.g., ``localAddress()`` or ``peerAddress()`` errors).
-- area: drop_overload
+    Fixed a bug in the :ref:`mTLS Authenticated <envoy_v3_api_msg_extensions.rbac.principals.mtls_authenticated.v3.Config>`
+    principal extension where if an invalid SAN matcher was configured, it would incorrectly match any
+    certificate in the allowed trust chain. Known bad configurations are an invalid ``OID`` when using
+    an ``OTHER_NAME``, or specifying a ``StringMatcher`` with an invalid configuration.
+- area: build
   change: |
-    Fixed a bug where ``drop_overload`` failed to use cached EDS resources.
-- area: http
+    Fixed ``Illegal ambiguous match`` error when building contrib targets with ``--config=aws-lc-fips``
+    on aarch64 by restricting the ``using_aws_lc`` branch of ``SELECTED_CONTRIB_EXTENSIONS`` to
+    ``linux_x86_64``. Mirrors the approach taken by #32382 for ``boringssl_fips``.
+- area: dynamic_modules
   change: |
-    Fixed upstream client to not close connection when idle timeout fires before the connection is
-    established. This change can be reverted by setting the runtime guard
-    ``envoy.reloadable_features.codec_client_enable_idle_timer_only_when_connected`` to ``false``.
+    Fixed a crashing bug in the HTTP filter when a stream was already above the downstream write-buffer
+    high watermark at filter-chain construction time. Downstream watermark callback registration is
+    now deferred until the in-module filter has been constructed.
+- area: dynamic_modules
+  change: |
+    Fixed a bug where the HTTP filter per-route configuration and the upstream HTTP TCP bridge
+    configuration did not handle the ``google.protobuf.Struct`` configuration message as the API
+    definition requires. Both factories now serialize the ``Struct`` to a JSON string and pass the
+    string to the dynamic module side as the configuration, matching the behavior already in place
+    for every other dynamic module extension factory.
 - area: oauth2
   change: |
-    Fixed OAuth2 refresh requests so host rewriting no longer overrides the original ``Host`` header value.
-- area: ext_authz
+    Fixed a crash in the OAuth2 filter where AES-CBC decryption of token cookies could spuriously
+    succeed (~1/256) when the configured HMAC secret did not match the secret used to encrypt the
+    cookie (for example after secret rotation, or when receiving legacy unencrypted tokens). The
+    resulting binary "plaintext" was written back into the ``Cookie:`` request header and tripped a
+    ``HeaderString`` validation assert. Such plaintexts are now rejected and the original cookie value
+    is preserved, matching the behavior already documented for the explicit decryption-failure case.
+- area: dns_resolver
   change: |
-    Fixed a bug where headers from a denied authorization response (non-200) were not properly propagated
-    to the client.
-- area: formatter
+    Fixed a memory leak in the Hickory DNS resolver where ``ActiveDnsQuery::cancel()``
+    did not free the pending query state or decrement the ``pending_resolutions`` gauge. Cancelled
+    queries now release their shell object, Rust-side query box, and gauge tick synchronously,
+    matching the contract followed by the c-ares and Apple DNS resolvers.
+- area: dns_resolver
   change: |
-    Fixed the log formatter in HTTP router upstream logs by correctly setting the downstream connection's
-    ``ConnectionInfoProvider`` in the ``StreamInfo``.
-- area: spiffe
+    Fixed a UAF in the Hickory DNS resolver where the dispatcher lambda posted by the
+    Rust-thread completion callback captured a raw pointer to the resolver. If the resolver was
+    destroyed before the dispatcher drained the lambda, dereferencing the pointer was undefined
+    behavior. The lambda now captures a ``std::weak_ptr`` and locks it before touching the resolver.
+- area: build
   change: |
-    Reduce the number of the file watches needed by :ref:`trust_bundles
-    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig.trust_bundles>` when the validator
-    is used in multiple places. Add support for :ref:`watched_directory
-    <envoy_v3_api_field_config.core.v3.datasource.watched_directory>` to support Kubernetes environments that rely on
-    atomic symbolic file updates.  Add content hashing during file watching to handle excessive watch notifications.
-- area: odcds
+    Fixed ``Illegal ambiguous match`` error when building contrib targets with ``--config=boringssl-fips``
+    on aarch64 by restricting the ``using_boringssl_fips`` branch of ``SELECTED_CONTRIB_EXTENSIONS`` to
+    ``linux_x86_64``. Mirrors the approach taken by #44661 for ``aws-lc``.
+- area: dns_resolver
   change: |
-    Fixed a crash (SIGABRT) when destroying OdCDS handles on worker threads. The handle no longer holds
-    a direct reference to the subscription, preventing thread-safety issues during destruction. The
-    subscription now persists in ClusterManagerImpl and is looked up by a config source key.
-- area: ext_authz
-  change: |
-    Fixed the HTTP ext_authz client to respect ``status_on_error`` configuration when the authorization
-    server returns a 5xx error or when HTTP call failures occur. Previously, these error scenarios always
-    returned 403 Forbidden regardless of the configured error status.
-- area: release
-  change: |
-    Published contrib binaries now include the ``-contrib`` suffix in their version string.
+    Fixed macOS build failure (#45061) for the Hickory DNS resolver by linking
+    Apple's ``SystemConfiguration`` framework. The framework is required by the
+    ``system-configuration`` crate that ``hickory-resolver`` pulls in via its
+    ``system-config`` feature.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -131,193 +131,133 @@ new_features:
     multiple sub filter chain in single position of the main HTTP filter chain.
     And allow per route configuration of the filter chain filter to select different sub filter chains
     based on route match criteria.
-- area: dynamic_modules
+- area: router
   change: |
-    Added :ref:`TLS certificate validator
-    <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig>`
-    support for dynamic modules, enabling custom TLS certificate validation to be implemented in dynamic modules.
-- area: stats
-  change: |
-    Added support to limit the number of stats stored in each stats scope in the stats library.
-- area: stats
-  change: |
-    The admin prometheus stats endpoint now supports the protobuf exposition format, and will automatically
-    use it if the request contains the correct Accept header, or if query parameter ``prom_protobuf=1`` is
-    set. In a prometheus scrape configuration, add ``PrometheusProto`` to ``scrape_protocols`` to use
-    the protobuf format. Additionally, when using the protobuf exposition format, the admin prometheus stats
-    endpoint now supports `native histograms <https://prometheus.io/docs/specs/native_histograms>`_
-    when using the prometheus protobuf exposition format, using query
-    ``/stats/prometheus?histogram_buckets=prometheusnative``.
-- area: tls
-  change: |
-    Added support for fetching certificates on-demand via SDS in the upstream TLS transport socket
-    using the extension :ref:`on-demand certificate selector
-    <extension_envoy.tls.certificate_selectors.on_demand_secret>`.
-- area: dynamic modules
-  change: |
-    Introduced the extended ABI forward compatibility mechanism for dynamic modules
-    where modules built with a SDK version can be loaded by Envoy
-    binaries of the next Envoy version. For example, A module built with the v1.38 SDK
-    can now be loaded by an Envoy binary of v1.39.
-- area: dynamic modules
-  change: |
-    Added drain and shutdown lifecycle hooks for bootstrap dynamic modules.
-- area: dynamic modules
-  change: |
-    Added support for dynamic modules authors to register any combination of http, network, listener,
-    udp listener, and bootstrap filters in the rust SDK.
-- area: mcp_router
-  change: |
-    Added support for MCP resource methods ``resources/list``, ``resources/read``,
-    ``resources/subscribe``, and ``resources/unsubscribe``.
-- area: mcp_router
-  change: |
-    Added support for MCP prompt methods ``prompts/list`` and ``prompts/get``.
-- area: ratelimit
-  change: |
-    Added per-descriptor ``x-ratelimit-*`` headers support. See the
-    :ref:`x_ratelimit_option <envoy_v3_api_field_config.route.v3.RateLimit.x_ratelimit_option>`
-    field documentation for more details.
-- area: ratelimit
-  change: |
-    Added ``RemoteAddressMatch`` action to the rate limit filter. This action will generate a descriptor based on the remote address of the
-    downstream connection by matching it against specified CIDR ranges with support for inversion and formatter substitution.
-- area: mcp_router
-  change: |
-    Added support for MCP client-to-server notification methods ``notifications/cancelled``
-    and ``notifications/roots/list_changed``.
-- area: mcp_router
-  change: |
-    Added support for MCP completion method ``completion/complete`` with routing based on
-    ``ref/prompt`` or ``ref/resource``.
-- area: mcp_router
-  change: |
-    Added support for MCP logging method ``logging/setLevel``.
-- area: access_log
-  change: |
-    Supported gauge in the :ref:`stats access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>`.
-- area: network
-  change: |
-    Added support access logging in network filters like http filters, by allowing network filters to register as access logger
-    instances.
-- area: formatter
-  change: |
-    Extended ``*_WITHOUT_PORT`` address formatters to accept an optional ``MASK_PREFIX_LEN`` parameter
-    that masks IP addresses and returns them in CIDR notation (e.g., ``%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(16)%``
-    returns ``10.1.0.0/16`` for client IP ``10.1.10.23``).
-- area: stat_sinks
-  change: |
-    Added support for exporting OpenTelemetry metrics via HTTP. The new ``http_service`` field
-    in :ref:`SinkConfig <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig>`
-    enables direct OTLP metrics export to backends that only accept HTTP (Dynatrace, Datadog, Elastic),
-    without requiring an intermediate collector sidecar.
-- area: ratelimit
-  change: |
-    Added support for shadow mode in the local rate limit filter.
-- area: config
-  change: |
-    Added support for :ref:`set_node_on_first_message_only
-    <envoy_v3_api_field_config.core.v3.ApiConfigSource.set_node_on_first_message_only>` to Delta-xDS.
-    Guarded by runtime flag ``envoy.reloadable_features.xds_legacy_delta_skip_subsequent_node``.
-- area: formatter
-  change: |
-    Added the new access log formatter ``DOWNSTREAM_LOCAL_CLOSE_REASON``.
-- area: formatter
-  change: |
-    Added ``%UPSTREAM_DETECTED_CLOSE_TYPE%`` and ``%DOWNSTREAM_DETECTED_CLOSE_TYPE%`` to expose the detected
-    close type of downstream and upstream connections. The possible values are ``Normal``, ``LocalReset``,
-    and ``RemoteReset``.
+    Added support for ``refreshRouteCluster`` on weighted cluster routes. When a filter calls
+    ``refreshRouteCluster()``, the weighted cluster entry will select a different cluster from the
+    configured pool, avoiding previously-tried clusters within the same request. Once all clusters
+    have been tried, the selection pool resets so that any cluster may be chosen again. This enables
+    filters to implement per-attempt cluster failover across weighted clusters without replacing the
+    entire route.
 - area: tcp_proxy
   change: |
-    Added an option to emit a log entry when the connection is accepted.
-- area: mcp_router
+    Added :ref:`check_drain_close
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.check_drain_close>` to the TCP proxy
+    filter to close downstream connections with ``FlushWrite`` when the drain manager requests drain close during
+    downstream read or write handling.
+- area: stat_sinks
   change: |
-    Added SSE (Server-Sent Events) streaming support for MCP backend responses. The router now handles
-    SSE responses from backends for ``tools/call`` with direct pass-through streaming, and supports SSE
-    aggregation for fanout operations (``tools/list``, ``initialize``) with incremental event parsing.
+    Added :ref:`max_data_points_per_request
+    <envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.max_data_points_per_request>`
+    configuration to the OpenTelemetry stat sink to chunk metric export requests.
+- area: set_metadata_filter
+  change: |
+    Added :ref:`per-route configuration support <envoy_v3_api_msg_extensions.filters.http.set_metadata.v3.Config>`
+    to the ``set_metadata`` HTTP filter.
+- area: logging
+  change: |
+    Added ``%N`` as a custom spdlog pattern flag that emits the Envoy version string. It can be
+    used in the ``--log-format`` CLI flag or the bootstrap ``application_log_config.log_format``
+    to include the running version in every log line, e.g. ``--log-format "[%N][%l] %v"``.
 - area: dynamic_modules
   change: |
-    Added :ref:`load balancing policies
-    <envoy_v3_api_msg_extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig>`
-    support for dynamic modules, enabling custom load balancing algorithms to be implemented in dynamic modules.
-- area: sse_parser
+    Added ``envoy_dynamic_module_callback_is_validation_mode`` ABI callback that allows dynamic
+    modules to check if the server is running in config validation mode.
+- area: dynamic_modules
   change: |
-    Extended the SSE parser utility to support all standard SSE fields: ``id``, ``event`` (as ``event_type``),
-    and ``retry``, in addition to the existing ``data`` field. The ``retry`` field is parsed as a ``uint32_t``
-    and only accepts values consisting of ASCII digits per the SSE specification.
-- area: http
+    Added ``envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes`` and
+    ``envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed`` ABI callbacks so
+    that a dynamic-module cluster's load balancer can read filter state set by an upstream HTTP
+    filter (or any other producer) when picking a host. The Rust SDK exposes these as
+    ``ClusterLbContext::get_filter_state_bytes`` and ``ClusterLbContext::get_filter_state_typed``.
+- area: access_log
   change: |
-    Added :ref:`envoy.filters.http.sse_to_metadata <config_http_filters_sse_to_metadata>` filter for extracting
-    values from Server-Sent Events (SSE) streams and writing them to dynamic metadata. Useful for capturing
-    token usage metrics from LLM API responses. Supports pluggable content parsers for different SSE data formats.
-- area: content_parsers
+    Supported the singleton stats scope in the :ref:`stats access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>`.
+- area: stat_sinks
   change: |
-    Added :ref:`envoy.content_parsers.json <extension_envoy.content_parsers.json>` content parser for extracting
-    values from JSON content using JSON path selectors. Can be used by filters that need to parse structured
-    JSON data and extract specific fields into metadata.
+    Added a new :ref:`WASM stats filter <config_stat_sinks_wasm_filter>` contrib extension
+    (``envoy.stat_sinks.wasm_filter``) that acts as programmable middleware between
+    the metrics snapshot and any inner stats sink. A user-supplied WASM plugin can:
+    filter metrics by index, inject global tags from node metadata
+    (``stats_filter_set_global_tags``), rename metrics (``stats_filter_set_name_overrides``),
+    inject synthetic counters/gauges (``stats_filter_inject_metrics``), and filter
+    histograms (``stats_filter_get_histograms``). This enables moving centralized
+    metric processing logic (tag enrichment, name rewriting, custom metric injection)
+    into the proxy itself. Configured via
+    :ref:`WasmFilterStatsSinkConfig <envoy_v3_api_msg_extensions.stat_sinks.wasm_filter.v3.WasmFilterStatsSinkConfig>`.
+- area: router
+  change: |
+    Added :ref:`refresh_cluster_on_retry <envoy_v3_api_field_config.route.v3.RetryPolicy.refresh_cluster_on_retry>`
+    to :ref:`retry policies <envoy_v3_api_msg_config.route.v3.RetryPolicy>` so retry attempts can
+    refresh the route-selected upstream cluster before being sent. This enables cross-cluster
+    retries for dynamic cluster selection such as the :ref:`matcher cluster specifier
+    <envoy_v3_api_msg_extensions.router.cluster_specifiers.matcher.v3.MatcherClusterSpecifier>`.
+- area: mysql_proxy
+  change: |
+    Added SSL termination support to the MySQL proxy filter with RSA-mediated ``caching_sha2_password``
+    authentication. The filter can now terminate downstream TLS connections using the
+    :ref:`starttls transport socket <envoy_v3_api_msg_extensions.transport_sockets.starttls.v3.StartTlsConfig>`
+    and transparently mediate MySQL 8.0+ ``caching_sha2_password`` full authentication by performing
+    RSA public key exchange on behalf of the client. Added a new
+    :ref:`downstream_ssl <envoy_v3_api_field_extensions.filters.network.mysql_proxy.v3.MySQLProxy.downstream_ssl>`
+    config option with ``DISABLE``, ``REQUIRE``, and ``ALLOW`` modes.
+- area: quic
+  change: |
+    Added support for TLS session ticket resumption in QUIC using configured session ticket keys from
+    :ref:`session_ticket_keys <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.session_ticket_keys>`.
+    This enables faster reconnection across server instances by allowing clients to resume TLS sessions
+    without full handshakes. The feature is disabled by default and can be enabled by setting runtime guard
+    ``envoy.reloadable_features.quic_session_ticket_support`` to ``true``.
+- area: composite
+  change: |
+    Added support for the
+    :ref:`inline matcher <envoy_v3_api_field_extensions.filters.http.composite.v3.Composite.matcher>`
+    in the composite HTTP filter. Now users could specify the matcher inline in the filter configuration
+    instead of using the :ref:`ExtensionWithMatcher
+    <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` filter.
 - area: resource_monitors
   change: |
-    Added cgroup v2 support to the CPU utilization resource monitor. The monitor now automatically
-    detects and selects between cgroup v1 and v2 at runtime by checking available cgroup files on
-    the system. This enables the resource monitor to work correctly in both cgroup v1 and v2
-    environments without configuration changes.
-- area: dynamic_modules
+    Overload manager fixed heap resource monitor now supports :ref:`max_heap_size_bytes_runtime
+    <envoy_v3_api_field_extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig.max_heap_size_bytes_runtime>`
+    for runtime-overridable max heap size (e.g. RTDS or ``/runtime_modify``).
+- area: jwt_authn
   change: |
-    Added configurable :ref:`metrics_namespace
-    <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.metrics_namespace>` field
-    to ``DynamicModuleConfig``. This allows users to customize the prefix used for all metrics
-    created by dynamic modules. Metrics now appear with the standard ``envoy_`` prefix followed by
-    the namespace in prometheus output (e.g. ``envoy_myapp_requests_total``). The legacy behavior
-    (stripping the namespace prefix from prometheus output) can be restored by setting the runtime
-    guard ``envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix`` to ``true``.
-- area: oauth2
+    Added :ref:`verification_status_header
+    <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.ExtractOnlyWithoutValidation.verification_status_header>`
+    to the ``ExtractOnlyWithoutValidation`` requirement. When a JWT is present in the request but fails
+    signature verification, the named request header (default ``x-jwt-signature-verified``) is set to
+    ``false`` so downstream filters (RBAC, ext_authz) can distinguish forwarded-but-unverified claims
+    from validated ones. The header is not set on a successfully verified JWT or when no JWT is present.
+    This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.jwt_authn_add_verification_status_header`` to ``false``.
+- area: access_log
   change: |
-    Added ``TLS_CLIENT_AUTH`` for the OAuth2 HTTP filter to support RFC 8705 mutual TLS client
-    authentication. In this mode ``token_secret`` is optional and ignored, and the token endpoint
-    cluster must be configured with mTLS.
-- area: dynamic_modules
+    Added ``%UPSTREAM_SERVER_NAME%`` access log formatter returning the SNI from the established upstream
+    TLS connection.
+- area: attributes
   change: |
-    Added a process-wide function registry to the dynamic modules ABI. Modules can register
-    functions by name via ``envoy_dynamic_module_callback_register_function`` and other modules
-    can resolve them via ``envoy_dynamic_module_callback_get_function``, enabling zero-copy
-    cross-module interactions analogous to ``dlsym``.
-- area: dynamic_modules
+    Added ``upstream.server_name`` CEL attribute returning the SNI from the established upstream
+    TLS connection.
+
+- area: tls
   change: |
-    Added metrics definition and update support for bootstrap dynamic modules.
-- area: dynamic_modules
+    Added substitution commands ``%DOWNSTREAM_TLS_GROUP%`` and ``%UPSTREAM_TLS_GROUP%``. The TLS group may be used
+    to discern if a TLS connection used a post quantum safe key exchange (e.g. X25519MLKEM768).
+- area: http_inspector
   change: |
-    Added timer API to the bootstrap extension dynamic modules ABI.
-- area: formatter
+    Enabled Balsa parser for HTTP inspector by default. This behavior can be temporarily
+    reverted by setting the runtime guard ``envoy.reloadable_features.http_inspector_use_balsa_parser``
+    to ``false``. This runtime guard will be removed in a future release of Envoy.
+- area: http_inspector
   change: |
-    Added ``QUERY_PARAMS`` support for substitution formatter to log all query params.
-    They can either be logged in their original form or decoded.
-- area: dynamic_modules
+    Enabled Balsa parser for HTTP inspector by default. This behavior can be temporarily
+    reverted by setting the runtime guard ``envoy.reloadable_features.http_inspector_use_balsa_parser``
+    to ``false``. This runtime guard will be removed in a future release of Envoy.
+
+- area: tcp_proxy
   change: |
-    Added init manager integration to the dynamic modules bootstrap extension ABI. An init target
-    is automatically registered for every bootstrap extension, blocking traffic until the module
-    signals readiness via ``signal_init_complete``.
-- area: geoip
-  change: |
-    Added ``asn_org`` field to :ref:`geo_field_keys
-    <envoy_v3_api_msg_extensions.geoip_providers.common.v3.CommonGeoipProviderConfig.GeolocationFieldKeys>`
-    to populate a header with the autonomous system organization name from the MaxMind ASN database.
-- area: tracers
-  change: |
-    Add log events to spans created by OpenTelemetry tracer.
-- area: mcp_router
-  change: |
-    Added SSE response support for MCP ``resources/list`` fanout aggregation.
-- area: admin
-  change: |
-    Added ``filter`` query parameter support to the ``/clusters`` endpoint. The parameter accepts a RE2
-    regular expression to filter clusters by name. Compatible with the ``format`` parameter for both
-    text and JSON output (e.g., ``/clusters?filter=service&format=json``).
-- area: mcp_router
-  change: |
-    Added :ref:`statistics <config_http_filters_mcp_router_statistics>` to the MCP router filter for
-    observability into request routing, fanout operations, and error conditions.
-- area: a2a
-  change: |
-    Added the parsing support for A2A(Agent2Agent) protocol. It is used to parse the A2A JSON-RPC messages.
+    Added ``envoy.reloadable_features.tcp_proxy_delay_route_selection`` to delay selecting a route until just before the upstream
+    connection is established. The selection moment depends on the value of
+    :ref:`upstream_connect_mode<envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_mode>`.
 
 deprecated:

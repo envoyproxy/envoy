@@ -26,6 +26,8 @@ public:
         cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
+    // Re-open stat creation so tests can call `define_*` from the test thread.
+    filter_config_->stat_creation_frozen_ = false;
 
     ON_CALL(connection_, dispatcher()).WillByDefault(testing::ReturnRef(worker_thread_dispatcher_));
     ON_CALL(read_callbacks_, connection()).WillByDefault(testing::ReturnRef(connection_));
@@ -58,9 +60,9 @@ TEST_F(DynamicModuleNetworkFilterTest, BasicDataFlow) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter->onWrite(write_data, false));
   EXPECT_EQ(Network::FilterStatus::Continue, filter->onWrite(write_data, true));
 
-  // Verify buffer is cleared after callbacks.
-  EXPECT_EQ(nullptr, filter->currentReadBuffer());
-  EXPECT_EQ(nullptr, filter->currentWriteBuffer());
+  // Verify buffers persist after callbacks for access from on_scheduled and other callbacks.
+  EXPECT_NE(nullptr, filter->currentReadBuffer());
+  EXPECT_NE(nullptr, filter->currentWriteBuffer());
 }
 
 TEST_F(DynamicModuleNetworkFilterTest, AllConnectionEvents) {
@@ -316,7 +318,7 @@ TEST_F(DynamicModuleNetworkFilterTest, DefineAndIncrementCounter) {
   auto result = envoy_dynamic_module_callback_network_filter_config_define_counter(
       filter_config_.get(), name, &counter_id);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(counter_id, 0);
+  EXPECT_EQ(counter_id, 1);
 
   // Create filter and increment counter.
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
@@ -339,7 +341,7 @@ TEST_F(DynamicModuleNetworkFilterTest, DefineAndManipulateGauge) {
   auto result = envoy_dynamic_module_callback_network_filter_config_define_gauge(
       filter_config_.get(), name, &gauge_id);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_id, 0);
+  EXPECT_EQ(gauge_id, 1);
 
   // Create filter and manipulate gauge.
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
@@ -367,7 +369,7 @@ TEST_F(DynamicModuleNetworkFilterTest, DefineAndRecordHistogram) {
   auto result = envoy_dynamic_module_callback_network_filter_config_define_histogram(
       filter_config_.get(), name, &histogram_id);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(histogram_id, 0);
+  EXPECT_EQ(histogram_id, 1);
 
   // Create filter and record histogram value.
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);

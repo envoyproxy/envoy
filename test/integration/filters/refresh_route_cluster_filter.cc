@@ -20,13 +20,13 @@ public:
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
     initial_cluster_ = decoder_callbacks_->route()->routeEntry()->clusterName();
-    has_initial_cluster_info_ = decoder_callbacks_->clusterInfo() != nullptr;
+    has_initial_cluster_info_ = decoder_callbacks_->clusterInfo().has_value();
 
     headers.setCopy(Http::LowerCaseString("env"), "prod");
     decoder_callbacks_->downstreamCallbacks()->refreshRouteCluster();
 
     refreshed_cluster_ = decoder_callbacks_->route()->routeEntry()->clusterName();
-    has_refreshed_cluster_info_ = decoder_callbacks_->clusterInfo() != nullptr;
+    has_refreshed_cluster_info_ = decoder_callbacks_->clusterInfo().has_value();
 
     return Http::FilterHeadersStatus::Continue;
   }

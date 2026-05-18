@@ -103,6 +103,7 @@ public:
   const std::vector<ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return parent_.setCurrentClientCertDetails();
   }
+  ClientCertFormat clientCertFormat() const override { return parent_.clientCertFormat(); }
   const Matcher::MatchTreePtr<HttpMatchingData>& forwardClientCertMatcher() const override {
     return parent_.forwardClientCertMatcher();
   }

@@ -85,7 +85,7 @@ void InsertContext::onBody(AdjustedByteRange range, Buffer::InstancePtr buffer,
   } else {
     range = AdjustedByteRange(0, entry_->bodySize());
   }
-  progress_receiver_->onBodyInserted(std::move(range), end_stream == EndStream::End);
+  progress_receiver_->onBodyInserted(range, end_stream == EndStream::End);
   if (end_stream != EndStream::End) {
     AdjustedByteRange next_range(range.end(), range.end() + InsertReadChunkSize);
     return source_->getBody(next_range,

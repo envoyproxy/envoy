@@ -18,7 +18,7 @@
 #include "test/fuzz/utility.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 
@@ -47,8 +47,6 @@ public:
   // Filter
   Router::RetryStatePtr createRetryState(const Router::RetryPolicy&, RequestHeaderMap&,
                                          const Upstream::ClusterInfo&,
-                                         const Router::VirtualCluster*,
-                                         Router::RouteStatsContextOptRef,
                                          Server::Configuration::CommonFactoryContext&,
                                          Event::Dispatcher&, Upstream::ResourcePriority) override {
     EXPECT_EQ(nullptr, retry_state_);

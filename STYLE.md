@@ -52,6 +52,15 @@
   raw memory in a test and return it to the production code with the expectation that the
   production code will hold it in a `unique_ptr` and free it. Envoy uses the factory pattern
   quite a bit for these cases. (Search the code for "factory").
+* For accessor functions, prefer `OptRef<const T>` or `const Type&` as return types for functions
+  that return *const* references to existing objects *when there is no intention of mutation*.
+  If the caller needs to take ownership of the returned object via a `shared_ptr`, add a separate
+  function with a `SharedPtr` suffix that returns a shared pointer to
+  extend ownership. For example:
+  * `const ConnectionInfoProvider& connectionInfoProvider() const;`
+  * `ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const;`
+  * `OptRef<const Route> route() const;`
+  * `RouteConstSharedPtr routeSharedPtr() const;`
 * Prefer explicitly sized integer types, such as uint64_t rather than size_t. In particular, use
   explicitly sized integers for data that is written to disk or involved in math that might overflow.
 * The Google C++ style guide points out that [non-PoD static and global variables are forbidden](https://google.github.io/styleguide/cppguide.html#Static_and_Global_Variables).

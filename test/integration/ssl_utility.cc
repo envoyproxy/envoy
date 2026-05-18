@@ -114,6 +114,12 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
                                       ContextManager& context_manager, Api::Api& api) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   initializeUpstreamTlsContextConfig(options, tls_context);
+#ifdef ENVOY_ENABLE_YAML
+  ENVOY_LOG_MISC(debug, "Client TLS factory:\n{}",
+                 MessageUtil::getYamlStringFromMessage(tls_context));
+#else
+  ENVOY_LOG_MISC(debug, "Client TLS factory:\n{}", tls_context.DebugString());
+#endif
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
   ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(ReturnRef(api));

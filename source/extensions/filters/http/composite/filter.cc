@@ -1,8 +1,11 @@
 #include "source/extensions/filters/http/composite/filter.h"
 
+#include <ranges>
+
 #include "envoy/http/filter.h"
 
 #include "source/common/common/stl_helpers.h"
+#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -40,6 +43,9 @@ std::unique_ptr<Protobuf::Struct> MatchedActionInfo::buildProtoStruct() const {
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
+  resolvePerRouteConfig();
+  matchAndHandleActions();
+
   return delegateFilterActionOr(delegated_filter_, &StreamDecoderFilter::decodeHeaders,
                                 Http::FilterHeadersStatus::Continue, headers, end_stream);
 }
@@ -50,6 +56,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 }
 
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trailers) {
+  matchAndHandleActions();
   return delegateFilterActionOr(delegated_filter_, &StreamDecoderFilter::decodeTrailers,
                                 Http::FilterTrailersStatus::Continue, trailers);
 }
@@ -71,6 +78,7 @@ Http::Filter1xxHeadersStatus Filter::encode1xxHeaders(Http::ResponseHeaderMap& h
 }
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_stream) {
+  matchAndHandleActions();
   return delegateFilterActionOr(delegated_filter_, &StreamEncoderFilter::encodeHeaders,
                                 Http::FilterHeadersStatus::Continue, headers, end_stream);
 }
@@ -93,6 +101,28 @@ void Filter::encodeComplete() {
 }
 
 void Filter::onMatchCallback(const Matcher::Action& action) {
+  resolvePerRouteConfig();
+  if (match_tree_ != nullptr) {
+    ENVOY_LOG(error, "Inline match tree is provided and the onMatchCallback should never be called "
+                     "from the ExtensionWithMatcher");
+
+    return;
+  }
+
+  // This is unnecessary actually because the match tree should be nullptr if we reached here, we
+  // just want to be defensive here to make sure the match tree won't be evaluated after this
+  // callback is called.
+  match_tree_evaluated_ = true;
+
+  handleAction(action);
+}
+
+void Filter::handleAction(const Matcher::Action& action) {
+  if (action.typeUrl() != ExecuteFilterAction::staticTypeUrl()) {
+    ENVOY_LOG(error, "Received unsupported action type: {}", action.typeUrl());
+    return;
+  }
+
   const auto& composite_action = action.getTyped<ExecuteFilterAction>();
 
   // Handle named filter chain lookup.
@@ -201,6 +231,49 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
   }
   // TODO(snowp): Make it possible for onMatchCallback to fail the stream by issuing a local reply,
   // either directly or via some return status.
+}
+
+void Filter::matchAndHandleActions() {
+  if (match_tree_evaluated_ || match_tree_ == nullptr || delegated_filter_ != nullptr) {
+    return;
+  }
+
+  Envoy::Http::Matching::HttpMatchingDataImpl matching_data(decoder_callbacks_->streamInfo());
+  auto request_headers = decoder_callbacks_->requestHeaders();
+  if (request_headers.has_value()) {
+    matching_data.onRequestHeaders(request_headers.value());
+  }
+  auto response_headers = encoder_callbacks_->responseHeaders();
+  if (response_headers.has_value()) {
+    matching_data.onResponseHeaders(response_headers.value());
+  }
+  auto request_trailers = decoder_callbacks_->requestTrailers();
+  if (request_trailers.has_value()) {
+    matching_data.onRequestTrailers(request_trailers.value());
+  }
+
+  auto result = Matcher::evaluateMatch<Envoy::Http::HttpMatchingData>(*match_tree_, matching_data);
+  match_tree_evaluated_ = result.isComplete();
+  if (result.isMatch()) {
+    const auto& action = result.action();
+    if (action != nullptr) {
+      handleAction(*action);
+    }
+  }
+}
+
+void Filter::resolvePerRouteConfig() {
+  if (per_route_config_resolved_) {
+    return;
+  }
+
+  const auto* per_route_config =
+      Envoy::Http::Utility::resolveMostSpecificPerFilterConfig<CompositePerRouteConfig>(
+          decoder_callbacks_);
+  if (per_route_config != nullptr) {
+    match_tree_ = per_route_config->matchTree();
+  }
+  per_route_config_resolved_ = true;
 }
 
 void Filter::updateFilterState(Http::StreamFilterCallbacks* callback,
@@ -369,8 +442,8 @@ void DelegatedFilterChain::decodeComplete() {
 Http::Filter1xxHeadersStatus
 DelegatedFilterChain::encode1xxHeaders(Http::ResponseHeaderMap& headers) {
   // Encode operations iterate in reverse order.
-  for (auto it = filters_.rbegin(); it != filters_.rend(); ++it) {
-    auto status = (*it)->encode1xxHeaders(headers);
+  for (auto& filter : std::ranges::reverse_view(filters_)) {
+    auto status = filter->encode1xxHeaders(headers);
     if (status != Http::Filter1xxHeadersStatus::Continue) {
       return status;
     }
@@ -381,8 +454,8 @@ DelegatedFilterChain::encode1xxHeaders(Http::ResponseHeaderMap& headers) {
 Http::FilterHeadersStatus DelegatedFilterChain::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                               bool end_stream) {
   // Encode operations iterate in reverse order.
-  for (auto it = filters_.rbegin(); it != filters_.rend(); ++it) {
-    auto status = (*it)->encodeHeaders(headers, end_stream);
+  for (auto& filter : std::ranges::reverse_view(filters_)) {
+    auto status = filter->encodeHeaders(headers, end_stream);
     if (status != Http::FilterHeadersStatus::Continue) {
       return status;
     }
@@ -392,8 +465,8 @@ Http::FilterHeadersStatus DelegatedFilterChain::encodeHeaders(Http::ResponseHead
 
 Http::FilterDataStatus DelegatedFilterChain::encodeData(Buffer::Instance& data, bool end_stream) {
   // Encode operations iterate in reverse order.
-  for (auto it = filters_.rbegin(); it != filters_.rend(); ++it) {
-    auto status = (*it)->encodeData(data, end_stream);
+  for (auto& filter : std::ranges::reverse_view(filters_)) {
+    auto status = filter->encodeData(data, end_stream);
     if (status != Http::FilterDataStatus::Continue) {
       return status;
     }
@@ -404,8 +477,8 @@ Http::FilterDataStatus DelegatedFilterChain::encodeData(Buffer::Instance& data, 
 Http::FilterTrailersStatus
 DelegatedFilterChain::encodeTrailers(Http::ResponseTrailerMap& trailers) {
   // Encode operations iterate in reverse order.
-  for (auto it = filters_.rbegin(); it != filters_.rend(); ++it) {
-    auto status = (*it)->encodeTrailers(trailers);
+  for (auto& filter : std::ranges::reverse_view(filters_)) {
+    auto status = filter->encodeTrailers(trailers);
     if (status != Http::FilterTrailersStatus::Continue) {
       return status;
     }
@@ -415,8 +488,8 @@ DelegatedFilterChain::encodeTrailers(Http::ResponseTrailerMap& trailers) {
 
 Http::FilterMetadataStatus DelegatedFilterChain::encodeMetadata(Http::MetadataMap& metadata_map) {
   // Encode operations iterate in reverse order.
-  for (auto it = filters_.rbegin(); it != filters_.rend(); ++it) {
-    auto status = (*it)->encodeMetadata(metadata_map);
+  for (auto& filter : std::ranges::reverse_view(filters_)) {
+    auto status = filter->encodeMetadata(metadata_map);
     if (status != Http::FilterMetadataStatus::Continue) {
       return status;
     }
@@ -433,8 +506,8 @@ void DelegatedFilterChain::setEncoderFilterCallbacks(
 
 void DelegatedFilterChain::encodeComplete() {
   // Encode operations iterate in reverse order.
-  for (auto it = filters_.rbegin(); it != filters_.rend(); ++it) {
-    (*it)->encodeComplete();
+  for (auto& filter : std::ranges::reverse_view(filters_)) {
+    filter->encodeComplete();
   }
 }
 

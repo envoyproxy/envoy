@@ -10,10 +10,12 @@
 #include "source/common/protobuf/protobuf.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
@@ -22,8 +24,12 @@
 namespace Envoy {
 namespace Config {
 namespace {
+using ::Envoy::StatusHelpers::HasStatus;
+using ::testing::_;
 using ::testing::AtLeast;
+using ::testing::HasSubstr;
 using ::testing::NiceMock;
+using ::testing::Return;
 
 class AsyncDataSourceTest : public testing::Test {
 protected:
@@ -201,6 +207,21 @@ TEST(DataSourceTest, EmptyFileTest) {
 
   const auto file_data = DataSource::read(config, true, *api, 555).value();
   EXPECT_TRUE(file_data.empty());
+}
+
+TEST(DataSourceTest, NegativeFileSize) {
+  envoy::config::core::v3::DataSource config;
+  config.set_filename("some_path");
+
+  NiceMock<Filesystem::MockInstance> file_system;
+  Api::ApiPtr api = Api::createApiForTest(file_system);
+
+  EXPECT_CALL(file_system, fileExists("some_path")).WillOnce(Return(true));
+  EXPECT_CALL(file_system, fileSize("some_path")).WillOnce(Return(-1));
+
+  const absl::StatusOr<std::string> file_data_or_error = DataSource::read(config, true, *api, 5555);
+  EXPECT_THAT(file_data_or_error, HasStatus(absl::StatusCode::kInvalidArgument,
+                                            HasSubstr("cannot determine size of file some_path")));
 }
 
 TEST(DataSourceProviderTest, NonFileDataSourceTest) {

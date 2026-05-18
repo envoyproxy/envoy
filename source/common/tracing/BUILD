@@ -138,3 +138,13 @@ envoy_cc_library(
         "@envoy_api//envoy/type/tracing/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "tracing_validation_lib",
+    srcs = ["tracing_validation.cc"],
+    hdrs = ["tracing_validation.h"],
+    deps = [
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/strings",
+    ],
+)

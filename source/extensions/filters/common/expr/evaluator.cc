@@ -59,6 +59,7 @@ absl::optional<CelValue> StreamActivation::FindValue(absl::string_view name,
     return CelValue::CreateMap(
         Protobuf::Arena::Create<RequestWrapper>(arena, *arena, activation_request_headers_, info));
   case ActivationToken::Response:
+    needs_response_path_data_ = true;
     return CelValue::CreateMap(Protobuf::Arena::Create<ResponseWrapper>(
         arena, *arena, activation_response_headers_, activation_response_trailers_, info));
   case ActivationToken::Connection:
@@ -302,8 +303,22 @@ std::string print(CelValue value) {
     return std::string(value.StringOrDie().value());
   case CelValue::Type::kBytes:
     return std::string(value.BytesOrDie().value());
-  case CelValue::Type::kMessage:
-    return value.IsNull() ? "NULL" : value.MessageOrDie()->ShortDebugString();
+  case CelValue::Type::kMessage: {
+    if (value.IsNull()) {
+      return "NULL";
+    }
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.cel_message_serialize_text_format")) {
+      return value.MessageOrDie()->ShortDebugString();
+    }
+    std::string textproto;
+    Protobuf::TextFormat::Printer printer;
+    printer.SetSingleLineMode(true);
+    if (printer.PrintToString(*value.MessageOrDie(), &textproto)) {
+      return textproto;
+    }
+    return "";
+  }
   case CelValue::Type::kDuration:
     return absl::FormatDuration(value.DurationOrDie());
   case CelValue::Type::kTimestamp:

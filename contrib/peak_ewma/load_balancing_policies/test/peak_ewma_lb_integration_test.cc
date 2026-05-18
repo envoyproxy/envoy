@@ -2,7 +2,6 @@
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/common.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
@@ -52,8 +51,7 @@ public:
     config.mutable_decay_time()->set_seconds(10);
 
     lb_ = std::make_unique<PeakEwmaLoadBalancer>(priority_set_, nullptr, stats_, runtime_, random_,
-                                                 50, *cluster_info_, time_source_, config,
-                                                 dispatcher_);
+                                                 50, *cluster_info_, time_source_, config);
   }
 
 protected:
@@ -67,7 +65,6 @@ protected:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<MockTimeSystem> time_source_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
 
   std::vector<Upstream::HostSharedPtr> hosts_;
   std::unique_ptr<PeakEwmaLoadBalancer> lb_;

@@ -1,3 +1,4 @@
+#include "envoy/extensions/filters/http/file_server/v3/file_server.pb.h"
 #include "envoy/extensions/filters/http/file_system_buffer/v3/file_system_buffer.pb.h"
 #include "envoy/extensions/filters/http/grpc_json_reverse_transcoder/v3/transcoder.pb.h"
 #include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
@@ -139,6 +140,18 @@ void cleanFileSystemBufferConfig(Protobuf::Message* message) {
   }
 }
 
+void cleanFileServerConfig(Protobuf::Message* message) {
+  envoy::extensions::filters::http::file_server::v3::FileServerConfig& config =
+      *Envoy::Protobuf::DynamicCastMessage<
+          envoy::extensions::filters::http::file_server::v3::FileServerConfig>(message);
+  if (config.manager_config().thread_pool().thread_count() > kMaxAsyncFileManagerThreadCount) {
+    throw EnvoyException(fmt::format(
+        "received input exceeding the allowed number of threads ({} > {}) for "
+        "FileServerConfig.AsyncFileManager",
+        config.manager_config().thread_pool().thread_count(), kMaxAsyncFileManagerThreadCount));
+  }
+}
+
 void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
                                          Protobuf::Message* message) {
   // Map filter name to clean-up function.
@@ -154,6 +167,9 @@ void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
   } else if (filter_name == "envoy.filters.http.file_system_buffer") {
     // Limit the number of threads to create to kMaxAsyncFileManagerThreadCount
     cleanFileSystemBufferConfig(message);
+  } else if (filter_name == "envoy.filters.http.file_server") {
+    // Limit the number of threads to create to kMaxAsyncFileManagerThreadCount
+    cleanFileServerConfig(message);
   }
 }
 

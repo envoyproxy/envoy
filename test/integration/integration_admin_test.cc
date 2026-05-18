@@ -461,7 +461,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
   EXPECT_EQ("OK\n", response->body());
 
-  test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
+  test_server_->waitForCounter("listener_manager.listener_stopped", Eq(1));
 }
 
 // Test Prometheus protobuf format with content negotiation via Accept header, and
@@ -515,7 +515,7 @@ TEST_P(IntegrationAdminTest, AdminDrainInboundOnly) {
   EXPECT_EQ("OK\n", response->body());
 
   // Validate that the inbound listener has been stopped.
-  test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
+  test_server_->waitForCounter("listener_manager.listener_stopped", Eq(1));
 }
 
 TEST_P(IntegrationAdminTest, AdminDrainInboundOnlyIdempotent) {
@@ -570,7 +570,7 @@ TEST_P(IntegrationAdminTest, AdminDrainInboundOnlyIdempotent) {
 
   // Validate that the inbound listener has been stopped and that we don't double count
   // the inbound_only drain and the universal drain.
-  test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
+  test_server_->waitForCounter("listener_manager.listener_stopped", Eq(1));
 }
 
 // Validates that the inbound only query param only drains inbound listeners when graceful is set.
@@ -610,7 +610,7 @@ TEST_P(IntegrationAdminTest, AdminDrainInboundOnlyGracefulConnectionCloseForInbo
   }
 
   // Validate that the inbound listener has been stopped.
-  test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
+  test_server_->waitForCounter("listener_manager.listener_stopped", Eq(1));
 }
 
 // Validates that the inbound only query param only drains inbound listeners when graceful is set.
@@ -651,7 +651,7 @@ TEST_P(IntegrationAdminTest, AdminDrainInboundOnlyGracefulNoConnectionCloseForOu
   }
 
   // Validate that the inbound listener has been stopped.
-  test_server_->waitForCounterEq("listener_manager.listener_stopped", 0);
+  test_server_->waitForCounter("listener_manager.listener_stopped", Eq(0));
 }
 
 TEST_P(IntegrationAdminTest, AdminOnDestroyCallbacks) {
@@ -803,7 +803,7 @@ TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(DISABLED_ExcludeMult
 
 // TODO(ambuc): Find a cleaner way to test this. This test has an unfortunate compromise:
 // `listener_manager.listener_create_success` must be instantiated, because BaseIntegrationTest
-// blocks on its creation (see waitForCounterGe and the suite of waitFor* functions).
+// blocks on its creation (see waitForCounter and the suite of waitFor* functions).
 // If this invariant is changed, this test must be rewritten.
 TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(IncludeExact)) {
   // Stats matching does not play well with LDS, at least in test. See #7215.

@@ -141,6 +141,17 @@ message HttpConnectionManager {
     UNESCAPE_AND_FORWARD = 4;
   }
 
+  // The format to use when writing the
+  // :ref:`config_http_conn_man_headers_x-forwarded-client-cert` (XFCC) header value.
+  enum ForwardClientCertFormat {
+    // Use the :ref:`text format <config_http_conn_man_headers_x-forwarded-client-cert_text>`.
+    // This is the default.
+    TEXT = 0;
+
+    // Use the :ref:`JSON format <config_http_conn_man_headers_x-forwarded-client-cert_json>`.
+    JSON = 1;
+  }
+
   // [#next-free-field: 14]
   message Tracing {
     option (udpa.annotations.versioning).previous_message_type =
@@ -272,7 +283,7 @@ message HttpConnectionManager {
     repeated config.core.v3.CidrRange cidr_ranges = 2;
   }
 
-  // [#next-free-field: 7]
+  // [#next-free-field: 8]
   message SetCurrentClientCertDetails {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager."
@@ -301,14 +312,26 @@ message HttpConnectionManager {
     // Whether to forward the URI type Subject Alternative Name of the client cert. Defaults to
     // false.
     bool uri = 5;
+
+    // The format for the header. When the :ref:`forward_client_cert_details
+    // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_client_cert_details>`
+    // is APPEND_FORWARD and an existing XFCC header is present, the format of the existing header
+    // is used. The configured format is used when there is no existing header value
+    // (APPEND_FORWARD with no prior XFCC header, or SANITIZE_SET which always replaces the value).
+    ForwardClientCertFormat format = 7;
   }
 
-  // The configuration for forwarding client cert details.
+  // The configuration for forwarding client cert details, used as the action config in a
+  // :ref:`forward_client_cert_matcher
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_client_cert_matcher>`.
   message ForwardClientCertConfig {
     // How to handle the XFCC header.
     ForwardClientCertDetails forward_client_cert_details = 1;
 
-    // How to set the current client cert details.
+    // The fields in the client certificate to forward. See
+    // :ref:`set_current_client_cert_details
+    // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.set_current_client_cert_details>`
+    // for details.
     SetCurrentClientCertDetails set_current_client_cert_details = 2;
   }
 
@@ -553,14 +576,16 @@ message HttpConnectionManager {
   //
   //   Currently some protocol codecs impose limits on the maximum size of a single header.
   //
-  //   * HTTP/2 (when using nghttp2) limits a single header to around 100kb.
-  //   * HTTP/3 limits a single header to around 1024kb.
+  //   * HTTP/2 (when using nghttp2) limits a single header to around 100 KB by default. This can be
+  //     adjusted via :ref:`max_header_field_size_kb
+  //     <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_header_field_size_kb>`.
+  //   * HTTP/3 limits a single header to around 1024 KB.
   //
   google.protobuf.UInt32Value max_request_headers_kb = 29
       [(validate.rules).uint32 = {lte: 8192 gt: 0}];
 
   // The stream idle timeout for connections managed by the connection manager.
-  // If not specified, this defaults to 5 minutes. The default value was selected
+  // If not specified, this defaults to ``5 minutes``. The default value was selected
   // so as not to interfere with any smaller configured timeouts that may have
   // existed in configurations prior to the introduction of this feature, while
   // introducing robustness to TCP connections that terminate without a FIN.
@@ -569,28 +594,29 @@ message HttpConnectionManager {
   // :ref:`route-level idle_timeout
   // <envoy_v3_api_field_config.route.v3.RouteAction.idle_timeout>`. Even on a stream in
   // which the override applies, prior to receipt of the initial request
-  // headers, the :ref:`stream_idle_timeout
-  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_idle_timeout>`
-  // applies. Each time an encode/decode event for headers or data is processed
-  // for the stream, the timer will be reset. If the timeout fires, the stream
-  // is terminated with a 408 Request Timeout error code if no upstream response
-  // header has been received, otherwise a stream reset occurs.
+  // headers, the ``stream_idle_timeout`` applies. Each time an encode/decode event
+  // for headers or data is processed for the stream, the timer will be reset. If the
+  // timeout fires, the stream is terminated with a ``408 Request Timeout`` error code
+  // if no upstream response header has been received, otherwise a stream reset occurs.
   //
-  // If the :ref:`overload action <config_overload_manager_overload_actions>` "envoy.overload_actions.reduce_timeouts"
-  // is configured, this timeout is scaled according to the value for
+  // If the :ref:`overload action <config_overload_manager_overload_actions>`
+  // ``envoy.overload_actions.reduce_timeouts`` is configured, this timeout is scaled
+  // according to the value for
   // :ref:`HTTP_DOWNSTREAM_STREAM_IDLE <envoy_v3_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.HTTP_DOWNSTREAM_STREAM_IDLE>`.
   //
-  // Note that it is possible to idle timeout even if the wire traffic for a stream is non-idle, due
-  // to the granularity of events presented to the connection manager. For example, while receiving
-  // very large request headers, it may be the case that there is traffic regularly arriving on the
-  // wire while the connection manage is only able to observe the end-of-headers event, hence the
-  // stream may still idle timeout.
+  // .. note::
   //
-  // A value of 0 will completely disable the connection manager stream idle
+  //   It is possible to idle timeout even if the wire traffic for a stream is non-idle, due
+  //   to the granularity of events presented to the connection manager. For example, while receiving
+  //   very large request headers, it may be the case that there is traffic regularly arriving on the
+  //   wire while the connection manager is only able to observe the end-of-headers event, hence the
+  //   stream may still idle timeout.
+  //
+  // A value of ``0`` will completely disable the connection manager stream idle
   // timeout, although per-route idle timeout overrides will continue to apply.
   //
-  // This timeout is also used as the default value for :ref:`stream_flush_timeout
-  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_flush_timeout>`.
+  // This timeout is also used as the default value for
+  // :ref:`stream_flush_timeout <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_flush_timeout>`.
   google.protobuf.Duration stream_idle_timeout = 24
       [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 

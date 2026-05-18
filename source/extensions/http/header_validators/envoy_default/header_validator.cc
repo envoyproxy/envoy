@@ -8,6 +8,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/match.h"
 
@@ -634,21 +635,27 @@ void HeaderValidator::sanitizeHeadersWithUnderscores(::Envoy::Http::HeaderMap& h
     return;
   }
 
-  std::vector<absl::string_view> drop_headers;
+  // Store owning copies because removing one duplicate header can free the
+  // underlying storage for another matching entry. Using absl::string_view
+  // would still be unsafe here as the view may dangle after the first removal.
+  // We only need unique names.
+  absl::flat_hash_set<std::string> drop_headers;
   header_map.iterate([&drop_headers](const ::Envoy::Http::HeaderEntry& header_entry)
                          -> ::Envoy::Http::HeaderMap::Iterate {
     const absl::string_view header_name = header_entry.key().getStringView();
     if (absl::StrContains(header_name, '_')) {
-      drop_headers.push_back(header_name);
+      drop_headers.emplace(header_name);
     }
 
     return ::Envoy::Http::HeaderMap::Iterate::Continue;
   });
 
   ASSERT(drop_headers.empty() || underscore_action == HeaderValidatorConfig::DROP_HEADER);
-  for (auto& name : drop_headers) {
-    stats_.incDroppedHeadersWithUnderscores();
-    header_map.remove(::Envoy::Http::LowerCaseString(name));
+  for (const auto& name : drop_headers) {
+    const size_t removed_headers = header_map.remove(::Envoy::Http::LowerCaseString(name));
+    for (size_t i = 0; i < removed_headers; ++i) {
+      stats_.incDroppedHeadersWithUnderscores();
+    }
   }
 }
 

@@ -816,6 +816,11 @@ public:
    * Check whether header matcher matches any headers in a given HeaderMap.
    */
   virtual bool matchesHeaders(const HeaderMap& headers) const PURE;
+
+  /**
+   * Matches headers validating each value individually.
+   */
+  virtual bool matchesHeadersIndividually(const HeaderMap& headers) const PURE;
 };
 
 using HeaderMatcherSharedPtr = std::shared_ptr<HeaderMatcher>;

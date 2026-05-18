@@ -1,3 +1,4 @@
+// NOLINT(namespace-envoy)
 // This file provides the version suffix for the contrib Envoy binary.
 // The contrib suffix distinguishes it from the standard binary.
 

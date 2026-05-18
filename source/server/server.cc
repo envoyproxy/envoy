@@ -103,8 +103,7 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
-      hooks_(hooks), quic_stat_names_(store.symbolTable()), server_contexts_(*this),
-      enable_reuse_port_default_(true), stats_flush_in_progress_(false) {
+      hooks_(hooks), quic_stat_names_(store.symbolTable()), server_contexts_(*this) {
   // Register the server factory context on the main thread.
   Configuration::ServerFactoryContextInstance::initialize(&server_contexts_);
 }
@@ -235,7 +234,8 @@ void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, S
   }
 }
 
-void InstanceBase::flushStats() {
+void InstanceBase::flushStats() { flushStatsImpl(); }
+void InstanceBase::flushStatsImpl() {
   if (stats_flush_in_progress_) {
     ENVOY_LOG(debug, "skipping stats flush as flush is already in progress");
     server_stats_->dropped_stat_flushes_.inc();
@@ -248,7 +248,7 @@ void InstanceBase::flushStats() {
   // completion callback is not called immediately. As a result of this server stats will
   // not be updated and flushed to stat sinks. So skip mergeHistograms call if workers are
   // not started yet.
-  if (initManager().state() == Init::Manager::State::Initialized) {
+  if (init_manager_.state() == Init::Manager::State::Initialized) {
     // A shutdown initiated before this callback may prevent this from being called as per
     // the semantics documented in ThreadLocal's runOnAllThreads method.
     stats_store_.mergeHistograms([this]() -> void { flushStatsInternal(); });
@@ -267,22 +267,21 @@ void InstanceBase::updateServerStats() {
                                        parent_stats.parent_memory_allocated_);
   server_stats_->memory_heap_size_.set(Memory::Stats::totalCurrentlyReserved());
   server_stats_->memory_physical_size_.set(Memory::Stats::totalPhysicalBytes());
-  if (!options().hotRestartDisabled()) {
+  if (!options_.hotRestartDisabled()) {
     server_stats_->parent_connections_.set(parent_stats.parent_connections_);
   }
   server_stats_->total_connections_.set(listener_manager_->numConnections() +
                                         parent_stats.parent_connections_);
   server_stats_->days_until_first_cert_expiring_.set(
-      sslContextManager().daysUntilFirstCertExpires().value_or(0));
+      ssl_context_manager_->daysUntilFirstCertExpires().value_or(0));
 
   auto secs_until_ocsp_response_expires =
-      sslContextManager().secondsUntilFirstOcspResponseExpires();
+      ssl_context_manager_->secondsUntilFirstOcspResponseExpires();
   if (secs_until_ocsp_response_expires) {
     server_stats_->seconds_until_first_ocsp_response_expiring_.set(
         secs_until_ocsp_response_expires.value());
   }
-  server_stats_->state_.set(
-      enumToInt(Utility::serverState(initManager().state(), healthCheckFailed())));
+  server_stats_->state_.set(enumToInt(Utility::serverState(init_manager_.state(), !live_.load())));
   server_stats_->stats_recent_lookups_.set(
       stats_store_.symbolTable().getRecentLookups([](absl::string_view, uint64_t) {}));
 }
@@ -290,8 +289,9 @@ void InstanceBase::updateServerStats() {
 void InstanceBase::flushStatsInternal() {
   updateServerStats();
   auto& stats_config = config_.statsConfig();
-  InstanceUtil::flushMetricsToSinks(stats_config.sinks(), stats_store_, clusterManager(),
-                                    timeSource());
+  ASSERT(config_.clusterManager() != nullptr);
+  InstanceUtil::flushMetricsToSinks(stats_config.sinks(), stats_store_, *config_.clusterManager(),
+                                    time_source_);
   if (const auto evict_on_flush = stats_config.evictOnFlush(); evict_on_flush > 0) {
     stats_eviction_counter_ = (stats_eviction_counter_ + 1) % evict_on_flush;
     if (stats_eviction_counter_ == 0) {
@@ -567,8 +567,8 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
                                   server_stats_->dynamic_unknown_fields_,
                                   server_stats_->wip_protos_);
 
-  memory_allocator_manager_ = std::make_unique<Memory::AllocatorManager>(
-      *api_, *stats_store_.rootScope(), bootstrap_.memory_allocator_manager());
+  memory_allocator_manager_ =
+      std::make_unique<Memory::AllocatorManager>(*api_, bootstrap_.memory_allocator_manager());
 
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       server_stats_->initialization_time_ms_, timeSource());
@@ -665,6 +665,11 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   loadServerFlags(initial_config.flagsPath());
 
+  // Runtime is initialized before the overload manager so resource monitor factories can use
+  // runtime keys (e.g. RuntimeUInt64).
+  runtime_ = component_factory.createRuntime(*this, initial_config);
+  validation_context_.setRuntime(runtime());
+
   // Initialize the overload manager early so other modules can register for actions.
   auto overload_manager_or_error = createOverloadManager();
   RETURN_IF_NOT_OK(overload_manager_or_error.status());
@@ -721,9 +726,25 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
         Config::ServerExtensionValues::get().DEFAULT_LISTENER);
   }
 
+  ProtobufTypes::MessagePtr listener_manager_config =
+      listener_manager_factory->createEmptyConfigProto();
+  if (bootstrap_.has_listener_manager()) {
+    listener_manager_config = Config::Utility::translateAnyToFactoryConfig(
+        bootstrap_.listener_manager().typed_config(),
+        messageValidationContext().staticValidationVisitor(), *listener_manager_factory);
+  }
+
   // Workers get created first so they register for thread local updates.
   listener_manager_ = listener_manager_factory->createListenerManager(
-      *this, nullptr, worker_factory_, bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
+      *listener_manager_config, *this, nullptr, worker_factory_,
+      bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
+
+  // Runtime is initialized before the overload manager so resource monitors can read runtime keys;
+  // that means the first runtime snapshot is published before workers register for thread-local
+  // updates. Refresh the snapshot now so worker threads receive a valid TLS snapshot.
+  if (runtime_) {
+    RETURN_IF_NOT_OK(runtime().onWorkerThreadsRegistered());
+  }
 
   // We can now initialize stats for threading.
   stats_store_.initializeThreading(*dispatcher_, thread_local_);
@@ -747,11 +768,6 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   // Please note: this order requires that RTDS is provisioned using a primary cluster. If RTDS is
   // provisioned through ADS then ADS must use primary cluster as well. This invariant is enforced
   // during RTDS initialization and invalid configuration will be rejected.
-
-  // Runtime gets initialized before the main configuration since during main configuration
-  // load things may grab a reference to the loader for later use.
-  runtime_ = component_factory.createRuntime(*this, initial_config);
-  validation_context_.setRuntime(runtime());
 
 #ifndef WIN32
   // Envoy automatically raises soft file limits, but we do it here in order to allow
@@ -859,13 +875,17 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   // Now that we are initialized, notify the bootstrap extensions.
   for (auto&& bootstrap_extension : bootstrap_extensions_) {
-    bootstrap_extension->onServerInitialized();
+    bootstrap_extension->onServerInitialized(*this);
   }
 
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
-  main_thread_guard_dog_ = maybeCreateGuardDog("main_thread");
-  worker_guard_dog_ = maybeCreateGuardDog("workers");
+  main_thread_guard_dog_ = maybeCreateGuardDog("main_thread", config_.mainThreadWatchdogConfig());
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.worker_threads_watchdog_fix")) {
+    worker_guard_dog_ = maybeCreateGuardDog("workers", config_.workerWatchdogConfig());
+  } else {
+    worker_guard_dog_ = maybeCreateGuardDog("workers", config_.mainThreadWatchdogConfig());
+  }
   return absl::OkStatus();
 }
 
@@ -1108,7 +1128,7 @@ void InstanceBase::terminate() {
 
   // Only flush if we have not been hot restarted.
   if (stat_flush_timer_) {
-    flushStats();
+    flushStatsImpl();
   }
 
   if (config_.clusterManager() != nullptr) {

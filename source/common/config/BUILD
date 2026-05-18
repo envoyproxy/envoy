@@ -245,8 +245,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "subscription_base_interface",
-    hdrs = ["subscription_base.h"],
+    name = "resource_type_helper_lib",
+    hdrs = ["resource_type_helper.h"],
     deps = [
         ":opaque_resource_decoder_lib",
         ":resource_name_lib",
@@ -313,6 +313,7 @@ envoy_cc_library(
         "//envoy/config:xds_manager_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:thread_lib",
+        "//source/common/upstream:load_stats_reporter_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

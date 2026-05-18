@@ -29,11 +29,10 @@ envoy_cc_library(
     deps = [
         "//envoy/thread_local:thread_local_interface",
         "//source/common/common:callback_impl_lib",
-        "//source/common/orca:orca_load_metrics_lib",
         "//source/extensions/load_balancing_policies/common:load_balancer_lib",
+        "//source/extensions/load_balancing_policies/common:orca_weight_manager_lib",
         "//source/extensions/load_balancing_policies/round_robin:round_robin_lb_lib",
         "@envoy_api//envoy/extensions/load_balancing_policies/client_side_weighted_round_robin/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/load_balancing_policies/round_robin/v3:pkg_cc_proto",
-        "@xds//xds/data/orca/v3:pkg_cc_proto",
     ],
 )

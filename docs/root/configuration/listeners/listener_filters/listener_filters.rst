@@ -14,4 +14,5 @@ Envoy has the following builtin listener filters.
   original_src_filter
   postgres_inspector_filter
   proxy_protocol
+  set_filter_state_filter
   tls_inspector

@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <functional>
 #include <list>
-#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -28,6 +27,7 @@
 #include "envoy/tcp/async_tcp_client.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/load_stats_reporter.h"
 
 #include "source/common/common/cleanup.h"
 #include "source/common/common/thread.h"
@@ -39,9 +39,10 @@
 #include "source/common/tcp/async_tcp_client_impl.h"
 #include "source/common/upstream/cluster_discovery_manager.h"
 #include "source/common/upstream/host_utility.h"
-#include "source/common/upstream/load_stats_reporter.h"
 #include "source/common/upstream/priority_conn_pool_map.h"
 #include "source/common/upstream/upstream_impl.h"
+
+#include "absl/container/btree_map.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -270,6 +271,13 @@ public:
     ASSERT(clusters_maps.added_via_api_clusters_num_ <=
            clusters_maps.active_clusters_.size() + clusters_maps.warming_clusters_.size());
     return clusters_maps;
+  }
+
+  void forEachActiveCluster(std::function<void(const Cluster&)> cb) const override {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
+    for (const auto& [unused_name, cluster_data] : active_clusters_) {
+      cb(*cluster_data->cluster_);
+    }
   }
 
   OptRef<const Cluster> getActiveCluster(const std::string& cluster_name) const override {
@@ -546,7 +554,7 @@ private:
     struct TcpConnPoolsContainer {
       TcpConnPoolsContainer(HostHandlePtr&& host_handle) : host_handle_(std::move(host_handle)) {}
 
-      using ConnPools = std::map<std::vector<uint8_t>, Tcp::ConnectionPool::InstancePtr>;
+      using ConnPools = absl::btree_map<std::vector<uint8_t>, Tcp::ConnectionPool::InstancePtr>;
 
       // Destroyed after pools.
       const HostHandlePtr host_handle_;
@@ -773,8 +781,7 @@ private:
         : cluster_config_(cluster_config), config_hash_(cluster_config_hash),
           version_info_(version_info), cluster_(std::move(cluster)),
           last_updated_(time_source.systemTime()), added_via_api_(added_via_api),
-          avoid_cds_removal_(avoid_cds_removal), added_or_updated_{},
-          required_for_ads_(required_for_ads) {}
+          avoid_cds_removal_(avoid_cds_removal), required_for_ads_(required_for_ads) {}
 
     bool blockUpdate(uint64_t hash) { return !added_via_api_ || config_hash_ == hash; }
 
@@ -808,7 +815,7 @@ private:
     // Keep smaller fields near the end to reduce padding
     const bool added_via_api_ : 1;
     const bool avoid_cds_removal_ : 1;
-    bool added_or_updated_ : 1;
+    bool added_or_updated_ : 1 = false;
     const bool required_for_ads_ : 1;
   };
 
@@ -821,7 +828,7 @@ private:
 
   using ClusterDataPtr = std::unique_ptr<ClusterData>;
   // This map is ordered so that config dumping is consistent.
-  using ClusterMap = std::map<std::string, ClusterDataPtr>;
+  using ClusterMap = absl::btree_map<std::string, ClusterDataPtr>;
 
   struct PendingUpdates {
     ~PendingUpdates() { disableTimer(); }

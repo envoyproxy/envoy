@@ -59,6 +59,7 @@ constexpr absl::string_view ReceiveBeforeConnectKey = "envoy.tcp_proxy.receive_b
  * All tcp proxy stats. @see stats_macros.h
  */
 #define ALL_TCP_PROXY_STATS(COUNTER, GAUGE)                                                        \
+  COUNTER(downstream_cx_drain_close)                                                               \
   COUNTER(downstream_cx_no_route)                                                                  \
   COUNTER(downstream_cx_rx_bytes_total)                                                            \
   COUNTER(downstream_cx_total)                                                                     \
@@ -69,6 +70,7 @@ constexpr absl::string_view ReceiveBeforeConnectKey = "envoy.tcp_proxy.receive_b
   COUNTER(idle_timeout)                                                                            \
   COUNTER(max_downstream_connection_duration)                                                      \
   COUNTER(upstream_flush_total)                                                                    \
+  COUNTER(route_delayed_total)                                                                     \
   GAUGE(downstream_cx_rx_bytes_buffered, Accumulate)                                               \
   GAUGE(downstream_cx_tx_bytes_buffered, Accumulate)                                               \
   GAUGE(upstream_flush_active, Accumulate)
@@ -264,6 +266,10 @@ public:
     const Network::ProxyProtocolTLVVector& proxyProtocolTLVs() const {
       return proxy_protocol_tlvs_;
     }
+    envoy::extensions::filters::network::tcp_proxy::v3::ProxyProtocolTlvMergePolicy
+    proxyProtocolTlvMergePolicy() const {
+      return proxy_protocol_tlv_merge_policy_;
+    }
 
     // Evaluate dynamic TLV formatters and combine with static TLVs.
     Network::ProxyProtocolTLVVector
@@ -299,6 +305,9 @@ public:
     BackOffStrategyPtr backoff_strategy_;
     Network::ProxyProtocolTLVVector proxy_protocol_tlvs_;
     std::vector<TlvFormatter> dynamic_tlv_formatters_;
+    envoy::extensions::filters::network::tcp_proxy::v3::ProxyProtocolTlvMergePolicy
+        proxy_protocol_tlv_merge_policy_{
+            envoy::extensions::filters::network::tcp_proxy::v3::ADD_IF_ABSENT};
   };
 
   using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;
@@ -370,6 +379,9 @@ public:
   }
 
   const absl::optional<uint32_t>& maxEarlyDataBytes() const { return max_early_data_bytes_; }
+  bool checkDrainClose() const { return check_drain_close_; }
+  const Network::DrainDecision& drainDecision() const { return drain_decision_; }
+  Network::DrainDirection drainCloseScope() const { return drain_close_scope_; }
 
 private:
   struct SimpleRouteImpl : public Route {
@@ -426,6 +438,9 @@ private:
   envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode upstream_connect_mode_{
       envoy::extensions::filters::network::tcp_proxy::v3::IMMEDIATE};
   absl::optional<uint32_t> max_early_data_bytes_;
+  const Network::DrainDecision& drain_decision_;
+  const Network::DrainDirection drain_close_scope_{};
+  const bool check_drain_close_{false};
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
@@ -546,8 +561,14 @@ public:
     void resetStream(Http::StreamResetReason, absl::string_view) override {
       IS_ENVOY_BUG("Not implemented. Unexpected call to resetStream()");
     };
-    Router::RouteConstSharedPtr route() override { return route_; }
-    Upstream::ClusterInfoConstSharedPtr clusterInfo() override {
+    OptRef<const Router::Route> route() override { return makeOptRefFromPtr(route_.get()); }
+    Router::RouteConstSharedPtr routeSharedPtr() override { return route_; }
+    OptRef<const Upstream::ClusterInfo> clusterInfo() override {
+      const auto info =
+          parent_->cluster_manager_.getThreadLocalCluster(parent_->route_->clusterName())->info();
+      return makeOptRefFromPtr<const Upstream::ClusterInfo>(info.get());
+    }
+    Upstream::ClusterInfoConstSharedPtr clusterInfoSharedPtr() override {
       return parent_->cluster_manager_.getThreadLocalCluster(parent_->route_->clusterName())
           ->info();
     }
@@ -606,9 +627,9 @@ public:
     Router::RouteSpecificFilterConfigs perFilterConfigs() const override { return {}; }
     Buffer::BufferMemoryAccountSharedPtr account() const override { return nullptr; }
     void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) override {}
-    absl::optional<Upstream::LoadBalancerContext::OverrideHost>
+    OptRef<const Upstream::LoadBalancerContext::OverrideHost>
     upstreamOverrideHost() const override {
-      return absl::nullopt;
+      return {};
     }
     bool shouldLoadShed() const override { return false; }
     void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override {
@@ -677,6 +698,7 @@ protected:
   void onDownstreamEvent(Network::ConnectionEvent event);
   void onUpstreamData(Buffer::Instance& data, bool end_stream);
   void onUpstreamEvent(Network::ConnectionEvent event);
+  void maybeCloseDownstreamForDrainClose();
   void onUpstreamConnection();
   void onIdleTimeout();
   void resetIdleTimer();
@@ -736,7 +758,7 @@ protected:
   // the upstream connection is established.
   bool receive_before_connect_{false};
   bool early_data_end_stream_{false};
-  Buffer::OwnedImpl early_data_buffer_{};
+  Buffer::OwnedImpl early_data_buffer_;
   HttpStreamDecoderFilterCallbacks upstream_decoder_filter_callbacks_;
 
   // Connection establishment mode configuration.
@@ -747,6 +769,7 @@ protected:
   bool initial_data_received_{false};
   bool read_disabled_due_to_buffer_{false}; // Track if we disabled reading due to buffer overflow.
   uint32_t max_buffered_bytes_{65536};      // Default 64KB.
+  bool delay_route_selection_{false};
 };
 
 // This class deals with an upstream connection that needs to finish flushing, when the downstream

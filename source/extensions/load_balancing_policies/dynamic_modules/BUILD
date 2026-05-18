@@ -14,6 +14,8 @@ envoy_cc_library(
     srcs = ["lb_config.cc"],
     hdrs = ["lb_config.h"],
     deps = [
+        "//envoy/stats:stats_interface",
+        "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
     ],
 )
@@ -47,6 +49,7 @@ envoy_cc_extension(
         ":abi_impl",
         ":lb_config_lib",
         ":load_balancer_lib",
+        "//envoy/server:factory_context_interface",
         "//source/common/protobuf:utility_lib",
         "//source/common/upstream:load_balancer_factory_base_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",

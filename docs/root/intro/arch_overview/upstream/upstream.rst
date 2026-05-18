@@ -14,6 +14,7 @@ Upstream clusters
   load_balancing/load_balancing
   aggregate_cluster
   composite_cluster
+  mcp_multicluster
   outlier
   circuit_breaking
   upstream_filters

@@ -12,6 +12,7 @@ builtin:
 - envoy.matching.inputs.response_headers
 - envoy.matching.inputs.response_trailers
 - envoy.matching.inputs.query_params
+- envoy.matching.inputs.local_reply
 - envoy.matching.inputs.cel_data_input
 - envoy.matching.inputs.destination_ip
 - envoy.matching.inputs.destination_port
@@ -78,6 +79,7 @@ categories:
 - envoy.filters.network
 - envoy.filters.udp_listener
 - envoy.filters.udp.session
+- envoy.filters.upstream_network
 - envoy.filters.quic_listener
 - envoy.formatter
 - envoy.geoip_providers

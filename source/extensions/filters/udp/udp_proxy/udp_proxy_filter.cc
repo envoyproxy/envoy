@@ -626,6 +626,8 @@ bool UdpProxyFilter::UdpActiveSession::createUpstream() {
     }
   }
 
+  // Track attempted hosts for access logging
+  udp_session_info_.upstreamInfo()->addUpstreamHostAttempted(host_);
   udp_session_info_.upstreamInfo()->setUpstreamHost(host_);
   cluster_->addSession(host_.get(), this);
   createUdpSocket(host_);

@@ -1,47 +1,68 @@
 package fake
 
+import (
+	"strings"
+	"unsafe"
+
+	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared"
+)
+
 type FakeHeaderMap struct {
 	Headers map[string][]string
 }
 
 func NewFakeHeaderMap(headers map[string][]string) *FakeHeaderMap {
+	normalized := make(map[string][]string, len(headers))
+	for k, v := range headers {
+		normalized[strings.ToLower(k)] = v
+	}
 	return &FakeHeaderMap{
-		Headers: headers,
+		Headers: normalized,
 	}
 }
 
-func (m *FakeHeaderMap) Get(key string) []string {
-	return m.Headers[key]
+func (m *FakeHeaderMap) Get(key string) []shared.UnsafeEnvoyBuffer {
+	values := m.Headers[strings.ToLower(key)]
+	result := make([]shared.UnsafeEnvoyBuffer, len(values))
+	for i, v := range values {
+		result[i] = shared.UnsafeEnvoyBuffer{Ptr: unsafe.StringData(v), Len: uint64(len(v))}
+	}
+	return result
 }
 
-func (m *FakeHeaderMap) GetOne(key string) string {
-	values := m.Headers[key]
+func (m *FakeHeaderMap) GetOne(key string) shared.UnsafeEnvoyBuffer {
+	values := m.Headers[strings.ToLower(key)]
 	if len(values) > 0 {
-		return values[0]
+		v := values[0]
+		return shared.UnsafeEnvoyBuffer{Ptr: unsafe.StringData(v), Len: uint64(len(v))}
 	}
-	return ""
+	return shared.UnsafeEnvoyBuffer{}
 }
 
-func (m *FakeHeaderMap) GetAll() [][2]string {
-	var result [][2]string
+func (m *FakeHeaderMap) GetAll() [][2]shared.UnsafeEnvoyBuffer {
+	var result [][2]shared.UnsafeEnvoyBuffer
 	for k, vs := range m.Headers {
 		for _, v := range vs {
-			result = append(result, [2]string{k, v})
+			result = append(result, [2]shared.UnsafeEnvoyBuffer{
+				{Ptr: unsafe.StringData(k), Len: uint64(len(k))},
+				{Ptr: unsafe.StringData(v), Len: uint64(len(v))},
+			})
 		}
 	}
 	return result
 }
 
 func (m *FakeHeaderMap) Set(key string, value string) {
-	m.Headers[key] = []string{value}
+	m.Headers[strings.ToLower(key)] = []string{value}
 }
 
 func (m *FakeHeaderMap) Add(key string, value string) {
-	m.Headers[key] = append(m.Headers[key], value)
+	lower := strings.ToLower(key)
+	m.Headers[lower] = append(m.Headers[lower], value)
 }
 
 func (m *FakeHeaderMap) Remove(key string) {
-	delete(m.Headers, key)
+	delete(m.Headers, strings.ToLower(key))
 }
 
 type FakeBodyBuffer struct {
@@ -54,8 +75,10 @@ func NewFakeBodyBuffer(body []byte) *FakeBodyBuffer {
 	}
 }
 
-func (b *FakeBodyBuffer) GetChunks() [][]byte {
-	return [][]byte{b.Body}
+func (b *FakeBodyBuffer) GetChunks() []shared.UnsafeEnvoyBuffer {
+	return []shared.UnsafeEnvoyBuffer{
+		{Ptr: unsafe.SliceData(b.Body), Len: uint64(len(b.Body))},
+	}
 }
 
 func (b *FakeBodyBuffer) GetSize() uint64 {
@@ -65,6 +88,7 @@ func (b *FakeBodyBuffer) GetSize() uint64 {
 func (b *FakeBodyBuffer) Drain(size uint64) {
 	if size >= uint64(len(b.Body)) {
 		b.Body = []byte{}
+		return
 	}
 	b.Body = b.Body[size:]
 }

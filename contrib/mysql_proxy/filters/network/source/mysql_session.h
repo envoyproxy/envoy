@@ -27,12 +27,23 @@ public:
 
   void setState(MySQLSession::State state) { state_ = state; }
   MySQLSession::State getState() { return state_; }
-  uint8_t getExpectedSeq() { return expected_seq_; }
-  void setExpectedSeq(uint8_t seq) { expected_seq_ = seq; }
+  uint8_t getExpectedSeq(bool is_upstream) { return seq_ - (is_upstream ? 0 : seq_offset_); }
+  uint8_t convertToSeqOnReciever(uint8_t seq, bool is_upstream) {
+    return seq - (is_upstream ? 1 : -1) * seq_offset_;
+  }
+  void resetSeq() {
+    seq_ = MYSQL_REQUEST_PKT_NUM;
+    seq_offset_ = 0;
+  }
+  void incSeq() { seq_++; }
+  int8_t getSeqOffset() const { return seq_offset_; }
+  void setSeqOffset(int8_t offset) { seq_offset_ = offset; }
+  void adjustSeqOffset(int8_t delta) { seq_offset_ += delta; }
 
 private:
   MySQLSession::State state_{State::Init};
-  uint8_t expected_seq_{0};
+  uint8_t seq_{0};
+  int8_t seq_offset_{0};
 };
 
 } // namespace MySQLProxy

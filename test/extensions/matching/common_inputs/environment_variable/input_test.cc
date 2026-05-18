@@ -10,12 +10,14 @@ namespace EnvironmentVariable {
 
 TEST(InputTest, BasicUsage) {
   {
-    Input input("foo");
-    EXPECT_EQ(absl::get<std::string>(input.get()), "foo");
+    auto foo = "foo";
+    Input input(foo);
+    EXPECT_EQ(input.get().stringData().value(), "foo");
   }
 
-  Input input("foo");
-  EXPECT_EQ(absl::get<std::string>(input.get()), "foo");
+  auto foo = "foo";
+  Input input(foo);
+  EXPECT_EQ(input.get().stringData().value(), "foo");
 }
 } // namespace EnvironmentVariable
 } // namespace CommonInputs

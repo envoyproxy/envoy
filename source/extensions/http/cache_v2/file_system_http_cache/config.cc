@@ -64,7 +64,7 @@ public:
           async_file_manager_factory_->getAsyncFileManager(config.manager_config());
       std::unique_ptr<FileSystemHttpCache> fs_cache = std::make_unique<FileSystemHttpCache>(
           singleton, cache_eviction_thread_, std::move(config), std::move(async_file_manager),
-          context.scope());
+          context.serverFactoryContext().scope());
       cache = CacheSessions::create(context, std::move(fs_cache));
       caches_[key] = cache;
     } else {

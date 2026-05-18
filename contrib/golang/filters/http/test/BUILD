@@ -20,6 +20,7 @@ envoy_cc_test(
     deps = [
         "//contrib/golang/filters/http/source:config",
         "//contrib/golang/filters/http/test/test_data/destroyconfig:destroyconfig_test_lib",
+        "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:utility_lib",
     ],
@@ -33,7 +34,9 @@ envoy_cc_test(
     ],
     rbe_pool = "6gig",
     deps = [
+        "//contrib/golang/common/dso/test:dso_mocks",
         "//contrib/golang/filters/http/source:golang_filter_lib",
+        "//source/common/network:address_lib",
         "//source/common/stream_info:stream_info_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
@@ -61,6 +64,7 @@ envoy_cc_test(
         "//source/extensions/filters/http/lua:config",
         "//test/config:v2_link_hacks",
         "//test/integration:http_integration_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],

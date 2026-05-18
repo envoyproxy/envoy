@@ -131,6 +131,31 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithHttpServiceEmptyHeaders) {
   EXPECT_NE(nullptr, zipkin_tracer);
 }
 
+TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTimestampTraceIds) {
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+  context.server_factory_context_.cluster_manager_.initializeClusters({"fake_cluster"}, {});
+
+  const std::string yaml_string = R"EOF(
+  http:
+    name: zipkin
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v3.ZipkinConfig
+      collector_cluster: fake_cluster
+      collector_endpoint: /api/v2/spans
+      collector_endpoint_version: HTTP_JSON
+      timestamp_trace_ids: true
+  )EOF";
+
+  envoy::config::trace::v3::Tracing configuration;
+  TestUtility::loadFromYaml(yaml_string, configuration);
+
+  ZipkinTracerFactory factory;
+  auto message = Config::Utility::translateToFactoryConfig(
+      configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
+  auto zipkin_tracer = factory.createTracerDriver(*message, context);
+  EXPECT_NE(nullptr, zipkin_tracer);
+}
+
 } // namespace
 } // namespace Zipkin
 } // namespace Tracers

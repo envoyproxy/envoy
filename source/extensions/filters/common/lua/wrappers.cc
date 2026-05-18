@@ -303,6 +303,18 @@ int SslConnectionWrapper::luaIssuerPeerCertificate(lua_State* state) {
   return 1;
 }
 
+int SslConnectionWrapper::luaSha256PeerCertificateIssuerDigest(lua_State* state) {
+  const std::string& hash = connection_info_.sha256PeerCertificateIssuerDigest();
+  lua_pushlstring(state, hash.data(), hash.size());
+  return 1;
+}
+
+int SslConnectionWrapper::luaSerialNumberPeerCertificateIssuer(lua_State* state) {
+  const std::string& serial = connection_info_.serialNumberPeerCertificateIssuer();
+  lua_pushlstring(state, serial.data(), serial.size());
+  return 1;
+}
+
 int SslConnectionWrapper::luaSubjectPeerCertificate(lua_State* state) {
   const std::string& peer_cert_subject = connection_info_.subjectPeerCertificate();
   lua_pushlstring(state, peer_cert_subject.data(), peer_cert_subject.size());

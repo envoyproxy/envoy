@@ -1,0 +1,66 @@
+date: March 11, 2026
+
+bug_fixes:
+- area: oauth2
+  change: |
+    Fixed OAuth2 refresh requests so host rewriting no longer overrides the original ``Host`` header value.
+- area: ext_proc
+  change: |
+    Fixed a bug to support two ext_proc filters configured in the chain. This change can be reverted by setting
+    the runtime guard ``envoy.reloadable_features.ext_proc_inject_data_with_state_update`` to ``false``.
+- area: ext_proc
+  change: |
+    Fixed message-valued CEL attribute serialization (for example
+    ``xds.virtual_host_metadata``) to use protobuf text format instead of debug string output.
+    This restores ext_proc compatibility with protobuf 30+ where debug-string output is
+    intentionally not parseable (for example ``goo.gle/debugonly`` prefixes). This change can
+    be reverted by setting runtime guard
+    ``envoy.reloadable_features.cel_message_serialize_text_format`` to ``false``.
+- area: ratelimit
+  change: |
+    Fixed a bug in the gRPC rate limit client where the client could get into a bad state if the
+    callbacks were not properly released after a request completion, leading to potential use-after-free
+    issues. The fix ensures that callbacks and request references are cleared after completion, and adds
+    assertions to enforce correct usage patterns.
+- area: ext_authz
+  change: |
+    Fixed a bug where headers from a denied authorization response (non-200) were not properly propagated
+    to the client.
+- area: ext_authz
+  change: |
+    Fixed the HTTP ext_authz client to respect ``status_on_error`` configuration when the authorization
+    server returns a 5xx error or when HTTP call failures occur. Previously, these error scenarios always
+    returned 403 Forbidden regardless of the configured error status.
+- area: release
+  change: |
+    Published contrib binaries now include the ``-contrib`` suffix in their version string.
+- area: access_log
+  change: |
+    Fixed a crash on listener removal with a process-level access log rate limiter
+    :ref:`ProcessRateLimitFilter <envoy_v3_api_msg_extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter>`.
+- area: http
+  change: |
+    Fixed an issue where filter chain execution could continue on HTTP streams that had been reset but not yet
+    destroyed. This could cause use-after-free conditions when filter callbacks were invoked on filters that
+    had already received ``onDestroy()``. The fix ensures that ``decodeHeaders()``, ``decodeData()``,
+    ``decodeTrailers()``, and ``decodeMetadata()`` are blocked after a downstream reset.
+- area: json
+  change: |
+    Fixed an off-by-one write in ``JsonEscaper::escapeString()`` that could corrupt the string null terminator
+    when the input string ends with a control character.
+- area: network
+  change: |
+    Fixed a crash in ``Utility::getAddressWithPort`` when called with a scoped IPv6 address (e.g., ``fe80::1%eth0``).
+- area: rbac
+  change: |
+    Fixed RBAC header matcher to validate each header value individually instead of concatenating multiple header values
+    into a single string. This prevents potential bypasses when requests contain multiple values for the same header.
+    The new behavior is enabled by the runtime guard ``envoy.reloadable_features.rbac_match_headers_individually``.
+
+new_features:
+- area: dynamic modules
+  change: |
+    Introduced the extended ABI forward compatibility mechanism for dynamic modules
+    where modules built with a SDK version can be loaded by Envoy
+    binaries of the next Envoy version. For example, A module built with the v1.38 SDK
+    can now be loaded by an Envoy binary of v1.39.

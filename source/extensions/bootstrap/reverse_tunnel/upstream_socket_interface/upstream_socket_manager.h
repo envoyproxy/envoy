@@ -14,7 +14,9 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/common/random_generator.h"
+#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_lifecycle_info.h"
 
+#include "absl/strings/string_view.h"
 #include "absl/synchronization/mutex.h"
 
 namespace Envoy {
@@ -38,7 +40,7 @@ public:
   UpstreamSocketManager(Event::Dispatcher& dispatcher,
                         ReverseTunnelAcceptorExtension* extension = nullptr);
 
-  ~UpstreamSocketManager();
+  ~UpstreamSocketManager() override;
 
   /**
    * Add accepted connection to socket manager.
@@ -50,7 +52,8 @@ public:
    */
   void addConnectionSocket(const std::string& node_id, const std::string& cluster_id,
                            Network::ConnectionSocketPtr socket,
-                           const std::chrono::seconds& ping_interval, bool rebalanced = true);
+                           const std::chrono::seconds& ping_interval, bool rebalanced = true,
+                           absl::string_view tenant_id = {});
 
   /**
    * Hand off a socket to this socket manager's dispatcher.
@@ -62,7 +65,8 @@ public:
    */
   void handoffSocketToWorker(const std::string& node_id, const std::string& cluster_id,
                              Network::ConnectionSocketPtr socket,
-                             const std::chrono::seconds& ping_interval);
+                             const std::chrono::seconds& ping_interval,
+                             absl::string_view tenant_id = {});
 
   /**
    * Get an available reverse connection socket.
@@ -78,21 +82,32 @@ public:
   void markSocketDead(const int fd);
 
   /**
-   * Ping all active reverse connections for health checks.
+   * @return lifecycle metadata for a tracked reverse-tunnel socket, or nullptr if none exists.
    */
-  void pingConnections();
+  const ReverseTunnelLifecycleInfo* getLifecycleInfo(int fd) const;
 
   /**
-   * Ping reverse connections for a specific node.
-   * @param node_id the node ID whose connections should be pinged.
+   * Update the close reason attached to a tracked reverse-tunnel socket.
    */
-  void pingConnections(const std::string& node_id);
+  void setCloseReason(int fd, absl::string_view close_reason);
 
   /**
-   * Enable the ping timer if not already enabled.
-   * @param ping_interval the interval at which ping keepalives should be sent.
+   * Mark that a handed-off upstream connection has the lifecycle filter attached and can emit its
+   * own close log once the real close reason is known.
    */
-  void tryEnablePingTimer(const std::chrono::seconds& ping_interval);
+  void markUpstreamLifecycleFilterAttached(int fd);
+
+  /**
+   * Emit the deferred close log for a handed-off socket once the connection filter has learned the
+   * final close reason.
+   */
+  void maybeEmitDeferredCloseLog(int fd, absl::string_view close_reason);
+
+  /**
+   * Send a ping keepalive for a single reverse connection.
+   * @param fd the file descriptor of the connection to ping.
+   */
+  void sendPingForConnection(int fd);
 
   /**
    * Clean up stale node entries when no active sockets remain.
@@ -118,6 +133,8 @@ public:
    * @param threshold minimum value 1.
    */
   void setMissThreshold(uint32_t threshold) { miss_threshold_ = std::max<uint32_t>(1, threshold); }
+  void setTenantIsolationEnabled(bool enabled) { tenant_isolation_enabled_ = enabled; }
+  bool tenantIsolationEnabled() const { return tenant_isolation_enabled_; }
 
   /**
    * Get the upstream extension for stats integration.
@@ -152,6 +169,19 @@ private:
    */
   bool hasAnySocketsForNode(const std::string& node_id);
 
+  /**
+   * Compute the ping interval in milliseconds with 15% jitter applied.
+   * @return jittered interval in milliseconds.
+   */
+  uint64_t pingIntervalWithJitterMs();
+
+  /**
+   * Re-arm the per-connection ping send timer for the given fd with jitter.
+   * No-op if the fd has no entry in fd_to_ping_send_timer_map_.
+   * @param fd the file descriptor whose send timer to re-arm.
+   */
+  void rearmPingSendTimer(int fd);
+
   // Thread local dispatcher instance.
   Event::Dispatcher& dispatcher_;
   Random::RandomGeneratorPtr random_generator_;
@@ -164,9 +194,15 @@ private:
   // node and is removed when the socket dies.
   absl::flat_hash_map<int, std::string> fd_to_node_map_;
 
+  // Map from FD to its iterator in accepted_reverse_connections_, used to avoid linear scans.
+  absl::flat_hash_map<int, std::list<Network::ConnectionSocketPtr>::iterator> fd_to_socket_it_map_;
+
   // Map from file descriptor to cluster ID. An entry is added when a reverse tunnel is accepted
   // from a node and is removed when the socket dies.
   absl::flat_hash_map<int, std::string> fd_to_cluster_map_;
+
+  // Original reverse-tunnel identity and addressing metadata keyed by file descriptor.
+  absl::flat_hash_map<int, ReverseTunnelLifecycleInfo> fd_to_lifecycle_info_;
 
   // Map of node ID to cluster, for all nodes that have a reverse tunnel socket.
   absl::flat_hash_map<std::string, std::string> node_to_cluster_map_;
@@ -188,14 +224,19 @@ private:
   absl::flat_hash_map<int, Event::FileEventPtr> fd_to_event_map_;
   absl::flat_hash_map<int, Event::TimerPtr> fd_to_timer_map_;
 
+  // Per-connection send timers that schedule individual ping sends with jitter.
+  absl::flat_hash_map<int, Event::TimerPtr> fd_to_ping_send_timer_map_;
+
   // Track consecutive ping misses per file descriptor.
   absl::flat_hash_map<int, uint32_t> fd_to_miss_count_;
   // Miss threshold before declaring a socket dead.
   static constexpr uint32_t kDefaultMissThreshold = 3;
   uint32_t miss_threshold_{kDefaultMissThreshold};
 
-  Event::TimerPtr ping_timer_;
   std::chrono::seconds ping_interval_{0};
+
+  // Per node counter for total active FDs.
+  absl::flat_hash_map<std::string, uint32_t> node_to_active_fd_count_;
 
   // Upstream extension for stats integration.
   ReverseTunnelAcceptorExtension* extension_;
@@ -204,6 +245,8 @@ private:
   // for the node. This is used to rebalance a request to accept reverse
   // connections to a different worker thread.
   absl::flat_hash_map<std::string, int> node_to_conn_count_map_;
+
+  bool tenant_isolation_enabled_{false};
 
   // Global list of all socket managers across threads for rebalancing.
   static std::vector<UpstreamSocketManager*> socket_managers_;

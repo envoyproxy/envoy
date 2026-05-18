@@ -71,7 +71,7 @@ public:
   findOrCreateGenericSecretProvider(const envoy::config::core::v3::ConfigSource& config_source,
                                     const std::string& config_name,
                                     Server::Configuration::ServerFactoryContext& server_context,
-                                    Init::Manager& init_manager) override;
+                                    OptRef<Init::Manager> init_manager) override;
 
 private:
   ProtobufTypes::MessagePtr dumpSecretConfigs(const Matchers::StringMatcher& name_matcher);

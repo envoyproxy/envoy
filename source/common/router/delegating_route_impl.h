@@ -47,8 +47,9 @@ public:
     return base_route_->filterDisabled(name);
   }
   const std::string& routeName() const override { return base_route_->routeName(); }
-  const VirtualHostConstSharedPtr& virtualHost() const override {
-    return base_route_->virtualHost();
+  const VirtualHost& virtualHost() const override { return base_route_->virtualHost(); }
+  VirtualHostConstSharedPtr virtualHostSharedPtr() const override {
+    return base_route_->virtualHostSharedPtr();
   }
 
 protected:
@@ -147,8 +148,10 @@ public:
 
   const std::string& clusterName() const override { return cluster_name_; }
 
-private:
-  const std::string cluster_name_;
+protected:
+  // Keep this as non-const member since some derived class may want to update the cluster name
+  // dynamically based on the request.
+  std::string cluster_name_;
 };
 
 } // namespace Router

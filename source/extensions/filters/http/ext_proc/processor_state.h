@@ -14,9 +14,10 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
-#include "source/extensions/filters/http/ext_proc/processing_effect.h"
+#include "source/extensions/filters/common/processing_effect/processing_effect.h"
 
 #include "absl/status/status.h"
+#include "absl/types/optional.h"
 #include "matching_utils.h"
 
 namespace Envoy {
@@ -32,7 +33,6 @@ public:
   bool end_stream = false;
   uint32_t length = 0;
 };
-using QueuedChunkPtr = std::unique_ptr<QueuedChunk>;
 
 class ChunkQueue {
 public:
@@ -43,13 +43,13 @@ public:
   bool empty() const { return queue_.empty(); }
   void push(Buffer::Instance& data, bool end_stream);
   void clear();
-  QueuedChunkPtr pop(Buffer::OwnedImpl& out_data);
+  absl::optional<QueuedChunk> pop(Buffer::OwnedImpl& out_data);
   const QueuedChunk& consolidate();
   Buffer::OwnedImpl& receivedData() { return received_data_; }
-  const std::deque<QueuedChunkPtr>& queue() const { return queue_; }
+  const std::deque<QueuedChunk>& queue() const { return queue_; }
 
 private:
-  std::deque<QueuedChunkPtr> queue_;
+  std::deque<QueuedChunk> queue_;
   // The total size of chunks in the queue.
   uint32_t bytes_enqueued_{};
   // The received data that had not been sent to downstream/upstream.
@@ -90,8 +90,10 @@ public:
       const std::vector<std::string>& typed_forwarding_namespaces,
       const std::vector<std::string>& untyped_receiving_namespaces,
       const std::vector<std::string>& untyped_cluster_metadata_forwarding_namespaces,
-      const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces)
+      const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces,
+      bool allow_content_length_header)
       : filter_(filter), traffic_direction_(traffic_direction),
+        allow_content_length_header_(allow_content_length_header),
         untyped_forwarding_namespaces_(&untyped_forwarding_namespaces),
         typed_forwarding_namespaces_(&typed_forwarding_namespaces),
         untyped_receiving_namespaces_(&untyped_receiving_namespaces),
@@ -183,10 +185,11 @@ public:
 
   const absl::optional<MonotonicTime>& getCallStartTime() const { return call_start_time_; }
   void onStartProcessorCall(Event::TimerCb cb, std::chrono::milliseconds timeout,
-                            CallbackState callback_state);
+                            CallbackState callback_state, bool send_body);
   void onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
                              CallbackState next_state = CallbackState::Idle);
-  void logMutation(CallbackState callback_state, ProcessingEffect::Effect processing_effect);
+  void logMutation(CallbackState callback_state,
+                   Extensions::Filters::Common::ProcessingEffect::Effect processing_effect);
   void stopMessageTimer();
   bool restartMessageTimer(const uint32_t message_timeout_ms);
 
@@ -219,20 +222,21 @@ public:
   // Move the contents of "data" into a QueuedChunk object on the streaming queue.
   void enqueueStreamingChunk(Buffer::Instance& data, bool end_stream);
   // If the queue has chunks, return the head of the queue.
-  QueuedChunkPtr dequeueStreamingChunk(Buffer::OwnedImpl& out_data);
+  absl::optional<QueuedChunk> dequeueStreamingChunk(Buffer::OwnedImpl& out_data);
   // Consolidate all the chunks on the queue into a single one and return a reference.
   const QueuedChunk& consolidateStreamedChunks() { return chunk_queue_.consolidate(); }
   bool queueOverHighLimit() const { return chunk_queue_.bytesEnqueued() > bufferLimit(); }
   bool queueBelowLowLimit() const { return chunk_queue_.bytesEnqueued() < bufferLimit() / 2; }
   bool shouldRemoveContentLength() const {
-    // Always remove the content length in 3 cases below:
-    // 1) STREAMED BodySendMode
-    // 2) BUFFERED_PARTIAL BodySendMode
-    // 3) BUFFERED BodySendMode + SKIP HeaderSendMode
-    // 4) FULL_DUPLEX_STREAMED BodySendMode
-    // In these modes, ext_proc filter can not guarantee to set the content length correctly if
-    // body is mutated by external processor later.
-    // In http1 codec, removing content length will enable chunked encoding whenever feasible.
+    // Always remove the content length in 4 cases below, unless allow_content_length_header is set
+    // to true in the config: 1) STREAMED BodySendMode 2) BUFFERED_PARTIAL BodySendMode 3) BUFFERED
+    // BodySendMode + SKIP HeaderSendMode 4) FULL_DUPLEX_STREAMED BodySendMode In these modes,
+    // ext_proc filter can not guarantee to set the content length correctly if body is mutated by
+    // external processor later. In http1 codec, removing content length will enable chunked
+    // encoding whenever feasible.
+    if (allow_content_length_header_) {
+      return false;
+    }
     return (
         body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::STREAMED ||
         body_mode_ ==
@@ -256,7 +260,7 @@ public:
   virtual envoy::service::ext_proc::v3::HttpTrailers*
   mutableTrailers(envoy::service::ext_proc::v3::ProcessingRequest& request) const PURE;
 
-  virtual Http::StreamFilterCallbacks* callbacks() const PURE;
+  virtual Http::StreamFilterCallbacks* filterCallbacks() const PURE;
 
   virtual bool sendAttributes(const ExpressionManager& mgr) const PURE;
 
@@ -329,8 +333,10 @@ protected:
   virtual bool isValidTrailersCallbackState() const;
 
   Filter& filter_;
-  Http::StreamFilterCallbacks* filter_callbacks_;
   CallbackState callback_state_ = CallbackState::Idle;
+  // The specific mode for body handling
+  envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode_;
+  const envoy::config::core::v3::TrafficDirection traffic_direction_;
 
   // Keep track of whether we requested a watermark.
   bool watermark_requested_ : 1 = false;
@@ -353,12 +359,15 @@ protected:
   bool partial_body_processed_ : 1 = false;
 
   // If true, the server wants to see the headers
-  bool send_headers_ : 1;
+  bool send_headers_ : 1 = false;
   // If true, the server wants to see the trailers
-  bool send_trailers_ : 1;
-
-  // The specific mode for body handling
-  envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode_;
+  bool send_trailers_ : 1 = false;
+  // Flag to track whether Envoy already received the new timeout message.
+  // Envoy should receive at most one such message in one particular state.
+  bool new_timeout_received_ : 1 = false;
+  // If true, the attributes for this processing state have already been sent.
+  bool attributes_sent_ : 1 = false;
+  const bool allow_content_length_header_ : 1;
 
   // The request_headers_ field is guaranteed to hold the pointer to the request
   // headers as set in decodeHeaders. This allows both decoding and encoding states
@@ -367,20 +376,14 @@ protected:
   Http::RequestOrResponseHeaderMap* headers_ = nullptr;
   Http::HeaderMap* trailers_ = nullptr;
   Event::TimerPtr message_timer_;
-  // Flag to track whether Envoy already received the new timeout message.
-  // Envoy should receive at most one such message in one particular state.
-  bool new_timeout_received_{false};
   ChunkQueue chunk_queue_;
   absl::optional<MonotonicTime> call_start_time_ = absl::nullopt;
-  const envoy::config::core::v3::TrafficDirection traffic_direction_;
 
   const std::vector<std::string>* untyped_forwarding_namespaces_{};
   const std::vector<std::string>* typed_forwarding_namespaces_{};
   const std::vector<std::string>* untyped_receiving_namespaces_{};
   const std::vector<std::string>* untyped_cluster_metadata_forwarding_namespaces_{};
   const std::vector<std::string>* typed_cluster_metadata_forwarding_namespaces_{};
-  // If true, the attributes for this processing state have already been sent.
-  bool attributes_sent_{};
 
 private:
   virtual void clearRouteCache(const envoy::service::ext_proc::v3::CommonResponse&) {}
@@ -391,7 +394,7 @@ private:
   void sendBufferedDataInStreamedMode(bool end_stream);
   absl::Status
   processHeaderMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response,
-                        ProcessingEffect::Effect& processing_effect);
+                        Extensions::Filters::Common::ProcessingEffect::Effect& processing_effect);
   void clearStreamingChunk() { chunk_queue_.clear(); }
 
   /**
@@ -470,7 +473,7 @@ private:
    */
   absl::Status processHeaderMutationIfAvailable(
       const envoy::service::ext_proc::v3::CommonResponse& common_response,
-      ProcessingEffect::Effect& effect);
+      Extensions::Filters::Common::ProcessingEffect::Effect& effect);
 
   /**
    * Validates content length against body mutation size. Content-length header is only
@@ -491,7 +494,7 @@ private:
    */
   void
   applyBufferedBodyMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response,
-                            ProcessingEffect::Effect& effect);
+                            Extensions::Filters::Common::ProcessingEffect::Effect& effect);
 
   /**
    * Finalizes body response processing by handling trailers and continuation.
@@ -509,11 +512,12 @@ public:
       const std::vector<std::string>& typed_forwarding_namespaces,
       const std::vector<std::string>& untyped_receiving_namespaces,
       const std::vector<std::string>& untyped_cluster_metadata_forwarding_namespaces,
-      const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces)
+      const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces,
+      bool allow_content_length_header)
       : ProcessorState(filter, envoy::config::core::v3::TrafficDirection::INBOUND,
                        untyped_forwarding_namespaces, typed_forwarding_namespaces,
                        untyped_receiving_namespaces, untyped_cluster_metadata_forwarding_namespaces,
-                       typed_cluster_metadata_forwarding_namespaces) {
+                       typed_cluster_metadata_forwarding_namespaces, allow_content_length_header) {
     setProcessingModeInternal(mode);
   }
   DecodingProcessorState(const DecodingProcessorState&) = delete;
@@ -521,7 +525,6 @@ public:
 
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
     decoder_callbacks_ = &callbacks;
-    filter_callbacks_ = &callbacks;
   }
 
   const Buffer::Instance* bufferedData() const override {
@@ -572,7 +575,7 @@ public:
   void requestWatermark() override;
   void clearWatermark() override;
 
-  Http::StreamFilterCallbacks* callbacks() const override { return decoder_callbacks_; }
+  Http::StreamFilterCallbacks* filterCallbacks() const override { return decoder_callbacks_; }
 
   bool sendAttributes(const ExpressionManager& mgr) const override {
     return !attributes_sent_ && mgr.hasRequestExpr();
@@ -642,8 +645,8 @@ private:
   absl::Status
   handleLocalResponseHeadersContinue(const ::envoy::service::ext_proc::v3::HttpHeaders& response);
 
-  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   bool local_response_started_{false};
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_ = nullptr;
 };
 
 class EncodingProcessorState : public ProcessorState {
@@ -654,11 +657,12 @@ public:
       const std::vector<std::string>& typed_forwarding_namespaces,
       const std::vector<std::string>& untyped_receiving_namespaces,
       const std::vector<std::string>& untyped_cluster_metadata_forwarding_namespaces,
-      const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces)
+      const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces,
+      bool allow_content_length_header)
       : ProcessorState(filter, envoy::config::core::v3::TrafficDirection::OUTBOUND,
                        untyped_forwarding_namespaces, typed_forwarding_namespaces,
                        untyped_receiving_namespaces, untyped_cluster_metadata_forwarding_namespaces,
-                       typed_cluster_metadata_forwarding_namespaces) {
+                       typed_cluster_metadata_forwarding_namespaces, allow_content_length_header) {
     setProcessingModeInternal(mode);
   }
   EncodingProcessorState(const EncodingProcessorState&) = delete;
@@ -666,7 +670,6 @@ public:
 
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
     encoder_callbacks_ = &callbacks;
-    filter_callbacks_ = &callbacks;
   }
 
   const Buffer::Instance* bufferedData() const override {
@@ -717,7 +720,7 @@ public:
   void requestWatermark() override;
   void clearWatermark() override;
 
-  Http::StreamFilterCallbacks* callbacks() const override { return encoder_callbacks_; }
+  Http::StreamFilterCallbacks* filterCallbacks() const override { return encoder_callbacks_; }
 
   bool sendAttributes(const ExpressionManager& mgr) const override {
     return !attributes_sent_ && mgr.hasResponseExpr();
@@ -743,8 +746,8 @@ private:
   void setProcessingModeInternal(
       const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode);
 
-  Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   bool local_response_streaming_{false};
+  Http::StreamEncoderFilterCallbacks* encoder_callbacks_ = nullptr;
 };
 
 } // namespace ExternalProcessing

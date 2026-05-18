@@ -38,7 +38,6 @@
 
 #include "test/mocks/http/header_validator.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/server/instance.h"
 #include "test/mocks/server/listener_factory_context.h"
 
 #if defined(ENVOY_ENABLE_QUIC)
@@ -958,6 +957,9 @@ private:
     bool bindToPort() const override { return true; }
     bool handOffRestoredDestinationConnections() const override { return false; }
     uint32_t perConnectionBufferLimitBytes() const override { return 0; }
+    std::chrono::milliseconds perConnectionBufferHighWatermarkTimeout() const override {
+      return std::chrono::milliseconds::zero();
+    }
     std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
     bool continueOnListenerFiltersTimeout() const override { return false; }
     Stats::Scope& listenerScope() override { return *parent_.stats_store_.rootScope(); }

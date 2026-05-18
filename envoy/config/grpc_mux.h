@@ -10,6 +10,7 @@
 #include "envoy/config/subscription.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/upstream/load_stats_reporter.h"
 
 #include "source/common/common/cleanup.h"
 #include "source/common/protobuf/protobuf.h"
@@ -124,6 +125,19 @@ public:
                   Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope& scope,
                   BackOffStrategyPtr&& backoff_strategy,
                   const envoy::config::core::v3::ApiConfigSource& ads_config_source) PURE;
+
+  /**
+   * Returns a load-stats-reporter that was created for the gRPC-Mux.
+   * Returns nullptr if a load-stats-reporter wasn't created for the gRPC-Mux.
+   */
+  virtual Upstream::LoadStatsReporter* loadStatsReporter() const PURE;
+
+  /**
+   * Returns a load-stats-reporter if it was previously created for the
+   * gRPC-Mux, or creates one and returns it. Enables lazy-initialization of the
+   * load-stats-reporter.
+   */
+  virtual Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() PURE;
 };
 
 using GrpcMuxPtr = std::unique_ptr<GrpcMux>;

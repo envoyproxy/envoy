@@ -257,6 +257,9 @@ TEST_F(IoUringImplTest, NestRemoveInjectCompletion) {
                 EXPECT_EQ(-11, res);
               } else {
                 io_uring_->removeInjectedCompletion(fd2);
+                EXPECT_EQ(2, data2);
+                // Simulate deletion in IoUringWorkerImpl
+                delete user_data;
                 EXPECT_EQ(-1, data2);
               }
               completions_nr++;

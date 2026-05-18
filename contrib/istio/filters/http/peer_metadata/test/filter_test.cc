@@ -83,7 +83,7 @@ protected:
 
   void checkShared(bool expected) {
     EXPECT_EQ(expected,
-              stream_info_.filterState()->objectsSharedWithUpstreamConnection()->size() > 0);
+              !stream_info_.filterState()->objectsSharedWithUpstreamConnection()->empty());
   }
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   NiceMock<MockSingletonManager> singleton_manager_;
@@ -443,7 +443,7 @@ TEST_F(PeerMetadataTest, UpstreamMXPropagationSkip) {
         istio:
           external: true
     )EOF");
-  ON_CALL(stream_info_, upstreamClusterInfo()).WillByDefault(testing::Return(cluster_info_));
+  stream_info_.upstream_cluster_info_ = cluster_info_;
   ON_CALL(*cluster_info_, metadata()).WillByDefault(ReturnRef(metadata));
   initialize(R"EOF(
     upstream_propagation:
@@ -460,7 +460,7 @@ TEST_F(PeerMetadataTest, UpstreamMXPropagationSkipPassthrough) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster_info_{
       std::make_shared<NiceMock<Upstream::MockClusterInfo>>()};
   cluster_info_->name_ = "PassthroughCluster";
-  ON_CALL(stream_info_, upstreamClusterInfo()).WillByDefault(testing::Return(cluster_info_));
+  stream_info_.upstream_cluster_info_ = cluster_info_;
   initialize(R"EOF(
     upstream_propagation:
       - istio_headers:

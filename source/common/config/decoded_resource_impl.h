@@ -33,9 +33,7 @@ public:
     if (resource.Is<envoy::service::discovery::v3::Resource>()) {
       envoy::service::discovery::v3::Resource r;
       RETURN_IF_NOT_OK(MessageUtil::unpackTo(resource, r));
-
       r.set_version(version);
-
       return std::make_unique<DecodedResourceImpl>(resource_decoder, r);
     }
 

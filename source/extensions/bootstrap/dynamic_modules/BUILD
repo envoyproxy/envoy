@@ -17,6 +17,7 @@ envoy_cc_library(
         "//envoy/event:dispatcher_interface",
         "//envoy/http:async_client_interface",
         "//envoy/server:factory_context_interface",
+        "//envoy/server:listener_manager_interface",
         "//envoy/stats:stats_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
@@ -50,6 +51,8 @@ envoy_cc_library(
     deps = [
         ":extension_config_lib",
         ":extension_lib",
+        "//envoy/server:admin_interface",
+        "//source/common/buffer:buffer_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",

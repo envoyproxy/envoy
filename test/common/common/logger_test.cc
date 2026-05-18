@@ -1,8 +1,10 @@
+#include <cstring>
 #include <memory>
 #include <string>
 
 #include "source/common/common/json_escape_string.h"
 #include "source/common/common/logger.h"
+#include "source/common/version/version_string.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
@@ -118,6 +120,36 @@ TEST(JsonEscapeTest, Escape) {
   expect_json_escape("\x1f", "\\u001f");
 }
 
+// Regression test for off-by-one write when control characters appear at the end of input.
+TEST(JsonEscapeTest, NulTerminatorIntegrity) {
+  const auto verify_nul_terminator = [](absl::string_view input) {
+    std::string escaped = JsonEscaper::escapeString(input, JsonEscaper::extraSpace(input));
+
+    // Verify the null terminator is intact.
+    EXPECT_EQ('\0', escaped.c_str()[escaped.size()])
+        << "null terminator corrupted for input ending with control character";
+
+    // Verify strlen matches the size. A corrupted null terminator would cause strlen
+    // to read past the string boundary.
+    EXPECT_EQ(escaped.size(), std::strlen(escaped.c_str()))
+        << "strlen mismatch indicates NUL terminator corruption";
+  };
+
+  // Test control characters at the end of input. These would trigger the buggy code path.
+  verify_nul_terminator("\x01");                           // Single control char.
+  verify_nul_terminator("\x00");                           // Single NUL.
+  verify_nul_terminator("test\x01");                       // Trailing control char.
+  verify_nul_terminator(absl::string_view("test\x00", 5)); // Trailing NUL.
+  verify_nul_terminator("\x01\x02");                       // Multiple control chars.
+  verify_nul_terminator("test\x01\x02");                   // Multiple trailing control chars.
+  verify_nul_terminator(std::string(100, 'A') + "\x1f");   // Large string ending with control char.
+
+  // Test control characters not at the end. These should always work.
+  verify_nul_terminator("\x01test");         // Leading control char.
+  verify_nul_terminator("te\x01st");         // Middle control char.
+  verify_nul_terminator("\x01test\x02more"); // Multiple control chars in middle.
+}
+
 class LoggerCustomFlagsTest : public testing::TestWithParam<spdlog::logger*> {
 public:
   LoggerCustomFlagsTest() : logger_(GetParam()) {}
@@ -141,6 +173,10 @@ public:
     formatter
         ->add_flag<CustomFlagFormatter::ExtractedMessage>(
             CustomFlagFormatter::ExtractedMessage::Placeholder)
+        .set_pattern(pattern);
+    formatter
+        ->add_flag<CustomFlagFormatter::EnvoyVersion>(
+            CustomFlagFormatter::EnvoyVersion::Placeholder)
         .set_pattern(pattern);
     logger_->set_formatter(std::move(formatter));
     logger_->set_level(spdlog::level::info);
@@ -205,6 +241,18 @@ TEST_P(LoggerCustomFlagsTest, LogMessageWithTagsAndExtractTags) {
                    ",\"key1\":\"val1\",\"key2\":\"val2\"");
   expectLogMessage("%*", "[Tags: \"key\":\"val\"] mes] sge3", ",\"key\":\"val\"");
   expectLogMessage("%*", "[Tags: \"key\":\"val\"] mes\"] sge4", ",\"key\":\"val\"");
+}
+
+TEST_P(LoggerCustomFlagsTest, LogMessageWithEnvoyVersion) {
+  // Sanity-check the version string before using it as expected output: it must be non-empty
+  // and follow the slash-separated format produced by envoyVersionString().
+  const std::string& version = envoyVersionString();
+  EXPECT_FALSE(version.empty());
+  EXPECT_NE(version.find('/'), std::string::npos);
+
+  // %N emits the Envoy version string from envoyVersionString().
+  expectLogMessage("%N %v", "hello", absl::StrCat(version, " hello"));
+  expectLogMessage("%v", "hello", "hello");
 }
 
 class NamedLogTest : public Loggable<Id::assert>, public testing::Test {};

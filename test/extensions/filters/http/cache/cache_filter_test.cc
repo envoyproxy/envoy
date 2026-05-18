@@ -1594,7 +1594,7 @@ TEST_F(ValidationHeadersTest, InvalidLastModified) {
 
 TEST_F(CacheFilterTest, NoRouteShouldLocalReply) {
   request_headers_.setHost("NoRoute");
-  EXPECT_CALL(decoder_callbacks_, route()).WillOnce(Return(nullptr));
+  EXPECT_CALL(decoder_callbacks_, route()).WillOnce(Return(OptRef<const Router::Route>{}));
   {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
     // The filter should stop decoding iteration when decodeHeaders is called as a cache lookup is

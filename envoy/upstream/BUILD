@@ -90,6 +90,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "load_stats_reporter_interface",
+    hdrs = ["load_stats_reporter.h"],
+    deps = [
+        "//envoy/stats:stats_macros",
+    ],
+)
+
+envoy_cc_library(
     name = "locality_lib",
     hdrs = ["locality.h"],
     deps = [

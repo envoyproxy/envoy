@@ -42,6 +42,7 @@ use(
         {
             "owner": "envoyproxy/dependency-shepherds!",
             "path": "(bazel/.*repos.*\\.bzl)|(bazel/dependency_imports\\.bzl)|(api/bazel/.*\\.bzl)|(.*/requirements\\.txt)|(.*\\.patch)",
+            "path_exclude": "compat/openssl/.*\\.patch",
             "label": "deps",
             "github_status_label": "any dependency change",
             "auto_assign": True,

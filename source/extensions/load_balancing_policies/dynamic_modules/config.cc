@@ -1,6 +1,9 @@
 #include "source/extensions/load_balancing_policies/dynamic_modules/config.h"
 
+#include "envoy/server/factory_context.h"
+
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/load_balancing_policies/dynamic_modules/load_balancer.h"
 
@@ -10,36 +13,6 @@ namespace LoadBalancingPolicies {
 namespace DynamicModules {
 
 namespace {
-
-// Extract configuration bytes from the Any field.
-std::string extractConfigBytes(const Protobuf::Any& any_config) {
-  if (any_config.type_url().empty()) {
-    return "";
-  }
-
-  const std::string& type_url = any_config.type_url();
-
-  // Handle well-known types that can be passed directly as bytes.
-  if (type_url == "type.googleapis.com/google.protobuf.StringValue") {
-    Protobuf::StringValue string_value;
-    if (any_config.UnpackTo(&string_value)) {
-      return string_value.value();
-    }
-  } else if (type_url == "type.googleapis.com/google.protobuf.BytesValue") {
-    Protobuf::BytesValue bytes_value;
-    if (any_config.UnpackTo(&bytes_value)) {
-      return bytes_value.value();
-    }
-  } else if (type_url == "type.googleapis.com/google.protobuf.Struct") {
-    Protobuf::Struct struct_value;
-    if (any_config.UnpackTo(&struct_value)) {
-      return MessageUtil::getJsonStringFromMessageOrError(struct_value, false);
-    }
-  }
-
-  // For unknown types, use the serialized bytes.
-  return any_config.value();
-}
 
 /**
  * Thread-aware load balancer implementation that creates DynamicModuleLoadBalancer instances.
@@ -80,7 +53,7 @@ Upstream::ThreadAwareLoadBalancerPtr
 Factory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
                 const Upstream::ClusterInfo& cluster_info,
                 const Upstream::PrioritySet& /*priority_set*/, Runtime::Loader&,
-                Random::RandomGenerator&, TimeSource&) {
+                Random::RandomGenerator& /*random*/, TimeSource& /*time_source*/) {
   const auto* typed_config = dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config.ptr());
   ASSERT(typed_config != nullptr, "Invalid dynamic module load balancer config");
 
@@ -89,7 +62,8 @@ Factory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
 }
 
 absl::StatusOr<Upstream::LoadBalancerConfigPtr>
-Factory::loadConfig(Server::Configuration::ServerFactoryContext&, const Protobuf::Message& config) {
+Factory::loadConfig(Server::Configuration::ServerFactoryContext& context,
+                    const Protobuf::Message& config) {
   const auto& typed_config = dynamic_cast<const DynamicModulesLbProto&>(config);
   const auto& module_config = typed_config.dynamic_module_config();
   const std::string& module_name = module_config.name();
@@ -102,14 +76,33 @@ Factory::loadConfig(Server::Configuration::ServerFactoryContext&, const Protobuf
                                                   module_name, module_or_error.status().message()));
   }
 
+  // Use configured metrics namespace or fall back to the default.
+  const std::string metrics_namespace = module_config.metrics_namespace().empty()
+                                            ? std::string(DefaultMetricsNamespace)
+                                            : module_config.metrics_namespace();
+
   // Create the load balancer configuration.
-  std::string config_bytes = extractConfigBytes(typed_config.lb_policy_config());
-  auto lb_config_or_error = DynamicModuleLbConfig::create(
-      typed_config.lb_policy_name(), config_bytes, std::move(module_or_error.value()));
+  std::string config_bytes;
+  if (typed_config.has_lb_policy_config()) {
+    auto config_or_error = MessageUtil::knownAnyToBytes(typed_config.lb_policy_config());
+    RETURN_IF_NOT_OK_REF(config_or_error.status());
+    config_bytes = std::move(config_or_error.value());
+  }
+  auto lb_config_or_error =
+      DynamicModuleLbConfig::create(typed_config.lb_policy_name(), config_bytes, metrics_namespace,
+                                    std::move(module_or_error.value()), context.serverScope());
   if (!lb_config_or_error.ok()) {
     return absl::InvalidArgumentError(
         fmt::format("failed to create load balancer config for module '{}': {}", module_name,
                     lb_config_or_error.status().message()));
+  }
+
+  // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.
+  // This causes the namespace prefix to be stripped from prometheus output and no envoy_ prefix
+  // is added. This is the legacy behavior for backward compatibility.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
+    context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
   }
 
   return std::make_unique<TypedDynamicModuleLbConfig>(std::move(lb_config_or_error.value()));

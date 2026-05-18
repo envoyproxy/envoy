@@ -43,6 +43,7 @@ public:
   MOCK_METHOD(absl::Status, initializeSecondaryClusters,
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
   MOCK_METHOD(ClusterInfoMaps, clusters, (), (const));
+  MOCK_METHOD(void, forEachActiveCluster, (std::function<void(const Cluster&)>), (const));
   MOCK_METHOD(OptRef<const Cluster>, getActiveCluster, (const std::string& cluster_name), (const));
   MOCK_METHOD(OptRef<const Cluster>, getActiveOrWarmingCluster, (const std::string& cluster_name),
               (const));

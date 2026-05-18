@@ -133,7 +133,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                       {{Admin::ParamDescriptor::Type::String, "filter",
                         "Regular expression (Google re2) for filtering clusters by name"}}),
           makeHandler(
-              "/config_dump", "dump current Envoy configs (experimental)",
+              "/config_dump", "dump current Envoy configs",
               MAKE_ADMIN_HANDLER(config_dump_handler_.handlerConfigDump), false, false,
               {{Admin::ParamDescriptor::Type::String, "resource", "The resource to dump"},
                {Admin::ParamDescriptor::Type::String, "mask",

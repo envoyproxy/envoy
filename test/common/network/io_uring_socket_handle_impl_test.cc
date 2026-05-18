@@ -1,7 +1,6 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/io_uring_socket_handle_impl.h"
 
-#include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/io/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"

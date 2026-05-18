@@ -114,6 +114,10 @@ public:
     return makeOptRefFromPtr(eds_resources_cache_.get());
   }
 
+  // TODO(adisuissa): finish implementation.
+  Upstream::LoadStatsReporter* loadStatsReporter() const override { return nullptr; }
+  Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() override { return nullptr; }
+
   GrpcStreamInterface<RQ, RS>& grpcStreamForTest() {
     // TODO(adisuissa): Once envoy.restart_features.xds_failover_support is deprecated,
     // return grpc_stream_.currentStreamForTest() directly (defined in GrpcMuxFailover).
@@ -312,6 +316,9 @@ public:
   }
 
   EdsResourcesCacheOptRef edsResourcesCache() override { return {}; }
+
+  Upstream::LoadStatsReporter* loadStatsReporter() const override { return nullptr; }
+  Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() override { return nullptr; }
 };
 
 } // namespace XdsMux

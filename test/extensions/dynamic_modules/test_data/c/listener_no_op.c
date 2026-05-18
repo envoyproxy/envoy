@@ -83,3 +83,19 @@ void envoy_dynamic_module_on_listener_filter_config_scheduled(
   (void)filter_config_module_ptr;
   (void)event_id;
 }
+
+void envoy_dynamic_module_on_listener_filter_http_callout_done(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_listener_filter_module_ptr filter_module_ptr, uint64_t callout_id,
+    envoy_dynamic_module_type_http_callout_result result,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size) {
+  (void)filter_envoy_ptr;
+  (void)filter_module_ptr;
+  (void)callout_id;
+  (void)result;
+  (void)headers;
+  (void)headers_size;
+  (void)body_chunks;
+  (void)body_chunks_size;
+}

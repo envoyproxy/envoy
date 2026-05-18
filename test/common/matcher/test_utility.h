@@ -19,10 +19,10 @@ struct TestData {
 // A CommonProtocolInput that returns the configured value every time.
 struct CommonProtocolTestInput : public CommonProtocolInput {
   explicit CommonProtocolTestInput(const std::string& data) : data_(data) {}
-  MatchingDataType get() override { return data_; }
-
+  DataInputGetResult get() override { return DataInputGetResult::CreateStringView(data_); }
   const std::string data_;
 };
+
 class TestCommonProtocolInputFactory : public CommonProtocolInputFactory {
 public:
   TestCommonProtocolInputFactory(absl::string_view factory_name, absl::string_view data)
@@ -47,28 +47,34 @@ private:
 
 // A DataInput that returns the configured value every time.
 struct TestInput : public DataInput<TestData> {
-  explicit TestInput(DataInputGetResult result) : result_(result) {}
-  DataInputGetResult get(const TestData&) const override { return result_; }
-  DataInputGetResult result_;
+  TestInput(absl::optional<std::string> input,
+            DataAvailability availability = DataAvailability::AllDataAvailable)
+      : data_(input), availability_(availability) {}
+
+  DataInputGetResult get(const TestData&) const override {
+    return data_ ? DataInputGetResult::CreateStringView(*data_, availability_)
+                 : DataInputGetResult::NoData(availability_);
+  }
+  const absl::optional<std::string> data_;
+  const DataAvailability availability_;
 };
 
 struct TestFloatInput : public DataInput<TestData> {
-  explicit TestFloatInput(DataInputGetResult result) : result_(result) {}
-  DataInputGetResult get(const TestData&) const override { return result_; }
+  DataInputGetResult get(const TestData&) const override { return DataInputGetResult::NoData(); }
   absl::string_view dataInputType() const override { return "float"; }
-  DataInputGetResult result_;
 };
 
 // Self-injecting factory for TestInput.
 class TestDataInputStringFactory : public DataInputFactory<TestData> {
 public:
-  TestDataInputStringFactory(DataInputGetResult result) : result_(result), injection_(*this) {}
-  TestDataInputStringFactory(absl::string_view data)
-      : TestDataInputStringFactory(
-            {DataInputGetResult::DataAvailability::AllDataAvailable, std::string(data)}) {}
+  TestDataInputStringFactory(absl::optional<std::string> data,
+                             DataAvailability availability = DataAvailability::AllDataAvailable)
+      : availability_(availability), data_(data), injection_(*this) {}
+  TestDataInputStringFactory(DataAvailability availability)
+      : TestDataInputStringFactory(absl::nullopt, availability) {}
   DataInputFactoryCb<TestData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
-    return [&]() { return std::make_unique<TestInput>(result_); };
+    return [&]() { return std::make_unique<TestInput>(data_, availability_); };
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -77,21 +83,23 @@ public:
   std::string name() const override { return "string"; }
 
 private:
-  const DataInputGetResult result_;
+  const DataAvailability availability_;
+  const absl::optional<std::string> data_;
   Registry::InjectFactory<DataInputFactory<TestData>> injection_;
 };
 
 // Secondary data input to avoid duplicate type registration.
 class TestDataInputBoolFactory : public DataInputFactory<TestData> {
 public:
-  TestDataInputBoolFactory(DataInputGetResult result) : result_(result), injection_(*this) {}
-  TestDataInputBoolFactory(absl::string_view data)
-      : TestDataInputBoolFactory(
-            {DataInputGetResult::DataAvailability::AllDataAvailable, std::string(data)}) {}
+  TestDataInputBoolFactory(absl::optional<std::string> data,
+                           DataAvailability availability = DataAvailability::AllDataAvailable)
+      : availability_(availability), data_(data), injection_(*this) {}
+  TestDataInputBoolFactory(DataAvailability availability)
+      : TestDataInputBoolFactory(absl::nullopt, availability) {}
   DataInputFactoryCb<TestData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
     // Note, here is using `TestInput` same as `TestDataInputStringFactory`.
-    return [&]() { return std::make_unique<TestInput>(result_); };
+    return [&]() { return std::make_unique<TestInput>(data_, availability_); };
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -100,19 +108,17 @@ public:
   std::string name() const override { return "bool"; }
 
 private:
-  const DataInputGetResult result_;
+  const DataAvailability availability_;
+  const absl::optional<std::string> data_;
   Registry::InjectFactory<DataInputFactory<TestData>> injection_;
 };
 
 class TestDataInputFloatFactory : public DataInputFactory<TestData> {
 public:
-  TestDataInputFloatFactory(DataInputGetResult result) : result_(result), injection_(*this) {}
-  TestDataInputFloatFactory(float)
-      : TestDataInputFloatFactory(
-            {DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()}) {}
+  TestDataInputFloatFactory(float) : injection_(*this) {}
   DataInputFactoryCb<TestData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
-    return [&]() { return std::make_unique<TestFloatInput>(result_); };
+    return [&]() { return std::make_unique<TestFloatInput>(); };
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -121,7 +127,6 @@ public:
   std::string name() const override { return "float"; }
 
 private:
-  const DataInputGetResult result_;
   Registry::InjectFactory<DataInputFactory<TestData>> injection_;
 };
 
@@ -131,7 +136,9 @@ private:
 struct BoolMatcher : public InputMatcher {
   explicit BoolMatcher(bool value) : value_(value) {}
 
-  bool match(const MatchingDataType&) override { return value_; }
+  MatchResult match(const DataInputGetResult&) override {
+    return value_ ? MatchResult::Matched : MatchResult::NoMatch;
+  }
   const bool value_;
 };
 
@@ -140,11 +147,12 @@ struct TestMatcher : public InputMatcher {
   explicit TestMatcher(std::function<bool(absl::optional<absl::string_view>)> predicate)
       : predicate_(predicate) {}
 
-  bool match(const MatchingDataType& input) override {
-    if (absl::holds_alternative<absl::monostate>(input)) {
-      return false;
+  MatchResult match(const DataInputGetResult& input) override {
+    const auto data = input.stringData();
+    if (data && predicate_(*data)) {
+      return MatchResult::Matched;
     }
-    return predicate_(absl::get<std::string>(input));
+    return MatchResult::NoMatch;
   }
 
   std::function<bool(absl::optional<absl::string_view>)> predicate_;
@@ -177,7 +185,7 @@ public:
 // An InputMatcher that always returns false.
 class NeverMatch : public InputMatcher {
 public:
-  bool match(const MatchingDataType&) override { return false; }
+  MatchResult match(const DataInputGetResult&) override { return MatchResult::NoMatch; }
 };
 
 /**
@@ -206,12 +214,12 @@ public:
 class CustomStringMatcher : public InputMatcher {
 public:
   explicit CustomStringMatcher(const std::string& str) : str_value_(str) {}
-  bool match(const MatchingDataType& input) override {
-    if (absl::holds_alternative<absl::monostate>(input)) {
-      return false;
+  MatchResult match(const DataInputGetResult& input) override {
+    const auto data = input.stringData();
+    if (data && *data == str_value_) {
+      return MatchResult::Matched;
     }
-
-    return str_value_ == absl::get<std::string>(input);
+    return MatchResult::NoMatch;
   }
 
 private:
@@ -248,30 +256,15 @@ public:
  * @param availability the data availability to use for the input.
  */
 SingleFieldMatcherPtr<TestData>
-createSingleMatcher(absl::optional<absl::string_view> input,
+createSingleMatcher(absl::optional<std::string> input,
                     std::function<bool(absl::optional<absl::string_view>)> predicate,
-                    DataInputGetResult::DataAvailability availability =
-                        DataInputGetResult::DataAvailability::AllDataAvailable) {
-  MatchingDataType data =
-      input.has_value() ? MatchingDataType(std::string(*input)) : absl::monostate();
-
-  return SingleFieldMatcher<TestData>::create(
-             std::make_unique<TestInput>(DataInputGetResult{availability, std::move(data)}),
-             std::make_unique<TestMatcher>(predicate))
+                    DataAvailability availability = DataAvailability::AllDataAvailable) {
+  return SingleFieldMatcher<TestData>::create(std::make_unique<TestInput>(input, availability),
+                                              std::make_unique<TestMatcher>(predicate))
       .value();
 }
 
-void PrintTo(const FieldMatchResult& result, std::ostream* os) {
-  if (result.isInsufficientData()) {
-    *os << "InsufficientData";
-  } else if (result.isNoMatch()) {
-    *os << "NoMatch";
-  } else if (result.isMatched()) {
-    *os << "Matched";
-  } else {
-    *os << "UnknownState";
-  }
-}
+void PrintTo(const MatchResult& result, std::ostream* os) { *os << MatchResultToString(result); }
 
 // Creates an OnMatch that evaluates to a StringValue with the provided value.
 template <class T> OnMatch<T> stringOnMatch(absl::string_view value, bool keep_matching = false) {
@@ -286,7 +279,7 @@ inline void PrintTo(const Action& action, std::ostream* os) {
   *os << "{type=" << action.typeUrl() << "}";
 }
 
-inline void PrintTo(const MatchResult& result, std::ostream* os) {
+inline void PrintTo(const ActionMatchResult& result, std::ostream* os) {
   if (result.isInsufficientData()) {
     *os << "InsufficientData";
   } else if (result.isNoMatch()) {
@@ -319,7 +312,7 @@ inline void PrintTo(const OnMatch<TestData>& on_match, std::ostream* os) {
 }
 
 MATCHER(HasInsufficientData, "") {
-  // Takes a MatchResult& and validates that it
+  // Takes a ActionMatchResult& and validates that it
   // is in the InsufficientData state.
   return arg.isInsufficientData();
 }
@@ -348,7 +341,7 @@ MATCHER_P(IsStringAction, matcher, "") {
 }
 
 MATCHER_P(HasStringAction, matcher, "") {
-  // Takes a MatchResult& and validates that it
+  // Takes a ActionMatchResult& and validates that it
   // has a StringAction with contents matching matcher.
   if (!arg.isMatch()) {
     return false;
@@ -357,7 +350,7 @@ MATCHER_P(HasStringAction, matcher, "") {
 }
 
 MATCHER_P(HasActionWithType, matcher, "") {
-  // Takes a MatchResult& and validates that it
+  // Takes a ActionMatchResult& and validates that it
   // has an action whose type matches matcher.
   if (!arg.isMatch()) {
     return false;
@@ -366,7 +359,7 @@ MATCHER_P(HasActionWithType, matcher, "") {
 }
 
 MATCHER(HasNoMatch, "") {
-  // Takes a MatchResult& and validates that it is NoMatch.
+  // Takes a ActionMatchResult& and validates that it is NoMatch.
   return arg.isNoMatch();
 }
 

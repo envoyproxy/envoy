@@ -74,8 +74,8 @@ void Filter::populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descript
   if (!on_stream_done) {
     // To use the exact same context for both request and on_stream_done rate limiting descriptors,
     // we save the route and per-route configuration here and use them later.
-    route_ = callbacks_->route();
-    cluster_ = callbacks_->clusterInfo();
+    route_ = callbacks_->routeSharedPtr();
+    cluster_ = callbacks_->clusterInfoSharedPtr();
   }
   if (!route_ || !cluster_) {
     return;
@@ -112,12 +112,12 @@ void Filter::populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descript
   case VhRateLimitOptions::Ignore:
     break;
   case VhRateLimitOptions::Include:
-    populateRateLimitDescriptorsForPolicy(route_->virtualHost()->rateLimitPolicy(), descriptors,
+    populateRateLimitDescriptorsForPolicy(route_->virtualHost().rateLimitPolicy(), descriptors,
                                           headers, on_stream_done);
     break;
   case VhRateLimitOptions::Override:
     if (route_entry->rateLimitPolicy().empty()) {
-      populateRateLimitDescriptorsForPolicy(route_->virtualHost()->rateLimitPolicy(), descriptors,
+      populateRateLimitDescriptorsForPolicy(route_->virtualHost().rateLimitPolicy(), descriptors,
                                             headers, on_stream_done);
     }
   }

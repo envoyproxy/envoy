@@ -88,14 +88,8 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
                        : nullptr,
                    StreamInfo::FilterState::LifeSpan::FilterChain),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
-      upstream_canary_(false), router_sent_end_stream_(false), encode_trailers_(false),
-      retried_(false), awaiting_headers_(true), outlier_detection_timeout_recorded_(false),
-      create_per_try_timeout_on_request_complete_(false), paused_for_connect_(false),
-      paused_for_websocket_(false), reset_stream_(false),
       record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()),
-      cleaned_up_(false), had_upstream_(false),
-      stream_options_({can_send_early_data, can_use_http3}), grpc_rq_success_deferred_(false),
-      enable_half_close_(enable_half_close) {
+      stream_options_({can_send_early_data, can_use_http3}), enable_half_close_(enable_half_close) {
   // Get tracing config once and reuse it.
   auto tracing_config = parent_.callbacks()->tracingConfig();
 
@@ -141,16 +135,15 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   }
 
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
-  stream_info_.route_ = parent_.callbacks()->route();
+  stream_info_.route_ = parent_.callbacks()->routeSharedPtr();
   stream_info_.upstreamInfo()->setUpstreamHost(upstream_host);
   parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
 
   stream_info_.healthCheck(parent_.callbacks()->streamInfo().healthCheck());
   stream_info_.setIsShadow(parent_.callbacks()->streamInfo().isShadow());
-  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
-      parent_.callbacks()->streamInfo().upstreamClusterInfo();
-  if (cluster_info.has_value()) {
-    stream_info_.setUpstreamClusterInfo(*cluster_info);
+  if (const auto cluster_info = parent_.callbacks()->streamInfo().upstreamClusterInfo()) {
+    stream_info_.setUpstreamClusterInfo(
+        parent_.callbacks()->streamInfo().upstreamClusterInfoSharedPtr());
   }
 
   // Set up the upstream HTTP filter manager.
@@ -657,7 +650,8 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   onUpstreamHostSelected(host, true);
 
   if (info.downstreamAddressProvider().connectionID().has_value()) {
-    upstream_info.setUpstreamConnectionId(info.downstreamAddressProvider().connectionID().value());
+    uint64_t connection_id = info.downstreamAddressProvider().connectionID().value();
+    upstream_info.setUpstreamConnectionId(connection_id);
   }
 
   if (info.downstreamAddressProvider().interfaceName().has_value()) {
@@ -837,8 +831,12 @@ void UpstreamRequestFilterManagerCallbacks::resetStream(
   return upstream_request_.onResetStream(reset_reason, transport_failure_reason);
 }
 
-Upstream::ClusterInfoConstSharedPtr UpstreamRequestFilterManagerCallbacks::clusterInfo() {
+OptRef<const Upstream::ClusterInfo> UpstreamRequestFilterManagerCallbacks::clusterInfo() {
   return upstream_request_.parent_.callbacks()->clusterInfo();
+}
+
+Upstream::ClusterInfoConstSharedPtr UpstreamRequestFilterManagerCallbacks::clusterInfoSharedPtr() {
+  return upstream_request_.parent_.callbacks()->clusterInfoSharedPtr();
 }
 
 Http::Http1StreamEncoderOptionsOptRef

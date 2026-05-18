@@ -18,7 +18,7 @@ namespace ReverseConnection {
 static bool reverse_tunnel_detailed_stats_warning_logged = false;
 
 // ReverseTunnelInitiatorExtension implementation
-void ReverseTunnelInitiatorExtension::onServerInitialized() {
+void ReverseTunnelInitiatorExtension::onServerInitialized(Server::Instance&) {
   ENVOY_LOG(debug, "ReverseTunnelInitiatorExtension::onServerInitialized");
 }
 

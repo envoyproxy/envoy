@@ -229,6 +229,15 @@ ProtocolOptionsConfigImpl::createProtocolOptionsConfig(
     Server::Configuration::ServerFactoryContext& server_context) {
   auto options_or_error = Http2::Utility::initializeAndValidateOptions(getHttp2Options(options));
   RETURN_IF_NOT_OK_REF(options_or_error.status());
+
+  if (options_or_error.value().has_max_header_field_size_kb() &&
+      options.common_http_protocol_options().has_max_response_headers_kb() &&
+      options_or_error.value().max_header_field_size_kb().value() >
+          options.common_http_protocol_options().max_response_headers_kb().value()) {
+    return absl::InvalidArgumentError(
+        "max_header_field_size_kb must not exceed max_response_headers_kb");
+  }
+
   auto cache_options_or_error = getAlternateProtocolsCacheOptions(options, server_context);
   RETURN_IF_NOT_OK_REF(cache_options_or_error.status());
   auto validator_factory_or_error = createHeaderValidatorFactory(options, server_context);
@@ -258,6 +267,15 @@ ProtocolOptionsConfigImpl::createProtocolOptionsConfig(
     ProtobufMessage::ValidationVisitor& validation_visitor) {
   auto options_or_error = Http2::Utility::initializeAndValidateOptions(http2_options);
   RETURN_IF_NOT_OK_REF(options_or_error.status());
+
+  if (options_or_error.value().has_max_header_field_size_kb() &&
+      common_options.has_max_response_headers_kb() &&
+      options_or_error.value().max_header_field_size_kb().value() >
+          common_options.max_response_headers_kb().value()) {
+    return absl::InvalidArgumentError(
+        "max_header_field_size_kb must not exceed max_response_headers_kb");
+  }
+
   return std::shared_ptr<ProtocolOptionsConfigImpl>(new ProtocolOptionsConfigImpl(
       http1_settings, options_or_error.value(), common_options, upstream_options,
       use_downstream_protocol, use_http2, server_context, validation_visitor));

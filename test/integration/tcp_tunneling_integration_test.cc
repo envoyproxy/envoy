@@ -18,6 +18,11 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
+using Params = std::tuple<Network::Address::IpVersion, Http::CodecType>;
+using testing::Eq;
+using testing::Ge;
+
 namespace {
 
 // Terminating CONNECT and sending raw TCP upstream.
@@ -166,7 +171,7 @@ TEST_P(ConnectTerminationIntegrationTest, Basic) {
 
   setUpConnection();
   sendBidirectionalDataAndCleanShutdown();
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 2);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Ge(2));
   cleanupUpstreamAndDownstream();
 
   setUpConnection();
@@ -371,6 +376,53 @@ TEST_P(ConnectTerminationIntegrationTest, UpstreamCloseWithHalfCloseEnabled) {
   cleanupUpstreamAndDownstream();
 }
 
+// Verify that upstream RST through tunneled CONNECT propagates as downstream RST
+// (default behavior with both guards enabled).
+TEST_P(ConnectTerminationIntegrationTest, UpstreamRstPropagationThroughTunnel) {
+  enableHalfClose(false);
+  initialize();
+
+  setUpConnection();
+  sendBidirectionalData();
+
+  // Upstream sends RST (AbortReset).
+  ASSERT_TRUE(fake_raw_upstream_connection_->close(Network::ConnectionCloseType::AbortReset));
+  ASSERT_TRUE(fake_raw_upstream_connection_->waitForDisconnect());
+
+  // Downstream should be disconnected (stream reset or connection close).
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(response_->waitForAnyTermination());
+  }
+}
+
+// Verify that upstream RST through tunneled CONNECT does NOT propagate as downstream RST
+// when the HTTP guard is explicitly disabled.
+TEST_P(ConnectTerminationIntegrationTest, UpstreamRstNotPropagatedWithoutHttpGuard) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.map_http_stream_reset_to_tcp_rst",
+                                    "false");
+  useAccessLog("%UPSTREAM_DETECTED_CLOSE_TYPE%");
+  initialize();
+
+  setUpConnection();
+  sendBidirectionalData();
+
+  // Upstream sends RST.
+  ASSERT_TRUE(fake_raw_upstream_connection_->close(Network::ConnectionCloseType::AbortReset));
+  ASSERT_TRUE(fake_raw_upstream_connection_->waitForDisconnect());
+
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(response_->waitForAnyTermination());
+  }
+
+  // With HTTP guard disabled, close type should not be RemoteReset.
+  auto log_result = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log_result, testing::Ne("RemoteReset"));
+}
+
 TEST_P(ConnectTerminationIntegrationTest, TestTimeout) {
   enable_timeout_ = true;
   initialize();
@@ -421,7 +473,7 @@ TEST_P(ConnectTerminationIntegrationTest, BasicMaxStreamDuration) {
   setUpConnection();
   sendBidirectionalData();
 
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_max_duration_reached", Ge(1));
 
   if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -535,8 +587,6 @@ INSTANTIATE_TEST_SUITE_P(HttpAndIpVersions, ConnectTerminationIntegrationTest,
                               Http::CodecType::HTTP3},
                              {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
-
-using Params = std::tuple<Network::Address::IpVersion, Http::CodecType>;
 
 // Test with proxy protocol headers.
 class ProxyProtocolConnectTerminationIntegrationTest : public ConnectTerminationIntegrationTest {
@@ -1534,9 +1584,9 @@ TEST_P(TcpTunnelingIntegrationTest, HeaderEvaluatorConfigUpdate) {
       });
   new_config_helper.setLds("1");
 
-  test_server_->waitForCounterEq("listener_manager.listener_modified", 1);
-  test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", 0);
-  test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", 0);
+  test_server_->waitForCounter("listener_manager.listener_modified", Eq(1));
+  test_server_->waitForGauge("listener_manager.total_listeners_warming", Eq(0));
+  test_server_->waitForGauge("listener_manager.total_listeners_draining", Eq(0));
 
   // Start a connection, and verify the upgrade headers are received upstream.
   auto tcp_client_2 = makeTcpConnection(lookupPort("tcp_proxy"));
@@ -1575,7 +1625,7 @@ TEST_P(TcpTunnelingIntegrationTest, Goaway) {
   setUpConnection(fake_upstream_connection_);
   sendBidiData(fake_upstream_connection_, true);
   closeConnection(fake_upstream_connection_);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Ge(1));
 
   // Make sure a subsequent connection can be established successfully.
   FakeHttpConnectionPtr fake_upstream_connection;
@@ -1585,7 +1635,7 @@ TEST_P(TcpTunnelingIntegrationTest, Goaway) {
 
   // Make sure the last stream is finished before doing test teardown.
   fake_upstream_connection->encodeGoAway();
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 2);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Ge(2));
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
@@ -1970,52 +2020,6 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamConnectingDownstreamDisconnect) {
   ASSERT_TRUE(fake_upstream_connection_->close());
 }
 
-// Test idle timeout when connection establishment is prevented by not sending upstream response
-TEST_P(TcpTunnelingIntegrationTest,
-       IdleTimeoutNoUpstreamConnectionNoIdleTimeoutSetOnNewConnection) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.tcp_proxy_set_idle_timer_immediately_on_new_connection", "false");
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(1);
-    auto* filter_chain = listener->mutable_filter_chains(0);
-    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
-
-    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
-    auto tcp_proxy_config =
-        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
-            *config_blob);
-
-    tcp_proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
-    tcp_proxy_config.mutable_idle_timeout()->CopyFrom(
-        ProtobufUtil::TimeUtil::MillisecondsToDuration(1));
-
-    config_blob->PackFrom(tcp_proxy_config);
-  });
-
-  initialize();
-
-  // Start downstream TCP connection (CONNECT will be sent upstream).
-  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  EXPECT_EQ(upstream_request_->headers().getMethodValue(), "CONNECT");
-
-  // Don't send response headers - this prevents the tunnel from being fully established.
-  // The TCP proxy will wait for the response, and the idle timeout will not trigger as
-  // the idle timeout is not set immediately on new connection.
-
-  // Verify the stream wasn't reset due to timeout
-  if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    ASSERT_FALSE(fake_upstream_connection_->waitForDisconnect(std::chrono::milliseconds(10)));
-  } else {
-    ASSERT_FALSE(upstream_request_->waitForReset(std::chrono::milliseconds(10)));
-  }
-
-  // Clean up the TCP client
-  tcp_client_->close();
-}
-
 // Test that a downstream flush works correctly (all data is flushed)
 TEST_P(TcpTunnelingIntegrationTest, TcpProxyDownstreamFlush) {
   // Use a very large size to make sure it is larger than the kernel socket read buffer.
@@ -2043,7 +2047,8 @@ TEST_P(TcpTunnelingIntegrationTest, TcpProxyDownstreamFlush) {
     upstream_request_->encodeData(data, true);
   }
 
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_flow_control_paused_reading_total", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_paused_reading_total",
+                               Ge(1));
   tcp_client_->readDisable(false);
   tcp_client_->waitForData(data);
   tcp_client_->waitForHalfClose();
@@ -2582,7 +2587,7 @@ TEST_P(TcpTunnelingIntegrationTestSimTime, TestIdletimeoutWithLargeOutstandingDa
   // Advance simulated time to trigger the idle timeout deterministically.
   timeSystem().advanceTimeAndRun(std::chrono::seconds(idle_timeout), *dispatcher_,
                                  Event::Dispatcher::RunType::NonBlock);
-  test_server_->waitForCounterGe("tcp.tcp_stats.idle_timeout", 1);
+  test_server_->waitForCounter("tcp.tcp_stats.idle_timeout", Ge(1));
 
   tcp_client_->waitForDisconnect();
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
@@ -2631,7 +2636,7 @@ TEST_P(TcpTunnelingIntegrationTestSimTime,
   timeSystem().advanceTimeAndRun(std::chrono::seconds(idle_timeout), *dispatcher_,
                                  Event::Dispatcher::RunType::NonBlock);
 
-  test_server_->waitForCounterGe("tcp.tcp_stats.idle_timeout", 1);
+  test_server_->waitForCounter("tcp.tcp_stats.idle_timeout", Ge(1));
   tcp_client_->waitForHalfClose();
 
   if (upstreamProtocol() == Http::CodecType::HTTP1) {

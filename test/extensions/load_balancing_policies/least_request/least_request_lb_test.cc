@@ -637,6 +637,34 @@ TEST(TypedLeastRequestLbConfigTest, TypedLeastRequestLbConfig) {
   }
 }
 
+TEST(EdfLbCoalesceDisabledTest, FallbackPathExercised) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update", "false"}});
+
+  Stats::IsolatedStoreImpl stats_store;
+  ClusterLbStatNames stat_names(stats_store.symbolTable());
+  ClusterLbStats stats(stat_names, *stats_store.rootScope());
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<MockPrioritySet> priority_set;
+  auto info = std::make_shared<NiceMock<MockClusterInfo>>();
+
+  envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest config;
+  config.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(60);
+  Event::SimulatedTimeSystem time_system;
+  LeastRequestLoadBalancer lb(priority_set, nullptr, stats, runtime, random, 50, config,
+                              time_system);
+
+  MockHostSet& host_set = *priority_set.getMockHostSet(0);
+  host_set.hosts_ = {makeTestHost(info, "tcp://127.0.0.1:80")};
+  host_set.healthy_hosts_ = host_set.hosts_;
+  host_set.runCallbacks({}, {});
+
+  auto result = lb.chooseHost(nullptr);
+  EXPECT_NE(nullptr, result.host);
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

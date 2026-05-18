@@ -16,6 +16,7 @@ envoy_cc_library(
     deps = [
         "//source/common/common:enum_to_int",
         "//source/common/http:header_map_lib",
+        "//source/common/http:http_service_headers_lib",
         "//source/common/http:utility_lib",
         "//source/extensions/filters/http/ext_proc:client_lib",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",

@@ -4,6 +4,8 @@
 #include "source/common/common/bit_array.h"
 #include "source/common/common/random_generator.h"
 
+#include "test/test_common/utility.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -78,6 +80,16 @@ INSTANTIATE_TEST_SUITE_P(GetAndSetTests, BitArrayTest,
                                             testing::Values(1, 10, 10000)));
 
 TEST_P(BitArrayTest, CanSetAndGetAllBits) { populateBitArrayAndCheckValuesStoredCorrectly(); }
+
+TEST_P(BitArrayTest, SetOutOfBounds) {
+  BitArray bit_array(bit_width_, num_items_);
+  EXPECT_ENVOY_BUG(bit_array.set(num_items_, 0), "BitArray::set requested index out of bounds");
+}
+
+TEST_P(BitArrayTest, GetOutOfBounds) {
+  BitArray bit_array(bit_width_, num_items_);
+  EXPECT_DEATH(bit_array.get(num_items_), "");
+}
 
 } // namespace
 } // namespace Envoy

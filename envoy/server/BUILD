@@ -342,6 +342,7 @@ envoy_cc_library(
     deps = [
         ":factory_context_interface",
         "//envoy/config:typed_config_interface",
+        "//envoy/server:instance_interface",
     ],
 )
 

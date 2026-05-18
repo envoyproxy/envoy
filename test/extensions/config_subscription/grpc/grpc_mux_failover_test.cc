@@ -100,8 +100,8 @@ TEST_F(GrpcMuxFailoverNoFailoverTest, PrimaryOnEstablishmentFailureInvoked) {
   EXPECT_CALL(primary_stream_, establishNewStream());
   grpc_mux_failover_.establishNewStream();
 
-  EXPECT_CALL(grpc_mux_callbacks_, onEstablishmentFailure(false));
-  primary_callbacks_->onEstablishmentFailure(false);
+  EXPECT_CALL(grpc_mux_callbacks_, onEstablishmentFailure(true));
+  primary_callbacks_->onEstablishmentFailure(true);
 }
 
 // Validates that onDiscoveryResponse callback is invoked on the primary stream
@@ -207,9 +207,9 @@ protected:
     EXPECT_CALL(failover_stream_, establishNewStream()).Times(0);
     grpc_mux_failover_->establishNewStream();
 
-    // First disconnect.
-    EXPECT_CALL(grpc_mux_callbacks_, onEstablishmentFailure(false));
-    primary_callbacks_->onEstablishmentFailure(false);
+    // First disconnect, try again with the initial-resource-versions.
+    EXPECT_CALL(grpc_mux_callbacks_, onEstablishmentFailure(true));
+    primary_callbacks_->onEstablishmentFailure(true);
 
     // Emulate a retry that ends with a second disconnect. It should close the
     // primary stream and try to establish the failover stream.
@@ -321,11 +321,11 @@ TEST_F(GrpcMuxFailoverTest, CheckRateLimitPrimaryStreamDefault) {
 TEST_F(GrpcMuxFailoverTest, AttemptPrimaryAfterPrimaryInitialFailure) {
   connectingToPrimary();
 
-  // First disconnect.
+  // First disconnect, try again with the initial-resource-versions.
   EXPECT_CALL(primary_stream_, closeStream()).Times(0);
-  EXPECT_CALL(grpc_mux_callbacks_, onEstablishmentFailure(false));
+  EXPECT_CALL(grpc_mux_callbacks_, onEstablishmentFailure(true));
   EXPECT_CALL(failover_stream_, establishNewStream()).Times(0);
-  primary_callbacks_->onEstablishmentFailure(false);
+  primary_callbacks_->onEstablishmentFailure(true);
 }
 
 // Validate that upon failure of the second connection to the primary, the
@@ -333,12 +333,13 @@ TEST_F(GrpcMuxFailoverTest, AttemptPrimaryAfterPrimaryInitialFailure) {
 TEST_F(GrpcMuxFailoverTest, AttemptFailoverAfterPrimaryTwoFailures) {
   connectingToPrimary();
 
-  // First disconnect.
-  EXPECT_CALL(grpc_mux_callbacks_, onEstablishmentFailure(false));
-  primary_callbacks_->onEstablishmentFailure(false);
+  // First disconnect, try again with the initial-resource-versions.
+  EXPECT_CALL(grpc_mux_callbacks_, onEstablishmentFailure(true));
+  primary_callbacks_->onEstablishmentFailure(true);
 
   // Emulate a retry that ends with a second disconnect. It should close the
-  // primary stream and try to establish the failover stream.
+  // primary stream and try to establish the failover stream, without
+  // sending the initial-resource-versions.
   EXPECT_CALL(primary_stream_, closeStream());
   EXPECT_CALL(grpc_mux_callbacks_, onEstablishmentFailure(false));
   EXPECT_CALL(primary_stream_, establishNewStream()).Times(0);
@@ -351,9 +352,9 @@ TEST_F(GrpcMuxFailoverTest, AttemptFailoverAfterPrimaryTwoFailures) {
 TEST_F(GrpcMuxFailoverTest, AlternatingBetweenFailoverAndPrimary) {
   connectingToPrimary();
 
-  // First disconnect.
-  EXPECT_CALL(grpc_mux_callbacks_, onEstablishmentFailure(false));
-  primary_callbacks_->onEstablishmentFailure(false);
+  // First disconnect, try again with the initial-resource-versions.
+  EXPECT_CALL(grpc_mux_callbacks_, onEstablishmentFailure(true));
+  primary_callbacks_->onEstablishmentFailure(true);
 
   // Emulate a 5 times disconnects.
   for (int attempt = 0; attempt < 5; ++attempt) {
@@ -371,10 +372,10 @@ TEST_F(GrpcMuxFailoverTest, AlternatingBetweenFailoverAndPrimary) {
       // connect to the primary. It should close the failover stream, and
       // enable the retry timer.
       EXPECT_CALL(failover_stream_, closeStream());
-      EXPECT_CALL(grpc_mux_callbacks_, onEstablishmentFailure(false));
+      EXPECT_CALL(grpc_mux_callbacks_, onEstablishmentFailure(true));
       EXPECT_CALL(failover_stream_, establishNewStream()).Times(0);
       EXPECT_CALL(*timer_, enableTimer(_, _));
-      failover_callbacks_->onEstablishmentFailure(false);
+      failover_callbacks_->onEstablishmentFailure(true);
       // Emulate a timer tick, which should try to reconnect to the primary
       // stream.
       EXPECT_CALL(primary_stream_, establishNewStream());
@@ -396,7 +397,7 @@ TEST_F(GrpcMuxFailoverTest, PrimaryOnlyAttemptsAfterPrimaryAvailable) {
     EXPECT_CALL(primary_stream_, closeStream()).Times(0);
     EXPECT_CALL(grpc_mux_callbacks_, onEstablishmentFailure(true));
     EXPECT_CALL(failover_stream_, establishNewStream()).Times(0);
-    primary_callbacks_->onEstablishmentFailure(false);
+    primary_callbacks_->onEstablishmentFailure(true);
   }
 
   // Emulate a call to establishNewStream().
@@ -439,7 +440,7 @@ TEST_F(GrpcMuxFailoverTest, AlternatingPrimaryAndFailoverAttemptsAfterFailoverAv
       EXPECT_CALL(grpc_mux_callbacks_, onEstablishmentFailure(true));
       EXPECT_CALL(primary_stream_, establishNewStream()).Times(0);
       EXPECT_CALL(failover_stream_, establishNewStream());
-      primary_callbacks_->onEstablishmentFailure(false);
+      primary_callbacks_->onEstablishmentFailure(true);
     }
   }
 
@@ -497,10 +498,10 @@ TEST_F(GrpcMuxFailoverTest, TimerDisabledUponExternalReconnect) {
 
   // Fail the attempt to connect to the failover.
   EXPECT_CALL(failover_stream_, closeStream());
-  EXPECT_CALL(grpc_mux_callbacks_, onEstablishmentFailure(false));
+  EXPECT_CALL(grpc_mux_callbacks_, onEstablishmentFailure(true));
   EXPECT_CALL(failover_stream_, establishNewStream()).Times(0);
   EXPECT_CALL(*timer_, enableTimer(_, _));
-  failover_callbacks_->onEstablishmentFailure(false);
+  failover_callbacks_->onEstablishmentFailure(true);
 
   // Attempt to reconnect again.
   EXPECT_CALL(*timer_, disableTimer());
