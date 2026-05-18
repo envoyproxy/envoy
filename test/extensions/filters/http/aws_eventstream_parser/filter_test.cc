@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/content_parsers/json/v3/json_content_parser.pb.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/config/metadata.h"
 #include "source/extensions/common/aws/eventstream/eventstream_parser.h"
 #include "source/extensions/filters/http/aws_eventstream_parser/config.h"
@@ -1657,6 +1658,136 @@ TEST_F(AwsEventstreamParserFilterTest, TypeConversionError) {
 
   EXPECT_EQ(1, findCounter("aws_eventstream_parser.resp.json.type_conversion_error"));
   EXPECT_EQ(0, findCounter("aws_eventstream_parser.resp.json.metadata_added"));
+}
+
+// ===== Bedrock Envelope Unwrap Tests =====
+
+// Test that a Bedrock InvokeModelWithResponseStream envelope is unwrapped and the inner
+// base64-decoded payload is parsed by the content parser.
+TEST_F(AwsEventstreamParserFilterTest, BedrockEnvelopeUnwrap) {
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"},
+                                          {"content-type", "application/vnd.amazon.eventstream"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+
+  // Inner payload: {"usage": {"total_tokens": 55}}
+  std::string inner_json = R"({"usage": {"total_tokens": 55}})";
+  std::string base64_inner = Base64::encode(inner_json.c_str(), inner_json.size());
+  // Bedrock envelope wraps the payload as {"bytes": "<base64>"}
+  std::string envelope = R"({"bytes": ")" + base64_inner + R"("})";
+
+  Buffer::OwnedImpl data(buildEventstreamMessage(envelope));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, true));
+
+  EXPECT_EQ(1, findCounter("aws_eventstream_parser.resp.json.metadata_added"));
+  const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
+  EXPECT_EQ(55, metadata.fields().at("tokens").number_value());
+}
+
+// Test Bedrock envelope with extra fields (e.g. "p") still unwraps correctly.
+TEST_F(AwsEventstreamParserFilterTest, BedrockEnvelopeWithExtraFields) {
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"},
+                                          {"content-type", "application/vnd.amazon.eventstream"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+
+  std::string inner_json = R"({"usage": {"total_tokens": 77}})";
+  std::string base64_inner = Base64::encode(inner_json.c_str(), inner_json.size());
+  std::string envelope = R"({"bytes": ")" + base64_inner + R"(", "p": "abcdefghijklmnop"})";
+
+  Buffer::OwnedImpl data(buildEventstreamMessage(envelope));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, true));
+
+  EXPECT_EQ(1, findCounter("aws_eventstream_parser.resp.json.metadata_added"));
+  const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
+  EXPECT_EQ(77, metadata.fields().at("tokens").number_value());
+}
+
+// Test that invalid base64 in Bedrock envelope falls back to original payload.
+TEST_F(AwsEventstreamParserFilterTest, BedrockEnvelopeInvalidBase64FallsBack) {
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"},
+                                          {"content-type", "application/vnd.amazon.eventstream"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+
+  // "bytes" contains invalid base64 — unwrapBedrockEnvelope returns nullopt,
+  // so the original JSON payload is used directly by the parser.
+  // "!!!" is not valid base64 and will decode to empty.
+  std::string envelope = R"({"bytes": "!!!"})";
+
+  Buffer::OwnedImpl data(buildEventstreamMessage(envelope));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, true));
+
+  // The original envelope JSON has no "usage.total_tokens", so no match.
+  EXPECT_EQ(0, findCounter("aws_eventstream_parser.resp.json.metadata_added"));
+}
+
+// Test that JSON without a "bytes" field is not treated as a Bedrock envelope.
+TEST_F(AwsEventstreamParserFilterTest, BedrockEnvelopeNoBytesField) {
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"},
+                                          {"content-type", "application/vnd.amazon.eventstream"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+
+  // Valid JSON but no "bytes" key — should use the payload as-is.
+  Buffer::OwnedImpl data(buildEventstreamMessage(R"({"usage": {"total_tokens": 33}})"));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, true));
+
+  EXPECT_EQ(1, findCounter("aws_eventstream_parser.resp.json.metadata_added"));
+  const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
+  EXPECT_EQ(33, metadata.fields().at("tokens").number_value());
+}
+
+// Test that non-JSON payload is not treated as a Bedrock envelope (falls through to parser).
+TEST_F(AwsEventstreamParserFilterTest, BedrockEnvelopeNonJsonPayload) {
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"},
+                                          {"content-type", "application/vnd.amazon.eventstream"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+
+  // Non-JSON payload — loadFromString fails, unwrap returns nullopt, original payload used.
+  Buffer::OwnedImpl data(buildEventstreamMessage("this is not json"));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, true));
+
+  // The plain text can't be parsed by JSON content parser either.
+  EXPECT_EQ(1, findCounter("aws_eventstream_parser.resp.json.parse_error"));
+  EXPECT_EQ(0, findCounter("aws_eventstream_parser.resp.json.metadata_added"));
+}
+
+// Test Bedrock envelope where decoded inner payload doesn't match any rule.
+TEST_F(AwsEventstreamParserFilterTest, BedrockEnvelopeUnwrappedNoMatch) {
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"},
+                                          {"content-type", "application/vnd.amazon.eventstream"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+
+  std::string inner_json = R"({"text": "hello world"})";
+  std::string base64_inner = Base64::encode(inner_json.c_str(), inner_json.size());
+  std::string envelope = R"({"bytes": ")" + base64_inner + R"("})";
+
+  Buffer::OwnedImpl data(buildEventstreamMessage(envelope));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, true));
+
+  // Unwrapped successfully but inner JSON has no "usage.total_tokens".
+  EXPECT_EQ(0, findCounter("aws_eventstream_parser.resp.json.metadata_added"));
+  EXPECT_EQ(0, findCounter("aws_eventstream_parser.resp.json.parse_error"));
+}
+
+// Test multiple messages where one is a Bedrock envelope and one is plain JSON.
+TEST_F(AwsEventstreamParserFilterTest, BedrockEnvelopeMixedWithPlainJson) {
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"},
+                                          {"content-type", "application/vnd.amazon.eventstream"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+
+  // First message: plain JSON, no match
+  std::string msg1 = buildEventstreamMessage(R"({"text": "hello"})");
+
+  // Second message: Bedrock envelope with matching inner payload
+  std::string inner_json = R"({"usage": {"total_tokens": 123}})";
+  std::string base64_inner = Base64::encode(inner_json.c_str(), inner_json.size());
+  std::string envelope = R"({"bytes": ")" + base64_inner + R"("})";
+  std::string msg2 = buildEventstreamMessage(envelope);
+
+  Buffer::OwnedImpl data(msg1 + msg2);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, true));
+
+  EXPECT_EQ(1, findCounter("aws_eventstream_parser.resp.json.metadata_added"));
+  const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
+  EXPECT_EQ(123, metadata.fields().at("tokens").number_value());
 }
 
 } // namespace

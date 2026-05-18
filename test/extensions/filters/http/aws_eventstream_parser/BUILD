@@ -29,6 +29,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.aws_eventstream_parser"],
     deps = [
         "//bazel:zlib",
+        "//source/common/common:base64_lib",
         "//source/common/config:metadata_lib",
         "//source/extensions/common/aws/eventstream:eventstream_parser_lib",
         "//source/extensions/filters/http/aws_eventstream_parser:aws_eventstream_parser_lib",
