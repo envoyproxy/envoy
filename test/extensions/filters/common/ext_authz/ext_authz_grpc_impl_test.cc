@@ -635,10 +635,8 @@ ok_response:
                      span_);
 }
 
-// TODO(https://github.com/envoyproxy/envoy/issues/45003)
-// This test ensures the default (buggy) behavior remains unchanged since
-// existing Envoy deployments may be relying on the default (buggy) behavior
-TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithKeepEmptyValueIgnored) {
+// This test ensures keep_empty_value is respected in ext_authz responses.
+TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithKeepEmptyValueRespected) {
   initialize();
 
   envoy::service::auth::v3::CheckResponse check_response;
@@ -654,12 +652,10 @@ ok_response:
 )EOF",
                             check_response);
 
-  // If keep_empty_value were respected, the header "x-keep-empty" should be DROPPED
-  // because its value is empty. However, the current implementation ignores this
-  // flag and blindly adds the empty header to the headers_to_set vector.
+  // keep_empty_value is false and value is empty, so the header should be dropped.
   auto expected_authz_response = Response{
       .status = CheckStatus::OK,
-      .headers_to_set = UnsafeHeaderVector{{"x-keep-empty", ""}},
+      .headers_to_set = UnsafeHeaderVector{},
       .status_code = Http::Code::OK,
       .grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok,
   };
