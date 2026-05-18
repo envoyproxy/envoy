@@ -6,6 +6,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -161,8 +162,8 @@ typed_config:
   });
   initializeFilter(filter_config);
   waitForOAuth2Response("test_client_secret");
-  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
-                                 std::chrono::milliseconds(2500));
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_fetched", Eq(1),
+                               std::chrono::milliseconds(2500));
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -206,8 +207,8 @@ typed_config:
 )EOF";
   initializeFilter(filter_config);
   waitForOAuth2Response("test_client_secret");
-  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
-                                 std::chrono::milliseconds(2500));
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_fetched", Eq(1),
+                               std::chrono::milliseconds(2500));
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -251,8 +252,8 @@ typed_config:
 )EOF";
   initializeFilter(filter_config);
   waitForOAuth2Response("test_client_secret");
-  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
-                                 std::chrono::milliseconds(2500));
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_fetched", Eq(1),
+                               std::chrono::milliseconds(2500));
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   default_request_headers_.setCopy(Envoy::Http::LowerCaseString("Authorization"),
@@ -307,8 +308,8 @@ typed_config:
 )EOF";
   initializeFilter(filter_config);
   waitForOAuth2Response("test_client_secret");
-  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
-                                 std::chrono::milliseconds(2500));
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_fetched", Eq(1),
+                               std::chrono::milliseconds(2500));
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   default_request_headers_.setCopy(Envoy::Http::LowerCaseString("Authorization"),
@@ -361,8 +362,8 @@ typed_config:
               path: "{{ test_tmpdir }}/initial_secret.yaml"
 )EOF";
   initializeFilter(filter_config);
-  test_server_->waitForCounterEq(
-      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_client_secret", 2,
+  test_server_->waitForCounter(
+      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_client_secret", Eq(2),
       std::chrono::milliseconds(5000));
   EXPECT_EQ(0UL,
             test_server_->counter("http.config_test.credential_injector.oauth2.token_requested")
@@ -374,13 +375,13 @@ typed_config:
   // Update the client secret and now token request should succeed after retry
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("client_secret.yaml"),
                               TestEnvironment::temporaryPath("initial_secret.yaml"));
-  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_requested", 1,
-                                 std::chrono::milliseconds(2500));
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_requested", Eq(1),
+                               std::chrono::milliseconds(2500));
 
   waitForOAuth2Response("test_client_secret");
 
-  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
-                                 std::chrono::milliseconds(2500));
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_fetched", Eq(1),
+                               std::chrono::milliseconds(2500));
 
   EXPECT_EQ(1UL,
             test_server_->counter("http.config_test.credential_injector.oauth2.token_requested")
@@ -452,8 +453,8 @@ typed_config:
           ->counter(
               "http.config_test.credential_injector.oauth2.token_fetch_failed_on_bad_response_code")
           ->value());
-  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
-                                 std::chrono::milliseconds(2500));
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_fetched", Eq(1),
+                               std::chrono::milliseconds(2500));
 
   EXPECT_EQ(2UL,
             test_server_->counter("http.config_test.credential_injector.oauth2.token_requested")
@@ -508,8 +509,8 @@ typed_config:
   oauth2_request_->encodeHeaders(jsonResponseHeaders(), false);
   encodeGoodJsonResponseBody(2);
 
-  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
-                                 std::chrono::milliseconds(500));
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_fetched", Eq(1),
+                               std::chrono::milliseconds(500));
 
   EXPECT_EQ(1UL,
             test_server_->counter("http.config_test.credential_injector.oauth2.token_requested")
@@ -537,8 +538,8 @@ typed_config:
   oauth2_request_->encodeHeaders(jsonResponseHeaders(), false);
   encodeGoodJsonResponseBody();
 
-  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 2,
-                                 std::chrono::milliseconds(1200));
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_fetched", Eq(2),
+                               std::chrono::milliseconds(1200));
 }
 
 TEST_P(CredentialInjectorIntegrationTest, BadTokenNoExpiry) {
@@ -571,8 +572,8 @@ typed_config:
   EXPECT_THAT(request_body_, HasClientSecret("test_client_secret"));
   oauth2_request_->encodeHeaders(jsonResponseHeaders(), false);
   encodeBadTokenResponseBody();
-  test_server_->waitForCounterEq(
-      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_bad_token", 1,
+  test_server_->waitForCounter(
+      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_bad_token", Eq(1),
       std::chrono::milliseconds(1000));
 }
 
@@ -607,8 +608,8 @@ typed_config:
   oauth2_request_->encodeHeaders(jsonResponseHeaders(), false);
   encodeBadJsonResponseBody();
 
-  test_server_->waitForCounterEq(
-      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_bad_token", 1,
+  test_server_->waitForCounter(
+      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_bad_token", Eq(1),
       std::chrono::milliseconds(1000));
 }
 
@@ -637,11 +638,11 @@ typed_config:
               path: "{{ test_tmpdir }}/client_secret.yaml"
 )EOF";
   initializeFilter(filter_config);
-  test_server_->waitForCounterEq(
-      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_cluster_not_found", 1,
+  test_server_->waitForCounter(
+      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_cluster_not_found", Eq(1),
       std::chrono::milliseconds(1490));
-  test_server_->waitForCounterEq(
-      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_cluster_not_found", 2,
+  test_server_->waitForCounter(
+      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_cluster_not_found", Eq(2),
       std::chrono::milliseconds(1490));
 }
 
@@ -676,21 +677,21 @@ typed_config:
   EXPECT_THAT(request_body_, HasClientSecret("test_client_secret"));
   oauth2_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
 
-  test_server_->waitForCounterEq(
-      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_stream_reset", 1,
+  test_server_->waitForCounter(
+      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_stream_reset", Eq(1),
       std::chrono::milliseconds(1000));
   EXPECT_EQ(1UL,
             test_server_->counter("http.config_test.credential_injector.oauth2.token_requested")
                 ->value());
-  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_requested", 2,
-                                 std::chrono::milliseconds(1200));
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_requested", Eq(2),
+                               std::chrono::milliseconds(1200));
   // wait for retried token request and respond with good response
   acceptNewStream();
   EXPECT_THAT(request_body_, HasClientSecret("test_client_secret"));
   oauth2_request_->encodeHeaders(jsonResponseHeaders(), false);
   encodeGoodJsonResponseBody(20);
-  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
-                                 std::chrono::milliseconds(1200));
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_fetched", Eq(1),
+                               std::chrono::milliseconds(1200));
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -772,8 +773,8 @@ typed_config:
   Buffer::OwnedImpl buffer(MessageUtil::getJsonStringFromMessageOrError(oauth_response));
   oauth2_request_->encodeData(buffer, true);
 
-  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
-                                 std::chrono::milliseconds(2500));
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_fetched", Eq(1),
+                               std::chrono::milliseconds(2500));
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);

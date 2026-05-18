@@ -21,14 +21,25 @@ uint64_t MemoryStatsReader::allocatedHeapBytes() {
   return Memory::Stats::totalCurrentlyAllocated();
 }
 
-FixedHeapMonitor::FixedHeapMonitor(
-    const envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig& config,
-    std::unique_ptr<MemoryStatsReader> stats)
-    : max_heap_(config.max_heap_size_bytes()), stats_(std::move(stats)) {
-  ASSERT(max_heap_ > 0);
-}
+FixedHeapMonitor::FixedHeapMonitor(absl::variant<uint64_t, Runtime::UInt64> max_heap_source,
+                                   std::unique_ptr<MemoryStatsReader> stats)
+    : max_heap_source_(std::move(max_heap_source)), stats_(std::move(stats)) {}
 
 void FixedHeapMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) {
+  const uint64_t max_heap = absl::visit(
+      [](const auto& source) -> uint64_t {
+        using T = std::decay_t<decltype(source)>;
+        if constexpr (std::is_same_v<T, uint64_t>) {
+          return source;
+        } else {
+          return source.value();
+        }
+      },
+      max_heap_source_);
+  if (max_heap == 0) {
+    callbacks.onFailure(EnvoyException("fixed_heap: max heap size must be greater than 0"));
+    return;
+  }
 
   size_t used = 0;
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fixed_heap_use_allocated")) {
@@ -42,9 +53,9 @@ void FixedHeapMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& call
   };
 
   Server::ResourceUsage usage;
-  usage.resource_pressure_ = used / static_cast<double>(max_heap_);
+  usage.resource_pressure_ = used / static_cast<double>(max_heap);
 
-  ENVOY_LOG_MISC(trace, "FixedHeapMonitor: used={}, max_heap={}, pressure={}", used, max_heap_,
+  ENVOY_LOG_MISC(trace, "FixedHeapMonitor: used={}, max_heap={}, pressure={}", used, max_heap,
                  usage.resource_pressure_);
 
   callbacks.onSuccess(usage);

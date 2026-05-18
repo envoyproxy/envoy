@@ -9,6 +9,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace Ssl {
 
@@ -63,7 +64,7 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidated) {
   auto conn = makeSslClientConnection({});
   IntegrationCodecClientPtr codec = makeHttpConnection(std::move(conn));
   ASSERT_TRUE(codec->connected());
-  test_server_->waitForCounterGe(listenerStatPrefix("ssl.handshake"), 1);
+  test_server_->waitForCounter(listenerStatPrefix("ssl.handshake"), Ge(1));
   EXPECT_EQ(test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"))->value(), 0);
   codec->close();
 }
@@ -82,7 +83,7 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidatedWithVerifyDepth) {
   auto conn = makeSslClientConnection({});
   IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
   ASSERT_TRUE(codec->connected());
-  test_server_->waitForCounterGe(listenerStatPrefix("ssl.handshake"), 1);
+  test_server_->waitForCounter(listenerStatPrefix("ssl.handshake"), Ge(1));
   EXPECT_EQ(test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"))->value(), 0);
   codec->close();
 }
@@ -102,7 +103,7 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidationSucceedNoDepthWithTrustRoo
   auto conn = makeSslClientConnection({});
   IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
   ASSERT_TRUE(codec->connected());
-  test_server_->waitForCounterGe(listenerStatPrefix("ssl.handshake"), 1);
+  test_server_->waitForCounter(listenerStatPrefix("ssl.handshake"), Ge(1));
   EXPECT_EQ(test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"))->value(), 0);
   codec->close();
 }
@@ -123,7 +124,7 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidationSucceedDepthWithTrustRootO
   auto conn = makeSslClientConnection({});
   IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
   ASSERT_TRUE(codec->connected());
-  test_server_->waitForCounterGe(listenerStatPrefix("ssl.handshake"), 1);
+  test_server_->waitForCounter(listenerStatPrefix("ssl.handshake"), Ge(1));
   EXPECT_EQ(test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"))->value(), 0);
   codec->close();
 }
@@ -143,7 +144,7 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidationFailedDepthWithTrustRootOn
   initialize();
   auto conn = makeSslClientConnection({});
   IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
-  test_server_->waitForCounterGe(listenerStatPrefix("ssl.fail_verify_error"), 1);
+  test_server_->waitForCounter(listenerStatPrefix("ssl.fail_verify_error"), Ge(1));
   ASSERT_TRUE(codec->waitForDisconnect());
 }
 
@@ -234,7 +235,7 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidatedWithCustomMatcher) {
   auto conn = makeSslClientConnection({});
   IntegrationCodecClientPtr codec = makeHttpConnection(std::move(conn));
   ASSERT_TRUE(codec->connected());
-  test_server_->waitForCounterGe(listenerStatPrefix("ssl.handshake"), 1);
+  test_server_->waitForCounter(listenerStatPrefix("ssl.handshake"), Ge(1));
   EXPECT_EQ(test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"))->value(), 0);
   codec->close();
 }

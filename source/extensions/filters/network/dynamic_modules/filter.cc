@@ -58,12 +58,16 @@ void DynamicModuleNetworkFilter::destroy() {
     config_->on_network_filter_destroy_(in_module_filter_);
     in_module_filter_ = nullptr;
   }
+  // Clear the cached dispatcher so any concurrent foreign-thread `commit()` short-circuits.
+  cached_dispatcher_.store(nullptr, std::memory_order_release);
   destroyed_ = true;
 }
 
 void DynamicModuleNetworkFilter::initializeReadFilterCallbacks(
     Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
+  // Publish the worker dispatcher for cross-thread `commit()`; see `dispatcher()`.
+  cached_dispatcher_.store(&callbacks.connection().dispatcher(), std::memory_order_release);
 
   const std::string& worker_name = callbacks.connection().dispatcher().name();
   auto pos = worker_name.find_first_of('_');

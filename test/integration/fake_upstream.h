@@ -38,7 +38,6 @@
 
 #include "test/mocks/http/header_validator.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/server/instance.h"
 #include "test/mocks/server/listener_factory_context.h"
 
 #if defined(ENVOY_ENABLE_QUIC)

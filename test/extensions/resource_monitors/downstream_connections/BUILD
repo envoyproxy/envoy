@@ -34,6 +34,7 @@ envoy_extension_cc_test(
         "//source/extensions/resource_monitors/downstream_connections:config",
         "//source/server:resource_monitor_config_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:options_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/resource_monitors/downstream_connections/v3:pkg_cc_proto",

@@ -10,6 +10,7 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/options.h"
 
 #include "gmock/gmock.h"
@@ -57,8 +58,9 @@ TEST(CgroupMemoryConfigTest, CreateMonitorDefault) {
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
   Server::MockOptions options;
+  testing::NiceMock<Runtime::MockLoader> runtime;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
-      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
   auto monitor = std::make_unique<CgroupMemoryMonitor>(config, mock_fs);
   EXPECT_NE(monitor, nullptr);
 }
@@ -89,8 +91,9 @@ TEST(CgroupMemoryConfigTest, CreateMonitorWithLimit) {
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
   Server::MockOptions options;
+  testing::NiceMock<Runtime::MockLoader> runtime;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
-      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
   auto monitor = std::make_unique<CgroupMemoryMonitor>(config, mock_fs);
   EXPECT_NE(monitor, nullptr);
 }
@@ -121,8 +124,9 @@ TEST(CgroupMemoryConfigTest, ZeroMemoryLimit) {
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
   Server::MockOptions options;
+  testing::NiceMock<Runtime::MockLoader> runtime;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
-      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
   auto monitor = std::make_unique<CgroupMemoryMonitor>(config, mock_fs);
   EXPECT_NE(monitor, nullptr);
 }
@@ -158,13 +162,15 @@ TEST(CgroupMemoryConfigTest, CreateMonitorIgnoresContext) {
   // Create contexts with the mock API
   Event::MockDispatcher dispatcher1;
   Server::MockOptions options1;
+  testing::NiceMock<Runtime::MockLoader> runtime1;
   Server::Configuration::ResourceMonitorFactoryContextImpl context1(
-      dispatcher1, options1, mock_api, ProtobufMessage::getStrictValidationVisitor());
+      dispatcher1, options1, mock_api, ProtobufMessage::getStrictValidationVisitor(), runtime1);
 
   Event::MockDispatcher dispatcher2;
   Server::MockOptions options2;
+  testing::NiceMock<Runtime::MockLoader> runtime2;
   Server::Configuration::ResourceMonitorFactoryContextImpl context2(
-      dispatcher2, options2, mock_api, ProtobufMessage::getStrictValidationVisitor());
+      dispatcher2, options2, mock_api, ProtobufMessage::getStrictValidationVisitor(), runtime2);
 
   auto monitor1 = factory->createResourceMonitor(config, context1);
   auto monitor2 = factory->createResourceMonitor(config, context2);

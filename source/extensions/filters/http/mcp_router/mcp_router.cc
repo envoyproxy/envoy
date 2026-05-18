@@ -677,8 +677,9 @@ void McpRouterFilter::initializeFanout(AggregationCallback callback) {
   // stores a pointer to the headers.
   auto stream_it = multistream_->begin();
   for (const auto& backend : config_->backends()) {
-    if (stream_it == multistream_->end())
+    if (stream_it == multistream_->end()) {
       break;
+    }
 
     auto headers = createUpstreamHeaders(backend, backend_sessions_[backend.name]);
     upstream_headers_.push_back(std::move(headers));

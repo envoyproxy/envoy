@@ -210,13 +210,6 @@ quic::QuicSpdyStream* EnvoyQuicClientSession::CreateIncomingStream(quic::QuicStr
   return nullptr;
 }
 
-quic::QuicSpdyStream*
-EnvoyQuicClientSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
-  // Envoy doesn't support server push.
-  IS_ENVOY_BUG("unexpectes server push call");
-  return nullptr;
-}
-
 bool EnvoyQuicClientSession::hasDataToWrite() { return HasDataToWrite(); }
 
 const quic::QuicConnection* EnvoyQuicClientSession::quicConnection() const {

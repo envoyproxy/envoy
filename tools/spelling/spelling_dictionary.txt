@@ -214,6 +214,7 @@ FB
 FCDS
 FCM
 FFFF
+FFI
 FIN
 FIPS
 FIRSTHDR
@@ -926,6 +927,7 @@ gso
 gzip
 hackery
 hacky
+handoff
 handshaker
 hardcoded
 hardcodes
@@ -1148,6 +1150,7 @@ num
 numkeys
 oauth
 observability
+observations
 ocagent
 offsetof
 oneof
@@ -1526,6 +1529,7 @@ tokenize
 tokenized
 tokenizes
 tokenizing
+tokio
 toolchain
 tos
 traceid
@@ -1709,3 +1713,6 @@ IWYU
 CRTP
 bitrate
 kbps
+dataset
+datasets
+smartptr

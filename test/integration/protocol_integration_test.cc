@@ -50,6 +50,8 @@
 #include "source/common/quic/client_connection_factory_impl.h"
 #endif
 
+using testing::Eq;
+using testing::Ge;
 using testing::HasSubstr;
 using testing::Not;
 
@@ -138,7 +140,7 @@ TEST_P(ProtocolIntegrationTest, UpstreamRequestsPerConnectionMetricHandshakeFail
   codec_client_->close();
 
   // Wait for connection failure to be recorded
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_connect_fail", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_connect_fail", Ge(1));
 
   // Verify that NO upstream_rq_per_cx histogram samples were recorded
   // because hasHandshakeCompleted() returned false (connection never established)
@@ -1342,7 +1344,7 @@ TEST_P(ProtocolIntegrationTest, RetryStreamingCancelDueToBufferOverflow) {
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("507", response->headers().getStatusValue());
-  test_server_->waitForCounterEq("cluster.cluster_0.retry_or_shadow_abandoned", 1);
+  test_server_->waitForCounter("cluster.cluster_0.retry_or_shadow_abandoned", Eq(1));
   cleanupUpstreamAndDownstream();
 }
 
@@ -1693,7 +1695,7 @@ TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
   // sure this path does standard HCM header transformations.
   EXPECT_TRUE(response->headers().Date() != nullptr);
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("500"));
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_5xx", 1);
+  test_server_->waitForCounter("http.config_test.downstream_rq_5xx", Eq(1));
 }
 
 // The downstream connection is closed when it is read disabled, and on OSX the
@@ -1809,7 +1811,7 @@ TEST_P(ProtocolIntegrationTest, BasicMaxStreamDuration) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_max_duration_reached", Ge(1));
 
   if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -1832,7 +1834,7 @@ TEST_P(ProtocolIntegrationTest, BasicDynamicMaxStreamDuration) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_max_duration_reached", Ge(1));
 
   if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -1882,7 +1884,7 @@ TEST_P(ProtocolIntegrationTest, MaxStreamDurationWithRetryPolicy) {
     ASSERT_TRUE(upstream_request_->waitForReset());
   }
 
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_max_duration_reached", Ge(1));
 
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
@@ -1931,11 +1933,11 @@ TEST_P(ProtocolIntegrationTest, MaxStreamDurationWithRetryPolicyWhenRetryUpstrea
     ASSERT_TRUE(upstream_request_->waitForReset());
   }
 
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_max_duration_reached", Ge(1));
 
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 2);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_max_duration_reached", Ge(2));
   if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
     ASSERT_TRUE(response->complete());
@@ -2221,7 +2223,7 @@ TEST_P(ProtocolIntegrationTest, 304WithBody) {
     // Ideally if we got the body with the headers we would instead reset the
     // stream, but it turns out that's complicated so instead we consistently
     // forward the headers and error out after.
-    test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_protocol_error", 1);
+    test_server_->waitForCounter("cluster.cluster_0.upstream_cx_protocol_error", Ge(1));
   }
 
   // Only for HTTP/2 and Http/3, where streams are ended with an explicit end-stream so we
@@ -2437,7 +2439,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
   if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
-    test_server_->waitForCounterGe("http.config_test.downstream_rq_4xx", 1);
+    test_server_->waitForCounter("http.config_test.downstream_rq_4xx", Ge(1));
   } else {
     ASSERT_TRUE(response->reset());
     EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
@@ -3250,20 +3252,20 @@ TEST_P(ProtocolIntegrationTest, Http1SafeConnDurationTimeout) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_200", Ge(1));
 
   if (downstream_protocol_ != Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(10000)));
-    test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
+    test_server_->waitForCounter("http.config_test.downstream_cx_max_duration_reached", Ge(1));
     EXPECT_EQ(test_server_->gauge("http.config_test.downstream_cx_http1_soft_drain")->value(), 0);
     // The rest of the test is only for http1.
     return;
   }
 
   // Wait until after the max connection duration
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
-  test_server_->waitForGaugeGe("http.config_test.downstream_cx_http1_soft_drain", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_max_duration_reached", Ge(1));
+  test_server_->waitForGauge("http.config_test.downstream_cx_http1_soft_drain", Ge(1));
 
   // Envoy now waits for one more request/response over this connection before sending the
   // connection:close header and closing the connection. No matter how long the request/response
@@ -3307,11 +3309,11 @@ TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutBasic) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_200", Ge(1));
 
   ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(10000)));
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_max_duration_reached", Ge(1));
 }
 
 // Test inflight request is processed correctly when timeout fires during request processing.
@@ -3327,7 +3329,7 @@ TEST_P(ProtocolIntegrationTest, ConnDurationInflightRequest) {
   waitForNextUpstreamRequest();
 
   // block and wait for counter to increase
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_max_duration_reached", Ge(1));
 
   // ensure request processed correctly
   upstream_request_->encodeHeaders(default_response_headers_, false);
@@ -3336,8 +3338,8 @@ TEST_P(ProtocolIntegrationTest, ConnDurationInflightRequest) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_200", Ge(1));
 
   ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(10000)));
 }
@@ -3352,7 +3354,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnDurationTimeoutNoHttpRequest) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(10000)));
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_max_duration_reached", Ge(1));
 }
 
 TEST_P(ProtocolIntegrationTest, TestPreconnect) {
@@ -3391,8 +3393,8 @@ TEST_P(ProtocolIntegrationTest, TestPreconnect) {
   // Preconnect is set to 2. Http 1 allows 1 request per connection so it requires 2 connections,
   // and http is configured for 4 so it requires only 1 connection.
   uint32_t expected_upstream_cx = (upstreamProtocol() == Http::CodecType::HTTP1) ? 2 : 1;
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", expected_upstream_cx);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", expected_upstream_cx);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Eq(expected_upstream_cx));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_cx_active", Eq(expected_upstream_cx));
 
   // Make several non-concurrent requests. The concurrency is only 1, so there should only be 1 or 2
   // upstream connections, already established by the first request.
@@ -3401,8 +3403,8 @@ TEST_P(ProtocolIntegrationTest, TestPreconnect) {
     ASSERT_TRUE(response->waitForEndStream());
   }
 
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", expected_upstream_cx);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", expected_upstream_cx);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Eq(expected_upstream_cx));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_cx_active", Eq(expected_upstream_cx));
 
   if (GetParam().downstream_protocol == Http::CodecType::HTTP1) {
     // The rest of the test requires multiple concurrent requests and isn't written to use multiple
@@ -3434,9 +3436,9 @@ TEST_P(ProtocolIntegrationTest, TestPreconnect) {
                              ? (concurrent_requests * 2)
                              : (concurrent_requests * 2 / 4);
 
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", expected_upstream_cx);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", expected_upstream_cx);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", concurrent_requests);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Eq(expected_upstream_cx));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_cx_active", Eq(expected_upstream_cx));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(concurrent_requests));
 
   for (auto& response : responses) {
     codec_client_->sendData(response.first, 0, true);
@@ -3457,7 +3459,7 @@ TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeout) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
 
-  test_server_->waitForCounterGe("http.config_test.downstream_rq_max_duration_reached", 1);
+  test_server_->waitForCounter("http.config_test.downstream_rq_max_duration_reached", Ge(1));
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("408", response->headers().getStatusValue());
@@ -3488,7 +3490,7 @@ TEST_P(ProtocolIntegrationTest, MaxStreamTimeoutWhenRequestIsNotComplete) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
 
-  test_server_->waitForCounterGe("http.config_test.downstream_rq_max_duration_reached", 1);
+  test_server_->waitForCounter("http.config_test.downstream_rq_max_duration_reached", Ge(1));
   ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(upstream_request_->complete());
@@ -3553,7 +3555,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MaxRequestsPerConnectionVsMaxConnectio
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_max_requests_reached")->value(),
             0);
 
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_max_duration_reached", Ge(1));
   // http1 is not closed at this point because envoy needs to send a response with the
   // connection:close response header to be able to safely close the connection. For other protocols
   // it's safe for envoy to just close the connection, so they do so.
@@ -3613,7 +3615,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MaxRequestsPerConnectionVsMaxStreamDur
             1);
 
   // Don't send a response. HCM should sendLocalReply after max stream duration has elapsed.
-  test_server_->waitForCounterGe("http.config_test.downstream_rq_max_duration_reached", 1);
+  test_server_->waitForCounter("http.config_test.downstream_rq_max_duration_reached", Ge(1));
 
   if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -4357,7 +4359,7 @@ TEST_P(
   // The request will go through all of Envoy's stream layer, but not be
   // serialized on the wire due to flow control.
   codec_client_->sendData(encoder, request_size, true);
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_rx_bytes_total", request_size);
+  test_server_->waitForCounter("http.config_test.downstream_cx_rx_bytes_total", Ge(request_size));
 
   // Now that the downstream request has fully made it to Envoy, encode the response.
   upstream_request_->encodeHeaders(
@@ -4370,14 +4372,14 @@ TEST_P(
   response->waitForHeaders();
 
   // HCM thinks we have no active stream now.
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_completed", 1);
-  test_server_->waitForGaugeEq("http.config_test.downstream_rq_active", 0);
+  test_server_->waitForCounter("http.config_test.downstream_rq_completed", Eq(1));
+  test_server_->waitForGauge("http.config_test.downstream_rq_active", Eq(0));
 
   // There is no reset for the cluster yet.
   if (upstreamProtocol() == Envoy::Http::CodecType::HTTP2) {
-    test_server_->waitForCounterEq("cluster.cluster_0.http2.rx_reset", 0);
+    test_server_->waitForCounter("cluster.cluster_0.http2.rx_reset", Eq(0));
   } else {
-    test_server_->waitForCounterEq("cluster.cluster_0.http3.rx_reset", 0);
+    test_server_->waitForCounter("cluster.cluster_0.http3.rx_reset", Eq(0));
   }
 
   // Send the reset stream to Envoy's upstream codec client. Envoy protocol
@@ -4386,9 +4388,9 @@ TEST_P(
   upstream_request_->encodeResetStream();
 
   if (upstreamProtocol() == Envoy::Http::CodecType::HTTP2) {
-    test_server_->waitForCounterEq("cluster.cluster_0.http2.rx_reset", 1);
+    test_server_->waitForCounter("cluster.cluster_0.http2.rx_reset", Eq(1));
   } else {
-    test_server_->waitForCounterEq("cluster.cluster_0.http3.rx_reset", 1);
+    test_server_->waitForCounter("cluster.cluster_0.http3.rx_reset", Eq(1));
   }
 }
 
@@ -5048,7 +5050,7 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleDownstreamSocketFail) {
                                     ? "listener.127.0.0.1_0.http3.downstream.tx."
                                     : "listener.[__1]_0.http3.downstream.tx.";
     std::string error_code = "quic_connection_close_error_code_QUIC_PACKET_WRITE_ERROR";
-    test_server_->waitForCounterEq(absl::StrCat(counter_scope, error_code), 1);
+    test_server_->waitForCounter(absl::StrCat(counter_scope, error_code), Eq(1));
     codec_client_->close();
   } else {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -5150,9 +5152,9 @@ TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketCreationFail) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   if (version_ == Network::Address::IpVersion::v4) {
-    test_server_->waitForCounterGe("listener.127.0.0.1_0.downstream_cx_total", 1);
+    test_server_->waitForCounter("listener.127.0.0.1_0.downstream_cx_total", Ge(1));
   } else {
-    test_server_->waitForCounterGe("listener.[__1]_0.downstream_cx_total", 1);
+    test_server_->waitForCounter("listener.[__1]_0.downstream_cx_total", Ge(1));
   }
 
   EXPECT_ENVOY_BUG(
@@ -5253,7 +5255,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderName) {
   if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
-    test_server_->waitForCounterGe("http.config_test.downstream_rq_4xx", 1);
+    test_server_->waitForCounter("http.config_test.downstream_rq_4xx", Ge(1));
   } else {
     // H/2 codec does not send 400 on protocol errors
     EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
@@ -5286,7 +5288,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderNameStreamError) {
   if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
-    test_server_->waitForCounterGe("http.config_test.downstream_rq_4xx", 1);
+    test_server_->waitForCounter("http.config_test.downstream_rq_4xx", Ge(1));
   } else {
     // H/2 codec does not send 400 on protocol errors
     EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
@@ -5314,7 +5316,7 @@ TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderName) {
 
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("502", response->headers().getStatusValue());
-  test_server_->waitForCounterGe("http.config_test.downstream_rq_5xx", 1);
+  test_server_->waitForCounter("http.config_test.downstream_rq_5xx", Ge(1));
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
     EXPECT_EQ(waitForAccessLog(access_log_name_),
               "upstream_reset_before_response_started{protocol_"
@@ -5347,7 +5349,7 @@ TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderNameStreamError) {
 
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("502", response->headers().getStatusValue());
-  test_server_->waitForCounterGe("http.config_test.downstream_rq_5xx", 1);
+  test_server_->waitForCounter("http.config_test.downstream_rq_5xx", Ge(1));
 
   std::string error_message = upstreamProtocol() == Http::CodecType::HTTP3
                                   ? "upstream_reset_before_response_started{protocol_error|QUIC_"
@@ -5925,7 +5927,7 @@ TEST_P(DownstreamProtocolIntegrationTest, DownstreamCxStats) {
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(512U, response->body().size());
 
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_tx_bytes_total", 512);
+  test_server_->waitForCounter("http.config_test.downstream_cx_tx_bytes_total", Ge(512));
 }
 
 // When upstream protocol is HTTP1, an OPTIONS request with no body will not

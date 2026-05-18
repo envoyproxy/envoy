@@ -24,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Stats configuration proto schema for ``envoy.stat_sinks.open_telemetry`` sink.
 // [#extension: envoy.stat_sinks.open_telemetry]
 
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message SinkConfig {
   // ConversionAction is used to convert a stat to a metric. If a stat matches,
   // the metric_name and static_metric_labels will be
@@ -94,4 +94,8 @@ message SinkConfig {
   // - ``envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig.ConversionAction``.
   // If stats are not matched, they will be directly converted to OTLP metrics as usual.
   xds.type.matcher.v3.Matcher custom_metric_conversions = 8;
+
+  // Maximum number of data points per request. If explicitly set to 0, there is no limit. If unset, it currently defaults to no limit.
+  // When the maximum number of data points is reached, the remaining data points will be sent in subsequent requests.
+  uint32 max_data_points_per_request = 10;
 }

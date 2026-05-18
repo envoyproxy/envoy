@@ -114,6 +114,16 @@ public:
   virtual void setSampled(bool sampled) PURE;
 
   /**
+   * @return whether this span will be exported to the tracing backend. The HTTP connection
+   * manager may skip finalize-time tag work for spans that return false, since those tags
+   * would be discarded by the driver anyway.
+   *
+   * If the driver cannot conclusively determine that the span will be dropped, it MUST
+   * return true so that the span is fully populated and suitable for export.
+   */
+  virtual bool exportedSpan() const PURE;
+
+  /**
    * When the startSpan() of tracer is called, the Envoy tracing decision is passed to the
    * tracer to help determine whether the span should be sampled.
    *

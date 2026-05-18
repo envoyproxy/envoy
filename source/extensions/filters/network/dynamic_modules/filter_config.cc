@@ -129,6 +129,7 @@ absl::StatusOr<DynamicModuleNetworkFilterConfigSharedPtr> newDynamicModuleNetwor
   if (config->in_module_config_ == nullptr) {
     return absl::InvalidArgumentError("Failed to initialize dynamic module network filter config");
   }
+  config->stat_creation_frozen_ = true;
   return config;
 }
 

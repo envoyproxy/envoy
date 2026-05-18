@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-echo "build --config=clang" >> user.bazelrc
+if [[ ! -f user.bazelrc ]] || ! grep -Fxq 'build --config=clang' user.bazelrc; then
+  echo -e "build --config=clang" >> user.bazelrc
+fi
 
 # Ideally we want this line so bazel doesn't pollute things outside of the devcontainer, but some of
 # API tooling (proto_sync) depends on symlink like bazel-bin.

@@ -485,9 +485,9 @@ TEST_F(CacheSessionsTest,
       .WillOnce([&](Event::Dispatcher&, AdjustedByteRange, GetBodyCallback&& cb) {
         cb(std::make_unique<Buffer::OwnedImpl>("abc"), EndStream::More);
       });
-  EXPECT_CALL(body_callback1, Call(Pointee(BufferStringEqual("abc")), EndStream::More));
-  EXPECT_CALL(body_callback2, Call(Pointee(BufferStringEqual("ab")), EndStream::More));
-  EXPECT_CALL(body_callback3, Call(Pointee(BufferStringEqual("bc")), EndStream::More));
+  EXPECT_CALL(body_callback1, Call(Pointee(BufferString("abc")), EndStream::More));
+  EXPECT_CALL(body_callback2, Call(Pointee(BufferString("ab")), EndStream::More));
+  EXPECT_CALL(body_callback3, Call(Pointee(BufferString("bc")), EndStream::More));
   progress->onBodyInserted(AdjustedByteRange(0, 3), false);
   pumpDispatcher();
   Mock::VerifyAndClearExpectations(mock_cache_reader);
@@ -503,7 +503,7 @@ TEST_F(CacheSessionsTest,
       .WillOnce([&](Event::Dispatcher&, AdjustedByteRange, GetBodyCallback&& cb) {
         cb(std::make_unique<Buffer::OwnedImpl>("abc"), EndStream::More);
       });
-  EXPECT_CALL(body_callback6, Call(Pointee(BufferStringEqual("abc")), EndStream::More));
+  EXPECT_CALL(body_callback6, Call(Pointee(BufferString("abc")), EndStream::More));
   result3->http_source_->getBody(AdjustedByteRange(0, 3), body_callback6.AsStdFunction());
   pumpDispatcher();
   Mock::VerifyAndClearExpectations(&body_callback6);
@@ -513,8 +513,8 @@ TEST_F(CacheSessionsTest,
       .WillOnce([&](Event::Dispatcher&, AdjustedByteRange, GetBodyCallback&& cb) {
         cb(std::make_unique<Buffer::OwnedImpl>("de"), EndStream::More);
       });
-  EXPECT_CALL(body_callback4, Call(Pointee(BufferStringEqual("de")), EndStream::More));
-  EXPECT_CALL(body_callback5, Call(Pointee(BufferStringEqual("de")), EndStream::More));
+  EXPECT_CALL(body_callback4, Call(Pointee(BufferString("de")), EndStream::More));
+  EXPECT_CALL(body_callback5, Call(Pointee(BufferString("de")), EndStream::More));
   progress->onBodyInserted(AdjustedByteRange(3, 5), false);
   pumpDispatcher();
   Http::TestResponseTrailerMapImpl trailers{{"x-test", "yes"}};
@@ -561,7 +561,7 @@ TEST_F(CacheSessionsTest, CacheHitGoesDirectlyToCachedResponses) {
               Call(Pointee(IsSupersetOfHeaders(*response_headers)), EndStream::More));
   result->http_source_->getHeaders(header_callback.AsStdFunction());
   MockFunction<void(Buffer::InstancePtr, EndStream)> body_callback1, body_callback2;
-  EXPECT_CALL(body_callback1, Call(Pointee(BufferStringEqual("abcde")), EndStream::More));
+  EXPECT_CALL(body_callback1, Call(Pointee(BufferString("abcde")), EndStream::More));
   EXPECT_CALL(*mock_cache_reader, getBody(_, RangeIs(0, 5), _))
       .WillOnce([&](Event::Dispatcher&, AdjustedByteRange, GetBodyCallback cb) {
         cb(std::make_unique<Buffer::OwnedImpl>("abcde"), EndStream::More);
@@ -839,6 +839,48 @@ TEST_F(CacheSessionsTest, RangeRequestWhenLengthIsUnknownReturnsNotSatisfiable) 
   ASSERT_THAT(result1, NotNull());
   result1->http_source_->getHeaders(headers_callback1.AsStdFunction());
   Mock::VerifyAndClearExpectations(&headers_callback1);
+}
+
+TEST_F(CacheSessionsTest, PassthroughWithUpstreamResetCallsGetHeadersCallbackWithNullPointer) {
+  Mock::VerifyAndClearExpectations(mock_cacheable_response_checker_.get());
+  EXPECT_CALL(*mock_cacheable_response_checker_, isCacheableResponse)
+      .Times(testing::AnyNumber())
+      .WillOnce(testing::Return(false));
+  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
+  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _)).Times(2);
+
+  ActiveLookupResultPtr result1;
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&result1](ActiveLookupResultPtr r) { result1 = std::move(r); });
+  pumpDispatcher();
+  consumeCallback(captured_lookup_callbacks_[0])(LookupResult{});
+  pumpDispatcher();
+  // Upstream request should have been sent.
+  ASSERT_THAT(fake_upstreams_.size(), Eq(1));
+  ASSERT_THAT(fake_upstream_get_headers_callbacks_.size(), Eq(1));
+  consumeCallback(fake_upstream_get_headers_callbacks_[0])(uncacheableResponseHeaders(),
+                                                           EndStream::End);
+  pumpDispatcher();
+  ASSERT_THAT(result1, NotNull());
+  EXPECT_THAT(result1->status_, Eq(CacheEntryStatus::Uncacheable));
+
+  ActiveLookupResultPtr result2;
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&result2](ActiveLookupResultPtr r) { result2 = std::move(r); });
+  pumpDispatcher();
+  ASSERT_THAT(result2, NotNull());
+  EXPECT_THAT(result2->status_, Eq(CacheEntryStatus::Uncacheable));
+  ASSERT_THAT(fake_upstreams_.size(), Eq(2));
+  ASSERT_THAT(fake_upstream_get_headers_callbacks_.size(), Eq(2));
+  EXPECT_THAT(fake_upstream_get_headers_callbacks_[1], IsNull());
+  Http::ResponseHeaderMapPtr headers2;
+  result2->http_source_->getHeaders(
+      [&headers2](Http::ResponseHeaderMapPtr h, EndStream) { headers2 = std::move(h); });
+  ASSERT_THAT(fake_upstream_get_headers_callbacks_[1], NotNull());
+  // Simulate an upstream reset by calling the get headers callback with a nullptr and reset end
+  // stream.
+  consumeCallback(fake_upstream_get_headers_callbacks_[1])(nullptr, EndStream::Reset);
+  EXPECT_THAT(headers2, IsNull());
 }
 
 // TODO: UpdateHeadersSkipSpecificHeaders

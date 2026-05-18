@@ -521,7 +521,7 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarking) {
   EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark());
   request->setWatermarkCallbacks(watermark_callbacks);
 
-  EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(""), true));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferString(""), true));
   Buffer::OwnedImpl empty;
   request->sendData(empty, true);
 
@@ -1161,7 +1161,7 @@ TEST_F(AsyncClientImplTest, RetryWithStream) {
   TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
-  EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual("test body"), true));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferString("test body"), true));
 
   headers.setReferenceEnvoyRetryOn(Headers::get().EnvoyRetryOnValues._5xx);
   AsyncClient::Stream* stream = client_.start(stream_callbacks_, {});
@@ -1185,7 +1185,7 @@ TEST_F(AsyncClientImplTest, RetryWithStream) {
           }));
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
-  EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual("test body"), true));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferString("test body"), true));
   timer_->invokeCallback();
 
   // Normal response.
@@ -1220,7 +1220,7 @@ TEST_F(AsyncClientImplTest, DataBufferForRetryOverflow) {
   const std::string body_str((1 << 16) + 1, 'a');
   Buffer::InstancePtr large_body{new Buffer::OwnedImpl(body_str)};
 
-  EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(body_str), true));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferString(body_str), true));
 
   headers.setReferenceEnvoyRetryOn(Headers::get().EnvoyRetryOnValues._5xx);
   AsyncClient::Stream* stream = client_.start(stream_callbacks_, {});
@@ -1266,7 +1266,7 @@ TEST_F(AsyncClientImplTest, DataBufferForRetryWithLargerBufferLimit) {
   const std::string body_str((1 << 16) + 1, 'a');
   Buffer::InstancePtr large_body{new Buffer::OwnedImpl(body_str)};
 
-  EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(body_str), true));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferString(body_str), true));
 
   headers.setReferenceEnvoyRetryOn(Headers::get().EnvoyRetryOnValues._5xx);
   // Set buffer limit to larger than body size.
@@ -1292,7 +1292,7 @@ TEST_F(AsyncClientImplTest, DataBufferForRetryWithLargerBufferLimit) {
           }));
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
-  EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(body_str), true));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferString(body_str), true));
   timer_->invokeCallback();
 
   // Normal response.

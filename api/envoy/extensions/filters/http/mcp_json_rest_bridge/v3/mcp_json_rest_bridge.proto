@@ -96,6 +96,26 @@ message McpJsonRestBridge {
 
   // Configuration for the MCP tools.
   ServerToolConfig tool_config = 2;
+
+  // Maximum size of the request body to buffer for transcoding and validation.
+  // If the request body exceeds this size, the request is rejected with ``413 Payload Too Large``.
+  // This limit applies to prevent unbounded buffering.
+  //
+  // It defaults to 64KB (65536 bytes) as the MCP calls (tools, resources, or prompts)
+  // only pass small arguments or identifiers.
+  //
+  // Setting it to 0 would disable the limit. It is not recommended to do so in production.
+  google.protobuf.UInt32Value max_request_body_size = 3;
+
+  // Maximum size of the response body to buffer for transcoding.
+  // If the response body exceeds this size, the response is rejected with an appropriate error.
+  // This limit applies to prevent unbounded buffering.
+  //
+  // It defaults to 1MB (1048576 bytes) to prevent transcoding failures on large payloads like
+  // file reads, while aligning with Envoy's standard default connection buffer limit.
+  //
+  // Setting it to 0 would disable the limit. It is not recommended to do so in production.
+  google.protobuf.UInt32Value max_response_body_size = 4;
 }
 
 // Configuration for the server metadata.

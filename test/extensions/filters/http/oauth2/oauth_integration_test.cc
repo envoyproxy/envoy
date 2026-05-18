@@ -10,6 +10,8 @@
 #include "absl/strings/escaping.h"
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -576,10 +578,10 @@ TEST_P(OauthIntegrationTest, AuthenticationFlow) {
   EXPECT_EQ(test_server_->counter("sds.hmac.update_success")->value(), 1);
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("token_secret_1.yaml"),
                               TestEnvironment::temporaryPath("token_secret.yaml"));
-  test_server_->waitForCounterEq("sds.token.update_success", 2, std::chrono::milliseconds(5000));
+  test_server_->waitForCounter("sds.token.update_success", Eq(2), std::chrono::milliseconds(5000));
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("hmac_secret_1.yaml"),
                               TestEnvironment::temporaryPath("hmac_secret.yaml"));
-  test_server_->waitForCounterEq("sds.hmac.update_success", 2, std::chrono::milliseconds(5000));
+  test_server_->waitForCounter("sds.hmac.update_success", Eq(2), std::chrono::milliseconds(5000));
   // 3. Do another one authentication flow.
   doAuthenticationFlow("token_secret_1", "hmac_secret_1", TEST_STATE_CSRF_TOKEN_1,
                        TEST_ENCODED_STATE_1, TEST_ENCRYPTED_CODE_VERIFIER_1);
@@ -601,10 +603,10 @@ TEST_P(OauthIntegrationTest, RefreshTokenFlow) {
   EXPECT_EQ(test_server_->counter("sds.hmac.update_success")->value(), 1);
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("token_secret_1.yaml"),
                               TestEnvironment::temporaryPath("token_secret.yaml"));
-  test_server_->waitForCounterEq("sds.token.update_success", 2, std::chrono::milliseconds(5000));
+  test_server_->waitForCounter("sds.token.update_success", Eq(2), std::chrono::milliseconds(5000));
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("hmac_secret_1.yaml"),
                               TestEnvironment::temporaryPath("hmac_secret.yaml"));
-  test_server_->waitForCounterEq("sds.hmac.update_success", 2, std::chrono::milliseconds(5000));
+  test_server_->waitForCounter("sds.hmac.update_success", Eq(2), std::chrono::milliseconds(5000));
   // 3. Do another one refresh token flow.
   doRefreshTokenFlow("token_secret_1", "hmac_secret_1");
 }
@@ -677,8 +679,8 @@ TEST_P(OauthIntegrationTest, LoadListenerAfterServerIsInitialized) {
 
   // add listener with oauth2 filter and sds configs
   sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "delayed");
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 2);
-  test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", 0);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(2));
+  test_server_->waitForGauge("listener_manager.total_listeners_warming", Eq(0));
 
   doAuthenticationFlow("token_secret", "hmac_secret", TEST_STATE_CSRF_TOKEN, TEST_ENCODED_STATE,
                        TEST_ENCRYPTED_CODE_VERIFIER);
@@ -830,10 +832,10 @@ TEST_P(OauthUseRefreshTokenDisabled, FailRefreshTokenFlow) {
   EXPECT_EQ(test_server_->counter("sds.hmac.update_success")->value(), 1);
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("token_secret_1.yaml"),
                               TestEnvironment::temporaryPath("token_secret.yaml"));
-  test_server_->waitForCounterEq("sds.token.update_success", 2, std::chrono::milliseconds(5000));
+  test_server_->waitForCounter("sds.token.update_success", Eq(2), std::chrono::milliseconds(5000));
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("hmac_secret_1.yaml"),
                               TestEnvironment::temporaryPath("hmac_secret.yaml"));
-  test_server_->waitForCounterEq("sds.hmac.update_success", 2, std::chrono::milliseconds(5000));
+  test_server_->waitForCounter("sds.hmac.update_success", Eq(2), std::chrono::milliseconds(5000));
   // 3. Do one refresh token flow. This should fail.
   doRefreshTokenFlow("token_secret_1", "hmac_secret_1", /* expect_failure */ true);
 }
@@ -896,7 +898,7 @@ TEST_P(OauthIntegrationTest, HmacChangeCausesReauth) {
   EXPECT_EQ(test_server_->counter("sds.hmac.update_success")->value(), 1);
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("hmac_secret_1.yaml"),
                               TestEnvironment::temporaryPath("hmac_secret.yaml"));
-  test_server_->waitForCounterEq("sds.hmac.update_success", 2, std::chrono::milliseconds(5000));
+  test_server_->waitForCounter("sds.hmac.update_success", Eq(2), std::chrono::milliseconds(5000));
 
   // 3. Make another request with the saved cookies after HMAC secret was changed
   codec_client_ = makeHttpConnection(lookupPort("http"));
