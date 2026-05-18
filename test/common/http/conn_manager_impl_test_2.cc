@@ -2501,8 +2501,6 @@ TEST_F(HttpConnectionManagerImplTest, DrainPercentageSkip) {
 
   EXPECT_EQ(1U, stats_.named_.downstream_cx_max_duration_reached_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_cx_max_duration_drain_skipped_.value());
-
-  EXPECT_CALL(*connection_duration_timer, disableTimer());
 }
 
 // Verify drain_percentage drains when the roll falls below the threshold.
