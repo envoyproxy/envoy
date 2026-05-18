@@ -1714,3 +1714,5 @@ kbps
 dataset
 datasets
 smartptr
+JA3
+JA4
