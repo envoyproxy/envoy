@@ -46,8 +46,9 @@ public:
    * @param token_request the GcpTokenRequest proto containing the request details.
    * @param callbacks the callbacks to be notified when the token fetch completes.
    */
-  virtual void fetchToken(const envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest& token_request,
-                          Callbacks& callbacks) PURE;
+  virtual void
+  fetchToken(const envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest& token_request,
+             Callbacks& callbacks) PURE;
 
   /**
    * Cancel the active request.

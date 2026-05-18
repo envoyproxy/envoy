@@ -301,13 +301,14 @@ TEST_F(GcpAuthnFilterTest, GcpTokenRequestSuccess) {
   // Set up new mock filter metadata using GcpTokenRequest.
   cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_));
-  
+
   envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
   token_request.mutable_jwt()->set_audience("test_audience_new");
 
-  (*metadata_.mutable_typed_filter_metadata())
-      [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-          .PackFrom(token_request);
+  (*metadata_
+        .mutable_typed_filter_metadata())[std::string(
+                                              Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+      .PackFrom(token_request);
   ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
 
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
