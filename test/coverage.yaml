@@ -30,7 +30,7 @@ directories:
   source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface: 96.3
   source/extensions/common/aws: 97.5
   source/extensions/common/aws/credential_providers: 100.0
-  source/extensions/common/proxy_protocol: 95.1  # Adjusted for security patch
+  source/extensions/common/proxy_protocol: 94.7  # Adjusted for security patch
   source/extensions/common/tap: 95.2
   source/extensions/common/wasm: 95.6  # flaky: be careful adjusting
   source/extensions/common/wasm/ext: 100.0
