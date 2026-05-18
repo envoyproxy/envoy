@@ -39,6 +39,9 @@ constexpr char DefaultConfig[] = R"EOF(
       num_retries: 5
   )EOF";
 
+// A mock GCE Identity Token (JWT) originally from token_cache_test.cc.
+// Payload: {"iss":"https://example.com","sub":"test@example.com", "aud":"example_service", "exp":2001001001}
+// Expiration corresponds to Sun May 29 2033 13:36:41 GMT.
 constexpr absl::string_view GoodTokenStr =
     "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUu"
     "Y29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiY"
