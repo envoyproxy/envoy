@@ -134,9 +134,9 @@ TEST_F(GcpAuthnFilterTest, Success) {
   // Create the client object.
   createClient();
 
-  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
-  audience.set_url("http://test_audience");
-  client_->fetchToken(audience, request_callbacks_);
+  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
+  token_request.mutable_jwt()->set_audience("http://test_audience");
+  client_->fetchToken(token_request, request_callbacks_);
   EXPECT_EQ(message_->headers().Method()->value().getStringView(), "GET");
   EXPECT_EQ(message_->headers().Path()->value().getStringView(),
             "/computeMetadata/v1/instance/service-accounts/default/identity?audience=http://"
@@ -185,9 +185,9 @@ TEST_F(GcpAuthnFilterTest, NoCluster) {
   TestUtility::loadFromYaml(no_cluster_config, config);
   overrideConfig(config);
   createClient();
-  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
-  audience.set_url("http://test_audience");
-  client_->fetchToken(audience, request_callbacks_);
+  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
+  token_request.mutable_jwt()->set_audience("http://test_audience");
+  client_->fetchToken(token_request, request_callbacks_);
 }
 
 TEST_F(GcpAuthnFilterTest, Failure) {
@@ -195,9 +195,9 @@ TEST_F(GcpAuthnFilterTest, Failure) {
   // Create the client object.
   createClient();
   EXPECT_CALL(request_callbacks_, onComplete(_));
-  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
-  audience.set_url("http://test_audience");
-  client_->fetchToken(audience, request_callbacks_);
+  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
+  token_request.mutable_jwt()->set_audience("http://test_audience");
+  client_->fetchToken(token_request, request_callbacks_);
   client_callback_->onFailure(client_request_, Http::AsyncClient::FailureReason::Reset);
 }
 
@@ -206,9 +206,9 @@ TEST_F(GcpAuthnFilterTest, NotOkResponse) {
   // Create the client object.
   createClient();
 
-  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
-  audience.set_url("http://test_audience");
-  client_->fetchToken(audience, request_callbacks_);
+  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
+  token_request.mutable_jwt()->set_audience("http://test_audience");
+  client_->fetchToken(token_request, request_callbacks_);
 
   Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
       {":status", "504"},
@@ -224,9 +224,9 @@ TEST_F(GcpAuthnFilterTest, EmptyResponseHeader) {
   // Create the client object.
   createClient();
 
-  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
-  audience.set_url("http://test_audience");
-  client_->fetchToken(audience, request_callbacks_);
+  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
+  token_request.mutable_jwt()->set_audience("http://test_audience");
+  client_->fetchToken(token_request, request_callbacks_);
 
   Envoy::Http::ResponseHeaderMapPtr empty_resp_headers(
       new Envoy::Http::TestResponseHeaderMapImpl({}));
@@ -292,6 +292,36 @@ TEST_F(GcpAuthnFilterTest, DestroyFilter) {
   filter_->onDestroy();
   // onDestroy() call is expected to update the state from `Calling` to `Complete`.
   EXPECT_EQ(filter_->state(), GcpAuthnFilter::State::Complete);
+}
+
+TEST_F(GcpAuthnFilterTest, GcpTokenRequestSuccess) {
+  setupMockObjects();
+  setupFilterAndCallback();
+
+  // Set up new mock filter metadata using GcpTokenRequest.
+  cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_));
+  
+  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
+  token_request.mutable_jwt()->set_audience("test_audience_new");
+
+  (*metadata_.mutable_typed_filter_metadata())
+      [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+          .PackFrom(token_request);
+  ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
+
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  response->body().add(std::string(GoodTokenStr));
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  client_callback_->onSuccess(client_request_, std::move(response));
 }
 
 } // namespace

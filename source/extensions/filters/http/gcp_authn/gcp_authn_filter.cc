@@ -14,6 +14,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/jwt/jwt.h"
 #include "source/common/jwt/status.h"
+#include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 
 #include "absl/status/statusor.h"
@@ -36,6 +37,40 @@ void addTokenToRequest(Http::RequestHeaderMap& hdrs, absl::string_view token_str
     hdrs.setCopy(Http::LowerCaseString(header.name()), id_token);
   }
 }
+
+absl::optional<envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest>
+retrieveTokenRequest(Upstream::ThreadLocalCluster* cluster) {
+  if (cluster == nullptr) {
+    return absl::nullopt;
+  }
+
+  auto filter_metadata = cluster->info()->metadata().typed_filter_metadata();
+  const auto filter_it = filter_metadata.find(std::string(FilterName));
+  if (filter_it == filter_metadata.end()) {
+    return absl::nullopt;
+  }
+
+  // 1. Try to unpack as the new GcpTokenRequest first.
+  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
+  if (MessageUtil::unpackTo(filter_it->second, token_request).ok()) {
+    try {
+      MessageUtil::validate(token_request, ProtobufMessage::getStrictValidationVisitor());
+      return token_request;
+    } catch (const EnvoyException& e) {
+      ENVOY_LOG_MISC(debug, "GcpTokenRequest validation failed: {}", e.what());
+      return absl::nullopt;
+    }
+  }
+
+  // 2. Fall back to unpacking the legacy Audience message and map it transparently.
+  envoy::extensions::filters::http::gcp_authn::v3::Audience legacy_audience;
+  if (MessageUtil::unpackTo(filter_it->second, legacy_audience).ok()) {
+    token_request.mutable_jwt()->set_audience(legacy_audience.url());
+    return token_request;
+  }
+
+  return absl::nullopt;
+}
 } // namespace
 
 using ::Envoy::Router::RouteConstSharedPtr;
@@ -57,18 +92,12 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
       context_.serverFactoryContext().clusterManager().getThreadLocalCluster(
           route->routeEntry()->clusterName());
 
-  if (cluster != nullptr) {
-    // The `audience` is passed to filter through cluster metadata.
-    auto filter_metadata = cluster->info()->metadata().typed_filter_metadata();
-    const auto filter_it = filter_metadata.find(std::string(FilterName));
-    if (filter_it != filter_metadata.end()) {
-      THROW_IF_NOT_OK(MessageUtil::unpackTo(filter_it->second, audience_proto_));
-    }
-  }
+  auto token_request_opt = retrieveTokenRequest(cluster);
 
-  if (!audience_proto_.url().empty()) {
+  if (token_request_opt.has_value()) {
+    token_request_ = token_request_opt.value();
     if (jwt_token_cache_ != nullptr) {
-      auto token = jwt_token_cache_->lookUp(audience_proto_);
+      auto token = jwt_token_cache_->lookUp(token_request_);
       if (token.has_value()) {
         // If token is found in the cache, we add the token string to the request directly and
         // continue the filter chain iteration.
@@ -80,7 +109,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
     // Save the pointer to the request headers for header manipulation based on http response later.
     request_header_map_ = &hdrs;
 
-    client_->fetchToken(audience_proto_, *this);
+    client_->fetchToken(token_request_, *this);
     initiating_call_ = false;
   } else {
     // There is no need to fetch the token if no audience is specified because no
@@ -113,7 +142,7 @@ void GcpAuthnFilter::onComplete(absl::StatusOr<GcpToken> token) {
       }
       if (jwt_token_cache_ != nullptr) {
         // Insert the token into cache along with the ownership transfer.
-        jwt_token_cache_->insert(audience_proto_, std::make_unique<GcpToken>(token_val));
+        jwt_token_cache_->insert(token_request_, std::make_unique<GcpToken>(token_val));
       }
     } else {
       ENVOY_LOG(error, "Failed to fetch token: {}", token.status().message());

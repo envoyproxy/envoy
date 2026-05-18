@@ -96,9 +96,9 @@ TEST_F(GcpAuthnClientImplTest, Success) {
   setupMockObjects();
   createClient();
 
-  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
-  audience.set_url("http://test_audience");
-  client_->fetchToken(audience, request_callbacks_);
+  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
+  token_request.mutable_jwt()->set_audience("http://test_audience");
+  client_->fetchToken(token_request, request_callbacks_);
   EXPECT_EQ(message_->headers().Method()->value().getStringView(), "GET");
   EXPECT_EQ(message_->headers().Path()->value().getStringView(),
             "/computeMetadata/v1/instance/service-accounts/default/identity?audience=http://"
@@ -145,18 +145,18 @@ TEST_F(GcpAuthnClientImplTest, NoCluster) {
   TestUtility::loadFromYaml(no_cluster_config, config);
   config_ = config;
   createClient();
-  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
-  audience.set_url("http://test_audience");
-  client_->fetchToken(audience, request_callbacks_);
+  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
+  token_request.mutable_jwt()->set_audience("http://test_audience");
+  client_->fetchToken(token_request, request_callbacks_);
 }
 
 TEST_F(GcpAuthnClientImplTest, Failure) {
   setupMockObjects();
   createClient();
   EXPECT_CALL(request_callbacks_, onComplete(_));
-  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
-  audience.set_url("http://test_audience");
-  client_->fetchToken(audience, request_callbacks_);
+  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
+  token_request.mutable_jwt()->set_audience("http://test_audience");
+  client_->fetchToken(token_request, request_callbacks_);
   client_callback_->onFailure(client_request_, Http::AsyncClient::FailureReason::Reset);
 }
 
@@ -164,9 +164,9 @@ TEST_F(GcpAuthnClientImplTest, NotOkResponse) {
   setupMockObjects();
   createClient();
 
-  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
-  audience.set_url("http://test_audience");
-  client_->fetchToken(audience, request_callbacks_);
+  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
+  token_request.mutable_jwt()->set_audience("http://test_audience");
+  client_->fetchToken(token_request, request_callbacks_);
 
   Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
       {":status", "504"},
@@ -181,9 +181,9 @@ TEST_F(GcpAuthnClientImplTest, EmptyResponseHeader) {
   setupMockObjects();
   createClient();
 
-  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
-  audience.set_url("http://test_audience");
-  client_->fetchToken(audience, request_callbacks_);
+  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
+  token_request.mutable_jwt()->set_audience("http://test_audience");
+  client_->fetchToken(token_request, request_callbacks_);
 
   Envoy::Http::ResponseHeaderMapPtr empty_resp_headers(
       new Envoy::Http::TestResponseHeaderMapImpl({}));
@@ -197,9 +197,9 @@ TEST_F(GcpAuthnClientImplTest, Cancel) {
   setupMockObjects();
   createClient();
 
-  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
-  audience.set_url("http://test_audience");
-  client_->fetchToken(audience, request_callbacks_);
+  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
+  token_request.mutable_jwt()->set_audience("http://test_audience");
+  client_->fetchToken(token_request, request_callbacks_);
 
   EXPECT_CALL(client_request_, cancel());
   client_->cancel();
@@ -221,9 +221,9 @@ TEST_F(GcpAuthnClientImplTest, NoRetryPolicy) {
   setupMockObjects();
   createClient();
 
-  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
-  audience.set_url("http://test_audience");
-  client_->fetchToken(audience, request_callbacks_);
+  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
+  token_request.mutable_jwt()->set_audience("http://test_audience");
+  client_->fetchToken(token_request, request_callbacks_);
 
   EXPECT_FALSE(options_.retry_policy.has_value());
 }

@@ -43,10 +43,10 @@ public:
   /**
    * Fetch a token.
    *
-   * @param audience the Audience proto containing the audience URL.
+   * @param token_request the GcpTokenRequest proto containing the request details.
    * @param callbacks the callbacks to be notified when the token fetch completes.
    */
-  virtual void fetchToken(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+  virtual void fetchToken(const envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest& token_request,
                           Callbacks& callbacks) PURE;
 
   /**

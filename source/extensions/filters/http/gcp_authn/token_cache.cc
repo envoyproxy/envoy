@@ -5,16 +5,15 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GcpAuthn {
 
-absl::optional<std::string>
-TokenCacheImpl::lookUp(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience) {
-  std::string key = audience.SerializeAsString();
+absl::optional<std::string> TokenCacheImpl::lookUp(
+    const envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest& token_request) {
+  std::string key = token_request.SerializeAsString();
   typename LRUCache::ScopedLookup lookup(&lru_cache_, key);
   if (lookup.found()) {
     GcpToken* const found_token = lookup.value();
     // Verify the validness of the token by checking its expiration time field.
     if (found_token->expires_at_ > 0 &&
-        DateUtil::nowToSeconds(time_source_) + JwtVerify::kClockSkewInSecond >
-            found_token->expires_at_) {
+        DateUtil::nowToSeconds(time_source_) + JwtVerify::kClockSkewInSecond > found_token->expires_at_) {
       // Remove the expired entry.
       lru_cache_.remove(key);
       return absl::nullopt;
@@ -27,9 +26,9 @@ TokenCacheImpl::lookUp(const envoy::extensions::filters::http::gcp_authn::v3::Au
 }
 
 void TokenCacheImpl::insert(
-    const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+    const envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest& token_request,
     std::unique_ptr<GcpToken> token) {
-  std::string key = audience.SerializeAsString();
+  std::string key = token_request.SerializeAsString();
   // Release the token to transfer the ownership.
   lru_cache_.insert(key, token.release(), 1);
 }

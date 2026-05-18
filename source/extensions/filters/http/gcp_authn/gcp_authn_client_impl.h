@@ -28,7 +28,7 @@ public:
   void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 
   // GcpAuthnClient implemented by this class.
-  void fetchToken(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+  void fetchToken(const envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest& token_request,
                   GcpAuthnClient::Callbacks& callbacks) override;
   void cancel() override;
 

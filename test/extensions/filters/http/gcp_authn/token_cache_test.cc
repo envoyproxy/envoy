@@ -47,36 +47,36 @@ public:
 
 TEST_F(TokenCacheTest, ValidToken) {
   EXPECT_EQ(token_cache_->capacity(), 100);
-  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
-  audience.set_url("http://example_service");
+  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
+  token_request.mutable_jwt()->set_audience("http://example_service");
 
   auto token = std::make_unique<GcpToken>();
   token->token_ = "foo";
   token->expires_at_ = ExpTime;
 
-  token_cache_->insert(audience, std::move(token));
-  auto found_token = token_cache_->lookUp(audience);
+  token_cache_->insert(token_request, std::move(token));
+  auto found_token = token_cache_->lookUp(token_request);
   EXPECT_TRUE(found_token.has_value());
   EXPECT_EQ(found_token.value(), "foo");
 }
 
 TEST_F(TokenCacheTest, ExpiredToken) {
-  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
-  audience.set_url("http://example_service");
+  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
+  token_request.mutable_jwt()->set_audience("http://example_service");
 
   auto token = std::make_unique<GcpToken>();
   token->token_ = "foo";
   token->expires_at_ = 1205005587; // Sat Mar 08 2008 14:46:27 GMT-0500
 
-  token_cache_->insert(audience, std::move(token));
-  auto found_token = token_cache_->lookUp(audience);
+  token_cache_->insert(token_request, std::move(token));
+  auto found_token = token_cache_->lookUp(token_request);
   EXPECT_FALSE(found_token.has_value());
 }
 
 // Test the token with the clock skew.
 TEST_F(TokenCacheTest, TokenWithClockSkew) {
-  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
-  audience.set_url("http://example_service");
+  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
+  token_request.mutable_jwt()->set_audience("http://example_service");
 
   // Set the time to exp_time + 1s.
   // i.e., The expiration time in the token is Sun May 29 2033 13:36:41 GMT and the time we
@@ -88,8 +88,8 @@ TEST_F(TokenCacheTest, TokenWithClockSkew) {
   token->token_ = "foo";
   token->expires_at_ = ExpTime;
 
-  token_cache_->insert(audience, std::move(token));
-  auto found_token = token_cache_->lookUp(audience);
+  token_cache_->insert(token_request, std::move(token));
+  auto found_token = token_cache_->lookUp(token_request);
   EXPECT_FALSE(found_token.has_value());
 
   // Set the time to exp_time - 1s.
@@ -98,8 +98,8 @@ TEST_F(TokenCacheTest, TokenWithClockSkew) {
   token2->token_ = "foo";
   token2->expires_at_ = ExpTime;
 
-  token_cache_->insert(audience, std::move(token2));
-  found_token = token_cache_->lookUp(audience);
+  token_cache_->insert(token_request, std::move(token2));
+  found_token = token_cache_->lookUp(token_request);
   EXPECT_TRUE(found_token.has_value());
   EXPECT_EQ(found_token.value(), "foo");
 }

@@ -67,6 +67,19 @@ message Audience {
   string url = 1 [(validate.rules).string = {min_len: 1}];
 }
 
+// GcpTokenRequest represents a configuration to fetch a GCP token.
+message GcpTokenRequest {
+  message Jwt {
+    string audience = 1 [(validate.rules).string = {min_len: 1}];
+  }
+
+  oneof request_type {
+    option (validate.required) = true;
+
+    Jwt jwt = 1;
+  }
+}
+
 // Token Cache configuration.
 message TokenCacheConfig {
   // The number of cache entries. The maximum number of entries is INT64_MAX as it is constrained by underlying cache implementation.
