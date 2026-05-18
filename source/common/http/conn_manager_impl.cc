@@ -1146,7 +1146,10 @@ bool streamErrorOnlyErrors(absl::string_view error_details) {
   // TODO(#28555): make these errors respect the stream_error_on_invalid_http_message
   return error_details == UhvResponseCodeDetail::get().FragmentInUrlPath ||
          error_details == UhvResponseCodeDetail::get().EscapedSlashesInPath ||
-         error_details == UhvResponseCodeDetail::get().Percent00InPath;
+         error_details == UhvResponseCodeDetail::get().Percent00InPath ||
+         (error_details == UhvResponseCodeDetail::get().InvalidUnderscore &&
+          Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.http2_h3_send_400_for_underscored_headers"));
 }
 } // namespace
 
@@ -1314,12 +1317,11 @@ bool ConnectionManagerImpl::ActiveStream::validateTrailers(RequestTrailerMap& tr
   if (use_legacy_reset) {
     filter_manager_.streamInfo().setResponseCodeDetails(failure_details);
     resetStream();
+    if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
+      connection_manager_.handleCodecError(failure_details);
+    }
   } else {
     sendLocalReply(Code::BadRequest, "", nullptr, grpc_status, failure_details);
-  }
-
-  if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
-    connection_manager_.handleCodecError(failure_details);
   }
   return false;
 }
