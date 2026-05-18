@@ -315,6 +315,7 @@ public:
                TimeSource& time_source, Random::RandomGenerator& random);
 
   // Http::PassThroughFilter
+  void onDestroy() override;
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override;
 
@@ -356,6 +357,7 @@ private:
   std::string original_request_url_;
   Http::RequestHeaderMap* request_headers_{nullptr};
   bool was_refresh_token_flow_{false};
+  bool destroyed_{false};
 
   std::unique_ptr<OAuth2Client> oauth_client_;
   FilterConfigSharedPtr config_;

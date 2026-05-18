@@ -577,6 +577,11 @@ OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
  * 4) user is authorized
  * 5) user is unauthorized
  */
+void OAuth2Filter::onDestroy() {
+  destroyed_ = true;
+  oauth_client_.reset();
+}
+
 Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   // Decrypt the OAuth tokens and update the corresponding cookies in the request headers
   // before forwarding the request upstream. This step must occur early to ensure that
@@ -1134,6 +1139,9 @@ void OAuth2Filter::onGetAccessTokenSuccess(const std::string& access_code,
                                            const std::string& id_token,
                                            const std::string& refresh_token,
                                            std::chrono::seconds expires_in) {
+  if (destroyed_) {
+    return;
+  }
   updateTokens(access_code, id_token, refresh_token, expires_in);
   finishGetAccessTokenFlow();
 }
@@ -1142,6 +1150,9 @@ void OAuth2Filter::onRefreshAccessTokenSuccess(const std::string& access_code,
                                                const std::string& id_token,
                                                const std::string& refresh_token,
                                                std::chrono::seconds expires_in) {
+  if (destroyed_) {
+    return;
+  }
   ASSERT(config_->useRefreshToken());
   updateTokens(access_code, id_token, refresh_token, expires_in);
   finishRefreshAccessTokenFlow();
@@ -1214,6 +1225,9 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
 }
 
 void OAuth2Filter::onRefreshAccessTokenFailure() {
+  if (destroyed_) {
+    return;
+  }
   config_->stats().oauth_refreshtoken_failure_.inc();
   // We failed to get an access token via the refresh token, so send the user to the oauth endpoint.
   if (canRedirectToOAuthServer(*request_headers_)) {
@@ -1281,6 +1295,9 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
 }
 
 void OAuth2Filter::sendUnauthorizedResponse() {
+  if (destroyed_) {
+    return;
+  }
   config_->stats().oauth_failure_.inc();
   decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, UnauthorizedBodyMessage, nullptr,
                                      absl::nullopt, EMPTY_STRING);

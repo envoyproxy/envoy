@@ -1030,6 +1030,49 @@ TEST_F(OAuth2Test, SetBearerToken) {
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_success").value(), 1);
 }
 
+// Regression test for incident-23729: OAuth2 filter use-after-free.
+// The filter's async token callback uses decoder_callbacks_ after onDestroy().
+TEST_F(OAuth2Test, UseAfterFreeOnStreamReset) {
+  init(getConfig(false, true));
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
+      {Http::Headers::get().Cookie.get(),
+       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+  EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
+                                                  "https://traffic.example.com" + TEST_CALLBACK,
+                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+            filter_->decodeHeaders(request_headers, false));
+
+  // Simulate downstream stream destroyed (H2 RST_STREAM).
+  filter_->onDestroy();
+
+  // Simulate the decoder_callbacks_ object being freed, as happens in production
+  // when the H2 stream is destroyed. We do this by creating a new mock on the heap,
+  // pointing the filter at it, then deleting it — leaving a dangling pointer.
+  auto* doomed_callbacks = new NiceMock<Http::MockStreamDecoderFilterCallbacks>();
+  filter_->setDecoderFilterCallbacks(*doomed_callbacks);
+  delete doomed_callbacks;
+
+  // Simulate token callback firing after stream destruction.
+  // The filter will try to use the now-freed decoder_callbacks_.
+  // ASAN will detect the heap-use-after-free.
+  filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
+                                   std::chrono::seconds(600));
+}
+
 TEST_F(OAuth2Test, SetBearerTokenWithEncryptionDisabled) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({{"envoy.reloadable_features.oauth2_encrypt_tokens", "false"}});
