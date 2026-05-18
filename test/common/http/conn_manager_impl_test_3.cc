@@ -2223,10 +2223,10 @@ TEST_F(HttpConnectionManagerImplTest,
        HeaderValidatorRejectTrailersBeforeResponseHttp2SendsLocalReply) {
   codec_->protocol_ = Protocol::Http2;
   setup();
-  expectUhvTrailerCheck(HeaderValidator::ValidationResult(
-                            HeaderValidator::ValidationResult::Action::Reject,
-                            "uhv.unexpected_underscore"),
-                        HeaderValidator::TransformationResult::success());
+  expectUhvTrailerCheck(
+      HeaderValidator::ValidationResult(HeaderValidator::ValidationResult::Action::Reject,
+                                        "uhv.unexpected_underscore"),
+      HeaderValidator::TransformationResult::success());
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
