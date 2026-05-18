@@ -647,6 +647,11 @@ void OAuth2Filter::resolveAndSetActiveConfig() {
  * 4) user is authorized
  * 5) user is unauthorized
  */
+void OAuth2Filter::onDestroy() {
+  destroyed_ = true;
+  oauth_client_.reset();
+}
+
 Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   // Sanitize OAuth status headers unconditionally at the start of the filter to prevent clients
   // from spoofing them. These headers are only supposed to be set by the OAuth2 filter itself.
@@ -1242,6 +1247,9 @@ void OAuth2Filter::onGetAccessTokenSuccess(const std::string& access_code,
                                            const std::string& id_token,
                                            const std::string& refresh_token,
                                            std::chrono::seconds expires_in) {
+  if (destroyed_) {
+    return;
+  }
   updateTokens(access_code, id_token, refresh_token, expires_in);
   finishGetAccessTokenFlow();
 }
@@ -1250,6 +1258,9 @@ void OAuth2Filter::onRefreshAccessTokenSuccess(const std::string& access_code,
                                                const std::string& id_token,
                                                const std::string& refresh_token,
                                                std::chrono::seconds expires_in) {
+  if (destroyed_) {
+    return;
+  }
   ASSERT(config_->useRefreshToken());
   updateTokens(access_code, id_token, refresh_token, expires_in);
   finishRefreshAccessTokenFlow();
@@ -1325,6 +1336,9 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
 }
 
 Http::FilterHeadersStatus OAuth2Filter::onRefreshAccessTokenFailure() {
+  if (destroyed_) {
+    return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+  }
   config_->stats().oauth_refreshtoken_failure_.inc();
   // We failed to get an access token via the refresh token. Forward the request based on the
   // matcher configuration.
@@ -1440,6 +1454,9 @@ void OAuth2Filter::addFlowCookieDeletionHeaders(Http::ResponseHeaderMap& headers
 }
 
 void OAuth2Filter::sendUnauthorizedResponse(const std::string& details) {
+  if (destroyed_) {
+    return;
+  }
   ENVOY_STREAM_LOG(warn, "Responding with 401 Unauthorized. Cause: {}", *decoder_callbacks_,
                    details);
   config_->stats().oauth_failure_.inc();

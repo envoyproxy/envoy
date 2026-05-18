@@ -355,6 +355,7 @@ public:
                Random::RandomGenerator& random);
 
   // Http::PassThroughFilter
+  void onDestroy() override;
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override;
 
@@ -400,6 +401,7 @@ private:
   std::string flow_id_;
   Http::RequestHeaderMap* request_headers_{nullptr};
   bool was_refresh_token_flow_{false};
+  bool destroyed_{false};
 
   std::shared_ptr<OAuth2Client> oauth_client_;
   FilterConfigSharedPtr default_config_;
