@@ -18,7 +18,7 @@
 #include "test/fuzz/utility.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 

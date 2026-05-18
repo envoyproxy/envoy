@@ -5,7 +5,6 @@
 #include "test/mocks/network/connection.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/server/instance.h"
 
 #include "contrib/rocketmq_proxy/filters/network/source/config.h"
 #include "contrib/rocketmq_proxy/filters/network/source/conn_manager.h"

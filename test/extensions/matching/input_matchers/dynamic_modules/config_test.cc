@@ -3,7 +3,7 @@
 #include "source/extensions/matching/input_matchers/dynamic_modules/config.h"
 
 #include "test/extensions/dynamic_modules/util.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"

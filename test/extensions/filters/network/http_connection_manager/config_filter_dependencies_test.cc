@@ -6,7 +6,6 @@
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
 
 #include "gmock/gmock.h"
