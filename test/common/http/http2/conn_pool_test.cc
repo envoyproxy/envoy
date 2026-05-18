@@ -1094,6 +1094,30 @@ TEST_F(Http2ConnPoolImplTest, RemoteReset) {
   EXPECT_EQ(0U, cluster_->traffic_stats_->upstream_cx_active_.value());
 }
 
+TEST_F(Http2ConnPoolImplTest, RemoteResetNoError) {
+  InSequence s;
+
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  expectClientConnect(0, r1);
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, false));
+  EXPECT_TRUE(
+      r1.callbacks_.outer_encoder_
+          ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, false)
+          .ok());
+  r1.inner_encoder_.stream_.resetStream(Http::StreamResetReason::RemoteResetNoError);
+
+  test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_CALL(*this, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_remote_.value());
+  EXPECT_EQ(0U, cluster_->traffic_stats_->upstream_rq_rx_reset_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_rx_reset_no_error_.value());
+  EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.rq_open_.value());
+  EXPECT_EQ(0U, cluster_->traffic_stats_->upstream_cx_active_.value());
+}
+
 TEST_F(Http2ConnPoolImplTest, DrainDisconnectWithActiveRequest) {
   InSequence s;
   cluster_->max_requests_per_connection_ = 1;

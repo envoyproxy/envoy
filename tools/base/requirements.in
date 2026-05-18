@@ -1,24 +1,16 @@
-aio.api.bazel>=0.1.0
-aio.api.github>=0.3.0
-aio.core>=0.11.0
+aio.api.bazel>=0.1.1
+aio.api.github>=0.3.1
+aio.core>=0.11.1
 aiohttp>=3.13.3
 aioquic>=0.9.21
-dependatool>=0.3.0
-envoy.base.utils>=0.6.0
-envoy.ci.report>=0.1.0
-envoy.code.check>=0.6.0
-envoy.dependency.check>=0.2.0
-# 0.0.13 pins envoy-base-utils==0.5.11 (old-style strict pin) conflicting with >=0.6.0 era
-envoy.distribution.distrotest>=0.0.12
-# 0.1.0 has a contradictory envoy-github-release==0.1.0 / envoy.github.release==0.1.1.dev dep
-envoy.distribution.release>=0.0.9
-# 0.0.10 pins envoy-base-utils==0.5.11 (old-style strict pin) conflicting with >=0.6.0 era
-envoy.distribution.repo>=0.0.8
-envoy.distribution.verify>=0.1.0
-envoy.gpg.identity>=0.1.2
-envoy.gpg.sign>=0.3.0
-flake8>=6
-frozendict>=2.3.7
+dependatool>=0.3.1
+envoy.base.utils>=0.6.3
+envoy.ci.report>=0.1.1
+envoy.code.check>=0.6.3
+envoy.dependency.check>=0.2.1
+envoy.distribution.release>=0.1.2
+envoy.distribution.verify>=0.1.1
+envoy.gpg.sign>=0.3.1
 gitpython
 icalendar>=6.1.1
 orjson>=3.10.15

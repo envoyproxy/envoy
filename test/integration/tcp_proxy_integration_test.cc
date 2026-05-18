@@ -3121,4 +3121,63 @@ TEST_P(TcpProxyIntegrationTest, DownstreamClosedWithEndStreamNoData) {
   tcp_client->close();
 }
 
+// Test route delayed route selection based on filter state
+TEST_P(TcpProxyIntegrationTest, DelayRouteSelectionWithSetFilterStateOnData) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.tcp_proxy_delay_route_selection",
+                                    "true");
+  fake_upstreams_count_ = 2;
+  config_helper_.addNetworkFilter(R"EOF(
+name: envoy.filters.network.set_filter_state
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config
+  on_downstream_data:
+  - object_key: envoy.tcp_proxy.cluster
+    format_string:
+      text_format_source:
+        inline_string: "cluster_1"
+)EOF");
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Add cluster_1 configuration (cluster_0 already exists by default)
+    auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+    cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    cluster->set_name("cluster_1");
+
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* filter = filter_chain->mutable_filters(1);
+
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+    filter->typed_config().UnpackTo(&tcp_proxy);
+
+    tcp_proxy.set_upstream_connect_mode(
+        envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+    tcp_proxy.mutable_max_early_data_bytes()->set_value(1024);
+
+    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+  });
+
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // Wait to ensure no connection is established without data.
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_FALSE(fake_upstreams_[1]->waitForRawConnection(fake_upstream_connection,
+                                                        std::chrono::milliseconds(1000)));
+
+  // Now send actual data.
+  ASSERT_TRUE(tcp_client->write("data"));
+
+  // Connection should now be established.
+  ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(4));
+
+  tcp_client->close();
+
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_cx_total")->value());
+  EXPECT_EQ(1, test_server_->counter("tcp.tcpproxy_stats.route_delayed_total")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+}
+
 } // namespace Envoy

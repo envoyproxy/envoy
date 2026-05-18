@@ -6,6 +6,8 @@
 
 #include "source/common/config/metadata.h"
 #include "source/common/http/message_impl.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/clusters/dynamic_modules/cluster.h"
 
 #include "test/common/upstream/utility.h"
@@ -13,6 +15,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/connection.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
@@ -2119,6 +2122,149 @@ TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamConnectionSniNullResult) 
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
   EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni(
       context_ptr, nullptr));
+}
+
+namespace {
+
+// A filter state object that does not support serializeAsString — used to exercise the typed-get
+// "object does not support serialization" failure branch.
+class UnserializableFilterStateObject : public StreamInfo::FilterState::Object {};
+
+} // namespace
+
+// Test get_filter_state_bytes with nullptr context.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateBytesNullContext) {
+  std::string key = "k";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes(
+      nullptr, key_buf, &result));
+}
+
+// Test get_filter_state_bytes with nullptr result.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateBytesNullResult) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string key = "k";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes(
+      context_ptr, key_buf, nullptr));
+}
+
+// Test get_filter_state_bytes when the request has no stream info.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateBytesNoStreamInfo) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(nullptr));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string key = "k";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes(
+      context_ptr, key_buf, &result));
+}
+
+// Test get_filter_state_bytes when the key is not present.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateBytesNotFound) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string key = "missing";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes(
+      context_ptr, key_buf, &result));
+}
+
+// Test get_filter_state_bytes happy path: producer stored a StringAccessor; cluster reads it.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateBytesFound) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filter_state_->setData("k", std::make_unique<Router::StringAccessorImpl>("v"),
+                                     StreamInfo::FilterState::StateType::ReadOnly);
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string key = "k";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes(
+      context_ptr, key_buf, &result));
+  EXPECT_EQ("v", absl::string_view(result.ptr, result.length));
+}
+
+// Test get_filter_state_typed with nullptr context.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedNullContext) {
+  std::string key = "k";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+      nullptr, key_buf, &result));
+}
+
+// Test get_filter_state_typed with nullptr result.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedNullResult) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string key = "k";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+      context_ptr, key_buf, nullptr));
+}
+
+// Test get_filter_state_typed when the request has no stream info.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedNoStreamInfo) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(nullptr));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string key = "k";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+      context_ptr, key_buf, &result));
+}
+
+// Test get_filter_state_typed when the key is not present.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedNotFound) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string key = "missing";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+      context_ptr, key_buf, &result));
+}
+
+// Test get_filter_state_typed when the stored object does not support serialization.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedNotSerializable) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filter_state_->setData("k", std::make_unique<UnserializableFilterStateObject>(),
+                                     StreamInfo::FilterState::StateType::ReadOnly);
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string key = "k";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+      context_ptr, key_buf, &result));
+}
+
+// Test get_filter_state_typed happy path: producer stored a serializable object; cluster reads it.
+TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedFound) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filter_state_->setData("k", std::make_unique<Router::StringAccessorImpl>("typed-v"),
+                                     StreamInfo::FilterState::StateType::ReadOnly);
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string key = "k";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+      context_ptr, key_buf, &result));
+  EXPECT_EQ("typed-v", absl::string_view(result.ptr, result.length));
 }
 
 // =================================================================================================

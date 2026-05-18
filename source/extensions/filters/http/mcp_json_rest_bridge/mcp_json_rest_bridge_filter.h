@@ -24,6 +24,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace McpJsonRestBridge {
 
+inline constexpr char FilterName[] = "envoy.filters.http.mcp_json_rest_bridge";
+
 /**
  * Configuration for the MCP JSON REST Bridge filter.
  */
@@ -43,6 +45,11 @@ public:
   uint32_t maxRequestBodySize() const { return max_request_body_size_; }
   uint32_t maxResponseBodySize() const { return max_response_body_size_; }
   bool textContentStreamingEnabled() const;
+
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge::RequestStorageMode
+  requestStorageMode() const {
+    return proto_config_.request_storage_mode();
+  }
 
 private:
   absl::flat_hash_map<std::string,
@@ -93,6 +100,9 @@ private:
   // It sends local error response and return an error status if the validation
   // fails. Otherwise, it returns OK status.
   absl::Status validateJsonRpcIdAndMethod(const nlohmann::json& json_rpc);
+
+  // Sets dynamic metadata for the filter based on the MCP request method and parameters.
+  void setDynamicMetadata(absl::string_view method, const nlohmann::json& json_rpc);
 
   // Builds streaming_json_prefix_ and streaming_json_suffix_ for the tools/call streaming path.
   void buildStreamingPrefixAndSuffix(bool is_error);

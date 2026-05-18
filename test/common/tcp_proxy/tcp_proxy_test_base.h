@@ -54,11 +54,11 @@ inline Config constructConfigFromYaml(const std::string& yaml,
   return {tcp_proxy, context};
 }
 
-class TcpProxyTestBase : public testing::TestWithParam<bool> {
+class TcpProxyTestBase
+    : public testing::TestWithParam<absl::node_hash_map<std::string, std::string>> {
 public:
   TcpProxyTestBase() {
-    scoped_runtime_.mergeValues({{"envoy.restart_features.upstream_http_filters_with_tcp_proxy",
-                                  GetParam() ? "true" : "false"}});
+    scoped_runtime_.mergeValues(GetParam());
     ON_CALL(*factory_context_.server_factory_context_.access_log_manager_.file_, write(_))
         .WillByDefault(SaveArg<0>(&access_log_data_));
     ON_CALL(filter_callbacks_.connection_.stream_info_, setUpstreamClusterInfo(_))
@@ -77,6 +77,19 @@ public:
     if (filter_ != nullptr) {
       filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
     }
+  }
+
+  static std::vector<absl::node_hash_map<std::string, std::string>> getRuntimeFlagsForTest() {
+    std::vector<absl::node_hash_map<std::string, std::string>> parameters;
+    for (auto upstream_http_filters_value : {false, true}) {
+      for (auto delay_route_selection_value : {false, true}) {
+        parameters.push_back({{"envoy.restart_features.upstream_http_filters_with_tcp_proxy",
+                               upstream_http_filters_value ? "true" : "false"},
+                              {"envoy.reloadable_features.tcp_proxy_delay_route_selection",
+                               delay_route_selection_value ? "true" : "false"}});
+      }
+    }
+    return parameters;
   }
 
   void configure(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) {
