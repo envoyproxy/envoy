@@ -434,7 +434,7 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
     cookie.set_address(std::string(
         fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value())));
     cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
-                           std::chrono::steady_clock::now().time_since_epoch())
+                           std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
     cookie.SerializeToString(&address_string);
@@ -476,7 +476,7 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
     cookie.set_address(std::string(
         fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value())));
     cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
-                           std::chrono::steady_clock::now().time_since_epoch())
+                           std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
     cookie.SerializeToString(&address_string);
@@ -516,7 +516,7 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
     envoy::Cookie cookie;
     cookie.set_address(std::string("127.0.0.1:50000"));
     cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
-                           std::chrono::steady_clock::now().time_since_epoch())
+                           std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
     cookie.SerializeToString(&address_string);
@@ -599,7 +599,7 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
     cookie.set_address(std::string(
         fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value())));
     cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
-                           std::chrono::steady_clock::now().time_since_epoch())
+                           std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
     cookie.SerializeToString(&cookie_string);
@@ -640,7 +640,7 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
     cookie.set_address(std::string(
         fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value())));
     cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
-                           std::chrono::steady_clock::now().time_since_epoch())
+                           std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
     cookie.SerializeToString(&cookie_string);
@@ -681,7 +681,7 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
     std::string cookie_string;
     cookie.set_address(std::string("127.0.0.7:50000"));
     cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
-                           std::chrono::steady_clock::now().time_since_epoch())
+                           std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
     cookie.SerializeToString(&cookie_string);
@@ -928,7 +928,7 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionDisabledByRoute) {
     cookie.set_address(std::string(
         fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value())));
     cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
-                           std::chrono::steady_clock::now().time_since_epoch())
+                           std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
     cookie.SerializeToString(&address_string);
@@ -1066,7 +1066,7 @@ TEST_F(StatefulSessionIntegrationTest, CookieStatefulSessionOverriddenByRoute) {
     cookie.set_address(std::string(
         fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value())));
     cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
-                           std::chrono::steady_clock::now().time_since_epoch())
+                           std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
     cookie.SerializeToString(&address_string);
@@ -1114,7 +1114,7 @@ TEST_F(StatefulSessionIntegrationTest, CookieStatefulSessionOverriddenByRoute) {
     cookie.set_address(std::string(
         fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value())));
     cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
-                           std::chrono::steady_clock::now().time_since_epoch())
+                           std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
     cookie.SerializeToString(&address_string);
@@ -1243,7 +1243,7 @@ TEST_F(StatefulSessionIntegrationTest, CookieBasedStatefulSessionDisabledByReque
     cookie.set_address(std::string(
         fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value())));
     cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
-                           std::chrono::steady_clock::now().time_since_epoch())
+                           std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
     cookie.SerializeToString(&address_string);
@@ -1425,7 +1425,7 @@ TEST_F(StatefulSessionIntegrationTest, CookieBasedStatefulSessionRejectExpiredCo
   cookie.set_address(std::string(
       fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value())));
   cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
-                         std::chrono::steady_clock::now().time_since_epoch())
+                         std::chrono::system_clock::now().time_since_epoch())
                          .count() -
                      10);
   std::string address_string;
