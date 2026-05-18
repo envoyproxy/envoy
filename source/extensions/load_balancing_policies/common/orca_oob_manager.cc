@@ -27,6 +27,9 @@ constexpr absl::string_view kStreamCoreMetricsMethod = "StreamCoreMetrics";
 // 3x gives the server two missed reports of slack before we treat the stream as
 // stalled and reconnect via handleTransientFailure.
 constexpr uint64_t kInactivityWatchdogMultiplier = 3;
+
+// Max allowed size of a single gRPC frame accepted on an OOB OrcaLoadReport stream.
+constexpr uint32_t kMaxOrcaReportFrameBytes = 64 * 1024;
 } // namespace
 
 OrcaOobManager::OrcaOobManager(std::chrono::milliseconds reporting_period,
@@ -200,6 +203,7 @@ void OrcaOobManager::OobSession::decodeTrailers(Http::ResponseTrailerMapPtr&& tr
                 Grpc::Common::getGrpcMessage(*trailers),
                 /*end_stream=*/true);
 }
+
 void OrcaOobManager::OobSession::onResetStream(Http::StreamResetReason reason, absl::string_view) {
   const bool expected_reset = expect_reset_;
   resetState();
@@ -217,6 +221,7 @@ void OrcaOobManager::OobSession::onGoAway(Http::GoAwayErrorCode error_code) {
   }
   handleTransientFailure(absl::StrCat("goaway error code=", static_cast<uint32_t>(error_code)));
 }
+
 void OrcaOobManager::OobSession::connectAndStream() {
   ASSERT(codec_client_ == nullptr);
   resetState();
@@ -336,6 +341,7 @@ void OrcaOobManager::OobSession::resetState() {
   expect_reset_ = false;
   request_encoder_ = nullptr;
   decoder_ = Grpc::Decoder();
+  decoder_.setMaxFrameLength(kMaxOrcaReportFrameBytes);
   received_no_error_goaway_ = false;
 }
 
