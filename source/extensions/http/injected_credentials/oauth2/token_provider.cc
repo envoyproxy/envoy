@@ -136,7 +136,7 @@ void TokenProvider::onGetAccessTokenFailure(FailureReason failure_reason) {
     break;
   }
 
-  // clear the cached expired token, so that requests are not forwarded with a stale token. 
+  // clear the cached expired token, so that requests are not forwarded with a stale token.
   if (dispatcher_->timeSource().monotonicTime() >= token_expiry_time_) {
     ENVOY_LOG(warn, "onGetAccessTokenFailure: Cached token has expired, clearing it.");
     ThreadLocalOauth2ClientCredentialsTokenSharedPtr empty(

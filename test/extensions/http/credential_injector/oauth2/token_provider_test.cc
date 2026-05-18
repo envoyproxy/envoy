@@ -56,7 +56,8 @@ TEST(TokenProvider, TokenProviderTest) {
       token_provider->onGetAccessTokenFailure(FilterCallbacks::FailureReason::StreamReset));
 }
 
-// Simulate a successful token fetch followed by a fetch failure while the token has NOT yet expired. 
+// Simulate a successful token fetch followed by a fetch failure while the token has NOT yet
+// expired.
 TEST(TokenProvider, FetchFailureInjectsStaleTokenWhenNotExpired) {
   const std::string yaml_string = R"EOF(
       token_fetch_retry_interval: 5s
@@ -92,11 +93,13 @@ TEST(TokenProvider, FetchFailureInjectsStaleTokenWhenNotExpired) {
   Envoy::Http::TestRequestHeaderMapImpl headers;
   absl::Status status = injector->inject(headers, false);
   EXPECT_TRUE(status.ok());
-  EXPECT_EQ("Bearer valid-access-token",
-            headers.get(Envoy::Http::CustomHeaders::get().Authorization)[0]->value().getStringView());
+  EXPECT_EQ(
+      "Bearer valid-access-token",
+      headers.get(Envoy::Http::CustomHeaders::get().Authorization)[0]->value().getStringView());
 }
 
-// Simulate a successful token fetch followed by a fetch failure after the token has already expired.
+// Simulate a successful token fetch followed by a fetch failure after the token has already
+// expired.
 TEST(TokenProvider, FetchFailureClearsExpiredTokenAndInjectFails) {
   const std::string yaml_string = R"EOF(
       token_fetch_retry_interval: 5s
