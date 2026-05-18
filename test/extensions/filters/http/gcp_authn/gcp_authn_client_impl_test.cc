@@ -39,6 +39,17 @@ constexpr char DefaultConfig[] = R"EOF(
       num_retries: 5
   )EOF";
 
+constexpr absl::string_view GoodTokenStr =
+    "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUu"
+    "Y29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiY"
+    "XVkIjoiZXhhbXBsZV9zZXJ2aWNlIn0.cuui_Syud76B0tqvjESE8IZbX7vzG6xA-M"
+    "Daof1qEFNIoCFT_YQPkseLSUSR2Od3TJcNKk-dKjvUEL1JW3kGnyC1dBx4f3-Xxro"
+    "yL23UbR2eS8TuxO9ZcNCGkjfvH5O4mDb6cVkFHRDEolGhA7XwNiuVgkGJ5Wkrvshi"
+    "h6nqKXcPNaRx9lOaRWg2PkE6ySNoyju7rNfunXYtVxPuUIkl0KMq3WXWRb_cb8a_Z"
+    "EprqSZUzi_ZzzYzqBNVhIJujcNWij7JRra2sXXiSAfKjtxHQoxrX8n4V1ySWJ3_1T"
+    "H_cJcdfS_RKP7YgXRWC0L16PNF5K7iqRqmjKALNe83ZFnFIw";
+const uint64_t ExpTime = 2001001001;
+
 class GcpAuthnClientImplTest : public testing::Test {
 public:
   GcpAuthnClientImplTest() {
@@ -100,9 +111,10 @@ TEST_F(GcpAuthnClientImplTest, Success) {
   }));
   Envoy::Http::ResponseMessagePtr response(
       new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
-  response->body().add("token_string");
+  response->body().add(std::string(GoodTokenStr));
 
-  EXPECT_CALL(request_callbacks_, onComplete(absl::StatusOr<std::string>("token_string")));
+  GcpToken expected_token{std::string(GoodTokenStr), ExpTime};
+  EXPECT_CALL(request_callbacks_, onComplete(absl::StatusOr<GcpToken>(expected_token)));
   client_callback_->onSuccess(client_request_, std::move(response));
 }
 

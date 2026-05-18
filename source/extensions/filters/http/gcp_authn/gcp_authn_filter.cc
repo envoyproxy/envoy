@@ -53,7 +53,6 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
   state_ = State::Calling;
   initiating_call_ = true;
 
-  envoy::extensions::filters::http::gcp_authn::v3::Audience audience_proto;
   Envoy::Upstream::ThreadLocalCluster* cluster =
       context_.serverFactoryContext().clusterManager().getThreadLocalCluster(
           route->routeEntry()->clusterName());
@@ -63,18 +62,17 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
     auto filter_metadata = cluster->info()->metadata().typed_filter_metadata();
     const auto filter_it = filter_metadata.find(std::string(FilterName));
     if (filter_it != filter_metadata.end()) {
-      THROW_IF_NOT_OK(MessageUtil::unpackTo(filter_it->second, audience_proto));
-      audience_str_ = audience_proto.url();
+      THROW_IF_NOT_OK(MessageUtil::unpackTo(filter_it->second, audience_proto_));
     }
   }
 
-  if (!audience_str_.empty()) {
+  if (!audience_proto_.url().empty()) {
     if (jwt_token_cache_ != nullptr) {
-      auto token = jwt_token_cache_->lookUp(audience_str_);
-      if (token != nullptr) {
+      auto token = jwt_token_cache_->lookUp(audience_proto_);
+      if (token.has_value()) {
         // If token is found in the cache, we add the token string to the request directly and
         // continue the filter chain iteration.
-        addTokenToRequest(hdrs, token->jwt_, filter_config_->token_header());
+        addTokenToRequest(hdrs, token.value(), filter_config_->token_header());
         return FilterHeadersStatus::Continue;
       }
     }
@@ -82,7 +80,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
     // Save the pointer to the request headers for header manipulation based on http response later.
     request_header_map_ = &hdrs;
 
-    client_->fetchToken(audience_proto, *this);
+    client_->fetchToken(audience_proto_, *this);
     initiating_call_ = false;
   } else {
     // There is no need to fetch the token if no audience is specified because no
@@ -101,28 +99,21 @@ void GcpAuthnFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallback
   decoder_callbacks_ = &callbacks;
 }
 
-void GcpAuthnFilter::onComplete(absl::StatusOr<std::string> token) {
+void GcpAuthnFilter::onComplete(absl::StatusOr<GcpToken> token) {
   state_ = State::Complete;
   if (!initiating_call_) {
     if (token.ok()) {
       // Modify the request header to include the ID token in a header (by default, the
       // `Authorization: Bearer ID_TOKEN` header).
-      std::string token_str = *token;
+      GcpToken token_val = *token;
       if (request_header_map_ != nullptr) {
-        addTokenToRequest(*request_header_map_, token_str, filter_config_->token_header());
+        addTokenToRequest(*request_header_map_, token_val.token_, filter_config_->token_header());
       } else {
         ENVOY_LOG(debug, "No request header to be modified.");
       }
-      // Decode the tokens.
-      std::unique_ptr<JwtVerify::Jwt> jwt = std::make_unique<JwtVerify::Jwt>();
-      Status status = jwt->parseFromString(token_str);
-      if (status == Status::Ok) {
-        if (jwt_token_cache_ != nullptr) {
-          // Insert the token into cache along with the ownership transfer.
-          jwt_token_cache_->insert(audience_str_, std::move(jwt));
-        }
-      } else {
-        ENVOY_LOG(error, "Failed to parse the token string, status : {}", Envoy::enumToInt(status));
+      if (jwt_token_cache_ != nullptr) {
+        // Insert the token into cache along with the ownership transfer.
+        jwt_token_cache_->insert(audience_proto_, std::make_unique<GcpToken>(token_val));
       }
     } else {
       ENVOY_LOG(error, "Failed to fetch token: {}", token.status().message());

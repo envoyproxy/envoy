@@ -3,6 +3,8 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/jwt/jwt.h"
+#include "source/common/jwt/verify.h"
 
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_replace.h"
@@ -84,7 +86,13 @@ void GcpAuthnClientImpl::onSuccess(const Http::AsyncClient::Request&,
     uint64_t status_code = status.value();
     if (status_code == Envoy::enumToInt(Envoy::Http::Code::OK)) {
       ASSERT(callbacks_ != nullptr);
-      callbacks_->onComplete(response->bodyAsString());
+      std::string token_str = response->bodyAsString();
+      std::unique_ptr<JwtVerify::Jwt> jwt = std::make_unique<JwtVerify::Jwt>();
+      if (jwt->parseFromString(token_str) == JwtVerify::Status::Ok) {
+        callbacks_->onComplete(GcpToken{token_str, jwt->exp_});
+      } else {
+        onError("Failed to parse identity token/JWT.");
+      }
       callbacks_ = nullptr;
     } else {
       onError(absl::StrFormat("Response status is not OK, status: %d", status_code));

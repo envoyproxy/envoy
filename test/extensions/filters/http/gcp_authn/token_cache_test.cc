@@ -20,8 +20,6 @@ using Server::Configuration::MockFactoryContext;
 using ::testing::NiceMock;
 
 // Good token
-// {"iss":"https://example.com","sub":"test@example.com", "aud":"example_service",
-// "exp":2001001001 - Sun May 29 2033 13:36:41 GMT-0400}
 constexpr absl::string_view GoodTokenStr =
     "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUu"
     "Y29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiY"
@@ -35,8 +33,6 @@ constexpr absl::string_view GoodTokenStr =
 const time_t ExpTime = 2001001001;
 
 // Expired token
-// {"iss":"https://example.com","sub":"test@example.com","aud":"example_service",
-// "exp":1205005587 - Sat Mar 08 2008 14:46:27 GMT-0500}
 constexpr absl::string_view ExpiredToken =
     "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUu"
     "Y29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImV4cCI6MTIwNTAwNTU4NywiY"
@@ -63,60 +59,71 @@ public:
     envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig config;
     // Initialize the token cache with filter configuration.
     TestUtility::loadFromYaml(DefaultConfig, config);
-    token_cache_ = std::make_unique<TokenCacheImpl<JwtToken>>(config.cache_config(), time_system_);
-
-    jwt_ = std::make_unique<JwtVerify::Jwt>();
+    token_cache_ = std::make_unique<TokenCacheImpl>(config.cache_config(), time_system_);
   }
 
   NiceMock<MockFactoryContext> context_;
-  std::unique_ptr<TokenCacheImpl<JwtToken>> token_cache_;
+  std::unique_ptr<TokenCacheImpl> token_cache_;
   Event::SimulatedTimeSystem time_system_;
-  std::unique_ptr<JwtVerify::Jwt> jwt_ = nullptr;
 };
 
 TEST_F(TokenCacheTest, ValidToken) {
   EXPECT_EQ(token_cache_->capacity(), 100);
-  std::string good_token = std::string(GoodTokenStr);
-  JwtVerify::Status status = jwt_->parseFromString(good_token);
-  EXPECT_TRUE(status == JwtVerify::Status::Ok);
-  auto* old_jwt = jwt_.get();
-  token_cache_->insert(good_token, std::move(jwt_));
-  auto* found_jwt = token_cache_->lookUp(good_token);
-  EXPECT_TRUE(found_jwt != nullptr);
-  EXPECT_EQ(found_jwt, old_jwt);
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.set_url("http://example_service");
+
+  auto token = std::make_unique<GcpToken>();
+  token->token_ = std::string(GoodTokenStr);
+  token->expires_at_ = ExpTime;
+
+  token_cache_->insert(audience, std::move(token));
+  auto found_token = token_cache_->lookUp(audience);
+  EXPECT_TRUE(found_token.has_value());
+  EXPECT_EQ(found_token.value(), std::string(GoodTokenStr));
 }
 
 TEST_F(TokenCacheTest, ExpiredToken) {
-  std::string expired_token = std::string(ExpiredToken);
-  JwtVerify::Status status = jwt_->parseFromString(expired_token);
-  EXPECT_TRUE(status == JwtVerify::Status::Ok);
-  token_cache_->insert(expired_token, std::move(jwt_));
-  auto* found_jwt = token_cache_->lookUp(expired_token);
-  EXPECT_TRUE(found_jwt == nullptr);
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.set_url("http://example_service");
+
+  auto token = std::make_unique<GcpToken>();
+  token->token_ = std::string(ExpiredToken);
+  token->expires_at_ = 1205005587; // Sat Mar 08 2008 14:46:27 GMT-0500
+
+  token_cache_->insert(audience, std::move(token));
+  auto found_token = token_cache_->lookUp(audience);
+  EXPECT_FALSE(found_token.has_value());
 }
 
 // Test the token with the clock skew.
 TEST_F(TokenCacheTest, TokenWithClockSkew) {
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.set_url("http://example_service");
+
   // Set the time to exp_time + 1s.
   // i.e., The expiration time in the token is `Sun May 29 2033 13:36:41 GMT-0400` and the time we
   // set to is `Sun May 29 2033 13:35:42 GMT-0400`.
   const time_t exp_time_with_skew = ExpTime - JwtVerify::kClockSkewInSecond;
   time_system_.setSystemTime(std::chrono::system_clock::from_time_t(exp_time_with_skew + 1));
-  std::string token = std::string(GoodTokenStr);
-  JwtVerify::Status status = jwt_->parseFromString(token);
-  EXPECT_TRUE(status == JwtVerify::Status::Ok);
-  token_cache_->insert(token, std::move(jwt_));
-  auto* found_jwt = token_cache_->lookUp(token);
-  EXPECT_TRUE(found_jwt == nullptr);
 
-  std::unique_ptr<JwtVerify::Jwt> jwt = std::make_unique<JwtVerify::Jwt>();
+  auto token = std::make_unique<GcpToken>();
+  token->token_ = std::string(GoodTokenStr);
+  token->expires_at_ = ExpTime;
+
+  token_cache_->insert(audience, std::move(token));
+  auto found_token = token_cache_->lookUp(audience);
+  EXPECT_FALSE(found_token.has_value());
+
   // Set the time to exp_time - 1s.
   time_system_.setSystemTime(std::chrono::system_clock::from_time_t(exp_time_with_skew));
-  auto* old_jwt = jwt.get();
-  token_cache_->insert(token, std::move(jwt));
-  found_jwt = token_cache_->lookUp(token);
-  EXPECT_TRUE(found_jwt != nullptr);
-  EXPECT_EQ(found_jwt, old_jwt);
+  auto token2 = std::make_unique<GcpToken>();
+  token2->token_ = std::string(GoodTokenStr);
+  token2->expires_at_ = ExpTime;
+
+  token_cache_->insert(audience, std::move(token2));
+  found_token = token_cache_->lookUp(audience);
+  EXPECT_TRUE(found_token.has_value());
+  EXPECT_EQ(found_token.value(), std::string(GoodTokenStr));
 }
 
 } // namespace
