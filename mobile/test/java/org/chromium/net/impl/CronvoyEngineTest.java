@@ -107,7 +107,7 @@ public class CronvoyEngineTest {
     assertThat(statsMap.containsKey("http.hcm.downstream_rq_2xx"));
     assertThat(statsMap.containsKey("http.hcm.downstream_total"));
     assertThat(statsMap.containsKey("runtime.load_success"));
-    assertThat(statsMap.get("runtime.load_success")).isEqualTo("1");
+    assertThat(statsMap.get("runtime.load_success")).isEqualTo("2");
   }
 
   @Test

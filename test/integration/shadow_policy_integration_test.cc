@@ -11,6 +11,8 @@
 #include "test/integration/socket_interface_swap.h"
 #include "test/test_common/test_runtime.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -84,8 +86,8 @@ public:
     if (filter_name_ != "add-body-filter") {
       EXPECT_EQ(10U, response->body().size());
     }
-    test_server_->waitForCounterGe("cluster.cluster_1.internal.upstream_rq_completed",
-                                   times_called);
+    test_server_->waitForCounter("cluster.cluster_1.internal.upstream_rq_completed",
+                                 Ge(times_called));
 
     upstream_headers_ =
         reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
@@ -121,7 +123,7 @@ TEST_P(ShadowPolicyIntegrationTest, Basic) {
   sendRequestAndValidateResponse(1);
   sendRequestAndValidateResponse(2);
 
-  test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_200", 2);
+  test_server_->waitForCounter("cluster.cluster_1.upstream_rq_200", Eq(2));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_cx_total")->value());
 }
@@ -141,7 +143,7 @@ TEST_P(ShadowPolicyIntegrationTest, BasicWithLimits) {
   sendRequestAndValidateResponse(1);
   sendRequestAndValidateResponse(2);
 
-  test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_200", 2);
+  test_server_->waitForCounter("cluster.cluster_1.upstream_rq_200", Eq(2));
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
   // https://github.com/envoyproxy/envoy/issues/26820
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_cx_total")->value());
@@ -291,8 +293,8 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithShadowUpstreamReset) 
 
   // Send upstream reset on shadow request.
   upstream_request_shadow->encodeResetStream();
-  test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_rx_reset", 1,
-                                 std::chrono::milliseconds(1000));
+  test_server_->waitForCounter("cluster.cluster_1.upstream_rq_rx_reset", Eq(1),
+                               std::chrono::milliseconds(1000));
 
   codec_client_->sendData(encoder, 20, true);
   ASSERT_TRUE(upstream_request_main->waitForData(*dispatcher_, 20));
@@ -544,7 +546,7 @@ TEST_P(ShadowPolicyIntegrationTest, MainRequestOverBufferLimit) {
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
   // The encoder-decoder-buffer-filter will buffer too much data triggering a local reply.
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_4xx", 1);
+  test_server_->waitForCounter("http.config_test.downstream_rq_4xx", Eq(1));
 }
 
 TEST_P(ShadowPolicyIntegrationTest, ShadowRequestOverBufferLimit) {
@@ -683,8 +685,8 @@ TEST_P(ShadowPolicyIntegrationTest, BackedUpConnectionBeforeShadowBegins) {
   auto main_response = std::move(result.second);
 
   // Connecting to the shadow stream should cause backpressure due to connection backup.
-  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_paused_reading_total", 1,
-                                 std::chrono::milliseconds(500));
+  test_server_->waitForCounter("http.config_test.downstream_flow_control_paused_reading_total",
+                               Eq(1), std::chrono::milliseconds(500));
 
   codec_client_->sendData(encoder, 1023, false);
 
@@ -703,7 +705,7 @@ TEST_P(ShadowPolicyIntegrationTest, BackedUpConnectionBeforeShadowBegins) {
   EXPECT_EQ(shadow_direct_response->headers().getStatusValue(), "200");
 
   // Two requests were sent over a single connection to cluster_1.
-  test_server_->waitForCounterGe("cluster.cluster_1.upstream_rq_completed", 2);
+  test_server_->waitForCounter("cluster.cluster_1.upstream_rq_completed", Ge(2));
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_flow_control_paused_reading_total")
                 ->value(),
@@ -748,8 +750,8 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithShadowBackpressure) {
   // This will result in one call of high watermark on the shadow stream, as
   // end_stream will not trigger watermark calls.
   codec_client_->sendData(encoder, 2048, false);
-  test_server_->waitForCounterGe("http.config_test.downstream_flow_control_paused_reading_total",
-                                 1);
+  test_server_->waitForCounter("http.config_test.downstream_flow_control_paused_reading_total",
+                               Ge(1));
   codec_client_->sendData(encoder, 2048, true);
   ASSERT_TRUE(upstream_request_main->waitForData(*dispatcher_, 2048 * 2));
   ASSERT_TRUE(upstream_request_shadow->waitForData(*dispatcher_, 2048 * 2));
@@ -769,13 +771,13 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithShadowBackpressure) {
 
   cleanupUpstreamAndDownstream();
 
-  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_paused_reading_total",
-                                 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 1);
-  test_server_->waitForCounterEq("cluster.cluster_1.upstream_cx_total", 1);
+  test_server_->waitForCounter("http.config_test.downstream_flow_control_paused_reading_total",
+                               Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_1.upstream_cx_total", Eq(1));
   // Main cluster saw no reset; shadow cluster saw remote reset.
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_completed", 1);
-  test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_completed", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_completed", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_1.upstream_rq_completed", Eq(1));
 }
 
 // Test request mirroring / shadowing with the cluster name in policy.

@@ -69,15 +69,35 @@ void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level
 
 uint32_t envoy_dynamic_module_callback_get_concurrency() {
   using namespace Envoy;
-  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  // The previous `ASSERT_IS_MAIN_OR_TEST_THREAD` is compiled out under NDEBUG and the
+  // `getExisting()` thread-local lookup returns nullptr off the main thread, so guard explicitly
+  // and fail closed.
+  if (!Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_get_concurrency must be called on the main thread");
+    return 0;
+  }
   auto context = Server::Configuration::ServerFactoryContextInstance::getExisting();
+  if (context == nullptr) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_get_concurrency called before the server context "
+                 "was initialized");
+    return 0;
+  }
   return context->options().concurrency();
 }
 
 bool envoy_dynamic_module_callback_is_validation_mode() {
   using namespace Envoy;
-  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  if (!Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(
+        "envoy_dynamic_module_callback_is_validation_mode must be called on the main thread");
+    return false;
+  }
   auto context = Server::Configuration::ServerFactoryContextInstance::getExisting();
+  if (context == nullptr) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_is_validation_mode called before the server "
+                 "context was initialized");
+    return false;
+  }
   return context->options().mode() == Server::Mode::Validate;
 }
 
@@ -721,6 +741,22 @@ envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni(
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed: "
                "not implemented in this context");
   return false;
 }

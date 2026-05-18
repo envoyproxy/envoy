@@ -85,7 +85,7 @@ public:
     return Config::ServerExtensionValues::get().VALIDATION_LISTENER;
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::config::listener::v3::ValidationListenerManager>();
+    return std::make_unique<envoy::config::bootstrap::v3::ValidationListenerManager>();
   }
 };
 

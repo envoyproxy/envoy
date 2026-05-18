@@ -32,6 +32,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//source/extensions/filters/http/ext_authz",
         "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
+        "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_factory_context_mocks",

@@ -120,8 +120,8 @@ struct ThreadLocalTransactionInfo : public ThreadLocal::ThreadLocalObject,
     audit_timer_ = dispatcher.createTimer([this]() -> void { auditTimerAction(); });
     audit_timer_->enableTimer(std::chrono::seconds(2));
   }
-  absl::flat_hash_map<std::string, std::shared_ptr<TransactionInfoItem>> transaction_info_map_{};
-  absl::flat_hash_map<std::string, std::shared_ptr<UpstreamRequest>> upstream_request_map_{};
+  absl::flat_hash_map<std::string, std::shared_ptr<TransactionInfoItem>> transaction_info_map_;
+  absl::flat_hash_map<std::string, std::shared_ptr<UpstreamRequest>> upstream_request_map_;
 
   std::shared_ptr<TransactionInfo> parent_;
   Event::Dispatcher& dispatcher_;
@@ -284,15 +284,15 @@ private:
   Upstream::ClusterManager& cluster_manager_;
   RouterStats& stats_;
 
-  RouteConstSharedPtr route_{};
+  RouteConstSharedPtr route_;
   const RouteEntry* route_entry_{};
-  MessageMetadataSharedPtr metadata_{};
+  MessageMetadataSharedPtr metadata_;
 
   std::shared_ptr<UpstreamRequest> upstream_request_;
   SipFilters::DecoderFilterCallbacks* callbacks_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   Upstream::ThreadLocalCluster* thread_local_cluster_;
-  std::shared_ptr<TransactionInfos> transaction_infos_{};
+  std::shared_ptr<TransactionInfos> transaction_infos_;
   std::shared_ptr<SipSettings> settings_;
   Server::Configuration::FactoryContext& context_;
 };

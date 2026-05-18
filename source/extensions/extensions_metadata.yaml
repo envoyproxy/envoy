@@ -1059,6 +1059,13 @@ envoy.filters.udp.session.dynamic_forward_proxy:
   status: alpha
   type_urls:
   - envoy.extensions.filters.udp.udp_proxy.session.dynamic_forward_proxy.v3.FilterConfig
+envoy.filters.upstream_network.reverse_tunnel_lifecycle:
+  categories:
+  - envoy.filters.upstream_network
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - google.protobuf.Empty
 envoy.formatter.cel:
   categories:
   - envoy.formatter

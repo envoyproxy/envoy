@@ -35,6 +35,8 @@ jobs:
     uses: ./.github/workflows/_load_env.yml
 
   deflake:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
       actions: read
       contents: read

@@ -284,8 +284,8 @@ RevConClusterFactory::createClusterWithConfig(
   }
 
   absl::Status creation_status = absl::OkStatus();
-  auto new_cluster = std::shared_ptr<RevConCluster>(
-      new RevConCluster(cluster, context, creation_status, proto_config));
+  auto new_cluster =
+      std::make_shared<RevConCluster>(cluster, context, creation_status, proto_config);
   RETURN_IF_NOT_OK(creation_status);
   auto lb = std::make_unique<RevConCluster::ThreadAwareLoadBalancer>(new_cluster);
   return std::make_pair(new_cluster, std::move(lb));

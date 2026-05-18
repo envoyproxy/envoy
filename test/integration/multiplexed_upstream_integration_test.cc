@@ -14,6 +14,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 
 class MultiplexedUpstreamIntegrationTest : public HttpProtocolIntegrationTest {
@@ -694,7 +696,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamGoaway) {
 
   // Send a goaway from upstream.
   fake_upstream_connection_->encodeGoAway();
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_close_notify", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_close_notify", Ge(1));
 
   // A new request should result in a new connection
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -769,10 +771,10 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DefaultAllowsUpstreamSafeRequestsUsin
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
 
   EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Ge(1));
 
   default_request_headers_.addCopy("second_request", "1");
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -817,7 +819,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DisableUpstreamEarlyData) {
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
 
   EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
 
@@ -855,7 +857,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamEarlyDataRejected) {
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
 
   EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
 
@@ -958,7 +960,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamDisconnectDuringEarlyData) {
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
 
   EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
 
@@ -1002,7 +1004,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DownstreamDisconnectDuringEarlyData) 
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
 
   EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
 
@@ -1017,12 +1019,12 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DownstreamDisconnectDuringEarlyData) 
                                        {"second-request", "1"}});
     // Even though the fake upstream is not responding, the 2 GET requests should still be forwarded
     // as early data.
-    test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_total", 2);
+    test_server_->waitForCounter("cluster.cluster_0.upstream_rq_total", Eq(2));
     EXPECT_EQ(1u,
               test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
     EXPECT_LE(1u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
     codec_client_->close();
-    test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_tx_reset", 1);
+    test_server_->waitForCounter("cluster.cluster_0.upstream_rq_tx_reset", Eq(1));
   }
   // Release the upstream lock and finish the handshake.
   waitForNextUpstreamConnection(std::vector<uint64_t>{0}, TestUtility::DefaultTimeout,
@@ -1052,7 +1054,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ConnPoolQueuingNonSafeRequest) {
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
 
   EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
 
@@ -1083,7 +1085,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ConnPoolQueuingNonSafeRequest) {
                                        {"forth-request", "1"}});
     // Even though the fake upstream is not responding, the 2 GET requests should still be forwarded
     // as early data.
-    test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_total", 3);
+    test_server_->waitForCounter("cluster.cluster_0.upstream_rq_total", Eq(3));
     EXPECT_EQ(1u,
               test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
     EXPECT_LE(2u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());

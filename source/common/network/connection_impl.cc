@@ -80,9 +80,6 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
           [this]() -> void { this->onReadBufferLowWatermark(); },
           [this]() -> void { this->onReadBufferHighWatermark(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
-      detect_early_close_(true), enable_half_close_(false), read_end_stream_raised_(false),
-      read_end_stream_(false), write_end_stream_(false), current_write_end_stream_(false),
-      dispatch_buffered_data_(false), transport_wants_read_(false),
       enable_close_through_filter_manager_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.connection_close_through_filter_manager")) {
 
@@ -359,7 +356,9 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   }
 
   ENVOY_CONN_LOG(debug, "closing socket: {}", *this, static_cast<uint32_t>(close_type));
-  transport_socket_->closeSocket(close_type);
+  const bool abort_reset = detected_close_type_ == StreamInfo::DetectedCloseType::RemoteReset ||
+                           detected_close_type_ == StreamInfo::DetectedCloseType::LocalReset;
+  transport_socket_->closeSocket(close_type, abort_reset);
 
   // Drain input and output buffers.
   updateReadBufferStats(0, 0);
@@ -373,8 +372,7 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
 
   connection_stats_.reset();
 
-  if (detected_close_type_ == StreamInfo::DetectedCloseType::RemoteReset ||
-      detected_close_type_ == StreamInfo::DetectedCloseType::LocalReset) {
+  if (abort_reset) {
 #if ENVOY_PLATFORM_ENABLE_SEND_RST
     const bool ok = Network::Socket::applyOptions(
         Network::SocketOptionFactory::buildZeroSoLingerOptions(), *socket_,

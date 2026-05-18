@@ -72,6 +72,15 @@ public:
   configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add);
 
   /*
+   * @param headers_to_add defines the headers to add during calls to evaluateHeaders.
+   * @param command_parsers custom formatter command parsers (e.g. for %SECRET()% substitution).
+   * @return HeaderParserPtr a configured HeaderParserPtr.
+   */
+  static absl::StatusOr<HeaderParserPtr>
+  configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add,
+            const Formatter::CommandParserPtrVector& command_parsers);
+
+  /*
    * @param headers_to_add defines headers to add during calls to evaluateHeaders.
    * @param append_action defines action taken to append/overwrite the given value for an existing
    * header or to only add this header if it's absent.

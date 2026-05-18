@@ -76,7 +76,7 @@ TEST_F(AsyncTcpClientImplTest, BasicWrite) {
   setUpClient();
   expectCreateConnection();
 
-  EXPECT_CALL(*connection_, write(BufferStringEqual("test data"), _));
+  EXPECT_CALL(*connection_, write(BufferString("test data"), _));
   Buffer::OwnedImpl buff("test data");
   client_->write(buff, false);
 

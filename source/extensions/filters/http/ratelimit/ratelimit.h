@@ -79,7 +79,9 @@ public:
                                        ? absl::optional<Envoy::Runtime::FractionalPercent>(
                                              Envoy::Runtime::FractionalPercent(
                                                  config.failure_mode_deny_percent(), runtime_))
-                                       : absl::nullopt) {
+                                       : absl::nullopt),
+        metadata_namespace_(config.metadata_namespace().empty() ? "envoy.filters.http.ratelimit"
+                                                                : config.metadata_namespace()) {
     absl::StatusOr<Router::HeaderParserPtr> response_headers_parser_or_ =
         Envoy::Router::HeaderParser::configure(config.response_headers_to_add());
     SET_AND_RETURN_IF_NOT_OK(response_headers_parser_or_.status(), creation_status);
@@ -89,6 +91,7 @@ public:
   }
 
   const std::string& domain() const { return domain_; }
+  const std::string& metadataNamespace() const { return metadata_namespace_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   uint64_t stage() const { return stage_; }
   Runtime::Loader& runtime() { return runtime_; }
@@ -172,6 +175,7 @@ private:
   const absl::optional<Envoy::Runtime::FractionalPercent> filter_enforced_;
   const absl::optional<Envoy::Runtime::FractionalPercent> failure_mode_deny_percent_;
   std::unique_ptr<RateLimitConfig> rate_limit_config_;
+  const std::string metadata_namespace_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

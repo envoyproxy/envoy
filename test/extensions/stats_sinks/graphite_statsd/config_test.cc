@@ -8,7 +8,7 @@
 #include "source/extensions/stat_sinks/common/statsd/statsd.h"
 #include "source/extensions/stat_sinks/graphite_statsd/config.h"
 
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"

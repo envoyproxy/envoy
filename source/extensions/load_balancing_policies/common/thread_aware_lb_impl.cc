@@ -177,7 +177,7 @@ void ThreadAwareLoadBalancerBase::refresh() {
   }
 
   {
-    absl::WriterMutexLock lock(&factory_->mutex_);
+    absl::WriterMutexLock lock(factory_->mutex_);
     factory_->healthy_per_priority_load_ = healthy_per_priority_load;
     factory_->degraded_per_priority_load_ = degraded_per_priority_load;
     factory_->per_priority_state_ = per_priority_state_vector;

@@ -30,6 +30,9 @@ namespace {
 using ::nlohmann::json;
 namespace McpConstants = Envoy::Extensions::Filters::Common::Mcp::McpConstants;
 
+constexpr uint32_t DEFAULT_MAX_REQUEST_BODY_SIZE = 1024 * 64;    // 64KB
+constexpr uint32_t DEFAULT_MAX_RESPONSE_BODY_SIZE = 1024 * 1024; // 1MB
+
 bool isMcpProtocolVersionSupported(absl::string_view protocol_version) {
   static const absl::NoDestructor<absl::flat_hash_set<absl::string_view>> supported_mcp_versions({
       McpConstants::LATEST_SUPPORTED_MCP_VERSION,
@@ -133,7 +136,11 @@ McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
         proto_config)
     : proto_config_(proto_config), fallback_protocol_version_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
                                        proto_config_.server_info(), fallback_protocol_version,
-                                       std::string(McpConstants::FALLBACK_PROTOCOL_VERSION))) {
+                                       std::string(McpConstants::FALLBACK_PROTOCOL_VERSION))),
+      max_request_body_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config_, max_request_body_size,
+                                                             DEFAULT_MAX_REQUEST_BODY_SIZE)),
+      max_response_body_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config_, max_response_body_size,
+                                                              DEFAULT_MAX_RESPONSE_BODY_SIZE)) {
   for (const auto& tool : proto_config.tool_config().tools()) {
     tool_to_http_rule_[tool.name()] = tool.http_rule();
   }
@@ -197,7 +204,16 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::decodeData(Buffer::Instance& dat
     return Http::FilterDataStatus::Continue;
   }
 
-  // TODO(guoyilin42): Add hard limit for the buffer size and flow control if possible.
+  const uint32_t max_request_body_size = config_->maxRequestBodySize();
+  if (max_request_body_size > 0 &&
+      (request_body_.length() + data.length()) > max_request_body_size) {
+    ENVOY_STREAM_LOG(error, "Request body exceeds limit. Size: {}, Limit: {}", *decoder_callbacks_,
+                     request_body_.length() + data.length(), max_request_body_size);
+    sendErrorResponse(Http::Code::PayloadTooLarge, "mcp_json_rest_bridge_filter_request_too_large",
+                      generateErrorJsonResponse(-32000, "Request body too large").dump());
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+
   request_body_.move(data);
 
   if (!end_stream) {
@@ -225,6 +241,7 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::decodeData(Buffer::Instance& dat
   if (mcp_operation_ == McpOperation::Initialization ||
       mcp_operation_ == McpOperation::InitializationAck ||
       mcp_operation_ == McpOperation::OperationFailed) {
+    // sendLocalReply was called in handleMcpMethod for these operations.
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
@@ -262,6 +279,27 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& dat
       mcp_operation_ == McpOperation::InitializationAck) {
     return Http::FilterDataStatus::Continue;
   }
+
+  const uint32_t max_response_body_size = config_->maxResponseBodySize();
+  if (max_response_body_size > 0 &&
+      (response_body_.length() + data.length()) > max_response_body_size) {
+    ENVOY_STREAM_LOG(error, "Response body exceeds limit. Size: {}, Limit: {}", *encoder_callbacks_,
+                     response_body_.length() + data.length(), max_response_body_size);
+    json error_json = {
+        {McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
+        // If the ID is missing in the request, the ID in the response should be null.
+        {McpConstants::ID_FIELD, session_id_.has_value() ? *session_id_ : json(nullptr)},
+        {McpConstants::ERROR_FIELD, generateErrorJsonResponse(-32000, "Response body too large")}};
+    encoder_callbacks_->sendLocalReply(
+        Http::Code::InternalServerError, error_json.dump(),
+        [](Http::ResponseHeaderMap& headers) {
+          headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
+        },
+        Grpc::Status::WellKnownGrpcStatus::Internal,
+        "mcp_json_rest_bridge_filter_response_too_large");
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+
   response_body_.move(data);
 
   if (!end_stream) {
@@ -297,6 +335,12 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc,
                       generateErrorJsonResponse(-32602, "Unsupported protocol version").dump());
     return;
   }
+
+  if (config_->requestStorageMode() == envoy::extensions::filters::http::mcp_json_rest_bridge::v3::
+                                           McpJsonRestBridge::DYNAMIC_METADATA) {
+    setDynamicMetadata(method, json_rpc);
+  }
+
   // TODO(guoyilin42): Consider supporting local response for tools/list in addition to the GET.
   if (method == McpConstants::Methods::TOOLS_LIST) {
     absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule> http_rule =
@@ -541,6 +585,30 @@ void McpJsonRestBridgeFilter::sendErrorResponse(Http::Code response_code,
   decoder_callbacks_->sendLocalReply(response_code, response_body, nullptr,
                                      Grpc::Status::WellKnownGrpcStatus::Internal,
                                      response_code_details);
+}
+
+void McpJsonRestBridgeFilter::setDynamicMetadata(absl::string_view method,
+                                                 const nlohmann::json& json_rpc) {
+  Protobuf::Struct metadata;
+  (*metadata.mutable_fields())[McpConstants::METHOD_FIELD].set_string_value(method);
+  if (json_rpc.contains(McpConstants::PARAMS_FIELD)) {
+    const auto& params = json_rpc[McpConstants::PARAMS_FIELD];
+    if (params.is_object()) {
+      Protobuf::Struct params_struct;
+      absl::Status status = MessageUtil::loadFromJsonNoThrow(params.dump(), params_struct);
+      if (status.ok()) {
+        *(*metadata.mutable_fields())[McpConstants::PARAMS_FIELD].mutable_struct_value() =
+            std::move(params_struct);
+      } else {
+        ENVOY_STREAM_LOG(warn, "Failed to parse params as Protobuf Struct: {}", *decoder_callbacks_,
+                         status);
+      }
+    }
+  }
+  decoder_callbacks_->streamInfo().setDynamicMetadata(
+      std::string(decoder_callbacks_->filterConfigName()), metadata);
+  ENVOY_STREAM_LOG(debug, "MCP JSON REST Bridge filter set dynamic metadata: {}",
+                   *decoder_callbacks_, metadata.DebugString());
 }
 
 absl::Status McpJsonRestBridgeFilter::validateJsonRpcIdAndMethod(const nlohmann::json& json_rpc) {

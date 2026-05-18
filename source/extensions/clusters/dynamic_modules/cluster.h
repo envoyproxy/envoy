@@ -261,6 +261,11 @@ public:
 
   const Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNamePool stat_name_pool_;
+  // We only allow the module to create stats during on_cluster_config_new, and not later from
+  // worker threads, so that we don't have to wrap stat_name_pool_ in a lock. Per-request label
+  // values use a stack-local Stats::StatNameDynamicPool in the increment callbacks (see
+  // abi_impl.cc).
+  bool stat_creation_frozen_ = false;
 
 private:
   DynamicModuleClusterConfig(const std::string& cluster_name, const std::string& cluster_config,
@@ -401,7 +406,7 @@ private:
   uint64_t getNextCalloutId() { return next_callout_id_++; }
 
   DynamicModuleClusterConfigSharedPtr config_;
-  envoy_dynamic_module_type_cluster_module_ptr in_module_cluster_;
+  envoy_dynamic_module_type_cluster_module_ptr in_module_cluster_{nullptr};
   Event::Dispatcher& dispatcher_;
   Server::Configuration::ServerFactoryContext& server_context_;
 
@@ -479,7 +484,7 @@ public:
 
 private:
   envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle_;
-  envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_;
+  envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_{nullptr};
   OnClusterLbCancelHostSelectionType cancel_fn_;
   std::shared_ptr<std::atomic<bool>> cancelled_;
 };

@@ -120,6 +120,9 @@ public:
   // Stats scope for metric creation.
   const Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNamePool stat_name_pool_;
+  // We only allow the module to create stats during the in-module config_new, and not later from
+  // worker threads, so that we don't have to wrap stat_name_pool_ in a lock.
+  bool stat_creation_frozen_ = false;
 
 private:
   // Metric storage.

@@ -33,7 +33,7 @@ not be changed on the release branch unless a bug or security vulnerability whic
 bazel build --config=boringssl-fips //source/exe:envoy-static
 ```
 
-- **Supported architectures:** Linux x86_64 only
+- **Supported architectures:** Linux x86_64, aarch64
 - **Version string:** `BoringSSL-FIPS` (visible in `envoy --version`)
 
 ### AWS-LC FIPS
