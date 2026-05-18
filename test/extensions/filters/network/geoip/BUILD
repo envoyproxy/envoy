@@ -19,7 +19,7 @@ envoy_cc_test(
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:filter_state_lib",
         "//source/extensions/filters/network/geoip:geoip_filter_lib",
-        "//test/extensions/filters/http/geoip:geoip_mocks",
+        "//test/mocks/geoip:geoip_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:logging_lib",
@@ -35,7 +35,7 @@ envoy_cc_test(
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/network/geoip:config",
-        "//test/extensions/filters/http/geoip:geoip_mocks",
+        "//test/mocks/geoip:geoip_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
