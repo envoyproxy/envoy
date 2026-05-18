@@ -670,11 +670,11 @@ TEST(LoadBalancerBaseCoalesceEnabledTest, LiveHealthFlagsTakePrecedenceOverStale
   MockHostSet& host_set = *priority_set.getMockHostSet(0);
   auto host = makeTestHost(info, "tcp://127.0.0.1:80");
 
-  // simulate the race: the host is actually healthy, but healthy_hosts_ is empty, 
+  // simulate the race: the host is actually healthy, but healthy_hosts_ is empty,
   // as if the FAIL snapshot arrived after the PASS snapshot
   // and overwrote the pre-partitioned vector before MemberUpdateCb fired.
   host_set.hosts_ = {host};
-  host_set.healthy_hosts_ = {}; 
+  host_set.healthy_hosts_ = {};
 
   ASSERT_EQ(Host::Health::Healthy, host->coarseHealth());
 
