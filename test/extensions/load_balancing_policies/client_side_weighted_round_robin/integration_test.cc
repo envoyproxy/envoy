@@ -316,8 +316,8 @@ TEST_P(ClientSideWeightedRoundRobinOobIntegrationTest, OobReportsApplyWeights) {
   respondToOobStreams(/*host0_qps=*/100.0, /*host1_qps=*/1000.0);
 
   // Verify the OOB plumbing is alive and reporting.
-  test_server_->waitForCounterGe("cluster.cluster_0.lb_orca_oob.reports_received", 2);
-  test_server_->waitForGaugeEq("cluster.cluster_0.lb_orca_oob.active_sessions", 2);
+  test_server_->waitForCounter("cluster.cluster_0.lb_orca_oob.reports_received", Ge(2));
+  test_server_->waitForGauge("cluster.cluster_0.lb_orca_oob.active_sessions", Eq(2));
 }
 
 // Tests to verify the behavior of load balancing policy when cluster is added,
