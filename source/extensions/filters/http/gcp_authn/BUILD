@@ -54,8 +54,10 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "token_cache",
+    srcs = ["token_cache.cc"],
     hdrs = ["token_cache.h"],
     deps = [
+        ":gcp_authn_client_interface",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",

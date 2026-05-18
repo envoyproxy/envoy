@@ -27,10 +27,8 @@ public:
 
   TokenCacheImpl() = delete;
 
-  absl::optional<std::string>
-  lookUp(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience);
-  void insert(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-              std::unique_ptr<GcpToken> token);
+  absl::optional<std::string> lookUp(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience);
+  void insert(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience, std::unique_ptr<GcpToken> token);
 
   uint64_t capacity() { return lru_cache_.maxSize(); }
 
@@ -66,35 +64,6 @@ struct TokenCache {
   }
   Envoy::ThreadLocal::TypedSlot<ThreadLocalCache> tls;
 };
-
-inline absl::optional<std::string>
-TokenCacheImpl::lookUp(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience) {
-  std::string key = audience.SerializeAsString();
-  typename LRUCache::ScopedLookup lookup(&lru_cache_, key);
-  if (lookup.found()) {
-    GcpToken* const found_token = lookup.value();
-    // Verify the validness of the token by checking its expiration time field.
-    if (found_token->expires_at_ > 0 &&
-        DateUtil::nowToSeconds(time_source_) + JwtVerify::kClockSkewInSecond >
-            found_token->expires_at_) {
-      // Remove the expired entry.
-      lru_cache_.remove(key);
-      return absl::nullopt;
-    }
-    // Return the valid token string.
-    return found_token->token_;
-  }
-  // Return empty/nullopt if no entry is found or it was expired.
-  return absl::nullopt;
-}
-
-inline void
-TokenCacheImpl::insert(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-                       std::unique_ptr<GcpToken> token) {
-  std::string key = audience.SerializeAsString();
-  // Release the token to transfer the ownership.
-  lru_cache_.insert(key, token.release(), 1);
-}
 
 } // namespace GcpAuthn
 } // namespace HttpFilters
