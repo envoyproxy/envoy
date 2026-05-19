@@ -143,6 +143,7 @@ public:
 
   // MCP validation getters
   bool isValidMcp() const { return is_valid_mcp_; }
+  bool isResponse() const { return has_result_ || has_error_; }
   const std::string& getMethod() const { return method_; }
 
 private:
@@ -191,6 +192,8 @@ private:
   bool is_valid_mcp_{false};
   bool has_jsonrpc_{false};
   bool has_method_{false};
+  bool has_result_{false};
+  bool has_error_{false};
 
   // Parsing completion state
   bool can_stop_parsing_{false};
@@ -247,6 +250,9 @@ public:
 
   // Check if all required fields have been collected
   bool hasAllRequiredFields();
+
+  // Check if this is a JSON-RPC response (has result/error, no method).
+  bool isResponse() const;
 
   // Get the method string
   const std::string& getMethod() const;
