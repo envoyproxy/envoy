@@ -638,9 +638,6 @@ ok_response:
 // This test ensures keep_empty_value is respected in ext_authz responses.
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithKeepEmptyValueRespected) {
   initialize();
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.ext_authz_respect_keep_empty_value", "true"}});
 
   envoy::service::auth::v3::CheckResponse check_response;
   TestUtility::loadFromYaml(R"EOF(
@@ -679,12 +676,18 @@ ok_response:
 
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithKeepEmptyValueTrue) {
   initialize();
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.ext_authz_respect_keep_empty_value", "true"}});
-
   envoy::service::auth::v3::CheckResponse check_response;
-
+  TestUtility::loadFromYaml(R"EOF(
+status:
+  code: 0
+ok_response:
+  headers:
+  - header:
+      key: x-keep-empty
+      value: ""
+    keep_empty_value: true
+)EOF",
+                            check_response);
   // keep_empty_value is true and value is empty, so the header should be kept.
   auto expected_authz_response = Response{
       .status = CheckStatus::OK,
@@ -692,15 +695,16 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithKeepEmptyValueTrue) {
       .status_code = Http::Code::OK,
       .grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok,
   };
-
-  // Build a response where keep_empty_value = true with an empty value
-  auto* header = check_response.mutable_ok_response()->mutable_response_headers_to_add()->Add();
-  header->mutable_header()->set_key("x-keep-empty");
-  header->mutable_header()->set_value("");
-  header->set_keep_empty_value(true);
-
-  // Assert the empty header IS present in the response
-  expectResponse(check_response, expected_authz_response);
+  envoy::service::auth::v3::CheckRequest request;
+  expectCallSend(request);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  Http::TestRequestHeaderMapImpl headers;
+  client_->onCreateInitialMetadata(headers);
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                      AuthzOkResponse(expected_authz_response))));
+  client_->onSuccess(std::make_unique<envoy::service::auth::v3::CheckResponse>(check_response),
+                     span_);
 }
 
 } // namespace ExtAuthz
