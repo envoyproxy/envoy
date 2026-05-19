@@ -106,7 +106,7 @@ bug_fixes:
   change: |
     Fixed a bug where ``keep_empty_value`` in ``HeaderValueOption`` was not respected.
     Empty-valued headers are now dropped by default. This behavior can be reverted by setting
-    runtime guard ``envoy.reloadable_features.ext_authz_respect_keep_empty_value`` to ``false``.    
+    runtime guard ``envoy.reloadable_features.ext_authz_respect_keep_empty_value`` to ``false``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
