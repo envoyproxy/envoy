@@ -94,10 +94,26 @@ RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) 
   }
 
   ENVOY_LOG(debug, "reverse_connection: using host identifier: {}", final_host_id);
-  return parent_->checkAndCreateHost(final_host_id);
+
+  Upstream::HostSharedPtr created_host;
+  auto response = parent_->checkAndCreateHost(final_host_id, created_host);
+
+  if (created_host != nullptr) {
+    std::weak_ptr<RevConCluster> weak_parent = parent_;
+    parent_->dispatcher_.post([weak_parent, created_host]() {
+      if (auto parent = weak_parent.lock()) {
+        parent->addHostToHostSet(created_host);
+      }
+    });
+  }
+
+  return response;
 }
 
-Upstream::HostSelectionResponse RevConCluster::checkAndCreateHost(absl::string_view host_id) {
+Upstream::HostSelectionResponse
+RevConCluster::checkAndCreateHost(absl::string_view host_id,
+                                  Upstream::HostSharedPtr& created_host) {
+  created_host = nullptr;
   // Get the SocketManager to resolve cluster ID to node ID.
   // The bootstrap extension is validated during cluster creation, and TLS is initialized before
   // request handling, so socket_manager should always be available.
@@ -146,25 +162,49 @@ Upstream::HostSelectionResponse RevConCluster::checkAndCreateHost(absl::string_v
   ENVOY_LOG(trace, "reverse_connection: created HostImpl {} for {}.", *host, node_id);
 
   host_map_[node_id] = host;
+  created_host = host;
   return {host};
 }
 
-void RevConCluster::cleanup() {
-  absl::WriterMutexLock wlock(host_map_lock_);
+void RevConCluster::addHostToHostSet(Upstream::HostSharedPtr host) {
+  const auto& first_host_set = priority_set_.getOrCreateHostSet(0);
+  Upstream::HostVectorSharedPtr all_hosts(new Upstream::HostVector(first_host_set.hosts()));
+  all_hosts->emplace_back(host);
+  ENVOY_LOG(debug, "reverse_connection: adding host to priority set, total hosts: {}",
+            all_hosts->size());
+  priority_set_.updateHosts(
+      0, Upstream::HostSetImpl::partitionHosts(all_hosts, Upstream::HostsPerLocalityImpl::empty()),
+      {}, {std::move(host)}, {}, absl::nullopt, absl::nullopt);
+}
 
-  for (auto iter = host_map_.begin(); iter != host_map_.end();) {
-    // Check if the host handle is acquired by any connection pool container or not. If not
-    // clean those host to prevent memory leakage.
-    const auto& host = iter->second;
-    if (!host->used()) {
-      ENVOY_LOG(debug, "Removing stale host: {}", *host);
-      host_map_.erase(iter++);
-    } else {
-      ++iter;
+void RevConCluster::cleanup() {
+  Upstream::HostVector to_be_removed;
+  Upstream::HostVectorSharedPtr keeping_hosts;
+
+  {
+    absl::WriterMutexLock wlock(host_map_lock_);
+    keeping_hosts = std::make_shared<Upstream::HostVector>();
+
+    for (auto iter = host_map_.begin(); iter != host_map_.end();) {
+      const auto& host = iter->second;
+      if (!host->used()) {
+        ENVOY_LOG(debug, "Removing stale host: {}", *host);
+        to_be_removed.push_back(host);
+        host_map_.erase(iter++);
+      } else {
+        keeping_hosts->push_back(host);
+        ++iter;
+      }
     }
   }
 
-  // Reschedule the cleanup after cleanup_interval_ duration.
+  if (!to_be_removed.empty()) {
+    priority_set_.updateHosts(0,
+                              Upstream::HostSetImpl::partitionHosts(
+                                  keeping_hosts, Upstream::HostsPerLocalityImpl::empty()),
+                              {}, {}, to_be_removed, absl::nullopt, absl::nullopt);
+  }
+
   cleanup_timer_->enableTimer(cleanup_interval_);
 }
 
