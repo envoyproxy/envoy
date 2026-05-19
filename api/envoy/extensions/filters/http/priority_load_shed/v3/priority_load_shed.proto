@@ -4,6 +4,8 @@ package envoy.extensions.filters.http.priority_load_shed.v3;
 
 import "envoy/type/v3/range.proto";
 
+import "google/protobuf/wrappers.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -43,9 +45,9 @@ message PriorityLoadShed {
 
   // If true, requests without the configured priority header are rejected with ``400`` instead
   // of using ``default_load_shed_point`` or bypassing the filter.
-  bool reject_on_missing_header = 4;
+  google.protobuf.BoolValue reject_on_missing_header = 4;
 
   // If true, requests with a non-numeric or negative header value are rejected with ``400``
   // instead of using ``default_load_shed_point`` or bypassing the filter.
-  bool reject_on_invalid_header = 5;
+  google.protobuf.BoolValue reject_on_invalid_header = 5;
 }

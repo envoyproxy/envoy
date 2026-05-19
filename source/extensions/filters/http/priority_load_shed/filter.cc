@@ -8,6 +8,7 @@
 
 #include "source/common/common/fmt.h"
 #include "source/common/http/headers.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/stream_info/utility.h"
 
 #include "absl/strings/numbers.h"
@@ -33,9 +34,10 @@ PriorityLoadShedFilterConfig::create(const ProtoConfig& config,
 PriorityLoadShedFilterConfig::PriorityLoadShedFilterConfig(
     const ProtoConfig& config, Server::LoadShedPointProvider& load_shed_point_provider,
     const std::string& stats_prefix, Stats::Scope& scope, absl::Status& creation_status)
-    : header_name_(config.header_name()),
-      reject_on_missing_header_(config.reject_on_missing_header()),
-      reject_on_invalid_header_(config.reject_on_invalid_header()),
+    : header_name_(config.header_name()), reject_on_missing_header_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+                                              config, reject_on_missing_header, false)),
+      reject_on_invalid_header_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, reject_on_invalid_header, false)),
       stats_(generateStats(stats_prefix, scope)) {
   if (config.header_name().empty()) {
     creation_status = absl::InvalidArgumentError("header_name must be non-empty");
