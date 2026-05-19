@@ -127,6 +127,10 @@ bug_fixes:
     Apple's ``SystemConfiguration`` framework. The framework is required by the
     ``system-configuration`` crate that ``hickory-resolver`` pulls in via its
     ``system-config`` feature.
+- area: oauth2
+  change: |
+    Fixed a bug where HMAC verification may exposure a timing side channel that leaks information of
+    HMAC secret validity.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
