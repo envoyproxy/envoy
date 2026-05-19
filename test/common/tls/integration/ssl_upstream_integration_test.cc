@@ -1,3 +1,6 @@
+#include "source/common/tls/server_context_config_impl.h"
+#include "source/common/tls/server_ssl_socket.h"
+
 #include "test/integration/http_integration.h"
 
 namespace Envoy {
@@ -160,6 +163,59 @@ TEST_P(SslUpstreamIntegrationTest, BothAutoValidationPreferenceSuccess) {
   auto_sni_san_validation_ = true;
   auto_san_validation_ = true;
   expectCertValidationSuccess();
+}
+
+class SslUpstreamNulSanIntegrationTest : public SslUpstreamIntegrationTest {
+public:
+  Network::DownstreamTransportSocketFactoryPtr
+  createCustomUpstreamTlsContext(const FakeUpstreamConfig& /*upstream_config*/) {
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    const std::string rundir = TestEnvironment::runfilesDirectory();
+
+    tls_context.mutable_common_tls_context()
+        ->mutable_validation_context()
+        ->mutable_trusted_ca()
+        ->set_filename(rundir + "/test/config/integration/certs/upstreamcacert.pem");
+
+    auto* certs = tls_context.mutable_common_tls_context()->add_tls_certificates();
+    certs->mutable_certificate_chain()->set_filename(
+        rundir + "/test/config/integration/certs/san_nul_servercert.pem");
+    certs->mutable_private_key()->set_filename(rundir +
+                                               "/test/config/integration/certs/upstreamkey.pem");
+
+    tls_context.mutable_common_tls_context()->add_alpn_protocols("http/1.1");
+
+    auto cfg_or_error = Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
+        tls_context, factory_context_, {}, false);
+    RELEASE_ASSERT(cfg_or_error.ok(), std::string(cfg_or_error.status().message()));
+    auto cfg = std::move(*cfg_or_error);
+    static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
+    auto factory_or_error = Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
+        std::move(cfg), BaseIntegrationTest::context_manager_, *upstream_stats_store->rootScope());
+    RELEASE_ASSERT(factory_or_error.ok(), std::string(factory_or_error.status().message()));
+    return std::move(*factory_or_error);
+  }
+
+  void createUpstreams() override {
+    for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
+      auto endpoint = upstream_address_fn_(i);
+      FakeUpstreamConfig config = upstreamConfig();
+      Network::DownstreamTransportSocketFactoryPtr factory = createCustomUpstreamTlsContext(config);
+      fake_upstreams_.emplace_back(std::make_unique<AutonomousUpstream>(
+          std::move(factory), endpoint, config, autonomous_allow_incomplete_streams_));
+    }
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, SslUpstreamNulSanIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(SslUpstreamNulSanIntegrationTest, EmbeddedNulSanValidation) {
+  auto_sni_ = true;
+  auto_san_validation_ = true;
+  sni_header_ = "example.com";
+  expectCertValidationFailure();
 }
 
 } // namespace Ssl
