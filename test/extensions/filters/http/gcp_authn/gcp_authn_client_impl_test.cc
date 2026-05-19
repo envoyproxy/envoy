@@ -228,6 +228,58 @@ TEST_F(GcpAuthnClientImplTest, NoRetryPolicy) {
   EXPECT_FALSE(options_.retry_policy.has_value());
 }
 
+TEST_F(GcpAuthnClientImplTest, TimeoutAtRootConfig) {
+  std::string root_timeout_config = R"EOF(
+    http_uri:
+      uri: http://testhost/path/test
+      cluster: test_cluster
+      timeout:
+        seconds: 5
+    timeout:
+      seconds: 15
+  )EOF";
+
+  GcpAuthnFilterConfig config;
+  TestUtility::loadFromYaml(root_timeout_config, config);
+  config_ = config;
+
+  setupMockObjects();
+  createClient();
+
+  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
+  token_request.mutable_jwt()->set_audience("http://test_audience");
+  client_->fetchToken(token_request, request_callbacks_);
+
+  // Verify that root-level timeout (15s) takes precedence over http_uri level timeout (5s).
+  EXPECT_EQ(options_.timeout->count(), 15000);
+}
+
+TEST_F(GcpAuthnClientImplTest, JwtParsingFailure) {
+  setupMockObjects();
+  createClient();
+
+  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
+  token_request.mutable_jwt()->set_audience("http://test_audience");
+  client_->fetchToken(token_request, request_callbacks_);
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  // Set invalid payload body
+  response->body().add("invalid_jwt_token_payload");
+
+  // Assert that callbacks are notified with an error since JWT parsing failed.
+  EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
+      .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
+        EXPECT_FALSE(token.ok());
+        EXPECT_EQ(token.status().message(), "Failed to parse identity token/JWT.");
+      }));
+
+  client_callback_->onSuccess(client_request_, std::move(response));
+}
+
 } // namespace
 } // namespace GcpAuthn
 } // namespace HttpFilters

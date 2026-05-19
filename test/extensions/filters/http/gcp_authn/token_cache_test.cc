@@ -104,6 +104,65 @@ TEST_F(TokenCacheTest, TokenWithClockSkew) {
   EXPECT_EQ(found_token.value(), "foo");
 }
 
+TEST_F(TokenCacheTest, TokenWithoutExpiration) {
+  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
+  token_request.mutable_jwt()->set_audience("http://example_service");
+
+  auto token = std::make_unique<GcpToken>();
+  token->token = "foo";
+  token->expires_at = 0; // 0 indicates no expiration
+
+  token_cache_->insert(token_request, std::move(token));
+
+  // Advance the simulated clock by a huge amount (e.g. 10 years)
+  time_system_.setSystemTime(std::chrono::system_clock::from_time_t(ExpTime + 315360000));
+
+  // The lookup should still find the token since it has no expiration!
+  auto found_token = token_cache_->lookUp(token_request);
+  EXPECT_TRUE(found_token.has_value());
+  EXPECT_EQ(found_token.value(), "foo");
+}
+
+TEST_F(TokenCacheTest, LruEviction) {
+  // Initialize a cache with capacity 2.
+  envoy::extensions::filters::http::gcp_authn::v3::TokenCacheConfig config;
+  config.mutable_cache_size()->set_value(2);
+  auto small_cache = std::make_unique<TokenCacheImpl>(config, time_system_);
+
+  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest req1;
+  req1.mutable_jwt()->set_audience("http://service1");
+  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest req2;
+  req2.mutable_jwt()->set_audience("http://service2");
+  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest req3;
+  req3.mutable_jwt()->set_audience("http://service3");
+
+  // Insert first two entries.
+  auto t1 = std::make_unique<GcpToken>();
+  t1->token = "token1";
+  t1->expires_at = ExpTime;
+  small_cache->insert(req1, std::move(t1));
+
+  auto t2 = std::make_unique<GcpToken>();
+  t2->token = "token2";
+  t2->expires_at = ExpTime;
+  small_cache->insert(req2, std::move(t2));
+
+  // Verify both are present.
+  EXPECT_TRUE(small_cache->lookUp(req1).has_value());
+  EXPECT_TRUE(small_cache->lookUp(req2).has_value());
+
+  // Insert third entry, which should trigger eviction of the least recently used entry (req1).
+  auto t3 = std::make_unique<GcpToken>();
+  t3->token = "token3";
+  t3->expires_at = ExpTime;
+  small_cache->insert(req3, std::move(t3));
+
+  // Verify req1 is evicted, while req2 and req3 are still present.
+  EXPECT_FALSE(small_cache->lookUp(req1).has_value());
+  EXPECT_TRUE(small_cache->lookUp(req2).has_value());
+  EXPECT_TRUE(small_cache->lookUp(req3).has_value());
+}
+
 } // namespace
 } // namespace GcpAuthn
 } // namespace HttpFilters
