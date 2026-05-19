@@ -6,6 +6,7 @@ permissions:
 on:
   workflow_call:
     secrets:
+      dockerhub-token:
       slack-bot-token:
     inputs:
       request:
@@ -23,6 +24,7 @@ concurrency:
 jobs:
   build:
     secrets:
+      dockerhub-token: ${{ secrets.dockerhub-token }}
       slack-bot-token: ${{ secrets.slack-bot-token }}
     permissions:
       actions: read

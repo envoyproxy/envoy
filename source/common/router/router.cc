@@ -833,9 +833,21 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
   // Ensure an http transport scheme is selected before continuing with decoding.
   ASSERT(headers.Scheme());
 
+  const auto* effective_retry_policy = getEffectiveRetryPolicy();
   retry_state_ =
-      createRetryState(*getEffectiveRetryPolicy(), headers, *cluster_, config_->factory_context_,
+      createRetryState(*effective_retry_policy, headers, *cluster_, config_->factory_context_,
                        callbacks_->dispatcher(), route_entry_->priority());
+  if (retry_state_ != nullptr) {
+    // Cross-cluster retry is enabled only if the retry policy requests cluster refresh and hedging
+    // is not active (hedging with cross-cluster retry is not supported).
+    //
+    // If the hedging policy is enabled, there would be multiple request attempts in parallel and
+    // different clusters may be selected for different attempts. It would make the retry logic more
+    // complicated.
+    cross_cluster_retry_ = effective_retry_policy->refreshClusterOnRetry() &&
+                           !hedging_params_.hedge_on_per_try_timeout_ &&
+                           callbacks_->downstreamCallbacks().has_value();
+  }
 
   absl::InlinedVector<std::reference_wrapper<const ShadowPolicy>, 2> active_shadow_policies;
 
@@ -904,6 +916,8 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
       // copy whole headers map is not cheap.
       shadow_headers = std::move(original_shadow_headers);
     } else {
+      ASSERT(original_shadow_headers != nullptr);
+      // NOLINTNEXTLINE(bugprone-use-after-move)
       shadow_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(*original_shadow_headers);
     }
     applyShadowPolicyHeaders(shadow_policy, *shadow_headers);
@@ -1181,6 +1195,8 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trail
       // copy whole trailers map is not cheap.
       shadow_trailer = std::move(original_shadow_trailer);
     } else {
+      ASSERT(original_shadow_trailer != nullptr);
+      // NOLINTNEXTLINE(bugprone-use-after-move)
       shadow_trailer = Http::createHeaderMap<Http::RequestTrailerMapImpl>(*original_shadow_trailer);
     }
     ASSERT(shadow_trailer != nullptr);
@@ -1982,7 +1998,7 @@ void Filter::onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_re
   // When route retry policy is configured and an upstream filter is returning StopIteration
   // in it's encodeHeaders() method, upstream_requests_.size() is equal to 0 in this case,
   // and we should just return.
-  if (upstream_requests_.size() == 0) {
+  if (upstream_requests_.empty()) {
     return;
   }
 
@@ -2006,7 +2022,7 @@ void Filter::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
   // When route retry policy is configured and an upstream filter is returning StopIteration
   // in it's encodeHeaders() method, upstream_requests_.size() is equal to 0 in this case,
   // and we should just return.
-  if (upstream_requests_.size() == 0) {
+  if (upstream_requests_.empty()) {
     return;
   }
 
@@ -2306,6 +2322,16 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
     host_selection_cancelable_.reset();
   }
 
+  if (cross_cluster_retry_) {
+    // If the cross cluster retry is enabled, we need to refresh the route cluster for this attempt.
+    //
+    // TODO(wbpcode): In current implementation, although we will refresh the target upstream
+    // cluster for this retry attempt. But part of initial cluster's configuration like circuit
+    // breaking, retry policy and so on will still be used for this request because it will bring
+    // lots of complexity to refresh all these state and bring limited benefit.
+    callbacks_->downstreamCallbacks()->refreshRouteCluster();
+  }
+
   // Clusters can technically get removed by CDS during a retry. Make sure it still exists.
   const auto cluster = config_->cm_.getThreadLocalCluster(route_entry_->clusterName());
   std::unique_ptr<GenericConnPool> generic_conn_pool;
@@ -2313,6 +2339,13 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
     sendNoHealthyUpstreamResponse({});
     cleanup();
     return;
+  }
+
+  if (auto cluster_info = cluster->info(); cluster_info != cluster_) {
+    ENVOY_STREAM_LOG(debug, "cross cluster retry from {} to {}", *callbacks_, cluster_->name(),
+                     cluster_info->name());
+    expired_clusters_.emplace_back(std::move(cluster_));
+    cluster_ = std::move(cluster_info);
   }
 
   // Update retry stats for the retry attempt before doing host selection, so that the stats are

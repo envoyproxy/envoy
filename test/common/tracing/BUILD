@@ -67,7 +67,7 @@ envoy_cc_test(
         "//source/common/tracing:tracer_config_lib",
         "//source/common/tracing:tracer_lib",
         "//source/common/tracing:tracer_manager_lib",
-        "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/server:tracer_factory_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",

@@ -13,7 +13,6 @@
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/config/xds_manager.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/server/instance.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {

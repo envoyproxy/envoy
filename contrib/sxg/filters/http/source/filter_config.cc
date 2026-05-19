@@ -34,10 +34,10 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::sxg::v3alpha:
       duration_(proto_config.has_duration() ? proto_config.duration().seconds() : 604800UL),
       cbor_url_(proto_config.cbor_url()), validity_url_(proto_config.validity_url()),
       mi_record_size_(proto_config.mi_record_size() ? proto_config.mi_record_size() : 4096L),
-      client_can_accept_sxg_header_(proto_config.client_can_accept_sxg_header().length() > 0
+      client_can_accept_sxg_header_(!proto_config.client_can_accept_sxg_header().empty()
                                         ? proto_config.client_can_accept_sxg_header()
                                         : "x-client-can-accept-sxg"),
-      should_encode_sxg_header_(proto_config.should_encode_sxg_header().length() > 0
+      should_encode_sxg_header_(!proto_config.should_encode_sxg_header().empty()
                                     ? proto_config.should_encode_sxg_header()
                                     : "x-should-encode-sxg"),
       header_prefix_filters_(initializeHeaderPrefixFilters(proto_config.header_prefix_filters())),

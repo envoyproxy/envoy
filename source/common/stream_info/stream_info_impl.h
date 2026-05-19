@@ -586,7 +586,7 @@ private:
   bool should_scheme_match_upstream_{false};
   bool should_drain_connection_{false};
   bool is_shadow_{false};
-  absl::optional<uint32_t> codec_stream_id_{};
+  absl::optional<uint32_t> codec_stream_id_;
 };
 
 } // namespace StreamInfo

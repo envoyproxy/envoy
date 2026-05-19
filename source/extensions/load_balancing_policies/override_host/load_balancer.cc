@@ -208,7 +208,7 @@ void OverrideHostLoadBalancer::LoadBalancerImpl::addSelectedHostKey(
 
   const std::string selected_endpoint = response.host->address()->asString();
   const Config::MetadataKey& metadata_key = config_.selectedHostKey().value();
-  if (metadata_key.path_.size() < 1) {
+  if (metadata_key.path_.empty()) {
     // Should not be possible based on proto validation, catching anyways.
     ENVOY_LOG(trace, "Path was not provided in selected_host_key.");
     return;
