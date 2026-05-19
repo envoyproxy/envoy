@@ -20,7 +20,7 @@
 #include "source/common/rds/static_route_config_provider_impl.h"
 
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"

@@ -1,4 +1,5 @@
 date: Pending
+<<<<<<< fix/40221-health-check-status-code
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
@@ -205,3 +206,5 @@ new_features:
     to discern if a TLS connection used a post quantum safe key exchange (e.g. X25519MLKEM768).
 
 deprecated:
+=======
+>>>>>>> main

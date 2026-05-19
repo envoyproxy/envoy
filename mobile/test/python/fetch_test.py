@@ -1,6 +1,5 @@
 """Integration tests for the Envoy Mobile Python bindings."""
 
-import random
 import threading
 import unittest
 from test.python.echo_test_server import EchoTestServer
@@ -21,10 +20,9 @@ class TestFetchRequest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Set up an echo test server for the tests to hit."""
-        port = random.randint(2**14, 2**16)
-        cls._echo_server = EchoTestServer("127.0.0.1", port)
+        cls._echo_server = EchoTestServer()
         cls._echo_server.start()
-        cls._echo_server_url = f"127.0.0.1:{port}"
+        cls._echo_server_url = cls._echo_server.url
 
     @classmethod
     def tearDownClass(cls):
@@ -38,6 +36,7 @@ class TestFetchRequest(unittest.TestCase):
             EngineBuilder()
             .set_log_level(LogLevel.trace)
             .add_runtime_guard("dns_cache_set_ip_version_to_remove", True)
+            .add_runtime_guard("getaddrinfo_no_ai_flags", True)
             .set_on_engine_running(lambda: engine_running.set())
             .enable_worker_thread(True)
             .build()
