@@ -190,7 +190,7 @@ genrule(
         ":versions.yaml",
         "//:VERSION.txt",
         "//changelogs",
-        "//changelogs:sections.yaml",
+        "//changelogs:changelogs.yaml",
         "//tools/docs:generate_version_histories",
     ],
 )
