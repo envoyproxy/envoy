@@ -16,7 +16,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"

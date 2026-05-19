@@ -45,7 +45,6 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/tracers/xray:config",
-        "//test/mocks/server:instance_mocks",
         "//test/mocks/server:tracer_factory_context_mocks",
         "//test/mocks/server:tracer_factory_mocks",
         "//test/test_common:environment_lib",

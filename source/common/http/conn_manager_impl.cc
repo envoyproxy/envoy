@@ -133,6 +133,10 @@ ConnectionManagerImpl::ConnectionManagerImpl(
           overload_manager.getLoadShedPoint(Server::LoadShedPointName::get().HcmDecodeHeaders)),
       hcm_ondata_creating_codec_(
           overload_manager.getLoadShedPoint(Server::LoadShedPointName::get().HcmCodecCreation)),
+      should_send_go_away_on_dispatch_(overload_manager.getLoadShedPoint(
+          Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch)),
+      should_send_go_away_and_close_on_dispatch_(overload_manager.getLoadShedPoint(
+          Server::LoadShedPointName::get().H2ServerGoAwayAndCloseOnDispatch)),
       overload_stop_accepting_requests_ref_(
           overload_state_.getState(Server::OverloadActionNames::get().StopAcceptingRequests)),
       overload_disable_keepalive_ref_(
@@ -155,6 +159,13 @@ ConnectionManagerImpl::ConnectionManagerImpl(
   ENVOY_LOG_ONCE_IF(trace, hcm_ondata_creating_codec_ == nullptr,
                     "LoadShedPoint envoy.load_shed_points.hcm_ondata_creating_codec is not found. "
                     "Is it configured?");
+  ENVOY_LOG_ONCE_IF(trace, should_send_go_away_on_dispatch_ == nullptr,
+                    "LoadShedPoint envoy.load_shed_points.http2_server_go_away_on_dispatch is not "
+                    "found. Is it configured?");
+  ENVOY_LOG_ONCE_IF(
+      trace, should_send_go_away_and_close_on_dispatch_ == nullptr,
+      "LoadShedPoint envoy.load_shed_points.http2_server_go_away_and_close_on_dispatch is not "
+      "found. Is it configured?");
 }
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
@@ -514,6 +525,20 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
     createCodec(data);
   }
 
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_fix_goaway_loadshed_point")) {
+    if (should_send_go_away_and_close_on_dispatch_ != nullptr &&
+        should_send_go_away_and_close_on_dispatch_->shouldShedLoad()) {
+      sendGoAwayAndClose(/*graceful=*/false);
+      handleCodecOverloadError(
+          "Load shed point http2_server_go_away_and_close_on_dispatch triggered");
+      return Network::FilterStatus::StopIteration;
+    }
+    if (should_send_go_away_on_dispatch_ != nullptr &&
+        should_send_go_away_on_dispatch_->shouldShedLoad()) {
+      sendGoAwayAndClose(/*graceful=*/true);
+    }
+  }
+
   bool redispatch;
   do {
     redispatch = false;
@@ -794,7 +819,7 @@ void ConnectionManagerImpl::onDrainTimeout() {
 }
 
 void ConnectionManagerImpl::sendGoAwayAndClose(bool graceful) {
-  ENVOY_CONN_LOG(trace, "connection manager sendGoAwayAndClose was triggerred from filters.",
+  ENVOY_CONN_LOG(trace, "connection manager sendGoAwayAndClose was triggered.",
                  read_callbacks_->connection());
   if (go_away_sent_) {
     return;

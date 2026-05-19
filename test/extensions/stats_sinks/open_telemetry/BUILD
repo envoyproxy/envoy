@@ -19,7 +19,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.stat_sinks.open_telemetry"],
     deps = [
         "//source/extensions/stat_sinks/open_telemetry:config",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/stat_sinks/open_telemetry/v3:pkg_cc_proto",
     ],
@@ -34,7 +34,7 @@ envoy_extension_cc_test(
         "//source/extensions/stat_sinks/open_telemetry:config",
         "//source/extensions/stat_sinks/open_telemetry:open_telemetry_lib",
         "//test/mocks/grpc:grpc_mocks",
-        "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
     ],
 )
 
@@ -74,6 +74,7 @@ envoy_cc_benchmark_binary(
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/stat_sinks/open_telemetry:open_telemetry_lib",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/container:inlined_vector",
