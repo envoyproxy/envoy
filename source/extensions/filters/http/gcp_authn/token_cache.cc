@@ -1,4 +1,5 @@
 #include "source/extensions/filters/http/gcp_authn/token_cache.h"
+
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
