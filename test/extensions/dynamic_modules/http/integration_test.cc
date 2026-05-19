@@ -1025,10 +1025,6 @@ TEST_P(DynamicModulesIntegrationTest, ConfigScheduler) {
   FAIL() << "Config was not updated in time";
 }
 
-// Verifies the config-time HttpCallout API: the filter config Create() initiates a
-// callout via HttpFilterConfigHandle.HttpCallout against cluster_0. Per-request filters
-// short-circuit with x-config-callout: success once the callout completes
-// (503 + "pending" until then).
 TEST_P(DynamicModulesIntegrationTest, ConfigCallout) {
   // C++ SDK does not expose the config-time callout API; skip.
   if (GetParam() == "cpp") {
@@ -1186,13 +1182,6 @@ TEST_P(DynamicModulesIntegrationTest, ListMetadataCallbacks) {
   EXPECT_EQ("false", bool_1[0]->value().getStringView());
 }
 
-// Verifies the scalar dynamic-metadata getters and SetMetadata. The route is configured
-// with metadata under "test_ns" containing string/number/bool values; the filter reads
-// them via Route source, writes them into Dynamic source under a test namespace, and on
-// the response side reads them back from Dynamic source and surfaces them via headers.
-//
-// Verifies: GetMetadataString, GetMetadataNumber, GetMetadataBool, SetMetadata,
-// GetMetadataKeys.
 TEST_P(DynamicModulesIntegrationTest, DynamicMetadata) {
   // C++ SDK doesn't currently surface the same scalar metadata API in its integration
   // module; skip.
@@ -1239,10 +1228,6 @@ TEST_P(DynamicModulesIntegrationTest, DynamicMetadata) {
   EXPECT_EQ("3", count_hdr[0]->value().getStringView());
 }
 
-// Verifies SetFilterState/GetFilterState round-trip across filter boundaries:
-// filter_state_writer (configured with "round_trip_value") sets a key on the request
-// side; filter_state_reader (chained after) reads it on the request side and surfaces
-// it via x-filter-state-value on the response.
 TEST_P(DynamicModulesIntegrationTest, FilterStateRoundTrip) {
   if (GetParam() == "cpp") {
     return;

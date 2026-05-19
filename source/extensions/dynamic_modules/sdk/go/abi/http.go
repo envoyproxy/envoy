@@ -16,6 +16,7 @@ import (
 	_ "embed"
 	"fmt"
 	"runtime"
+	"strconv"
 	"sync"
 	"unsafe"
 
@@ -32,6 +33,12 @@ type httpFilterConfigWrapperPerRoute struct {
 	config any
 }
 
+type httpFilterWrapper = dymHttpFilterHandle
+
+type httpFilterSharedDataWrapper struct {
+	data any
+}
+
 const numManagerShards = 32
 
 // The managers to keep track of configs and plugins.
@@ -45,19 +52,16 @@ func (m *manager[T]) record(item *T) unsafe.Pointer {
 	index := uintptr(pointer) % numManagerShards
 	m.mutex[index].Lock()
 	defer m.mutex[index].Unlock()
+	// Assume the map is initialized.
 	m.data[index][uintptr(pointer)] = item
 	return pointer
 }
 
-// unwrap returns the live wrapper for the given pointer key, or nil if the wrapper is no
-// longer registered (e.g., remove already ran). Callers MUST handle a nil return — a stale
-// pointer cast would otherwise alias freed memory and crash or corrupt unrelated state when
-// Envoy delivers a late callback after destroy.
 func (m *manager[T]) unwrap(itemPtr unsafe.Pointer) *T {
-	if itemPtr == nil {
-		return nil
-	}
-	key := uintptr(itemPtr)
+	return (*T)(itemPtr)
+}
+
+func (m *manager[T]) search(key uintptr) *T {
 	index := key % numManagerShards
 	m.mutex[index].Lock()
 	defer m.mutex[index].Unlock()
@@ -81,7 +85,8 @@ func newManager[T any]() *manager[T] {
 
 var configManager = newManager[httpFilterConfigWrapper]()
 var configPerRouteManager = newManager[httpFilterConfigWrapperPerRoute]()
-var pluginManager = newManager[dymHttpFilterHandle]()
+var pluginManager = newManager[httpFilterWrapper]()
+var sharedDataManager = newManager[httpFilterSharedDataWrapper]()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -198,7 +203,7 @@ func envoyBufferSliceToUnsafeEnvoyBufferSlice(
 
 func hostLog(level shared.LogLevel, format string, args []any) {
 	logLevel := uint32(level)
-	// Skip Sprintf if logging at this level is disabled.
+	// Quick check if logging is enabled at this level.
 	if !bool(C.envoy_dynamic_module_callback_log_enabled(
 		(C.envoy_dynamic_module_type_log_level)(logLevel),
 	)) {
@@ -302,7 +307,7 @@ func (h *dymHeaderMap) Add(key, value string) {
 }
 
 func (h *dymHeaderMap) Remove(key string) {
-	// The ABI removes a header by setting its value to a null buffer.
+	// The ABI use the set to nil to remove the header.
 	C.envoy_dynamic_module_callback_http_set_header(
 		(C.envoy_dynamic_module_type_http_filter_envoy_ptr)(h.hostPluginPtr),
 		(C.envoy_dynamic_module_type_http_header_type)(h.headerType),
@@ -371,12 +376,15 @@ func (b *dymBodyBuffer) Drain(size uint64) {
 // child spans spawned from this span can be tracked on the owning filter handle and safely
 // retired when the stream is destroyed.
 type dymSpan struct {
-	spanPtr       C.envoy_dynamic_module_type_span_envoy_ptr
 	hostPluginPtr C.envoy_dynamic_module_type_http_filter_envoy_ptr
+	spanPtr       C.envoy_dynamic_module_type_span_envoy_ptr
 	filter        *dymHttpFilterHandle
 }
 
 func (s *dymSpan) SetTag(key, value string) {
+	if s == nil || s.spanPtr == nil {
+		return
+	}
 	C.envoy_dynamic_module_callback_http_span_set_tag(
 		s.spanPtr,
 		stringToModuleBuffer(key),
@@ -387,6 +395,9 @@ func (s *dymSpan) SetTag(key, value string) {
 }
 
 func (s *dymSpan) SetOperation(operation string) {
+	if s == nil || s.spanPtr == nil {
+		return
+	}
 	C.envoy_dynamic_module_callback_http_span_set_operation(
 		s.spanPtr,
 		stringToModuleBuffer(operation),
@@ -395,6 +406,9 @@ func (s *dymSpan) SetOperation(operation string) {
 }
 
 func (s *dymSpan) Log(event string) {
+	if s == nil || s.spanPtr == nil {
+		return
+	}
 	C.envoy_dynamic_module_callback_http_span_log(
 		s.hostPluginPtr,
 		s.spanPtr,
@@ -404,13 +418,16 @@ func (s *dymSpan) Log(event string) {
 }
 
 func (s *dymSpan) SetSampled(sampled bool) {
-	C.envoy_dynamic_module_callback_http_span_set_sampled(
-		s.spanPtr,
-		(C.bool)(sampled),
-	)
+	if s == nil || s.spanPtr == nil {
+		return
+	}
+	C.envoy_dynamic_module_callback_http_span_set_sampled(s.spanPtr, C.bool(sampled))
 }
 
 func (s *dymSpan) GetBaggage(key string) (shared.UnsafeEnvoyBuffer, bool) {
+	if s == nil || s.spanPtr == nil {
+		return shared.UnsafeEnvoyBuffer{}, false
+	}
 	var valueView C.envoy_dynamic_module_type_envoy_buffer
 	ret := C.envoy_dynamic_module_callback_http_span_get_baggage(
 		s.spanPtr,
@@ -418,13 +435,19 @@ func (s *dymSpan) GetBaggage(key string) (shared.UnsafeEnvoyBuffer, bool) {
 		&valueView,
 	)
 	runtime.KeepAlive(key)
-	if !bool(ret) || valueView.ptr == nil || valueView.length == 0 {
-		return shared.UnsafeEnvoyBuffer{}, bool(ret)
+	if !bool(ret) {
+		return shared.UnsafeEnvoyBuffer{}, false
+	}
+	if valueView.ptr == nil || valueView.length == 0 {
+		return shared.UnsafeEnvoyBuffer{}, true
 	}
 	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
 }
 
 func (s *dymSpan) SetBaggage(key, value string) {
+	if s == nil || s.spanPtr == nil {
+		return
+	}
 	C.envoy_dynamic_module_callback_http_span_set_baggage(
 		s.spanPtr,
 		stringToModuleBuffer(key),
@@ -435,36 +458,45 @@ func (s *dymSpan) SetBaggage(key, value string) {
 }
 
 func (s *dymSpan) GetTraceID() (shared.UnsafeEnvoyBuffer, bool) {
+	if s == nil || s.spanPtr == nil {
+		return shared.UnsafeEnvoyBuffer{}, false
+	}
 	var valueView C.envoy_dynamic_module_type_envoy_buffer
-	ret := C.envoy_dynamic_module_callback_http_span_get_trace_id(
-		s.spanPtr,
-		&valueView,
-	)
-	if !bool(ret) || valueView.ptr == nil || valueView.length == 0 {
-		return shared.UnsafeEnvoyBuffer{}, bool(ret)
+	ret := C.envoy_dynamic_module_callback_http_span_get_trace_id(s.spanPtr, &valueView)
+	if !bool(ret) {
+		return shared.UnsafeEnvoyBuffer{}, false
+	}
+	if valueView.ptr == nil || valueView.length == 0 {
+		return shared.UnsafeEnvoyBuffer{}, true
 	}
 	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
 }
 
 func (s *dymSpan) GetSpanID() (shared.UnsafeEnvoyBuffer, bool) {
+	if s == nil || s.spanPtr == nil {
+		return shared.UnsafeEnvoyBuffer{}, false
+	}
 	var valueView C.envoy_dynamic_module_type_envoy_buffer
-	ret := C.envoy_dynamic_module_callback_http_span_get_span_id(
-		s.spanPtr,
-		&valueView,
-	)
-	if !bool(ret) || valueView.ptr == nil || valueView.length == 0 {
-		return shared.UnsafeEnvoyBuffer{}, bool(ret)
+	ret := C.envoy_dynamic_module_callback_http_span_get_span_id(s.spanPtr, &valueView)
+	if !bool(ret) {
+		return shared.UnsafeEnvoyBuffer{}, false
+	}
+	if valueView.ptr == nil || valueView.length == 0 {
+		return shared.UnsafeEnvoyBuffer{}, true
 	}
 	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
 }
 
-func (s *dymSpan) SpawnChild(operationName string) shared.ChildSpan {
+func (s *dymSpan) SpawnChild(operation string) shared.ChildSpan {
+	if s == nil || s.spanPtr == nil {
+		return nil
+	}
 	childPtr := C.envoy_dynamic_module_callback_http_span_spawn_child(
 		s.hostPluginPtr,
 		s.spanPtr,
-		stringToModuleBuffer(operationName),
+		stringToModuleBuffer(operation),
 	)
-	runtime.KeepAlive(operationName)
+	runtime.KeepAlive(operation)
 	if childPtr == nil {
 		return nil
 	}
@@ -486,8 +518,6 @@ type dymChildSpan struct {
 	finished      bool
 }
 
-// asSpanPtr returns the child span as the generic span pointer accepted by the span_* callbacks.
-// In the ABI both pointer types are void*, and Envoy resolves the right type via dynamic_cast.
 func (c *dymChildSpan) asSpanPtr() C.envoy_dynamic_module_type_span_envoy_ptr {
 	return C.envoy_dynamic_module_type_span_envoy_ptr(c.childPtr)
 }
@@ -579,19 +609,12 @@ type dymHttpFilterHandle struct {
 	plugin            shared.HttpFilter
 	scheduler         *dymScheduler
 	streamCompleted   bool
-	streamDestroyed   bool
 	localResponseSent bool
 
-	// calloutCallbacks/streamCallbacks/data are accessed only from the worker thread that
-	// owns the stream — Envoy invokes filter callbacks and dispatches callout completions
-	// on the same thread, so no synchronization is needed.
 	calloutCallbacks map[uint64]shared.HttpCalloutCallback
 	streamCallbacks  map[uint64]shared.HttpStreamCallback
 
-	// data backs SetData/GetData — per-stream module-private state for cross-phase
-	// communication. Held in Go memory rather than smuggled through Envoy dynamic metadata
-	// (which would expose the storage to other filters and observers).
-	data map[string]any
+	recordedSharedData []unsafe.Pointer
 
 	downstreamWatermarkCallbacks shared.DownstreamWatermarkCallbacks
 
@@ -602,8 +625,6 @@ type dymHttpFilterHandle struct {
 	childSpans map[*dymChildSpan]struct{}
 }
 
-// trackChildSpan registers a child span so it will be finished if the stream is destroyed
-// before the module calls Finish on it.
 func (h *dymHttpFilterHandle) trackChildSpan(c *dymChildSpan) {
 	if h.childSpans == nil {
 		h.childSpans = make(map[*dymChildSpan]struct{})
@@ -611,14 +632,10 @@ func (h *dymHttpFilterHandle) trackChildSpan(c *dymChildSpan) {
 	h.childSpans[c] = struct{}{}
 }
 
-// untrackChildSpan removes a child span from the wrapper's tracking set after the user
-// calls Finish on it.
 func (h *dymHttpFilterHandle) untrackChildSpan(c *dymChildSpan) {
 	delete(h.childSpans, c)
 }
 
-// finishChildSpansOnDestroy is called from the stream-destroy hook. It finishes every
-// span the module forgot, releasing the host-side Tracing::Span allocations.
 func (h *dymHttpFilterHandle) finishChildSpansOnDestroy() {
 	for c := range h.childSpans {
 		if !c.finished {
@@ -823,6 +840,7 @@ func (h *dymHttpFilterHandle) GetMetadataListString(source shared.MetadataSource
 	if !bool(ret) {
 		return shared.UnsafeEnvoyBuffer{}, false
 	}
+	// Handle the case where the value is empty string.
 	if valueView.ptr == nil || valueView.length == 0 {
 		return shared.UnsafeEnvoyBuffer{}, true
 	}
@@ -985,8 +1003,11 @@ func (h *dymHttpFilterHandle) GetFilterStateTyped(key string) (shared.UnsafeEnvo
 		&valueView,
 	)
 	runtime.KeepAlive(key)
-	if !bool(ret) || valueView.ptr == nil || valueView.length == 0 {
-		return shared.UnsafeEnvoyBuffer{}, bool(ret)
+	if !bool(ret) {
+		return shared.UnsafeEnvoyBuffer{}, false
+	}
+	if valueView.ptr == nil || valueView.length == 0 {
+		return shared.UnsafeEnvoyBuffer{}, true
 	}
 	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
 }
@@ -1029,14 +1050,41 @@ func (h *dymHttpFilterHandle) SetFilterStateTyped(key string, value []byte) bool
 }
 
 func (h *dymHttpFilterHandle) GetData(key string) any {
-	return h.data[key]
+	buf, found := h.GetMetadataString(shared.MetadataSourceTypeDynamic,
+		"composer.shared_data", key)
+	if !found {
+		return nil
+	}
+	// Convert string back to uintptr safely.
+	uintValue, err := strconv.ParseUint(buf.ToUnsafeString(), 10, 64)
+	if err != nil {
+		return nil
+	}
+	pointer := uintptr(uintValue)
+	// Use search rather than unwrap because the go runtime will complain
+	// the pointer parsed from string `pointer arithmetic result points to invalid allocation`.
+	wrapper := sharedDataManager.search(pointer)
+	if wrapper == nil {
+		return nil
+	}
+	return wrapper.data
 }
 
 func (h *dymHttpFilterHandle) SetData(key string, value any) {
-	if h.data == nil {
-		h.data = make(map[string]any)
+	wrapper := &httpFilterSharedDataWrapper{data: value}
+	pointer := sharedDataManager.record(wrapper)
+	h.recordedSharedData = append(h.recordedSharedData, pointer)
+
+	// Covert pointer to uintptr to string safely.
+	stringValue := strconv.FormatUint(uint64(uintptr(pointer)), 10)
+	h.SetMetadata("composer.shared_data", key, stringValue)
+}
+
+func (h *dymHttpFilterHandle) clearData() {
+	for _, pointer := range h.recordedSharedData {
+		sharedDataManager.remove(pointer)
 	}
-	h.data[key] = value
+	h.recordedSharedData = nil
 }
 
 func (h *dymHttpFilterHandle) SendLocalResponse(
@@ -1047,6 +1095,7 @@ func (h *dymHttpFilterHandle) SendLocalResponse(
 ) {
 	h.localResponseSent = true
 
+	// Prepare headers.
 	headerViews := headersToModuleHttpHeaderSlice(headers)
 	C.envoy_dynamic_module_callback_http_send_response(
 		h.hostPluginPtr,
@@ -1065,6 +1114,7 @@ func (h *dymHttpFilterHandle) SendLocalResponse(
 func (h *dymHttpFilterHandle) SendResponseHeaders(
 	headers [][2]string, endOfStream bool,
 ) {
+	// Prepare headers.
 	headerViews := headersToModuleHttpHeaderSlice(headers)
 	C.envoy_dynamic_module_callback_http_send_response_headers(
 		h.hostPluginPtr,
@@ -1090,6 +1140,7 @@ func (h *dymHttpFilterHandle) SendResponseData(
 func (h *dymHttpFilterHandle) SendResponseTrailers(
 	trailers [][2]string,
 ) {
+	// Prepare trailers.
 	trailerViews := headersToModuleHttpHeaderSlice(trailers)
 	C.envoy_dynamic_module_callback_http_send_response_trailers(
 		h.hostPluginPtr,
@@ -1128,35 +1179,38 @@ func (h *dymHttpFilterHandle) RefreshRouteCluster() {
 }
 
 func (h *dymHttpFilterHandle) GetWorkerIndex() uint32 {
-	return uint32(C.envoy_dynamic_module_callback_http_filter_get_worker_index(
-		h.hostPluginPtr,
-	))
+	return uint32(C.envoy_dynamic_module_callback_http_filter_get_worker_index(h.hostPluginPtr))
 }
 
 func (h *dymHttpFilterHandle) SetSocketOptionInt(
-	level, name int64, state shared.SocketOptionState,
-	direction shared.SocketDirection, value int64,
+	level, name int64,
+	state shared.SocketOptionState,
+	direction shared.SocketDirection,
+	value int64,
 ) bool {
-	return bool(C.envoy_dynamic_module_callback_http_set_socket_option_int(
+	ret := C.envoy_dynamic_module_callback_http_set_socket_option_int(
 		h.hostPluginPtr,
-		(C.int64_t)(level),
-		(C.int64_t)(name),
-		(C.envoy_dynamic_module_type_socket_option_state)(state),
-		(C.envoy_dynamic_module_type_socket_direction)(direction),
-		(C.int64_t)(value),
-	))
+		C.int64_t(level),
+		C.int64_t(name),
+		C.envoy_dynamic_module_type_socket_option_state(state),
+		C.envoy_dynamic_module_type_socket_direction(direction),
+		C.int64_t(value),
+	)
+	return bool(ret)
 }
 
 func (h *dymHttpFilterHandle) SetSocketOptionBytes(
-	level, name int64, state shared.SocketOptionState,
-	direction shared.SocketDirection, value []byte,
+	level, name int64,
+	state shared.SocketOptionState,
+	direction shared.SocketDirection,
+	value []byte,
 ) bool {
 	ret := C.envoy_dynamic_module_callback_http_set_socket_option_bytes(
 		h.hostPluginPtr,
-		(C.int64_t)(level),
-		(C.int64_t)(name),
-		(C.envoy_dynamic_module_type_socket_option_state)(state),
-		(C.envoy_dynamic_module_type_socket_direction)(direction),
+		C.int64_t(level),
+		C.int64_t(name),
+		C.envoy_dynamic_module_type_socket_option_state(state),
+		C.envoy_dynamic_module_type_socket_direction(direction),
 		bytesToModuleBuffer(value),
 	)
 	runtime.KeepAlive(value)
@@ -1164,16 +1218,17 @@ func (h *dymHttpFilterHandle) SetSocketOptionBytes(
 }
 
 func (h *dymHttpFilterHandle) GetSocketOptionInt(
-	level, name int64, state shared.SocketOptionState,
+	level, name int64,
+	state shared.SocketOptionState,
 	direction shared.SocketDirection,
 ) (int64, bool) {
-	var value C.int64_t = 0
+	var value C.int64_t
 	ret := C.envoy_dynamic_module_callback_http_get_socket_option_int(
 		h.hostPluginPtr,
-		(C.int64_t)(level),
-		(C.int64_t)(name),
-		(C.envoy_dynamic_module_type_socket_option_state)(state),
-		(C.envoy_dynamic_module_type_socket_direction)(direction),
+		C.int64_t(level),
+		C.int64_t(name),
+		C.envoy_dynamic_module_type_socket_option_state(state),
+		C.envoy_dynamic_module_type_socket_direction(direction),
 		&value,
 	)
 	if !bool(ret) {
@@ -1183,68 +1238,67 @@ func (h *dymHttpFilterHandle) GetSocketOptionInt(
 }
 
 func (h *dymHttpFilterHandle) GetSocketOptionBytes(
-	level, name int64, state shared.SocketOptionState,
+	level, name int64,
+	state shared.SocketOptionState,
 	direction shared.SocketDirection,
 ) (shared.UnsafeEnvoyBuffer, bool) {
 	var valueView C.envoy_dynamic_module_type_envoy_buffer
 	ret := C.envoy_dynamic_module_callback_http_get_socket_option_bytes(
 		h.hostPluginPtr,
-		(C.int64_t)(level),
-		(C.int64_t)(name),
-		(C.envoy_dynamic_module_type_socket_option_state)(state),
-		(C.envoy_dynamic_module_type_socket_direction)(direction),
+		C.int64_t(level),
+		C.int64_t(name),
+		C.envoy_dynamic_module_type_socket_option_state(state),
+		C.envoy_dynamic_module_type_socket_direction(direction),
 		&valueView,
 	)
-	if !bool(ret) || valueView.ptr == nil || valueView.length == 0 {
-		return shared.UnsafeEnvoyBuffer{}, bool(ret)
+	if !bool(ret) {
+		return shared.UnsafeEnvoyBuffer{}, false
+	}
+	if valueView.ptr == nil || valueView.length == 0 {
+		return shared.UnsafeEnvoyBuffer{}, true
 	}
 	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
 }
 
 func (h *dymHttpFilterHandle) GetBufferLimit() uint64 {
-	return uint64(C.envoy_dynamic_module_callback_http_get_buffer_limit(
-		h.hostPluginPtr,
-	))
+	return uint64(C.envoy_dynamic_module_callback_http_get_buffer_limit(h.hostPluginPtr))
 }
 
 func (h *dymHttpFilterHandle) SetBufferLimit(limit uint64) {
-	C.envoy_dynamic_module_callback_http_set_buffer_limit(
-		h.hostPluginPtr,
-		(C.uint64_t)(limit),
-	)
+	C.envoy_dynamic_module_callback_http_set_buffer_limit(h.hostPluginPtr, C.uint64_t(limit))
 }
 
 func (h *dymHttpFilterHandle) GetActiveSpan() shared.Span {
-	spanPtr := C.envoy_dynamic_module_callback_http_get_active_span(
-		h.hostPluginPtr,
-	)
+	spanPtr := C.envoy_dynamic_module_callback_http_get_active_span(h.hostPluginPtr)
 	if spanPtr == nil {
 		return nil
 	}
 	return &dymSpan{
-		spanPtr:       spanPtr,
 		hostPluginPtr: h.hostPluginPtr,
+		spanPtr:       spanPtr,
 		filter:        h,
 	}
 }
 
 func (h *dymHttpFilterHandle) GetClusterName() (shared.UnsafeEnvoyBuffer, bool) {
 	var valueView C.envoy_dynamic_module_type_envoy_buffer
-	ret := C.envoy_dynamic_module_callback_http_get_cluster_name(
-		h.hostPluginPtr,
-		&valueView,
-	)
-	if !bool(ret) || valueView.ptr == nil || valueView.length == 0 {
-		return shared.UnsafeEnvoyBuffer{}, bool(ret)
+	ret := C.envoy_dynamic_module_callback_http_get_cluster_name(h.hostPluginPtr, &valueView)
+	if !bool(ret) {
+		return shared.UnsafeEnvoyBuffer{}, false
+	}
+	if valueView.ptr == nil || valueView.length == 0 {
+		return shared.UnsafeEnvoyBuffer{}, true
 	}
 	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
 }
 
 func (h *dymHttpFilterHandle) GetClusterHostCounts(priority uint32) (shared.ClusterHostCounts, bool) {
-	var total, healthy, degraded C.size_t
+	var total C.size_t
+	var healthy C.size_t
+	var degraded C.size_t
 	ret := C.envoy_dynamic_module_callback_http_get_cluster_host_count(
 		h.hostPluginPtr,
-		(C.uint32_t)(priority),
+		C.uint32_t(priority),
 		&total,
 		&healthy,
 		&degraded,
@@ -1263,7 +1317,7 @@ func (h *dymHttpFilterHandle) SetUpstreamOverrideHost(host string, strict bool) 
 	ret := C.envoy_dynamic_module_callback_http_set_upstream_override_host(
 		h.hostPluginPtr,
 		stringToModuleBuffer(host),
-		(C.bool)(strict),
+		C.bool(strict),
 	)
 	runtime.KeepAlive(host)
 	return bool(ret)
@@ -1272,7 +1326,7 @@ func (h *dymHttpFilterHandle) SetUpstreamOverrideHost(host string, strict bool) 
 func (h *dymHttpFilterHandle) ResetStream(reason shared.HttpFilterStreamResetReason, details string) {
 	C.envoy_dynamic_module_callback_http_filter_reset_stream(
 		h.hostPluginPtr,
-		(C.envoy_dynamic_module_type_http_filter_stream_reset_reason)(reason),
+		C.envoy_dynamic_module_type_http_filter_stream_reset_reason(reason),
 		stringToModuleBuffer(details),
 	)
 	runtime.KeepAlive(details)
@@ -1281,23 +1335,16 @@ func (h *dymHttpFilterHandle) ResetStream(reason shared.HttpFilterStreamResetRea
 func (h *dymHttpFilterHandle) SendGoAwayAndClose(graceful bool) {
 	C.envoy_dynamic_module_callback_http_filter_send_go_away_and_close(
 		h.hostPluginPtr,
-		(C.bool)(graceful),
+		C.bool(graceful),
 	)
 }
 
 func (h *dymHttpFilterHandle) RecreateStream(headers [][2]string) bool {
-	if len(headers) == 0 {
-		return bool(C.envoy_dynamic_module_callback_http_filter_recreate_stream(
-			h.hostPluginPtr,
-			nil,
-			0,
-		))
-	}
 	headerViews := headersToModuleHttpHeaderSlice(headers)
 	ret := C.envoy_dynamic_module_callback_http_filter_recreate_stream(
 		h.hostPluginPtr,
 		unsafe.SliceData(headerViews),
-		(C.size_t)(len(headerViews)),
+		C.size_t(len(headerViews)),
 	)
 	runtime.KeepAlive(headers)
 	runtime.KeepAlive(headerViews)
@@ -1361,6 +1408,8 @@ func (h *dymHttpFilterHandle) GetMostSpecificConfig() any {
 
 func (h *dymHttpFilterHandle) GetScheduler() shared.Scheduler {
 	if h.scheduler == nil {
+		// The scheduler is created lazily and should never be nil
+		// in practice. But it will be nil in mock tests.
 		schedulerPtr := C.envoy_dynamic_module_callback_http_filter_scheduler_new(
 			h.hostPluginPtr)
 		h.scheduler = newDymScheduler(
@@ -1388,6 +1437,7 @@ func (h *dymHttpFilterHandle) Log(level shared.LogLevel, format string, args ...
 func (h *dymHttpFilterHandle) HttpCallout(
 	cluster string, headers [][2]string, body []byte, timeoutMs uint64,
 	cb shared.HttpCalloutCallback) (shared.HttpCalloutInitResult, uint64) {
+	// Prepare headers.
 	headerViews := headersToModuleHttpHeaderSlice(headers)
 	var calloutID C.uint64_t = 0
 
@@ -1422,6 +1472,7 @@ func (h *dymHttpFilterHandle) HttpCallout(
 func (h *dymHttpFilterHandle) StartHttpStream(
 	cluster string, headers [][2]string, body []byte, endOfStream bool, timeoutMs uint64,
 	cb shared.HttpStreamCallback) (shared.HttpCalloutInitResult, uint64) {
+	// Prepare headers.
 	headerViews := headersToModuleHttpHeaderSlice(headers)
 	var streamID C.uint64_t = 0
 
@@ -1470,6 +1521,7 @@ func (h *dymHttpFilterHandle) SendHttpStreamData(
 func (h *dymHttpFilterHandle) SendHttpStreamTrailers(
 	streamID uint64, trailers [][2]string,
 ) bool {
+	// Prepare trailers.
 	trailerViews := headersToModuleHttpHeaderSlice(trailers)
 	ret := C.envoy_dynamic_module_callback_http_stream_send_trailers(
 		h.hostPluginPtr,
@@ -1504,6 +1556,7 @@ func (h *dymHttpFilterHandle) ClearDownstreamWatermarkCallbacks() {
 func (h *dymHttpFilterHandle) RecordHistogramValue(id shared.MetricID,
 	value uint64, tagsValues ...string) shared.MetricsResult {
 	idUint64 := uint64(id)
+	// Prepare tag values.
 	tagValueViews := stringArrayToModuleBufferSlice(tagsValues)
 
 	ret := C.envoy_dynamic_module_callback_http_filter_record_histogram_value(
@@ -1522,6 +1575,7 @@ func (h *dymHttpFilterHandle) RecordHistogramValue(id shared.MetricID,
 func (h *dymHttpFilterHandle) SetGaugeValue(id shared.MetricID,
 	value uint64, tagsValues ...string) shared.MetricsResult {
 	idUint64 := uint64(id)
+	// Prepare tag values.
 	tagValueViews := stringArrayToModuleBufferSlice(tagsValues)
 
 	ret := C.envoy_dynamic_module_callback_http_filter_set_gauge(
@@ -1539,6 +1593,7 @@ func (h *dymHttpFilterHandle) SetGaugeValue(id shared.MetricID,
 
 func (h *dymHttpFilterHandle) IncrementGaugeValue(id shared.MetricID,
 	value uint64, tagsValues ...string) shared.MetricsResult {
+	// Prepare tag values.
 	tagValueViews := stringArrayToModuleBufferSlice(tagsValues)
 	ret := C.envoy_dynamic_module_callback_http_filter_increment_gauge(
 		h.hostPluginPtr,
@@ -1554,6 +1609,7 @@ func (h *dymHttpFilterHandle) IncrementGaugeValue(id shared.MetricID,
 
 func (h *dymHttpFilterHandle) DecrementGaugeValue(id shared.MetricID,
 	value uint64, tagsValues ...string) shared.MetricsResult {
+	// Prepare tag values.
 	tagValueViews := stringArrayToModuleBufferSlice(tagsValues)
 	ret := C.envoy_dynamic_module_callback_http_filter_decrement_gauge(
 		h.hostPluginPtr,
@@ -1569,6 +1625,7 @@ func (h *dymHttpFilterHandle) DecrementGaugeValue(id shared.MetricID,
 
 func (h *dymHttpFilterHandle) IncrementCounterValue(id shared.MetricID,
 	value uint64, tagsValues ...string) shared.MetricsResult {
+	// Prepare tag values.
 	tagValueViews := stringArrayToModuleBufferSlice(tagsValues)
 	ret := C.envoy_dynamic_module_callback_http_filter_increment_counter(
 		h.hostPluginPtr,
@@ -1624,9 +1681,7 @@ func newDymStreamPluginHandle(
 }
 
 type dymConfigHandle struct {
-	hostConfigPtr C.envoy_dynamic_module_type_http_filter_config_envoy_ptr
-	// calloutCallbacks/streamCallbacks are accessed only on the main thread — config-level
-	// callouts both initiate and complete via main_thread_dispatcher_, so no locking needed.
+	hostConfigPtr    C.envoy_dynamic_module_type_http_filter_config_envoy_ptr
 	calloutCallbacks map[uint64]shared.HttpCalloutCallback
 	streamCallbacks  map[uint64]shared.HttpStreamCallback
 	scheduler        *dymScheduler
@@ -1638,6 +1693,7 @@ func (h *dymConfigHandle) Log(level shared.LogLevel, format string, args ...any)
 
 func (h *dymConfigHandle) DefineHistogram(name string,
 	tagKeys ...string) (shared.MetricID, shared.MetricsResult) {
+	// Prepare tag keys.
 	tagKeyViews := stringArrayToModuleBufferSlice(tagKeys)
 
 	var metricID C.size_t = 0
@@ -1663,6 +1719,7 @@ func (h *dymConfigHandle) DefineHistogram(name string,
 
 func (h *dymConfigHandle) DefineGauge(name string,
 	tagKeys ...string) (shared.MetricID, shared.MetricsResult) {
+	// Prepare tag keys.
 	tagKeyViews := stringArrayToModuleBufferSlice(tagKeys)
 
 	var metricID C.size_t = 0
@@ -1687,6 +1744,7 @@ func (h *dymConfigHandle) DefineGauge(name string,
 
 func (h *dymConfigHandle) DefineCounter(name string,
 	tagKeys ...string) (shared.MetricID, shared.MetricsResult) {
+	// Prepare tag keys.
 	tagKeyViews := stringArrayToModuleBufferSlice(tagKeys)
 
 	var metricID C.size_t = 0
@@ -1811,6 +1869,8 @@ func (h *dymConfigHandle) ResetHttpStream(streamID uint64) {
 
 func (h *dymConfigHandle) GetScheduler() shared.Scheduler {
 	if h.scheduler == nil {
+		// The scheduler is created lazily and should never be nil
+		// in practice. But it will be nil in mock tests.
 		schedulerPtr := C.envoy_dynamic_module_callback_http_filter_config_scheduler_new(
 			h.hostConfigPtr)
 		h.scheduler = newDymScheduler(
@@ -1885,9 +1945,6 @@ func envoy_dynamic_module_on_http_filter_config_destroy(
 	configPtr C.envoy_dynamic_module_type_http_filter_config_module_ptr,
 ) {
 	factoryWrapper := configManager.unwrap(unsafe.Pointer(configPtr))
-	if factoryWrapper == nil {
-		return
-	}
 	if factoryWrapper.configHandle.scheduler != nil {
 		factoryWrapper.configHandle.scheduler.close()
 		factoryWrapper.configHandle.scheduler = nil
@@ -1904,6 +1961,7 @@ func envoy_dynamic_module_on_http_filter_per_route_config_new(
 	nameStr := envoyBufferToStringUnsafe(name)
 	configBytes := envoyBufferToBytesCopy(config)
 
+	// The route config handle only make logging available.
 	configHandle := &dymRouteConfigHandle{}
 
 	configFactory := sdk.GetHttpFilterConfigFactory(nameStr)
@@ -1944,6 +2002,8 @@ func envoy_dynamic_module_on_http_filter_new(
 	if factoryWrapper == nil {
 		return nil
 	}
+	
+	// Create the plugin wrapper.
 
 	pluginWrapper := newDymStreamPluginHandle(hostPluginPtr)
 	pluginWrapper.plugin = factoryWrapper.pluginFactory.Create(pluginWrapper)
@@ -1956,11 +2016,11 @@ func envoy_dynamic_module_on_http_filter_destroy(
 	pluginPtr C.envoy_dynamic_module_type_http_filter_module_ptr,
 ) {
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
-	if pluginWrapper == nil || pluginWrapper.streamDestroyed {
+	if pluginWrapper == nil {
 		return
 	}
-	pluginWrapper.streamDestroyed = true
 	pluginWrapper.finishChildSpansOnDestroy()
+	pluginWrapper.clearData()
 	if pluginWrapper.plugin != nil {
 		pluginWrapper.plugin.OnDestroy()
 	}
@@ -1973,6 +2033,7 @@ func envoy_dynamic_module_on_http_filter_request_headers(
 	pluginPtr C.envoy_dynamic_module_type_http_filter_module_ptr,
 	endOfStream C.bool,
 ) C.envoy_dynamic_module_type_on_http_filter_request_headers_status {
+	// Get the plugin wrapper.
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
 	if pluginWrapper == nil || pluginWrapper.plugin == nil {
 		return 0
@@ -2060,13 +2121,12 @@ func envoy_dynamic_module_on_http_filter_stream_complete(
 		return
 	}
 	pluginWrapper.streamCompleted = true
+	pluginWrapper.clearData()
 	if pluginWrapper.scheduler != nil {
 		pluginWrapper.scheduler.close()
 		pluginWrapper.scheduler = nil
 	}
 	pluginWrapper.plugin.OnStreamComplete()
-	// data is held in Go memory and is freed when the wrapper is GC'd after pluginManager
-	// removes it; no explicit teardown is needed.
 }
 
 //export envoy_dynamic_module_on_http_filter_scheduled
@@ -2098,6 +2158,7 @@ func envoy_dynamic_module_on_http_filter_http_callout_done(
 		return
 	}
 
+	// Prepare headers and body chunks.
 	resultHeaders := envoyHttpHeaderSliceToUnsafeHeaderSlice(unsafe.Slice(headers, int(headersSize)))
 	resultChunks := envoyBufferSliceToUnsafeEnvoyBufferSlice(unsafe.Slice(chunks, int(chunksSize)))
 
@@ -2126,9 +2187,11 @@ func envoy_dynamic_module_on_http_filter_http_stream_headers(
 		return
 	}
 
+	// Prepare headers.
 	resultHeaders := envoyHttpHeaderSliceToUnsafeHeaderSlice(unsafe.Slice(headers, int(headersSize)))
 
-	if cb := pluginWrapper.streamCallbacks[uint64(streamID)]; cb != nil {
+	cb := pluginWrapper.streamCallbacks[uint64(streamID)]
+	if cb != nil {
 		cb.OnHttpStreamHeaders(uint64(streamID), resultHeaders, bool(endOfStream))
 	}
 }
@@ -2147,9 +2210,11 @@ func envoy_dynamic_module_on_http_filter_http_stream_data(
 		return
 	}
 
+	// Prepare data.
 	resultData := envoyBufferSliceToUnsafeEnvoyBufferSlice(unsafe.Slice(chunks, int(chunksSize)))
 
-	if cb := pluginWrapper.streamCallbacks[uint64(streamID)]; cb != nil {
+	cb := pluginWrapper.streamCallbacks[uint64(streamID)]
+	if cb != nil {
 		cb.OnHttpStreamData(uint64(streamID), resultData, bool(endOfStream))
 	}
 }
@@ -2167,9 +2232,11 @@ func envoy_dynamic_module_on_http_filter_http_stream_trailers(
 		return
 	}
 
+	// Prepare trailers.
 	resultTrailers := envoyHttpHeaderSliceToUnsafeHeaderSlice(unsafe.Slice(trailers, int(trailersSize)))
 
-	if cb := pluginWrapper.streamCallbacks[uint64(streamID)]; cb != nil {
+	cb := pluginWrapper.streamCallbacks[uint64(streamID)]
+	if cb != nil {
 		cb.OnHttpStreamTrailers(uint64(streamID), resultTrailers)
 	}
 }
@@ -2255,6 +2322,7 @@ func envoy_dynamic_module_on_http_filter_local_reply(
 			shared.LocalReplyStatusContinue,
 		)
 	}
+
 	return C.envoy_dynamic_module_type_on_http_filter_local_reply_status(
 		pluginWrapper.plugin.OnLocalReply(
 			uint32(response_code),
@@ -2308,7 +2376,8 @@ func envoy_dynamic_module_on_http_filter_config_http_stream_headers(
 
 	resultHeaders := envoyHttpHeaderSliceToUnsafeHeaderSlice(unsafe.Slice(headers, int(headersSize)))
 
-	if cb := ch.streamCallbacks[uint64(streamID)]; cb != nil {
+	cb := ch.streamCallbacks[uint64(streamID)]
+	if cb != nil {
 		cb.OnHttpStreamHeaders(uint64(streamID), resultHeaders, bool(endOfStream))
 	}
 }
@@ -2330,7 +2399,8 @@ func envoy_dynamic_module_on_http_filter_config_http_stream_data(
 
 	resultData := envoyBufferSliceToUnsafeEnvoyBufferSlice(unsafe.Slice(chunks, int(chunksSize)))
 
-	if cb := ch.streamCallbacks[uint64(streamID)]; cb != nil {
+	cb := ch.streamCallbacks[uint64(streamID)]
+	if cb != nil {
 		cb.OnHttpStreamData(uint64(streamID), resultData, bool(endOfStream))
 	}
 }
@@ -2351,7 +2421,8 @@ func envoy_dynamic_module_on_http_filter_config_http_stream_trailers(
 
 	resultTrailers := envoyHttpHeaderSliceToUnsafeHeaderSlice(unsafe.Slice(trailers, int(trailersSize)))
 
-	if cb := ch.streamCallbacks[uint64(streamID)]; cb != nil {
+	cb := ch.streamCallbacks[uint64(streamID)]
+	if cb != nil {
 		cb.OnHttpStreamTrailers(uint64(streamID), resultTrailers)
 	}
 }

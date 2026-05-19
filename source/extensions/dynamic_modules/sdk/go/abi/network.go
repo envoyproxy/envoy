@@ -20,8 +20,10 @@ type networkFilterConfigWrapper struct {
 	configHandle  *dymNetworkConfigHandle
 }
 
+type networkFilterWrapper = dymNetworkFilterHandle
+
 var networkConfigManager = newManager[networkFilterConfigWrapper]()
-var networkPluginManager = newManager[dymNetworkFilterHandle]()
+var networkPluginManager = newManager[networkFilterWrapper]()
 
 type dymNetworkBuffer struct {
 	hostPluginPtr C.envoy_dynamic_module_type_network_filter_envoy_ptr
@@ -128,12 +130,10 @@ func (b *dymNetworkBuffer) Append(data []byte) bool {
 }
 
 type dymNetworkFilterHandle struct {
-	hostPluginPtr C.envoy_dynamic_module_type_network_filter_envoy_ptr
-	plugin        shared.NetworkFilter
-	readBuffer    dymNetworkBuffer
-	writeBuffer   dymNetworkBuffer
-	// calloutCallbacks is accessed only from the worker thread that owns the connection —
-	// Envoy invokes filter callbacks and dispatches callout completions on the same thread.
+	hostPluginPtr    C.envoy_dynamic_module_type_network_filter_envoy_ptr
+	plugin           shared.NetworkFilter
+	readBuffer       dymNetworkBuffer
+	writeBuffer      dymNetworkBuffer
 	calloutCallbacks map[uint64]shared.HttpCalloutCallback
 	scheduler        *dymScheduler
 	filterDestroyed  bool

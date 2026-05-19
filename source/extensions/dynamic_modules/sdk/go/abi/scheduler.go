@@ -13,18 +13,13 @@ import (
 
 // dymScheduler is the SDK-side implementation of shared.Scheduler used by every extension
 // surface that exposes a NewScheduler method (HTTP filter, network filter, cluster, bootstrap,
-// etc.). It is defined here rather than in http.go so that the type's home file reflects its
-// cross-surface role.
+// etc.).
 type dymScheduler struct {
 	schedulerPtr  unsafe.Pointer
 	schedulerLock sync.Mutex
 	nextTaskID    uint64
 	tasks         map[uint64]func()
 	commitFunc    func(unsafe.Pointer, C.uint64_t)
-	// deleteFunc invokes the host's *_scheduler_delete callback for this scheduler.
-	// Stored here so close() can free the host-side allocation synchronously from the
-	// destroy hook (the finalizer-only path leaks under LeakSanitizer because Go GC
-	// finalizers don't run on process exit).
 	deleteFunc func(unsafe.Pointer)
 }
 

@@ -70,12 +70,11 @@ const (
 type LocalReplyStatus int32
 
 const (
-	// LocalReplyStatusContinue indicates that the local reply should continue to be sent
-	// after all filters are informed.
+	// LocalReplyStatusContinue indicates that the local reply should continue to be sent after all
+	// filters are informed.
 	LocalReplyStatusContinue LocalReplyStatus = 0
-	// LocalReplyStatusContinueAndResetStream indicates that the local reply notification
-	// should continue to all filters, but the stream should be reset instead of sending
-	// the local reply.
+	// LocalReplyStatusContinueAndResetStream indicates that the local reply notification should
+	// continue to all filters, but the stream should be reset instead of sending the local reply.
 	LocalReplyStatusContinueAndResetStream LocalReplyStatus = 1
 	LocalReplyStatusDefault                LocalReplyStatus = LocalReplyStatusContinue
 )
