@@ -93,8 +93,7 @@ TEST_F(CryptoUtilsTest, GetBase64EncodedCertificateFingerprintSuccessDnsSan) {
   EXPECT_CALL(*secret_provider, secret()).WillRepeatedly(Return(secret.get()));
 
   std::vector<Matchers::StringMatcherImpl> san_matchers;
-  san_matchers.emplace_back(
-      Matchers::StringMatcherImpl::createExactMatcher("localhost"));
+  san_matchers.emplace_back(Matchers::StringMatcherImpl::createExactMatcher("localhost"));
 
   auto fingerprint = getBase64EncodedCertificateFingerprint(secret_provider, san_matchers, *api_);
   ASSERT_TRUE(fingerprint.ok());
