@@ -643,7 +643,7 @@ public:
                Server::OverloadManager&));
   MOCK_METHOD(DateProvider&, dateProvider, ());
   MOCK_METHOD(std::chrono::milliseconds, drainTimeout, (), (const));
-  MOCK_METHOD(absl::optional<double>, drainTimeoutJitterPercentage, (), (const));
+  MOCK_METHOD(absl::optional<double>, drainPercentage, (), (const));
   MOCK_METHOD(FilterChainFactory&, filterFactory, ());
   MOCK_METHOD(bool, generateRequestId, (), (const));
   MOCK_METHOD(bool, preserveExternalRequestId, (), (const));
@@ -653,7 +653,6 @@ public:
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
   MOCK_METHOD(bool, isRoutable, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, maxConnectionDuration, (), (const));
-  MOCK_METHOD(absl::optional<double>, drainPercentage, (), (const));
   MOCK_METHOD(bool, http1SafeMaxConnectionDuration, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, maxStreamDuration, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, streamIdleTimeout, (), (const));

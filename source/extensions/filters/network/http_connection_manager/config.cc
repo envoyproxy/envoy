@@ -800,6 +800,27 @@ HttpConnectionManagerConfig::maxConnectionDuration() const {
   return duration;
 }
 
+std::chrono::milliseconds HttpConnectionManagerConfig::drainTimeout() const {
+  std::chrono::milliseconds timeout = drain_timeout_;
+  // Apply jitter: extend the drain grace period (between the shutdown notice
+  // GOAWAY and the final GOAWAY) by a random amount up to
+  // drain_timeout * jitter_percentage / 100. The jittering is an internal
+  // implementation detail of the HttpConnectionManagerConfig and not exposed
+  // as a separate interface method: callers receive a freshly jittered value
+  // on every call and arm the timer with it directly.
+  if (drain_timeout_jitter_percentage_.has_value() &&
+      drain_timeout_jitter_percentage_.value() > 0) {
+    const uint64_t max_jitter_ms = static_cast<uint64_t>(
+        std::ceil(timeout.count() * (drain_timeout_jitter_percentage_.value() / 100.0)));
+    if (max_jitter_ms > 0) {
+      const uint64_t jitter_ms =
+          context_.serverFactoryContext().api().randomGenerator().random() % max_jitter_ms;
+      timeout = std::chrono::milliseconds(static_cast<uint64_t>(timeout.count()) + jitter_ms);
+    }
+  }
+  return timeout;
+}
+
 Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
     Network::Connection& connection, const Buffer::Instance& data,
     Http::ServerConnectionCallbacks& callbacks, Server::OverloadManager& overload_manager) {

@@ -1179,9 +1179,12 @@ TEST_F(HttpConnectionManagerConfigTest, DrainTimeoutJitter) {
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
-  EXPECT_EQ(5000, config.drainTimeout().count());
-  ASSERT_TRUE(config.drainTimeoutJitterPercentage().has_value());
-  EXPECT_EQ(25.0, config.drainTimeoutJitterPercentage().value());
+  // With jitter configured (25%), each call returns a value in [5000, 6250].
+  for (int i = 0; i < 5; ++i) {
+    const auto value = config.drainTimeout().count();
+    EXPECT_GE(value, 5000);
+    EXPECT_LE(value, 6250);
+  }
 }
 
 // Validate that drain_timeout_jitter defaults to unset.
@@ -1201,7 +1204,8 @@ TEST_F(HttpConnectionManagerConfigTest, DrainTimeoutJitterDefault) {
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
-  EXPECT_FALSE(config.drainTimeoutJitterPercentage().has_value());
+  // No jitter configured: drainTimeout() returns its base (default 5s).
+  EXPECT_EQ(5000, config.drainTimeout().count());
 }
 
 // Validate drain_percentage is parsed from HCM config.

@@ -108,9 +108,18 @@ public:
     return ServerConnectionPtr{codec_};
   }
   DateProvider& dateProvider() override { return date_provider_; }
-  std::chrono::milliseconds drainTimeout() const override { return std::chrono::milliseconds(100); }
-  absl::optional<double> drainTimeoutJitterPercentage() const override {
-    return drain_timeout_jitter_percentage_;
+  std::chrono::milliseconds drainTimeout() const override {
+    std::chrono::milliseconds timeout(100);
+    if (drain_timeout_jitter_percentage_.has_value() &&
+        drain_timeout_jitter_percentage_.value() > 0) {
+      const uint64_t max_jitter_ms = static_cast<uint64_t>(
+          std::ceil(timeout.count() * (drain_timeout_jitter_percentage_.value() / 100.0)));
+      if (max_jitter_ms > 0) {
+        const uint64_t jitter_ms = random_.random() % max_jitter_ms;
+        timeout = std::chrono::milliseconds(static_cast<uint64_t>(timeout.count()) + jitter_ms);
+      }
+    }
+    return timeout;
   }
   FilterChainFactory& filterFactory() override { return filter_factory_; }
   bool generateRequestId() const override { return true; }

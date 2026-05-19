@@ -166,10 +166,7 @@ public:
                                         Http::ServerConnectionCallbacks& callbacks,
                                         Server::OverloadManager& overload_manager) override;
   Http::DateProvider& dateProvider() override { return date_provider_; }
-  std::chrono::milliseconds drainTimeout() const override { return drain_timeout_; }
-  absl::optional<double> drainTimeoutJitterPercentage() const override {
-    return drain_timeout_jitter_percentage_;
-  }
+  std::chrono::milliseconds drainTimeout() const override;
   FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() const override { return generate_request_id_; }
   bool preserveExternalRequestId() const override { return preserve_external_request_id_; }

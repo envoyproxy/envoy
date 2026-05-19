@@ -40,9 +40,6 @@ public:
   }
   DateProvider& dateProvider() override { return parent_.dateProvider(); }
   std::chrono::milliseconds drainTimeout() const override { return parent_.drainTimeout(); }
-  absl::optional<double> drainTimeoutJitterPercentage() const override {
-    return parent_.drainTimeoutJitterPercentage();
-  }
   FilterChainFactory& filterFactory() override { return parent_.filterFactory(); }
   bool generateRequestId() const override { return parent_.generateRequestId(); }
   bool preserveExternalRequestId() const override { return parent_.preserveExternalRequestId(); }

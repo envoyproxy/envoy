@@ -1,7 +1,6 @@
 #include "source/common/http/conn_manager_impl.h"
 
 #include <chrono>
-#include <cmath>
 #include <cstdint>
 #include <functional>
 #include <iterator>
@@ -1711,21 +1710,7 @@ void ConnectionManagerImpl::startDrainSequence() {
   drain_state_ = DrainState::Draining;
   codec_->shutdownNotice();
   drain_timer_ = dispatcher_->createTimer([this]() -> void { onDrainTimeout(); });
-  std::chrono::milliseconds drain_timeout = config_->drainTimeout();
-  // Apply jitter: extend the drain grace period by a random amount up to
-  // drain_timeout * jitter_percentage / 100. Staggers the final GOAWAY across
-  // simultaneously-draining connections to mitigate thundering-herd reconnects.
-  const auto& jitter_pct = config_->drainTimeoutJitterPercentage();
-  if (jitter_pct.has_value() && jitter_pct.value() > 0) {
-    const uint64_t max_jitter_ms =
-        static_cast<uint64_t>(std::ceil(drain_timeout.count() * (jitter_pct.value() / 100.0)));
-    if (max_jitter_ms > 0) {
-      const uint64_t jitter_ms = random_generator_.random() % max_jitter_ms;
-      drain_timeout =
-          std::chrono::milliseconds(static_cast<uint64_t>(drain_timeout.count()) + jitter_ms);
-    }
-  }
-  drain_timer_->enableTimer(drain_timeout);
+  drain_timer_->enableTimer(config_->drainTimeout());
 }
 
 void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {

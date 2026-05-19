@@ -136,7 +136,6 @@ public:
   }
   DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() const override { return std::chrono::milliseconds(100); }
-  absl::optional<double> drainTimeoutJitterPercentage() const override { return absl::nullopt; }
   FilterChainFactory& filterFactory() override { return filter_factory_; }
   bool generateRequestId() const override { return true; }
   bool preserveExternalRequestId() const override { return false; }
