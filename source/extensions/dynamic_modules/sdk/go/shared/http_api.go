@@ -1,4 +1,4 @@
-//go:generate mockgen -source=api.go -destination=mocks/mock_api.go -package=mocks
+//go:generate mockgen -source=http_api.go -destination=mocks/mock_http_api.go -package=mocks
 package shared
 
 type HeadersStatus int32
@@ -65,6 +65,8 @@ const (
 	TrailersStatusDefault TrailersStatus = TrailersStatusContinue
 )
 
+// LocalReplyStatus is returned from HttpFilter.OnLocalReply to control whether Envoy should
+// send the local reply to the client or reset the stream instead.
 type LocalReplyStatus int32
 
 const (
@@ -81,38 +83,28 @@ const (
 // not implement flexible stream control. But it should be enough for most of the use cases.
 type HttpFilter interface {
 	// OnRequestHeaders will be called when the request headers are received.
-	// @Param headers the request headers.
-	// @Param endOfStream whether this is the end of the stream.
-	// @Return HeadersStatus the status to control the plugin chain processing.
+	// Returns the status to control the plugin chain processing.
 	OnRequestHeaders(headers HeaderMap, endOfStream bool) HeadersStatus
 
 	// OnRequestBody will be called when the request body are received. This may be called multiple times.
-	// @Param body the request body.
-	// @Param endOfStream whether this is the end of the stream.
-	// @Return BodyStatus the status to control the plugin chain processing.
+	// Returns the status to control the plugin chain processing.
 	OnRequestBody(body BodyBuffer, endOfStream bool) BodyStatus
 
 	// OnRequestTrailers will be called when the request trailers are received.
-	// @Param trailers the request trailers.
-	// @Return TrailersStatus the status to control the plugin chain processing.
+	// Returns the status to control the plugin chain processing.
 	OnRequestTrailers(trailers HeaderMap) TrailersStatus
 
 	// OnResponseHeaders will be called when the response headers are received.
-	// @Param headers the response headers.
-	// @Param endOfStream whether this is the end of the stream.
-	// @Return HeadersStatus the status to control the plugin chain processing.
+	// Returns the status to control the plugin chain processing.
 	OnResponseHeaders(headers HeaderMap, endOfStream bool) HeadersStatus
 
 	// OnResponseBody will be called when the response body is received. This may be called multiple
 	// times.
-	// @Param body the response body.
-	// @Param endOfStream whether this is the end of the stream.
-	// @Return BodyStatus the status to control the plugin chain processing.
+	// Returns the status to control the plugin chain processing.
 	OnResponseBody(body BodyBuffer, endOfStream bool) BodyStatus
 
 	// OnResponseTrailers will be called when the response trailers are received.
-	// @Param trailers the response trailers.
-	// @Return TrailersStatus the status to control the plugin chain processing.
+	// Returns the status to control the plugin chain processing.
 	OnResponseTrailers(trailers HeaderMap) TrailersStatus
 
 	// OnStreamComplete is called when the stream processing is complete and before access logs
@@ -126,16 +118,15 @@ type HttpFilter interface {
 	// any per-stream resources.
 	OnDestroy()
 
-	// OnLocalReply is called when a local reply is being sent. This allows the filter to modify
-	// the local reply or decide to reset the stream instead. This is called before the local reply
-	// is sent to the client and before the stream is reset.
-	// @Param responseCode the response code of the local reply.
-	// @Param details the details of the local reply. This is usually used to indicate the reason
-	// for sending the local reply, for example, "buffer overflow" or "rate limit exceeded".
-	// @Param resetImminent whether the stream is going to be reset after this local reply. This allows
-	// the filter to decide whether to continue with sending the local reply or just reset the stream.
-	// @Return LocalReplyStatus the status to control whether to continue with sending the local reply
-	// or reset the stream.
+	// OnLocalReply is called when a local reply is being sent. The filter can either let the
+	// reply proceed (LocalReplyStatusContinue) or ask Envoy to reset the stream instead
+	// (LocalReplyStatusContinueAndResetStream). This is invoked before the reply leaves
+	// Envoy and before any stream reset.
+	//
+	// details is a short description of why the local reply is being sent (e.g.
+	// "buffer overflow", "rate limit exceeded"). The buffer aliases Envoy memory; copy
+	// before retaining past this call. resetImminent is true if Envoy is going to reset
+	// the stream after this call.
 	OnLocalReply(responseCode uint32, details UnsafeEnvoyBuffer, resetImminent bool) LocalReplyStatus
 }
 
