@@ -156,9 +156,6 @@ public:
   absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
     return max_connection_duration_;
   }
-  absl::optional<double> maxConnectionDurationJitterPercentage() const override {
-    return absl::nullopt;
-  }
   absl::optional<double> drainPercentage() const override { return absl::nullopt; }
   bool http1SafeMaxConnectionDuration() const override { return false; }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }

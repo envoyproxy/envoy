@@ -305,16 +305,14 @@ public:
   virtual bool isRoutable() const PURE;
 
   /**
-   * @return optional maximum connection duration timeout for manager connections.
+   * @return optional maximum connection duration timeout for manager connections. If
+   *         ``max_connection_duration_jitter`` is configured, each call returns the
+   *         base duration extended by a random amount up to
+   *         ``max_connection_duration * jitter / 100``. The jittering is an
+   *         implementation detail and not exposed as a separate interface method;
+   *         callers should arm their timer with whatever value this returns.
    */
   virtual absl::optional<std::chrono::milliseconds> maxConnectionDuration() const PURE;
-
-  /**
-   * @return optional jitter percentage for max_connection_duration. When set, the actual
-   *         connection duration is extended by a random amount up to
-   *         max_connection_duration * jitter / 100.
-   */
-  virtual absl::optional<double> maxConnectionDurationJitterPercentage() const PURE;
 
   /**
    * @return whether maxConnectionDuration allows HTTP1 clients to choose when to close connection

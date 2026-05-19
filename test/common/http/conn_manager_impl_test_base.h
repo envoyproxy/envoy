@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cmath>
+
 #include "source/common/http/conn_manager_impl.h"
 #include "source/common/http/context_impl.h"
 #include "source/common/http/date_provider_impl.h"
@@ -119,10 +121,20 @@ public:
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   bool isRoutable() const override { return true; }
   absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
-    return max_connection_duration_;
-  }
-  absl::optional<double> maxConnectionDurationJitterPercentage() const override {
-    return max_connection_duration_jitter_percentage_;
+    if (!max_connection_duration_.has_value()) {
+      return absl::nullopt;
+    }
+    std::chrono::milliseconds duration = max_connection_duration_.value();
+    if (max_connection_duration_jitter_percentage_.has_value() &&
+        max_connection_duration_jitter_percentage_.value() > 0) {
+      const uint64_t max_jitter_ms = static_cast<uint64_t>(std::ceil(
+          duration.count() * (max_connection_duration_jitter_percentage_.value() / 100.0)));
+      if (max_jitter_ms > 0) {
+        const uint64_t jitter_ms = random_.random() % max_jitter_ms;
+        duration = std::chrono::milliseconds(static_cast<uint64_t>(duration.count()) + jitter_ms);
+      }
+    }
+    return duration;
   }
   absl::optional<double> drainPercentage() const override { return drain_percentage_; }
   bool http1SafeMaxConnectionDuration() const override {

@@ -1128,9 +1128,13 @@ TEST_F(HttpConnectionManagerConfigTest, MaxConnectionDurationJitter) {
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
-  EXPECT_EQ(10000, config.maxConnectionDuration().value().count());
-  ASSERT_TRUE(config.maxConnectionDurationJitterPercentage().has_value());
-  EXPECT_EQ(50.0, config.maxConnectionDurationJitterPercentage().value());
+  // With jitter configured (50%), each call returns a value in [10000, 15000].
+  // The jittering is internal to the config; we observe it by sampling.
+  for (int i = 0; i < 5; ++i) {
+    const auto value = config.maxConnectionDuration().value().count();
+    EXPECT_GE(value, 10000);
+    EXPECT_LE(value, 15000);
+  }
 }
 
 // Validate that max_connection_duration_jitter defaults to unset.
@@ -1153,7 +1157,6 @@ TEST_F(HttpConnectionManagerConfigTest, MaxConnectionDurationJitterDefault) {
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
   EXPECT_EQ(10000, config.maxConnectionDuration().value().count());
-  EXPECT_FALSE(config.maxConnectionDurationJitterPercentage().has_value());
 }
 
 // Validate drain_timeout_jitter is parsed from HCM config.

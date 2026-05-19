@@ -1,6 +1,7 @@
 #include "source/extensions/filters/network/http_connection_manager/config.h"
 
 #include <chrono>
+#include <cmath>
 #include <memory>
 #include <string>
 #include <vector>
@@ -772,6 +773,31 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           std::make_pair(name, FilterConfig{std::move(factories), enabled}));
     }
   }
+}
+
+absl::optional<std::chrono::milliseconds>
+HttpConnectionManagerConfig::maxConnectionDuration() const {
+  if (!max_connection_duration_.has_value()) {
+    return absl::nullopt;
+  }
+  std::chrono::milliseconds duration = max_connection_duration_.value();
+  // Apply jitter: extend the base duration by a random amount up to
+  // base_duration * jitter_percentage / 100. The jittering is an internal
+  // implementation detail of the HttpConnectionManagerConfig and not exposed
+  // as a separate interface method (follows the pattern requested in PR #44064
+  // review): callers receive a freshly jittered value on every call and arm
+  // the timer with it directly.
+  if (max_connection_duration_jitter_percentage_.has_value() &&
+      max_connection_duration_jitter_percentage_.value() > 0) {
+    const uint64_t max_jitter_ms = static_cast<uint64_t>(
+        std::ceil(duration.count() * (max_connection_duration_jitter_percentage_.value() / 100.0)));
+    if (max_jitter_ms > 0) {
+      const uint64_t jitter_ms =
+          context_.serverFactoryContext().api().randomGenerator().random() % max_jitter_ms;
+      duration = std::chrono::milliseconds(static_cast<uint64_t>(duration.count()) + jitter_ms);
+    }
+  }
+  return duration;
 }
 
 Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(

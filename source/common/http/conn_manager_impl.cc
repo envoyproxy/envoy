@@ -216,7 +216,7 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
     connection_duration_timer_ =
         dispatcher_->createScaledTimer(Event::ScaledTimerType::HttpDownstreamMaxConnectionTimeout,
                                        [this]() -> void { onConnectionDurationTimeout(); });
-    connection_duration_timer_->enableTimer(computeJitteredConnectionDuration());
+    connection_duration_timer_->enableTimer(config_->maxConnectionDuration().value());
   }
 
   read_callbacks_->connection().setDelayedCloseTimeout(config_->delayedCloseTimeout());
@@ -808,7 +808,7 @@ void ConnectionManagerImpl::onConnectionDurationTimeout() {
       ENVOY_CONN_LOG(debug, "drain_percentage skip: resetting duration timer",
                      read_callbacks_->connection());
       stats_.named_.downstream_cx_max_duration_drain_skipped_.inc();
-      connection_duration_timer_->enableTimer(computeJitteredConnectionDuration());
+      connection_duration_timer_->enableTimer(config_->maxConnectionDuration().value());
       return;
     }
   }
@@ -828,23 +828,6 @@ void ConnectionManagerImpl::onConnectionDurationTimeout() {
       startDrainSequence();
     }
   }
-}
-
-std::chrono::milliseconds ConnectionManagerImpl::computeJitteredConnectionDuration() {
-  std::chrono::milliseconds duration = config_->maxConnectionDuration().value();
-  // Apply jitter: extend the base duration by a random amount up to
-  // base_duration * jitter_percentage / 100. Follows the same pattern as TCP proxy's
-  // max_downstream_connection_duration_jitter_percentage.
-  const auto& jitter_pct = config_->maxConnectionDurationJitterPercentage();
-  if (jitter_pct.has_value() && jitter_pct.value() > 0) {
-    const uint64_t max_jitter_ms =
-        static_cast<uint64_t>(std::ceil(duration.count() * (jitter_pct.value() / 100.0)));
-    if (max_jitter_ms > 0) {
-      const uint64_t jitter_ms = random_generator_.random() % max_jitter_ms;
-      duration = std::chrono::milliseconds(static_cast<uint64_t>(duration.count()) + jitter_ms);
-    }
-  }
-  return duration;
 }
 
 void ConnectionManagerImpl::onDrainTimeout() {
