@@ -14,6 +14,7 @@
 #include "source/extensions/filters/http/mcp_router/session_codec.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/status/statusor.h"
 
 namespace Envoy {
@@ -134,8 +135,9 @@ private:
   // Extracts JSON-RPC payload from a response, handling SSE event wrapping.
   std::string extractJsonRpcFromResponse(const BackendResponse& response);
 
-  // Initialize fanout connections to all backends.
-  void initializeFanout(AggregationCallback callback);
+  // Initialize fanout connections to all backends (or a subset if target_backends is provided).
+  void initializeFanout(AggregationCallback callback,
+                        const std::vector<std::string>& target_backends = {});
   // Initialize single backend connection.
   void initializeSingleBackend(const McpBackendConfig& backend,
                                std::function<void(BackendResponse)> callback);
@@ -143,6 +145,14 @@ private:
   void initializeSingleBackend(const McpBackendConfig& backend,
                                std::function<void(BackendResponse)> callback,
                                bool streaming_enabled);
+
+  // Lazy initialization helpers.
+  void lazyInitSingleBackend(const McpBackendConfig& backend,
+                             std::function<void(bool)> on_init_complete);
+  void lazyInitFanout(std::function<void(bool)> on_init_complete);
+  std::string buildSyntheticInitBody();
+  void resetStreamState();
+  void updateEncodedSessionId();
 
   // Stream data to established connection(s).
   void streamData(Buffer::Instance& data, bool end_stream);
@@ -197,6 +207,11 @@ private:
   bool initialized_{false};
   // Track if SSE headers were sent (for aggregation with SSE backends)
   bool sse_headers_sent_{false};
+
+  // Lazy initialization state.
+  bool lazy_init_pending_{false};
+  absl::flat_hash_set<std::string> initialized_backends_;
+  Buffer::OwnedImpl lazy_init_request_body_;
 };
 
 } // namespace McpRouter
