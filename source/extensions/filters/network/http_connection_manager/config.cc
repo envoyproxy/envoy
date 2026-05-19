@@ -784,9 +784,8 @@ HttpConnectionManagerConfig::maxConnectionDuration() const {
   // Apply jitter: extend the base duration by a random amount up to
   // base_duration * jitter_percentage / 100. The jittering is an internal
   // implementation detail of the HttpConnectionManagerConfig and not exposed
-  // as a separate interface method (follows the pattern requested in PR #44064
-  // review): callers receive a freshly jittered value on every call and arm
-  // the timer with it directly.
+  // as a separate interface method: callers receive a freshly jittered value
+  // on every call and arm the timer with it directly.
   if (max_connection_duration_jitter_percentage_.has_value() &&
       max_connection_duration_jitter_percentage_.value() > 0) {
     const uint64_t max_jitter_ms = static_cast<uint64_t>(
