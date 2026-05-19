@@ -102,6 +102,11 @@ bug_fixes:
     Fixed ``Illegal ambiguous match`` error when building contrib targets with ``--config=boringssl-fips``
     on aarch64 by restricting the ``using_boringssl_fips`` branch of ``SELECTED_CONTRIB_EXTENSIONS`` to
     ``linux_x86_64``. Mirrors the approach taken by #44661 for ``aws-lc``.
+- area: ext_authz
+  change: |
+    Fixed a bug where ``keep_empty_value`` in ``HeaderValueOption`` was not respected.
+    Empty-valued headers are now dropped by default. This behavior can be reverted by setting
+    runtime guard ``envoy.reloadable_features.ext_authz_respect_keep_empty_value`` to ``false``.    
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
