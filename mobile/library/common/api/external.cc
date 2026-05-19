@@ -32,9 +32,7 @@ void* retrieveApi(absl::string_view name, bool allow_absent) {
   return api;
 }
 
-void unregisterApi(absl::string_view name) {
-  registry_.erase(name);
-}
+void unregisterApi(absl::string_view name) { registry_.erase(name); }
 
 } // namespace External
 } // namespace Api
