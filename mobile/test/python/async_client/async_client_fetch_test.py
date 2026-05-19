@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-import random
 import unittest
 from test.python.echo_test_server import EchoTestServer
 
@@ -16,10 +15,9 @@ class TestAsyncClientFetch(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Set up an echo test server for the tests to hit."""
-        port = random.randint(2**14, 2**16)
-        cls._echo_server = EchoTestServer("127.0.0.1", port)
+        cls._echo_server = EchoTestServer()
         cls._echo_server.start()
-        cls._echo_server_url = f"http://127.0.0.1:{port}"
+        cls._echo_server_url = f"http://{cls._echo_server.url}"
 
     @classmethod
     def tearDownClass(cls):
@@ -28,7 +26,11 @@ class TestAsyncClientFetch(unittest.TestCase):
 
     def _make_client_builder(self):
         # factory to keep constructor logic consistent without sharing instances
-        builder = EngineBuilder().set_log_level(LogLevel.trace)
+        builder = (
+            EngineBuilder()
+            .set_log_level(LogLevel.trace)
+            .add_runtime_guard("getaddrinfo_no_ai_flags", True)
+        )
         return builder
 
     def test_simple_get_request(self):

@@ -49,6 +49,9 @@ public:
     EXPECT_EQ(timeouts, stats_store_.counter("dns.hickory.timeouts").value());
   }
 
+  // The resolver assigns query IDs starting at 1 and increments monotonically.
+  static constexpr uint64_t kFirstQueryId = 1;
+
   Stats::TestUtil::TestStore stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
@@ -241,7 +244,18 @@ TEST_F(HickoryDnsImplTest, CancelQuery) {
       });
 
   EXPECT_NE(query, nullptr);
+  // The pending_resolutions gauge tracks the live query.
+  EXPECT_EQ(1, stats_store_
+                   .gauge("dns.hickory.pending_resolutions", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
+
   query->cancel(ActiveDnsQuery::CancelReason::QueryAbandoned);
+
+  // cancel() must reconcile the gauge synchronously and free the pending object. This is
+  // the regression test for https://github.com/envoyproxy/envoy/issues/45058.
+  EXPECT_EQ(0, stats_store_
+                   .gauge("dns.hickory.pending_resolutions", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
 
   // Resolve a second query to verify the resolver is still functional after cancel.
   bool second_callback_called = false;
@@ -420,7 +434,8 @@ TEST_F(HickoryDnsImplTest, CancelledQueryResultIsDropped) {
   query->cancel(ActiveDnsQuery::CancelReason::QueryAbandoned);
 
   // Issue a second query and wait for it to complete. By the time it finishes, the
-  // first query's async result has also arrived and been dropped by the dispatcher.
+  // first query's async result has also arrived and been dropped because cancel()
+  // removed the entry from pending_queries_.
   bool second_callback_called = false;
   resolver_->resolve("localhost", DnsLookupFamily::All,
                      [this, &second_callback_called](DnsResolver::ResolutionStatus,
@@ -432,6 +447,11 @@ TEST_F(HickoryDnsImplTest, CancelledQueryResultIsDropped) {
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
   EXPECT_TRUE(second_callback_called);
   EXPECT_FALSE(callback_called);
+  // Only the second query produces a resolve_total bump; the cancelled query does not.
+  EXPECT_EQ(1, stats_store_.counter("dns.hickory.resolve_total").value());
+  EXPECT_EQ(0, stats_store_
+                   .gauge("dns.hickory.pending_resolutions", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
 }
 
 TEST_F(HickoryDnsImplTest, OnResolveCompleteForCancelledQuery) {
@@ -439,8 +459,9 @@ TEST_F(HickoryDnsImplTest, OnResolveCompleteForCancelledQuery) {
   auto* hickory_resolver = dynamic_cast<HickoryDnsResolver*>(resolver_.get());
   ASSERT_NE(hickory_resolver, nullptr);
 
-  // Issue a query and immediately cancel it. The query remains in pending_queries_ with
-  // cancelled_ set to true.
+  // Issue a query and immediately cancel it. cancel() removes the entry from
+  // `pending_queries_` synchronously, so a late `onResolveComplete` for the same
+  // query ID must safely no-op without invoking the user callback.
   bool callback_called = false;
   auto* query =
       resolver_->resolve("localhost", DnsLookupFamily::All,
@@ -449,13 +470,14 @@ TEST_F(HickoryDnsImplTest, OnResolveCompleteForCancelledQuery) {
   EXPECT_NE(query, nullptr);
   query->cancel(ActiveDnsQuery::CancelReason::QueryAbandoned);
 
-  // Simulate the `Tokio` task delivering a result for the cancelled query. The query ID
-  // is 1 (first query issued on a fresh resolver). This exercises the cancelled path in
-  // onResolveComplete where the result is dropped without invoking the callback.
-  hickory_resolver->onResolveComplete(1, envoy_dynamic_module_type_dns_resolution_status_Completed,
-                                      "resolved", {});
+  // Simulate the Tokio task delivering a late result for the cancelled query. The
+  // lookup must hit the unknown-id early return because cancel() removed the entry.
+  hickory_resolver->onResolveComplete(
+      kFirstQueryId, envoy_dynamic_module_type_dns_resolution_status_Completed, "resolved", {});
 
   EXPECT_FALSE(callback_called);
+  // resolve_total is not incremented for cancelled queries.
+  EXPECT_EQ(0, stats_store_.counter("dns.hickory.resolve_total").value());
 }
 
 TEST_F(HickoryDnsImplTest, DestroyWithPendingQueries) {
@@ -469,9 +491,77 @@ TEST_F(HickoryDnsImplTest, DestroyWithPendingQueries) {
         [](DnsResolver::ResolutionStatus, absl::string_view, std::list<DnsResponse>&&) {});
   }
 
-  // Destroy the resolver immediately. The destructor should cancel all pending queries
-  // and shut down the `Tokio` runtime cleanly.
+  // Destroy the resolver immediately. The destructor cancels remaining queries, shuts
+  // down the Tokio runtime, and decrements the gauge for each abandoned query.
   resolver_.reset();
+  EXPECT_EQ(0, stats_store_
+                   .gauge("dns.hickory.pending_resolutions", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/45058 with high
+// cancel volume. The DFP scenario in the issue cancels a query for every timeout, and
+// previously each cancel leaked one pending_resolutions gauge tick and one heap object.
+TEST_F(HickoryDnsImplTest, RepeatedCancelDoesNotLeakGauge) {
+  initialize();
+
+  constexpr int kIterations = 50;
+  for (int i = 0; i < kIterations; ++i) {
+    auto* query = resolver_->resolve(
+        "localhost", DnsLookupFamily::All,
+        [](DnsResolver::ResolutionStatus, absl::string_view, std::list<DnsResponse>&&) {
+          FAIL() << "callback must not fire for a cancelled query";
+        });
+    ASSERT_NE(query, nullptr);
+    query->cancel(ActiveDnsQuery::CancelReason::Timeout);
+  }
+
+  EXPECT_EQ(0, stats_store_
+                   .gauge("dns.hickory.pending_resolutions", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
+  EXPECT_EQ(0, stats_store_.counter("dns.hickory.resolve_total").value());
+}
+
+// Regression test for a use-after-free in the ABI callback. If the resolver is destroyed
+// after the callback has copied response data and posted a lambda to the dispatcher but
+// before the dispatcher runs that lambda, the lambda must not dereference a freed
+// resolver. The fix uses `std::weak_ptr` to detect destruction inside the lambda.
+TEST_F(HickoryDnsImplTest, ResolverDestroyedBeforePostedCallbackRuns) {
+  initialize();
+  auto* hickory_resolver = dynamic_cast<HickoryDnsResolver*>(resolver_.get());
+  ASSERT_NE(hickory_resolver, nullptr);
+
+  // Issue a query so the first query ID is registered in pending_queries_.
+  bool callback_called = false;
+  resolver_->resolve("localhost", DnsLookupFamily::All,
+                     [&callback_called](DnsResolver::ResolutionStatus, absl::string_view,
+                                        std::list<DnsResponse>&&) { callback_called = true; });
+
+  // Invoke the ABI callback directly to deterministically reproduce the post sequence
+  // without depending on Tokio timing. This posts a lambda capturing a weak_ptr.
+  const std::string addr_str = "127.0.0.1:0";
+  envoy_dynamic_module_type_dns_address addr;
+  addr.address_ptr = addr_str.c_str();
+  addr.address_length = addr_str.size();
+  addr.ttl_seconds = 60;
+
+  envoy_dynamic_module_type_module_buffer details_buf;
+  details_buf.ptr = nullptr;
+  details_buf.length = 0;
+
+  envoy_dynamic_module_callback_dns_resolve_complete(
+      static_cast<const void*>(hickory_resolver), kFirstQueryId,
+      envoy_dynamic_module_type_dns_resolution_status_Completed, details_buf, &addr, 1);
+
+  // Destroy the resolver before the dispatcher processes the queued lambda. Without
+  // weak_ptr, the lambda's captured raw pointer would dangle and dereferencing it would
+  // be undefined behavior (ASan would catch the use-after-free).
+  resolver_.reset();
+
+  // Drain the dispatcher. The lambda's weak_ptr.lock() returns nullptr, so the lambda
+  // exits without touching the freed resolver and the user callback is not invoked.
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_FALSE(callback_called);
 }
 
 TEST_F(HickoryDnsImplTest, StatsNotFoundOnDirectCallback) {
@@ -586,6 +676,12 @@ TEST_F(HickoryDnsImplTest, StatsOnCancelledQuery) {
   EXPECT_NE(query, nullptr);
   query->cancel(ActiveDnsQuery::CancelReason::QueryAbandoned);
 
+  // cancel() reconciles the gauge synchronously; no need to drive the dispatcher or
+  // destroy the resolver to observe the decrement.
+  EXPECT_EQ(0, stats_store_
+                   .gauge("dns.hickory.pending_resolutions", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
+
   // Resolve a second query and wait for it to complete.
   bool second_callback_called = false;
   resolver_->resolve("localhost", DnsLookupFamily::All,
@@ -597,16 +693,12 @@ TEST_F(HickoryDnsImplTest, StatsOnCancelledQuery) {
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
   EXPECT_TRUE(second_callback_called);
 
-  // The second query is guaranteed to complete. The cancelled query's `Tokio` task may or may
-  // not have posted a result before seeing the cancel flag, so resolve_total is at least 1.
-  EXPECT_GE(stats_store_.counter("dns.hickory.resolve_total").value(), 1);
+  // Exactly one query completed (the second one). The cancelled query never produces a
+  // resolve_total bump.
+  EXPECT_EQ(1, stats_store_.counter("dns.hickory.resolve_total").value());
   EXPECT_EQ(0, stats_store_.counter("dns.hickory.not_found").value());
   EXPECT_EQ(0, stats_store_.counter("dns.hickory.get_addr_failure").value());
   EXPECT_EQ(0, stats_store_.counter("dns.hickory.timeouts").value());
-
-  // Destroying the resolver ensures that any remaining pending queries have their
-  // pending_resolutions gauge decremented in the destructor.
-  resolver_.reset();
   EXPECT_EQ(0, stats_store_
                    .gauge("dns.hickory.pending_resolutions", Stats::Gauge::ImportMode::NeverImport)
                    .value());

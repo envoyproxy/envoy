@@ -3,6 +3,8 @@ from http.server import HTTPServer
 from threading import Event
 from threading import Thread
 import json
+import random
+import socket
 
 
 class EchoServerHandler(BaseHTTPRequestHandler):
@@ -67,10 +69,44 @@ class EchoServerHandler(BaseHTTPRequestHandler):
         pass
 
 
+class HTTPServerV6(HTTPServer):
+    address_family = socket.AF_INET6
+
+
+def is_ipv4_supported():
+    try:
+        socket.getaddrinfo("127.0.0.1", None, family=socket.AF_INET)
+        return True
+    except socket.gaierror:
+        return False
+
+
+def is_ipv6_supported():
+    try:
+        socket.getaddrinfo("::1", None, family=socket.AF_INET6)
+        return True
+    except socket.gaierror:
+        return False
+
+
 class EchoTestServer:
 
-    def __init__(self, ip, port):
-        self._server = HTTPServer((ip, port), EchoServerHandler)
+    def __init__(self):
+        use_v4 = is_ipv4_supported()
+        if not (use_v4 or is_ipv6_supported()):
+            raise RuntimeError("Neither IPv4 nor IPv6 is supported by the environment")
+
+        port = random.randint(2**14, 2**16)
+        server = None
+        if use_v4:
+            server = HTTPServer(("127.0.0.1", port), EchoServerHandler)
+            self.url = f"127.0.0.1:{port}"
+        else:
+            server = HTTPServerV6(("::1", port), EchoServerHandler)
+            self.url = f"[::1]:{port}"
+
+        self._server = server
+        assert self._server is not None
         self._server_thread = Thread(target=self._server.serve_forever, daemon=True)
         self._server.socket.settimeout(10.0)
 
@@ -78,5 +114,6 @@ class EchoTestServer:
         self._server_thread.start()
 
     def stop(self):
+        assert self._server is not None
         self._server.shutdown()
         self._server_thread.join()

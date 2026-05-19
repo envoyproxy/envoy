@@ -24,7 +24,7 @@ envoy_extension_cc_test(
         "//test/common/matcher:test_utility_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/matcher:matcher_mocks",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:registry_lib",
         "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",

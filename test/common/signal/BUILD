@@ -31,7 +31,6 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/signal:fatal_error_handler_lib",
-        "//test/mocks/server:instance_mocks",
         "//test/test_common:utility_lib",
     ],
 )
