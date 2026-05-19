@@ -26,7 +26,6 @@ envoy_cc_test(
     srcs = ["config_test.cc"],
     deps = [
         "//contrib/stat_sinks/wasm_filter/source:config_lib",
-        "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//contrib/envoy/extensions/stat_sinks/wasm_filter/v3:pkg_cc_proto",
     ],

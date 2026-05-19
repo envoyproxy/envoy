@@ -29,6 +29,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
+#include "openssl/mem.h"
 #include "openssl/rand.h"
 
 using namespace std::chrono_literals;
@@ -41,6 +42,14 @@ namespace Oauth2 {
 namespace {
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     authorization_handle(Http::CustomHeaders::get().Authorization);
+
+// Cryptographically safe HMAC comparison of two string views.
+bool safeStringViewEqual(absl::string_view s1, absl::string_view s2) {
+  if (s1.length() != s2.length()) {
+    return false;
+  }
+  return CRYPTO_memcmp(s1.data(), s2.data(), s1.length()) == 0;
+}
 
 constexpr const char* CookieDeleteFormatString =
     "{}=deleted; path={}; expires=Thu, 01 Jan 1970 00:00:00 GMT";
@@ -275,7 +284,7 @@ bool validateCsrfTokenHmac(const std::string& hmac_secret, const std::string& cs
   std::string token = std::string(csrf_token.substr(0, pos));
   std::string hmac = std::string(csrf_token.substr(pos + 1));
   std::vector<uint8_t> hmac_secret_vec(hmac_secret.begin(), hmac_secret.end());
-  return generateHmacBase64(hmac_secret_vec, token) == hmac;
+  return safeStringViewEqual(generateHmacBase64(hmac_secret_vec, token), hmac);
 }
 
 // Generates a PKCE code verifier with 32 octets of randomness.
@@ -590,10 +599,12 @@ bool OAuth2CookieValidator::hmacIsValid() const {
   if (!cookie_domain_.empty()) {
     cookie_domain = cookie_domain_;
   }
-  return ((encodeHmacBase64(secret_, cookie_domain, expires_, access_token_, id_token_,
-                            refresh_token_) == hmac_) ||
-          (encodeHmacHexBase64(secret_, cookie_domain, expires_, access_token_, id_token_,
-                               refresh_token_) == hmac_));
+  return (safeStringViewEqual(encodeHmacBase64(secret_, cookie_domain, expires_, access_token_,
+                                               id_token_, refresh_token_),
+                              hmac_) ||
+          safeStringViewEqual(encodeHmacHexBase64(secret_, cookie_domain, expires_, access_token_,
+                                                  id_token_, refresh_token_),
+                              hmac_));
 }
 
 bool OAuth2CookieValidator::timestampIsValid() const {
@@ -1622,7 +1633,7 @@ bool OAuth2Filter::validateCsrfToken(const Http::RequestHeaderMap& headers,
     return false;
   }
 
-  if (cookie_value.value() != csrf_token) {
+  if (!safeStringViewEqual(cookie_value.value(), csrf_token)) {
     return false;
   }
   return validateCsrfTokenHmac(config_->hmacSecret(), csrf_token);

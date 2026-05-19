@@ -27,7 +27,7 @@
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/fuzz/utility.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/retry_priority.h"
 #include "test/mocks/upstream/retry_priority_factory.h"
 #include "test/mocks/upstream/test_retry_host_predicate_factory.h"
@@ -359,6 +359,124 @@ void checkPathMatchCriterion(const Route* route, const std::string& expected_mat
 class RouteMatcherTest : public testing::Test,
                          public ConfigImplTestBase,
                          public TestScopedRuntime {};
+
+TEST(RouteMatchContextTest, BasicPathAndQuery) {
+  Http::TestRequestHeaderMapImpl headers{{":path", "/foo?a=1&b=2"}};
+  RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
+
+  EXPECT_EQ(ctx.path(), "/foo?a=1&b=2");
+  EXPECT_EQ(ctx.pathWithoutQuery(), "/foo");
+  EXPECT_EQ(ctx.sanitizedPath(), "/foo?a=1&b=2");
+  EXPECT_EQ(ctx.sanitizedPathWithoutQuery(), "/foo");
+  EXPECT_EQ(ctx.queryParams().getFirstValue("a").value(), "1");
+  EXPECT_EQ(ctx.queryParams().getFirstValue("b").value(), "2");
+}
+
+TEST(RouteMatchContextTest, PathWithFragment) {
+  Http::TestRequestHeaderMapImpl headers{{":path", "/foo?x=1#section"}};
+  RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
+
+  EXPECT_EQ(ctx.pathWithoutQuery(), "/foo");
+  EXPECT_EQ(ctx.sanitizedPathWithoutQuery(), "/foo");
+}
+
+TEST(RouteMatchContextTest, NoQueryString) {
+  Http::TestRequestHeaderMapImpl headers{{":path", "/foo/bar"}};
+  RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
+
+  EXPECT_EQ(ctx.path(), "/foo/bar");
+  EXPECT_EQ(ctx.pathWithoutQuery(), "/foo/bar");
+  EXPECT_FALSE(ctx.queryParams().getFirstValue("any").has_value());
+}
+
+TEST(RouteMatchContextTest, SanitizedPathStripsPathParams) {
+  Http::TestRequestHeaderMapImpl headers{{":path", "/foo;env=prod;ver=2?a=1"}};
+  RouteMatchContext ctx(headers, /*ignore_path_params=*/true);
+
+  EXPECT_EQ(ctx.sanitizedPath(), "/foo");
+  EXPECT_EQ(ctx.sanitizedPathWithoutQuery(), "/foo");
+  // Raw accessors are unaffected.
+  EXPECT_EQ(ctx.path(), "/foo;env=prod;ver=2?a=1");
+  EXPECT_EQ(ctx.pathWithoutQuery(), "/foo;env=prod;ver=2");
+}
+
+TEST(RouteMatchContextTest, SanitizedPathNoOpWhenNotConfigured) {
+  Http::TestRequestHeaderMapImpl headers{{":path", "/foo;env=prod?a=1"}};
+  RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
+
+  EXPECT_EQ(ctx.sanitizedPath(), "/foo;env=prod?a=1");
+  EXPECT_EQ(ctx.sanitizedPathWithoutQuery(), "/foo;env=prod");
+}
+
+TEST(RouteMatchContextTest, IsGrpc) {
+  {
+    Http::TestRequestHeaderMapImpl headers{{":path", "/pkg.Svc/Method"},
+                                           {"content-type", "application/grpc"}};
+    RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
+    EXPECT_TRUE(ctx.isGrpc());
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers{{":path", "/foo"}, {"content-type", "application/json"}};
+    RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
+    EXPECT_FALSE(ctx.isGrpc());
+  }
+}
+
+TEST(RouteMatchContextTest, Cookies) {
+  Http::TestRequestHeaderMapImpl headers{{":path", "/foo"}, {"cookie", "session=abc; user=xyz"}};
+  RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
+
+  const auto& cookies = ctx.cookies();
+  EXPECT_EQ(cookies.at("session"), "abc");
+  EXPECT_EQ(cookies.at("user"), "xyz");
+  EXPECT_EQ(cookies.size(), 2);
+}
+
+TEST(RouteMatchContextTest, NoCookies) {
+  Http::TestRequestHeaderMapImpl headers{{":path", "/foo"}};
+  RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
+
+  EXPECT_TRUE(ctx.cookies().empty());
+}
+
+// Regression test: route 1 checks cookie "session" (no match), route 2 checks
+// cookie "user" (match). With the old filtered-cache bug, route 1's evaluation
+// would cache only {"session": ...}, causing route 2 to miss "user" and fail.
+TEST_F(RouteMatcherTest, CookiesCachedAcrossDifferentNameSets) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: cookie
+    domains: ["*"]
+    routes:
+      - match:
+          prefix: "/"
+          cookies:
+            - name: session
+              string_match:
+                exact: expected
+        route: { cluster: session-cluster }
+      - match:
+          prefix: "/"
+          cookies:
+            - name: user
+              string_match:
+                exact: xyz
+        route: { cluster: user-cluster }
+      - match:
+          prefix: "/"
+        route: { cluster: default }
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters(
+      {"session-cluster", "user-cluster", "default"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  // session=other → route 1 misses; user=xyz → route 2 matches.
+  auto headers = genHeaders("www.example.com", "/foo", "GET");
+  headers.addCopy("cookie", "session=other; user=xyz");
+  EXPECT_EQ("user-cluster", config.route(headers, 0)->routeEntry()->clusterName());
+}
 
 TEST_F(RouteMatcherTest, TestConnectRoutes) {
   const std::string yaml = R"EOF(
@@ -4961,6 +5079,7 @@ virtual_hosts:
         per_try_idle_timeout: 5s
         num_retries: 3
         retry_on: 5xx,gateway-error,connect-failure,reset
+        refresh_cluster_on_retry: true
   )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
@@ -5021,6 +5140,14 @@ virtual_hosts:
                 ->routeEntry()
                 ->retryPolicy()
                 ->retryOn());
+  EXPECT_FALSE(config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                   ->routeEntry()
+                   ->retryPolicy()
+                   ->refreshClusterOnRetry());
+  EXPECT_TRUE(config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                  ->routeEntry()
+                  ->retryPolicy()
+                  ->refreshClusterOnRetry());
 }
 
 class TestRetryOptionsPredicateFactory : public Upstream::RetryOptionsPredicateFactory {
