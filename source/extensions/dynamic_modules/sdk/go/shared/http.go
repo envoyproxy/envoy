@@ -238,9 +238,9 @@ type HttpFilterHandle interface {
 	// copy the data if you need to keep it and use it later.
 	GetAttributeString(attributeID AttributeID) (UnsafeEnvoyBuffer, bool)
 
-	// GetAttributeNumber retrieves the integer attribute value of the stream.
+	// GetAttributeNumber retrieves the float attribute value of the stream.
 	// Returns attribute value if found, otherwise (0, false).
-	GetAttributeNumber(attributeID AttributeID) (uint64, bool)
+	GetAttributeNumber(attributeID AttributeID) (float64, bool)
 
 	// GetAttributeBool retrieves the bool attribute value of the stream.
 	// Returns attribute value and true if found, otherwise false.
