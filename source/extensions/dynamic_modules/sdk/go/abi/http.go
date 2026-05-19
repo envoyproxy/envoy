@@ -371,10 +371,6 @@ func (b *dymBodyBuffer) Drain(size uint64) {
 	)
 }
 
-// dymSpan implements shared.Span by wrapping the active span pointer for the current stream.
-// The pointer is owned by Envoy and must not be finished by the module. filter is retained so
-// child spans spawned from this span can be tracked on the owning filter handle and safely
-// retired when the stream is destroyed.
 type dymSpan struct {
 	hostPluginPtr C.envoy_dynamic_module_type_http_filter_envoy_ptr
 	spanPtr       C.envoy_dynamic_module_type_span_envoy_ptr
@@ -501,88 +497,21 @@ func (s *dymSpan) SpawnChild(operation string) shared.ChildSpan {
 		return nil
 	}
 	child := &dymChildSpan{
-		childPtr:      childPtr,
-		hostPluginPtr: s.hostPluginPtr,
-		filter:        s.filter,
+		dymSpan: dymSpan{
+			hostPluginPtr: s.hostPluginPtr,
+			spanPtr:       C.envoy_dynamic_module_type_span_envoy_ptr(childPtr),
+			filter:        s.filter,
+		},
+		childPtr: childPtr,
 	}
 	s.filter.trackChildSpan(child)
 	return child
 }
 
-// dymChildSpan implements shared.ChildSpan. The module owns the underlying span and should
-// call Finish exactly once; the filter destroy hook finishes any spans the module forgot.
 type dymChildSpan struct {
-	childPtr      C.envoy_dynamic_module_type_child_span_module_ptr
-	hostPluginPtr C.envoy_dynamic_module_type_http_filter_envoy_ptr
-	filter        *dymHttpFilterHandle
-	finished      bool
-}
-
-func (c *dymChildSpan) asSpanPtr() C.envoy_dynamic_module_type_span_envoy_ptr {
-	return C.envoy_dynamic_module_type_span_envoy_ptr(c.childPtr)
-}
-
-func (c *dymChildSpan) SetTag(key, value string) {
-	C.envoy_dynamic_module_callback_http_span_set_tag(
-		c.asSpanPtr(),
-		stringToModuleBuffer(key),
-		stringToModuleBuffer(value),
-	)
-	runtime.KeepAlive(key)
-	runtime.KeepAlive(value)
-}
-
-func (c *dymChildSpan) SetOperation(operation string) {
-	C.envoy_dynamic_module_callback_http_span_set_operation(
-		c.asSpanPtr(),
-		stringToModuleBuffer(operation),
-	)
-	runtime.KeepAlive(operation)
-}
-
-func (c *dymChildSpan) Log(event string) {
-	C.envoy_dynamic_module_callback_http_span_log(
-		c.hostPluginPtr,
-		c.asSpanPtr(),
-		stringToModuleBuffer(event),
-	)
-	runtime.KeepAlive(event)
-}
-
-func (c *dymChildSpan) SetSampled(sampled bool) {
-	C.envoy_dynamic_module_callback_http_span_set_sampled(
-		c.asSpanPtr(),
-		(C.bool)(sampled),
-	)
-}
-
-func (c *dymChildSpan) SetBaggage(key, value string) {
-	C.envoy_dynamic_module_callback_http_span_set_baggage(
-		c.asSpanPtr(),
-		stringToModuleBuffer(key),
-		stringToModuleBuffer(value),
-	)
-	runtime.KeepAlive(key)
-	runtime.KeepAlive(value)
-}
-
-func (c *dymChildSpan) SpawnChild(operationName string) shared.ChildSpan {
-	childPtr := C.envoy_dynamic_module_callback_http_span_spawn_child(
-		c.hostPluginPtr,
-		c.asSpanPtr(),
-		stringToModuleBuffer(operationName),
-	)
-	runtime.KeepAlive(operationName)
-	if childPtr == nil {
-		return nil
-	}
-	child := &dymChildSpan{
-		childPtr:      childPtr,
-		hostPluginPtr: c.hostPluginPtr,
-		filter:        c.filter,
-	}
-	c.filter.trackChildSpan(child)
-	return child
+	dymSpan
+	childPtr C.envoy_dynamic_module_type_child_span_module_ptr
+	finished bool
 }
 
 func (c *dymChildSpan) Finish() {
@@ -618,10 +547,6 @@ type dymHttpFilterHandle struct {
 
 	downstreamWatermarkCallbacks shared.DownstreamWatermarkCallbacks
 
-	// childSpans tracks unfinished child spans owned by user code so the stream-destroy hook
-	// can finish any the module forgot. The host's span pointer stays valid until
-	// envoy_dynamic_module_callback_http_child_span_finish runs, so finishing orphans here
-	// is what releases the host-side Tracing::Span — dropping them would leak it.
 	childSpans map[*dymChildSpan]struct{}
 }
 

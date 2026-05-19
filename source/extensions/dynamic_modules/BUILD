@@ -79,11 +79,10 @@ envoy_cc_library(
 go_library(
     name = "go_sdk_shared",
     srcs = [
-        "sdk/go/shared/http.go",
-        "sdk/go/shared/http_api.go",
+        "sdk/go/shared/api.go",
+        "sdk/go/shared/base.go",
         "sdk/go/shared/network_api.go",
         "sdk/go/shared/network_base.go",
-        "sdk/go/shared/types.go",
     ],
     importpath = "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared",
     visibility = ["//visibility:public"],
