@@ -627,6 +627,70 @@ TEST_F(GrpcStatsFilterConfigTest, UpstreamStatsWithTrailersOnly) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
 }
 
+TEST_F(GrpcStatsFilterConfigTest, StatsConnectStreamingDirectResponse) {
+  config_.mutable_stats_for_all_methods()->set_value(true);
+  initialize();
+
+  EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillRepeatedly(testing::Return(nullptr));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/connect+proto"},
+      {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  Buffer::OwnedImpl req_buffer{"{}"};
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(req_buffer, true));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  Buffer::OwnedImpl resp_buffer{"{}"};
+  Grpc::Encoder().prependFrameHeader(Envoy::Grpc::CONNECT_FH_EOS, resp_buffer);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(resp_buffer, true));
+}
+
+TEST_F(GrpcStatsFilterConfigTest, StatsConnectUnaryDirectResponse) {
+  config_.mutable_stats_for_all_methods()->set_value(true);
+  config_.set_emit_filter_state(true);
+  initialize();
+
+  EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillRepeatedly(testing::Return(nullptr));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/proto"},
+      {"connect-protocol-version", "1"},
+      {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  Buffer::OwnedImpl buffer{"{}"};
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  buffer = {"{}"};
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(buffer, true));
+}
+
+TEST_F(GrpcStatsFilterConfigTest, StatsGrpcDirectResponse) {
+  config_.mutable_stats_for_all_methods()->set_value(true);
+  config_.set_emit_filter_state(true);
+  initialize();
+
+  EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillRepeatedly(testing::Return(nullptr));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/grpc"},
+      {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  Protobuf::Value v1;
+  v1.set_string_value("v1");
+  auto b1 = Grpc::Common::serializeToGrpcFrame(v1);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(*b1, true));
+
+  Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/grpc"},
+                                                   {":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(*b1, true));
+}
+
 } // namespace
 } // namespace GrpcStats
 } // namespace HttpFilters
