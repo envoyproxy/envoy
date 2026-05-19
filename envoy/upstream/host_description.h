@@ -45,7 +45,8 @@ using MetadataConstSharedPtr = std::shared_ptr<const envoy::config::core::v3::Me
   COUNTER(rq_timeout)                                                                              \
   COUNTER(rq_total)                                                                                \
   GAUGE(cx_active)                                                                                 \
-  GAUGE(rq_active)
+  GAUGE(rq_active)                                                                                 \
+  GAUGE(rq_pending_active)
 
 /**
  * All per host stats defined. @see stats_macros.h

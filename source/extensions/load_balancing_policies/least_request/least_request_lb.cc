@@ -1,7 +1,20 @@
 #include "source/extensions/load_balancing_policies/least_request/least_request_lb.h"
 
+#include "source/common/runtime/runtime_features.h"
+
 namespace Envoy {
 namespace Upstream {
+
+namespace {
+uint64_t effectiveActiveRequests(const Host& host) {
+  uint64_t active = host.stats().rq_active_.value();
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.least_request_lb_count_pending_requests")) {
+    active += host.stats().rq_pending_active_.value();
+  }
+  return active;
+}
+} // namespace
 
 double LeastRequestLoadBalancer::hostWeight(const Host& host) const {
   // This method is called to calculate the dynamic weight as following when all load balancing
@@ -27,10 +40,9 @@ double LeastRequestLoadBalancer::hostWeight(const Host& host) const {
   // If the value of active requests is the max value, adding +1 will overflow
   // it and cause a divide by zero. This won't happen in normal cases but stops
   // failing fuzz tests
+  const uint64_t active = effectiveActiveRequests(host);
   const uint64_t active_request_value =
-      host.stats().rq_active_.value() != std::numeric_limits<uint64_t>::max()
-          ? host.stats().rq_active_.value() + 1
-          : host.stats().rq_active_.value();
+      active != std::numeric_limits<uint64_t>::max() ? active + 1 : active;
 
   if (active_request_bias_ == 1.0) {
     host_weight = static_cast<double>(host.weight()) / active_request_value;
@@ -89,8 +101,8 @@ HostSharedPtr LeastRequestLoadBalancer::unweightedHostPickFullScan(const HostVec
       continue;
     }
 
-    const auto candidate_active_rq = candidate_host->stats().rq_active_.value();
-    const auto sampled_active_rq = sampled_host->stats().rq_active_.value();
+    const auto candidate_active_rq = effectiveActiveRequests(*candidate_host);
+    const auto sampled_active_rq = effectiveActiveRequests(*sampled_host);
 
     if (sampled_active_rq < candidate_active_rq) {
       // Reset the count of known tied hosts.
@@ -129,8 +141,8 @@ HostSharedPtr LeastRequestLoadBalancer::unweightedHostPickNChoices(const HostVec
       continue;
     }
 
-    const auto candidate_active_rq = candidate_host->stats().rq_active_.value();
-    const auto sampled_active_rq = sampled_host->stats().rq_active_.value();
+    const auto candidate_active_rq = effectiveActiveRequests(*candidate_host);
+    const auto sampled_active_rq = effectiveActiveRequests(*sampled_host);
 
     if (sampled_active_rq < candidate_active_rq) {
       candidate_host = sampled_host;
