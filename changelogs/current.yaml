@@ -14,6 +14,10 @@ bug_fixes:
 - area: load_report
   change: |
     Fixed an issue upon load-report shutdown race with ADS stream. Introduced proper cleanup of the gRPC stream.
+- area: oauth2
+  change: |
+    Fixed a bug where HMAC verification may exposure a timing side channel that leaks information of
+    HMAC secret validity.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
