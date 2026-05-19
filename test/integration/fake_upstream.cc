@@ -401,8 +401,10 @@ FakeHttpConnection::FakeHttpConnection(
     Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
     uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-        headers_with_underscores_action)
+        headers_with_underscores_action,
+    bool deferred_read_enable)
     : FakeConnectionBase(shared_connection, time_system), type_(type),
+      deferred_read_enable_(deferred_read_enable),
       header_validator_factory_(
           IntegrationUtil::makeHeaderValidationFactory(fakeUpstreamHeaderValidatorConfig())) {
   ASSERT(max_request_headers_count != 0);
@@ -439,10 +441,11 @@ FakeHttpConnection::FakeHttpConnection(
 
 void FakeHttpConnection::initialize() {
   FakeConnectionBase::initialize();
-  if (shared_connection_.connected() && !shared_connection_.connection().readEnabled()) {
-    // FakeUpstream::consumeConnection() may hand HTTP connections off before the codec/filter
-    // stack is initialized. Re-enable reads only after initialize() has attached the HTTP read
-    // filter, or early request bytes can be consumed without ever creating a FakeStream.
+  if (deferred_read_enable_ && shared_connection_.connected() &&
+      !shared_connection_.connection().readEnabled()) {
+    // Re-enable reads that were explicitly deferred by consumeConnection(defer_read_enable=true)
+    // to ensure the HTTP codec and read filter are fully initialized before processing request
+    // bytes. This must not re-enable reads when disable_and_do_not_enable_ is active.
     shared_connection_.connection().readDisable(false);
   }
 }
@@ -760,9 +763,8 @@ bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
   // not lazily create for HTTP/3
   if (http_type_ == Http::CodecType::HTTP3) {
     quic_connections_.push_back(std::make_unique<FakeHttpConnection>(
-        *this, consumeConnection(/*defer_read_enable=*/true), http_type_, time_system_,
-        config_.max_request_headers_kb_, config_.max_request_headers_count_,
-        config_.headers_with_underscores_action_));
+        *this, consumeConnection(), http_type_, time_system_, config_.max_request_headers_kb_,
+        config_.max_request_headers_count_, config_.headers_with_underscores_action_));
     quic_connections_.back()->initialize();
   }
   return true;
@@ -834,7 +836,8 @@ AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_di
     connection = std::make_unique<FakeHttpConnection>(
         *this, consumeConnection(/*defer_read_enable=*/true), http_type_, time_system_,
         config_.max_request_headers_kb_, config_.max_request_headers_count_,
-        config_.headers_with_underscores_action_);
+        config_.headers_with_underscores_action_,
+        /*deferred_read_enable=*/read_disable_on_new_connection_ && !disable_and_do_not_enable_);
     connection->initialize();
     return AssertionSuccess();
   });
@@ -872,7 +875,9 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
         connection = std::make_unique<FakeHttpConnection>(
             upstream, upstream.consumeConnection(/*defer_read_enable=*/true), upstream.http_type_,
             upstream.timeSystem(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
-            Http::DEFAULT_MAX_HEADERS_COUNT, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+            Http::DEFAULT_MAX_HEADERS_COUNT, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
+            /*deferred_read_enable=*/upstream.read_disable_on_new_connection_ &&
+                !upstream.disable_and_do_not_enable_);
         connection->initialize();
         return AssertionSuccess();
       }));
