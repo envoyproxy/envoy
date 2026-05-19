@@ -234,6 +234,37 @@ TEST_F(ClusterTest, CreateSubClusterConfig) {
   EXPECT_EQ(false, sub_cluster_pair.second.has_value());
 }
 
+// sub cluster is not exist and load balancer would return nullptr.
+TEST_F(ClusterTest, SubClusterNotExist) {
+  initialize(sub_cluster_yaml_config_, false);
+
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("DFPCluster:localhost:80"))
+      .WillOnce(Return(nullptr));
+
+  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("localhost")).host);
+}
+
+// Load balancer will return null host if the cluster is destroyed in the main thread.
+TEST_F(ClusterTest, ClusterDestroyedInMainThread) {
+  initialize(default_yaml_config_, false);
+  makeTestHost("host1:0", "1.2.3.4");
+  InSequence s;
+
+  // LB will immediately resolve host1.
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
+  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ("1.2.3.4:0",
+            cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
+  EXPECT_CALL(*host_map_["host1:0"], touch());
+  EXPECT_EQ("1.2.3.4:0",
+            lb_->chooseHost(setHostAndReturnContext("host1:0")).host->address()->asString());
+
+  // Destroy the cluster, LB will return nullptr without accessing the cluster.
+  cluster_.reset();
+  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1:0")).host);
+}
+
 // Basic flow of the cluster including adding hosts and removing them.
 TEST_F(ClusterTest, BasicFlow) {
   initialize(default_yaml_config_, false);
