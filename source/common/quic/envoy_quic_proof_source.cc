@@ -118,11 +118,9 @@ void EnvoyQuicProofSource::updateFilterChainManager(
 
 void EnvoyQuicProofSource::OnNewSslCtx(SSL_CTX* ssl_ctx) {
   registerCertCompression(ssl_ctx);
-  // Key log is independent of session ticket processing; install always.
-  SSL_CTX_set_keylog_callback(ssl_ctx, EnvoyTlsServerHandshaker::keylogCallback);
-  // Envoy's ticket key callback is opt-in via the runtime flag. When off,
-  // leave the SSL_CTX alone so QUICHE/BoringSSL handle tickets via their
-  // default path; the per-connection handshaker mirrors this gating.
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.quic_keylog_support")) {
+    SSL_CTX_set_keylog_callback(ssl_ctx, EnvoyTlsServerHandshaker::keylogCallback);
+  }
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_session_ticket_support")) {
     SSL_CTX_set_tlsext_ticket_key_cb(ssl_ctx, EnvoyTlsServerHandshaker::ticketKeyCallback);
   }

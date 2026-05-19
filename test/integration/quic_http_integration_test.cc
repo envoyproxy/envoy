@@ -2116,6 +2116,7 @@ public:
   std::string setUpKeylog(bool configure, bool local_filter = false, bool remote_filter = false,
                           bool local_negative = false, bool remote_negative = false) {
     concurrency_ = 1;
+    config_helper_.addRuntimeOverride("envoy.restart_features.quic_keylog_support", "true");
     const std::string path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
     if (configure) {
       configureKeylog(path, local_filter, remote_filter, local_negative, remote_negative);
@@ -2223,8 +2224,8 @@ TEST_P(QuicKeylogIntegrationTest, KeylogRemoteFilterNoMatch) {
   assertKeylogEmpty(path);
 }
 
-// The SSL_CTX key log callback is installed regardless of configuration;
-// maybeWriteKeyLog short-circuits when no key log file was opened.
+// The key log runtime flag installs the SSL_CTX callback, but maybeWriteKeyLog
+// short-circuits when no key log file was opened.
 TEST_P(QuicKeylogIntegrationTest, KeylogNotConfigured) {
   const std::string path = setUpKeylog(/*configure=*/false);
   runOneRequest();

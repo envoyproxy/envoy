@@ -16,6 +16,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -377,10 +378,21 @@ TEST_F(EnvoyQuicProofSourceTest, ComputeSignatureFailAlgorithmMismatch) {
 // BoringSSL has no getter for the ticket key callback, so the ticket install
 // can only be observed via behavior; the key log callback has one.
 TEST_F(EnvoyQuicProofSourceTest, OnNewSslCtxInstallsKeylogCallback) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.restart_features.quic_keylog_support", "true"}});
   bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
   ASSERT_NE(ssl_ctx, nullptr);
   proof_source_.OnNewSslCtx(ssl_ctx.get());
   EXPECT_EQ(EnvoyTlsServerHandshaker::keylogCallback, SSL_CTX_get_keylog_callback(ssl_ctx.get()));
+}
+
+TEST_F(EnvoyQuicProofSourceTest, OnNewSslCtxDoesNotInstallKeylogCallbackWhenFlagOff) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.restart_features.quic_keylog_support", "false"}});
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ssl_ctx, nullptr);
+  proof_source_.OnNewSslCtx(ssl_ctx.get());
+  EXPECT_EQ(nullptr, SSL_CTX_get_keylog_callback(ssl_ctx.get()));
 }
 
 } // namespace Quic
