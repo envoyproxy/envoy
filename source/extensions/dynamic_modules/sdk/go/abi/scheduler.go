@@ -20,7 +20,7 @@ type dymScheduler struct {
 	nextTaskID    uint64
 	tasks         map[uint64]func()
 	commitFunc    func(unsafe.Pointer, C.uint64_t)
-	deleteFunc func(unsafe.Pointer)
+	deleteFunc    func(unsafe.Pointer)
 }
 
 func newDymScheduler(

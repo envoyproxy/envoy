@@ -1927,7 +1927,7 @@ func envoy_dynamic_module_on_http_filter_new(
 	if factoryWrapper == nil {
 		return nil
 	}
-	
+
 	// Create the plugin wrapper.
 
 	pluginWrapper := newDymStreamPluginHandle(hostPluginPtr)
