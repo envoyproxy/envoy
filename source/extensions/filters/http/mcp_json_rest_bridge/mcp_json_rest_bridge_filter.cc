@@ -6,6 +6,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
@@ -359,6 +360,8 @@ void McpJsonRestBridgeFilter::serveToolsListLocal(const nlohmann::json& json_rpc
   std::string request_id_json = "null";
   if (json_rpc.contains("id")) {
     request_id_json = json_rpc["id"].dump();
+  } else {
+    ASSERT(false, "serveToolsListLocal requires an RPC ID");
   }
 
   Buffer::OwnedImpl response_data;
