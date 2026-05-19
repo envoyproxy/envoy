@@ -57,8 +57,7 @@ DynamicModuleLbConfig::DynamicModuleLbConfig(
     const std::string& lb_policy_name, const std::string& lb_config,
     const std::string& metrics_namespace,
     Envoy::Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope)
-    : in_module_config_(nullptr),
-      stats_scope_(stats_scope.createScope(absl::StrCat(metrics_namespace, "."))),
+    : stats_scope_(stats_scope.createScope(absl::StrCat(metrics_namespace, "."))),
       stat_name_pool_(stats_scope_->symbolTable()), lb_policy_name_(lb_policy_name),
       lb_config_(lb_config), dynamic_module_(std::move(dynamic_module)) {}
 

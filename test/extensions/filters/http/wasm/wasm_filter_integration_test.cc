@@ -24,6 +24,8 @@ namespace Extensions {
 namespace Wasm {
 namespace {
 
+using testing::Ge;
+
 class WasmFilterIntegrationTest
     : public HttpIntegrationTest,
       public testing::TestWithParam<std::tuple<std::string, std::string, bool, Http::CodecType>> {
@@ -467,8 +469,8 @@ typed_config:
 
   // Wait until the DATA frame (1024 payload + 9-byte frame header) has been
   // received by the server's HTTP/2 codec.
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_rx_bytes_total",
-                                 bytes_before_data + 1033);
+  test_server_->waitForCounter("http.config_test.downstream_cx_rx_bytes_total",
+                               Ge(bytes_before_data + 1033));
 
   // Grab the worker-thread dispatcher and callbacks.
   Event::Dispatcher* conn_dispatcher;
@@ -526,7 +528,7 @@ typed_config:
       test_server_->counter("http.config_test.downstream_rq_total")->value();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto follow_up_response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  test_server_->waitForCounterGe("http.config_test.downstream_rq_total", initial_rq_total + 1);
+  test_server_->waitForCounter("http.config_test.downstream_rq_total", Ge(initial_rq_total + 1));
   // The reload check (when the bug is present) runs on the worker thread as
   // part of the Wasm filter's per-request setup; downstream_rq_total can tick
   // before that work has finished. Post a fence to the same worker dispatcher

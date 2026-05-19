@@ -272,6 +272,8 @@ public:
   static void loadFromJson(absl::string_view json, Protobuf::Struct& message);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);
+  static absl::Status loadFromYamlNoThrow(const std::string& yaml, Protobuf::Message& message,
+                                          ProtobufMessage::ValidationVisitor& validation_visitor);
 #endif
 
   // This function attempts to load Envoy configuration from the specified file

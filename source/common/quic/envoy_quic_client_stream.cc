@@ -279,8 +279,15 @@ bool EnvoyQuicClientStream::OnStopSending(quic::QuicResetStreamError error) {
   if (read_side_closed() && !end_stream_encoded) {
     // If both directions are closed but end stream hasn't been encoded yet, notify reset callbacks.
     // Treat this as a remote reset, since the stream will be closed in both directions.
+    Http::StreamResetReason reason;
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_preserve_rst_no_error") &&
+        error.internal_code() == quic::QUIC_STREAM_NO_ERROR) {
+      reason = Http::StreamResetReason::RemoteResetNoError;
+    } else {
+      reason = quicRstErrorToEnvoyRemoteResetReason(error.internal_code());
+    }
     runResetCallbacks(
-        quicRstErrorToEnvoyRemoteResetReason(error.internal_code()),
+        reason,
         absl::StrCat(quic::QuicRstStreamErrorCodeToString(error.internal_code()), "|FROM_PEER"));
   }
   return true;
@@ -383,14 +390,23 @@ void EnvoyQuicClientStream::maybeDecodeTrailers() {
 void EnvoyQuicClientStream::OnStreamReset(const quic::QuicRstStreamFrame& frame) {
   ENVOY_STREAM_LOG(debug, "received reset code={}", *this, static_cast<int>(frame.error_code));
   stats_.rx_reset_.inc();
-  bool end_stream_decoded_and_encoded = read_side_closed() && local_end_stream_;
+  // Capture pre-reset state: OnStreamReset closes the read side, so read_side_closed()
+  // will be true afterwards regardless of whether the response was fully received.
+  bool read_side_was_closed = read_side_closed();
+  bool end_stream_decoded_and_encoded = read_side_was_closed && local_end_stream_;
   // This closes read side in IETF Quic, but doesn't close write side.
   quic::QuicSpdyClientStream::OnStreamReset(frame);
   ASSERT(read_side_closed());
   if (write_side_closed() && !end_stream_decoded_and_encoded) {
+    Http::StreamResetReason reason;
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_preserve_rst_no_error") &&
+        frame.error_code == quic::QUIC_STREAM_NO_ERROR && read_side_was_closed) {
+      reason = Http::StreamResetReason::RemoteResetNoError;
+    } else {
+      reason = quicRstErrorToEnvoyRemoteResetReason(frame.error_code);
+    }
     runResetCallbacks(
-        quicRstErrorToEnvoyRemoteResetReason(frame.error_code),
-        absl::StrCat(quic::QuicRstStreamErrorCodeToString(frame.error_code), "|FROM_PEER"));
+        reason, absl::StrCat(quic::QuicRstStreamErrorCodeToString(frame.error_code), "|FROM_PEER"));
   }
 }
 

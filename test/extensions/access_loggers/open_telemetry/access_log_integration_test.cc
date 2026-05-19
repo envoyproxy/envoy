@@ -17,6 +17,7 @@
 #include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
 
 using testing::AssertionResult;
+using testing::Eq;
 
 constexpr char EXPECTED_REQUEST_MESSAGE[] = R"EOF(
     resource_logs:
@@ -277,7 +278,7 @@ TEST_P(AccessLogIntegrationTest, AccessLoggerStatsAreIndependentOfListener) {
         });
     new_config_helper.setLds("1");
     ASSERT_TRUE(codec_client_->waitForDisconnect());
-    test_server_->waitForGaugeEq("listener_manager.total_listeners_active", 1);
+    test_server_->waitForGauge("listener_manager.total_listeners_active", Eq(1));
   }
 
   // Make another request, the existing access logger should be used.
@@ -290,7 +291,7 @@ TEST_P(AccessLogIntegrationTest, AccessLoggerStatsAreIndependentOfListener) {
   codec_client_->close();
   cleanup();
 
-  test_server_->waitForCounterEq("access_logs.open_telemetry_access_log.logs_written", 2);
+  test_server_->waitForCounter("access_logs.open_telemetry_access_log.logs_written", Eq(2));
 }
 
 class AccessLogFormatterHeaderTest : public testing::TestWithParam<Network::Address::IpVersion>,

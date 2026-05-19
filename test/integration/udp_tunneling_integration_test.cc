@@ -15,6 +15,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -190,7 +192,7 @@ TEST_P(ConnectUdpTerminationIntegrationTest, MaxStreamDuration) {
   setUpConnection();
   exchangeValidCapsules();
 
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_max_duration_reached", Ge(1));
 
   if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -498,8 +500,8 @@ typed_config:
     // Send upgrade headers downstream, fully establishing the connection.
     upstream_request_->encodeHeaders(response_headers_, false);
 
-    test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", tunnels_count);
-    test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
+    test_server_->waitForCounter("cluster.cluster_0.udp.sess_tunnel_success", Eq(tunnels_count));
+    test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(1));
   }
 
   void sendCapsuleDownstream(const std::string datagram, bool end_stream = false) {
@@ -540,7 +542,7 @@ typed_config:
 
   void drainListeners() {
     test_server_->server().dispatcher().post([this]() { test_server_->server().drainListeners(); });
-    test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
+    test_server_->waitForCounter("listener_manager.listener_stopped", Eq(1));
   }
 
   TestConfig config_;
@@ -566,7 +568,7 @@ TEST_P(UdpTunnelingIntegrationTest, BasicFlowWithBuffering) {
 
   sendCapsuleDownstream("response1", false);
   sendCapsuleDownstream("response2", true);
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
 }
 
 TEST_P(UdpTunnelingIntegrationTest, BasicFlowNoBuffering) {
@@ -581,7 +583,7 @@ TEST_P(UdpTunnelingIntegrationTest, BasicFlowNoBuffering) {
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({datagram2})));
 
   sendCapsuleDownstream("response", true);
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
 }
 
 TEST_P(UdpTunnelingIntegrationTest, BasicFlowWithPost) {
@@ -594,7 +596,7 @@ TEST_P(UdpTunnelingIntegrationTest, BasicFlowWithPost) {
   // Wait for buffered datagram.
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({datagram1})));
   sendCapsuleDownstream("response", true);
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
 }
 
 TEST_P(UdpTunnelingIntegrationTest, TwoConsecutiveDownstreamSessions) {
@@ -604,10 +606,10 @@ TEST_P(UdpTunnelingIntegrationTest, TwoConsecutiveDownstreamSessions) {
 
   establishConnection("hello1");
   sendCapsuleDownstream("response2", true); // Will end first session.
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
   establishConnection("hello2", 2); // Will create another session.
   sendCapsuleDownstream("response2", true);
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
 }
 
 TEST_P(UdpTunnelingIntegrationTest, IdleTimeoutWithUpstreamConnectionAndResponseHeaders) {
@@ -643,9 +645,9 @@ TEST_P(UdpTunnelingIntegrationTest, IdleTimeoutWithUpstreamConnectionAndResponse
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({datagram})));
 
   sendCapsuleDownstream("response1", false);
-  test_server_->waitForCounterEq("udp.foo.idle_timeout", 1);
+  test_server_->waitForCounter("udp.foo.idle_timeout", Eq(1));
   ASSERT_TRUE(upstream_request_->waitForReset());
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
 
   EXPECT_THAT(waitForAccessLog(access_log_filename),
               testing::HasSubstr(StreamInfo::ResponseFlagUtils::STREAM_IDLE_TIMEOUT));
@@ -685,11 +687,11 @@ TEST_P(UdpTunnelingIntegrationTest, IdleTimeoutWithUpstreamConnectionNoResponseH
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   expectRequestHeaders(upstream_request_->headers());
 
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
-  test_server_->waitForCounterEq("udp.foo.idle_timeout", 1);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(1));
+  test_server_->waitForCounter("udp.foo.idle_timeout", Eq(1));
   ASSERT_TRUE(upstream_request_->waitForReset());
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 0);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_tunnel_success", Eq(0));
 
   EXPECT_THAT(waitForAccessLog(access_log_filename),
               testing::HasSubstr(StreamInfo::ResponseFlagUtils::STREAM_IDLE_TIMEOUT));
@@ -740,10 +742,10 @@ TEST_P(UdpTunnelingIntegrationTest, IdleTimeoutNoUpstreamConnection) {
   // Drainer filter will stop the iteration until the session idle timeout, so no connection to
   // upstream will be created.
   client_->write("hello", *listener_address_);
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
-  test_server_->waitForCounterEq("udp.foo.idle_timeout", 1);
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 0);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(1));
+  test_server_->waitForCounter("udp.foo.idle_timeout", Eq(1));
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_tunnel_success", Eq(0));
 
   EXPECT_THAT(waitForAccessLog(access_log_filename),
               testing::HasSubstr(StreamInfo::ResponseFlagUtils::STREAM_IDLE_TIMEOUT));
@@ -758,16 +760,16 @@ TEST_P(UdpTunnelingIntegrationTest, BufferOverflowDueToCapacity) {
   // we expect the second one to be dropped.
   client_->write("hello1", *listener_address_);
   client_->write("hello2", *listener_address_);
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_buffer_overflow", 1);
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_tunnel_buffer_overflow", Eq(1));
 
   // "hello3" will drop because it's sent before the tunnel is established, and the buffer is full.
   establishConnection("hello3");
   // Wait for the buffered datagram.
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({"hello1"})));
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_buffer_overflow", 2);
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_tunnel_buffer_overflow", Eq(2));
 
   sendCapsuleDownstream("response", true);
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
 }
 
 TEST_P(UdpTunnelingIntegrationTest, BufferOverflowDueToSize) {
@@ -779,16 +781,16 @@ TEST_P(UdpTunnelingIntegrationTest, BufferOverflowDueToSize) {
   // we expect the second one to be dropped.
   client_->write("hello1", *listener_address_);
   client_->write("hello2", *listener_address_);
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_buffer_overflow", 1);
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_tunnel_buffer_overflow", Eq(1));
 
   // "hello3" will drop because it's sent before the tunnel is established, and the buffer is full.
   establishConnection("hello3");
   // Wait for the buffered datagram.
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({"hello1"})));
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_buffer_overflow", 2);
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_tunnel_buffer_overflow", Eq(2));
 
   sendCapsuleDownstream("response", true);
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
 }
 
 TEST_P(UdpTunnelingIntegrationTest, ConnectionReuse) {
@@ -811,8 +813,8 @@ TEST_P(UdpTunnelingIntegrationTest, ConnectionReuse) {
   // Send upgrade headers downstream, fully establishing the connection.
   upstream_request2->encodeHeaders(response_headers_, false);
 
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 2);
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 2);
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_tunnel_success", Eq(2));
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(2));
 
   // Wait for buffered datagram for each stream.
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({"hello_1"})));
@@ -821,14 +823,14 @@ TEST_P(UdpTunnelingIntegrationTest, ConnectionReuse) {
   // Send capsule from upstream over the first stream, and close it.
   sendCapsuleDownstream("response_1", true);
   // First stream is closed so we expect active sessions to decrease to 1.
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(1));
 
   // Send capsule from upstream over the second stream, and close it.
   upstream_request2->encodeData(encapsulate("response_2"), true);
   Network::UdpRecvData response_datagram;
   client2.recv(response_datagram);
   EXPECT_EQ("response_2", response_datagram.buffer_->toString());
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
 }
 
 TEST_P(UdpTunnelingIntegrationTest, FailureOnBadResponseHeaders) {
@@ -868,10 +870,10 @@ TEST_P(UdpTunnelingIntegrationTest, FailureOnBadResponseHeaders) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "404"}};
   upstream_request_->encodeHeaders(response_headers, true);
 
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_connect_attempts_exceeded", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_failure", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 0);
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_connect_attempts_exceeded", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_tunnel_failure", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_tunnel_success", Eq(0));
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
 
   const std::string expected_log =
       "1 " + std::string(StreamInfo::ResponseFlagUtils::UPSTREAM_CONNECTION_FAILURE) + "," +
@@ -917,8 +919,8 @@ TEST_P(UdpTunnelingIntegrationTest,
   Http::TestResponseHeaderMapImpl fail_response_headers{{":status", "404"}};
   upstream_request_->encodeHeaders(fail_response_headers, true);
 
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_retry", 1);
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_retry", Eq(1));
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(1));
 
   // The request is retried, expect new downstream headers
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
@@ -928,9 +930,9 @@ TEST_P(UdpTunnelingIntegrationTest,
   // Send upgrade headers downstream, fully establishing the connection.
   upstream_request_->encodeHeaders(response_headers_, false);
 
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 1);
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_tunnel_success", Eq(1));
   sendCapsuleDownstream("response", true);
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
 
   const std::string expected_log =
       "2 " + std::string(StreamInfo::ResponseFlagUtils::UPSTREAM_CONNECTION_FAILURE);
@@ -986,8 +988,8 @@ TEST_P(UdpTunnelingIntegrationTest,
   Http::TestResponseHeaderMapImpl fail_response_headers{{":status", "404"}};
   upstream_request_->encodeHeaders(fail_response_headers, true);
 
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_retry", 1);
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_retry", Eq(1));
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(1));
 
   // The request is retried, expect new downstream headers
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
@@ -997,9 +999,9 @@ TEST_P(UdpTunnelingIntegrationTest,
   // Send upgrade headers downstream, fully establishing the connection.
   upstream_request_->encodeHeaders(response_headers_, false);
 
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 1);
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_tunnel_success", Eq(1));
   sendCapsuleDownstream("response", true);
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
 
   const std::string expected_log =
       "2 " + std::string(StreamInfo::ResponseFlagUtils::UPSTREAM_CONNECTION_FAILURE);
@@ -1042,27 +1044,27 @@ TEST_P(UdpTunnelingIntegrationTest,
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   expectRequestHeaders(upstream_request_->headers());
 
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(1));
 
   // Close the upstream connection before sending response headers.
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
   // Retry to create a new stream on new connection and not the closed one.
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_retry", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_retry", Eq(1));
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   expectRequestHeaders(upstream_request_->headers());
 
   upstream_request_->encodeHeaders(response_headers_, false);
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 1);
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_tunnel_success", Eq(1));
 
   // Wait for datagram.
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({datagram})));
   sendCapsuleDownstream("response", true);
 
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
 
   const std::string expected_log =
       "2 " + std::string(StreamInfo::ResponseFlagUtils::UPSTREAM_CONNECTION_FAILURE);
@@ -1116,27 +1118,27 @@ TEST_P(UdpTunnelingIntegrationTest,
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   expectRequestHeaders(upstream_request_->headers());
 
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(1));
 
   // Close the upstream connection before sending response headers.
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
   // Retry to create a new stream on new connection and not the closed one.
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_retry", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_retry", Eq(1));
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   expectRequestHeaders(upstream_request_->headers());
 
   upstream_request_->encodeHeaders(response_headers_, false);
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 1);
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_tunnel_success", Eq(1));
 
   // Wait for datagram.
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({datagram})));
   sendCapsuleDownstream("response", true);
 
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
 
   const std::string expected_log =
       "2 " + std::string(StreamInfo::ResponseFlagUtils::UPSTREAM_CONNECTION_FAILURE);
@@ -1180,7 +1182,7 @@ TEST_P(UdpTunnelingIntegrationTest, PropagateValidResponseHeaders) {
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({datagram})));
 
   sendCapsuleDownstream("response", true);
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
 
   // Verify response header value is in the access log.
   EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr("capsule-protocol"));
@@ -1225,10 +1227,10 @@ TEST_P(UdpTunnelingIntegrationTest, PropagateInvalidResponseHeaders) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "404"}};
   upstream_request_->encodeHeaders(response_headers, true);
 
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_connect_attempts_exceeded", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_failure", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 0);
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_connect_attempts_exceeded", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_tunnel_failure", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_tunnel_success", Eq(0));
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
 
   // Verify response header value is in the access log.
   EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr("404"));
@@ -1273,8 +1275,8 @@ TEST_P(UdpTunnelingIntegrationTest, PropagateInvalidResponseHeadersWithRetry) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "404"}};
   upstream_request_->encodeHeaders(response_headers, true);
 
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_retry", 1);
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_retry", Eq(1));
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(1));
 
   // Since retry is enabled, a new request is expected to be sent by the UDP proxy.
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
@@ -1283,9 +1285,9 @@ TEST_P(UdpTunnelingIntegrationTest, PropagateInvalidResponseHeadersWithRetry) {
 
   upstream_request_->encodeHeaders(response_headers, true);
 
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_failure", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 0);
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_tunnel_failure", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_tunnel_success", Eq(0));
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
 
   // Verify response header value is in the access log.
   EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr("404"));
@@ -1332,7 +1334,7 @@ TEST_P(UdpTunnelingIntegrationTest, PropagateResponseTrailers) {
   Http::TestResponseTrailerMapImpl response_trailers{{"test-trailer-name", trailer_value}};
   upstream_request_->encodeTrailers(response_trailers);
 
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
 
   // Verify response trailer value is in the access log.
   EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr(trailer_value));
@@ -1387,7 +1389,7 @@ TEST_P(UdpTunnelingIntegrationTest, FlushAccessLogOnTunnelConnected) {
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({datagram})));
   sendCapsuleDownstream("response", true);
 
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
 }
 
 TEST_P(UdpTunnelingIntegrationTest, DontFlushTunnelConnectedAccessLogWithInvalidResponseHeaders) {
@@ -1432,10 +1434,10 @@ TEST_P(UdpTunnelingIntegrationTest, DontFlushTunnelConnectedAccessLogWithInvalid
   Http::TestResponseHeaderMapImpl response_headers{{":status", "404"}};
   upstream_request_->encodeHeaders(response_headers, true);
 
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_connect_attempts_exceeded", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_failure", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 0);
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_connect_attempts_exceeded", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_tunnel_failure", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_tunnel_success", Eq(0));
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
 
   // Verify that UdpTunnelUpstreamConnected access log wasn't flushed.
   const std::string access_log = waitForAccessLog(access_log_filename);
@@ -1555,7 +1557,7 @@ TEST_P(UdpTunnelingIntegrationTest, BytesMeterAccessLog) {
   auto expected_received_wire_bytes = expected_response_wire_size + response_capsule_size;
   EXPECT_EQ(std::to_string(expected_received_wire_bytes), access_log_parts[6]);
 
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
 }
 
 TEST_P(UdpTunnelingIntegrationTest, DrainListenersWhileTunnelingActiveSessionIsStillActive) {
@@ -1570,11 +1572,11 @@ TEST_P(UdpTunnelingIntegrationTest, DrainListenersWhileTunnelingActiveSessionIsS
 
   // Send a response and keep the session alive.
   sendCapsuleDownstream("response", false);
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(1));
 
   // Drain listeners while udp session is still active.
   drainListeners();
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpAndHttpVersions, UdpTunnelingIntegrationTest,

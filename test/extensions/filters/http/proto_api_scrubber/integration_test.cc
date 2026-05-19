@@ -31,6 +31,7 @@ namespace scrubber_test = test::extensions::filters::http::proto_api_scrubber;
 using envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig;
 using envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
 using ::Envoy::Extensions::HttpFilters::GrpcFieldExtraction::checkSerializedData;
+using testing::Ge;
 
 std::string apikeysDescriptorPath() {
   return TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
@@ -772,7 +773,7 @@ TEST_P(ProtoApiScrubberIntegrationTest, UnaryRequestPassesThrough) {
   ASSERT_TRUE(response->waitForEndStream());
 
   // Verify Stats
-  test_server_->waitForCounterGe("proto_api_scrubber.total_requests_checked", 1);
+  test_server_->waitForCounter("proto_api_scrubber.total_requests_checked", Ge(1));
 }
 
 // Tests that the streaming request passes through without modification if there are no restrictions
@@ -1042,7 +1043,7 @@ TEST_P(ProtoApiScrubberIntegrationTest, RejectsMethodNotInDescriptor) {
   EXPECT_EQ("3", grpc_status->value().getStringView()); // 3 = Invalid Argument
 
   // Verify Stats: Scrubbing failed because method not found implies no type info found.
-  test_server_->waitForCounterGe("proto_api_scrubber.request_scrubbing_failed", 1);
+  test_server_->waitForCounter("proto_api_scrubber.request_scrubbing_failed", Ge(1));
 }
 
 // Tests that the request is rejected if the gRPC `:path` header is in invalid format.
@@ -1066,7 +1067,7 @@ TEST_P(ProtoApiScrubberIntegrationTest, RejectsInvalidPathFormat) {
   EXPECT_EQ("3", grpc_status->value().getStringView()); // 3 = Invalid Argument
 
   // Verify Stats for invalid method name.
-  test_server_->waitForCounterGe("proto_api_scrubber.invalid_method_name", 1);
+  test_server_->waitForCounter("proto_api_scrubber.invalid_method_name", Ge(1));
 }
 
 // Tests that the request is rejected if a method-level block rule matches.
@@ -1116,7 +1117,7 @@ TEST_P(ProtoApiScrubberIntegrationTest, RejectsBlockedMethod) {
   EXPECT_EQ("5", grpc_status->value().getStringView()); // 5 = Not Found.
 
   // Verify Stats for blocked method.
-  test_server_->waitForCounterGe("proto_api_scrubber.method_blocked", 1);
+  test_server_->waitForCounter("proto_api_scrubber.method_blocked", Ge(1));
 }
 
 } // namespace

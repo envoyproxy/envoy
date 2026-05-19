@@ -8,6 +8,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -536,7 +538,7 @@ TEST_P(LocalRateLimitFilterIntegrationTest, ShadowModeTest) {
   sendAndVerifyRequest("foo", "200", 0);
   cleanupUpstreamAndDownstream();
 
-  test_server_->waitForCounterEq("http_local_rate_limiter.http_local_rate_limit.shadow_mode", 1);
+  test_server_->waitForCounter("http_local_rate_limiter.http_local_rate_limit.shadow_mode", Eq(1));
   EXPECT_EQ(
       1,
       test_server_->counter("http_local_rate_limiter.http_local_rate_limit.shadow_mode")->value());
@@ -551,7 +553,7 @@ TEST_P(LocalRateLimitFilterIntegrationTest, ShadowModeTest) {
   sendAndVerifyRequest("bar", "200", 0);
   cleanupUpstreamAndDownstream();
 
-  test_server_->waitForCounterEq("http_local_rate_limiter.http_local_rate_limit.shadow_mode", 2);
+  test_server_->waitForCounter("http_local_rate_limiter.http_local_rate_limit.shadow_mode", Eq(2));
   EXPECT_EQ(
       2,
       test_server_->counter("http_local_rate_limiter.http_local_rate_limit.shadow_mode")->value());
@@ -714,7 +716,7 @@ TEST_P(LocalRateLimitFilterIntegrationTest, BasicTestPerRouteAndRds) {
       Config::TestTypeUrl::get().RouteConfiguration,
       {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(update_route_config_)},
       "2");
-  test_server_->waitForCounterGe("http.config_test.rds.basic_routes.update_success", 2);
+  test_server_->waitForCounter("http.config_test.rds.basic_routes.update_success", Ge(2));
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(upstream_request_->complete());
@@ -755,7 +757,7 @@ TEST_P(LocalRateLimitFilterIntegrationTest, TestLocalClusterRateLimit) {
   ASSERT(share_provider_manager != nullptr);
   auto share_provider = share_provider_manager->getShareProvider({});
 
-  test_server_->waitForGaugeEq("cluster.local_cluster.membership_total", 1);
+  test_server_->waitForGauge("cluster.local_cluster.membership_total", Eq(1));
   simTime().advanceTimeWait(std::chrono::milliseconds(1));
 
   EXPECT_EQ(1.0, share_provider->getTokensShareFactor());
@@ -766,7 +768,7 @@ TEST_P(LocalRateLimitFilterIntegrationTest, TestLocalClusterRateLimit) {
           update_local_cluster_endpoints_)},
       "2");
 
-  test_server_->waitForGaugeEq("cluster.local_cluster.membership_total", 2);
+  test_server_->waitForGauge("cluster.local_cluster.membership_total", Eq(2));
   simTime().advanceTimeWait(std::chrono::milliseconds(1));
 
   EXPECT_EQ(0.5, share_provider->getTokensShareFactor());

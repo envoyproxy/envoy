@@ -16,7 +16,7 @@ void EncoderImpl::encode(const MessageMetadataSharedPtr& metadata, Buffer::Insta
     case OperationType::Insert: {
       std::string value = absl::get<InsertOperationValue>(operation.value_).value_;
       if (value == ";ep=" || value == ",opaque=") {
-        if (metadata->ep().has_value() && metadata->ep().value().length() > 0) {
+        if (metadata->ep().has_value() && !metadata->ep().value().empty()) {
           output += raw_msg.substr(previous_position, operation.position_ - previous_position);
           previous_position = operation.position_;
 

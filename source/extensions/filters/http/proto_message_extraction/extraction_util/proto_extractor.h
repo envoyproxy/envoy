@@ -42,11 +42,13 @@ private:
 
   // Populate the target resource or the target resource callback in the extracted message
   // metadata.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void GetTargetResourceOrTargetResourceCallback(
       const Protobuf::FieldMask& field_mask, const Protobuf::field_extraction::MessageData& message,
       bool callback, ExtractedMessageMetadata* extracted_message_metadata) const;
 
   // Function to get the value associated with a key
+  // NOLINTNEXTLINE(readability-identifier-naming)
   const Protobuf::FieldMask& FindWithDefault(ExtractedMessageDirective directive);
 
   const google::grpc::transcoding::TypeHelper* type_helper_;
