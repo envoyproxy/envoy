@@ -90,7 +90,20 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //   - Body: {"data": "updated value"}
 //     (Only the "payload" field from arguments is used as the body. Other arguments not in the
 //     path, like 'resource_id', become query parameters.)
+// [#next-free-field: 6]
 message McpJsonRestBridge {
+  // Where to store parsed MCP request attributes.
+  enum RequestStorageMode {
+    // Unspecified. Uses default behavior (nothing is stored).
+    MODE_UNSPECIFIED = 0;
+
+    // Store request attributes in dynamic metadata. The metadata namespace
+    // is the filter's config name as specified by the ``name`` field in the
+    // ``http_filters`` list (e.g. ``envoy.filters.http.mcp_json_rest_bridge``
+    // if using the canonical filter name).
+    DYNAMIC_METADATA = 1;
+  }
+
   // General server information.
   ServerInfo server_info = 1;
 
@@ -116,6 +129,13 @@ message McpJsonRestBridge {
   //
   // Setting it to 0 would disable the limit. It is not recommended to do so in production.
   google.protobuf.UInt32Value max_response_body_size = 4;
+
+  // Where to store parsed MCP request attributes.
+  // Default is not storing anything.
+  // When set to ``DYNAMIC_METADATA``, attributes are stored in dynamic metadata
+  // using the filter's config name (i.e. the ``name`` field of this filter's entry
+  // in the ``http_filters`` list) as the metadata namespace.
+  RequestStorageMode request_storage_mode = 5 [(validate.rules).enum = {defined_only: true}];
 }
 
 // Configuration for the server metadata.

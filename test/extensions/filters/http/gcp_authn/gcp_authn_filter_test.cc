@@ -1,8 +1,8 @@
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.h"
 
 #include "source/common/http/header_map_impl.h"
+#include "source/extensions/filters/http/gcp_authn/gcp_authn_client_impl.h"
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_filter.h"
-#include "source/extensions/filters/http/gcp_authn/gcp_authn_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/gcp_authn/mocks.h"
@@ -69,13 +69,13 @@ public:
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
-  void setupMockFilterMetadata(bool valid) {
+  void setupMockFilterMetadata(bool valid, const std::string& audience_url = "test") {
     // Set up mock filter metadata.
     cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
     EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_));
     if (valid) {
       envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
-      audience.set_url("test");
+      audience.set_url(audience_url);
 
       (*metadata_.mutable_typed_filter_metadata())
           [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
@@ -91,7 +91,7 @@ public:
             config);
   }
 
-  void createClient() { client_ = std::make_unique<GcpAuthnClient>(config_, context_); }
+  void createClient() { client_ = std::make_unique<GcpAuthnClientImpl>(config_, context_); }
 
   NiceMock<MockFactoryContext> context_;
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
@@ -99,14 +99,14 @@ public:
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Envoy::Http::MockAsyncClientRequest> client_request_{
       &thread_local_cluster_.async_client_};
-  MockRequestCallbacks request_callbacks_;
+  NiceMock<MockGcpAuthnClientCallbacks> request_callbacks_;
 
   // Mocks for http request.
   Envoy::Http::AsyncClient::Callbacks* client_callback_;
   Envoy::Http::RequestMessagePtr message_;
   Envoy::Http::AsyncClient::RequestOptions options_;
 
-  std::unique_ptr<GcpAuthnClient> client_;
+  std::unique_ptr<GcpAuthnClientImpl> client_;
   std::unique_ptr<GcpAuthnFilter> filter_;
   GcpAuthnFilterConfig config_;
   FilterConfigSharedPtr filter_config_;
@@ -120,10 +120,13 @@ TEST_F(GcpAuthnFilterTest, Success) {
   // Create the client object.
   createClient();
 
-  client_->fetchToken(request_callbacks_, buildRequest(config_.http_uri().uri()));
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.set_url("http://test_audience");
+  client_->fetchToken(audience, request_callbacks_);
   EXPECT_EQ(message_->headers().Method()->value().getStringView(), "GET");
-  EXPECT_EQ(message_->headers().Host()->value().getStringView(), "testhost");
-  EXPECT_EQ(message_->headers().Path()->value().getStringView(), "/path/test");
+  EXPECT_EQ(message_->headers().Path()->value().getStringView(),
+            "/computeMetadata/v1/instance/service-accounts/default/identity?audience=http://"
+            "test_audience");
 
   EXPECT_EQ(options_.retry_policy->num_retries().value(), 5);
   EXPECT_EQ(options_.retry_policy->retry_back_off().base_interval().seconds(), 1);
@@ -135,8 +138,9 @@ TEST_F(GcpAuthnFilterTest, Success) {
   }));
   Envoy::Http::ResponseMessagePtr response(
       new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  response->body().add("token_string");
 
-  EXPECT_CALL(request_callbacks_, onComplete(response.get()));
+  EXPECT_CALL(request_callbacks_, onComplete(absl::StatusOr<std::string>("token_string")));
   client_callback_->onSuccess(client_request_, std::move(response));
 }
 
@@ -161,20 +165,24 @@ TEST_F(GcpAuthnFilterTest, NoCluster) {
               httpAsyncClient())
       .Times(0);
 
-  EXPECT_CALL(request_callbacks_, onComplete(/*response_ptr=*/nullptr));
+  EXPECT_CALL(request_callbacks_, onComplete(_));
   GcpAuthnFilterConfig config;
   TestUtility::loadFromYaml(no_cluster_config, config);
   overrideConfig(config);
   createClient();
-  client_->fetchToken(request_callbacks_, buildRequest(config.http_uri().uri()));
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.set_url("http://test_audience");
+  client_->fetchToken(audience, request_callbacks_);
 }
 
 TEST_F(GcpAuthnFilterTest, Failure) {
   setupMockObjects();
   // Create the client object.
   createClient();
-  EXPECT_CALL(request_callbacks_, onComplete(/*response_ptr=*/nullptr));
-  client_->fetchToken(request_callbacks_, buildRequest(config_.http_uri().uri()));
+  EXPECT_CALL(request_callbacks_, onComplete(_));
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.set_url("http://test_audience");
+  client_->fetchToken(audience, request_callbacks_);
   client_callback_->onFailure(client_request_, Http::AsyncClient::FailureReason::Reset);
 }
 
@@ -183,14 +191,16 @@ TEST_F(GcpAuthnFilterTest, NotOkResponse) {
   // Create the client object.
   createClient();
 
-  client_->fetchToken(request_callbacks_, buildRequest(config_.http_uri().uri()));
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.set_url("http://test_audience");
+  client_->fetchToken(audience, request_callbacks_);
 
   Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
       {":status", "504"},
   }));
   Envoy::Http::ResponseMessagePtr response(
       new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
-  EXPECT_CALL(request_callbacks_, onComplete(/*response_ptr=*/nullptr));
+  EXPECT_CALL(request_callbacks_, onComplete(_));
   client_callback_->onSuccess(client_request_, std::move(response));
 }
 
@@ -199,13 +209,15 @@ TEST_F(GcpAuthnFilterTest, EmptyResponseHeader) {
   // Create the client object.
   createClient();
 
-  client_->fetchToken(request_callbacks_, buildRequest(config_.http_uri().uri()));
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.set_url("http://test_audience");
+  client_->fetchToken(audience, request_callbacks_);
 
   Envoy::Http::ResponseHeaderMapPtr empty_resp_headers(
       new Envoy::Http::TestResponseHeaderMapImpl({}));
   Envoy::Http::ResponseMessagePtr empty_response(
       new Envoy::Http::ResponseMessageImpl(std::move(empty_resp_headers)));
-  EXPECT_CALL(request_callbacks_, onComplete(/*response_ptr=*/nullptr));
+  EXPECT_CALL(request_callbacks_, onComplete(_));
   client_callback_->onSuccess(client_request_, std::move(empty_response));
 }
 
@@ -243,6 +255,7 @@ TEST_F(GcpAuthnFilterTest, ResumeFilterChainIteration) {
   }));
   Envoy::Http::ResponseMessagePtr response(
       new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  response->body().add("token_string");
   // continueDecoding() is expected to be called to resume the filter chain iteration after
   // onSuccess().
   EXPECT_CALL(decoder_callbacks_, continueDecoding());

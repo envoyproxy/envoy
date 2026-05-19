@@ -24,6 +24,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace McpJsonRestBridge {
 
+inline constexpr char FilterName[] = "envoy.filters.http.mcp_json_rest_bridge";
+
 /**
  * Configuration for the MCP JSON REST Bridge filter.
  */
@@ -44,6 +46,11 @@ public:
   const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ServerToolConfig&
   toolConfig() const {
     return proto_config_.tool_config();
+  }
+
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge::RequestStorageMode
+  requestStorageMode() const {
+    return proto_config_.request_storage_mode();
   }
 
 private:
@@ -120,6 +127,9 @@ private:
   // It sends local error response and return an error status if the validation
   // fails. Otherwise, it returns OK status.
   absl::Status validateJsonRpcIdAndMethod(const nlohmann::json& json_rpc);
+
+  // Sets dynamic metadata for the filter based on the MCP request method and parameters.
+  void setDynamicMetadata(absl::string_view method, const nlohmann::json& json_rpc);
 
   enum class McpOperation {
     Unspecified = 0,
