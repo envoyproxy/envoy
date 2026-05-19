@@ -168,7 +168,8 @@ private:
         : stats_(stats), random_(random), hash_policy_(std::move(hash_policy)) {}
 
     // Upstream::LoadBalancerFactory
-    // Ignore the params for the thread-aware LB.
+    // Uses the per-worker params to create the thread-aware LB instance, including the worker
+    // priority_set used to register member-update callbacks.
     LoadBalancerPtr create(LoadBalancerParams) override;
     bool recreateOnHostChange() const override { return false; }
 
