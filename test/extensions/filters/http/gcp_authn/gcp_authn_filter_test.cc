@@ -2,6 +2,7 @@
 
 #include "source/common/http/header_map_impl.h"
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_client_impl.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_filter.h"
 
 #include "test/common/http/common.h"
@@ -245,7 +246,7 @@ TEST_F(GcpAuthnFilterTest, GcpTokenRequestInvalidType) {
   cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_));
 
-  google::protobuf::Duration invalid_proto;
+  Protobuf::Duration invalid_proto;
   invalid_proto.set_seconds(5);
 
   (*metadata_

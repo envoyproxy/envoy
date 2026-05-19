@@ -16,7 +16,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GcpAuthn {
 
-using LRUCache = ::Envoy::SimpleLruCache::SimpleLRUCache<std::string, GcpToken>;
+using LRUCache = ::Envoy::SimpleLruCache::SimpleLRUCache<uint64_t, GcpToken>;
 
 class TokenCacheImpl : public Logger::Loggable<Logger::Id::init> {
 public:

@@ -53,13 +53,12 @@ retrieveTokenRequest(Upstream::ThreadLocalCluster* cluster) {
   // 1. Try to unpack as the new GcpTokenRequest first.
   envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
   if (MessageUtil::unpackTo(filter_it->second, token_request).ok()) {
-    try {
-      MessageUtil::validate(token_request, ProtobufMessage::getStrictValidationVisitor());
+    std::string err;
+    if (Validate(token_request, &err)) {
       return token_request;
-    } catch (const EnvoyException& e) {
-      ENVOY_LOG_MISC(debug, "GcpTokenRequest validation failed: {}", e.what());
-      return absl::nullopt;
     }
+    ENVOY_LOG_MISC(debug, "GcpTokenRequest validation failed: {}", err);
+    return absl::nullopt;
   }
 
   // 2. Fall back to unpacking the legacy Audience message and map it transparently.

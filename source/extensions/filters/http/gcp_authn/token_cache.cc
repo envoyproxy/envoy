@@ -1,4 +1,5 @@
 #include "source/extensions/filters/http/gcp_authn/token_cache.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -7,7 +8,7 @@ namespace GcpAuthn {
 
 absl::optional<std::string> TokenCacheImpl::lookUp(
     const envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest& token_request) {
-  std::string key = token_request.SerializeAsString();
+  uint64_t key = MessageUtil::hash(token_request);
   typename LRUCache::ScopedLookup lookup(&lru_cache_, key);
   if (lookup.found()) {
     GcpToken* const found_token = lookup.value();
@@ -29,7 +30,7 @@ absl::optional<std::string> TokenCacheImpl::lookUp(
 void TokenCacheImpl::insert(
     const envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest& token_request,
     std::unique_ptr<GcpToken> token) {
-  std::string key = token_request.SerializeAsString();
+  uint64_t key = MessageUtil::hash(token_request);
   // Release the token to transfer the ownership.
   lru_cache_.insert(key, token.release(), 1);
 }
