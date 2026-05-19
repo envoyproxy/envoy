@@ -504,12 +504,12 @@ Upstream::HostConstSharedPtr Cluster::findHostByName(const std::string& host) co
 }
 
 Cluster::LoadBalancer::~LoadBalancer() {
-  // Clean up pending host selection handles to avoid calling back into the load balancer after
-  // the load_balancer_destroyed.
+  // Clean up pending host selection handles to avoid calling back into a destroyed load
+  // balancer. Notify each pending callback that host selection was aborted because the load
+  // balancer was destroyed.
   while (!pending_host_selection_handles_.empty()) {
     auto handle = *pending_host_selection_handles_.begin();
     handle->cancel();
-    handle->pending_host_selection_handles_.reset();
     handle->context_->onAsyncHostSelection(nullptr, "load_balancer_destroyed");
   }
 }

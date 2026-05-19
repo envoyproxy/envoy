@@ -333,7 +333,7 @@ public:
                                           bool end_stream) override;
 
   bool continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_stream,
-                             std::unique_ptr<GenericConnPool> generic_conn_pool);
+                             GenericConnPoolPtr generic_conn_pool);
 
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
@@ -573,9 +573,8 @@ private:
                                          Event::Dispatcher& dispatcher,
                                          Upstream::ResourcePriority priority) PURE;
 
-  std::unique_ptr<GenericConnPool>
-  createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
-                 const Upstream::HostConstSharedPtr& host);
+  GenericConnPoolPtr createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
+                                    const Upstream::HostConstSharedPtr& host);
   UpstreamRequestPtr createUpstreamRequest();
   absl::optional<absl::string_view> getShadowCluster(const ShadowPolicy& shadow_policy,
                                                      const Http::HeaderMap& headers) const;

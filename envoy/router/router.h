@@ -1676,8 +1676,6 @@ public:
   virtual const StreamInfo::BytesMeterSharedPtr& bytesMeter() PURE;
 };
 
-using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;
-
 /*
  * A factory for creating generic connection pools.
  */

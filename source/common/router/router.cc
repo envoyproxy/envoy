@@ -732,7 +732,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       host_selection_response.cancelable->cancel();
     }
 
-    std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPoolOrHandleFailure(
+    GenericConnPoolPtr generic_conn_pool = createConnPoolOrHandleFailure(
         std::move(host_selection_response.host), cluster, host_selection_response.details,
         host_selection_response.failure_status);
     if (generic_conn_pool == nullptr) {
@@ -751,8 +751,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // like stream timeout.
   host_selection_cancelable_ = std::move(host_selection_response.cancelable);
   // Configure a callback to be called on asynchronous host selection.
-  on_host_selected_ = ([this,
-                        end_stream](std::unique_ptr<GenericConnPool> generic_conn_pool) -> void {
+  on_host_selected_ = ([this, end_stream](GenericConnPoolPtr generic_conn_pool) -> void {
     // It should always be safe to call continueDecodeHeaders. In the case the
     // stream had a local reply before host selection completed,
     // the lookup should be canceled.
@@ -959,8 +958,8 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
   return !saw_local_reply_;
 }
 
-std::unique_ptr<GenericConnPool> Filter::createConnPool(Upstream::ThreadLocalCluster& cluster,
-                                                        const Upstream::HostConstSharedPtr& host) {
+GenericConnPoolPtr Filter::createConnPool(Upstream::ThreadLocalCluster& cluster,
+                                          const Upstream::HostConstSharedPtr& host) {
   GenericConnPoolFactory* factory = nullptr;
   ProtobufTypes::MessagePtr message;
   if (cluster_->upstreamConfig().has_value()) {

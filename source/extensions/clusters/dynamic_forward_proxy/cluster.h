@@ -158,7 +158,12 @@ private:
         std::string hostname,
         absl::flat_hash_set<DFPHostSelectionHandle*>& pending_host_selection_handles)
         : context_(context), cluster_(cluster), hostname_(hostname),
-          pending_host_selection_handles_(pending_host_selection_handles) {};
+          pending_host_selection_handles_(pending_host_selection_handles) {}
+
+    // Ideally the cancel() will be called to cancel the async host selection before the handle is
+    // destructed. In case it is not, the destructor will also ensure the cancellation of the async
+    // host selection to avoid calling back into the load balancer after it is destructed.
+    ~DFPHostSelectionHandle() override { cancel(); }
 
     void cancel() override {
       // Cancels the DNS callback.
