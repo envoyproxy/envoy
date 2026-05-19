@@ -136,7 +136,7 @@ void GcpAuthnFilter::onComplete(absl::StatusOr<GcpToken> token) {
       // `Authorization: Bearer ID_TOKEN` header).
       GcpToken token_val = *token;
       if (request_header_map_ != nullptr) {
-        addTokenToRequest(*request_header_map_, token_val.token_, filter_config_->token_header());
+        addTokenToRequest(*request_header_map_, token_val.token, filter_config_->token_header());
       } else {
         ENVOY_LOG(debug, "No request header to be modified.");
       }

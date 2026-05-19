@@ -51,8 +51,8 @@ TEST_F(TokenCacheTest, ValidToken) {
   token_request.mutable_jwt()->set_audience("http://example_service");
 
   auto token = std::make_unique<GcpToken>();
-  token->token_ = "foo";
-  token->expires_at_ = ExpTime;
+  token->token = "foo";
+  token->expires_at = ExpTime;
 
   token_cache_->insert(token_request, std::move(token));
   auto found_token = token_cache_->lookUp(token_request);
@@ -65,8 +65,8 @@ TEST_F(TokenCacheTest, ExpiredToken) {
   token_request.mutable_jwt()->set_audience("http://example_service");
 
   auto token = std::make_unique<GcpToken>();
-  token->token_ = "foo";
-  token->expires_at_ = 1205005587; // Sat Mar 08 2008 14:46:27 GMT-0500
+  token->token = "foo";
+  token->expires_at = 1205005587; // Sat Mar 08 2008 14:46:27 GMT-0500
 
   token_cache_->insert(token_request, std::move(token));
   auto found_token = token_cache_->lookUp(token_request);
@@ -85,8 +85,8 @@ TEST_F(TokenCacheTest, TokenWithClockSkew) {
   time_system_.setSystemTime(std::chrono::system_clock::from_time_t(exp_time_with_skew + 1));
 
   auto token = std::make_unique<GcpToken>();
-  token->token_ = "foo";
-  token->expires_at_ = ExpTime;
+  token->token = "foo";
+  token->expires_at = ExpTime;
 
   token_cache_->insert(token_request, std::move(token));
   auto found_token = token_cache_->lookUp(token_request);
@@ -95,8 +95,8 @@ TEST_F(TokenCacheTest, TokenWithClockSkew) {
   // Set the time to exp_time - 1s.
   time_system_.setSystemTime(std::chrono::system_clock::from_time_t(exp_time_with_skew));
   auto token2 = std::make_unique<GcpToken>();
-  token2->token_ = "foo";
-  token2->expires_at_ = ExpTime;
+  token2->token = "foo";
+  token2->expires_at = ExpTime;
 
   token_cache_->insert(token_request, std::move(token2));
   found_token = token_cache_->lookUp(token_request);

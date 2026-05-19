@@ -88,9 +88,9 @@ void GcpAuthnClientImpl::onSuccess(const Http::AsyncClient::Request&,
     if (status_code == Envoy::enumToInt(Envoy::Http::Code::OK)) {
       ASSERT(callbacks_ != nullptr);
       std::string token_str = response->bodyAsString();
-      std::unique_ptr<JwtVerify::Jwt> jwt = std::make_unique<JwtVerify::Jwt>();
-      if (jwt->parseFromString(token_str) == JwtVerify::Status::Ok) {
-        callbacks_->onComplete(GcpToken{token_str, jwt->exp_});
+      JwtVerify::Jwt jwt;
+      if (jwt.parseFromString(token_str) == JwtVerify::Status::Ok) {
+        callbacks_->onComplete(GcpToken{token_str, jwt.exp_});
       } else {
         onError("Failed to parse identity token/JWT.");
       }

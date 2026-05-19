@@ -12,15 +12,15 @@ absl::optional<std::string> TokenCacheImpl::lookUp(
   if (lookup.found()) {
     GcpToken* const found_token = lookup.value();
     // Verify the validness of the token by checking its expiration time field.
-    if (found_token->expires_at_ > 0 &&
+    if (found_token->expires_at > 0 &&
         DateUtil::nowToSeconds(time_source_) + JwtVerify::kClockSkewInSecond >
-            found_token->expires_at_) {
+            found_token->expires_at) {
       // Remove the expired entry.
       lru_cache_.remove(key);
       return absl::nullopt;
     }
     // Return the valid token string.
-    return found_token->token_;
+    return found_token->token;
   }
   // Return empty/nullopt if no entry is found or it was expired.
   return absl::nullopt;

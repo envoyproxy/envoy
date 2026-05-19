@@ -13,11 +13,11 @@ namespace HttpFilters {
 namespace GcpAuthn {
 
 struct GcpToken {
-  std::string token_;
-  uint64_t expires_at_{0}; // Expiration time in seconds since epoch.
+  std::string token;
+  uint64_t expires_at{0}; // Expiration time in seconds since epoch.
 
   bool operator==(const GcpToken& other) const {
-    return token_ == other.token_ && expires_at_ == other.expires_at_;
+    return token == other.token && expires_at == other.expires_at;
   }
 };
 
