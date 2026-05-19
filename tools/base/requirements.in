@@ -12,7 +12,7 @@ envoy.distribution.release>=0.1.2
 envoy.distribution.verify>=0.1.1
 envoy.gpg.sign>=0.3.1
 gitpython
-icalendar>=6.1.1
+icalendar>=7.1.1
 orjson>=3.10.15
 pep8-naming
 # Upgrading beyond 4.21.x doesnt currently work. 4.23+ might work when the following is resolved
