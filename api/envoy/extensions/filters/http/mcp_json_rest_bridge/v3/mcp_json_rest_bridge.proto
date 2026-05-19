@@ -211,9 +211,6 @@ message ToolsListSpecificConfig {
   // not "type". Tools with no parameters may omit this to signify a tool with no constraints on the
   // parameters object, or set to '"additionalProperties": false' to require empty parameters.
   string input_schema = 3;
-
-  reserved 4;
-  reserved "output_schema";
 }
 
 message ToolConfig {

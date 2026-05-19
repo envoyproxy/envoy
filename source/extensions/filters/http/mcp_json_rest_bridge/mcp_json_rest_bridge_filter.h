@@ -110,7 +110,7 @@ private:
   void handleMcpMethod(const nlohmann::json& json_rpc,
                        Http::RequestHeaderMapOptRef request_headers);
 
-  // Serves a local tools/list response using the per-route configuration, bypassing upstream.
+  // Serves a local tools/list response using tools' ToolsListSpecificConfig.
   void serveToolsListLocal(const nlohmann::json& json_rpc);
 
   // Modifies the response from upstream into JSON-RPC response.

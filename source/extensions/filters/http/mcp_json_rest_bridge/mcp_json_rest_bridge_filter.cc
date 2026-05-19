@@ -413,6 +413,8 @@ void McpJsonRestBridgeFilter::serveToolsListLocal(const nlohmann::json& json_rpc
   response_headers->setContentType(Http::Headers::get().ContentTypeValues.Json);
   response_headers->setContentLength(response_data.length());
 
+  // Send the response via encodeHeaders/encodeData instead of sendLocalReply to avoid copying the
+  // response body.
   decoder_callbacks_->encodeHeaders(std::move(response_headers), false,
                                     "mcp_json_rest_bridge_tools_list");
 

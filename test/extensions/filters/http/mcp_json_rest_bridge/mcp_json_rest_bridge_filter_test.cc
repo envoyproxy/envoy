@@ -1382,12 +1382,12 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListPerRouteConfig) {
   std::string json = R"({"jsonrpc": "2.0", "method": "tools/list", "id": "req-1"})";
   Buffer::OwnedImpl data(json);
 
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(testing::_, false))
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false))
       .WillOnce(testing::Invoke([](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ("200", headers.getStatusValue());
         EXPECT_EQ("application/json", headers.getContentTypeValue());
       }));
-  EXPECT_CALL(decoder_callbacks_, encodeData(testing::_, true))
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true))
       .WillOnce(testing::Invoke([](Buffer::Instance& data, bool) {
         auto parsed_response = nlohmann::json::parse(data.toString());
 
@@ -1433,12 +1433,12 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListLocalEmpty) {
   std::string json = R"({"jsonrpc": "2.0", "method": "tools/list", "id": "req-1"})";
   Buffer::OwnedImpl data(json);
 
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(testing::_, false))
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false))
       .WillOnce(testing::Invoke([](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ("200", headers.getStatusValue());
         EXPECT_EQ("application/json", headers.getContentTypeValue());
       }));
-  EXPECT_CALL(decoder_callbacks_, encodeData(testing::_, true))
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true))
       .WillOnce(testing::Invoke([](Buffer::Instance& data, bool) {
         auto parsed_response = nlohmann::json::parse(data.toString());
 
