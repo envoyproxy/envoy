@@ -1610,6 +1610,28 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
                    *callbacks_, Http::Utility::resetReasonToString(reset_reason),
                    transport_failure_reason);
 
+  if (reset_reason == Http::StreamResetReason::RemoteResetNoError) {
+    auto request_ptr = upstream_request.removeFromList(upstream_requests_);
+    callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
+    if (numRequestsAwaitingHeaders() == 0 && pending_retries_ == 0) {
+      if (downstream_response_started_) {
+        // If the entire response, including `end_stream`, has already been sent, this will
+        // be translated into `NO_ERROR` by the codec.
+        callbacks_->resetStream(reset_reason, "");
+      } else {
+        // This shouldn't happen: RemoteResetNoError requires a complete upstream response,
+        // which means headers were already forwarded, setting downstream_response_started_.
+        // Handle defensively to avoid a downstream request hang.
+        onUpstreamAbort(Http::Code::ServiceUnavailable,
+                        StreamInfo::CoreResponseFlag::UpstreamRemoteReset, "", false,
+                        StreamInfo::ResponseCodeDetails::get().EarlyUpstreamReset);
+        IS_ENVOY_BUG("StreamResetReason::RemoteResetNoError should not be raised unless the entire "
+                     "response was received already.");
+      }
+    }
+    return;
+  }
+
   const bool dropped = reset_reason == Http::StreamResetReason::Overflow;
 
   // Ignore upstream reset caused by a resource overflow.
@@ -1715,6 +1737,9 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
     return StreamInfo::CoreResponseFlag::UpstreamRemoteReset;
   case Http::StreamResetReason::ProtocolError:
     return StreamInfo::CoreResponseFlag::UpstreamProtocolError;
+  case Http::StreamResetReason::RemoteResetNoError:
+    IS_ENVOY_BUG("unexpected RemoteResetNoError in streamResetReasonToResponseFlag");
+    return StreamInfo::CoreResponseFlag::UpstreamRemoteReset;
   case Http::StreamResetReason::OverloadManager:
     return StreamInfo::CoreResponseFlag::OverloadManager;
   }

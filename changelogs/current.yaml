@@ -62,6 +62,13 @@ bug_fixes:
     Fixed a bug in load stats reporting where reports were dropped if only custom metrics or completed
     requests were present in a reporting interval. This behavioral change can be reverted by setting
     the runtime guard ``envoy.reloadable_features.report_load_for_non_zero_stats`` to ``false``.
+- area: http
+  change: |
+    Fixed a bug where an upstream HTTP/2 or HTTP/3 ``RST_STREAM(NO_ERROR)`` received after a complete
+    response would cause the response to be discarded and replaced with an error. This behavior is
+    common with some gRPC clients and servers, but is often intermittent. This behavior can be
+    temporarily reverted by setting the runtime flag
+    ``envoy.reloadable_features.http_preserve_rst_no_error`` to ``false``.
 - area: spiffe_validator
   change: |
     Fixed a bug where if an invalid custom SAN matcher was configured it would later lead to a crash
@@ -97,17 +104,38 @@ bug_fixes:
     resulting binary "plaintext" was written back into the ``Cookie:`` request header and tripped a
     ``HeaderString`` validation assert. Such plaintexts are now rejected and the original cookie value
     is preserved, matching the behavior already documented for the explicit decryption-failure case.
+- area: dns_resolver
+  change: |
+    Fixed a memory leak in the Hickory DNS resolver where ``ActiveDnsQuery::cancel()``
+    did not free the pending query state or decrement the ``pending_resolutions`` gauge. Cancelled
+    queries now release their shell object, Rust-side query box, and gauge tick synchronously,
+    matching the contract followed by the c-ares and Apple DNS resolvers.
+- area: dns_resolver
+  change: |
+    Fixed a UAF in the Hickory DNS resolver where the dispatcher lambda posted by the
+    Rust-thread completion callback captured a raw pointer to the resolver. If the resolver was
+    destroyed before the dispatcher drained the lambda, dereferencing the pointer was undefined
+    behavior. The lambda now captures a ``std::weak_ptr`` and locks it before touching the resolver.
 - area: build
   change: |
     Fixed ``Illegal ambiguous match`` error when building contrib targets with ``--config=boringssl-fips``
     on aarch64 by restricting the ``using_boringssl_fips`` branch of ``SELECTED_CONTRIB_EXTENSIONS`` to
     ``linux_x86_64``. Mirrors the approach taken by #44661 for ``aws-lc``.
+- area: dns_resolver
+  change: |
+    Fixed macOS build failure (#45061) for the Hickory DNS resolver by linking
+    Apple's ``SystemConfiguration`` framework. The framework is required by the
+    ``system-configuration`` crate that ``hickory-resolver`` pulls in via its
+    ``system-config`` feature.
+- area: oauth2
+  change: |
+    Fixed a bug where HMAC verification may exposure a timing side channel that leaks information of
+    HMAC secret validity.
 - area: ext_authz
   change: |
     Fixed a bug where ``keep_empty_value`` in ``HeaderValueOption`` was not respected.
     Empty-valued headers are now dropped by default. This behavior can be reverted by setting
     runtime guard ``envoy.reloadable_features.ext_authz_respect_keep_empty_value`` to ``false``.
-
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
@@ -219,7 +247,6 @@ new_features:
   change: |
     Added ``upstream.server_name`` CEL attribute returning the SNI from the established upstream
     TLS connection.
-
 - area: tls
   change: |
     Added substitution commands ``%DOWNSTREAM_TLS_GROUP%`` and ``%UPSTREAM_TLS_GROUP%``. The TLS group may be used
@@ -234,6 +261,9 @@ new_features:
     Enabled Balsa parser for HTTP inspector by default. This behavior can be temporarily
     reverted by setting the runtime guard ``envoy.reloadable_features.http_inspector_use_balsa_parser``
     to ``false``. This runtime guard will be removed in a future release of Envoy.
+- area: ratelimit
+  change: |
+    Make namespace for storing rate limit service response metadata configurable.
 
 - area: tcp_proxy
   change: |
