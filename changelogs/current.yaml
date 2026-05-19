@@ -51,6 +51,18 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: file_server
+  change: |
+    Fixed a use-after-free in the ``file_server`` HTTP filter when a request
+    is cancelled (downstream RST, stream timeout, etc.) before the underlying
+    ``AsyncFileManager::stat`` or ``read`` callback fires. ``FileStreamer``
+    previously captured ``[this]`` into the async-file callbacks, which left
+    a dangling pointer if the ``FileStreamer`` was destroyed while a stat or
+    read was still in flight. The async-file manager guarantees the callback
+    eventually runs, so the dangling capture was reachable on any client
+    reset under load. Captures now hold a ``std::weak_ptr<bool>`` sentinel
+    owned by the ``FileStreamer``; when the sentinel cannot be locked the
+    callback short-circuits to a no-op.
 - area: wasm
   change: |
     Fixed a bug where Envoy did not recreate the Wasm VM when only

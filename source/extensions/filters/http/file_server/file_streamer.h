@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
@@ -29,7 +31,8 @@ public:
 
 class FileStreamer {
 public:
-  explicit FileStreamer(FileStreamerClient& client) : client_(client) {}
+  explicit FileStreamer(FileStreamerClient& client)
+      : client_(client), alive_(std::make_shared<bool>(true)) {}
   ~FileStreamer();
   // Starts reading and streaming the file.
   // end == 0 means read to end of file.
@@ -62,6 +65,10 @@ private:
   bool action_has_been_postponed_by_pause_ = false;
   AsyncFileHandle async_file_;
   CancelFunction cancel_callback_ = []() {};
+ // Sentinel that callbacks weak-capture so an in-flight async-file completion
+ // dispatched after FileStreamer destruction becomes a no-op rather
+ // than dereferencing the destroyed FileStreamer / FileStreamerClient.
+  std::shared_ptr<bool> alive_;
 };
 
 } // namespace FileServer

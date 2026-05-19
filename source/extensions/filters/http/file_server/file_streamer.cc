@@ -31,7 +31,11 @@ void FileStreamer::begin(const FileServerConfig& config, Event::Dispatcher& disp
   end_ = end;
   file_path_ = std::move(file_path);
   cancel_callback_ = file_server_config_->asyncFileManager()->stat(
-      dispatcher_, file_path_.string(), [this](absl::StatusOr<struct stat> result) {
+      dispatcher_, file_path_.string(),
+      [this, alive = std::weak_ptr<bool>(alive_)](absl::StatusOr<struct stat> result) {
+ // Async file callbacks may still fire after abort()/destruction; drop
+ // the callback if FileStreamer has been torn down .
+        if (alive.expired()) { return; }
         if (!result.ok()) {
           client_.errorFromFile(abslStatusToHttpStatus(result.status().code()),
                                 absl::StrCat("file_server_stat_error"));
@@ -44,7 +48,8 @@ void FileStreamer::begin(const FileServerConfig& config, Event::Dispatcher& disp
         }
         cancel_callback_ = file_server_config_->asyncFileManager()->openExistingFile(
             dispatcher_, file_path_.string(), Common::AsyncFiles::AsyncFileManager::Mode::ReadOnly,
-            [this](absl::StatusOr<AsyncFileHandle> result) {
+            [this, alive](absl::StatusOr<AsyncFileHandle> result) {
+              if (alive.expired()) { return; }
               if (!result.ok()) {
                 client_.errorFromFile(abslStatusToHttpStatus(result.status().code()),
                                       absl::StrCat("file_server_open_error"));
@@ -67,7 +72,9 @@ void FileStreamer::startDir(int behavior_index) {
     cancel_callback_ = file_server_config_->asyncFileManager()->openExistingFile(
         dispatcher_, (file_path_ / std::filesystem::path{behavior->default_file()}).string(),
         Common::AsyncFiles::AsyncFileManager::Mode::ReadOnly,
-        [this, behavior_index](absl::StatusOr<AsyncFileHandle> result) {
+        [this, alive = std::weak_ptr<bool>(alive_),
+         behavior_index](absl::StatusOr<AsyncFileHandle> result) {
+          if (alive.expired()) { return; }
           if (!result.ok()) {
             // Try the next directoryBehavior.
             // Since the action is dispatched, this isn't recursion.
@@ -92,7 +99,10 @@ void FileStreamer::startDir(int behavior_index) {
 
 void FileStreamer::startFile() {
   ASSERT(async_file_);
-  auto queued = async_file_->stat(dispatcher_, [this](absl::StatusOr<struct stat> result) {
+  auto queued = async_file_->stat(
+      dispatcher_,
+      [this, alive = std::weak_ptr<bool>(alive_)](absl::StatusOr<struct stat> result) {
+    if (alive.expired()) { return; }
     if (!result.ok()) {
       client_.errorFromFile(abslStatusToHttpStatus(result.status().code()),
                             "file_server_opened_file_stat_failed");
@@ -150,8 +160,10 @@ void FileStreamer::readBodyChunk() {
   ASSERT(async_file_);
   static const uint64_t kMaxReadSize = 32 * 1024;
   uint64_t sz = std::min(end_ - pos_, kMaxReadSize);
-  auto queued =
-      async_file_->read(dispatcher_, pos_, sz, [this](absl::StatusOr<Buffer::InstancePtr> result) {
+  auto queued = async_file_->read(
+      dispatcher_, pos_, sz,
+      [this, alive = std::weak_ptr<bool>(alive_)](absl::StatusOr<Buffer::InstancePtr> result) {
+        if (alive.expired()) { return; }
         if (!result.ok()) {
           client_.errorFromFile(abslStatusToHttpStatus(result.status().code()),
                                 "file_server_read_operation_failed");
@@ -170,9 +182,16 @@ void FileStreamer::readBodyChunk() {
   cancel_callback_ = std::move(queued.value());
 }
 
-void FileStreamer::abort() { cancel_callback_(); }
+void FileStreamer::abort() {
+  cancel_callback_();
+ // Invalidate the alive sentinel so any callback that the dispatcher has
+ // already enqueued and that cancellation cannot suppress will short-circuit
+ // instead of dereferencing this object or its FileStreamerClient .
+  alive_.reset();
+}
 
 FileStreamer::~FileStreamer() {
+  alive_.reset();
   if (async_file_) {
     async_file_->close(nullptr, [](absl::Status) {}).IgnoreError();
   }
