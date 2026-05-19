@@ -82,11 +82,31 @@ TEST_F(CryptoUtilsTest, GetBase64EncodedCertificateFingerprintSuccess) {
   // SPELLCHECKER(on)
 }
 
+TEST_F(CryptoUtilsTest, GetBase64EncodedCertificateFingerprintSuccessDnsSan) {
+  auto secret_provider = std::make_shared<NiceMock<Secret::MockTlsCertificateConfigProvider>>();
+  auto secret = std::make_unique<envoy::extensions::transport_sockets::tls::v3::TlsCertificate>();
+
+  std::string cert_path =
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamlocalhostcert.pem");
+  secret->mutable_certificate_chain()->set_filename(cert_path);
+
+  EXPECT_CALL(*secret_provider, secret()).WillRepeatedly(Return(secret.get()));
+
+  std::vector<Matchers::StringMatcherImpl> san_matchers;
+  san_matchers.emplace_back(
+      Matchers::StringMatcherImpl::createExactMatcher("localhost"));
+
+  auto fingerprint = getBase64EncodedCertificateFingerprint(secret_provider, san_matchers, *api_);
+  ASSERT_TRUE(fingerprint.ok());
+}
+
 TEST_F(CryptoUtilsTest, GetBase64EncodedCertificateFingerprintNoSecret) {
   auto secret_provider = std::make_shared<NiceMock<Secret::MockTlsCertificateConfigProvider>>();
   EXPECT_CALL(*secret_provider, secret()).WillRepeatedly(Return(nullptr));
 
   std::vector<Matchers::StringMatcherImpl> san_matchers;
+  san_matchers.emplace_back(
+      Matchers::StringMatcherImpl::createExactMatcher("spiffe://lyft.com/frontend-team"));
   auto fingerprint = getBase64EncodedCertificateFingerprint(secret_provider, san_matchers, *api_);
   EXPECT_FALSE(fingerprint.ok());
   EXPECT_EQ(fingerprint.status().message(), "Secret is null");
@@ -111,7 +131,7 @@ TEST_F(CryptoUtilsTest, GetBase64EncodedCertificateFingerprintSanMismatch) {
   EXPECT_EQ(fingerprint.status().message(), "Subject Alternative Names do not match");
 }
 
-TEST_F(CryptoUtilsTest, GetBase64EncodedCertificateFingerprintDefaultMatchersMismatch) {
+TEST_F(CryptoUtilsTest, GetBase64EncodedCertificateFingerprintEmptyMatchers) {
   auto secret_provider = std::make_shared<NiceMock<Secret::MockTlsCertificateConfigProvider>>();
   auto secret = std::make_unique<envoy::extensions::transport_sockets::tls::v3::TlsCertificate>();
 
@@ -124,11 +144,13 @@ TEST_F(CryptoUtilsTest, GetBase64EncodedCertificateFingerprintDefaultMatchersMis
   std::vector<Matchers::StringMatcherImpl> san_matchers; // Empty
   auto fingerprint = getBase64EncodedCertificateFingerprint(secret_provider, san_matchers, *api_);
   EXPECT_FALSE(fingerprint.ok());
-  EXPECT_EQ(fingerprint.status().message(), "Subject Alternative Names do not match");
+  EXPECT_EQ(fingerprint.status().message(), "SAN matchers are empty");
 }
 
 TEST_F(CryptoUtilsTest, GetBase64EncodedCertificateFingerprintNullProvider) {
   std::vector<Matchers::StringMatcherImpl> san_matchers;
+  san_matchers.emplace_back(
+      Matchers::StringMatcherImpl::createExactMatcher("spiffe://lyft.com/frontend-team"));
   auto fingerprint = getBase64EncodedCertificateFingerprint(nullptr, san_matchers, *api_);
   EXPECT_FALSE(fingerprint.ok());
   EXPECT_EQ(fingerprint.status().message(), "TLS certificate provider is null");
@@ -142,6 +164,8 @@ TEST_F(CryptoUtilsTest, GetBase64EncodedCertificateFingerprintDataSourceReadFail
   EXPECT_CALL(*secret_provider, secret()).WillRepeatedly(Return(secret.get()));
 
   std::vector<Matchers::StringMatcherImpl> san_matchers;
+  san_matchers.emplace_back(
+      Matchers::StringMatcherImpl::createExactMatcher("spiffe://lyft.com/frontend-team"));
   auto fingerprint = getBase64EncodedCertificateFingerprint(secret_provider, san_matchers, *api_);
   EXPECT_FALSE(fingerprint.ok());
   EXPECT_EQ(fingerprint.status().message(), "Failed to read certificate from data source");
@@ -155,6 +179,8 @@ TEST_F(CryptoUtilsTest, GetBase64EncodedCertificateFingerprintEmptyContent) {
   EXPECT_CALL(*secret_provider, secret()).WillRepeatedly(Return(secret.get()));
 
   std::vector<Matchers::StringMatcherImpl> san_matchers;
+  san_matchers.emplace_back(
+      Matchers::StringMatcherImpl::createExactMatcher("spiffe://lyft.com/frontend-team"));
   auto fingerprint = getBase64EncodedCertificateFingerprint(secret_provider, san_matchers, *api_);
   EXPECT_FALSE(fingerprint.ok());
   EXPECT_EQ(fingerprint.status().message(), "Certificate file content is empty");
@@ -168,6 +194,8 @@ TEST_F(CryptoUtilsTest, GetBase64EncodedCertificateFingerprintParseFailure) {
   EXPECT_CALL(*secret_provider, secret()).WillRepeatedly(Return(secret.get()));
 
   std::vector<Matchers::StringMatcherImpl> san_matchers;
+  san_matchers.emplace_back(
+      Matchers::StringMatcherImpl::createExactMatcher("spiffe://lyft.com/frontend-team"));
   auto fingerprint = getBase64EncodedCertificateFingerprint(secret_provider, san_matchers, *api_);
   EXPECT_FALSE(fingerprint.ok());
   EXPECT_EQ(fingerprint.status().message(), "Failed to parse certificate");

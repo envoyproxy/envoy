@@ -91,7 +91,7 @@ envoy_cc_library(
         "//source/common/common:matchers_lib",
         "//source/common/config:datasource_lib",
         "//source/common/http:utility_lib",
+        "//source/common/tls:utility_lib",
         "@abseil-cpp//absl/strings:string_view",
-        "@re2",
     ],
 )

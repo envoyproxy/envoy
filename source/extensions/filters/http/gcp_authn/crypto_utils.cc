@@ -23,10 +23,10 @@
 #include "source/common/common/matchers.h"
 #include "source/common/common/thread.h"
 #include "source/common/config/datasource.h"
+#include "source/common/tls/utility.h"
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "re2/re2.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -35,42 +35,16 @@ namespace GcpAuthn {
 namespace {
 
 std::vector<std::string> getSubjectAltNames(X509* cert) {
-  std::vector<std::string> sans;
-  STACK_OF(GENERAL_NAME)* gens = static_cast<STACK_OF(GENERAL_NAME)*>(
-      X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr));
-
-  if (gens != nullptr) {
-    int count = sk_GENERAL_NAME_num(gens);
-    for (int i = 0; i < count; ++i) {
-      GENERAL_NAME* gen = sk_GENERAL_NAME_value(gens, i);
-      if (gen->type == GEN_URI) {
-        ASN1_IA5STRING* uri = gen->d.uniformResourceIdentifier;
-        if (uri != nullptr) {
-          sans.push_back(std::string(reinterpret_cast<const char*>(ASN1_STRING_get0_data(uri)),
-                                     ASN1_STRING_length(uri)));
-        }
-      }
-    }
-    GENERAL_NAMES_free(gens);
-  }
+  std::vector<std::string> sans =
+      Envoy::Extensions::TransportSockets::Tls::Utility::getSubjectAltNames(*cert, GEN_URI);
+  std::vector<std::string> dns_sans =
+      Envoy::Extensions::TransportSockets::Tls::Utility::getSubjectAltNames(*cert, GEN_DNS);
+  sans.insert(sans.end(), dns_sans.begin(), dns_sans.end());
   return sans;
 }
 
 bool validateSubjectAltNames(const std::vector<std::string>& sans,
                              const std::vector<Matchers::StringMatcherImpl>& san_matchers) {
-  if (san_matchers.empty()) {
-    // Regex match for SAN.
-    static const LazyRE2 org_regex = {"^agents\\.global\\.org-\\d+\\.system\\.id\\.goog$"};
-    static const LazyRE2 proj_regex = {"^agents\\.global\\.proj-\\d+\\.system\\.id\\.goog$"};
-
-    for (const auto& san : sans) {
-      if (RE2::FullMatch(san, *org_regex) || RE2::FullMatch(san, *proj_regex)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   for (const auto& san : sans) {
     for (const auto& matcher : san_matchers) {
       if (matcher.match(san)) {
@@ -84,7 +58,7 @@ bool validateSubjectAltNames(const std::vector<std::string>& sans,
 absl::StatusOr<std::string> calculateFingerprint(X509* cert) {
   unsigned char* der = nullptr;
   int len = i2d_X509(cert, &der);
-  if (len < 0) {
+  if (len <= 0) {
     ENVOY_LOG_MISC(error, "Failed to get DER encoding of certificate");
     return absl::InternalError("Failed to get DER encoding of certificate");
   }
@@ -105,6 +79,10 @@ absl::StatusOr<std::string> getBase64EncodedCertificateFingerprint(
   // Config::DataSource::read() is blocking and should only be called on the
   // main thread.
   ASSERT_IS_MAIN_OR_TEST_THREAD();
+
+  if (san_matchers.empty()) {
+    return absl::InvalidArgumentError("SAN matchers are empty");
+  }
 
   if (tls_cert_provider == nullptr) {
     return absl::InvalidArgumentError("TLS certificate provider is null");
