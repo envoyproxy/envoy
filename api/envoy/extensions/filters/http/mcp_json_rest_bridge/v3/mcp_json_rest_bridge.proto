@@ -192,8 +192,8 @@ message ToolsListSpecificConfig {
   // parameters object, or set to '"additionalProperties": false' to require empty parameters.
   string input_schema = 3;
 
-  // Optional output schema. If present, uses the same format as input_schema.
-  string output_schema = 4;
+  reserved 4;
+  reserved "output_schema";
 }
 
 message ToolConfig {

@@ -60,8 +60,10 @@ class McpJsonRestBridgePerRouteConfig : public Router::RouteSpecificFilterConfig
 public:
   explicit McpJsonRestBridgePerRouteConfig(
       const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
-          proto_config)
-      : tool_config_(proto_config.tool_config()) {}
+          proto_config);
+
+  absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+  getHttpRule(absl::string_view tool_name) const;
 
   const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ServerToolConfig&
   toolConfig() const {
@@ -69,6 +71,9 @@ public:
   }
 
 private:
+  absl::flat_hash_map<std::string,
+                      envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+      tool_to_http_rule_;
   const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ServerToolConfig tool_config_;
 };
 
@@ -91,6 +96,7 @@ public:
                                           bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
+  void onDestroy() override;
 
 private:
   // Handles "method" field in the MCP request.
@@ -99,12 +105,6 @@ private:
 
   // Serves a local tools/list response using the per-route configuration, bypassing upstream.
   void serveToolsListLocal(const nlohmann::json& json_rpc);
-
-  std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>
-  getTools() const;
-
-  const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*
-  getTool(absl::string_view tool_name) const;
 
   // Modifies the response from upstream into JSON-RPC response.
   void encodeJsonRpcData(Http::ResponseHeaderMapOptRef response_headers);
@@ -147,6 +147,8 @@ private:
   std::string response_body_str_;
 
   McpJsonRestBridgeFilterConfigSharedPtr config_;
+  Router::RouteConstSharedPtr route_;
+  const McpJsonRestBridgePerRouteConfig* per_route_config_{nullptr};
 };
 
 } // namespace McpJsonRestBridge

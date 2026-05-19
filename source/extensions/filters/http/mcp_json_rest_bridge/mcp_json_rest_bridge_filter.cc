@@ -160,56 +160,23 @@ McpJsonRestBridgeFilterConfig::getHttpRule(absl::string_view tool_name) const {
   return it->second;
 }
 
-std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>
-McpJsonRestBridgeFilter::getTools() const {
-  absl::flat_hash_set<std::string> seen_tools;
-  std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>
-      combined;
-
-  const auto* per_route_config =
-      Http::Utility::resolveMostSpecificPerFilterConfig<McpJsonRestBridgePerRouteConfig>(
-          decoder_callbacks_);
-
-  if (per_route_config) {
-    for (const auto& tool : per_route_config->toolConfig().tools()) {
-      if (seen_tools.insert(tool.name()).second) {
-        combined.push_back(&tool);
-      }
-    }
+McpJsonRestBridgePerRouteConfig::McpJsonRestBridgePerRouteConfig(
+    const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
+        proto_config)
+    : tool_config_(proto_config.tool_config()) {
+  for (const auto& tool : tool_config_.tools()) {
+    tool_to_http_rule_[tool.name()] = tool.http_rule();
   }
-
-  for (const auto& tool : config_->toolConfig().tools()) {
-    if (seen_tools.insert(tool.name()).second) {
-      combined.push_back(&tool);
-    }
-  }
-
-  return combined;
 }
 
-const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*
-McpJsonRestBridgeFilter::getTool(absl::string_view tool_name) const {
-  // TODO(mkbehr): Pre-process or cache a lookup table if we ever need to check many tools per
-  // request.
-  const auto* per_route_config =
-      Http::Utility::resolveMostSpecificPerFilterConfig<McpJsonRestBridgePerRouteConfig>(
-          decoder_callbacks_);
-
-  if (per_route_config) {
-    for (const auto& tool : per_route_config->toolConfig().tools()) {
-      if (tool.name() == tool_name) {
-        return &tool;
-      }
-    }
+absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+McpJsonRestBridgePerRouteConfig::getHttpRule(absl::string_view tool_name) const {
+  auto it = tool_to_http_rule_.find(tool_name);
+  if (it == tool_to_http_rule_.end()) {
+    return absl::InvalidArgumentError(
+        fmt::format("Failed to find http rule for tool_name: {}", tool_name));
   }
-
-  for (const auto& tool : config_->toolConfig().tools()) {
-    if (tool.name() == tool_name) {
-      return &tool;
-    }
-  }
-
-  return nullptr;
+  return it->second;
 }
 
 Http::FilterHeadersStatus
@@ -249,6 +216,14 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::decodeData(Buffer::Instance& dat
                                                            bool end_stream) {
   if (mcp_operation_ == McpOperation::Unspecified) {
     return Http::FilterDataStatus::Continue;
+  }
+
+  if (!route_) {
+    route_ = decoder_callbacks_->routeSharedPtr();
+    if (route_) {
+      per_route_config_ = dynamic_cast<const McpJsonRestBridgePerRouteConfig*>(
+          route_->mostSpecificPerFilterConfig("envoy.filters.http.mcp_json_rest_bridge"));
+    }
   }
 
   const uint32_t max_request_body_size = config_->maxRequestBodySize();
@@ -373,6 +348,11 @@ Http::FilterTrailersStatus McpJsonRestBridgeFilter::encodeTrailers(Http::Respons
   return Http::FilterTrailersStatus::Continue;
 }
 
+void McpJsonRestBridgeFilter::onDestroy() {
+  route_.reset();
+  per_route_config_ = nullptr;
+}
+
 // Send a local reply for a tools/list call. Construct the response body directly instead of
 // building a JSON object, to minimize copying.
 void McpJsonRestBridgeFilter::serveToolsListLocal(const nlohmann::json& json_rpc) {
@@ -386,8 +366,12 @@ void McpJsonRestBridgeFilter::serveToolsListLocal(const nlohmann::json& json_rpc
   response_data.add(request_id_json);
   response_data.add(",\"result\":{\"tools\":[");
 
+  const auto& tools =
+      per_route_config_ ? per_route_config_->toolConfig().tools() : config_->toolConfig().tools();
+
   bool first_tool = true;
-  for (const auto* tool : getTools()) {
+  for (const auto& tool_proto : tools) {
+    const auto* tool = &tool_proto;
     if (!first_tool) {
       response_data.add(",");
     }
@@ -413,11 +397,6 @@ void McpJsonRestBridgeFilter::serveToolsListLocal(const nlohmann::json& json_rpc
       response_data.add(tool->tool_list_config().input_schema());
     } else {
       response_data.add("{\"type\":\"object\"}");
-    }
-
-    if (!tool->tool_list_config().output_schema().empty()) {
-      response_data.add(",\"outputSchema\":");
-      response_data.add(tool->tool_list_config().output_schema());
     }
 
     response_data.add("}");
@@ -451,21 +430,17 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc,
     return;
   }
   if (method == McpConstants::Methods::TOOLS_LIST) {
-    const auto* per_route_config =
-        Http::Utility::resolveMostSpecificPerFilterConfig<McpJsonRestBridgePerRouteConfig>(
-            decoder_callbacks_);
-
     bool has_tool_list_http_rule = config_->toolConfig().has_tool_list_http_rule();
     bool has_tool_list_local = config_->toolConfig().has_tool_list_local();
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule* http_rule =
         has_tool_list_http_rule ? &config_->toolConfig().tool_list_http_rule() : nullptr;
 
-    if (per_route_config) {
-      if (per_route_config->toolConfig().has_tool_list_http_rule()) {
+    if (per_route_config_) {
+      if (per_route_config_->toolConfig().has_tool_list_http_rule()) {
         has_tool_list_http_rule = true;
         has_tool_list_local = false;
-        http_rule = &per_route_config->toolConfig().tool_list_http_rule();
-      } else if (per_route_config->toolConfig().has_tool_list_local()) {
+        http_rule = &per_route_config_->toolConfig().tool_list_http_rule();
+      } else if (per_route_config_->toolConfig().has_tool_list_local()) {
         has_tool_list_local = true;
         has_tool_list_http_rule = false;
         http_rule = nullptr;
@@ -648,8 +623,18 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_
   }
   const auto& tool_name = name_it->get<std::string>();
 
-  const auto* tool = getTool(tool_name);
-  if (!tool || !tool->has_http_rule()) {
+  const auto* per_route_config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<McpJsonRestBridgePerRouteConfig>(
+          decoder_callbacks_);
+
+  absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule> http_rule;
+  if (per_route_config) {
+    http_rule = per_route_config->getHttpRule(tool_name);
+  } else {
+    http_rule = config_->getHttpRule(tool_name);
+  }
+
+  if (!http_rule.ok()) {
     ENVOY_STREAM_LOG(error, "Failed to get http rule for method: {}", *decoder_callbacks_,
                      tool_name);
     sendErrorResponse(Http::Code::BadRequest, "mcp_json_rest_bridge_filter_unknown_tool",
@@ -669,7 +654,7 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_
   const nlohmann::json empty_arguments = nlohmann::json::object();
   const nlohmann::json& arguments = arguments_it != params.end() ? *arguments_it : empty_arguments;
 
-  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(tool->http_rule(), arguments);
+  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(*http_rule, arguments);
   if (!http_request.ok()) {
     ENVOY_STREAM_LOG(error, "Failed to build HTTP request for method: {} with status: {}",
                      *decoder_callbacks_, tool_name, http_request.status());
@@ -736,9 +721,11 @@ absl::Status McpJsonRestBridgeFilter::validateJsonRpcIdAndMethod(const nlohmann:
     // The notifications/initialized request is not required to have an ID
     // field.
   } else if (!session_id.ok()) {
-    sendErrorResponse(Http::Code::BadRequest, "mcp_json_rest_bridge_filter_id_not_found",
-                      generateErrorJsonResponse(-32600, "Missing ID field").dump());
-    return absl::InvalidArgumentError("Missing ID field");
+    mcp_operation_ = McpOperation::InitializationAck;
+    decoder_callbacks_->sendLocalReply(Http::Code::NoContent, "", nullptr,
+                                       Grpc::Status::WellKnownGrpcStatus::Ok,
+                                       "mcp_json_rest_bridge_filter_notification");
+    return absl::InvalidArgumentError("Notification request");
   }
   return absl::OkStatus();
 }
