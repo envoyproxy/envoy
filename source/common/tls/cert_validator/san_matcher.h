@@ -84,7 +84,9 @@ private:
   const std::string dns_exact_match_;
 };
 
-SanMatcherPtr createStringSanMatcher(
+// Returns either a non-null SanMatcherPtr, or an error why it couldn't be
+// created.
+absl::StatusOr<SanMatcherPtr> createStringSanMatcher(
     const envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher& matcher,
     Server::Configuration::CommonFactoryContext& context);
 

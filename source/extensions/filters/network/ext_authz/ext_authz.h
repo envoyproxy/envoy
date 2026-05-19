@@ -162,7 +162,7 @@ private:
   FilterReturn filter_return_{FilterReturn::Stop};
   // Used to identify if the callback to onComplete() is synchronous (on the stack) or asynchronous.
   bool calling_check_{};
-  envoy::service::auth::v3::CheckRequest check_request_{};
+  envoy::service::auth::v3::CheckRequest check_request_;
 };
 } // namespace ExtAuthz
 } // namespace NetworkFilters

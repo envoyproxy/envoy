@@ -132,7 +132,7 @@ public:
     // Make sure Envoy saw upstream connection close.
     std::string target_name =
         absl::StrFormat("cluster.cluster_%d.upstream_cx_active", result.upstream_index.value());
-    test_server_->waitForGaugeEq(target_name, 0);
+    test_server_->waitForGauge(target_name, testing::Eq(0));
   }
 
 private:

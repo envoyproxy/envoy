@@ -239,15 +239,19 @@ protected:
     // Other calls for server sessions will by default get a normal OwnedImpl.
     EXPECT_CALL(*factory, createBuffer_(_, _, _))
         .Times(AnyNumber())
-        .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
-                             std::function<void()> above_overflow) -> Buffer::Instance* {
-          client_write_buffer_ = new MockWatermarkBuffer(below_low, above_high, above_overflow);
-          return client_write_buffer_;
-        }))
-        .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
-                                  std::function<void()> above_overflow) -> Buffer::Instance* {
-          return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
-        }));
+        .WillOnce(
+            Invoke([&](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                       absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+              client_write_buffer_ = new MockWatermarkBuffer(
+                  std::move(below_low), std::move(above_high), std::move(above_overflow));
+              return client_write_buffer_;
+            }))
+        .WillRepeatedly(
+            Invoke([](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                      absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+              return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
+                                                 std::move(above_overflow));
+            }));
   }
 
 protected:
@@ -262,12 +266,14 @@ protected:
   ConnectionMocks createConnectionMocks(bool create_timer = true) {
     auto dispatcher = std::make_unique<NiceMock<Event::MockDispatcher>>();
     EXPECT_CALL(dispatcher->buffer_factory_, createBuffer_(_, _, _))
-        .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
-                                  std::function<void()> above_overflow) -> Buffer::Instance* {
-          // ConnectionImpl calls Envoy::MockBufferFactory::create(), which calls createBuffer_()
-          // and wraps the returned raw pointer below with a unique_ptr.
-          return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
-        }));
+        .WillRepeatedly(
+            Invoke([](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                      absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+              // ConnectionImpl calls Envoy::MockBufferFactory::create(), which calls
+              // createBuffer_() and wraps the returned raw pointer below with a unique_ptr.
+              return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
+                                                 std::move(above_overflow));
+            }));
 
     if (create_timer) {
       // This timer will be returned (transferring ownership) to the ConnectionImpl when
@@ -501,7 +507,7 @@ TEST_P(ConnectionImplTest, SetServerTransportSocketTimeout) {
   Stats::MockCounter timeout_counter;
   EXPECT_CALL(timeout_counter, inc());
   server_connection->setTransportSocketConnectTimeout(std::chrono::seconds(3), timeout_counter);
-  EXPECT_CALL(*transport_socket, closeSocket(ConnectionEvent::LocalClose));
+  EXPECT_CALL(*transport_socket, closeSocket(ConnectionEvent::LocalClose, false));
   mock_timer->invokeCallback();
   EXPECT_THAT(stream_info_.connectionTerminationDetails(),
               Optional(HasSubstr("transport socket timeout")));
@@ -2211,10 +2217,12 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayConfigDisabledTest) {
   NiceMock<MockConnectionCallbacks> callbacks;
   NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(dispatcher.buffer_factory_, createBuffer_(_, _, _))
-      .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
-                                std::function<void()> above_overflow) -> Buffer::Instance* {
-        return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
-      }));
+      .WillRepeatedly(
+          Invoke([](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                    absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+            return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
+                                               std::move(above_overflow));
+          }));
   IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>(0);
   std::unique_ptr<Network::ConnectionImpl> server_connection(new Network::ConnectionImpl(
       dispatcher, std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
@@ -3227,10 +3235,12 @@ public:
   void initializeConnection() {
     EXPECT_CALL(dispatcher_, isThreadSafe()).WillRepeatedly(Return(true));
     EXPECT_CALL(dispatcher_.buffer_factory_, createBuffer_(_, _, _))
-        .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
-                                  std::function<void()> above_overflow) -> Buffer::Instance* {
-          return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
-        }));
+        .WillRepeatedly(
+            Invoke([](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                      absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+              return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
+                                                 std::move(above_overflow));
+            }));
 
     file_event_ = new NiceMock<Event::MockFileEvent>;
     EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
@@ -4018,7 +4028,7 @@ TEST_F(MockTransportConnectionImplTest, BufferHighWatermarkTimeoutClosesConnecti
 
   // Timer callback fires - closeSocket is called first, then during buffer drain enabled() is
   // checked
-  EXPECT_CALL(*transport_socket_, closeSocket(ConnectionEvent::LocalClose));
+  EXPECT_CALL(*transport_socket_, closeSocket(ConnectionEvent::LocalClose, false));
   EXPECT_CALL(*buffer_timer, enabled()).WillOnce(Return(false));
   buffer_timer->invokeCallback();
   EXPECT_EQ(static_cast<const Network::Connection&>(*connection_).localCloseReason(),
@@ -4065,7 +4075,7 @@ TEST_F(MockTransportConnectionImplTest, BufferHighWatermarkTimeoutCancelledOnDra
   EXPECT_CALL(*buffer_timer, disableTimer());
   EXPECT_TRUE(file_ready_cb_(Event::FileReadyType::Write).ok());
 
-  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  EXPECT_CALL(*transport_socket_, closeSocket(_, _));
   connection_->close(ConnectionCloseType::NoFlush);
 }
 
@@ -4204,7 +4214,7 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnored) {
       }));
   EXPECT_TRUE(file_ready_cb_(Event::FileReadyType::Read).ok());
   // Deferred close.
-  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  EXPECT_CALL(*transport_socket_, closeSocket(_, _));
 }
 
 // Test that if a read event occurs after
@@ -4231,7 +4241,7 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnoredWithFilt
       }));
   EXPECT_TRUE(file_ready_cb_(Event::FileReadyType::Read).ok());
   // Deferred close.
-  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  EXPECT_CALL(*transport_socket_, closeSocket(_, _));
 }
 
 // Test that if a read event occurs after
@@ -4262,7 +4272,7 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnoredWithWrit
   EXPECT_CALL(*transport_socket_, doWrite(_, true))
       .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
   // Deferred close.
-  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  EXPECT_CALL(*transport_socket_, closeSocket(_, _));
 }
 
 // Test that if a read event occurs after
@@ -4292,7 +4302,7 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnoredCanFlush
   EXPECT_TRUE(file_ready_cb_(Event::FileReadyType::Read).ok());
 
   // Deferred close.
-  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  EXPECT_CALL(*transport_socket_, closeSocket(_, _));
 }
 
 // Test that if a read event occurs after close(ConnectionCloseType::NoFlush),
@@ -4303,7 +4313,7 @@ TEST_F(PostCloseConnectionImplTest, NoReadAfterCloseNoFlush) {
   initialize();
 
   // Immediate connection close.
-  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  EXPECT_CALL(*transport_socket_, closeSocket(_, _));
   connection_->close(ConnectionCloseType::NoFlush);
 
   // We don't even see a doRead(), let alone an onData() callback.
@@ -4320,7 +4330,7 @@ TEST_F(PostCloseConnectionImplTest, NoReadAfterCloseFlushWrite) {
   initialize();
 
   // Connection flush and close.
-  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  EXPECT_CALL(*transport_socket_, closeSocket(_, _));
   connection_->close(ConnectionCloseType::FlushWrite);
 
   // We don't even see a doRead(), let alone an onData() callback.
@@ -4341,7 +4351,7 @@ TEST_F(PostCloseConnectionImplTest, NoReadAfterCloseFlushWriteWriteData) {
   // it will be flushed here.
   EXPECT_CALL(*transport_socket_, doWrite(_, true))
       .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
-  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  EXPECT_CALL(*transport_socket_, closeSocket(_, _));
   connection_->close(ConnectionCloseType::FlushWrite);
 
   // We don't even see a doRead(), let alone an onData() callback.
@@ -4359,7 +4369,7 @@ TEST_F(PostCloseConnectionImplTest, CloseAbort) {
   // Connection abort. We have data written above in writeSomeData(),
   // it won't be written and flushed due to ``ConnectionCloseType::Abort``.
   EXPECT_CALL(*transport_socket_, doWrite(_, true)).Times(0);
-  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  EXPECT_CALL(*transport_socket_, closeSocket(_, _));
   connection_->close(ConnectionCloseType::Abort);
 }
 
@@ -4372,7 +4382,7 @@ TEST_F(PostCloseConnectionImplTest, AbortReset) {
   // Connection abort. We have data written above in writeSomeData(),
   // it won't be written and flushed due to ``ConnectionCloseType::AbortReset``.
   EXPECT_CALL(*transport_socket_, doWrite(_, true)).Times(0);
-  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  EXPECT_CALL(*transport_socket_, closeSocket(_, _));
   connection_->close(ConnectionCloseType::AbortReset);
 }
 

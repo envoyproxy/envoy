@@ -20,6 +20,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -224,7 +226,7 @@ key:
   cleanupUpstreamAndDownstream();
 
   // Test "foo-route" and 'bar-route' both gets routed to cluster_0.
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+  test_server_->waitForCounter("http.config_test.rds.foo_route1.update_success", Ge(1));
   for (const std::string& scope_key : std::vector<std::string>{"foo-route", "bar-route"}) {
     sendRequestAndVerifyResponse(
         Http::TestRequestHeaderMapImpl{{":method", "GET"},
@@ -235,29 +237,31 @@ key:
         456, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", scope_key}}, 123,
         /*cluster_0*/ 0);
   }
-  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_attempt",
-                                 // update_attempt only increase after a response
-                                 isDelta() ? 1 : 2);
-  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 1);
+  test_server_->waitForCounter("http.config_test.scoped_rds.foo-scoped-routes.update_attempt",
+                               Ge( // update_attempt only increase after a response
+                                   isDelta() ? 1 : 2));
+  test_server_->waitForCounter("http.config_test.scoped_rds.foo-scoped-routes.update_success",
+                               Ge(1));
   // The version gauge should be set to xxHash64("1").
-  test_server_->waitForGaugeEq("http.config_test.scoped_rds.foo-scoped-routes.version",
-                               13237225503670494420UL);
+  test_server_->waitForGauge("http.config_test.scoped_rds.foo-scoped-routes.version",
+                             Eq(13237225503670494420UL));
 
   // Add a new scope scope_route3 with a brand new RouteConfiguration foo_route2.
   const std::string scope_route3 = fmt::format(scope_tmpl, "foo_scope3", "foo_route2", "baz-route");
 
   sendSrdsResponse({scope_route1, scope_route2, scope_route3}, /*added*/ {scope_route3}, {}, "2");
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_attempt", 2);
+  test_server_->waitForCounter("http.config_test.rds.foo_route1.update_attempt", Ge(2));
   sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_1"), "3");
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 2);
+  test_server_->waitForCounter("http.config_test.rds.foo_route1.update_success", Ge(2));
   createRdsStream("foo_route2");
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route2.update_attempt", 1);
+  test_server_->waitForCounter("http.config_test.rds.foo_route2.update_attempt", Ge(1));
   sendRdsResponse(fmt::format(route_config_tmpl, "foo_route2", "cluster_0"), "1");
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route2.update_success", 1);
-  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 2);
+  test_server_->waitForCounter("http.config_test.rds.foo_route2.update_success", Ge(1));
+  test_server_->waitForCounter("http.config_test.scoped_rds.foo-scoped-routes.update_success",
+                               Ge(2));
   // The version gauge should be set to xxHash64("2").
-  test_server_->waitForGaugeEq("http.config_test.scoped_rds.foo-scoped-routes.version",
-                               6927017134761466251UL);
+  test_server_->waitForGauge("http.config_test.scoped_rds.foo-scoped-routes.version",
+                             Eq(6927017134761466251UL));
   // After RDS update, requests within scope 'foo_scope1' or 'foo_scope2' get routed to
   // 'cluster_1'.
   for (const std::string& scope_key : std::vector<std::string>{"foo-route", "bar-route"}) {
@@ -282,7 +286,8 @@ key:
 
   // Delete foo_scope1 and requests within the scope gets 400s.
   sendSrdsResponse({scope_route2, scope_route3}, {}, {"foo_scope1"}, "3");
-  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 3);
+  test_server_->waitForCounter("http.config_test.scoped_rds.foo-scoped-routes.update_success",
+                               Ge(3));
   codec_client_ = makeHttpConnection(lookupPort("http"));
   response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
@@ -297,7 +302,8 @@ key:
   const std::string& scope_route4 =
       fmt::format(scope_tmpl, "foo_scope4", "foo_route4", "xyz-route");
   sendSrdsResponse({scope_route3, scope_route2, scope_route4}, {scope_route4}, {}, "4");
-  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 4);
+  test_server_->waitForCounter("http.config_test.scoped_rds.foo-scoped-routes.update_success",
+                               Ge(4));
   codec_client_ = makeHttpConnection(lookupPort("http"));
   response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
@@ -312,10 +318,10 @@ key:
   cleanupUpstreamAndDownstream();
 
   // RDS updated foo_route4, requests with scope key "xyz-route" now hit cluster_1.
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route4.update_attempt", 1);
+  test_server_->waitForCounter("http.config_test.rds.foo_route4.update_attempt", Ge(1));
   createRdsStream("foo_route4");
   sendRdsResponse(fmt::format(route_config_tmpl, "foo_route4", "cluster_1"), "3");
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route4.update_success", 1);
+  test_server_->waitForCounter("http.config_test.rds.foo_route4.update_success", Ge(1));
   sendRequestAndVerifyResponse(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/meh"},
@@ -385,11 +391,12 @@ key:
   // Replace foo-scope with a scoped route using an RDS subscription.
   sendSrdsResponse({scoped_route_with_rds_subscription}, {scoped_route_with_rds_subscription}, {},
                    "2");
-  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 2);
+  test_server_->waitForCounter("http.config_test.scoped_rds.foo-scoped-routes.update_success",
+                               Ge(2));
   createRdsStream("route_config");
-  test_server_->waitForCounterGe("http.config_test.rds.route_config.update_attempt", 1);
+  test_server_->waitForCounter("http.config_test.rds.route_config.update_attempt", Ge(1));
   sendRdsResponse(route_config, "1");
-  test_server_->waitForCounterGe("http.config_test.rds.route_config.update_success", 1);
+  test_server_->waitForCounter("http.config_test.rds.route_config.update_success", Ge(1));
 
   // foo-route now goes to cluster_1.
   sendRequestAndVerifyResponse(
@@ -404,7 +411,8 @@ key:
 
   // Replace foo-scope with bar-scope, which uses an inlined RouteConfiguration.
   sendSrdsResponse({scoped_route2}, {scoped_route2}, {}, "3");
-  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 3);
+  test_server_->waitForCounter("http.config_test.scoped_rds.foo-scoped-routes.update_success",
+                               Ge(3));
 
   // foo-route now returns 404.
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -446,8 +454,8 @@ key:
   };
   initialize();
 
-  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_rejected",
-                                 1);
+  test_server_->waitForCounter("http.config_test.scoped_rds.foo-scoped-routes.update_rejected",
+                               Ge(1));
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
@@ -468,7 +476,7 @@ key:
     - string_key: foo
 )EOF";
   sendSrdsResponse({scope_route2}, {scope_route2}, {}, "1");
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_attempt", 1);
+  test_server_->waitForCounter("http.config_test.rds.foo_route1.update_attempt", Ge(1));
   createRdsStream("foo_route1");
   constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
@@ -480,7 +488,7 @@ key:
           route: {{ cluster: {} }}
 )EOF";
   sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+  test_server_->waitForCounter("http.config_test.rds.foo_route1.update_success", Ge(1));
   sendRequestAndVerifyResponse(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/meh"},
@@ -525,7 +533,7 @@ key:
   initialize();
   registerTestServerPorts({"http"});
 
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route.update_rejected", 1);
+  test_server_->waitForCounter("http.config_test.rds.foo_route.update_rejected", Ge(1));
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
@@ -563,8 +571,8 @@ key:
     - string_key: foo
 )EOF";
   sendSrdsResponse({}, {scope_route2}, {}, "2");
-  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_rejected",
-                                 1);
+  test_server_->waitForCounter("http.config_test.scoped_rds.foo-scoped-routes.update_rejected",
+                               Ge(1));
   sendSrdsResponse({}, {}, {"foo_scope1", "foo_scope2"}, "3");
 }
 
@@ -658,7 +666,7 @@ key:
   verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
 
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+  test_server_->waitForCounter("http.config_test.rds.foo_route1.update_success", Ge(1));
 
   // listener_0 can match using "=" as separator
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -689,7 +697,7 @@ key:
   verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
 
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+  test_server_->waitForCounter("http.config_test.rds.foo_route1.update_success", Ge(1));
 
   // listener_1 can match using "," as separator
   codec_client_ = makeHttpConnection(lookupPort("listener_1"));
@@ -708,13 +716,14 @@ key:
   EXPECT_EQ(456, upstream_request_->bodyLength());
   cleanupUpstreamAndDownstream();
 
-  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_attempt",
-                                 // update_attempt only increase after a response
-                                 isDelta() ? 1 : 2);
-  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 1);
+  test_server_->waitForCounter("http.config_test.scoped_rds.foo-scoped-routes.update_attempt",
+                               Ge( // update_attempt only increase after a response
+                                   isDelta() ? 1 : 2));
+  test_server_->waitForCounter("http.config_test.scoped_rds.foo-scoped-routes.update_success",
+                               Ge(1));
   // The version gauge should be set to xxHash64("1").
-  test_server_->waitForGaugeEq("http.config_test.scoped_rds.foo-scoped-routes.version",
-                               13237225503670494420UL);
+  test_server_->waitForGauge("http.config_test.scoped_rds.foo-scoped-routes.version",
+                             Eq(13237225503670494420UL));
 }
 
 } // namespace

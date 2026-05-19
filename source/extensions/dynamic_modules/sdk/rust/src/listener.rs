@@ -5,6 +5,7 @@ use crate::{
   NEW_LISTENER_FILTER_CONFIG_FUNCTION,
 };
 use mockall::*;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 
 /// The trait that represents the Envoy listener filter configuration.
 /// This is used in [`NewListenerFilterConfigFunction`] to pass the Envoy filter configuration
@@ -567,13 +568,9 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
     if !result || address.length == 0 || address.ptr.is_null() {
       return None;
     }
-    let address_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        address.ptr as *const _,
-        address.length,
-      ))
-    };
-    Some((address_str.to_string(), port))
+    let address_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(address.ptr as *const u8, address.length) };
+    Some((address_str.into_owned(), port))
   }
 
   fn get_local_address(&self) -> Option<(String, u32)> {
@@ -592,13 +589,9 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
     if !result || address.length == 0 || address.ptr.is_null() {
       return None;
     }
-    let address_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        address.ptr as *const _,
-        address.length,
-      ))
-    };
-    Some((address_str.to_string(), port))
+    let address_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(address.ptr as *const u8, address.length) };
+    Some((address_str.into_owned(), port))
   }
 
   fn get_direct_remote_address(&self) -> Option<(String, u32)> {
@@ -617,13 +610,9 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
     if !result || address.length == 0 || address.ptr.is_null() {
       return None;
     }
-    let address_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        address.ptr as *const _,
-        address.length,
-      ))
-    };
-    Some((address_str.to_string(), port))
+    let address_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(address.ptr as *const u8, address.length) };
+    Some((address_str.into_owned(), port))
   }
 
   fn get_direct_local_address(&self) -> Option<(String, u32)> {
@@ -642,13 +631,9 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
     if !result || address.length == 0 || address.ptr.is_null() {
       return None;
     }
-    let address_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        address.ptr as *const _,
-        address.length,
-      ))
-    };
-    Some((address_str.to_string(), port))
+    let address_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(address.ptr as *const u8, address.length) };
+    Some((address_str.into_owned(), port))
   }
 
   fn get_original_dst(&self) -> Option<(String, u32)> {
@@ -667,13 +652,9 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
     if !result || address.length == 0 || address.ptr.is_null() {
       return None;
     }
-    let address_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        address.ptr as *const _,
-        address.length,
-      ))
-    };
-    Some((address_str.to_string(), port))
+    let address_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(address.ptr as *const u8, address.length) };
+    Some((address_str.into_owned(), port))
   }
 
   fn get_address_type(&self) -> abi::envoy_dynamic_module_type_address_type {
@@ -721,13 +702,9 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
       )
     };
     if success && !result.ptr.is_null() && result.length > 0 {
-      let value_str = unsafe {
-        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-          result.ptr as *const _,
-          result.length,
-        ))
-      };
-      Some(value_str.to_string())
+      let value_str =
+        unsafe { crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length) };
+      Some(value_str.into_owned())
     } else {
       None
     }
@@ -1217,22 +1194,26 @@ pub extern "C" fn envoy_dynamic_module_on_listener_filter_config_new(
   name: abi::envoy_dynamic_module_type_envoy_buffer,
   config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> abi::envoy_dynamic_module_type_listener_filter_config_module_ptr {
-  let mut envoy_filter_config = EnvoyListenerFilterConfigImpl::new(envoy_filter_config_ptr);
-  let name_str = unsafe {
-    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-      name.ptr as *const _,
-      name.length,
-    ))
-  };
-  let config_slice = unsafe { std::slice::from_raw_parts(config.ptr as *const _, config.length) };
-  init_listener_filter_config(
-    &mut envoy_filter_config,
-    name_str,
-    config_slice,
-    NEW_LISTENER_FILTER_CONFIG_FUNCTION
-      .get()
-      .expect("NEW_LISTENER_FILTER_CONFIG_FUNCTION must be set"),
-  )
+  catch_unwind(AssertUnwindSafe(|| {
+    let mut envoy_filter_config = EnvoyListenerFilterConfigImpl::new(envoy_filter_config_ptr);
+    let name_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(name.ptr as *const u8, name.length) };
+    let config_slice = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(config.ptr as *const u8, config.length)
+    };
+    init_listener_filter_config(
+      &mut envoy_filter_config,
+      name_str.as_ref(),
+      config_slice,
+      NEW_LISTENER_FILTER_CONFIG_FUNCTION
+        .get()
+        .expect("NEW_LISTENER_FILTER_CONFIG_FUNCTION must be set"),
+    )
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_listener_filter_config_new", panic);
+    std::ptr::null()
+  })
 }
 
 pub(crate) fn init_listener_filter_config<
@@ -1259,10 +1240,18 @@ pub(crate) fn init_listener_filter_config<
 pub unsafe extern "C" fn envoy_dynamic_module_on_listener_filter_config_destroy(
   filter_config_ptr: abi::envoy_dynamic_module_type_listener_filter_config_module_ptr,
 ) {
-  drop_wrapped_c_void_ptr!(
-    filter_config_ptr,
-    ListenerFilterConfig<EnvoyListenerFilterImpl>
-  );
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    drop_wrapped_c_void_ptr!(
+      filter_config_ptr,
+      ListenerFilterConfig<EnvoyListenerFilterImpl>
+    );
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_listener_filter_config_destroy",
+      panic,
+    );
+  });
 }
 
 /// # Safety
@@ -1274,12 +1263,19 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_listener_filter_new(
   filter_config_ptr: abi::envoy_dynamic_module_type_listener_filter_config_module_ptr,
   envoy_filter_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
 ) -> abi::envoy_dynamic_module_type_listener_filter_module_ptr {
-  let mut envoy_filter = EnvoyListenerFilterImpl::new(envoy_filter_ptr);
-  let filter_config = {
-    let raw = filter_config_ptr as *const *const dyn ListenerFilterConfig<EnvoyListenerFilterImpl>;
-    &**raw
-  };
-  envoy_dynamic_module_on_listener_filter_new_impl(&mut envoy_filter, filter_config)
+  catch_unwind(AssertUnwindSafe(|| {
+    let mut envoy_filter = EnvoyListenerFilterImpl::new(envoy_filter_ptr);
+    let filter_config = {
+      let raw =
+        filter_config_ptr as *const *const dyn ListenerFilterConfig<EnvoyListenerFilterImpl>;
+      &**raw
+    };
+    envoy_dynamic_module_on_listener_filter_new_impl(&mut envoy_filter, filter_config)
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_listener_filter_new", panic);
+    std::ptr::null()
+  })
 }
 
 pub(crate) fn envoy_dynamic_module_on_listener_filter_new_impl(
@@ -1295,9 +1291,15 @@ pub extern "C" fn envoy_dynamic_module_on_listener_filter_on_accept(
   envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
   filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
 ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
-  let filter = filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>;
-  let filter = unsafe { &mut *filter };
-  filter.on_accept(&mut EnvoyListenerFilterImpl::new(envoy_ptr))
+  catch_unwind(AssertUnwindSafe(|| {
+    let filter = filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>;
+    let filter = unsafe { &mut *filter };
+    filter.on_accept(&mut EnvoyListenerFilterImpl::new(envoy_ptr))
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_listener_filter_on_accept", panic);
+    abi::envoy_dynamic_module_type_on_listener_filter_status::StopIteration
+  })
 }
 
 #[no_mangle]
@@ -1305,9 +1307,15 @@ pub extern "C" fn envoy_dynamic_module_on_listener_filter_on_data(
   envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
   filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
 ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
-  let filter = filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>;
-  let filter = unsafe { &mut *filter };
-  filter.on_data(&mut EnvoyListenerFilterImpl::new(envoy_ptr))
+  catch_unwind(AssertUnwindSafe(|| {
+    let filter = filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>;
+    let filter = unsafe { &mut *filter };
+    filter.on_data(&mut EnvoyListenerFilterImpl::new(envoy_ptr))
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_listener_filter_on_data", panic);
+    abi::envoy_dynamic_module_type_on_listener_filter_status::StopIteration
+  })
 }
 
 #[no_mangle]
@@ -1315,17 +1323,27 @@ pub extern "C" fn envoy_dynamic_module_on_listener_filter_on_close(
   envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
   filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
 ) {
-  let filter = filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>;
-  let filter = unsafe { &mut *filter };
-  filter.on_close(&mut EnvoyListenerFilterImpl::new(envoy_ptr));
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let filter = filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>;
+    let filter = unsafe { &mut *filter };
+    filter.on_close(&mut EnvoyListenerFilterImpl::new(envoy_ptr));
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_listener_filter_on_close", panic);
+  });
 }
 
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_listener_filter_destroy(
   filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
 ) {
-  let _ =
-    unsafe { Box::from_raw(filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>) };
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let _ =
+      unsafe { Box::from_raw(filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>) };
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_listener_filter_destroy", panic);
+  });
 }
 
 #[no_mangle]
@@ -1334,9 +1352,14 @@ pub extern "C" fn envoy_dynamic_module_on_listener_filter_scheduled(
   filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
   event_id: u64,
 ) {
-  let filter = filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>;
-  let filter = unsafe { &mut *filter };
-  filter.on_scheduled(&mut EnvoyListenerFilterImpl::new(envoy_ptr), event_id);
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let filter = filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>;
+    let filter = unsafe { &mut *filter };
+    filter.on_scheduled(&mut EnvoyListenerFilterImpl::new(envoy_ptr), event_id);
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_listener_filter_scheduled", panic);
+  });
 }
 
 #[no_mangle]
@@ -1345,10 +1368,18 @@ pub extern "C" fn envoy_dynamic_module_on_listener_filter_config_scheduled(
   filter_config_module_ptr: abi::envoy_dynamic_module_type_listener_filter_config_module_ptr,
   event_id: u64,
 ) {
-  let filter_config =
-    filter_config_module_ptr as *const *const dyn ListenerFilterConfig<EnvoyListenerFilterImpl>;
-  let filter_config = unsafe { &**filter_config };
-  filter_config.on_config_scheduled(event_id);
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let filter_config =
+      filter_config_module_ptr as *const *const dyn ListenerFilterConfig<EnvoyListenerFilterImpl>;
+    let filter_config = unsafe { &**filter_config };
+    filter_config.on_config_scheduled(event_id);
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_listener_filter_config_scheduled",
+      panic,
+    );
+  });
 }
 
 /// # Safety
@@ -1366,15 +1397,14 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_listener_filter_http_callout_do
   body_chunks: *const abi::envoy_dynamic_module_type_envoy_buffer,
   body_chunks_size: usize,
 ) {
-  let filter = filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>;
-  let filter = unsafe { &mut *filter };
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let filter = filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>;
+    let filter = unsafe { &mut *filter };
 
-  // Convert headers to Vec<(EnvoyBuffer, EnvoyBuffer)>.
-  let header_vec = if headers.is_null() || headers_size == 0 {
-    Vec::new()
-  } else {
-    let headers_slice = unsafe { std::slice::from_raw_parts(headers, headers_size) };
-    headers_slice
+    // Convert headers to Vec<(EnvoyBuffer, EnvoyBuffer)>.
+    let headers_slice =
+      unsafe { crate::ffi_helpers::slice_from_raw_or_empty(headers, headers_size) };
+    let header_vec: Vec<(EnvoyBuffer, EnvoyBuffer)> = headers_slice
       .iter()
       .map(|h| {
         (
@@ -1382,25 +1412,28 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_listener_filter_http_callout_do
           unsafe { EnvoyBuffer::new_from_raw(h.value_ptr as *const _, h.value_length) },
         )
       })
-      .collect()
-  };
+      .collect();
 
-  // Convert body chunks to Vec<EnvoyBuffer>.
-  let body_vec = if body_chunks.is_null() || body_chunks_size == 0 {
-    Vec::new()
-  } else {
-    let chunks_slice = unsafe { std::slice::from_raw_parts(body_chunks, body_chunks_size) };
-    chunks_slice
+    // Convert body chunks to Vec<EnvoyBuffer>.
+    let chunks_slice =
+      unsafe { crate::ffi_helpers::slice_from_raw_or_empty(body_chunks, body_chunks_size) };
+    let body_vec: Vec<EnvoyBuffer> = chunks_slice
       .iter()
       .map(|c| unsafe { EnvoyBuffer::new_from_raw(c.ptr as *const _, c.length) })
-      .collect()
-  };
+      .collect();
 
-  filter.on_http_callout_done(
-    &mut EnvoyListenerFilterImpl::new(envoy_ptr),
-    callout_id,
-    result,
-    header_vec,
-    body_vec,
-  );
+    filter.on_http_callout_done(
+      &mut EnvoyListenerFilterImpl::new(envoy_ptr),
+      callout_id,
+      result,
+      header_vec,
+      body_vec,
+    );
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_listener_filter_http_callout_done",
+      panic,
+    );
+  });
 }

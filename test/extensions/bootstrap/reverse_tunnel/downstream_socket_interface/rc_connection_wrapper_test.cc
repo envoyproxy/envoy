@@ -1073,6 +1073,73 @@ TEST_F(RCConnectionWrapperTest, DecodeHeadersNonOk) {
   wrapper.decodeHeaders(std::move(headers), true);
 }
 
+// In upgrade mode, a 101 Switching Protocols response is treated as handshake success
+// and a 200 response is treated as a protocol mismatch.
+TEST_F(RCConnectionWrapperTest, DecodeHeadersUpgradeMode) {
+  ReverseConnectionSocketConfig upgrade_config = createDefaultTestConfig();
+  upgrade_config.use_http_upgrade = true;
+  auto upgrade_io_handle = createTestIOHandle(upgrade_config);
+
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+
+  // 101 -> success path.
+  {
+    auto mock_connection = setupMockConnection();
+    RCConnectionWrapper wrapper(*upgrade_io_handle, std::move(mock_connection), mock_host,
+                                "test-cluster");
+    Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
+    headers->setStatus(101);
+    wrapper.decodeHeaders(std::move(headers), true);
+  }
+  // 200 in upgrade mode -> failure path (server didn't switch protocols).
+  {
+    auto mock_connection = setupMockConnection();
+    RCConnectionWrapper wrapper(*upgrade_io_handle, std::move(mock_connection), mock_host,
+                                "test-cluster");
+    Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
+    headers->setStatus(200);
+    wrapper.decodeHeaders(std::move(headers), true);
+  }
+}
+
+// In upgrade mode, connect() emits `Connection: Upgrade` + `Upgrade: reverse-tunnel`
+// in the handshake request. Verifies by capturing the bytes written by the encoder.
+TEST_F(RCConnectionWrapperTest, ConnectEmitsUpgradeHeaders) {
+  ReverseConnectionSocketConfig upgrade_config = createDefaultTestConfig();
+  upgrade_config.use_http_upgrade = true;
+  auto upgrade_io_handle = createTestIOHandle(upgrade_config);
+
+  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  std::string written;
+  EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
+  EXPECT_CALL(*mock_connection, addReadFilter(_));
+  EXPECT_CALL(*mock_connection, connect());
+  EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(43));
+  EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
+  EXPECT_CALL(*mock_connection, write(_, _))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& buffer, bool) {
+        written.append(buffer.toString());
+        buffer.drain(buffer.length());
+      }));
+
+  auto mock_remote = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 80);
+  auto mock_local = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 10001);
+  EXPECT_CALL(*mock_connection, connectionInfoProvider())
+      .WillRepeatedly(Invoke([mock_remote, mock_local]() -> const Network::ConnectionInfoProvider& {
+        static auto provider =
+            std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local, mock_remote);
+        return *provider;
+      }));
+
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  RCConnectionWrapper wrapper(*upgrade_io_handle, std::move(mock_connection), mock_host,
+                              "test-cluster");
+  (void)wrapper.connect("tenant", "cluster", "node");
+
+  EXPECT_THAT(written, testing::HasSubstr("upgrade: reverse-tunnel"));
+  EXPECT_THAT(written, testing::HasSubstr("connection: upgrade"));
+}
+
 // Test dispatchHttp1 error path by initializing codec via connect() and
 // then feeding invalid bytes to the parser.
 TEST_F(RCConnectionWrapperTest, DispatchHttp1ErrorPath) {

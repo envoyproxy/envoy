@@ -438,7 +438,8 @@ TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderInterfaceCoverageViaNewStream)
   auto logs = decoder.accessLogHandlers();
   EXPECT_TRUE(logs.empty());
   auto handle = decoder.getRequestDecoderHandle();
-  EXPECT_EQ(nullptr, handle.get());
+  EXPECT_NE(nullptr, handle.get());
+  EXPECT_EQ(&decoder, handle->get().ptr());
 }
 
 // Test configuration with custom ping interval.
@@ -2088,6 +2089,94 @@ TEST_F(ReverseTunnelFilterWithTenantIsolationTest, FilterReadsTenantIsolationFro
   Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders(
       "GET", "/reverse_connections/request", node_id_with_delimiter, "cluster", "tenant"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
+
+  auto parse_error = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.parse_error");
+  ASSERT_NE(nullptr, parse_error);
+  EXPECT_EQ(1, parse_error->value());
+}
+
+// Upgrade-mode handshake: `Upgrade: reverse-tunnel` request -> `101` with echoed headers.
+TEST_F(ReverseTunnelFilterWithUpstreamTest, UpgradeMode_RespondsWith101) {
+  // Reconfigure filter with upgrade enabled.
+  proto_config_.set_use_http_upgrade(true);
+  auto config_or_error = ReverseTunnelFilterConfig::create(proto_config_, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  config_ = config_or_error.value();
+  filter_ =
+      std::make_unique<ReverseTunnelFilter>(config_, *stats_store_.rootScope(), overload_manager_);
+  filter_->initializeReadFilterCallbacks(callbacks_);
+
+  // Build a socket whose io_handle.duplicate() returns a valid duped handle, since the
+  // success path in `processAcceptedConnection` registers the duped fd with the upstream
+  // socket manager. Pattern mirrors `SuccessfulSocketDuplication` above.
+  auto mock_socket = std::make_unique<Network::MockConnectionSocket>();
+  auto mock_io_handle = std::make_unique<Network::MockIoHandle>();
+  auto dup_handle = std::make_unique<Network::MockIoHandle>();
+  EXPECT_CALL(*dup_handle, isOpen()).WillRepeatedly(testing::Return(true));
+  EXPECT_CALL(*dup_handle, resetFileEvents());
+  EXPECT_CALL(*dup_handle, fdDoNotUse()).WillRepeatedly(testing::Return(123));
+  EXPECT_CALL(*mock_io_handle, duplicate())
+      .WillOnce(testing::Return(testing::ByMove(std::move(dup_handle))));
+  EXPECT_CALL(*mock_socket, ioHandle()).WillRepeatedly(testing::ReturnRef(*mock_io_handle));
+  EXPECT_CALL(*mock_socket, isOpen()).WillRepeatedly(testing::Return(true));
+  EXPECT_CALL(*mock_io_handle, fdDoNotUse()).WillRepeatedly(testing::Return(122));
+  static Network::ConnectionSocketPtr stored_socket;
+  static std::unique_ptr<Network::MockIoHandle> stored_handle;
+  stored_handle = std::move(mock_io_handle);
+  stored_socket = std::move(mock_socket);
+  EXPECT_CALL(callbacks_.connection_, getSocket())
+      .WillRepeatedly(testing::ReturnRef(stored_socket));
+
+  std::string written;
+  EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
+      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+        written.append(data.toString());
+        data.drain(data.length());
+      }));
+  // Upgrade mode forces the original connection to close after handshake.
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+
+  std::string req = "GET /reverse_connections/request HTTP/1.1\r\n"
+                    "Host: localhost\r\n"
+                    "Connection: Upgrade\r\n"
+                    "Upgrade: reverse-tunnel\r\n"
+                    "x-envoy-reverse-tunnel-node-id: n\r\n"
+                    "x-envoy-reverse-tunnel-cluster-id: c\r\n"
+                    "x-envoy-reverse-tunnel-tenant-id: t\r\n"
+                    "Content-Length: 0\r\n\r\n";
+  Buffer::OwnedImpl request(req);
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
+  EXPECT_THAT(written, testing::HasSubstr("101 Switching Protocols"));
+  EXPECT_THAT(written, testing::HasSubstr("upgrade: reverse-tunnel"));
+
+  auto accepted = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.accepted");
+  ASSERT_NE(nullptr, accepted);
+  EXPECT_EQ(1, accepted->value());
+}
+
+// When `use_http_upgrade=true` but the request does not advertise the upgrade,
+// the filter rejects with `426 Upgrade Required` and closes the connection.
+TEST_F(ReverseTunnelFilterWithUpstreamTest, UpgradeMode_MissingUpgradeRejected) {
+  proto_config_.set_use_http_upgrade(true);
+  auto config_or_error = ReverseTunnelFilterConfig::create(proto_config_, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  config_ = config_or_error.value();
+  filter_ =
+      std::make_unique<ReverseTunnelFilter>(config_, *stats_store_.rootScope(), overload_manager_);
+  filter_->initializeReadFilterCallbacks(callbacks_);
+
+  std::string written;
+  EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
+      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+        written.append(data.toString());
+        data.drain(data.length());
+      }));
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+
+  Buffer::OwnedImpl request(
+      makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
+  EXPECT_THAT(written, testing::HasSubstr("426 Upgrade Required"));
 
   auto parse_error = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.parse_error");
   ASSERT_NE(nullptr, parse_error);

@@ -168,7 +168,7 @@ build:mobile-cc --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
 # CC with xDS
 build:mobile-cc-xds-enabled --config=mobile-cc
-test:mobile-cc-xds-enabled --define=envoy_mobile_xds=enabled
+build:mobile-cc-xds-enabled --define=envoy_mobile_xds=enabled
 
 # Coverage
 build:mobile-coverage --build_tests_only

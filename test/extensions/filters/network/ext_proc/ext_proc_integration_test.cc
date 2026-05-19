@@ -19,6 +19,7 @@ namespace ExtProc {
 
 using envoy::service::network_ext_proc::v3::ProcessingRequest;
 using envoy::service::network_ext_proc::v3::ProcessingResponse;
+using testing::Ge;
 
 // Test-only filter that sets both typed and untyped connection metadata based on filter config
 class MetadataSetterFilter : public Network::ReadFilter {
@@ -338,7 +339,7 @@ public:
 
   void verifyCounters(const std::map<std::string, uint64_t>& expected_counters) {
     for (const auto& [name, value] : expected_counters) {
-      test_server_->waitForCounterGe("network_ext_proc.ext_proc_prefix." + name, value);
+      test_server_->waitForCounter("network_ext_proc.ext_proc_prefix." + name, Ge(value));
     }
   }
 
@@ -670,7 +671,7 @@ TEST_P(NetworkExtProcFilterIntegrationTest, GrpcStreamFailure) {
   // Close gRPC stream with an error status instead of Ok
   // This should trigger onGrpcError instead of onGrpcClose
   closeGrpcStream();
-  test_server_->waitForCounterGe("network_ext_proc.ext_proc_prefix.streams_grpc_error", 1);
+  test_server_->waitForCounter("network_ext_proc.ext_proc_prefix.streams_grpc_error", Ge(1));
   ASSERT_FALSE(tcp_client->write("", true));
   tcp_client->waitForDisconnect();
 
@@ -699,7 +700,7 @@ TEST_P(NetworkExtProcFilterIntegrationTest, GrpcStreamFailureWithFailureModeAllo
   closeGrpcStream();
 
   // Wait for the failure_mode_allowed counter to increment
-  test_server_->waitForCounterGe("network_ext_proc.ext_proc_prefix.failure_mode_allowed", 1);
+  test_server_->waitForCounter("network_ext_proc.ext_proc_prefix.failure_mode_allowed", Ge(1));
 
   // Should be able to continue using the connection after stream failure
   ASSERT_TRUE(tcp_client->write("more_data", true));

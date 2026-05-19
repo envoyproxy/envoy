@@ -406,7 +406,7 @@ private:
   uint64_t getNextCalloutId() { return next_callout_id_++; }
 
   DynamicModuleClusterConfigSharedPtr config_;
-  envoy_dynamic_module_type_cluster_module_ptr in_module_cluster_;
+  envoy_dynamic_module_type_cluster_module_ptr in_module_cluster_{nullptr};
   Event::Dispatcher& dispatcher_;
   Server::Configuration::ServerFactoryContext& server_context_;
 
@@ -484,7 +484,7 @@ public:
 
 private:
   envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle_;
-  envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_;
+  envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_{nullptr};
   OnClusterLbCancelHostSelectionType cancel_fn_;
   std::shared_ptr<std::atomic<bool>> cancelled_;
 };

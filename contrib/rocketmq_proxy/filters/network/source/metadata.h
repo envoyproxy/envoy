@@ -30,7 +30,7 @@ public:
 
 private:
   bool is_oneway_{false};
-  absl::optional<std::string> topic_name_{};
+  absl::optional<std::string> topic_name_;
 
   Http::HeaderMapPtr headers_{Http::RequestHeaderMapImpl::create()};
 };

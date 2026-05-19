@@ -14,7 +14,9 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/common/random_generator.h"
+#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_lifecycle_info.h"
 
+#include "absl/strings/string_view.h"
 #include "absl/synchronization/mutex.h"
 
 namespace Envoy {
@@ -38,7 +40,7 @@ public:
   UpstreamSocketManager(Event::Dispatcher& dispatcher,
                         ReverseTunnelAcceptorExtension* extension = nullptr);
 
-  ~UpstreamSocketManager();
+  ~UpstreamSocketManager() override;
 
   /**
    * Add accepted connection to socket manager.
@@ -50,7 +52,8 @@ public:
    */
   void addConnectionSocket(const std::string& node_id, const std::string& cluster_id,
                            Network::ConnectionSocketPtr socket,
-                           const std::chrono::seconds& ping_interval, bool rebalanced = true);
+                           const std::chrono::seconds& ping_interval, bool rebalanced = true,
+                           absl::string_view tenant_id = {});
 
   /**
    * Hand off a socket to this socket manager's dispatcher.
@@ -62,7 +65,8 @@ public:
    */
   void handoffSocketToWorker(const std::string& node_id, const std::string& cluster_id,
                              Network::ConnectionSocketPtr socket,
-                             const std::chrono::seconds& ping_interval);
+                             const std::chrono::seconds& ping_interval,
+                             absl::string_view tenant_id = {});
 
   /**
    * Get an available reverse connection socket.
@@ -76,6 +80,28 @@ public:
    * @param fd the FD for the socket to be marked dead.
    */
   void markSocketDead(const int fd);
+
+  /**
+   * @return lifecycle metadata for a tracked reverse-tunnel socket, or nullptr if none exists.
+   */
+  const ReverseTunnelLifecycleInfo* getLifecycleInfo(int fd) const;
+
+  /**
+   * Update the close reason attached to a tracked reverse-tunnel socket.
+   */
+  void setCloseReason(int fd, absl::string_view close_reason);
+
+  /**
+   * Mark that a handed-off upstream connection has the lifecycle filter attached and can emit its
+   * own close log once the real close reason is known.
+   */
+  void markUpstreamLifecycleFilterAttached(int fd);
+
+  /**
+   * Emit the deferred close log for a handed-off socket once the connection filter has learned the
+   * final close reason.
+   */
+  void maybeEmitDeferredCloseLog(int fd, absl::string_view close_reason);
 
   /**
    * Send a ping keepalive for a single reverse connection.
@@ -174,6 +200,9 @@ private:
   // Map from file descriptor to cluster ID. An entry is added when a reverse tunnel is accepted
   // from a node and is removed when the socket dies.
   absl::flat_hash_map<int, std::string> fd_to_cluster_map_;
+
+  // Original reverse-tunnel identity and addressing metadata keyed by file descriptor.
+  absl::flat_hash_map<int, ReverseTunnelLifecycleInfo> fd_to_lifecycle_info_;
 
   // Map of node ID to cluster, for all nodes that have a reverse tunnel socket.
   absl::flat_hash_map<std::string, std::string> node_to_cluster_map_;
