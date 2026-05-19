@@ -59,7 +59,7 @@ bug_fixes:
     health checks) and a cookie hash policy is configured. Previously the
     function unconditionally dereferenced ``downstreamConnection()`` to compose
     the per-connection seed for the generated cookie value. When the
-    connection pointer was null the worker would segfault. The function now
+    connection pointer was null the worker would crash. The function now
     skips the connection-derived seed and returns an empty cookie value in
     that path, preserving hash-stability for those async invocations.
 - area: wasm
