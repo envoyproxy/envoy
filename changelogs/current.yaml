@@ -175,6 +175,12 @@ new_features:
     that a dynamic-module cluster's load balancer can read filter state set by an upstream HTTP
     filter (or any other producer) when picking a host. The Rust SDK exposes these as
     ``ClusterLbContext::get_filter_state_bytes`` and ``ClusterLbContext::get_filter_state_typed``.
+- area: dynamic_modules
+  change: |
+    Added the ``envoy_dynamic_module_callback_cluster_lb_context_get_host_stat`` ABI callback so
+    custom cluster load balancers can read per-host counters and gauges at request time inside
+    ``envoy_dynamic_module_on_cluster_lb_choose_host``. The Rust SDK exposes this as
+    ``ClusterLbContext::get_host_stat``.
 - area: access_log
   change: |
     Supported the singleton stats scope in the :ref:`stats access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>`.
