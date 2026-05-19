@@ -17,6 +17,6 @@ envoy_cc_test(
     deps = [
         "//source/extensions/filters/network/generic_proxy/codecs/http1:config",
         "//test/extensions/filters/network/generic_proxy/mocks:codec_mocks",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
     ],
 )

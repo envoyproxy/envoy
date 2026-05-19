@@ -93,7 +93,7 @@ public:
                                         Server::Configuration::ServerFactoryContext& context,
                                         Stats::Store& stats_store);
 
-  ~DynamicModuleBootstrapExtensionConfig();
+  ~DynamicModuleBootstrapExtensionConfig() override;
 
   /**
    * This is called when an event is scheduled via

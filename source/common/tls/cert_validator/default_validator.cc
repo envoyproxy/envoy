@@ -162,12 +162,9 @@ absl::StatusOr<int> DefaultCertValidator::initializeSslContexts(std::vector<SSL_
     if (!cert_validation_config->subjectAltNameMatchers().empty()) {
       for (const envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher& matcher :
            cert_validation_config->subjectAltNameMatchers()) {
-        auto san_matcher = createStringSanMatcher(matcher, context_);
-        if (san_matcher == nullptr) {
-          return absl::InvalidArgumentError(
-              absl::StrCat("Failed to create string SAN matcher of type ", matcher.san_type()));
-        }
-        subject_alt_name_matchers_.emplace_back(std::move(san_matcher));
+        auto status_or_san_matcher = createStringSanMatcher(matcher, context_);
+        RETURN_IF_NOT_OK_REF(status_or_san_matcher.status());
+        subject_alt_name_matchers_.emplace_back(std::move(*status_or_san_matcher));
       }
       verify_mode = verify_mode_validation_context;
     }
@@ -396,7 +393,7 @@ bool DefaultCertValidator::verifySubjectAltName(X509* cert,
   for (const GENERAL_NAME* general_name : san_names.get()) {
     const std::string san = Utility::generalNameAsString(general_name);
     for (auto& config_san : subject_alt_names) {
-      if (general_name->type == GEN_DNS ? Utility::dnsNameMatch(config_san, san.c_str())
+      if (general_name->type == GEN_DNS ? Utility::dnsNameMatch(config_san, san)
                                         : config_san == san) {
         return true;
       }

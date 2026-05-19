@@ -1,0 +1,96 @@
+# `sections:` lists the valid top-level changelog sections (e.g.
+#     `bug_fixes`, `new_features`).
+#     NB: Do not change sections without prior agreement from maintainers
+#     TODO(phlax): move current config to tool defaults
+#
+# `areas:` lists the canonical set of areas accepted by per-entry
+#     changelog filenames in changelogs/current/<section>/<area>__<slug>.rst.
+#     In filenames, '/' MUST be encoded as '~'.
+#     Adding a new area requires a PR updating this file.
+
+sections:
+  changes:
+    title: Changes
+  behavior_changes:
+    title: Incompatible behavior changes
+    description: |
+      *Changes that are expected to cause an incompatibility if applicable;
+      deployment changes are likely required*
+
+  minor_behavior_changes:
+    title: Minor behavior changes
+    description: |
+      *Changes that may cause incompatibilities for some users, but should
+      not for most*
+
+  bug_fixes:
+    title: Bug fixes
+    description: |
+      *Changes expected to improve the state of the world and are unlikely
+      to have negative effects*
+
+  removed_config_or_runtime:
+    title: Removed config or runtime
+    description: |
+      *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+
+  new_features:
+    title: New features
+  deprecated:
+    title: Deprecated
+
+areas:
+  access_log:
+    title: access_log
+  attributes:
+    title: attributes
+  build:
+    title: build
+  composite:
+    title: composite
+  dns_resolver:
+    title: dns_resolver
+  dynamic_modules:
+    title: dynamic_modules
+  golang:
+    title: golang
+  http:
+    title: http
+  http2:
+    title: http2
+  http_inspector:
+    title: http_inspector
+  jwt_authn:
+    title: jwt_authn
+  load_report:
+    title: load_report
+  logging:
+    title: logging
+  mysql_proxy:
+    title: mysql_proxy
+  oauth2:
+    title: oauth2
+  quic:
+    title: quic
+  ratelimit:
+    title: ratelimit
+  rbac:
+    title: rbac
+  resource_monitors:
+    title: resource_monitors
+  router:
+    title: router
+  set_metadata_filter:
+    title: set_metadata_filter
+  spiffe_validator:
+    title: spiffe_validator
+  stat_sinks:
+    title: stat_sinks
+  stats:
+    title: stats
+  tcp_proxy:
+    title: tcp_proxy
+  tls:
+    title: tls
+  wasm:
+    title: wasm

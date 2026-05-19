@@ -148,7 +148,7 @@ public:
       : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
                stats, std::move(destructor_cb), dispatcher, api, warm) {}
 
-  virtual const SecretType* secret() const override PURE;
+  const SecretType* secret() const override PURE;
 
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
   addValidationCallback(std::function<absl::Status(const SecretType&)> callback) override {
