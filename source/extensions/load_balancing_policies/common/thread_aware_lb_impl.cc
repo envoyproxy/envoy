@@ -237,8 +237,8 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
 }
 
 void ThreadAwareLoadBalancerBase::LoadBalancerImpl::refresh() {
-  // We must protect current_lb_ via a RW lock since it is accessed and written to by multiple
-  // threads. All complex processing has already been precalculated however.
+  // The per priority state is shared across all threads and refreshed on main thread. We need to
+  // copy the latest per priority state to the worker thread load balancer instance under lock.
   absl::ReaderMutexLock lock(factory_->mutex_);
   healthy_per_priority_load_ = factory_->healthy_per_priority_load_;
   degraded_per_priority_load_ = factory_->degraded_per_priority_load_;

@@ -165,7 +165,7 @@ TEST_F(MaglevLoadBalancerTest, WorkerLbRefreshesOnMemberUpdate) {
   // fires the member update.
   EXPECT_EQ("127.0.0.1:90", lb->chooseHost(nullptr).host->address()->asString());
 
-  // Simulate the TLS priority set firing the member update on the worker. The worker LB must
+  // Simulate the worker priority set firing the member update on the worker. The worker LB must
   // refresh its cached state from the factory.
   worker_priority_set_.member_update_cb_helper_.runCallbacks({}, {});
 
