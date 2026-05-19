@@ -1284,7 +1284,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListPerRouteConfig) {
 
   McpJsonRestBridgePerRouteConfig override(override_config);
 
-  ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig)
       .WillByDefault(testing::Return(&override));
 
   EXPECT_CALL(decoder_callbacks_, requestHeaders())
@@ -1388,7 +1388,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsCallPerRouteConfig) {
 
   McpJsonRestBridgePerRouteConfig override(override_config);
 
-  ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig)
       .WillByDefault(testing::Return(&override));
 
   EXPECT_CALL(decoder_callbacks_, requestHeaders())
@@ -1425,7 +1425,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsCallPerRouteConfigOverridesStaticTool) 
 
   McpJsonRestBridgePerRouteConfig override(override_config);
 
-  ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig)
       .WillByDefault(testing::Return(&override));
 
   EXPECT_CALL(decoder_callbacks_, requestHeaders())

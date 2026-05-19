@@ -81,11 +81,6 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
-- area: mcp_json_rest_bridge
-  change: |
-    Added local response handling for the ``tools/list`` JSON-RPC method in the MCP JSON REST bridge filter.
-    Configuring ``tools_list_local`` will cause the filter to directly generate and
-    serve the available tools list response without sending a request upstream.
 - area: router
   change: |
     Added support for ``refreshRouteCluster`` on weighted cluster routes. When a filter calls

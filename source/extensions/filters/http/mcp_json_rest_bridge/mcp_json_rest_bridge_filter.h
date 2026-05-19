@@ -131,7 +131,7 @@ private:
     InitializationAck = 3,
     // Clients send a tools/list request to discover available tools.
     ToolsList = 4,
-    // Clients send a tools/list request that is handled locally via per-route config.
+    // Clients send a tools/list request that is handled locally.
     ToolsListLocal = 5,
     // Clients send a tools/call request to invoke a tool.
     ToolsCall = 6,
@@ -146,6 +146,7 @@ private:
   Buffer::OwnedImpl response_body_;
   std::string response_body_str_;
 
+  // Route and per-route config, latched on decodeData.
   McpJsonRestBridgeFilterConfigSharedPtr config_;
   Router::RouteConstSharedPtr route_;
   const McpJsonRestBridgePerRouteConfig* per_route_config_{nullptr};

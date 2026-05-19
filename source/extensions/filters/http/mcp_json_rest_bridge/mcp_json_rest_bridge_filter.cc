@@ -392,6 +392,7 @@ void McpJsonRestBridgeFilter::serveToolsListLocal(const nlohmann::json& json_rpc
     response_data.add(",\"description\":");
     response_data.add(desc_json.dump());
 
+    // WARNING: assumes input_schema is trusted to be a valid JSON fragment. Does not validate.
     response_data.add(",\"inputSchema\":");
     if (!tool->tool_list_config().input_schema().empty()) {
       response_data.add(tool->tool_list_config().input_schema());
