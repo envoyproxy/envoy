@@ -91,6 +91,8 @@ public:
   virtual Server::Configuration::FactoryContext& factoryContext() const = 0;
   virtual const McpBackendConfig* findBackend(const std::string& name) const = 0;
 
+  virtual bool lazyInitialization() const = 0;
+
   virtual bool hasSessionIdentity() const = 0;
   virtual const SubjectSource& subjectSource() const = 0;
   virtual ValidationMode validationMode() const = 0;
@@ -117,6 +119,8 @@ public:
   }
   const McpBackendConfig* findBackend(const std::string& name) const override;
 
+  bool lazyInitialization() const override { return lazy_initialization_; }
+
   bool hasSessionIdentity() const override {
     return !absl::holds_alternative<absl::monostate>(session_identity_.subject_source);
   }
@@ -133,6 +137,7 @@ private:
   std::vector<McpBackendConfig> backends_;
   std::string default_backend_name_;
   Server::Configuration::FactoryContext& factory_context_;
+  bool lazy_initialization_;
   SessionIdentityConfig session_identity_;
   std::string metadata_namespace_;
   McpRouterStats stats_;
@@ -155,6 +160,8 @@ public:
     return base_config_->factoryContext();
   }
   const McpBackendConfig* findBackend(const std::string& name) const override;
+
+  bool lazyInitialization() const override { return base_config_->lazyInitialization(); }
 
   bool hasSessionIdentity() const override { return base_config_->hasSessionIdentity(); }
   const SubjectSource& subjectSource() const override { return base_config_->subjectSource(); }
