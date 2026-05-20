@@ -6,10 +6,12 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 
+#include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/common/mcp/constants.h"
 #include "source/extensions/filters/http/mcp_json_rest_bridge/http_request_builder.h"
+#include "source/extensions/filters/http/mcp_json_rest_bridge/trace_context.h"
 
 #include "absl/base/no_destructor.h"
 #include "absl/container/flat_hash_set.h"
@@ -27,11 +29,24 @@ namespace HttpFilters {
 namespace McpJsonRestBridge {
 namespace {
 
+using ::Envoy::Extensions::HttpFilters::McpJsonRestBridge::McpTraceContext;
 using ::nlohmann::json;
 namespace McpConstants = Envoy::Extensions::Filters::Common::Mcp::McpConstants;
 
 constexpr uint32_t DEFAULT_MAX_REQUEST_BODY_SIZE = 1024 * 64;    // 64KB
 constexpr uint32_t DEFAULT_MAX_RESPONSE_BODY_SIZE = 1024 * 1024; // 1MB
+
+const Http::LowerCaseString& traceparentHeader() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "traceparent");
+}
+
+const Http::LowerCaseString& tracestateHeader() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "tracestate");
+}
+
+const Http::LowerCaseString& baggageHeader() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "baggage");
+}
 
 bool isMcpProtocolVersionSupported(absl::string_view protocol_version) {
   static const absl::NoDestructor<absl::flat_hash_set<absl::string_view>> supported_mcp_versions({
@@ -69,7 +84,8 @@ json translateJsonRestResponseToJsonRpc(absl::string_view tool_call_response,
 }
 
 json generateInitializeResponse(const json& session_id, absl::string_view server_name,
-                                absl::string_view protocol_version) {
+                                absl::string_view protocol_version, bool list_changed,
+                                absl::string_view description) {
   absl::string_view negotiated_protocol_version = McpConstants::LATEST_SUPPORTED_MCP_VERSION;
   if (isMcpProtocolVersionSupported(protocol_version)) {
     negotiated_protocol_version = protocol_version;
@@ -81,12 +97,14 @@ json generateInitializeResponse(const json& session_id, absl::string_view server
 
   json result;
   result[McpConstants::PROTOCOL_VERSION_FIELD] = negotiated_protocol_version;
-  // TODO(guoyilin42): Support list_changed from ServerToolConfig and description from ServerInfo.
   result[McpConstants::CAPABILITIES_FIELD][McpConstants::TOOLS_FIELD]
-        [McpConstants::LIST_CHANGED_FIELD] = false;
+        [McpConstants::LIST_CHANGED_FIELD] = list_changed;
   result[McpConstants::SERVER_INFO_FIELD][McpConstants::NAME_FIELD] = server_name;
   result[McpConstants::SERVER_INFO_FIELD][McpConstants::VERSION_FIELD] =
       McpConstants::DEFAULT_SERVER_VERSION;
+  if (!description.empty()) {
+    result[McpConstants::SERVER_INFO_FIELD][McpConstants::DESCRIPTION_FIELD] = description;
+  }
   ret[McpConstants::RESULT_FIELD] = result;
   return ret;
 }
@@ -127,6 +145,22 @@ bool validateRequestMcpVersion(absl::string_view method,
     }
   }
   return isMcpProtocolVersionSupported(protocol_version);
+}
+
+void setTraceContextHeaders(Http::RequestHeaderMap& request_headers,
+                            const McpTraceContext& trace_context) {
+  if (!trace_context.traceparent().empty()) {
+    request_headers.setCopy(traceparentHeader(), trace_context.traceparent());
+    if (trace_context.tracestate().empty()) {
+      request_headers.remove(tracestateHeader());
+    } else {
+      request_headers.setCopy(tracestateHeader(), trace_context.tracestate());
+    }
+  }
+
+  if (!trace_context.baggage().empty()) {
+    request_headers.setCopy(baggageHeader(), trace_context.baggage());
+  }
 }
 
 } // namespace
@@ -179,8 +213,10 @@ McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, 
   }
 
   mcp_operation_ = McpOperation::Undecided;
-  // TODO(guoyilin42): Strip port number from server_name_.
+  // Strip the port number from the Host header value (e.g., "example.com:8080" -> "example.com",
+  // "[::1]:8080" -> "[::1]") using the shared Envoy utility.
   server_name_ = std::string(request_headers.getHostValue());
+  Http::HeaderUtility::stripPortFromHost(server_name_);
 
   if (request_headers.getMethodValue() != Http::Headers::get().MethodValues.Post) {
     ENVOY_STREAM_LOG(warn, "Only POST method is supported for MCP. Received: {}",
@@ -378,7 +414,8 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc,
           generateInitializeResponse(
               *session_id_, server_name_,
               json_rpc[McpConstants::PARAMS_FIELD][McpConstants::PROTOCOL_VERSION_FIELD]
-                  .get<std::string>())
+                  .get<std::string>(),
+              config_->toolsListChanged(), config_->serverDescription())
               .dump(),
           [](Http::ResponseHeaderMap& headers) {
             headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
@@ -400,6 +437,12 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc,
                                        "mcp_json_rest_bridge_filter_initialize_ack");
   } else if (method == McpConstants::Methods::TOOLS_CALL) {
     mcp_operation_ = McpOperation::ToolsCall;
+    if (config_->traceContextExtraction() && request_headers.has_value()) {
+      ENVOY_STREAM_LOG(debug, "Trace context extraction is enabled for tools/call method.",
+                       *decoder_callbacks_);
+      McpTraceContext trace_context(json_rpc);
+      setTraceContextHeaders(*request_headers, trace_context);
+    }
     mapMcpToolToApiBackend(json_rpc);
   } else {
     sendErrorResponse(

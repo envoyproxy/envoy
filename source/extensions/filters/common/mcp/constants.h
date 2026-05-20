@@ -48,6 +48,7 @@ constexpr absl::string_view LIST_CHANGED_FIELD = "listChanged";
 constexpr absl::string_view SERVER_INFO_FIELD = "serverInfo";
 constexpr absl::string_view NAME_FIELD = "name";
 constexpr absl::string_view VERSION_FIELD = "version";
+constexpr absl::string_view DESCRIPTION_FIELD = "description";
 constexpr absl::string_view DEFAULT_SERVER_VERSION = "1.0.0";
 
 constexpr absl::string_view IS_MCP_REQUEST = "is_mcp_request";

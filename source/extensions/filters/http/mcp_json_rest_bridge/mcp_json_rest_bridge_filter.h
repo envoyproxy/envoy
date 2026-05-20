@@ -50,6 +50,12 @@ public:
     return proto_config_.request_storage_mode();
   }
 
+  bool traceContextExtraction() const { return proto_config_.trace_context_extraction(); }
+
+  bool toolsListChanged() const { return proto_config_.tool_config().list_changed(); }
+
+  const std::string& serverDescription() const { return proto_config_.server_info().description(); }
+
 private:
   absl::flat_hash_map<std::string,
                       envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>

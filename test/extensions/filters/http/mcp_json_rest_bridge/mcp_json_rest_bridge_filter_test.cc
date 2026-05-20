@@ -104,6 +104,87 @@ TEST_F(McpJsonRestBridgeFilterTest, InitializeRequestReturnsServerInfoLocalRespo
             Http::FilterDataStatus::Continue);
 }
 
+TEST_F(McpJsonRestBridgeFilterTest, InitializeRequestStripsPortFromServerName) {
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {":authority", "test-host:8080"}};
+
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  // Port ":8080" must be stripped; serverInfo.name should be "test-host".
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(
+          Eq(Http::Code::OK),
+          StrEq(
+              R"json({"id":0,"jsonrpc":"2.0","result":{"capabilities":{"tools":{"listChanged":false}},"protocolVersion":"2025-06-18","serverInfo":{"name":"test-host","version":"1.0.0"}}})json"),
+          _, _, _));
+
+  Buffer::OwnedImpl body(
+      R"json({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-06-18"}})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::Continue);
+  Buffer::OwnedImpl response_body("initialize response");
+  EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, InitializeRequestStripsPortFromIPv6ServerName) {
+  // IPv6 address with port: "[::1]:9000" -> "[::1]"
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {":authority", "[::1]:9000"}};
+
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(
+          Eq(Http::Code::OK),
+          StrEq(
+              R"json({"id":0,"jsonrpc":"2.0","result":{"capabilities":{"tools":{"listChanged":false}},"protocolVersion":"2025-06-18","serverInfo":{"name":"[::1]","version":"1.0.0"}}})json"),
+          _, _, _));
+
+  Buffer::OwnedImpl body(
+      R"json({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-06-18"}})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::Continue);
+  Buffer::OwnedImpl response_body("initialize response");
+  EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, InitializeRequestPreservesIPv6ServerNameWithoutPort) {
+  // IPv6 address without port: "[::1]" -> "[::1]" (no change)
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {":authority", "[::1]"}};
+
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(
+          Eq(Http::Code::OK),
+          StrEq(
+              R"json({"id":0,"jsonrpc":"2.0","result":{"capabilities":{"tools":{"listChanged":false}},"protocolVersion":"2025-06-18","serverInfo":{"name":"[::1]","version":"1.0.0"}}})json"),
+          _, _, _));
+
+  Buffer::OwnedImpl body(
+      R"json({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-06-18"}})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::Continue);
+  Buffer::OwnedImpl response_body("initialize response");
+  EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+}
+
 TEST_F(McpJsonRestBridgeFilterTest, NotMcpRequestResponsePassThrough) {
   // Request URL not started with /mcp (or query params) should pass through.
   request_headers_ = {{":path", "/mcp/foo"}};
@@ -1311,6 +1392,399 @@ TEST_F(McpJsonRestBridgeFilterTest, DynamicMetadataStoredWhenConfigured) {
             Http::FilterDataStatus::Continue);
 }
 
+TEST_F(McpJsonRestBridgeFilterTest, TraceContextExtractionDisabled) {
+  request_headers_ = {{":method", "POST"},
+                      {":path", "/mcp"},
+                      {"traceparent", "00-old-traceparent-00"},
+                      {"tracestate", "old-tracestate"},
+                      {"baggage", "old-baggage"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","arguments":{"parent":"projects/cloudesf-codelab","key":{"displayName":"display-key"}},"_meta":{"traceparent":"00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01","tracestate":"key2=value2","baggage":"key3=value3"}}})json");
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("traceparent")), SizeIs(1));
+  EXPECT_THAT(
+      request_headers_.get(Http::LowerCaseString("traceparent"))[0]->value().getStringView(),
+      StrEq("00-old-traceparent-00"));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("tracestate")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("tracestate"))[0]->value().getStringView(),
+              StrEq("old-tracestate"));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("baggage")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("baggage"))[0]->value().getStringView(),
+              StrEq("old-baggage"));
+}
+
+class TraceContextExtractionTest : public testing::Test {
+public:
+  void SetUp() override {
+    envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config =
+        ParseTextProtoOrDie(R"pb(
+      trace_context_extraction: true
+      tool_config {
+        tools {
+          name: "create_api_key"
+          http_rule: {
+            post: "/v1/{parent=projects/*}/apiKeys"
+            body: "key"
+          }
+        }
+      }
+    )pb");
+    config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
+    filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
+    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+    EXPECT_CALL(decoder_callbacks_, requestHeaders())
+        .WillRepeatedly(Return(Http::RequestHeaderMapOptRef(request_headers_)));
+    EXPECT_CALL(encoder_callbacks_, responseHeaders())
+        .WillRepeatedly(Return(Http::ResponseHeaderMapOptRef(response_headers_)));
+  }
+
+  McpJsonRestBridgeFilterConfigSharedPtr config_;
+  std::unique_ptr<McpJsonRestBridgeFilter> filter_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
+  Http::TestRequestHeaderMapImpl request_headers_;
+  Http::TestResponseHeaderMapImpl response_headers_;
+};
+
+TEST_F(TraceContextExtractionTest, AllTraceHeadersInMeta) {
+  request_headers_ = {{":method", "POST"},
+                      {":path", "/mcp"},
+                      {"traceparent", "00-old-traceparent-00"},
+                      {"tracestate", "old-tracestate"},
+                      {"baggage", "old-baggage"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","arguments":{"parent":"projects/cloudesf-codelab","key":{"displayName":"display-key"}},"_meta":{"traceparent":"00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01","tracestate":"key2=value2","baggage":"key3=value3"}}})json");
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("traceparent")), SizeIs(1));
+  EXPECT_THAT(
+      request_headers_.get(Http::LowerCaseString("traceparent"))[0]->value().getStringView(),
+      StrEq("00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("tracestate")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("tracestate"))[0]->value().getStringView(),
+              StrEq("key2=value2"));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("baggage")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("baggage"))[0]->value().getStringView(),
+              StrEq("key3=value3"));
+}
+
+TEST_F(TraceContextExtractionTest, TraceParentOnlyInMetaRemovesTracestateButNotBaggage) {
+  request_headers_ = {{":method", "POST"},
+                      {":path", "/mcp"},
+                      {"traceparent", "00-old-traceparent-00"},
+                      {"tracestate", "old-tracestate"},
+                      {"baggage", "old-baggage"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","arguments":{"parent":"projects/cloudesf-codelab","key":{"displayName":"display-key"}},"_meta":{"traceparent":"00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"}}})json");
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("traceparent")), SizeIs(1));
+  EXPECT_THAT(
+      request_headers_.get(Http::LowerCaseString("traceparent"))[0]->value().getStringView(),
+      StrEq("00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"));
+  EXPECT_FALSE(request_headers_.has(Http::LowerCaseString("tracestate")));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("baggage")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("baggage"))[0]->value().getStringView(),
+              StrEq("old-baggage"));
+}
+
+TEST_F(TraceContextExtractionTest, NoTraceParentInMeta) {
+  request_headers_ = {{":method", "POST"},
+                      {":path", "/mcp"},
+                      {"traceparent", "00-old-traceparent-00"},
+                      {"tracestate", "old-tracestate"},
+                      {"baggage", "old-baggage"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","arguments":{"parent":"projects/cloudesf-codelab","key":{"displayName":"display-key"}},"_meta":{"tracestate":"key2=value2","baggage":"key3=value3"}}})json");
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("traceparent")), SizeIs(1));
+  EXPECT_THAT(
+      request_headers_.get(Http::LowerCaseString("traceparent"))[0]->value().getStringView(),
+      StrEq("00-old-traceparent-00"));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("tracestate")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("tracestate"))[0]->value().getStringView(),
+              StrEq("old-tracestate"));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("baggage")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("baggage"))[0]->value().getStringView(),
+              StrEq("key3=value3"));
+}
+
+TEST_F(TraceContextExtractionTest, BaggageOnlyInMeta) {
+  request_headers_ = {{":method", "POST"},
+                      {":path", "/mcp"},
+                      {"traceparent", "00-old-traceparent-00"},
+                      {"tracestate", "old-tracestate"},
+                      {"baggage", "old-baggage"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","arguments":{"parent":"projects/cloudesf-codelab","key":{"displayName":"display-key"}},"_meta":{"baggage":"key3=value3"}}})json");
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("traceparent")), SizeIs(1));
+  EXPECT_THAT(
+      request_headers_.get(Http::LowerCaseString("traceparent"))[0]->value().getStringView(),
+      StrEq("00-old-traceparent-00"));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("tracestate")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("tracestate"))[0]->value().getStringView(),
+              StrEq("old-tracestate"));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("baggage")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("baggage"))[0]->value().getStringView(),
+              StrEq("key3=value3"));
+}
+
+TEST_F(TraceContextExtractionTest, InvalidTraceparentInMeta) {
+  request_headers_ = {{":method", "POST"},
+                      {":path", "/mcp"},
+                      {"traceparent", "00-old-traceparent-00"},
+                      {"tracestate", "old-tracestate"},
+                      {"baggage", "old-baggage"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","arguments":{"parent":"projects/cloudesf-codelab","key":{"displayName":"display-key"}},"_meta":{"traceparent":"invalid-traceparent","tracestate":"new=state","baggage":"key3=value3"}}})json");
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("traceparent")), SizeIs(1));
+  EXPECT_THAT(
+      request_headers_.get(Http::LowerCaseString("traceparent"))[0]->value().getStringView(),
+      StrEq("00-old-traceparent-00"));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("tracestate")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("tracestate"))[0]->value().getStringView(),
+              StrEq("old-tracestate"));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("baggage")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("baggage"))[0]->value().getStringView(),
+              StrEq("key3=value3"));
+}
+
+TEST_F(TraceContextExtractionTest, EmptyTraceparentInMeta) {
+  request_headers_ = {{":method", "POST"},
+                      {":path", "/mcp"},
+                      {"traceparent", "00-old-traceparent-00"},
+                      {"tracestate", "old-tracestate"},
+                      {"baggage", "old-baggage"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","arguments":{"parent":"projects/cloudesf-codelab","key":{"displayName":"display-key"}},"_meta":{"traceparent":"","tracestate":"new=state","baggage":"key3=value3"}}})json");
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("traceparent")), SizeIs(1));
+  EXPECT_THAT(
+      request_headers_.get(Http::LowerCaseString("traceparent"))[0]->value().getStringView(),
+      StrEq("00-old-traceparent-00"));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("tracestate")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("tracestate"))[0]->value().getStringView(),
+              StrEq("old-tracestate"));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("baggage")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("baggage"))[0]->value().getStringView(),
+              StrEq("key3=value3"));
+}
+
+TEST_F(TraceContextExtractionTest, InvalidTracestateInMeta) {
+  request_headers_ = {{":method", "POST"},
+                      {":path", "/mcp"},
+                      {"traceparent", "00-old-traceparent-00"},
+                      {"tracestate", "old-tracestate"},
+                      {"baggage", "old-baggage"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","arguments":{"parent":"projects/cloudesf-codelab","key":{"displayName":"display-key"}},"_meta":{"traceparent":"00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01","tracestate":"1key=value"}}})json");
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("traceparent")), SizeIs(1));
+  EXPECT_THAT(
+      request_headers_.get(Http::LowerCaseString("traceparent"))[0]->value().getStringView(),
+      StrEq("00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"));
+  EXPECT_FALSE(request_headers_.has(Http::LowerCaseString("tracestate")));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("baggage")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("baggage"))[0]->value().getStringView(),
+              StrEq("old-baggage"));
+}
+
+TEST_F(TraceContextExtractionTest, InvalidBaggageInMeta) {
+  request_headers_ = {{":method", "POST"},
+                      {":path", "/mcp"},
+                      {"traceparent", "00-old-traceparent-00"},
+                      {"tracestate", "old-tracestate"},
+                      {"baggage", "old-baggage"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","arguments":{"parent":"projects/cloudesf-codelab","key":{"displayName":"display-key"}},"_meta":{"traceparent":"00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01","tracestate":"key2=value2","baggage":"key name=value"}}})json");
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("traceparent")), SizeIs(1));
+  EXPECT_THAT(
+      request_headers_.get(Http::LowerCaseString("traceparent"))[0]->value().getStringView(),
+      StrEq("00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("tracestate")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("tracestate"))[0]->value().getStringView(),
+              StrEq("key2=value2"));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("baggage")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("baggage"))[0]->value().getStringView(),
+              StrEq("old-baggage"));
+}
+
+TEST_F(TraceContextExtractionTest, TraceParentAndTracestateInMetaLeavesBaggageIntact) {
+  request_headers_ = {{":method", "POST"},
+                      {":path", "/mcp"},
+                      {"traceparent", "00-old-traceparent-00"},
+                      {"tracestate", "old-tracestate"},
+                      {"baggage", "old-baggage"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","arguments":{"parent":"projects/cloudesf-codelab","key":{"displayName":"display-key"}},"_meta":{"traceparent":"00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01","tracestate":"key2=value2"}}})json");
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("traceparent")), SizeIs(1));
+  EXPECT_THAT(
+      request_headers_.get(Http::LowerCaseString("traceparent"))[0]->value().getStringView(),
+      StrEq("00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("tracestate")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("tracestate"))[0]->value().getStringView(),
+              StrEq("key2=value2"));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("baggage")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("baggage"))[0]->value().getStringView(),
+              StrEq("old-baggage"));
+}
+
+TEST_F(TraceContextExtractionTest, TraceHeadersInMetaNoOriginalHeaders) {
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","arguments":{"parent":"projects/cloudesf-codelab","key":{"displayName":"display-key"}},"_meta":{"traceparent":"00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01","tracestate":"key2=value2","baggage":"key3=value3"}}})json");
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("traceparent")), SizeIs(1));
+  EXPECT_THAT(
+      request_headers_.get(Http::LowerCaseString("traceparent"))[0]->value().getStringView(),
+      StrEq("00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("tracestate")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("tracestate"))[0]->value().getStringView(),
+              StrEq("key2=value2"));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("baggage")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("baggage"))[0]->value().getStringView(),
+              StrEq("key3=value3"));
+}
+
+TEST_F(TraceContextExtractionTest, NoMetaInRequest) {
+  request_headers_ = {{":method", "POST"},
+                      {":path", "/mcp"},
+                      {"traceparent", "00-old-traceparent-00"},
+                      {"tracestate", "old-tracestate"},
+                      {"baggage", "old-baggage"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","arguments":{"parent":"projects/cloudesf-codelab","key":{"displayName":"display-key"}}}})json");
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("traceparent")), SizeIs(1));
+  EXPECT_THAT(
+      request_headers_.get(Http::LowerCaseString("traceparent"))[0]->value().getStringView(),
+      StrEq("00-old-traceparent-00"));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("tracestate")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("tracestate"))[0]->value().getStringView(),
+              StrEq("old-tracestate"));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("baggage")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("baggage"))[0]->value().getStringView(),
+              StrEq("old-baggage"));
+}
+
+TEST_F(TraceContextExtractionTest, TraceContextNotExtractedForInitialize) {
+  request_headers_ = {{":method", "POST"},
+                      {":path", "/mcp"},
+                      {":authority", "test-host"},
+                      {"traceparent", "00-old-traceparent-00"},
+                      {"tracestate", "old-tracestate"},
+                      {"baggage", "old-baggage"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  constexpr absl::string_view kExpectedResponse =
+      R"json({"id":0,"jsonrpc":"2.0","result":{"capabilities":{"tools":{"listChanged":false}},"protocolVersion":"2025-06-18","serverInfo":{"name":"test-host","version":"1.0.0"}}})json";
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Eq(Http::Code::OK), StrEq(kExpectedResponse), _, _, _));
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-06-18","_meta":{"traceparent":"00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01","tracestate":"key2=value2","baggage":"key3=value3"}}})json");
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("traceparent")), SizeIs(1));
+  EXPECT_THAT(
+      request_headers_.get(Http::LowerCaseString("traceparent"))[0]->value().getStringView(),
+      StrEq("00-old-traceparent-00"));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("tracestate")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("tracestate"))[0]->value().getStringView(),
+              StrEq("old-tracestate"));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("baggage")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("baggage"))[0]->value().getStringView(),
+              StrEq("old-baggage"));
+}
+
 class McpHttpMethodFilterTest : public testing::TestWithParam<std::string> {
 public:
   void SetUp() override {
@@ -1356,6 +1830,86 @@ TEST_P(McpHttpMethodFilterTest, NonPostMethodsReturnMethodNotAllowed) {
   EXPECT_THAT(
       additional_response_headers.get(Http::LowerCaseString("allow"))[0]->value().getStringView(),
       StrEq("POST"));
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, InitializeResponseIncludesListChangedWhenConfigured) {
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config =
+      ParseTextProtoOrDie(R"pb(
+    tool_config {
+      list_changed: true
+    }
+  )pb");
+  config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
+  filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(Return(Http::RequestHeaderMapOptRef(request_headers_)));
+
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {":authority", "test-host"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(
+          Eq(Http::Code::OK),
+          StrEq(
+              R"json({"id":0,"jsonrpc":"2.0","result":{"capabilities":{"tools":{"listChanged":true}},"protocolVersion":"2025-06-18","serverInfo":{"name":"test-host","version":"1.0.0"}}})json"),
+          _, _, _));
+
+  Buffer::OwnedImpl body(
+      R"json({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-06-18"}})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, InitializeResponseIncludesDescriptionWhenConfigured) {
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config =
+      ParseTextProtoOrDie(R"pb(
+    server_info {
+      description: "My MCP server"
+    }
+  )pb");
+  config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
+  filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(Return(Http::RequestHeaderMapOptRef(request_headers_)));
+
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {":authority", "test-host"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(
+          Eq(Http::Code::OK),
+          StrEq(
+              R"json({"id":0,"jsonrpc":"2.0","result":{"capabilities":{"tools":{"listChanged":false}},"protocolVersion":"2025-06-18","serverInfo":{"description":"My MCP server","name":"test-host","version":"1.0.0"}}})json"),
+          _, _, _));
+
+  Buffer::OwnedImpl body(
+      R"json({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-06-18"}})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, InitializeResponseNoDescriptionWhenNotConfigured) {
+  // Default config has no description; description field must be absent from serverInfo.
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {":authority", "test-host"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Eq(Http::Code::OK), testing::Not(testing::HasSubstr("description")), _, _, _));
+
+  Buffer::OwnedImpl body(
+      R"json({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-06-18"}})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
 }
 
 } // namespace
