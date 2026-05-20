@@ -49,14 +49,16 @@ public:
 
   ProtobufTypes::MessagePtr serializeAsProto() const override {
     auto message = std::make_unique<Protobuf::StringValue>();
-    message->set_value(filter_config_name_);
+    message->set_value(std::string(filter_config_name_));
     return message;
   }
 
-  absl::optional<std::string> serializeAsString() const override { return filter_config_name_; }
+  absl::optional<std::string> serializeAsString() const override {
+    return std::string(filter_config_name_);
+  }
 
 private:
-  const std::string filter_config_name_;
+  const absl::string_view filter_config_name_;
 };
 
 // TODO(wbpcode): Rather than allocating every filter with an unique pointer, we could

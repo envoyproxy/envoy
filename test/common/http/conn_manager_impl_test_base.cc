@@ -264,9 +264,6 @@ void HttpConnectionManagerImplMixin::setupFilterChain(int num_decoder_filters,
     encoder_filters_.push_back(new NiceMock<MockStreamEncoderFilter>());
   }
 
-  // Pre-calculate vector to ensure they have a stable address for the duration of the test.
-  filter_names_.reserve(num_requests * (num_decoder_filters + num_encoder_filters) + 1);
-
   InSequence s;
   for (int req = 0; req < num_requests; req++) {
     EXPECT_CALL(filter_factory_, createFilterChain(_))
