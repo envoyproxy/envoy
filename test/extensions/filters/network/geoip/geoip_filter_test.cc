@@ -109,7 +109,6 @@ public:
 
   void setFilterStateClientIp(const std::string& key, const std::string& ip) {
     filter_state_->setData(key, std::make_shared<Router::StringAccessorImpl>(ip),
-                           StreamInfo::FilterState::StateType::Mutable,
                            StreamInfo::FilterState::LifeSpan::Connection);
   }
 

@@ -1067,8 +1067,7 @@ TEST_F(OriginalDstClusterTest, UseFilterState) {
   connection.stream_info_.filterState()->setData(
       Upstream::OriginalDstClusterFilterStateKey,
       std::make_shared<Network::AddressObject>(
-          std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11", 6666)),
-      StreamInfo::FilterState::StateType::ReadOnly);
+          std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11", 6666)));
   TestLoadBalancerContext lb_context1(&connection, Http::Headers::get().EnvoyOriginalDstHost.get(),
                                       "127.0.0.1:5555");
 
@@ -1135,8 +1134,7 @@ TEST_F(OriginalDstClusterTest, UseFilterStateWithPortOverride) {
   connection.stream_info_.filterState()->setData(
       Upstream::OriginalDstClusterFilterStateKey,
       std::make_shared<Network::AddressObject>(
-          std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11", 6666)),
-      StreamInfo::FilterState::StateType::ReadOnly);
+          std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11", 6666)));
   TestLoadBalancerContext lb_context1(&connection, Http::Headers::get().EnvoyOriginalDstHost.get(),
                                       "127.0.0.1:5555");
 

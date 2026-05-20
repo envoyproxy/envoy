@@ -527,7 +527,7 @@ typed_config:
   callbacks.connection().streamInfo().filterState()->setData(
       "envoy.tls.cert_validator.spiffe.workload_trust_domain",
       std::make_shared<Router::StringAccessorImpl>("mydomain.org"),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   {
     SCOPED_TRACE("Trust domain matches so should be accepted (server).");

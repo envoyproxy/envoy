@@ -45,8 +45,7 @@ public:
   void onConnected() override {
     const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
         callbacks_->connection().streamInfo().filterState();
-    filter_state->setData("test_key", std::make_unique<Router::StringAccessorImpl>("test_value"),
-                          StreamInfo::FilterState::StateType::ReadOnly);
+    filter_state->setData("test_key", std::make_unique<Router::StringAccessorImpl>("test_value"));
     transport_socket_->onConnected();
   }
 
