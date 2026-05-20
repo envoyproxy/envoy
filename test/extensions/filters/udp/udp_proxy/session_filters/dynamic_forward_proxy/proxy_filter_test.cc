@@ -35,15 +35,15 @@ public:
   }
 
   void setFilterStateHost(const std::string& host) {
-    stream_info_.filterState()->setData(
-        "envoy.upstream.dynamic_host", std::make_shared<Envoy::Router::StringAccessorImpl>(host),
-        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+    stream_info_.filterState()->setData("envoy.upstream.dynamic_host",
+                                        std::make_shared<Envoy::Router::StringAccessorImpl>(host),
+                                        StreamInfo::FilterState::LifeSpan::Connection);
   }
 
   void setFilterStatePort(uint32_t port) {
-    stream_info_.filterState()->setData(
-        "envoy.upstream.dynamic_port", std::make_shared<StreamInfo::UInt32AccessorImpl>(port),
-        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+    stream_info_.filterState()->setData("envoy.upstream.dynamic_port",
+                                        std::make_shared<StreamInfo::UInt32AccessorImpl>(port),
+                                        StreamInfo::FilterState::LifeSpan::Connection);
   }
 
   void setFilterState(const std::string& host, uint32_t port) {

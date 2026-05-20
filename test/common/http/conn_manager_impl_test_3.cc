@@ -1669,8 +1669,7 @@ private:
 
 TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
   filter_callbacks_.connection_.stream_info_.filter_state_->setData(
-      "connection_provided_data", std::make_shared<SimpleType>(555),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      "connection_provided_data", std::make_shared<SimpleType>(555));
 
   setup(SetupOpts().setTracing(false));
   setupFilterChain(1, 0, /* num_requests = */ 3);
@@ -1690,15 +1689,12 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
         .WillOnce(Invoke([this](HeaderMap&, bool) -> FilterHeadersStatus {
           decoder_filters_[0]->callbacks_->streamInfo().filterState()->setData(
               "per_filter_chain", std::make_unique<SimpleType>(1),
-              StreamInfo::FilterState::StateType::ReadOnly,
               StreamInfo::FilterState::LifeSpan::FilterChain);
           decoder_filters_[0]->callbacks_->streamInfo().filterState()->setData(
               "per_downstream_request", std::make_unique<SimpleType>(2),
-              StreamInfo::FilterState::StateType::ReadOnly,
               StreamInfo::FilterState::LifeSpan::Request);
           decoder_filters_[0]->callbacks_->streamInfo().filterState()->setData(
               "per_downstream_connection", std::make_unique<SimpleType>(3),
-              StreamInfo::FilterState::StateType::ReadOnly,
               StreamInfo::FilterState::LifeSpan::Connection);
           return FilterHeadersStatus::StopIteration;
         }));
