@@ -559,7 +559,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallStreamingTranscoding) {
             http_rule:
               post: "/v1/{parent=projects/*}/keys"
               body: "key"
-        text_content_streaming_enabled: true
+            text_content_streaming_enabled: true
   )EOF";
 
   initializeFilter(config);
@@ -641,7 +641,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallStreamingErrorResponse) {
             http_rule:
               post: "/v1/{parent=projects/*}/keys"
               body: "key"
-        text_content_streaming_enabled: true
+            text_content_streaming_enabled: true
   )EOF";
 
   initializeFilter(config);

@@ -188,6 +188,15 @@ message ServerToolConfig {
   // - If not provided: The ``tools/list`` request is passed through. This allows subsequent
   //   extension or the backend itself to handle the tools/list request if they support it.
   HttpRule tool_list_http_rule = 3;
+}
+
+// Configuration for a specific MCP tool.
+message ToolConfig {
+  // Name of the tool.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The HTTP configuration rules that apply to the normal backend.
+  HttpRule http_rule = 2;
 
   // Enables streaming transcoding for unstructured text responses (``content`` field of a result).
   //
@@ -202,16 +211,7 @@ message ServerToolConfig {
   //   output: [prefix+escaped_chunk1] → [escaped_chunk2] → [escaped_chunk3+suffix]
   //
   // Disabled by default.
-  bool text_content_streaming_enabled = 4;
-}
-
-// Configuration for a specific MCP tool.
-message ToolConfig {
-  // Name of the tool.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
-
-  // The HTTP configuration rules that apply to the normal backend.
-  HttpRule http_rule = 2;
+  bool text_content_streaming_enabled = 3;
 }
 
 // Defines the schema of the JSON-RPC to REST mapping. It specifies how the "arguments"

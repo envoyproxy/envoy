@@ -1320,8 +1320,8 @@ public:
         tools {
           name: "get_api_key"
           http_rule: { get: "/v1/apiKeys" }
+          text_content_streaming_enabled: true
         }
-        text_content_streaming_enabled: true
       }
     )pb");
     config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);

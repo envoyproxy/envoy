@@ -144,19 +144,27 @@ McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
       max_response_body_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config_, max_response_body_size,
                                                               DEFAULT_MAX_RESPONSE_BODY_SIZE)) {
   for (const auto& tool : proto_config.tool_config().tools()) {
-    tool_to_http_rule_[tool.name()] = tool.http_rule();
+    tool_entries_[tool.name()] = {tool.http_rule(), tool.text_content_streaming_enabled()};
   }
   ENVOY_LOG(debug, "Received MCP JSON REST Bridge config: {}", proto_config_.DebugString());
 }
 
 absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
 McpJsonRestBridgeFilterConfig::getHttpRule(absl::string_view tool_name) const {
-  auto it = tool_to_http_rule_.find(tool_name);
-  if (it == tool_to_http_rule_.end()) {
+  auto it = tool_entries_.find(tool_name);
+  if (it == tool_entries_.end()) {
     return absl::InvalidArgumentError(
         fmt::format("Failed to find http rule for tool_name: {}", tool_name));
   }
-  return it->second;
+  return it->second.http_rule;
+}
+
+bool McpJsonRestBridgeFilterConfig::textContentStreamingEnabled(absl::string_view tool_name) const {
+  auto it = tool_entries_.find(tool_name);
+  if (it == tool_entries_.end()) {
+    return false;
+  }
+  return it->second.text_content_streaming_enabled;
 }
 
 absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
@@ -267,7 +275,7 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
   // Streaming mode: pre-build the JSON-RPC prefix/suffix, strip Content-Length
   // (final size is unknown), and let the headers flow through immediately so
   // the client can start receiving data without waiting for the full body.
-  if (mcp_operation_ == McpOperation::ToolsCall && config_->textContentStreamingEnabled()) {
+  if (mcp_operation_ == McpOperation::ToolsCall && text_content_streaming_enabled_) {
     buildStreamingPrefixAndSuffix(getResponseCode(response_headers) >=
                                   static_cast<int>(Http::Code::BadRequest));
     response_headers.removeContentLength();
@@ -592,6 +600,9 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_
                       generateErrorJsonResponse(-32602, "Unknown tool").dump());
     return;
   }
+
+  // Set the per-request streaming flag based on the tool's config.
+  text_content_streaming_enabled_ = config_->textContentStreamingEnabled(tool_name);
 
   const auto arguments_it = params.find(McpConstants::ARGUMENTS_FIELD);
   if (arguments_it != params.end() && !arguments_it->is_object()) {
