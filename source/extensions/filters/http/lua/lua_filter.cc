@@ -216,6 +216,10 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
   lua_state_.registerType<ConnectionDynamicMetadataMapIterator>();
   lua_state_.registerType<VirtualHostWrapper>();
   lua_state_.registerType<RouteWrapper>();
+  lua_state_.registerType<CounterWrapper>();
+  lua_state_.registerType<GaugeWrapper>();
+  lua_state_.registerType<HistogramWrapper>();
+  lua_state_.registerType<StatsScopeWrapper>();
 
   const Filters::Common::Lua::InitializerList initializers(
       // EnvoyTimestampResolution "enum".
@@ -833,7 +837,11 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
     : cluster_manager_(cluster_manager),
       clear_route_cache_(
           proto_config.has_clear_route_cache() ? proto_config.clear_route_cache().value() : true),
-      stats_(generateStats(stats_prefix, proto_config.stat_prefix(), scope)) {
+      stats_(generateStats(stats_prefix, proto_config.stat_prefix(), scope)),
+      lua_stats_scope_(
+          scope.createScope(proto_config.stat_prefix().empty()
+                                ? absl::StrCat(stats_prefix, "lua")
+                                : absl::StrCat(stats_prefix, "lua.", proto_config.stat_prefix()))) {
   if (proto_config.has_default_source_code()) {
     if (!proto_config.inline_code().empty()) {
       throw EnvoyException("Error: Only one of `inline_code` or `default_source_code` can be set "
@@ -985,6 +993,16 @@ int StreamHandleWrapper::luaFilterContext(lua_State* state) {
   } else {
     filter_context_wrapper_.reset(
         Filters::Common::Lua::MetadataMapWrapper::create(state, callbacks_.filterContext()), true);
+  }
+  return 1;
+}
+
+int StreamHandleWrapper::luaStats(lua_State* state) {
+  ASSERT(state_ == State::Running);
+  if (stats_scope_wrapper_.get() != nullptr) {
+    stats_scope_wrapper_.pushStack();
+  } else {
+    stats_scope_wrapper_.reset(StatsScopeWrapper::create(state, callbacks_.statsScope()), true);
   }
   return 1;
 }

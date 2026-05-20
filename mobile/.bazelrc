@@ -114,6 +114,7 @@ build:mobile-clang --host_platform=@mobile_clang_platform
 build:mobile-rbe --google_default_credentials=false
 build:mobile-rbe --remote_cache=grpcs://envoy.cluster.engflow.com
 build:mobile-rbe --remote_executor=grpcs://envoy.cluster.engflow.com
+build:mobile-rbe --experimental_remote_downloader=grpcs://envoy.cluster.engflow.com
 build:mobile-rbe --bes_backend=grpcs://envoy.cluster.engflow.com/
 build:mobile-rbe --bes_results_url=https://envoy.cluster.engflow.com/invocation/
 build:mobile-rbe --credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
@@ -128,6 +129,10 @@ build:mobile-rbe --verbose_failures
 build:mobile-rbe --spawn_strategy=remote,sandboxed,local
 build:mobile-rbe --experimental_ui_max_stdouterr_bytes=10485760
 build:mobile-rbe --extra_execution_platforms=//bazel/platforms/rbe:linux_x64
+# Recover from transient gRPC failures (e.g. UNAVAILABLE: io exception) talking to engflow.
+build:mobile-rbe --remote_retries=10
+build:mobile-rbe --remote_retry_max_delay=60s
+build:mobile-rbe --experimental_remote_cache_eviction_retries=5
 
 
 #############################################################################
@@ -149,6 +154,7 @@ build:mobile-tsan --config=tsan
 build:mobile-tsan --config=mobile-clang
 build:mobile-tsan --build_tests_only
 test:mobile-tsan --test_env=ENVOY_IP_TEST_VERSIONS=v4only
+build:mobile-tsan --test_timeout=240,1200,3000,9600
 
 
 #############################################################################
@@ -162,7 +168,7 @@ build:mobile-cc --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
 # CC with xDS
 build:mobile-cc-xds-enabled --config=mobile-cc
-test:mobile-cc-xds-enabled --define=envoy_mobile_xds=enabled
+build:mobile-cc-xds-enabled --define=envoy_mobile_xds=enabled
 
 # Coverage
 build:mobile-coverage --build_tests_only

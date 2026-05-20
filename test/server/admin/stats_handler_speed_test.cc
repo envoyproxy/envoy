@@ -436,6 +436,31 @@ BENCHMARK_CAPTURE(BM_FilteredCountersPrometheus, per_endpoint_stats_enabled, tru
     ->Unit(benchmark::kMillisecond);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_PrometheusFull(benchmark::State& state, bool per_endpoint_stats) {
+  Envoy::Server::StatsHandlerTest& test_context = testContext(per_endpoint_stats);
+  Envoy::Server::StatsParams params;
+  Envoy::Buffer::OwnedImpl response;
+  params.parse("?format=prometheus", response);
+  // per_endpoint_stats: 418M for true, 261M for false
+  const uint64_t lower_limit = per_endpoint_stats ? 400 * 1000 * 1000 : 200 * 1000 * 1000;
+  const uint64_t upper_limit = per_endpoint_stats ? 420 * 1000 * 1000 : 300 * 1000 * 1000;
+
+  uint64_t count;
+  for (auto _ : state) { // NOLINT
+    count = test_context.handlerStats(params);
+    RELEASE_ASSERT(count > lower_limit, "expected count > lower_limit");
+    RELEASE_ASSERT(count < upper_limit, "expected count < upper_limit");
+  }
+
+  auto label = absl::StrCat("output per iteration: ", count);
+  state.SetLabel(label);
+}
+BENCHMARK_CAPTURE(BM_PrometheusFull, per_endpoint_stats_disabled, false)
+    ->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(BM_PrometheusFull, per_endpoint_stats_enabled, true)
+    ->Unit(benchmark::kMillisecond);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_HistogramsJson(benchmark::State& state, bool per_endpoint_stats) {
   Envoy::Server::StatsHandlerTest& test_context = testContext(per_endpoint_stats);
   Envoy::Server::StatsParams params;

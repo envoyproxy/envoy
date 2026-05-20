@@ -10,8 +10,6 @@
 #include "source/extensions/filters/http/grpc_http1_reverse_bridge/filter.h"
 
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/runtime/mocks.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 

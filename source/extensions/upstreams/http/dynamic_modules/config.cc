@@ -37,7 +37,7 @@ absl::StatusOr<BridgeConfigSharedPtr> getOrCreateBridgeConfig(
 
   std::string bridge_config_bytes;
   if (proto_config.has_bridge_config()) {
-    auto config_or_error = MessageUtil::anyToBytes(proto_config.bridge_config());
+    auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.bridge_config());
     if (!config_or_error.ok()) {
       return absl::InvalidArgumentError("failed to parse bridge_config: " +
                                         std::string(config_or_error.status().message()));

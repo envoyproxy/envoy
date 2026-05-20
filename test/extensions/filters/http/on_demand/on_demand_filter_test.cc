@@ -5,7 +5,6 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"

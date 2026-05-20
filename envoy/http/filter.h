@@ -1226,18 +1226,43 @@ class StreamFilter : public virtual StreamDecoderFilter, public virtual StreamEn
 
 using StreamFilterSharedPtr = std::shared_ptr<StreamFilter>;
 
-class HttpMatchingData {
+class HttpMatchingData final {
 public:
   static absl::string_view name() { return "http"; }
 
-  virtual ~HttpMatchingData() = default;
+  explicit HttpMatchingData(const StreamInfo::StreamInfo& stream_info)
+      : stream_info_(stream_info) {}
 
-  virtual RequestHeaderMapOptConstRef requestHeaders() const PURE;
-  virtual RequestTrailerMapOptConstRef requestTrailers() const PURE;
-  virtual ResponseHeaderMapOptConstRef responseHeaders() const PURE;
-  virtual ResponseTrailerMapOptConstRef responseTrailers() const PURE;
-  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
-  virtual const Network::ConnectionInfoProvider& connectionInfoProvider() const PURE;
+  void onRequestHeaders(const RequestHeaderMap& request_headers) {
+    request_headers_ = &request_headers;
+  }
+
+  void onRequestTrailers(const RequestTrailerMap& request_trailers) {
+    request_trailers_ = &request_trailers;
+  }
+
+  void onResponseHeaders(const ResponseHeaderMap& response_headers) {
+    response_headers_ = &response_headers;
+  }
+
+  void onResponseTrailers(const ResponseTrailerMap& response_trailers) {
+    response_trailers_ = &response_trailers;
+  }
+
+  RequestHeaderMapOptConstRef requestHeaders() const { return makeOptRefFromPtr(request_headers_); }
+  RequestTrailerMapOptConstRef requestTrailers() const {
+    return makeOptRefFromPtr(request_trailers_);
+  }
+  ResponseHeaderMapOptConstRef responseHeaders() const {
+    return makeOptRefFromPtr(response_headers_);
+  }
+  ResponseTrailerMapOptConstRef responseTrailers() const {
+    return makeOptRefFromPtr(response_trailers_);
+  }
+  const StreamInfo::StreamInfo& streamInfo() const { return stream_info_; }
+  const Network::ConnectionInfoProvider& connectionInfoProvider() const {
+    return stream_info_.downstreamAddressProvider();
+  }
 
   const StreamInfo::FilterState& filterState() const { return streamInfo().filterState(); }
   const envoy::config::core::v3::Metadata& metadata() const {
@@ -1253,6 +1278,13 @@ public:
   }
 
   Ssl::ConnectionInfoConstSharedPtr ssl() const { return connectionInfoProvider().sslConnection(); }
+
+private:
+  const StreamInfo::StreamInfo& stream_info_;
+  const RequestHeaderMap* request_headers_{};
+  const ResponseHeaderMap* response_headers_{};
+  const RequestTrailerMap* request_trailers_{};
+  const ResponseTrailerMap* response_trailers_{};
 };
 
 /**

@@ -69,6 +69,8 @@ void HttpFilterTest::initialize(std::string&& yaml, bool is_upstream_filter) {
       {{"envoy.reloadable_features.ext_proc_stream_close_optimization", "true"}});
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.ext_proc_inject_data_with_state_update", "true"}});
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.ext_proc_return_stop_iteration", "true"}});
   client_ = std::make_unique<MockClient>();
   route_ = std::make_shared<NiceMock<Router::MockRoute>>();
   EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(Invoke(this, &HttpFilterTest::doStart));

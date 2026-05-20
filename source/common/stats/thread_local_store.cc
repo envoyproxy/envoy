@@ -417,6 +417,10 @@ ThreadLocalStoreImpl::ScopeImpl::ScopeImpl(ThreadLocalStoreImpl& parent, StatNam
 }
 
 ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {
+  if (cleanup_callback_) {
+    cleanup_callback_();
+  }
+
   // Helps reproduce a previous race condition by pausing here in tests while we
   // loop over scopes. 'this' will not have been removed from the scopes_ table
   // yet, so we need to be careful.
@@ -433,15 +437,19 @@ ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {
 // converting them to StatName. Making the tag extraction optional within this class simplifies the
 // RAII ergonomics (as opposed to making the construction of this object conditional).
 //
-// The StatNameTagVector returned by this object will be valid as long as this object is in scope
+// The StatNameTagSpan returned by this object will be valid as long as this object is in scope
 // and the provided stat_name_tags are valid.
 //
 // When tag extraction is not done, this class is just a passthrough for the provided name/tags.
 class StatNameTagHelper {
 public:
   StatNameTagHelper(ThreadLocalStoreImpl& tls, StatName name,
-                    const absl::optional<StatNameTagVector>& stat_name_tags)
-      : pool_(tls.symbolTable()), stat_name_tags_(stat_name_tags.value_or(StatNameTagVector())) {
+                    absl::optional<StatNameTagSpan> stat_name_tags)
+      : pool_(tls.symbolTable()) {
+    if (stat_name_tags.has_value()) {
+      stat_name_tags_.assign(stat_name_tags->begin(), stat_name_tags->end());
+    }
+
     if (!stat_name_tags) {
       TagVector tags;
       tag_extracted_name_ =
@@ -459,12 +467,12 @@ public:
     }
   }
 
-  const StatNameTagVector& statNameTags() const { return stat_name_tags_; }
+  StatNameTagSpan statNameTags() const { return stat_name_tags_; }
   StatName tagExtractedName() const { return tag_extracted_name_; }
 
 private:
   StatNamePool pool_;
-  StatNameTagVector stat_name_tags_;
+  StatNameTagVec stat_name_tags_;
   StatName tag_extracted_name_;
 };
 
@@ -499,8 +507,7 @@ bool ThreadLocalStoreImpl::checkAndRememberRejection(StatName name,
 
 template <class StatType>
 StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
-    StatName full_stat_name, StatName name_no_tags,
-    const absl::optional<StatNameTagVector>& stat_name_tags,
+    StatName full_stat_name, StatName name_no_tags, absl::optional<StatNameTagSpan> stat_name_tags,
     StatNameHashMap<RefcountPtr<StatType>>& central_cache_map,
     StatsMatcher::FastResult fast_reject_result, StatNameStorageSet& central_rejected_stats,
     MakeStatFn<StatType> make_stat, StatRefMap<StatType>* tls_cache,
@@ -533,12 +540,14 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   } else {
     // Stat creation here. Check limits.
     if constexpr (std::is_same_v<StatType, Counter>) {
-      if (limits_.max_counters != 0 && central_cache_map.size() >= limits_.max_counters) {
+      if (limits_.max_counters.has_value() &&
+          central_cache_map.size() >= limits_.max_counters.value()) {
         parent_.counters_overflow_->inc();
         return null_stat;
       }
     } else if constexpr (std::is_same_v<StatType, Gauge>) {
-      if (limits_.max_gauges != 0 && central_cache_map.size() >= limits_.max_gauges) {
+      if (limits_.max_gauges.has_value() &&
+          central_cache_map.size() >= limits_.max_gauges.value()) {
         parent_.gauges_overflow_->inc();
         return null_stat;
       }
@@ -575,7 +584,13 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
   }
 
   // Determine the final name based on the prefix and the passed name.
-  TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
+  const TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags,
+                                             symbolTable());
+  return getOrCreateCounterBase(joiner);
+}
+
+Counter& ThreadLocalStoreImpl::ScopeImpl::getOrCreateCounterBase(
+    const TagUtility::TagStatNameJoiner& joiner) {
   Stats::StatName final_stat_name = joiner.nameWithTags();
 
   StatsMatcher::FastResult fast_reject_result = scopeFastRejects(final_stat_name);
@@ -595,12 +610,10 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
 
   const CentralCacheEntrySharedPtr& central_cache = centralCacheNoThreadAnalysis();
   return safeMakeStat<Counter>(
-      final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache->counters_,
+      final_stat_name, joiner.tagExtractedName(), joiner.effectiveTags(), central_cache->counters_,
       fast_reject_result, central_cache->rejected_stats_,
-      [](Allocator& allocator, StatName name, StatName tag_extracted_name,
-         const StatNameTagVector& tags) -> CounterSharedPtr {
-        return allocator.makeCounter(name, tag_extracted_name, tags);
-      },
+      [](Allocator& allocator, StatName name, StatName tag_extracted_name, StatNameTagSpan tags)
+          -> CounterSharedPtr { return allocator.makeCounter(name, tag_extracted_name, tags); },
       tls_cache, tls_rejected_stats, parent_.null_counter_);
 }
 
@@ -626,10 +639,18 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
   if (scopeRejectsAll() && import_mode != Gauge::ImportMode::HiddenAccumulate) {
     return parent_.null_gauge_;
   }
-
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
   // share this code so I'm leaving it largely duplicated for now.
-  TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
+  const TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags,
+                                             symbolTable());
+
+  return getOrCreateGaugeBase(joiner, import_mode);
+}
+
+Gauge&
+ThreadLocalStoreImpl::ScopeImpl::getOrCreateGaugeBase(const TagUtility::TagStatNameJoiner& joiner,
+                                                      Gauge::ImportMode import_mode) {
+
   StatName final_stat_name = joiner.nameWithTags();
 
   StatsMatcher::FastResult fast_reject_result;
@@ -652,10 +673,10 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
 
   const CentralCacheEntrySharedPtr& central_cache = centralCacheNoThreadAnalysis();
   Gauge& gauge = safeMakeStat<Gauge>(
-      final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache->gauges_,
+      final_stat_name, joiner.tagExtractedName(), joiner.effectiveTags(), central_cache->gauges_,
       fast_reject_result, central_cache->rejected_stats_,
       [import_mode](Allocator& allocator, StatName name, StatName tag_extracted_name,
-                    const StatNameTagVector& tags) -> GaugeSharedPtr {
+                    StatNameTagSpan tags) -> GaugeSharedPtr {
         return allocator.makeGauge(name, tag_extracted_name, tags, import_mode);
       },
       tls_cache, tls_rejected_stats, parent_.null_gauge_);
@@ -674,6 +695,13 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
   // share this code so I'm leaving it largely duplicated for now.
   TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
+
+  return getOrCreateHistogramBase(joiner, unit);
+}
+
+Histogram& ThreadLocalStoreImpl::ScopeImpl::getOrCreateHistogramBase(
+    const TagUtility::TagStatNameJoiner& joiner, Histogram::Unit unit) {
+
   StatName final_stat_name = joiner.nameWithTags();
 
   StatsMatcher::FastResult fast_reject_result = scopeFastRejects(final_stat_name);
@@ -707,7 +735,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
                                                effectiveMatcher())) {
     return parent_.null_histogram_;
   } else {
-    StatNameTagHelper tag_helper(parent_, joiner.tagExtractedName(), stat_name_tags);
+    StatNameTagHelper tag_helper(parent_, joiner.tagExtractedName(), joiner.effectiveTags());
 
     ConstSupportedBuckets* buckets = nullptr;
     const auto string_stat_name = symbolTable().toString(final_stat_name);
@@ -721,8 +749,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
       if (iter != parent_.histogram_set_.end()) {
         stat = RefcountPtr<ParentHistogramImpl>(*iter);
       } else {
-        if (limits_.max_histograms != 0 &&
-            central_cache->histograms_.size() >= limits_.max_histograms) {
+        if (limits_.max_histograms.has_value() &&
+            central_cache->histograms_.size() >= limits_.max_histograms.value()) {
           parent_.histograms_overflow_->inc();
           return parent_.null_histogram_;
         }
@@ -757,6 +785,12 @@ TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatNameWithTags(
 
   // Determine the final name based on the prefix and the passed name.
   TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
+
+  return getOrCreateTextReadoutBase(joiner);
+}
+
+TextReadout& ThreadLocalStoreImpl::ScopeImpl::getOrCreateTextReadoutBase(
+    const TagUtility::TagStatNameJoiner& joiner) {
   Stats::StatName final_stat_name = joiner.nameWithTags();
 
   StatsMatcher::FastResult fast_reject_result = scopeFastRejects(final_stat_name);
@@ -776,10 +810,10 @@ TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatNameWithTags(
 
   const CentralCacheEntrySharedPtr& central_cache = centralCacheNoThreadAnalysis();
   return safeMakeStat<TextReadout>(
-      final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache->text_readouts_,
-      fast_reject_result, central_cache->rejected_stats_,
+      final_stat_name, joiner.tagExtractedName(), joiner.effectiveTags(),
+      central_cache->text_readouts_, fast_reject_result, central_cache->rejected_stats_,
       [](Allocator& allocator, StatName name, StatName tag_extracted_name,
-         const StatNameTagVector& tags) -> TextReadoutSharedPtr {
+         StatNameTagSpan tags) -> TextReadoutSharedPtr {
         return allocator.makeTextReadout(name, tag_extracted_name, tags);
       },
       tls_cache, tls_rejected_stats, parent_.null_text_readout_);
@@ -848,7 +882,7 @@ Histogram& ThreadLocalStoreImpl::tlsHistogram(ParentHistogramImpl& parent, uint6
 
 ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit,
                                                    StatName tag_extracted_name,
-                                                   const StatNameTagVector& stat_name_tags,
+                                                   StatNameTagSpan stat_name_tags,
                                                    SymbolTable& symbol_table,
                                                    absl::optional<uint32_t> bins)
     : HistogramImplHelper(name, tag_extracted_name, stat_name_tags, symbol_table), unit_(unit),
@@ -878,7 +912,7 @@ void ThreadLocalHistogramImpl::merge(histogram_t* target) {
 ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit,
                                          ThreadLocalStoreImpl& thread_local_store,
                                          StatName tag_extracted_name,
-                                         const StatNameTagVector& stat_name_tags,
+                                         StatNameTagSpan stat_name_tags,
                                          ConstSupportedBuckets& supported_buckets,
                                          absl::optional<uint32_t> bins, uint64_t id)
     : MetricImpl(name, tag_extracted_name, stat_name_tags, thread_local_store.symbolTable()),
@@ -1287,9 +1321,9 @@ void ThreadLocalStoreImpl::extractAndAppendTags(absl::string_view name, StatName
 }
 
 void ThreadLocalStoreImpl::ensureOverflowStats(const ScopeStatsLimitSettings& limits) {
-  const bool need_counter_overflow_stat = limits.max_counters != 0;
-  const bool need_gauge_overflow_stat = limits.max_gauges != 0;
-  const bool need_histogram_overflow_stat = limits.max_histograms != 0;
+  const bool need_counter_overflow_stat = limits.max_counters.has_value();
+  const bool need_gauge_overflow_stat = limits.max_gauges.has_value();
+  const bool need_histogram_overflow_stat = limits.max_histograms.has_value();
 
   if (!need_counter_overflow_stat && !need_gauge_overflow_stat && !need_histogram_overflow_stat) {
     return;

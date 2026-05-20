@@ -135,6 +135,12 @@ public:
    * @return absl::string_view the value of filter config name.
    */
   virtual const absl::string_view filterConfigName() const PURE;
+
+  /**
+   * @return Stats::Scope& the stats scope for creating custom Lua stats. The scope
+   * is pre-configured with the appropriate lua stat prefix.
+   */
+  virtual Stats::Scope& statsScope() PURE;
 };
 
 class Filter;
@@ -210,7 +216,8 @@ public:
             {"clearRouteCache", static_luaClearRouteCache},
             {"filterContext", static_luaFilterContext},
             {"virtualHost", static_luaVirtualHost},
-            {"route", static_luaRoute}};
+            {"route", static_luaRoute},
+            {"stats", static_luaStats}};
   }
 
 private:
@@ -357,6 +364,11 @@ private:
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaRoute);
 
+  /**
+   * @return a handle to the stats scope for creating custom stats.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaStats);
+
   enum Timestamp::Resolution getTimestampResolution(absl::string_view unit_parameter);
 
   int doHttpCall(lua_State* state, const HttpCallOptions& options);
@@ -383,6 +395,7 @@ private:
     connection_stream_info_wrapper_.reset();
     virtual_host_wrapper_.reset();
     route_wrapper_.reset();
+    stats_scope_wrapper_.reset();
   }
 
   // Http::AsyncClient::Callbacks
@@ -414,6 +427,7 @@ private:
   Filters::Common::Lua::LuaDeathRef<PublicKeyWrapper> public_key_wrapper_;
   Filters::Common::Lua::LuaDeathRef<VirtualHostWrapper> virtual_host_wrapper_;
   Filters::Common::Lua::LuaDeathRef<RouteWrapper> route_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<StatsScopeWrapper> stats_scope_wrapper_;
   State state_{State::Running};
   std::function<void()> yield_callback_;
   Http::AsyncClient::Request* http_request_{};
@@ -457,6 +471,7 @@ public:
   bool clearRouteCache() const { return clear_route_cache_; }
 
   const LuaFilterStats& stats() const { return stats_; }
+  Stats::Scope& luaStatsScope() const { return *lua_stats_scope_; }
 
   Upstream::ClusterManager& cluster_manager_;
 
@@ -471,6 +486,8 @@ private:
   PerLuaCodeSetupPtr default_lua_code_setup_;
   absl::flat_hash_map<std::string, PerLuaCodeSetupPtr> per_lua_code_setups_map_;
   LuaFilterStats stats_;
+  // Sub-scope pre-configured with the lua stat prefix.
+  Stats::ScopeSharedPtr lua_stats_scope_;
 };
 
 using FilterConfigConstSharedPtr = std::shared_ptr<FilterConfig>;
@@ -591,6 +608,7 @@ private:
     const absl::string_view filterConfigName() const override {
       return callbacks_->filterConfigName();
     }
+    Stats::Scope& statsScope() override { return parent_.config_->luaStatsScope(); }
 
     Filter& parent_;
     Http::StreamDecoderFilterCallbacks* callbacks_{};
@@ -624,6 +642,7 @@ private:
     const absl::string_view filterConfigName() const override {
       return callbacks_->filterConfigName();
     }
+    Stats::Scope& statsScope() override { return parent_.config_->luaStatsScope(); }
 
     Filter& parent_;
     Http::StreamEncoderFilterCallbacks* callbacks_{};

@@ -6,16 +6,15 @@
 
 namespace Envoy {
 
-class DynamicModulesNetworkIntegrationTest
-    : public testing::TestWithParam<Network::Address::IpVersion>,
-      public BaseIntegrationTest {
+class DynamicModulesNetworkIntegrationTestBase : public BaseIntegrationTest {
 public:
-  DynamicModulesNetworkIntegrationTest()
-      : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {
+  explicit DynamicModulesNetworkIntegrationTestBase(Network::Address::IpVersion version)
+      : BaseIntegrationTest(version, ConfigHelper::tcpProxyConfig()) {
     skip_tag_extraction_rule_check_ = true;
     enableHalfClose(true);
   }
 
+protected:
   void initializeFilter(const std::string& filter_name, const std::string& module_name,
                         const std::string& search_path, const std::string& config = "") {
     TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
@@ -51,15 +50,17 @@ public:
 
     BaseIntegrationTest::initialize();
   }
+};
+
+class DynamicModulesNetworkIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public DynamicModulesNetworkIntegrationTestBase {
+public:
+  DynamicModulesNetworkIntegrationTest() : DynamicModulesNetworkIntegrationTestBase(GetParam()) {}
 
   void initializeCFilter(const std::string& filter_name, const std::string& config = "") {
     initializeFilter(filter_name, "network_no_op",
                      "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c", config);
-  }
-
-  void initializeRustFilter(const std::string& filter_name, const std::string& config = "") {
-    initializeFilter(filter_name, "network_integration_test",
-                     "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/rust", config);
   }
 };
 
@@ -134,11 +135,35 @@ TEST_P(DynamicModulesNetworkIntegrationTest, HalfClose) {
   tcp_client->close();
 }
 
-// Verifies that read_disable/read_enabled work correctly through the Rust SDK.
-// The Rust filter disables and re-enables reads during on_read, asserting correct
-// state transitions. If any assertion fails, the filter panics and the connection aborts.
-TEST_P(DynamicModulesNetworkIntegrationTest, FlowControl) {
-  initializeRustFilter("flow_control");
+class DynamicModulesNetworkSdkIntegrationTest : public testing::TestWithParam<std::string>,
+                                                public DynamicModulesNetworkIntegrationTestBase {
+public:
+  DynamicModulesNetworkSdkIntegrationTest()
+      : DynamicModulesNetworkIntegrationTestBase(GetParam() == "rust"
+                                                     ? Envoy::Network::Address::IpVersion::v4
+                                                     : Envoy::Network::Address::IpVersion::v6) {}
+
+  void initializeSdkFilter(const std::string& filter_name, const std::string& config = "") {
+    initializeFilter(filter_name, "network_integration_test",
+                     "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/" + GetParam(),
+                     config);
+  }
+};
+
+#ifndef __SANITIZE_ADDRESS__
+auto DynamicModulesNetworkSdkIntegrationTestValues = testing::Values("rust", "go", "cpp");
+#else
+auto DynamicModulesNetworkSdkIntegrationTestValues = testing::Values("rust", "go");
+#endif
+
+INSTANTIATE_TEST_SUITE_P(SdkLanguages, DynamicModulesNetworkSdkIntegrationTest,
+                         DynamicModulesNetworkSdkIntegrationTestValues,
+                         [](const testing::TestParamInfo<std::string>& info) {
+                           return info.param;
+                         });
+
+TEST_P(DynamicModulesNetworkSdkIntegrationTest, FlowControl) {
+  initializeSdkFilter("flow_control");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(tcp_client->connected());
@@ -162,11 +187,8 @@ TEST_P(DynamicModulesNetworkIntegrationTest, FlowControl) {
   tcp_client->close();
 }
 
-// Verifies that get_connection_state returns the correct state during data processing.
-// The Rust filter asserts that the connection is Open during on_new_connection, on_read,
-// and on_write callbacks.
-TEST_P(DynamicModulesNetworkIntegrationTest, ConnectionState) {
-  initializeRustFilter("connection_state");
+TEST_P(DynamicModulesNetworkSdkIntegrationTest, ConnectionState) {
+  initializeSdkFilter("connection_state");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(tcp_client->connected());
@@ -190,10 +212,8 @@ TEST_P(DynamicModulesNetworkIntegrationTest, ConnectionState) {
   tcp_client->close();
 }
 
-// Verifies that enable_half_close/is_half_close_enabled work correctly through the Rust SDK.
-// The Rust filter verifies half-close state and toggles it during on_read.
-TEST_P(DynamicModulesNetworkIntegrationTest, HalfCloseControl) {
-  initializeRustFilter("half_close");
+TEST_P(DynamicModulesNetworkSdkIntegrationTest, HalfCloseControl) {
+  initializeSdkFilter("half_close");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(tcp_client->connected());
@@ -213,10 +233,8 @@ TEST_P(DynamicModulesNetworkIntegrationTest, HalfCloseControl) {
   tcp_client->close();
 }
 
-// Verifies that get_buffer_limit/set_buffer_limits work correctly through the Rust SDK.
-// The Rust filter reads the initial buffer limit, sets a new one, and asserts the change.
-TEST_P(DynamicModulesNetworkIntegrationTest, BufferLimits) {
-  initializeRustFilter("buffer_limits");
+TEST_P(DynamicModulesNetworkSdkIntegrationTest, BufferLimits) {
+  initializeSdkFilter("buffer_limits");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(tcp_client->connected());

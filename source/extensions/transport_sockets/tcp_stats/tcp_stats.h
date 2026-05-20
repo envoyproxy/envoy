@@ -13,6 +13,7 @@
 #include "source/extensions/transport_sockets/common/passthrough.h"
 
 // Defined in /usr/include/linux/tcp.h.
+// NOLINTNEXTLINE(readability-identifier-naming)
 struct tcp_info;
 
 namespace Envoy {
@@ -60,7 +61,7 @@ public:
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   void onConnected() override;
-  void closeSocket(Network::ConnectionEvent event) override;
+  void closeSocket(Network::ConnectionEvent event, bool abort_reset) override;
 
 private:
   absl::optional<struct tcp_info> querySocketInfo();

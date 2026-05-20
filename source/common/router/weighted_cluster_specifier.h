@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstdint>
+#include <memory>
+
 #include "envoy/router/cluster_specifier_plugin.h"
 
 #include "source/common/router/delegating_route_impl.h"
@@ -19,24 +22,29 @@ class WeightedClusterSpecifierPlugin;
 struct WeightedClustersConfigEntry {
 public:
   static absl::StatusOr<std::shared_ptr<WeightedClustersConfigEntry>>
-  create(const ClusterWeightProto& cluster, const MetadataMatchCriteria* parent_metadata_match,
-         std::string&& runtime_key, Server::Configuration::ServerFactoryContext& context);
+  create(const ClusterWeightProto& cluster, uint64_t index,
+         const MetadataMatchCriteria* parent_metadata_match, absl::string_view runtime_key_prefix,
+         Server::Configuration::ServerFactoryContext& context);
 
   uint64_t clusterWeight(Runtime::Loader& loader) const {
-    return loader.snapshot().getInteger(runtime_key_, cluster_weight_);
+    return runtime_key_.empty() ? cluster_weight_
+                                : loader.snapshot().getInteger(runtime_key_, cluster_weight_);
   }
+  uint64_t clusterWeight() const { return cluster_weight_; }
+  uint64_t clusterIndex() const { return cluster_index_; }
 
 private:
   friend class WeightedClusterEntry;
   friend class WeightedClusterSpecifierPlugin;
 
-  WeightedClustersConfigEntry(const ClusterWeightProto& cluster,
+  WeightedClustersConfigEntry(const ClusterWeightProto& cluster, uint64_t index,
                               const MetadataMatchCriteria* parent_metadata_match,
-                              std::string&& runtime_key,
+                              absl::string_view runtime_key_prefix,
                               Server::Configuration::ServerFactoryContext& context);
 
   const std::string runtime_key_;
-  const uint64_t cluster_weight_;
+  const uint64_t cluster_weight_{};
+  const uint64_t cluster_index_{};
   MetadataMatchCriteriaConstPtr cluster_metadata_match_criteria_;
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
@@ -49,8 +57,10 @@ private:
 using WeightedClustersConfigEntryConstSharedPtr =
     std::shared_ptr<const WeightedClustersConfigEntry>;
 
-class WeightedClusterSpecifierPlugin : public ClusterSpecifierPlugin,
-                                       public Logger::Loggable<Logger::Id::router> {
+class WeightedClusterSpecifierPlugin
+    : public ClusterSpecifierPlugin,
+      public Logger::Loggable<Logger::Id::router>,
+      public std::enable_shared_from_this<WeightedClusterSpecifierPlugin> {
 public:
   WeightedClusterSpecifierPlugin(const WeightedClusterProto& weighted_clusters,
                                  const MetadataMatchCriteria* parent_metadata_match,
@@ -65,14 +75,10 @@ public:
   absl::Status validateClusters(const Upstream::ClusterManager& cm) const override;
 
 private:
-  RouteConstSharedPtr pickWeightedCluster(RouteEntryAndRouteConstSharedPtr parent,
-                                          const Http::RequestHeaderMap& headers,
-                                          const StreamInfo::StreamInfo& stream_info,
-                                          uint64_t random_value) const;
+  friend class WeightedClusterEntry;
 
   Runtime::Loader& loader_;
   const Http::LowerCaseString random_value_header_;
-  const std::string runtime_key_prefix_;
   const bool use_hash_policy_{};
   std::vector<WeightedClustersConfigEntryConstSharedPtr> weighted_clusters_;
   uint64_t total_cluster_weight_{0};

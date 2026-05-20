@@ -4,6 +4,7 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 
 #include "source/common/common/base64.h"
+#include "source/common/grpc/common.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/load_balancing_policies/round_robin/config.h"
@@ -12,7 +13,10 @@
 
 #include "absl/strings/numbers.h"
 #include "gtest/gtest.h"
+#include "xds/data/orca/v3/orca_load_report.pb.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolicies {
@@ -189,6 +193,133 @@ TEST_P(ClientSideWeightedRoundRobinIntegrationTest, NormalLoadBalancing) {
   runNormalLoadBalancing();
 }
 
+// Minimal happy-path integration test for ORCA out-of-band (OOB) reporting.
+// Verifies that when `enable_oob_load_report=true` is set on a
+// `client_side_weighted_round_robin` cluster,
+// Envoy opens one OOB gRPC stream per upstream host targeting
+// /xds.service.orca.v3.OpenRcaService/StreamCoreMetrics, and that
+// server-pushed OrcaLoadReports are observed via the cluster-scoped
+// `lb_orca_oob.*` stats.
+class ClientSideWeightedRoundRobinOobIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  ClientSideWeightedRoundRobinOobIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
+    // OOB reports use gRPC, so upstream connections must speak HTTP/2.
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+    setUpstreamCount(2);
+  }
+
+  void TearDown() override { cleanupOobStreams(); }
+
+  void initializeConfig() {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
+      ASSERT(cluster_0->name() == "cluster_0");
+      auto* endpoint = cluster_0->mutable_load_assignment()->mutable_endpoints()->Mutable(0);
+
+      constexpr absl::string_view endpoints_yaml = R"EOF(
+          lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: {}
+                  port_value: 0
+          - endpoint:
+              address:
+                socket_address:
+                  address: {}
+                  port_value: 0
+          )EOF";
+      const std::string local_address = Network::Test::getLoopbackAddressString(GetParam());
+      TestUtility::loadFromYaml(fmt::format(endpoints_yaml, local_address, local_address),
+                                *endpoint);
+
+      auto* policy = cluster_0->mutable_load_balancing_policy();
+      const std::string policy_yaml = R"EOF(
+          policies:
+          - typed_extension_config:
+              name: envoy.load_balancing_policies.client_side_weighted_round_robin
+              typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin
+                  enable_oob_load_report: true
+                  oob_reporting_period:
+                      seconds: 1
+                  blackout_period:
+                      seconds: 1
+                  weight_expiration_period:
+                      seconds: 180
+                  weight_update_period:
+                      seconds: 1
+          )EOF";
+      TestUtility::loadFromYaml(policy_yaml, *policy);
+    });
+    HttpIntegrationTest::initialize();
+  }
+
+  // Accept one OOB stream per upstream and reply with one server-streamed
+  // OrcaLoadReport per stream. The streams remain open (no trailers).
+  void respondToOobStreams(double host0_qps, double host1_qps) {
+    for (size_t i = 0; i < 2; ++i) {
+      FakeHttpConnectionPtr conn;
+      ASSERT_TRUE(fake_upstreams_[i]->waitForHttpConnection(*dispatcher_, conn));
+
+      FakeStreamPtr stream;
+      ASSERT_TRUE(conn->waitForNewStream(*dispatcher_, stream));
+      // Envoy ends the request half-stream after sending the single
+      // OrcaLoadReportRequest message.
+      ASSERT_TRUE(stream->waitForEndStream(*dispatcher_));
+
+      // Send gRPC response headers; do NOT send trailers (server-streaming).
+      Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"},
+                                                   {"content-type", "application/grpc"}};
+      stream->encodeHeaders(resp_headers, false);
+
+      xds::data::orca::v3::OrcaLoadReport report;
+      report.set_application_utilization(0.5);
+      report.set_rps_fractional(i == 0 ? host0_qps : host1_qps);
+      auto frame = Grpc::Common::serializeToGrpcFrame(report);
+      stream->encodeData(*frame, false);
+
+      // Keep the connection and stream alive for the lifetime of the test so
+      // Envoy continues to see an active OOB session.
+      stream_holder_.push_back(std::move(stream));
+      conn_holder_.push_back(std::move(conn));
+    }
+  }
+
+  void cleanupOobStreams() {
+    for (auto& conn : conn_holder_) {
+      if (conn != nullptr) {
+        AssertionResult result = conn->close();
+        RELEASE_ASSERT(result, result.message());
+        result = conn->waitForDisconnect();
+        RELEASE_ASSERT(result, result.message());
+      }
+    }
+    stream_holder_.clear();
+    conn_holder_.clear();
+  }
+
+  std::vector<FakeHttpConnectionPtr> conn_holder_;
+  std::vector<FakeStreamPtr> stream_holder_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ClientSideWeightedRoundRobinOobIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(ClientSideWeightedRoundRobinOobIntegrationTest, OobReportsApplyWeights) {
+  initializeConfig();
+  // Envoy should open one OOB stream per upstream host. Drive each stream
+  // through to a single OrcaLoadReport.
+  respondToOobStreams(/*host0_qps=*/100.0, /*host1_qps=*/1000.0);
+
+  // Verify the OOB plumbing is alive and reporting.
+  test_server_->waitForCounter("cluster.cluster_0.lb_orca_oob.reports_received", Ge(2));
+  test_server_->waitForGauge("cluster.cluster_0.lb_orca_oob.active_sessions", Eq(2));
+}
+
 // Tests to verify the behavior of load balancing policy when cluster is added,
 // removed, and added again.
 class ClientSideWeightedRoundRobinXdsIntegrationTest
@@ -267,7 +398,7 @@ public:
     // Wait for the server initialization to be done.
     server_initialized.WaitForNotification();
 
-    test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+    test_server_->waitForGauge("cluster_manager.active_clusters", Ge(2));
 
     // Wait for our statically specified listener to become ready, and register
     // its port in the test framework's downstream listener port map.
@@ -398,7 +529,7 @@ TEST_P(ClientSideWeightedRoundRobinXdsIntegrationTest, ClusterUpDownUp) {
                                                              {}, {FirstClusterName}, "42");
   // We can continue the test once we're sure that Envoy's ClusterManager has
   // made use of the DiscoveryResponse that says cluster_1 is gone.
-  test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+  test_server_->waitForCounter("cluster_manager.cluster_removed", Ge(1));
 
   // Now that cluster_1 is gone, the listener (with its routing to cluster_1)
   // should 503.
@@ -414,7 +545,7 @@ TEST_P(ClientSideWeightedRoundRobinXdsIntegrationTest, ClusterUpDownUp) {
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
                                                              {cluster1_}, {cluster1_}, {}, "413");
 
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(2));
   waitFor200("/cluster1");
 
   cleanupUpstreamAndDownstream();
@@ -440,7 +571,7 @@ TEST_P(ClientSideWeightedRoundRobinXdsIntegrationTest, TwoClusters) {
       Config::TestTypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster2_}, {}, "42");
   // Wait for the cluster to be active (two upstream clusters plus the CDS
   // cluster).
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(3));
 
   // A request for the second cluster should be fine.
   waitFor200("/cluster2");
@@ -453,7 +584,7 @@ TEST_P(ClientSideWeightedRoundRobinXdsIntegrationTest, TwoClusters) {
       Config::TestTypeUrl::get().Cluster, {cluster2_}, {}, {FirstClusterName}, "43");
   // We can continue the test once we're sure that Envoy's ClusterManager has
   // made use of the DiscoveryResponse that says cluster_1 is gone.
-  test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+  test_server_->waitForCounter("cluster_manager.cluster_removed", Ge(1));
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/cluster2", "",
                                                 downstream_protocol_, version_, "foo.com");
@@ -466,7 +597,7 @@ TEST_P(ClientSideWeightedRoundRobinXdsIntegrationTest, TwoClusters) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "43", {}, {}, {}));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TestTypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster1_}, {}, "413");
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(3));
   waitFor200("/cluster1");
 
   cleanupUpstreamAndDownstream();
@@ -542,8 +673,8 @@ public:
                                                                {cluster1_}, {cluster1_}, {}, "55");
 
     // Wait for EDS request.
-    test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
-    test_server_->waitForGaugeEq("cluster.cluster_1.warming_state", 1);
+    test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(1));
+    test_server_->waitForGauge("cluster.cluster_1.warming_state", Eq(1));
     EXPECT_TRUE(compareDiscoveryRequest(
         Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(), "",
         {FirstClusterName}, {FirstClusterName}, {}));
@@ -592,7 +723,7 @@ public:
                                         {FirstClusterName}, {}, {}));
 
     // Cluster should become active.
-    test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+    test_server_->waitForGauge("cluster_manager.active_clusters", Ge(2));
 
     // Wait for our statically specified listener to become ready, and register
     // its port in the test framework's downstream listener port map.
@@ -749,7 +880,7 @@ TEST_P(ClientSideWeightedRoundRobinEdsIntegrationTest, UpdateLocalityPriority) {
     sendRequestsAndTrackUpstreamUsage(upstream_qps, 10, initial_usage);
     ENVOY_LOG(trace, "initial_usage {}", initial_usage);
 
-    test_server_->waitForCounterEq("cluster.cluster_1.membership_change", i * 2 + 1);
+    test_server_->waitForCounter("cluster.cluster_1.membership_change", Eq(i * 2 + 1));
 
     // Send another 100 requests to cluster1, expecting weights to be used.
     std::vector<uint64_t> upstream_usage;
@@ -798,7 +929,7 @@ TEST_P(ClientSideWeightedRoundRobinEdsIntegrationTest, AddRemoveLocality) {
     sendRequestsAndTrackUpstreamUsage(upstream_qps, 10, initial_usage);
     ENVOY_LOG(trace, "initial_usage {}", initial_usage);
 
-    test_server_->waitForCounterEq("cluster.cluster_1.membership_change", i + 1);
+    test_server_->waitForCounter("cluster.cluster_1.membership_change", Eq(i + 1));
 
     // Send another 100 requests to cluster1, expecting weights to be used.
     std::vector<uint64_t> upstream_usage;

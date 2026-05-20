@@ -10,6 +10,7 @@
 #include "gtest/gtest.h"
 
 using testing::Combine;
+using testing::Ge;
 using testing::HasSubstr;
 using ::testing::TestParamInfo;
 using testing::Values;
@@ -353,7 +354,7 @@ TEST_P(ThriftConnManagerIntegrationTest, EarlyClose) {
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(expected_upstream->waitForRawConnection(fake_upstream_connection));
 
-  test_server_->waitForCounterGe("thrift.thrift_stats.cx_destroy_remote_with_active_rq", 1);
+  test_server_->waitForCounter("thrift.thrift_stats.cx_destroy_remote_with_active_rq", Ge(1));
 
   Stats::CounterSharedPtr counter =
       test_server_->counter("thrift.thrift_stats.cx_destroy_remote_with_active_rq");
@@ -377,7 +378,7 @@ TEST_P(ThriftConnManagerIntegrationTest, EarlyCloseWithUpstream) {
 
   tcp_client->close();
 
-  test_server_->waitForCounterGe("thrift.thrift_stats.cx_destroy_remote_with_active_rq", 1);
+  test_server_->waitForCounter("thrift.thrift_stats.cx_destroy_remote_with_active_rq", Ge(1));
 
   Stats::CounterSharedPtr counter =
       test_server_->counter("thrift.thrift_stats.cx_destroy_remote_with_active_rq");
@@ -474,7 +475,7 @@ TEST_P(ThriftConnManagerIntegrationTest, OnewayEarlyClosePartialRequest) {
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(expected_upstream->waitForRawConnection(fake_upstream_connection));
 
-  test_server_->waitForCounterGe("thrift.thrift_stats.cx_destroy_remote_with_active_rq", 1);
+  test_server_->waitForCounter("thrift.thrift_stats.cx_destroy_remote_with_active_rq", Ge(1));
 
   Stats::CounterSharedPtr counter =
       test_server_->counter("thrift.thrift_stats.cx_destroy_remote_with_active_rq");

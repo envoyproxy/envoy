@@ -52,6 +52,20 @@ func (mr *MockHttpFilterMockRecorder) OnDestroy() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnDestroy", reflect.TypeOf((*MockHttpFilter)(nil).OnDestroy))
 }
 
+// OnLocalReply mocks base method.
+func (m *MockHttpFilter) OnLocalReply(responseCode uint32, details shared.UnsafeEnvoyBuffer, resetImminent bool) shared.LocalReplyStatus {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "OnLocalReply", responseCode, details, resetImminent)
+	ret0, _ := ret[0].(shared.LocalReplyStatus)
+	return ret0
+}
+
+// OnLocalReply indicates an expected call of OnLocalReply.
+func (mr *MockHttpFilterMockRecorder) OnLocalReply(responseCode, details, resetImminent any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnLocalReply", reflect.TypeOf((*MockHttpFilter)(nil).OnLocalReply), responseCode, details, resetImminent)
+}
+
 // OnRequestBody mocks base method.
 func (m *MockHttpFilter) OnRequestBody(body shared.BodyBuffer, endOfStream bool) shared.BodyStatus {
 	m.ctrl.T.Helper()

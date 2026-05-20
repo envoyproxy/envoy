@@ -217,6 +217,19 @@ bool MetaDataAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_e
     metadata_source = cluster_info.has_value() ? &cluster_info.ref().metadata() : nullptr;
     break;
   }
+  case envoy::config::route::v3::RateLimit::Action::MetaData::CLUSTER_LOCALITY_ENTRY: {
+    const auto upstream_info = info.upstreamInfo();
+    // Upstream host is only available after upstream host selection.
+    // This means that the cluster locality metadata can only be used on the
+    // response path (apply_on_stream_done is set to true) or in a scenario where host selection is
+    // done before the rate limit action is executed.
+    if (upstream_info.has_value() && upstream_info->upstreamHost()) {
+      metadata_source = upstream_info->upstreamHost()->localityMetadata().get();
+    } else {
+      metadata_source = nullptr;
+    }
+    break;
+  }
   }
 
   const std::string metadata_string_value =

@@ -32,6 +32,8 @@ using Envoy::Http::HttpStatusIs;
 using testing::Combine;
 using testing::ContainsRegex;
 using testing::EndsWith;
+using testing::Eq;
+using testing::Ge;
 using testing::HasSubstr;
 using testing::Not;
 using testing::StartsWith;
@@ -84,7 +86,7 @@ TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
     socket_option->set_int_value(10000); // Invalid value.
   });
   initialize();
-  test_server_->waitForCounterGe("listener_manager.listener_create_failure", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_failure", Ge(1));
 }
 
 // Verify that we gracefully handle an invalid post-bind socket option when using reuse_port.
@@ -105,7 +107,7 @@ TEST_P(IntegrationTest, BadPostbindSocketOptionWithReusePort) {
     socket_option->set_int_value(10000); // Invalid value.
   });
   initialize();
-  test_server_->waitForCounterGe("listener_manager.listener_create_failure", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_failure", Ge(1));
 }
 
 // Verify that we gracefully handle an invalid post-listen socket option.
@@ -121,7 +123,7 @@ TEST_P(IntegrationTest, BadPostListenSocketOption) {
     socket_option->set_int_value(10000); // Invalid value.
   });
   initialize();
-  test_server_->waitForCounterGe("listener_manager.listener_create_failure", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_failure", Ge(1));
 }
 
 // Make sure we have correctly specified per-worker performance stats.
@@ -137,15 +139,19 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   // Per-worker listener stats.
   auto check_listener_stats = [this](uint64_t cx_active, uint64_t cx_total) {
     if (version_ == Network::Address::IpVersion::v4) {
-      test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_0.downstream_cx_active", cx_active);
-      test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_1.downstream_cx_active", cx_active);
-      test_server_->waitForCounterEq("listener.127.0.0.1_0.worker_0.downstream_cx_total", cx_total);
-      test_server_->waitForCounterEq("listener.127.0.0.1_0.worker_1.downstream_cx_total", cx_total);
+      test_server_->waitForGauge("listener.127.0.0.1_0.worker_0.downstream_cx_active",
+                                 Eq(cx_active));
+      test_server_->waitForGauge("listener.127.0.0.1_0.worker_1.downstream_cx_active",
+                                 Eq(cx_active));
+      test_server_->waitForCounter("listener.127.0.0.1_0.worker_0.downstream_cx_total",
+                                   Eq(cx_total));
+      test_server_->waitForCounter("listener.127.0.0.1_0.worker_1.downstream_cx_total",
+                                   Eq(cx_total));
     } else {
-      test_server_->waitForGaugeEq("listener.[__1]_0.worker_0.downstream_cx_active", cx_active);
-      test_server_->waitForGaugeEq("listener.[__1]_0.worker_1.downstream_cx_active", cx_active);
-      test_server_->waitForCounterEq("listener.[__1]_0.worker_0.downstream_cx_total", cx_total);
-      test_server_->waitForCounterEq("listener.[__1]_0.worker_1.downstream_cx_total", cx_total);
+      test_server_->waitForGauge("listener.[__1]_0.worker_0.downstream_cx_active", Eq(cx_active));
+      test_server_->waitForGauge("listener.[__1]_0.worker_1.downstream_cx_active", Eq(cx_active));
+      test_server_->waitForCounter("listener.[__1]_0.worker_0.downstream_cx_total", Eq(cx_total));
+      test_server_->waitForCounter("listener.[__1]_0.worker_1.downstream_cx_total", Eq(cx_total));
     }
   };
   check_listener_stats(0, 0);
@@ -207,15 +213,19 @@ TEST_P(IntegrationTest, ConnectionBalanceFactory) {
 
   auto check_listener_stats = [this](uint64_t cx_active, uint64_t cx_total) {
     if (version_ == Network::Address::IpVersion::v4) {
-      test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_0.downstream_cx_active", cx_active);
-      test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_1.downstream_cx_active", cx_active);
-      test_server_->waitForCounterEq("listener.127.0.0.1_0.worker_0.downstream_cx_total", cx_total);
-      test_server_->waitForCounterEq("listener.127.0.0.1_0.worker_1.downstream_cx_total", cx_total);
+      test_server_->waitForGauge("listener.127.0.0.1_0.worker_0.downstream_cx_active",
+                                 Eq(cx_active));
+      test_server_->waitForGauge("listener.127.0.0.1_0.worker_1.downstream_cx_active",
+                                 Eq(cx_active));
+      test_server_->waitForCounter("listener.127.0.0.1_0.worker_0.downstream_cx_total",
+                                   Eq(cx_total));
+      test_server_->waitForCounter("listener.127.0.0.1_0.worker_1.downstream_cx_total",
+                                   Eq(cx_total));
     } else {
-      test_server_->waitForGaugeEq("listener.[__1]_0.worker_0.downstream_cx_active", cx_active);
-      test_server_->waitForGaugeEq("listener.[__1]_0.worker_1.downstream_cx_active", cx_active);
-      test_server_->waitForCounterEq("listener.[__1]_0.worker_0.downstream_cx_total", cx_total);
-      test_server_->waitForCounterEq("listener.[__1]_0.worker_1.downstream_cx_total", cx_total);
+      test_server_->waitForGauge("listener.[__1]_0.worker_0.downstream_cx_active", Eq(cx_active));
+      test_server_->waitForGauge("listener.[__1]_0.worker_1.downstream_cx_active", Eq(cx_active));
+      test_server_->waitForCounter("listener.[__1]_0.worker_0.downstream_cx_total", Eq(cx_total));
+      test_server_->waitForCounter("listener.[__1]_0.worker_1.downstream_cx_total", Eq(cx_total));
     }
   };
   check_listener_stats(0, 0);
@@ -253,8 +263,8 @@ TEST_P(IntegrationTest, AllWorkersAreHandlingLoad) {
     worker1_stat_name = "listener.[__1]_0.worker_1.downstream_cx_total";
   }
 
-  test_server_->waitForCounterEq(worker0_stat_name, 0);
-  test_server_->waitForCounterEq(worker1_stat_name, 0);
+  test_server_->waitForCounter(worker0_stat_name, Eq(0));
+  test_server_->waitForCounter(worker1_stat_name, Eq(0));
 
   // We set the counters for the two workers to see how many connections each handles.
   uint64_t w0_ctr = 0;
@@ -845,8 +855,8 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
   auto response2 = codec_client2->makeRequestWithBody(default_request_headers_, 512);
 
   // Validate one request active, the other pending.
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_pending_active", 1);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_pending_active", Eq(1));
 
   // Response 1.
   upstream_request_->encodeHeaders(default_response_headers_, false);
@@ -857,8 +867,8 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_200", Ge(1));
 
   // Response 2.
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
@@ -872,8 +882,8 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response2->complete());
   EXPECT_EQ("200", response2->headers().getStatusValue());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 2);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 2);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Ge(2));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_200", Ge(2));
 }
 
 TEST_P(IntegrationTest, TestSmuggling) {
@@ -939,6 +949,38 @@ TEST_P(IntegrationTest, TestSmuggling) {
     sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
     EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
   }
+}
+
+TEST_P(IntegrationTest, TestInvalidChunkedEncoding) {
+  autonomous_upstream_ = true;
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.strict_chunk_parsing", "true");
+#ifdef ENVOY_ENABLE_UHV
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
+                                    "true");
+#endif
+  config_helper_.disableDelayClose();
+  initialize();
+  std::string response;
+  const std::string request = "GET / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: chunked\r\n\r\n"
+                              "1\r\nAAAAAA\r\n0\r\n\r\nXXXXXX";
+  sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
+}
+
+TEST_P(IntegrationTest, TestInvalidChunkedEncodingDefault) {
+  autonomous_upstream_ = true;
+#ifdef ENVOY_ENABLE_UHV
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
+                                    "true");
+#endif
+  config_helper_.disableDelayClose();
+  initialize();
+  std::string response;
+  const std::string request =
+      "GET / HTTP/1.1\r\nHost: host\r\nConnection: close\r\ntransfer-encoding: chunked\r\n\r\n"
+      "1\r\nAAAAAA\r\n0\r\n\r\nXXXXXX";
+  sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 200 OK\r\n"));
 }
 
 TEST_P(IntegrationTest, TestInvalidTransferEncoding) {
@@ -1870,13 +1912,13 @@ TEST_P(IntegrationTest, NoConnectionPoolsFree) {
   auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
 
   // Validate none active.
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_pending_active", 0);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(0));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_pending_active", Eq(0));
 
   ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_EQ("503", response->headers().getStatusValue());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_503", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_503", Ge(1));
 
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_pool_overflow")->value(), 1);
 }

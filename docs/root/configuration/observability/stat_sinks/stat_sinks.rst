@@ -8,3 +8,4 @@ Stat sinks
   kafka_stat_sink
   open_telemetry_stat_sink
   wasm_stat_sink
+  wasm_filter_stat_sink

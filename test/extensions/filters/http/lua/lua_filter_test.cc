@@ -152,6 +152,9 @@ public:
     EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
   }
 
+  // stats_store_ must be declared before config_ so that the sub-scope held by
+  // FilterConfig (lua_stats_scope_) is destroyed before the store itself.
+  Stats::TestUtil::TestStore stats_store_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Api::MockApi> api_;
@@ -167,7 +170,6 @@ public:
   NiceMock<Envoy::Network::MockConnection> connection_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
   Tracing::MockSpan child_span_;
-  Stats::TestUtil::TestStore stats_store_;
 
   const std::string HEADER_ONLY_SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
@@ -4497,6 +4499,74 @@ TEST_F(LuaHttpFilterTest, GetRouteFromHandleNoRoute) {
 
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
   EXPECT_EQ(2, stats_store_.counter("test.lua.executions").value());
+}
+
+// Test stats() API from Lua script.
+TEST_F(LuaHttpFilterTest, StatsApi) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local stats = request_handle:stats()
+
+      -- Test counter.
+      local counter = stats:counter("my_counter")
+      counter:inc()
+      counter:add(5)
+
+      -- Test gauge.
+      local gauge = stats:gauge("my_gauge")
+      gauge:set(100)
+      gauge:inc()
+      gauge:dec()
+      gauge:add(10)
+      gauge:sub(5)
+
+      -- Test histogram.
+      local histogram = stats:histogram("my_histogram", "ms")
+      histogram:recordValue(42)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  // Verify stats were created with the correct prefix.
+  EXPECT_EQ(6, stats_store_.counter("test.lua.my_counter").value());
+
+  auto gauge = stats_store_.findGaugeByString("test.lua.my_gauge");
+  ASSERT_TRUE(gauge.has_value());
+  EXPECT_EQ(105, gauge->get().value());
+
+  auto histogram = stats_store_.findHistogramByString("test.lua.my_histogram");
+  ASSERT_TRUE(histogram.has_value());
+  EXPECT_EQ(Stats::Histogram::Unit::Milliseconds, histogram->get().unit());
+}
+
+// Test stats() API with custom stat_prefix.
+TEST_F(LuaHttpFilterTest, StatsApiWithPrefix) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local stats = request_handle:stats()
+      local counter = stats:counter("requests")
+      counter:inc()
+    end
+  )EOF"};
+
+  InSequence s;
+  envoy::extensions::filters::http::lua::v3::Lua lua_config;
+  lua_config.mutable_default_source_code()->set_inline_string(SCRIPT);
+  lua_config.set_stat_prefix("custom_prefix");
+  envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_config;
+  setupConfig(lua_config, per_route_config);
+  setupFilter();
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  // Verify the counter was created with the custom prefix.
+  EXPECT_EQ(1, stats_store_.counter("test.lua.custom_prefix.requests").value());
 }
 
 } // namespace

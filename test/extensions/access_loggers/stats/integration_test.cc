@@ -1,11 +1,14 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
+#include "test/integration/ads_integration.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -49,7 +52,8 @@ TEST_P(StatsAccessLogIntegrationTest, Basic) {
               name: envoy.access_loggers.stats
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
-                stat_prefix: test_stat_prefix
+                stats_scope:
+                  prefix: test_stat_prefix
                 counters:
                   - stat:
                       name: fixedcounter
@@ -85,9 +89,10 @@ TEST_P(StatsAccessLogIntegrationTest, Basic) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ(response->headers().getStatusValue(), "200");
 
-  test_server_->waitForCounterEq(
-      "test_stat_prefix.fixedcounter.fixed_tag.fixed_value.dynamic_tag.mytagvalue_HTTP/1.1", 42);
-  test_server_->waitForCounterEq("test_stat_prefix.formatcounter", 200);
+  test_server_->waitForCounter(
+      "test_stat_prefix.fixedcounter.fixed_tag.fixed_value.dynamic_tag.mytagvalue_HTTP/1.1",
+      Eq(42));
+  test_server_->waitForCounter("test_stat_prefix.formatcounter", Eq(200));
   test_server_->waitUntilHistogramHasSamples("test_stat_prefix.testhistogram.tag.mytagvalue");
 
   Stats::ParentHistogramSharedPtr histogram =
@@ -104,7 +109,8 @@ TEST_P(StatsAccessLogIntegrationTest, Concurrency) {
               name: envoy.access_loggers.stats
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
-                stat_prefix: test_stat_prefix
+                stats_scope:
+                  prefix: test_stat_prefix
                 counters:
                   - stat:
                       name: formatcounter
@@ -149,7 +155,8 @@ TEST_P(StatsAccessLogIntegrationTest, PercentHistogram) {
               name: envoy.access_loggers.stats
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
-                stat_prefix: test_stat_prefix
+                stats_scope:
+                  prefix: test_stat_prefix
                 histograms:
                   - stat:
                       name: testhistogram
@@ -185,7 +192,8 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGauge) {
               name: envoy.access_loggers.stats
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
-                stat_prefix: test_stat_prefix
+                stats_scope:
+                  prefix: test_stat_prefix
                 gauges:
                   - stat:
                       name: active_requests
@@ -213,7 +221,7 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGauge) {
   waitForNextUpstreamRequest();
 
   // After DownstreamStart is logged, gauge should be 1.
-  test_server_->waitForGaugeEq("test_stat_prefix.active_requests.request_header_tag.my-tag", 1);
+  test_server_->waitForGauge("test_stat_prefix.active_requests.request_header_tag.my-tag", Eq(1));
 
   // Send response from upstream.
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
@@ -224,7 +232,7 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGauge) {
   EXPECT_EQ(response->headers().getStatusValue(), "200");
 
   // After DownstreamEnd is logged, gauge should be 0.
-  test_server_->waitForGaugeEq("test_stat_prefix.active_requests.request_header_tag.my-tag", 0);
+  test_server_->waitForGauge("test_stat_prefix.active_requests.request_header_tag.my-tag", Eq(0));
 
   codec_client_->close();
 }
@@ -237,7 +245,8 @@ TEST_P(StatsAccessLogIntegrationTest, SubtractWithoutAdd) {
                   types: [DownstreamEnd]
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
-                stat_prefix: test_stat_prefix
+                stats_scope:
+                  prefix: test_stat_prefix
                 gauges:
                   - stat:
                       name: active_requests
@@ -269,9 +278,9 @@ TEST_P(StatsAccessLogIntegrationTest, SubtractWithoutAdd) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ(response->headers().getStatusValue(), "200");
 
-  test_server_->waitForGaugeEq("test_stat_prefix.active_requests.request_header_tag.my-tag", 0);
+  test_server_->waitForGauge("test_stat_prefix.active_requests.request_header_tag.my-tag", Eq(0));
   codec_client_->close();
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
 }
 
 TEST_P(StatsAccessLogIntegrationTest, GaugeInterleavedOpsWithEviction) {
@@ -279,7 +288,8 @@ TEST_P(StatsAccessLogIntegrationTest, GaugeInterleavedOpsWithEviction) {
               name: envoy.access_loggers.stats
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
-                stat_prefix: test_stat_prefix
+                stats_scope:
+                  prefix: test_stat_prefix
                 gauges:
                   - stat:
                       name: active_requests
@@ -304,8 +314,8 @@ TEST_P(StatsAccessLogIntegrationTest, GaugeInterleavedOpsWithEviction) {
   IntegrationCodecClientPtr codec_client1 = makeHttpConnection(lookupPort("http"));
   IntegrationStreamDecoderPtr response1 = codec_client1->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest();
-  test_server_->waitForGaugeEq(
-      "test_stat_prefix.active_requests.request_header_tag.my-eviction-test-tag", 1);
+  test_server_->waitForGauge(
+      "test_stat_prefix.active_requests.request_header_tag.my-eviction-test-tag", Eq(1));
 
   // Simulate eviction from the store.
   absl::Notification evict_done;
@@ -331,15 +341,15 @@ TEST_P(StatsAccessLogIntegrationTest, GaugeInterleavedOpsWithEviction) {
   ASSERT_TRUE(upstream_request2->waitForEndStream(*dispatcher_));
 
   // The gauge should be kept even with eviction happened and the active request is 2.
-  test_server_->waitForGaugeEq(
-      "test_stat_prefix.active_requests.request_header_tag.my-eviction-test-tag", 2);
+  test_server_->waitForGauge(
+      "test_stat_prefix.active_requests.request_header_tag.my-eviction-test-tag", Eq(2));
 
   // Clean up.
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   upstream_request_->encodeHeaders(response_headers, true);
   ASSERT_TRUE(response1->waitForEndStream());
-  test_server_->waitForGaugeEq(
-      "test_stat_prefix.active_requests.request_header_tag.my-eviction-test-tag", 1);
+  test_server_->waitForGauge(
+      "test_stat_prefix.active_requests.request_header_tag.my-eviction-test-tag", Eq(1));
   upstream_request2->encodeHeaders(response_headers, true);
   ASSERT_TRUE(response2->waitForEndStream());
 
@@ -352,8 +362,8 @@ TEST_P(StatsAccessLogIntegrationTest, GaugeInterleavedOpsWithEviction) {
   });
   evict_done3.WaitForNotification();
 
-  test_server_->waitForGaugeEq(
-      "test_stat_prefix.active_requests.request_header_tag.my-eviction-test-tag", 0);
+  test_server_->waitForGauge(
+      "test_stat_prefix.active_requests.request_header_tag.my-eviction-test-tag", Eq(0));
 
   codec_client1->close();
   codec_client2->close();
@@ -368,7 +378,8 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeEvictedWhileInflight) {
               name: envoy.access_loggers.stats
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
-                stat_prefix: test_stat_prefix
+                stats_scope:
+                  prefix: test_stat_prefix
                 gauges:
                   - stat:
                       name: active_requests
@@ -404,8 +415,8 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeEvictedWhileInflight) {
         IntegrationStreamDecoderPtr response1 =
             codec_client1->makeHeaderOnlyRequest(request_headers);
         waitForNextUpstreamRequest();
-        test_server_->waitForGaugeEq(
-            "test_stat_prefix.active_requests.request_header_tag.my-evict-crash-tag", 1);
+        test_server_->waitForGauge(
+            "test_stat_prefix.active_requests.request_header_tag.my-evict-crash-tag", Eq(1));
 
         // Force gauge value to 0 so it can be evicted while FilterState is holding it.
         test_server_
@@ -439,7 +450,8 @@ TEST_P(StatsAccessLogIntegrationTest, GaugeCleanupOnDestructor) {
               name: envoy.access_loggers.stats
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
-                stat_prefix: test_stat_prefix
+                stats_scope:
+                  prefix: test_stat_prefix
                 gauges:
                   - stat:
                       name: active_requests
@@ -467,8 +479,8 @@ TEST_P(StatsAccessLogIntegrationTest, GaugeCleanupOnDestructor) {
   waitForNextUpstreamRequest();
 
   // DownstreamStart logged, gauge should be 1.
-  test_server_->waitForGaugeEq(
-      "test_stat_prefix.active_requests.request_header_tag.my-evict-cleanup-tag", 1);
+  test_server_->waitForGauge(
+      "test_stat_prefix.active_requests.request_header_tag.my-evict-cleanup-tag", Eq(1));
 
   upstream_request_->encodeHeaders(response_headers, true);
   ASSERT_TRUE(response->waitForEndStream());
@@ -478,8 +490,58 @@ TEST_P(StatsAccessLogIntegrationTest, GaugeCleanupOnDestructor) {
   // Since sub_log_type is configured for UdpPeriodic (which never happens in HTTP), the explicit
   // SUB op is skipped. When the request dies, AccessLogState destructor should run and subtract the
   // gauge. The gauge should go back to 0.
-  test_server_->waitForGaugeEq(
-      "test_stat_prefix.active_requests.request_header_tag.my-evict-cleanup-tag", 0);
+  test_server_->waitForGauge(
+      "test_stat_prefix.active_requests.request_header_tag.my-evict-cleanup-tag", Eq(0));
+}
+
+TEST_P(StatsAccessLogIntegrationTest, SharedScope) {
+  const std::string config_yaml1 = R"EOF(
+              name: envoy.access_loggers.stats
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
+                stats_scope:
+                  sharing_name: "shared_scope"
+                  prefix: shared_scope_limits
+                  max_counters: 1
+                counters:
+                  - stat:
+                      name: formatcounter1
+                    value_format: '%RESPONSE_CODE%'
+)EOF";
+
+  const std::string config_yaml2 = R"EOF(
+              name: envoy.access_loggers.stats
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
+                stats_scope:
+                  sharing_name: "shared_scope"
+                  prefix: shared_scope_limits
+                  max_counters: 1
+                counters:
+                  - stat:
+                      name: formatcounter2
+                    value_format: '%RESPONSE_CODE%'
+)EOF";
+
+  init(std::vector<std::string>{config_yaml1, config_yaml2});
+
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":authority", "envoyproxy.io"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"}};
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
+
+  // Since both access loggers share the same configuration, they should share the same scope.
+  // We expect the first counter to be incremented once (by the first access logger).
+  // The second counter (from the second logger) should be dropped because the scope limit is 1.
+  test_server_->waitForCounter("shared_scope_limits.formatcounter1", Eq(200));
+
+  auto store_counter = test_server_->counter("shared_scope_limits.formatcounter2");
+  EXPECT_EQ(store_counter, nullptr);
 }
 
 } // namespace
@@ -509,7 +571,8 @@ typed_config:
     - name: envoy.access_loggers.stats
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
-        stat_prefix: test_stat_prefix
+        stats_scope:
+          prefix: test_stat_prefix
         gauges:
           - stat:
               name: active_connections
@@ -529,20 +592,20 @@ typed_config:
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(raw_conn1));
   ASSERT_TRUE(client1->connected());
 
-  test_server_->waitForGaugeEq("test_stat_prefix.active_connections", 1);
+  test_server_->waitForGauge("test_stat_prefix.active_connections", Eq(1));
 
   IntegrationTcpClientPtr client2 = makeTcpConnection(lookupPort("listener_0"));
   FakeRawConnectionPtr raw_conn2;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(raw_conn2));
   ASSERT_TRUE(client2->connected());
 
-  test_server_->waitForGaugeEq("test_stat_prefix.active_connections", 2);
+  test_server_->waitForGauge("test_stat_prefix.active_connections", Eq(2));
 
   client1->close();
-  test_server_->waitForGaugeEq("test_stat_prefix.active_connections", 1);
+  test_server_->waitForGauge("test_stat_prefix.active_connections", Eq(1));
 
   client2->close();
-  test_server_->waitForGaugeEq("test_stat_prefix.active_connections", 0);
+  test_server_->waitForGauge("test_stat_prefix.active_connections", Eq(0));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, StatsAccessLogTcpIntegrationTest,

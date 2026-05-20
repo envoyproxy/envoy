@@ -7,6 +7,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl EVP_PKEY_free \
   --uncomment-func-decl EVP_PKEY_up_ref \
   --uncomment-func-decl EVP_PKEY_cmp \
+  --uncomment-func-decl EVP_PKEY_eq \
   --uncomment-func-decl EVP_PKEY_id \
   --uncomment-func-decl EVP_PKEY_assign_RSA \
   --uncomment-func-decl EVP_PKEY_get0_RSA \

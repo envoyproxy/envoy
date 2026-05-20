@@ -9,7 +9,6 @@
 
 #include "test/extensions/filters/http/cache_v2/http_cache_implementation_test_common.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 

@@ -15,8 +15,10 @@ envoy_cc_library(
     hdrs = [
         "dynamic_modules.h",
     ],
+    external_deps = ["ssl"],
     deps = [
         "//envoy/common:exception_lib",
+        "//source/common/common:hex_lib",
         "//source/common/common:utility_lib",
         "//source/extensions/dynamic_modules/abi",
     ],
@@ -54,6 +56,8 @@ go_library(
     srcs = [
         "sdk/go/shared/api.go",
         "sdk/go/shared/base.go",
+        "sdk/go/shared/network_api.go",
+        "sdk/go/shared/network_base.go",
     ],
     cgo = True,
     importpath = "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared",
@@ -75,6 +79,7 @@ go_library(
     name = "go_sdk_abi",
     srcs = [
         "sdk/go/abi/internal.go",
+        "sdk/go/abi/network.go",
         "//source/extensions/dynamic_modules/abi:abi.h",
     ],
     cgo = True,

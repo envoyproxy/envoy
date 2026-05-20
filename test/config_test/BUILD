@@ -54,7 +54,7 @@ envoy_cc_test(
         "CONFIGS_TAR_PATH": "$(location :configs)",
         "GODEBUG": "cgocheck=0",
     },
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_large",
     deps = [":test_runner_lib"],
 )
 

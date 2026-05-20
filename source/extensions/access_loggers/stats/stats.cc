@@ -7,6 +7,7 @@
 
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/stats/symbol_table.h"
+#include "source/extensions/access_loggers/stats/scope_provider_singleton.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -169,9 +170,15 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
                                Server::Configuration::GenericFactoryContext& context,
                                AccessLog::FilterPtr&& filter,
                                const std::vector<Formatter::CommandParserPtr>& commands)
-    : Common::ImplBase(std::move(filter)),
-      scope_(context.statsScope().createScope(config.stat_prefix(), true /* evictable */)),
-      stat_name_pool_(scope_->symbolTable()), histograms_([&]() {
+    : Common::ImplBase(std::move(filter)), scope_([&]() {
+        envoy::type::v3::Scope modified_config = config.stats_scope();
+        if (!config.stat_prefix().empty()) {
+          modified_config.set_prefix(config.stat_prefix());
+        }
+        return Stats::ScopeProviderSingleton::getScope(context, modified_config);
+      }()),
+
+      stat_name_pool_(context.statsScope().symbolTable()), histograms_([&]() {
         std::vector<Histogram> histograms;
         for (const auto& hist_cfg : config.histograms()) {
           histograms.emplace_back(NameAndTags(hist_cfg.stat(), stat_name_pool_, commands, context),

@@ -14,6 +14,7 @@ envoy_cc_test(
     srcs = ["config_test.cc"],
     rbe_pool = "6gig",
     deps = [
+        "//test/mocks/server:listener_factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/udp_packet_writer/v3:pkg_cc_proto",
     ] + envoy_select_enable_http3([

@@ -1,7 +1,7 @@
 REPOSITORY_LOCATIONS_SPEC = dict(
     envoy_examples = dict(
-        version = "0.2.2",
-        sha256 = "865726ea8c02dc7418f75d6aecf17ccb61ac4fad7a6a73649220e7520f6d0f8d",
+        version = "0.2.3",
+        sha256 = "a0fc7991a346333c1e3d17ab6d8a68bc3d0a4e76a6f6adf83b51eab9e7103bd8",
         strip_prefix = "examples-{version}",
         urls = ["https://github.com/envoyproxy/examples/archive/v{version}.tar.gz"],
     ),

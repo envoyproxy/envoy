@@ -15,7 +15,7 @@ Http::FilterFactoryCb McpRouterFilterConfigFactory::createFilterFactoryFromProto
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
 
   auto config =
-      std::make_shared<McpRouterConfig>(proto_config, stats_prefix, context.scope(), context);
+      std::make_shared<McpRouterConfigImpl>(proto_config, stats_prefix, context.scope(), context);
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<McpRouterFilter>(config));

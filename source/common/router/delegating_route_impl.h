@@ -148,8 +148,10 @@ public:
 
   const std::string& clusterName() const override { return cluster_name_; }
 
-private:
-  const std::string cluster_name_;
+protected:
+  // Keep this as non-const member since some derived class may want to update the cluster name
+  // dynamically based on the request.
+  std::string cluster_name_;
 };
 
 } // namespace Router

@@ -4,7 +4,9 @@
 
 #include "envoy/ssl/tls_certificate_config.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_tls_server_handshaker.h"
 #include "source/common/quic/quic_io_handle_wrapper.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
@@ -113,7 +115,12 @@ void EnvoyQuicProofSource::updateFilterChainManager(
   filter_chain_manager_ = &filter_chain_manager;
 }
 
-void EnvoyQuicProofSource::OnNewSslCtx(SSL_CTX* ssl_ctx) { registerCertCompression(ssl_ctx); }
+void EnvoyQuicProofSource::OnNewSslCtx(SSL_CTX* ssl_ctx) {
+  registerCertCompression(ssl_ctx);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_session_ticket_support")) {
+    SSL_CTX_set_tlsext_ticket_key_cb(ssl_ctx, EnvoyTlsServerHandshaker::ticketKeyCallback);
+  }
+}
 
 } // namespace Quic
 } // namespace Envoy

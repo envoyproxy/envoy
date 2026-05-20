@@ -317,6 +317,21 @@ def _aws_lc():
         name = "aws_lc",
         build_file = "@envoy//bazel/external:aws_lc.BUILD",
     )
+    CMAKE_SOURCE_BUILD_CONTENT = "%s\nexports_files([\"bootstrap\"])" % BUILD_ALL_CONTENT
+    external_http_archive(
+        name = "fips_cmake_src",
+        build_file_content = CMAKE_SOURCE_BUILD_CONTENT,
+    )
+    CLANG_BUILD_CONTENT = "%s\nexports_files([\"bin/clang\", \"bin/clang++\"])" % BUILD_ALL_CONTENT
+    external_http_archive(
+        name = "fips_clang_ppc64le",
+        build_file_content = CLANG_BUILD_CONTENT,
+    )
+    GO_BUILD_CONTENT = "%s\nexports_files([\"bin/go\"])" % _build_all_content(["test/**"])
+    external_http_archive(
+        name = "fips_go_ppc64le",
+        build_file_content = GO_BUILD_CONTENT,
+    )
 
 def _openssl():
     external_http_archive(
@@ -609,6 +624,10 @@ def _nghttp2():
             "@envoy//bazel/foreign_cc:nghttp2.patch",
             "@envoy//bazel/foreign_cc:nghttp2_huffman.patch",
             "@envoy//bazel/foreign_cc:nghttp2_max_hd_nv.patch",
+            "@envoy//bazel/foreign_cc:nghttp2-CVE-2026-27135_part1.diff",
+            "@envoy//bazel/foreign_cc:nghttp2-CVE-2026-27135_part2.diff",
+            "@envoy//bazel/foreign_cc:nghttp2-CVE-2026-27135_part3.diff",
+            "@envoy//bazel/foreign_cc:nghttp2-CVE-2026-27135_part4.diff",
         ],
     )
 

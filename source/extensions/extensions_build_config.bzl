@@ -71,6 +71,7 @@ EXTENSIONS = {
 
     "envoy.bootstrap.reverse_tunnel.downstream_socket_interface": "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_initiator_lib",
     "envoy.bootstrap.reverse_tunnel.upstream_socket_interface": "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
+    "envoy.filters.upstream_network.reverse_tunnel_lifecycle": "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
 
     #
     # Health checkers
@@ -260,6 +261,7 @@ EXTENSIONS = {
     "envoy.filters.network.http_connection_manager":              "//source/extensions/filters/network/http_connection_manager:config",
     "envoy.filters.network.local_ratelimit":                      "//source/extensions/filters/network/local_ratelimit:config",
     "envoy.filters.network.mongo_proxy":                          "//source/extensions/filters/network/mongo_proxy:config",
+    "envoy.filters.network.tcp_bandwidth_limit":                  "//source/extensions/filters/network/tcp_bandwidth_limit:config",
     "envoy.filters.network.ratelimit":                            "//source/extensions/filters/network/ratelimit:config",
     "envoy.filters.network.rbac":                                 "//source/extensions/filters/network/rbac:config",
     "envoy.filters.network.redis_proxy":                          "//source/extensions/filters/network/redis_proxy:config",
