@@ -42,52 +42,55 @@ private:
   IoSocketHandleImpl io_handle_;
 };
 
-static void BM_GetOrCreateEnvoyAddressInstanceNoCache(benchmark::State& state) {
+static void bmGetOrCreateEnvoyAddressInstanceNoCache(benchmark::State& state) {
   std::vector<sockaddr_storage> addresses = Test::getSockAddrSampleAddresses(/*count=*/4);
   IoSocketHandleImplTestWrapper wrapper(/*cache_size=*/0);
   for (auto _ : state) {
+    benchmark::DoNotOptimize(_);
     for (int i = 0; i < 50; ++i) {
       benchmark::DoNotOptimize(wrapper.getOrCreateEnvoyAddressInstances(addresses[0]));
       benchmark::DoNotOptimize(wrapper.getOrCreateEnvoyAddressInstances(addresses[1]));
     }
   }
 }
-BENCHMARK(BM_GetOrCreateEnvoyAddressInstanceNoCache)->Iterations(1000);
+BENCHMARK(bmGetOrCreateEnvoyAddressInstanceNoCache)->Iterations(1000);
 
-static void BM_GetOrCreateEnvoyAddressInstanceConnectedSocket(benchmark::State& state) {
+static void bmGetOrCreateEnvoyAddressInstanceConnectedSocket(benchmark::State& state) {
   std::vector<sockaddr_storage> addresses = Test::getSockAddrSampleAddresses(/*count=*/4);
   IoSocketHandleImplTestWrapper wrapper(/*cache_size=*/4);
   for (auto _ : state) {
+    benchmark::DoNotOptimize(_);
     for (int i = 0; i < 50; ++i) {
       benchmark::DoNotOptimize(wrapper.getOrCreateEnvoyAddressInstances(addresses[0]));
       benchmark::DoNotOptimize(wrapper.getOrCreateEnvoyAddressInstances(addresses[1]));
     }
   }
 }
-BENCHMARK(BM_GetOrCreateEnvoyAddressInstanceConnectedSocket)->Iterations(1000);
+BENCHMARK(bmGetOrCreateEnvoyAddressInstanceConnectedSocket)->Iterations(1000);
 
-static void BM_GetOrCreateEnvoyAddressInstanceUnconnectedSocket(benchmark::State& state) {
+static void bmGetOrCreateEnvoyAddressInstanceUnconnectedSocket(benchmark::State& state) {
   std::vector<sockaddr_storage> addresses = Test::getSockAddrSampleAddresses(/*count=*/100);
   IoSocketHandleImplTestWrapper wrapper(/*cache_size=*/4);
   for (auto _ : state) {
+    benchmark::DoNotOptimize(_);
     for (const sockaddr_storage& ss : addresses) {
       benchmark::DoNotOptimize(wrapper.getOrCreateEnvoyAddressInstances(ss));
     }
   }
 }
-BENCHMARK(BM_GetOrCreateEnvoyAddressInstanceUnconnectedSocket)->Iterations(1000);
+BENCHMARK(bmGetOrCreateEnvoyAddressInstanceUnconnectedSocket)->Iterations(1000);
 
-static void
-BM_GetOrCreateEnvoyAddressInstanceUnconnectedSocketLargerCache(benchmark::State& state) {
+static void bmGetOrCreateEnvoyAddressInstanceUnconnectedSocketLargerCache(benchmark::State& state) {
   std::vector<sockaddr_storage> addresses = Test::getSockAddrSampleAddresses(/*count=*/100);
   IoSocketHandleImplTestWrapper wrapper(/*cache_size=*/50);
   for (auto _ : state) {
+    benchmark::DoNotOptimize(_);
     for (const sockaddr_storage& ss : addresses) {
       benchmark::DoNotOptimize(wrapper.getOrCreateEnvoyAddressInstances(ss));
     }
   }
 }
-BENCHMARK(BM_GetOrCreateEnvoyAddressInstanceUnconnectedSocketLargerCache)->Iterations(1000);
+BENCHMARK(bmGetOrCreateEnvoyAddressInstanceUnconnectedSocketLargerCache)->Iterations(1000);
 
 } // namespace Network
 } // namespace Envoy

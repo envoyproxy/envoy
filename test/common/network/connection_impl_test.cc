@@ -4163,9 +4163,7 @@ TEST_F(MockTransportConnectionImplTest, UpdatingBufferHighWatermarkTimeoutToZero
 // Fixture for validating behavior after a connection is closed.
 class PostCloseConnectionImplTest : public MockTransportConnectionImplTest {
 public:
-  PostCloseConnectionImplTest() : MockTransportConnectionImplTest() {
-    MockTransportConnectionImplTest::initializeConnection();
-  }
+  PostCloseConnectionImplTest() { MockTransportConnectionImplTest::initializeConnection(); }
 
 protected:
   // Setup connection, single read event.

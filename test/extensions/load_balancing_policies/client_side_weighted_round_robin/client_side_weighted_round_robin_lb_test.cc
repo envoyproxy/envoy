@@ -418,12 +418,13 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, SlowStartConfig_RampUp) {
   size_t h1_count = 0, h2_count = 0;
   for (size_t i = 0; i < picks1; ++i) {
     auto chosen = lb_->chooseHost(nullptr).host;
-    if (chosen == h1)
+    if (chosen == h1) {
       ++h1_count;
-    else if (chosen == h2)
+    } else if (chosen == h2) {
       ++h2_count;
-    else
+    } else {
       FAIL();
+    }
   }
   // Expect h1 to be chosen noticeably more often (ratio ~ (1):(0.35)).
   EXPECT_GT(h1_count, h2_count);
@@ -436,12 +437,13 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, SlowStartConfig_RampUp) {
   h2_count = 0;
   for (size_t i = 0; i < picks1; ++i) {
     auto chosen = lb_->chooseHost(nullptr).host;
-    if (chosen == h1)
+    if (chosen == h1) {
       ++h1_count;
-    else if (chosen == h2)
+    } else if (chosen == h2) {
       ++h2_count;
-    else
+    } else {
       FAIL();
+    }
   }
   // Now expect closer to 2:1 ratio in favor of h1; i.e., still h1 > h2.
   EXPECT_GT(h1_count, h2_count);
@@ -454,12 +456,13 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, SlowStartConfig_RampUp) {
   h2_count = 0;
   for (size_t i = 0; i < picks1; ++i) {
     auto chosen = lb_->chooseHost(nullptr).host;
-    if (chosen == h1)
+    if (chosen == h1) {
       ++h1_count;
-    else if (chosen == h2)
+    } else if (chosen == h2) {
       ++h2_count;
-    else
+    } else {
       FAIL();
+    }
   }
   // Expect approximately equal selection; allow 30% tolerance.
   double final_ratio =

@@ -3,6 +3,7 @@
 #include "source/common/quic/quic_stat_names.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/test_common/enum_test_utils.h"
 
 #include "gtest/gtest.h"
 
@@ -30,9 +31,9 @@ TEST_F(QuicStatNamesTest, QuicConnectionCloseStats) {
 
 TEST_F(QuicStatNamesTest, OutOfRangeQuicConnectionCloseStats) {
   uint64_t bad_error_code = quic::QUIC_LAST_ERROR + 1;
-  quic_stat_names_.chargeQuicConnectionCloseStats(scope_,
-                                                  static_cast<quic::QuicErrorCode>(bad_error_code),
-                                                  quic::ConnectionCloseSource::FROM_SELF, false);
+  quic_stat_names_.chargeQuicConnectionCloseStats(
+      scope_, uncheckedEnumCastForTest<quic::QuicErrorCode>(bad_error_code),
+      quic::ConnectionCloseSource::FROM_SELF, false);
   EXPECT_EQ(1U,
             store_.counter("http3.downstream.tx.quic_connection_close_error_code_QUIC_LAST_ERROR")
                 .value());
@@ -51,7 +52,7 @@ TEST_F(QuicStatNamesTest, OutOfRangeResetStreamErrorStats) {
   quic_stat_names_.chargeQuicResetStreamErrorStats(
       scope_,
       quic::QuicResetStreamError::FromInternal(
-          static_cast<quic::QuicRstStreamErrorCode>(bad_error_code)),
+          uncheckedEnumCastForTest<quic::QuicRstStreamErrorCode>(bad_error_code)),
       true, false);
   EXPECT_EQ(
       1U, store_.counter("http3.downstream.tx.quic_reset_stream_error_code_QUIC_STREAM_LAST_ERROR")

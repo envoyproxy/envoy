@@ -60,9 +60,9 @@ struct GrpcInitializeConfigOpts {
 
 struct WaitForSuccessfulUpstreamResponseOpts {
   // Fields of type Headers must be set at initialization.
-  const Headers headers_to_add = {};
-  const Headers headers_to_append = {};
-  const Headers headers_to_remove = {};
+  const Headers headers_to_add;
+  const Headers headers_to_append;
+  const Headers headers_to_remove;
   const Http::TestRequestHeaderMapImpl new_headers_from_upstream = {};
   const Http::TestRequestHeaderMapImpl headers_to_append_multiple = {};
   bool failure_mode_allowed_header = false;
@@ -705,7 +705,7 @@ attributes:
   Buffer::OwnedImpl request_body_;
   const uint64_t response_size_ = 512;
   const uint64_t max_request_bytes_ = 1024;
-  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config_{};
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config_;
   const std::string base_filter_config_ = R"EOF(
     allowed_headers:
       patterns:
@@ -949,7 +949,7 @@ public:
     cleanup();
   }
 
-  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config_{};
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config_;
   FakeHttpConnectionPtr fake_ext_authz_connection_;
   FakeStreamPtr ext_authz_request_;
   IntegrationStreamDecoderPtr response_;

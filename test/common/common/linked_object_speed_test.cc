@@ -27,6 +27,7 @@ struct IntrusiveObject : public IntrusiveListNode<IntrusiveObject> {
 static void BM_StdListPushFront(benchmark::State& state) {
   const int n = state.range(0);
   for (auto _ : state) {
+    benchmark::DoNotOptimize(_);
     std::list<std::unique_ptr<StdListObject>> list;
     for (int i = 0; i < n; ++i) {
       LinkedList::moveIntoList(std::make_unique<StdListObject>(i), list);
@@ -41,6 +42,7 @@ BENCHMARK(BM_StdListPushFront)->Arg(64)->Arg(512);
 static void BM_StdListRemoveAll(benchmark::State& state) {
   const int n = state.range(0);
   for (auto _ : state) {
+    benchmark::DoNotOptimize(_);
     state.PauseTiming();
     std::list<std::unique_ptr<StdListObject>> list;
     std::vector<StdListObject*> ptrs;
@@ -68,6 +70,7 @@ static void BM_StdListIterate(benchmark::State& state) {
     LinkedList::moveIntoListBack(std::make_unique<StdListObject>(i), list);
   }
   for (auto _ : state) {
+    benchmark::DoNotOptimize(_);
     int64_t sum = 0;
     for (const auto& obj : list) {
       sum += obj->value;
@@ -86,6 +89,7 @@ BENCHMARK(BM_StdListIterate)->Arg(64)->Arg(512);
 static void BM_IntrusiveListPushFront(benchmark::State& state) {
   const int n = state.range(0);
   for (auto _ : state) {
+    benchmark::DoNotOptimize(_);
     IntrusiveList<IntrusiveObject> list;
     for (int i = 0; i < n; ++i) {
       list.push(std::make_unique<IntrusiveObject>(i));
@@ -100,6 +104,7 @@ BENCHMARK(BM_IntrusiveListPushFront)->Arg(64)->Arg(512);
 static void BM_IntrusiveListRemoveAll(benchmark::State& state) {
   const int n = state.range(0);
   for (auto _ : state) {
+    benchmark::DoNotOptimize(_);
     state.PauseTiming();
     IntrusiveList<IntrusiveObject> list;
     std::vector<IntrusiveObject*> ptrs;
@@ -128,6 +133,7 @@ static void BM_IntrusiveListIterate(benchmark::State& state) {
     list.pushBack(std::make_unique<IntrusiveObject>(i));
   }
   for (auto _ : state) {
+    benchmark::DoNotOptimize(_);
     int64_t sum = 0;
     for (IntrusiveObject* p = list.front(); p != nullptr; p = p->next()) {
       sum += p->value;

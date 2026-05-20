@@ -17,6 +17,8 @@
 #include "include/proxy-wasm/null_plugin.h"
 #endif
 
+#include "test/test_common/enum_test_utils.h"
+
 START_WASM_PLUGIN(CommonWasmTestCpp)
 
 static int* badptr = nullptr;
@@ -108,7 +110,7 @@ WASM_EXPORT(uint32_t, proxy_on_vm_start, (uint32_t context_id, uint32_t configur
     CHECK_RESULT(proxy_define_metric(MetricType::Histogram, name.data(), name.size(), &h));
     // Bad type.
     CHECK_RESULT_NOT_OK(
-        proxy_define_metric(static_cast<MetricType>(9999), name.data(), name.size(), &c));
+        proxy_define_metric(uncheckedEnumCastForTest<MetricType>(9999), name.data(), name.size(), &c));
 
     CHECK_RESULT(proxy_increment_metric(c, 1));
     CHECK_RESULT(proxy_increment_metric(g, 1));

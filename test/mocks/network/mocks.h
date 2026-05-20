@@ -341,7 +341,7 @@ public:
   MOCK_METHOD(bool, addedViaApi, (), (const));
   MOCK_METHOD(const FilterChainInfoSharedPtr&, filterChainInfo, (), (const));
 
-  envoy::config::core::v3::Metadata metadata_{};
+  envoy::config::core::v3::Metadata metadata_;
   FilterChainInfoSharedPtr filter_chain_info_;
 };
 
@@ -355,7 +355,7 @@ public:
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
 
   std::string filter_chain_name_{"mock"};
-  envoy::config::core::v3::Metadata metadata_{};
+  envoy::config::core::v3::Metadata metadata_;
 };
 
 class MockFilterChainManager : public FilterChainManager {

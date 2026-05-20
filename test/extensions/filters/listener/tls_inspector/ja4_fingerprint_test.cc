@@ -7,9 +7,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using ::testing::Eq;
-using ::testing::HasSubstr;
-
 namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
