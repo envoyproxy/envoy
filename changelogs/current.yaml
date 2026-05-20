@@ -1,1 +1,15 @@
 date: Pending
+
+new_features:
+- area: http
+  change: |
+    Added a new :ref:`extracted_external_address
+    <envoy_v3_api_msg_extensions.http.original_ip_detection.extracted_external_address.v3.ExtractedExternalAddressConfig>`
+    original IP detection extension that reads the upstream-resolved
+    ``x-envoy-external-address`` header (via the typed
+    ``Http::RequestHeaderMap::EnvoyExternalAddress()`` accessor) as the
+    downstream remote address. Intended for interior proxies (sidecars,
+    waypoints, second-tier gateways) in hierarchical Envoy deployments where
+    an edge proxy has already extracted the original client IP and the
+    interior proxy cannot statically configure the correct
+    ``xff_num_trusted_hops``.

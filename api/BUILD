@@ -336,6 +336,7 @@ proto_library(
         "//envoy/extensions/http/injected_credentials/generic/v3:pkg",
         "//envoy/extensions/http/injected_credentials/oauth2/v3:pkg",
         "//envoy/extensions/http/original_ip_detection/custom_header/v3:pkg",
+        "//envoy/extensions/http/original_ip_detection/extracted_external_address/v3:pkg",
         "//envoy/extensions/http/original_ip_detection/xff/v3:pkg",
         "//envoy/extensions/http/stateful_session/cookie/v3:pkg",
         "//envoy/extensions/http/stateful_session/envelope/v3:pkg",

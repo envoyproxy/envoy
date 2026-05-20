@@ -166,7 +166,6 @@ public:
     return internal_address_config_;
   }
   uint32_t xffNumTrustedHops() const override { return 0; }
-  bool useExtractedExternalAddress() const override { return false; }
   bool skipXffAppend() const override { return false; }
   const std::string& via() const override { return EMPTY_STRING; }
   Http::ForwardClientCertType forwardClientCert() const override { return forward_client_cert_; }

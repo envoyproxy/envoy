@@ -1168,6 +1168,13 @@ envoy.http.original_ip_detection.custom_header:
   status: stable
   type_urls:
   - envoy.extensions.http.original_ip_detection.custom_header.v3.CustomHeaderConfig
+envoy.http.original_ip_detection.extracted_external_address:
+  categories:
+  - envoy.http.original_ip_detection
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.http.original_ip_detection.extracted_external_address.v3.ExtractedExternalAddressConfig
 envoy.http.original_ip_detection.xff:
   categories:
   - envoy.http.original_ip_detection

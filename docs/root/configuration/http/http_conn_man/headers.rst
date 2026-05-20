@@ -118,11 +118,25 @@ if the request is from an external client. ``x-envoy-external-address`` is not s
 for internal requests. This header can be safely forwarded between internal services for analytics
 purposes without having to deal with the complexities of XFF.
 
-In multi-proxy deployments (e.g., service meshes), interior proxies can be configured with
-:ref:`use_extracted_external_address <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_extracted_external_address>`
-to use an existing ``x-envoy-external-address`` header value as the downstream remote address,
-instead of re-extracting from XFF. This allows interior proxies to defer to an upstream edge
-proxy's client IP extraction.
+In hierarchical Envoy deployments where an interior proxy (e.g., a sidecar, a waypoint, or a
+second-tier gateway) sits behind an edge proxy that has already extracted the original client
+IP, the interior proxy generally cannot configure
+:ref:`xff_num_trusted_hops
+<envoy_v3_api_field_extensions.http.original_ip_detection.xff.v3.XffConfig.xff_num_trusted_hops>`
+correctly because the number of upstream hops varies by call path. The
+:ref:`extracted_external_address
+<envoy_v3_api_msg_extensions.http.original_ip_detection.extracted_external_address.v3.ExtractedExternalAddressConfig>`
+original IP detection extension addresses this by reading the upstream-resolved
+``x-envoy-external-address`` value directly via a typed header accessor.
+
+.. note::
+  As with any reader of ``x-envoy-external-address`` on an interior proxy, the
+  :ref:`extracted_external_address
+  <envoy_v3_api_msg_extensions.http.original_ip_detection.extracted_external_address.v3.ExtractedExternalAddressConfig>`
+  extension presumes the established trust contract that the header arrives from a trusted
+  upstream Envoy. Operators who need to strip a client-supplied value at an interior proxy can
+  add ``x-envoy-external-address`` to :ref:`route_config.internal_only_headers
+  <envoy_v3_api_field_config.route.v3.RouteConfiguration.internal_only_headers>`.
 
 .. _config_http_conn_man_headers_x-envoy-force-trace:
 

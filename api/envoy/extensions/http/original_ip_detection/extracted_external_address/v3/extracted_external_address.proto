@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package envoy.extensions.http.original_ip_detection.extracted_external_address.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.http.original_ip_detection.extracted_external_address.v3";
+option java_outer_classname = "ExtractedExternalAddressProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/original_ip_detection/extracted_external_address/v3;extracted_external_addressv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Extracted external address original IP detection extension]
+
+// This extension detects the original downstream remote IP by reading the
+// :ref:`x-envoy-external-address
+// <config_http_conn_man_headers_x-envoy-external-address>` request header
+// populated by an upstream Envoy proxy. It is intended for interior proxies
+// (sidecars, waypoints, second-tier gateways) in hierarchical Envoy
+// deployments where the edge proxy has already extracted the original client
+// IP via ``use_remote_address`` + XFF and recorded it in
+// ``x-envoy-external-address``.
+//
+// The interior proxy cannot generally know the correct
+// :ref:`xff_num_trusted_hops
+// <envoy_v3_api_field_extensions.http.original_ip_detection.xff.v3.XffConfig.xff_num_trusted_hops>`
+// statically (it depends on the deployment topology and the call path).
+// Trusting the upstream-resolved external address avoids re-running XFF
+// extraction with a hop count that cannot be configured correctly for all
+// callers.
+//
+// When the header is present and parses as a valid IP address, the detected
+// address is treated as trusted (set
+// :ref:`allow_extension_to_set_address_as_trusted
+// <envoy_v3_api_field_extensions.http.original_ip_detection.custom_header.v3.CustomHeaderConfig.allow_extension_to_set_address_as_trusted>`
+// semantics). When the header is absent or unparseable, this extension
+// returns no detection result, allowing subsequent extensions in the chain
+// (or the default XFF fallback) to run.
+//
+// Unlike
+// :ref:`custom_header
+// <envoy_v3_api_msg_extensions.http.original_ip_detection.custom_header.v3.CustomHeaderConfig>`,
+// this extension reads ``x-envoy-external-address`` via the typed Envoy
+// header accessor rather than by string name, so the binding to the
+// Envoy-managed header is enforced at compile time.
+//
+// .. note::
+//   ``x-envoy-external-address`` is an Envoy-managed header, written by an
+//   edge HCM running with ``use_remote_address: true``. As with any reader
+//   of this header on an interior proxy, this extension presumes the
+//   established trust contract: that the value arrives from a trusted
+//   upstream Envoy. Operators who need to strip a client-supplied value at
+//   an interior proxy can add ``x-envoy-external-address`` to
+//   :ref:`route_config.internal_only_headers
+//   <envoy_v3_api_field_config.route.v3.RouteConfiguration.internal_only_headers>`.
+//
+// See :ref:`original_ip_detection_extensions
+// <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection_extensions>`
+// for an overview of how extensions operate and what happens when an
+// extension fails to detect the remote IP.
+//
+// [#extension: envoy.http.original_ip_detection.extracted_external_address]
+message ExtractedExternalAddressConfig {
+  // This message is intentionally empty. The header name is fixed (the
+  // typed accessor binds to ``x-envoy-external-address``), the trust
+  // semantics are fixed (the upstream Envoy is presumed to have already
+  // resolved a trusted external address), and ``skip_xff_append`` is fixed
+  // to ``true`` (interior proxies should not pollute XFF with their own
+  // connection peer). A request to reject on missing/unparseable header
+  // (analogous to ``custom_header``'s ``reject_with_status``) is
+  // intentionally not supported: an interior proxy generally wants to fall
+  // through to the chained XFF fallback when the upstream-resolved value
+  // is missing, not reject the request.
+}

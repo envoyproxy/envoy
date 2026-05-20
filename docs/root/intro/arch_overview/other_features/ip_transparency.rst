@@ -23,10 +23,12 @@ These techniques vary in complexity and applicability.
 Envoy also supports
 :ref:`extensions <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection_extensions>`
 for detecting the original IP address. This might be useful if none of the techniques below is
-applicable to your setup. Two available extensions are the :ref:`custom header
+applicable to your setup. Available extensions are the :ref:`custom header
 <envoy_v3_api_msg_extensions.http.original_ip_detection.custom_header.v3.CustomHeaderConfig>`
-extension and the :ref:`xff <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>`
-extension.
+extension, the :ref:`xff <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>`
+extension, and the :ref:`extracted external address
+<envoy_v3_api_msg_extensions.http.original_ip_detection.extracted_external_address.v3.ExtractedExternalAddressConfig>`
+extension (for interior proxies in hierarchical Envoy deployments).
 
 HTTP Headers
 ------------
