@@ -2180,8 +2180,7 @@ TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateBytesNotFound) {
 TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateBytesFound) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  stream_info.filter_state_->setData("k", std::make_unique<Router::StringAccessorImpl>("v"),
-                                     StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info.filter_state_->setData("k", std::make_unique<Router::StringAccessorImpl>("v"));
   ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
   std::string key = "k";
@@ -2240,8 +2239,7 @@ TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedNotFound) {
 TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedNotSerializable) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  stream_info.filter_state_->setData("k", std::make_unique<UnserializableFilterStateObject>(),
-                                     StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info.filter_state_->setData("k", std::make_unique<UnserializableFilterStateObject>());
   ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
   std::string key = "k";
@@ -2255,8 +2253,7 @@ TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedNotSerializable) {
 TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedFound) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  stream_info.filter_state_->setData("k", std::make_unique<Router::StringAccessorImpl>("typed-v"),
-                                     StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info.filter_state_->setData("k", std::make_unique<Router::StringAccessorImpl>("typed-v"));
   ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
   std::string key = "k";

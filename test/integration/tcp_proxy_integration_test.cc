@@ -1927,7 +1927,6 @@ public:
     // the connection.
     read_callbacks_->connection().streamInfo().filterState()->setData(
         TcpProxy::ReceiveBeforeConnectKey, std::make_unique<StreamInfo::BoolAccessorImpl>(true),
-        StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
   }
 

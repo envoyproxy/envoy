@@ -1279,7 +1279,7 @@ public:
         std::make_unique<StreamInfo::UpstreamAddress>(
             Envoy::Network::Utility::parseInternetAddressAndPortNoThrow(upstream_ips.back(),
                                                                         false)),
-        StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
+        StreamInfo::FilterState::LifeSpan::Request);
   }
 };
 
