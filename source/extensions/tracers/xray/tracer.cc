@@ -204,7 +204,7 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
   } else if (name == Tracing::Tags::get().HttpStatusCode) {
     uint64_t status_code;
     if (!absl::SimpleAtoi(value, &status_code)) {
-      ENVOY_LOG(debug, "{} must be a number, given: {}", Tracing::Tags::get().HttpStatusCode,
+      ENVOY_LOG(debug, "{} must be a number, given: {}", Tracing::Tags::get().HttpStatusCode.name(),
                 value);
       return;
     }
@@ -213,7 +213,8 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
   } else if (name == Tracing::Tags::get().ResponseSize) {
     uint64_t response_size;
     if (!absl::SimpleAtoi(value, &response_size)) {
-      ENVOY_LOG(debug, "{} must be a number, given: {}", Tracing::Tags::get().ResponseSize, value);
+      ENVOY_LOG(debug, "{} must be a number, given: {}", Tracing::Tags::get().ResponseSize.name(),
+                value);
       return;
     }
     addToHttpResponseAnnotations(SpanContentLength, ValueUtil::numberValue(response_size));
