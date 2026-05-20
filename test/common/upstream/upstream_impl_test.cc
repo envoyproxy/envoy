@@ -2583,7 +2583,7 @@ TEST_F(StaticClusterImplTest, LoadAssignmentEndpointStatName) {
       endpoints:
       - lb_endpoints:
         - endpoint:
-            stat_name: shared.backend/a
+            observability_name: shared.backend/a
             address:
               socket_address:
                 address: 10.0.0.1
