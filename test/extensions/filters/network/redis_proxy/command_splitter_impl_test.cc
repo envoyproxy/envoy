@@ -437,6 +437,135 @@ TEST_F(RedisSingleServerRequestTest, HExpireSuccess) {
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.hexpire.success").value());
 }
 
+TEST_F(RedisSingleServerRequestTest, HExpireAtSuccess) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  // HEXPIREAT key unix-time-seconds FIELDS numfields field [field ...]
+  makeBulkStringArray(*request, {"hexpireat", "hello", "9999999999", "fields", "1", "field1"});
+  makeRequest("hello", std::move(request));
+  EXPECT_NE(nullptr, handle_);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.hexpireat.latency"),
+                          10));
+  respond();
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hexpireat.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hexpireat.success").value());
+}
+
+TEST_F(RedisSingleServerRequestTest, HPExpireSuccess) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  // HPEXPIRE key milliseconds FIELDS numfields field [field ...]
+  makeBulkStringArray(*request, {"hpexpire", "hello", "10000", "fields", "1", "field1"});
+  makeRequest("hello", std::move(request));
+  EXPECT_NE(nullptr, handle_);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.hpexpire.latency"),
+                          10));
+  respond();
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hpexpire.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hpexpire.success").value());
+}
+
+TEST_F(RedisSingleServerRequestTest, HPExpireAtSuccess) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  // HPEXPIREAT key unix-time-milliseconds FIELDS numfields field [field ...]
+  makeBulkStringArray(*request, {"hpexpireat", "hello", "9999999999000", "fields", "1", "field1"});
+  makeRequest("hello", std::move(request));
+  EXPECT_NE(nullptr, handle_);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.hpexpireat.latency"),
+                          10));
+  respond();
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hpexpireat.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hpexpireat.success").value());
+}
+
+TEST_F(RedisSingleServerRequestTest, HPersistSuccess) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  // HPERSIST key FIELDS numfields field [field ...]
+  makeBulkStringArray(*request, {"hpersist", "hello", "fields", "1", "field1"});
+  makeRequest("hello", std::move(request));
+  EXPECT_NE(nullptr, handle_);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.hpersist.latency"),
+                          10));
+  respond();
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hpersist.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hpersist.success").value());
+}
+
+TEST_F(RedisSingleServerRequestTest, HTtlSuccess) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  // HTTL key FIELDS numfields field [field ...]
+  makeBulkStringArray(*request, {"httl", "hello", "fields", "1", "field1"});
+  makeRequest("hello", std::move(request));
+  EXPECT_NE(nullptr, handle_);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.httl.latency"), 10));
+  respond();
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.httl.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.httl.success").value());
+}
+
+TEST_F(RedisSingleServerRequestTest, HPTtlSuccess) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  // HPTTL key FIELDS numfields field [field ...]
+  makeBulkStringArray(*request, {"hpttl", "hello", "fields", "1", "field1"});
+  makeRequest("hello", std::move(request));
+  EXPECT_NE(nullptr, handle_);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.hpttl.latency"), 10));
+  respond();
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hpttl.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hpttl.success").value());
+}
+
+// Verify write classification: hexpire/hexpireat/hpexpire/hpexpireat/hpersist are write commands.
+TEST_F(RedisSingleServerRequestTest, HashFieldExpiryWriteCommandsClassification) {
+  for (const std::string& cmd :
+       {"hexpire", "hexpireat", "hpexpire", "hpexpireat", "hpersist"}) {
+    EXPECT_FALSE(Common::Redis::SupportedCommands::isReadCommand(cmd))
+        << cmd << " should be classified as a write command";
+  }
+}
+
+// Verify read classification: httl/hpttl are read commands (not in writeCommands).
+TEST_F(RedisSingleServerRequestTest, HashFieldExpiryReadCommandsClassification) {
+  for (const std::string& cmd : {"httl", "hpttl"}) {
+    EXPECT_TRUE(Common::Redis::SupportedCommands::isReadCommand(cmd))
+        << cmd << " should be classified as a read command";
+  }
+}
+
 TEST_F(RedisSingleServerRequestTest, PingSuccess) {
   InSequence s;
 
