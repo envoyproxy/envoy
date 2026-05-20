@@ -92,7 +92,6 @@ public:
         std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers));
     auto filter_state = stream_info_.filterState();
     filter_state->setData(TcpProxy::TunnelResponseHeaders::key(), headers,
-                          StreamInfo::FilterState::StateType::Mutable,
                           StreamInfo::FilterState::LifeSpan::Connection);
   }
 
