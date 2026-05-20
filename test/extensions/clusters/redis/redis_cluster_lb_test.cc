@@ -37,8 +37,8 @@ public:
   const std::string& clientZone() const override { return client_zone_; }
 
   absl::optional<uint64_t> hash_key_;
-  bool is_read_;
-  NetworkFilters::Common::Redis::Client::ReadPolicy read_policy_;
+  bool is_read_{};
+  NetworkFilters::Common::Redis::Client::ReadPolicy read_policy_{};
   std::string client_zone_;
 };
 
