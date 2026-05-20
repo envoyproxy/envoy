@@ -441,6 +441,11 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
   // Initialize connection establishment mode.
   connect_mode_ = config_->upstreamConnectMode();
 
+  // Delay route selection needs to set on initialization since mid execution changes
+  // could lead to inconsistent behavior
+  delay_route_selection_ =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tcp_proxy_delay_route_selection");
+
   // Check if early data buffering is enabled.
   if (config_->maxEarlyDataBytes().has_value()) {
     receive_before_connect_ = true;
@@ -1092,7 +1097,10 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
                        "Initial data received, establishing upstream connection. "
                        "early_data_buffer_.length()={}",
                        read_callbacks_->connection(), early_data_buffer_.length());
-        // Route should already be set in onNewConnection().
+        if (delay_route_selection_) {
+          route_ = pickRoute();
+        }
+        // If delay_route_selection_ is unset, route should already be set in onNewConnection().
         ASSERT(route_ != nullptr);
         establishUpstreamConnection();
       }
@@ -1173,9 +1181,15 @@ Network::FilterStatus Filter::onNewConnection() {
     return establishUpstreamConnection();
   }
 
-  // For ON_DOWNSTREAM_DATA or ON_DOWNSTREAM_TLS_HANDSHAKE modes, delay the connection.
-  // Pre-pick the route so it's available when connection is triggered.
-  route_ = pickRoute();
+  if (!delay_route_selection_) {
+    // For ON_DOWNSTREAM_DATA or ON_DOWNSTREAM_TLS_HANDSHAKE modes, delay the connection.
+    // Pre-pick the route so it's available when connection is triggered.
+    route_ = pickRoute();
+  } else {
+    config_->stats().route_delayed_total_.inc();
+    ENVOY_CONN_LOG(debug, "Delaying picking route until upstream connection establishement",
+                   read_callbacks_->connection());
+  }
 
   // Log the specific delay reason.
   if (connect_mode_ == UpstreamConnectMode::ON_DOWNSTREAM_DATA) {
@@ -1505,7 +1519,10 @@ void Filter::onDownstreamTlsHandshakeComplete() {
 
   // For ON_DOWNSTREAM_TLS_HANDSHAKE mode, establish the upstream connection now.
   if (connect_mode_ == UpstreamConnectMode::ON_DOWNSTREAM_TLS_HANDSHAKE) {
-    // Route should already be set in onNewConnection().
+    if (delay_route_selection_) {
+      route_ = pickRoute();
+    }
+    // If delay_route_selection_ is unset, route should already be set in onNewConnection().
     ASSERT(route_ != nullptr);
     establishUpstreamConnection();
   }
