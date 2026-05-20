@@ -954,7 +954,7 @@ TEST_F(AsyncClientImplTest, WithFilterState) {
   auto state_object = std::make_shared<TestStateObject>("stored-test-state");
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
-  filter_state->setData("test-filter", state_object, StreamInfo::FilterState::StateType::Mutable);
+  filter_state->setData("test-filter", state_object);
   options.setFilterState(filter_state);
 
   auto* request = client_.send(std::move(message_), callbacks_, options);

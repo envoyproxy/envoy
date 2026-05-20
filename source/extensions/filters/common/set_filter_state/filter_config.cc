@@ -57,7 +57,6 @@ Config::parse(const Protobuf::RepeatedPtrField<FilterStateValueProto>& proto_val
     if (value.factory_ == nullptr) {
       throw EnvoyException(fmt::format("'{}' does not have an object factory", value.key_));
     }
-    value.state_type_ = proto_value.read_only() ? StateType::ReadOnly : StateType::Mutable;
     switch (proto_value.shared_with_upstream()) {
     case FilterStateValueProto::ONCE:
       value.stream_sharing_ = StreamSharing::SharedWithUpstreamConnectionOnce;
@@ -92,8 +91,7 @@ void Config::updateFilterState(const Formatter::Context& context,
       continue;
     }
     ENVOY_LOG(debug, "Created the filter state '{}' from value '{}'", value.key_, bytes_value);
-    info.filterState()->setData(value.key_, std::move(object), value.state_type_, life_span_,
-                                value.stream_sharing_);
+    info.filterState()->setData(value.key_, std::move(object), life_span_, value.stream_sharing_);
   }
 }
 

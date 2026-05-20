@@ -4716,7 +4716,6 @@ TEST_P(ClientConnectionWithCustomRawBufferSocketTest, TransportSocketCallbacks) 
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   auto filter_state_object = std::make_shared<TestObject>();
   filter_state.setData("test-filter-state", filter_state_object,
-                       StreamInfo::FilterState::StateType::ReadOnly,
                        StreamInfo::FilterState::LifeSpan::Connection,
                        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   transport_socket_options_ = TransportSocketOptionsUtility::fromFilterState(filter_state);
