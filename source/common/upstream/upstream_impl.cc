@@ -514,6 +514,8 @@ HostDescriptionImplBase::HostDescriptionImplBase(
       locality_metadata_(locality_metadata), locality_(std::move(locality)),
       locality_zone_stat_name_(locality_->zone(), cluster->statsScope().symbolTable()),
       priority_(priority),
+      // TODO(wbpcode): This should be resolved.
+      // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
       socket_factory_(resolveTransportSocketFactory(dest_address, endpoint_metadata_.get())) {
   if (health_check_config.port_value() != 0 && dest_address->type() != Network::Address::Type::Ip) {
     // Setting the health check port to non-0 only works for IP-type addresses. Setting the port
@@ -599,6 +601,19 @@ Host::CreateConnectionData HostImplBase::createHealthCheckConnection(
           : transportSocketFactory();
   return createConnection(dispatcher, cluster(), healthCheckAddress(), {}, factory, nullptr,
                           transport_socket_options, shared_from_this());
+}
+
+Host::CreateConnectionData HostImplBase::createOrcaReportingConnection(
+    Event::Dispatcher& dispatcher,
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+    const envoy::config::core::v3::Metadata* metadata) const {
+  const auto orca_address = orcaReportingAddress();
+  Network::UpstreamTransportSocketFactory& factory =
+      (metadata != nullptr)
+          ? resolveTransportSocketFactory(orca_address, metadata, transport_socket_options)
+          : transportSocketFactory();
+  return createConnection(dispatcher, cluster(), orca_address, addressListOrNull(), factory,
+                          /*options=*/nullptr, transport_socket_options, shared_from_this());
 }
 
 absl::optional<Network::Address::InstanceConstSharedPtr> HostImplBase::maybeGetProxyRedirectAddress(

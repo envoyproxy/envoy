@@ -107,7 +107,7 @@ absl::optional<CgroupPathInfo> CgroupCpuUtil::getCurrentCgroupPath(Filesystem::I
     return absl::nullopt;
   }
 
-  const std::string content = result.value();
+  const std::string& content = result.value();
   const std::vector<absl::string_view> lines = absl::StrSplit(content, '\n');
 
   std::string v2_path;   // Save v2 path in case no v1 found
@@ -381,7 +381,7 @@ absl::optional<std::string> CgroupCpuUtil::discoverCgroupMount(Filesystem::Insta
     return absl::nullopt;
   }
 
-  const std::string content = result.value();
+  const std::string& content = result.value();
   const std::vector<absl::string_view> lines = absl::StrSplit(content, '\n');
 
   std::string v2_mount_point; // Save v2 mount in case no v1 found

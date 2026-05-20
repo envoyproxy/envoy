@@ -158,7 +158,7 @@ private:
   OptRef<OverloadManager> null_overload_manager_;
   const std::string per_handler_stat_prefix_;
   // Declare before its users ActiveListenerDetails.
-  std::atomic<uint64_t> num_handler_connections_{};
+  std::atomic<uint64_t> num_handler_connections_{0};
   absl::flat_hash_map<uint64_t, std::unique_ptr<ActiveListenerDetails>> listener_map_by_tag_;
   absl::flat_hash_map<std::string, std::shared_ptr<PerAddressActiveListenerDetails>>
       tcp_listener_map_by_address_;
