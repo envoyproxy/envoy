@@ -109,7 +109,7 @@ RedisClusterLoadBalancerFactory::create(Upstream::LoadBalancerParams params) {
 RedisClusterLoadBalancerFactory::RedisClusterLoadBalancer::RedisClusterLoadBalancer(
     std::shared_ptr<RedisClusterLoadBalancerFactory> factory,
     const Upstream::PrioritySet& priority_set)
-    : factory_(std::move(factory)), random_(factory_->random_) {
+    : factory_(factory), random_(factory->random_) {
   refresh();
   member_update_cb_ = priority_set.addMemberUpdateCb(
       [this](const Upstream::HostVector&, const Upstream::HostVector&) { refresh(); });
