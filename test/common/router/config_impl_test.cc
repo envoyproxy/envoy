@@ -579,9 +579,9 @@ virtual_hosts:
     EXPECT_EQ("http://bat4.com/new_path", redirect->newUri(headers));
   }
 
-  stream_info.filterState()->setData(
-      Router::OriginalConnectPort::key(), std::make_unique<Router::OriginalConnectPort>(10),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
+  stream_info.filterState()->setData(Router::OriginalConnectPort::key(),
+                                     std::make_unique<Router::OriginalConnectPort>(10),
+                                     StreamInfo::FilterState::LifeSpan::Request);
   // Port addition for CONNECT without port
   {
     Http::TestRequestHeaderMapImpl headers =
@@ -1370,7 +1370,6 @@ virtual_hosts:
     auto address_obj = std::make_unique<Network::Address::InstanceAccessor>(
         Envoy::Network::Utility::parseInternetAddressNoThrow("10.0.0.1", 443, false));
     stream_info.filterState()->setData("envoy.address", std::move(address_obj),
-                                       StreamInfo::FilterState::StateType::ReadOnly,
                                        StreamInfo::FilterState::LifeSpan::Request);
     EXPECT_EQ("filter_state_cluster",
               config.route(genHeaders("foo.com", "/", "GET"), stream_info, 0)
@@ -2479,7 +2478,6 @@ protected:
         std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
             Envoy::StreamInfo::FilterState::LifeSpan::FilterChain));
     filter_state->setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
-                          StreamInfo::FilterState::StateType::ReadOnly,
                           StreamInfo::FilterState::LifeSpan::FilterChain);
     ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
     ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
@@ -3650,13 +3648,10 @@ public:
       : filter_state_(std::make_shared<StreamInfo::FilterStateImpl>(
             StreamInfo::FilterState::LifeSpan::FilterChain)) {
 
-    filter_state_->setData("null-value", nullptr, StreamInfo::FilterState::StateType::ReadOnly,
-                           StreamInfo::FilterState::LifeSpan::FilterChain);
+    filter_state_->setData("null-value", nullptr, StreamInfo::FilterState::LifeSpan::FilterChain);
     filter_state_->setData("nonhashable", std::make_unique<NonHashable>(),
-                           StreamInfo::FilterState::StateType::ReadOnly,
                            StreamInfo::FilterState::LifeSpan::FilterChain);
     filter_state_->setData("hashable", std::make_unique<HashableObj>(),
-                           StreamInfo::FilterState::StateType::ReadOnly,
                            StreamInfo::FilterState::LifeSpan::FilterChain);
   }
   class NonHashable : public StreamInfo::FilterState::Object {};

@@ -131,8 +131,7 @@ TEST_F(ConfigTest, UpdateValue) {
       text_format_source:
         inline_string: "XXX"
   )YAML"});
-  info_.filterState()->setData("foo", std::make_unique<Router::StringAccessorImpl>("OLD"),
-                               StateType::Mutable);
+  info_.filterState()->setData("foo", std::make_unique<Router::StringAccessorImpl>("OLD"));
   update();
   EXPECT_FALSE(info_.filterState()->hasDataAtOrAboveLifeSpan(LifeSpan::Request));
   const auto* foo = info_.filterState()->getDataReadOnly<Router::StringAccessor>("foo");
