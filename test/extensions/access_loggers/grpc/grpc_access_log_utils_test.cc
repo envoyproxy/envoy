@@ -122,7 +122,6 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest, FilterStateFromUpstream) {
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
   state->setValue("value_from_upstream_peer");
   filter_state->setData("upstream_peer", std::move(state),
-                        StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::Connection);
   stream_info.upstreamInfo()->setUpstreamFilterState(filter_state);
 
@@ -171,7 +170,6 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest,
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
   upstream_state->setValue("value_from_upstream_peer");
   filter_state->setData("same_key", std::move(upstream_state),
-                        StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::Connection);
   stream_info.upstreamInfo()->setUpstreamFilterState(filter_state);
 

@@ -312,7 +312,6 @@ TEST(MatchingData, FilterStateInput) {
   }
 
   filter_state.setData("unknown_key", std::make_shared<Router::StringAccessorImpl>("some_value"),
-                       StreamInfo::FilterState::StateType::Mutable,
                        StreamInfo::FilterState::LifeSpan::Connection);
 
   {
@@ -323,7 +322,6 @@ TEST(MatchingData, FilterStateInput) {
 
   std::string value = "filter_state_value";
   filter_state.setData(key, std::make_shared<Router::StringAccessorImpl>(value),
-                       StreamInfo::FilterState::StateType::Mutable,
                        StreamInfo::FilterState::LifeSpan::Connection);
 
   {
@@ -379,7 +377,7 @@ TEST(MatchingData, FilterStateInputWithField) {
       key,
       std::make_shared<TestFieldFilterStateObject>(absl::flat_hash_map<std::string, std::string>{
           {"my_field", "field_value"}, {"other_field", "other_value"}}),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   // Should return the specific field value, not the serialized whole object.
   {
@@ -419,7 +417,6 @@ TEST(MatchingData, FilterStateInputWithFieldFallbackToSerialize) {
 
   // StringAccessorImpl does NOT support field access.
   filter_state.setData(key, std::make_shared<Router::StringAccessorImpl>("plain_value"),
-                       StreamInfo::FilterState::StateType::Mutable,
                        StreamInfo::FilterState::LifeSpan::Connection);
 
   {
@@ -445,7 +442,7 @@ TEST(MatchingData, FilterStateInputWithoutFieldUsesSerialize) {
       key,
       std::make_shared<TestFieldFilterStateObject>(
           absl::flat_hash_map<std::string, std::string>{{"my_field", "field_value"}}),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   {
     const auto result = input.get(data);

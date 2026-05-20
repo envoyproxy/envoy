@@ -11,6 +11,7 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
+using ::testing::Return;
 using ::testing::ReturnRef;
 
 MockFactoryContext::MockFactoryContext() {
@@ -22,6 +23,9 @@ MockFactoryContext::MockFactoryContext() {
 
   ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));
   ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(*listener_store_.rootScope()));
+  ON_CALL(*this, listenerInfo()).WillByDefault(ReturnRef(listener_info_));
+  ON_CALL(listener_info_, direction())
+      .WillByDefault(Return(envoy::config::core::v3::TrafficDirection::UNSPECIFIED));
 }
 
 MockFactoryContext::~MockFactoryContext() = default;

@@ -138,7 +138,7 @@ public:
   double successRate(SuccessRateMonitorType) const override { return -1; }
 
 private:
-  const absl::optional<MonotonicTime> time_{};
+  const absl::optional<MonotonicTime> time_;
 };
 
 /**
@@ -324,6 +324,9 @@ public:
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
     return health_check_address_;
   }
+  Network::Address::InstanceConstSharedPtr orcaReportingAddress() const override {
+    return address_;
+  }
   SharedConstAddressVector addressListOrNull() const override { return address_list_or_null_; }
 
 protected:
@@ -376,6 +379,10 @@ public:
       Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
       Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const override;
   CreateConnectionData createHealthCheckConnection(
+      Event::Dispatcher& dispatcher,
+      Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+      const envoy::config::core::v3::Metadata* metadata) const override;
+  CreateConnectionData createOrcaReportingConnection(
       Event::Dispatcher& dispatcher,
       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
       const envoy::config::core::v3::Metadata* metadata) const override;
@@ -479,13 +486,14 @@ private:
 
   void setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_status);
 
-  std::atomic<uint32_t> health_flags_{};
+  std::atomic<uint32_t> health_flags_{0};
   std::atomic<uint32_t> weight_;
   bool disable_active_health_check_;
   // TODO(wbpcode): should we store the EDS health status to health_flags_ to get unified status or
   // flag access? May be we could refactor HealthFlag to contain all these statuses and flags in the
   // future.
-  std::atomic<Host::HealthStatus> eds_health_status_{};
+  std::atomic<Host::HealthStatus> eds_health_status_{
+      envoy::config::core::v3::HealthStatus::UNKNOWN};
   // 0 indicates no status has been set.
   std::atomic<uint64_t> last_hc_http_status_{0};
 
@@ -501,7 +509,7 @@ private:
     }
     const std::weak_ptr<const HostImplBase> parent_;
   };
-  mutable std::atomic<uint32_t> handle_count_{};
+  mutable std::atomic<uint32_t> handle_count_{0};
 };
 
 class HostImpl : public HostImplBase, public HostDescriptionImpl {
@@ -685,7 +693,7 @@ using HostSetImplPtr = std::unique_ptr<HostSetImpl>;
  */
 class PrioritySetImpl : public PrioritySet {
 public:
-  PrioritySetImpl() : batch_update_(false) {}
+  PrioritySetImpl() = default;
   // From PrioritySet
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
   addMemberUpdateCb(MemberUpdateCb callback) const override {
@@ -750,7 +758,7 @@ private:
       member_update_cb_helper_;
   mutable Common::CallbackManager<void, uint32_t, const HostVector&, const HostVector&>
       priority_update_cb_helper_;
-  bool batch_update_ : 1;
+  bool batch_update_ : 1 = false;
 
   // Helper class to maintain state as we perform multiple host updates. Keeps track of all hosts
   // that have been added/removed throughout the batch update, and ensures that we properly manage
@@ -1251,7 +1259,7 @@ protected:
   Outlier::DetectorSharedPtr outlier_detector_;
   const bool wait_for_warm_on_init_;
 
-  Server::Configuration::TransportSocketFactoryContextImplPtr transport_factory_context_{};
+  Server::Configuration::TransportSocketFactoryContextImplPtr transport_factory_context_;
 
 protected:
   Random::RandomGenerator& random_;

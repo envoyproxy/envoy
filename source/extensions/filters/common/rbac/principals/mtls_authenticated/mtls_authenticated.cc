@@ -12,8 +12,12 @@ namespace Principals {
 MtlsAuthenticatedMatcher::MtlsAuthenticatedMatcher(
     const envoy::extensions::rbac::principals::mtls_authenticated::v3::Config& auth,
     Server::Configuration::CommonFactoryContext& context)
-    : matcher_(auth.has_san_matcher() ? Extensions::TransportSockets::Tls::createStringSanMatcher(
-                                            auth.san_matcher(), context)
+    : matcher_(auth.has_san_matcher() ? [&]() {
+        auto status_or_matcher =
+            Extensions::TransportSockets::Tls::createStringSanMatcher(auth.san_matcher(), context);
+        THROW_IF_NOT_OK_REF(status_or_matcher.status());
+        return std::move(*status_or_matcher);
+      }()
                                       : nullptr) {
   if (!auth.has_san_matcher() && !auth.any_validated_client_certificate()) {
     throw EnvoyException("envoy.rbac.principals.mtls_authenticated did not have any configured "

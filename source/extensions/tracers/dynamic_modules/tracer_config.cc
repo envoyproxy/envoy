@@ -186,6 +186,7 @@ std::string DynamicModuleSpan::getBaggage(absl::string_view key) {
   envoy_dynamic_module_type_module_buffer value_out = {.ptr = nullptr, .length = 0};
   if (config_->on_span_get_baggage_(in_module_span_, key_buf, &value_out) &&
       value_out.ptr != nullptr) {
+    // NOLINTNEXTLINE(modernize-return-braced-init-list)
     return std::string(value_out.ptr, value_out.length);
   }
   return {};
@@ -202,6 +203,7 @@ void DynamicModuleSpan::setBaggage(absl::string_view key, absl::string_view valu
 std::string DynamicModuleSpan::getTraceId() const {
   envoy_dynamic_module_type_module_buffer value_out = {.ptr = nullptr, .length = 0};
   if (config_->on_span_get_trace_id_(in_module_span_, &value_out) && value_out.ptr != nullptr) {
+    // NOLINTNEXTLINE(modernize-return-braced-init-list)
     return std::string(value_out.ptr, value_out.length);
   }
   return {};
@@ -210,6 +212,7 @@ std::string DynamicModuleSpan::getTraceId() const {
 std::string DynamicModuleSpan::getSpanId() const {
   envoy_dynamic_module_type_module_buffer value_out = {.ptr = nullptr, .length = 0};
   if (config_->on_span_get_span_id_(in_module_span_, &value_out) && value_out.ptr != nullptr) {
+    // NOLINTNEXTLINE(modernize-return-braced-init-list)
     return std::string(value_out.ptr, value_out.length);
   }
   return {};

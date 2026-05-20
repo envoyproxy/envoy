@@ -109,11 +109,11 @@ public:
 private:
   using SamplingExponentsT = absl::flat_hash_map<std::string, SamplingState>;
   SamplingExponentsT sampling_exponents_;
-  mutable absl::Mutex sampling_exponents_mutex_{};
-  std::string rest_bucket_key_{};
+  mutable absl::Mutex sampling_exponents_mutex_;
+  std::string rest_bucket_key_;
   std::unique_ptr<StreamSummaryT> stream_summary_;
   uint64_t last_effective_count_{};
-  mutable absl::Mutex stream_summary_mutex_{};
+  mutable absl::Mutex stream_summary_mutex_;
   SamplerConfigProviderPtr sampler_config_provider_;
 
   void logSamplingInfo(const TopKListT& top_k, const SamplingExponentsT& new_sampling_exponents,

@@ -10,6 +10,7 @@
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
 #include "envoy/extensions/udp_packet_writer/v3/udp_default_writer_factory.pb.h"
 #include "envoy/network/exception.h"
+#include "envoy/network/udp_packet_writer_factory_factory.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/options.h"
 #include "envoy/server/transport_socket_config.h"
@@ -701,7 +702,7 @@ ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listene
     auto* factory_factory = Config::Utility::getFactory<Network::UdpPacketWriterFactoryFactory>(
         config.udp_listener_config().udp_packet_packet_writer_config());
     udp_listener_config_->writer_factory_ = factory_factory->createUdpPacketWriterFactory(
-        config.udp_listener_config().udp_packet_packet_writer_config());
+        config.udp_listener_config().udp_packet_packet_writer_config(), *listener_factory_context_);
   }
   if (config.udp_listener_config().has_quic_options()) {
 #ifdef ENVOY_ENABLE_QUIC
