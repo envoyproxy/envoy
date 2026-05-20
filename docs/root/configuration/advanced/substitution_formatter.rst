@@ -1304,6 +1304,12 @@ Current supported substitution commands include:
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
+``%DOWNSTREAM_TLS_GROUP%``
+  HTTP/TCP/THRIFT
+    The name of the TLS group used for the key agreement to establish the downstream TLS connection.
+  UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
 ``%DOWNSTREAM_TLS_VERSION%``
   HTTP/TCP/THRIFT
     The TLS version (e.g., ``TLSv1.2``, ``TLSv1.3``) used to establish the downstream TLS connection.
@@ -1343,6 +1349,24 @@ Current supported substitution commands include:
 ``%DOWNSTREAM_PEER_CHAIN_SERIALS%``
   HTTP/TCP/THRIFT
     The comma-separated serial numbers of all client certificates used to establish the downstream TLS connection.
+  UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
+``%DOWNSTREAM_PEER_ISSUER_FINGERPRINT_256%``
+  HTTP/TCP/THRIFT
+    The hex-encoded SHA256 fingerprint of the verified issuer (CA) certificate from the
+    validated downstream TLS peer certificate. Requires a validated peer certificate chain
+    (e.g., mTLS with ``require_client_certificate: true`` and a ``validation_context``). Returns
+    ``"-"`` if there is no validated peer certificate chain or no issuer certificate can be found.
+  UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
+``%DOWNSTREAM_PEER_ISSUER_SERIAL%``
+  HTTP/TCP/THRIFT
+    The serial number of the verified issuer (CA) certificate from the validated downstream TLS
+    peer certificate. Requires a validated peer certificate chain (e.g., mTLS with
+    ``require_client_certificate: true`` and a ``validation_context``). Returns ``"-"`` if there
+    is no validated peer certificate chain or no issuer certificate can be found.
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
@@ -1428,9 +1452,23 @@ Current supported substitution commands include:
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
+``%UPSTREAM_TLS_GROUP%``
+  HTTP/TCP/THRIFT
+    The name of the TLS group used for the key agreement to establish the upstream TLS connection.
+  UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
 ``%UPSTREAM_TLS_VERSION%``
   HTTP/TCP/THRIFT
     The TLS version (e.g., ``TLSv1.2``, ``TLSv1.3``) used to establish the upstream TLS connection.
+  UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
+.. _config_access_log_format_upstream_server_name:
+
+``%UPSTREAM_SERVER_NAME%``
+  HTTP/TCP/THRIFT
+    The TLS SNI value used to establish the upstream TLS connection.
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 

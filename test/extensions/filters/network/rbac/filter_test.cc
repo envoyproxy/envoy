@@ -12,7 +12,7 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 
 #include "xds/type/matcher/v3/matcher.pb.h"
 

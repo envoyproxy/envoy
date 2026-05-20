@@ -12,6 +12,8 @@
 namespace Envoy {
 
 using Extensions::TransportSockets::Tls::ContextImplPeer;
+using testing::Eq;
+using testing::Ge;
 
 namespace Quic {
 
@@ -96,7 +98,7 @@ TEST_P(QuicHttpIntegrationTest, RuntimeEnableDraft29) {
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
   codec_client_->close();
-  test_server_->waitForCounterEq("http3.quic_version_h3_29", 1u);
+  test_server_->waitForCounter("http3.quic_version_h3_29", Eq(1u));
 }
 
 TEST_P(QuicHttpIntegrationTest, CertCompressionEnabled) {
@@ -146,17 +148,17 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   // Close the second connection.
   codec_client_->close();
   if (version_ == Network::Address::IpVersion::v4) {
-    test_server_->waitForCounterEq(
+    test_server_->waitForCounter(
         "listener.127.0.0.1_0.http3.downstream.rx.quic_connection_close_error_"
         "code_QUIC_NO_ERROR",
-        2u);
+        Eq(2u));
   } else {
-    test_server_->waitForCounterEq("listener.[__1]_0.http3.downstream.rx.quic_connection_close_"
-                                   "error_code_QUIC_NO_ERROR",
-                                   2u);
+    test_server_->waitForCounter("listener.[__1]_0.http3.downstream.rx.quic_connection_close_"
+                                 "error_code_QUIC_NO_ERROR",
+                                 Eq(2u));
   }
 
-  test_server_->waitForCounterEq("http3.quic_version_rfc_v1", 2u);
+  test_server_->waitForCounter("http3.quic_version_rfc_v1", Eq(2u));
 
   // Start the third connection.
   codec_client_ = makeRawHttp3Connection(makeClientConnection((lookupPort("http"))), absl::nullopt,
@@ -588,7 +590,7 @@ TEST_P(QuicHttpIntegrationTest, ResetRequestWithInvalidCharacter) {
                                   ? "listener.127.0.0.1_0.http3.downstream.tx."
                                   : "listener.[__1]_0.http3.downstream.tx.";
   std::string error_code = "quic_connection_close_error_code_QUIC_HTTP_FRAME_ERROR";
-  test_server_->waitForCounterEq(absl::StrCat(counter_scope, error_code), 1U);
+  test_server_->waitForCounter(absl::StrCat(counter_scope, error_code), Eq(1U));
 }
 
 TEST_P(QuicHttpIntegrationTest, Http3ClientKeepalive) {
@@ -821,7 +823,7 @@ TEST_P(QuicHttpIntegrationTest, MultipleNetworkFilters) {
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
-  test_server_->waitForCounterEq("test_network_filter.on_new_connection", 1);
+  test_server_->waitForCounter("test_network_filter.on_new_connection", Eq(1));
   EXPECT_EQ(test_server_->counter("test_network_filter.on_data")->value(), 0);
   codec_client_->close();
 }
@@ -1339,9 +1341,9 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateNonDefaultFilterChain) {
       });
 
   new_config_helper.setLds("1");
-  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
-  test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 1);
-  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Ge(1));
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Ge(1));
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
   makeRequestAndWaitForResponse(*codec_client_0);
   EXPECT_TRUE(codec_client_1->sawGoAway());
   codec_client_1->close();
@@ -1353,8 +1355,8 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateNonDefaultFilterChain) {
 
   // Update filter chain again to add back filter_chain_1.
   config_helper_.setLds("1");
-  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 2);
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 3);
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Ge(2));
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(3));
 
   auto codec_client_3 =
       makeHttpConnection(makeClientConnectionWithHost(lookupPort("http"), "lyft.com"));
@@ -1381,10 +1383,10 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateDefaultFilterChain) {
       });
 
   new_config_helper.setLds("1");
-  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
-  test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 1);
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Ge(1));
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Ge(1));
 
-  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
   // This connection should pick up the default filter chain.
   auto codec_client_default =
       makeHttpConnection(makeClientConnectionWithHost(lookupPort("http"), "lyft.com"));
@@ -1401,9 +1403,9 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateDefaultFilterChain) {
   });
 
   new_config_helper1.setLds("1");
-  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 2);
-  test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 1);
-  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Ge(2));
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Ge(1));
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
 
   makeRequestAndWaitForResponse(*codec_client_0);
   EXPECT_TRUE(codec_client_default->sawGoAway());
@@ -1423,9 +1425,9 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateDefaultFilterChain) {
       });
 
   new_config_helper2.setLds("1");
-  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 3);
-  test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 1);
-  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Ge(3));
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Ge(1));
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
 
   makeRequestAndWaitForResponse(*codec_client_0);
   codec_client_0->close();
@@ -1448,10 +1450,10 @@ TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableEarlyData) {
   configureEarlyData(false, &new_config_helper);
 
   new_config_helper.setLds("1");
-  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
-  test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 1);
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Ge(1));
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Ge(1));
 
-  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
   // The 2nd connection should try to do 0-RTT but get rejected and QUICHE will transparently retry
   // the request after handshake completes.
   auto codec_client_2 = makeRawHttp3Connection(
@@ -1475,9 +1477,9 @@ TEST_P(QuicInplaceLdsIntegrationTest, StatelessResetOldConnection) {
   designated_connection_ids_.push_back(quic_connection_->connection_id());
   codec_client0->close();
   if (version_ == Network::Address::IpVersion::v4) {
-    test_server_->waitForGaugeEq("listener.127.0.0.1_0.downstream_cx_active", 0u);
+    test_server_->waitForGauge("listener.127.0.0.1_0.downstream_cx_active", Eq(0u));
   } else {
-    test_server_->waitForGaugeEq("listener.[__1]_0.downstream_cx_active", 0u);
+    test_server_->waitForGauge("listener.[__1]_0.downstream_cx_active", Eq(0u));
   }
 
   // This new connection would be reset.
@@ -1489,11 +1491,11 @@ TEST_P(QuicInplaceLdsIntegrationTest, StatelessResetOldConnection) {
       static_cast<EnvoyQuicClientSession*>(codec_client1->connection())->error();
   EXPECT_TRUE(error == quic::QUIC_NETWORK_IDLE_TIMEOUT || error == quic::QUIC_HANDSHAKE_TIMEOUT);
   if (version_ == Network::Address::IpVersion::v4) {
-    test_server_->waitForCounterGe(
-        "listener.127.0.0.1_0.quic.dispatcher.stateless_reset_packets_sent", 1u);
+    test_server_->waitForCounter(
+        "listener.127.0.0.1_0.quic.dispatcher.stateless_reset_packets_sent", Ge(1u));
   } else {
-    test_server_->waitForCounterGe("listener.[__1]_0.quic.dispatcher.stateless_reset_packets_sent",
-                                   1u);
+    test_server_->waitForCounter("listener.[__1]_0.quic.dispatcher.stateless_reset_packets_sent",
+                                 Ge(1u));
   }
 }
 
@@ -1566,8 +1568,8 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddress) {
     // Most v6 platform doesn't support two loopback interfaces.
     EXPECT_EQ("127.0.0.2", quic_connection_->peer_address().host().ToString());
     EXPECT_EQ("127.0.0.1", quic_connection_->self_address().host().ToString());
-    test_server_->waitForCounterGe(
-        "listener.0.0.0.0_0.quic.connection.num_packets_rx_on_preferred_address", 2u);
+    test_server_->waitForCounter(
+        "listener.0.0.0.0_0.quic.connection.num_packets_rx_on_preferred_address", Ge(2u));
   }
 }
 
@@ -1658,8 +1660,8 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDNAT) {
   if (version_ == Network::Address::IpVersion::v4) {
     // Most v6 platform doesn't support two loopback interfaces.
     EXPECT_EQ("1.2.3.4", quic_connection_->peer_address().host().ToString());
-    test_server_->waitForCounterGe(
-        "listener.0.0.0.0_0.quic.connection.num_packets_rx_on_preferred_address", 2u);
+    test_server_->waitForCounter(
+        "listener.0.0.0.0_0.quic.connection.num_packets_rx_on_preferred_address", Ge(2u));
   }
 
   // Close connections before `SocketInterfaceSwap` goes out of scope to ensure packets aren't
@@ -1786,8 +1788,8 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDualStack) {
   ASSERT_TRUE(response->complete());
 
   EXPECT_EQ("127.0.0.2", quic_connection_->peer_address().host().ToString());
-  test_server_->waitForCounterGe(
-      "listener.[__]_0.quic.connection.num_packets_rx_on_preferred_address", 2u);
+  test_server_->waitForCounter(
+      "listener.[__]_0.quic.connection.num_packets_rx_on_preferred_address", Ge(2u));
 }
 
 TEST_P(QuicHttpIntegrationTest, PreferredAddressDroppedByIncompatibleListenerFilter) {
@@ -1971,7 +1973,8 @@ TEST_P(QuicHttpIntegrationTest, ConnectionDebugVisitor) {
                   quic::ConnectionCloseSourceToString(quic::ConnectionCloseSource::FROM_PEER)),
       {
         quic_session->close(Network::ConnectionCloseType::NoFlush);
-        test_server_->waitForGaugeEq(fmt::format("listener.{}.downstream_cx_active", listener), 0u);
+        test_server_->waitForGauge(fmt::format("listener.{}.downstream_cx_active", listener),
+                                   Eq(0u));
       });
 }
 
@@ -2038,6 +2041,75 @@ TEST_P(QuicHttpIntegrationTest, QuicListenerFilterReceivesFirstPacketWithCmsg) {
   EXPECT_GT(std::stoi(metrics.at(1)), 0);
   // first packet has packet headers length greater than zero.
   EXPECT_GT(std::stoi(metrics.at(2)), 0);
+}
+
+TEST_P(QuicHttpIntegrationTest, SessionTicketResumptionWithStaticKeys) {
+  concurrency_ = 1;
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_session_ticket_support",
+                                    "true");
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* ts = bootstrap.mutable_static_resources()
+                   ->mutable_listeners(0)
+                   ->mutable_filter_chains(0)
+                   ->mutable_transport_socket();
+    auto quic_transport_socket_config = MessageUtil::anyConvert<
+        envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport>(
+        *ts->mutable_typed_config());
+    auto* keys = quic_transport_socket_config.mutable_downstream_tls_context()
+                     ->mutable_session_ticket_keys();
+    // Session ticket keys must be exactly 80 bytes.
+    keys->add_keys()->set_inline_bytes(std::string(80, '\x01'));
+    ts->mutable_typed_config()->PackFrom(quic_transport_socket_config);
+  });
+
+  initialize();
+
+  // First connection: full handshake.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response1->waitForEndStream());
+  EnvoyQuicClientSession* quic_session1 =
+      static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
+  EXPECT_FALSE(quic_session1->IsResumption());
+  codec_client_->close();
+
+  // Second connection: should resume via session ticket.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EnvoyQuicClientSession* quic_session2 =
+      static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
+  EXPECT_TRUE(quic_session2->IsResumption());
+  codec_client_->close();
+}
+
+TEST_P(QuicHttpIntegrationTest, NoSessionTicketResumptionWithoutKeys) {
+  concurrency_ = 1;
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_session_ticket_support",
+                                    "true");
+  // No session_ticket_keys configured — tickets should be disabled.
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response1->waitForEndStream());
+  codec_client_->close();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EnvoyQuicClientSession* quic_session =
+      static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
+  EXPECT_FALSE(quic_session->IsResumption());
+  codec_client_->close();
 }
 
 } // namespace Quic

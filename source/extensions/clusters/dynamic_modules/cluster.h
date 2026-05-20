@@ -26,6 +26,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
+#include "absl/functional/function_ref.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -260,6 +261,11 @@ public:
 
   const Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNamePool stat_name_pool_;
+  // We only allow the module to create stats during on_cluster_config_new, and not later from
+  // worker threads, so that we don't have to wrap stat_name_pool_ in a lock. Per-request label
+  // values use a stack-local Stats::StatNameDynamicPool in the increment callbacks (see
+  // abi_impl.cc).
+  bool stat_creation_frozen_ = false;
 
 private:
   DynamicModuleClusterConfig(const std::string& cluster_name, const std::string& cluster_config,
@@ -400,7 +406,7 @@ private:
   uint64_t getNextCalloutId() { return next_callout_id_++; }
 
   DynamicModuleClusterConfigSharedPtr config_;
-  envoy_dynamic_module_type_cluster_module_ptr in_module_cluster_;
+  envoy_dynamic_module_type_cluster_module_ptr in_module_cluster_{nullptr};
   Event::Dispatcher& dispatcher_;
   Server::Configuration::ServerFactoryContext& server_context_;
 
@@ -433,25 +439,28 @@ public:
    * Creates a new scheduler for the given cluster.
    */
   static DynamicModuleClusterScheduler* create(DynamicModuleCluster* cluster) {
-    return new DynamicModuleClusterScheduler(cluster->weak_from_this(), cluster->dispatcher_);
+    return new DynamicModuleClusterScheduler(cluster->weak_from_this());
   }
 
   void commit(uint64_t event_id) {
-    dispatcher_.post([cluster = cluster_, event_id]() {
-      if (std::shared_ptr<DynamicModuleCluster> cluster_shared = cluster.lock()) {
-        cluster_shared->onScheduled(event_id);
+    // Lock the cluster so its dispatcher member stays valid across `post`.
+    auto cluster_shared = cluster_.lock();
+    if (!cluster_shared) {
+      return;
+    }
+    cluster_shared->dispatcher_.post([cluster = cluster_, event_id]() {
+      if (std::shared_ptr<DynamicModuleCluster> cs = cluster.lock()) {
+        cs->onScheduled(event_id);
       }
     });
   }
 
 private:
-  DynamicModuleClusterScheduler(std::weak_ptr<DynamicModuleCluster> cluster,
-                                Event::Dispatcher& dispatcher)
-      : cluster_(std::move(cluster)), dispatcher_(dispatcher) {}
+  explicit DynamicModuleClusterScheduler(std::weak_ptr<DynamicModuleCluster> cluster)
+      : cluster_(std::move(cluster)) {}
 
   // Using a weak pointer to avoid unnecessarily extending the lifetime of the cluster.
   std::weak_ptr<DynamicModuleCluster> cluster_;
-  Event::Dispatcher& dispatcher_;
 };
 
 /**
@@ -475,7 +484,7 @@ public:
 
 private:
   envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle_;
-  envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_;
+  envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_{nullptr};
   OnClusterLbCancelHostSelectionType cancel_fn_;
   std::shared_ptr<std::atomic<bool>> cancelled_;
 };
@@ -485,7 +494,11 @@ private:
  */
 class DynamicModuleLoadBalancer : public Upstream::LoadBalancer {
 public:
-  DynamicModuleLoadBalancer(const DynamicModuleClusterHandleSharedPtr& handle);
+  // ``priority_set`` must be the worker local priority set supplied via
+  // ``LoadBalancerParams::priority_set``. The membership update subscription is registered on it so
+  // that the callback list is mutated only on the thread that owns this load balancer instance.
+  DynamicModuleLoadBalancer(const DynamicModuleClusterHandleSharedPtr& handle,
+                            const Upstream::PrioritySet& priority_set);
   ~DynamicModuleLoadBalancer() override;
 
   // Upstream::LoadBalancer.
@@ -532,8 +545,22 @@ public:
   const Upstream::HostVector* hostsAdded() const { return hosts_added_; }
   const Upstream::HostVector* hostsRemoved() const { return hosts_removed_; }
 
+  // Returns the priority set that this load balancer subscribes to for host membership updates.
+  const Upstream::PrioritySet& memberUpdatePrioritySet() const { return priority_set_; }
+
+  /**
+   * Looks up `lb` in the process-wide registry of live instances. Returns true and invokes `f`
+   * with the instance under the registry lock when found, false otherwise. Used by the async
+   * host selection completion ABI callback, which receives a raw pointer from the module that
+   * may outlive the load balancer.
+   */
+  static bool withActiveInstance(const DynamicModuleLoadBalancer* lb,
+                                 absl::FunctionRef<void(const DynamicModuleLoadBalancer&)> f);
+
 private:
   const DynamicModuleClusterHandleSharedPtr handle_;
+  // Worker local priority set that backs the membership update subscription.
+  const Upstream::PrioritySet& priority_set_;
   envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_;
 
   // Shared cancellation flag for the active async host selection. Set in chooseHost when the

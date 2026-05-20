@@ -164,6 +164,17 @@ x-forwarded-client-cert
 or all of the clients or proxies that a request has flowed through, on its way from the client to the
 server. A proxy may choose to sanitize/append/forward the XFCC header before proxying the request.
 
+The XFCC header value can be formatted in either text or JSON format, controlled by the
+:ref:`format<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.SetCurrentClientCertDetails.format>`
+option.
+
+.. _config_http_conn_man_headers_x-forwarded-client-cert_text:
+
+Text format
+^^^^^^^^^^^
+
+The text format is the default.
+
 The XFCC header value is a comma (``,``) separated string. Each substring is an XFCC element, which
 holds information added by a single proxy. A proxy can append the current client certificate
 information as an XFCC element, to the end of the request's XFCC header after a comma.
@@ -187,16 +198,60 @@ A client certificate may contain multiple Subject Alternative Name types. For de
 
 .. _RFC 5280: https://tools.ietf.org/html/rfc5280#section-4.2.1.6
 
-Some examples of the XFCC header are:
+Some examples of the XFCC header in text format are:
 
 1. For one client certificate with only URI type Subject Alternative Name: ``x-forwarded-client-cert: By=http://frontend.lyft.com;Hash=468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688;Subject="/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=Test Client";URI=http://testclient.lyft.com``
 2. For two client certificates with only URI type Subject Alternative Name: ``x-forwarded-client-cert: By=http://frontend.lyft.com;Hash=468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688;URI=http://testclient.lyft.com,By=http://backend.lyft.com;Hash=9ba61d6425303443c0748a02dd8de688468ed33be74eee6556d90c0149c1309e;URI=http://frontend.lyft.com``
 3. For one client certificate with both URI type and DNS type Subject Alternative Name: ``x-forwarded-client-cert: By=http://frontend.lyft.com;Hash=468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688;Subject="/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=Test Client";URI=http://testclient.lyft.com;DNS=lyft.com;DNS=www.lyft.com``
 
+.. _config_http_conn_man_headers_x-forwarded-client-cert_json:
+
+JSON format
+^^^^^^^^^^^
+
+When the JSON format is selected, the XFCC header value is a JSON array of objects. Each object in
+the array represents the certificate information added by a single proxy. The same keys used in the
+text format are available as JSON object fields, but with the following structural differences:
+
+* ``by``, ``uri``, ``dns``, and ``chain`` are JSON arrays of strings (since they can have multiple values).
+  For ``chain``, each string is the PEM-encoded representation of a single certificate
+  in the peer certificate chain. This is the peer provided chain, not the validated chain.
+* ``hash``, ``cert``, and ``subject`` are JSON strings.
+* Unlike the text format, ``cert`` and ``chain`` PEM values are not URL-encoded; instead,
+  special characters (such as newlines in PEM data) are escaped using standard JSON escaping rules.
+* Only fields with non-empty values are included in the JSON object.
+* Values are escaped according to JSON rules (e.g. ``"`` becomes ``\"``, ``\`` becomes ``\\``).
+
+An example of the XFCC header in JSON format:
+
+.. code-block:: json
+
+  [{"by":["http://frontend.lyft.com"],"hash":"468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688","subject":"/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=Test Client","uri":["http://testclient.lyft.com"],"dns":["lyft.com","www.lyft.com"]}]
+
+An example with two proxy hops:
+
+.. code-block:: json
+
+  [{"by":["http://frontend.lyft.com"],"hash":"468ed33be74eee6556d90c0149c1309e","uri":["http://testclient.lyft.com"]},{"by":["http://backend.lyft.com"],"hash":"9ba61d6425303443c0748a02dd8de688","uri":["http://frontend.lyft.com"]}]
+
+Format auto-detection when appending
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When ``forward_client_cert_details`` is ``APPEND_FORWARD`` and the request already has an XFCC
+header, the format of the existing header value is auto-detected rather than using the configured
+format. This prevents mixing text and JSON formats in the same header value. The detection is
+heuristic: if the existing value starts with ``[`` and ends with ``]``, it is treated as a JSON
+array and the new entry is appended as a new object within that array. Otherwise, the existing value
+is treated as text and the new entry is appended using the text format with a ``,`` delimiter.
+
+The configured format is only used when there is no existing XFCC header value (either because the
+mode is ``SANITIZE_SET``, which always replaces the value, or because the mode is ``APPEND_FORWARD``
+and no prior XFCC header was present).
+
 How Envoy processes XFCC is specified by the
-:ref:`forward_client_cert_details<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_client_cert_details>`
-and the
-:ref:`set_current_client_cert_details<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.set_current_client_cert_details>`
+:ref:`forward_client_cert_details<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_client_cert_details>`,
+the
+:ref:`set_current_client_cert_details<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.set_current_client_cert_details>`,
 HTTP connection manager options. If ``forward_client_cert_details`` is unset, the XFCC header will be sanitized by
 default.
 

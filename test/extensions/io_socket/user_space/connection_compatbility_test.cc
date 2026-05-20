@@ -8,8 +8,6 @@
 #include "source/common/network/utility.h"
 #include "source/extensions/io_socket/user_space/io_handle_impl.h"
 
-#include "test/mocks/api/mocks.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 
 #include "gmock/gmock.h"

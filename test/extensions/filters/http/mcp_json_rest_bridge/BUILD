@@ -26,6 +26,7 @@ envoy_cc_test(
         "//source/extensions/filters/http/mcp_json_rest_bridge:mcp_json_rest_bridge_filter_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/mcp_json_rest_bridge/v3:pkg_cc_proto",
         "@nlohmann_json//:json",
         "@ocp-diag-core//ocpdiag/core/testing:parse_text_proto",
     ],

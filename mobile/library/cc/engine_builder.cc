@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <sys/socket.h>
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/socket_option.pb.h"
 #include "envoy/config/metrics/v3/metrics_service.pb.h"
 #include "envoy/extensions/compression/brotli/decompressor/v3/brotli.pb.h"
@@ -12,6 +13,7 @@
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 #include "envoy/extensions/filters/http/router/v3/router.pb.h"
 #include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.h"
+#include "envoy/extensions/early_data/v3/default_early_data_policy.pb.h"
 
 #if defined(__APPLE__)
 #include "envoy/extensions/network/dns_resolver/apple/v3/apple_dns_resolver.pb.h"
@@ -231,6 +233,16 @@ EngineBuilder& EngineBuilder::enableHttp3(bool http3_on) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::enableEarlyData(bool early_data_on) {
+  enable_early_data_ = early_data_on;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::enableScone(bool enable) {
+  scone_enabled_ = enable;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::addQuicConnectionOption(std::string option) {
   quic_connection_options_.push_back(std::move(option));
   return *this;
@@ -315,6 +327,10 @@ EngineBuilder& EngineBuilder::setMaxConcurrentStreams(int max_concurrent_streams
 
 EngineBuilder&
 EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_validation_on) {
+  if (use_worker_thread_) {
+    // Platform certificate validation is not supported with worker thread.
+    return *this;
+  }
   platform_certificates_validation_on_ = platform_certificates_validation_on;
   return *this;
 }
@@ -367,6 +383,19 @@ std::string EngineBuilder::nativeNameToConfig(absl::string_view name) {
   any_config.SerializeToString(&ret);
   return ret;
 #endif
+}
+
+EngineBuilder& EngineBuilder::enableWorkerThread(bool use_worker_thread) {
+  use_worker_thread_ = use_worker_thread;
+  if (use_worker_thread_) {
+    // Platform certificate validation and system proxy settings are not supported with worker
+    // thread.
+    platform_certificates_validation_on_ = false;
+#ifdef __APPLE__
+    respect_system_proxy_settings_ = false;
+#endif
+  }
+  return *this;
 }
 
 EngineBuilder& EngineBuilder::addPlatformFilter(const std::string& name) {
@@ -434,6 +463,10 @@ EngineBuilder::setMaxTimeOnNonDefaultNetworkSeconds(int max_time_on_non_default_
 
 #if defined(__APPLE__)
 EngineBuilder& EngineBuilder::respectSystemProxySettings(bool value, int refresh_interval_secs) {
+  if (use_worker_thread_) {
+    // System proxy settings are not supported with worker thread.
+    return *this;
+  }
   respect_system_proxy_settings_ = value;
   if (refresh_interval_secs > 0) {
     proxy_settings_refresh_interval_secs_ = refresh_interval_secs;
@@ -448,91 +481,6 @@ EngineBuilder& EngineBuilder::setIosNetworkServiceType(int ios_network_service_t
 #endif
 
 #ifdef ENVOY_MOBILE_XDS
-XdsBuilder::XdsBuilder(std::string xds_server_address, const uint32_t xds_server_port)
-    : xds_server_address_(std::move(xds_server_address)), xds_server_port_(xds_server_port) {}
-
-XdsBuilder& XdsBuilder::addInitialStreamHeader(std::string header, std::string value) {
-  envoy::config::core::v3::HeaderValue header_value;
-  header_value.set_key(std::move(header));
-  header_value.set_value(std::move(value));
-  xds_initial_grpc_metadata_.emplace_back(std::move(header_value));
-  return *this;
-}
-
-XdsBuilder& XdsBuilder::setSslRootCerts(std::string root_certs) {
-  ssl_root_certs_ = std::move(root_certs);
-  return *this;
-}
-
-XdsBuilder& XdsBuilder::addRuntimeDiscoveryService(std::string resource_name,
-                                                   const int timeout_in_seconds) {
-  rtds_resource_name_ = std::move(resource_name);
-  rtds_timeout_in_seconds_ = timeout_in_seconds > 0 ? timeout_in_seconds : DefaultXdsTimeout;
-  return *this;
-}
-
-XdsBuilder& XdsBuilder::addClusterDiscoveryService(std::string cds_resources_locator,
-                                                   const int timeout_in_seconds) {
-  enable_cds_ = true;
-  cds_resources_locator_ = std::move(cds_resources_locator);
-  cds_timeout_in_seconds_ = timeout_in_seconds > 0 ? timeout_in_seconds : DefaultXdsTimeout;
-  return *this;
-}
-
-void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap& bootstrap) const {
-  auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
-  ads_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
-  ads_config->set_set_node_on_first_message_only(true);
-  ads_config->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-
-  auto& grpc_service = *ads_config->add_grpc_services();
-  grpc_service.mutable_envoy_grpc()->set_cluster_name("base");
-  grpc_service.mutable_envoy_grpc()->set_authority(
-      absl::StrCat(xds_server_address_, ":", xds_server_port_));
-
-  if (!xds_initial_grpc_metadata_.empty()) {
-    grpc_service.mutable_initial_metadata()->Assign(xds_initial_grpc_metadata_.begin(),
-                                                    xds_initial_grpc_metadata_.end());
-  }
-
-  if (!rtds_resource_name_.empty()) {
-    auto* layered_runtime = bootstrap.mutable_layered_runtime();
-    auto* layer = layered_runtime->add_layers();
-    layer->set_name("rtds_layer");
-    auto* rtds_layer = layer->mutable_rtds_layer();
-    rtds_layer->set_name(rtds_resource_name_);
-    auto* rtds_config = rtds_layer->mutable_rtds_config();
-    rtds_config->mutable_ads();
-    rtds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
-    rtds_config->mutable_initial_fetch_timeout()->set_seconds(rtds_timeout_in_seconds_);
-  }
-
-  if (enable_cds_) {
-    auto* cds_config = bootstrap.mutable_dynamic_resources()->mutable_cds_config();
-    if (cds_resources_locator_.empty()) {
-      cds_config->mutable_ads();
-    } else {
-      bootstrap.mutable_dynamic_resources()->set_cds_resources_locator(cds_resources_locator_);
-      cds_config->mutable_api_config_source()->set_api_type(
-          envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC);
-      cds_config->mutable_api_config_source()->set_transport_api_version(
-          envoy::config::core::v3::ApiVersion::V3);
-    }
-    cds_config->mutable_initial_fetch_timeout()->set_seconds(cds_timeout_in_seconds_);
-    cds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
-    bootstrap.add_node_context_params("cluster");
-    // Stat prefixes that we use in tests.
-    auto* list =
-        bootstrap.mutable_stats_config()->mutable_stats_matcher()->mutable_inclusion_list();
-    list->add_patterns()->set_exact("cluster_manager.active_clusters");
-    list->add_patterns()->set_exact("cluster_manager.cluster_added");
-    list->add_patterns()->set_exact("cluster_manager.cluster_updated");
-    list->add_patterns()->set_exact("cluster_manager.cluster_removed");
-    // Allow SDS related stats.
-    list->add_patterns()->mutable_safe_regex()->set_regex("sds\\..*");
-    list->add_patterns()->mutable_safe_regex()->set_regex(".*\\.ssl_context_update_by_sds");
-  }
-}
 
 EngineBuilder& EngineBuilder::setXds(XdsBuilder xds_builder) {
   xds_builder_ = std::move(xds_builder);
@@ -578,6 +526,13 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   auto* backoff = route_to->mutable_retry_policy()->mutable_retry_back_off();
   backoff->mutable_base_interval()->set_nanos(250000000);
   backoff->mutable_max_interval()->set_seconds(60);
+
+  if (!enable_early_data_) {
+    auto* early_data = route_to->mutable_early_data_policy();
+    early_data->set_name("envoy.route.early_data_policy.default");
+    ::envoy::extensions::early_data::v3::DefaultEarlyDataPolicy config;
+    early_data->mutable_typed_config()->PackFrom(config);
+  }
 
   for (auto filter = native_filter_chain_.rbegin(); filter != native_filter_chain_.rend();
        ++filter) {
@@ -953,6 +908,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       }
     }
 
+    if (scone_enabled_) {
+      quic_protocol_options->mutable_enable_scone()->set_value(true);
+    }
+
     if (use_quic_platform_packet_writer_ || enable_quic_connection_migration_) {
       envoy_mobile::extensions::quic_packet_writer::platform::QuicPlatformPacketWriterConfig
           writer_config;
@@ -1119,7 +1078,13 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   }
 #endif // ENVOY_MOBILE_XDS
 
-  envoy::config::listener::v3::ApiListenerManager api;
+  envoy::config::bootstrap::v3::ApiListenerManager api;
+  if (!use_worker_thread_) {
+    api.set_threading_model(envoy::config::bootstrap::v3::ApiListenerManager::MAIN_THREAD_ONLY);
+  } else {
+    api.set_threading_model(
+        envoy::config::bootstrap::v3::ApiListenerManager::STANDALONE_WORKER_THREAD);
+  }
   auto* listener_manager = bootstrap->mutable_listener_manager();
   listener_manager->mutable_typed_config()->PackFrom(api);
   listener_manager->set_name("envoy.listener_manager_impl.api");
@@ -1128,10 +1093,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 }
 
 EngineSharedPtr EngineBuilder::build() {
-  InternalEngine* envoy_engine = absl::IgnoreLeak(
-      new InternalEngine(std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
-                         network_thread_priority_, high_watermark_,
-                         disable_dns_refresh_on_network_change_, enable_logger_));
+  InternalEngine* envoy_engine = absl::IgnoreLeak(new InternalEngine(
+      std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
+      network_thread_priority_, high_watermark_, enable_logger_, use_worker_thread_));
+  envoy_engine->disableDnsRefreshOnNetworkChange(disable_dns_refresh_on_network_change_);
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.

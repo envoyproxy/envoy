@@ -48,7 +48,7 @@ fi
 # Setting environments for buildx tools
 
 config_env() {
-    BUILDKIT_VERSION=$(grep '^FROM moby/buildkit:' ci/Dockerfile-buildkit | cut -d ':' -f2)
+    BUILDKIT_VERSION=$(grep '^FROM moby/buildkit:' ci/Dockerfile-buildkit | cut -d ':' -f2-)
     echo ">> BUILDX: install ${BUILDKIT_VERSION}"
 
     if [[ "${DOCKER_PLATFORM}" == *","*  ]]; then

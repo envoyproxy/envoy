@@ -9,6 +9,7 @@ NUMPAT
 PUBSUB
 RANDOMKEY
 SLOWLOG
+addend
 addrlen
 defragmentation
 evictable
@@ -65,6 +66,7 @@ CIO
 cbegin
 cend
 constness
+consume
 cstr
 deadcode
 DFP
@@ -111,6 +113,7 @@ ETX
 FS
 FIXME
 decrypted
+decrypts
 gperf
 HEXDIG
 HEXDIGIT
@@ -180,6 +183,7 @@ DST
 DW
 DWORD
 EAGAIN
+EINTR
 ECDH
 ECDHE
 ECDS
@@ -193,6 +197,8 @@ ENOENT
 ENV
 EOF
 EOS
+EPOLLHUP
+EPOLLOUT
 EQ
 ERANGE
 EV
@@ -208,6 +214,7 @@ FB
 FCDS
 FCM
 FFFF
+FFI
 FIN
 FIPS
 FIRSTHDR
@@ -374,10 +381,12 @@ OCSP
 OD
 ODCDS
 OKP
+middleware
 middlewildcard
 monostate
 mpd
 msan
+multicluster
 mutators
 mybucket
 myobject
@@ -505,6 +514,7 @@ STDSTRING
 STL
 STRLEN
 STS
+subcluster
 SUBCOMMAND
 SVG
 SVID
@@ -544,6 +554,7 @@ UTC
 UTF
 UUID
 UUIDs
+Valkey
 VC
 VCHAR
 VCL
@@ -710,6 +721,7 @@ codebase
 codec
 codecs
 codepath
+codepoint
 codepoints
 codings
 combinatorial
@@ -746,6 +758,7 @@ ctor
 ctrl
 customizations
 darwin
+datacenter
 datadog
 datagram
 datagrams
@@ -824,6 +837,7 @@ encodings
 endian
 endianness
 endl
+enricher
 enqueue
 enqueued
 enqueues
@@ -913,6 +927,7 @@ gso
 gzip
 hackery
 hacky
+handoff
 handshaker
 hardcoded
 hardcodes
@@ -930,6 +945,7 @@ healths
 healthz
 hermeticity
 highp
+hit
 hoc
 hostname
 hostnames
@@ -987,6 +1003,7 @@ iteratively
 javascript
 jitter
 jittered
+jemalloc
 joinable
 js
 kafka
@@ -1133,6 +1150,7 @@ num
 numkeys
 oauth
 observability
+observations
 ocagent
 offsetof
 oneof
@@ -1287,6 +1305,7 @@ refcount
 referencee
 referer
 refetch
+refill
 reframed
 refvec
 regex
@@ -1423,6 +1442,7 @@ str
 streambuf
 strerr
 strerror
+string
 stringbuf
 stringified
 stringify
@@ -1445,6 +1465,7 @@ submessages
 subnet
 subnets
 suboptimal
+subprocess
 subsecond
 subseconds
 subsegment
@@ -1461,6 +1482,7 @@ subzone
 sudo
 suf
 superclass
+superpod
 superroot
 superset
 supportability
@@ -1502,10 +1524,13 @@ timestamps
 timeval
 tmp
 tmpfile
+tmpfs
+token
 tokenize
 tokenized
 tokenizes
 tokenizing
+tokio
 toolchain
 tos
 traceid
@@ -1686,3 +1711,9 @@ lcalpha
 nblk
 chr
 IWYU
+CRTP
+bitrate
+kbps
+dataset
+datasets
+smartptr

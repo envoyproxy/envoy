@@ -65,6 +65,18 @@ const (
 	TrailersStatusDefault TrailersStatus = TrailersStatusContinue
 )
 
+type LocalReplyStatus int32
+
+const (
+	// LocalReplyStatusContinue indicates that the local reply should continue to be sent after all
+	// filters are informed.
+	LocalReplyStatusContinue LocalReplyStatus = 0
+	// LocalReplyStatusContinueAndResetStream indicates that the local reply notification should
+	// continue to all filters, but the stream should be reset instead of sending the local reply.
+	LocalReplyStatusContinueAndResetStream LocalReplyStatus = 1
+	LocalReplyStatusDefault                LocalReplyStatus = LocalReplyStatusContinue
+)
+
 // HttpFilter is the interface to implement your own plugin logic. This is a simplified version and could
 // not implement flexible stream control. But it should be enough for most of the use cases.
 type HttpFilter interface {
@@ -113,6 +125,18 @@ type HttpFilter interface {
 	// after OnStreamComplete and access logs are flushed. This is a good place to release
 	// any per-stream resources.
 	OnDestroy()
+
+	// OnLocalReply is called when a local reply is being sent. This allows the filter to modify
+	// the local reply or decide to reset the stream instead. This is called before the local reply
+	// is sent to the client and before the stream is reset.
+	// @Param responseCode the response code of the local reply.
+	// @Param details the details of the local reply. This is usually used to indicate the reason
+	// for sending the local reply, for example, "buffer overflow" or "rate limit exceeded".
+	// @Param resetImminent whether the stream is going to be reset after this local reply. This allows
+	// the filter to decide whether to continue with sending the local reply or just reset the stream.
+	// @Return LocalReplyStatus the status to control whether to continue with sending the local reply
+	// or reset the stream.
+	OnLocalReply(responseCode uint32, details UnsafeEnvoyBuffer, resetImminent bool) LocalReplyStatus
 }
 
 type EmptyHttpFilter struct {
@@ -146,6 +170,10 @@ func (p *EmptyHttpFilter) OnStreamComplete() {
 }
 
 func (p *EmptyHttpFilter) OnDestroy() {
+}
+
+func (p *EmptyHttpFilter) OnLocalReply(responseCode uint32, details UnsafeEnvoyBuffer, resetImminent bool) LocalReplyStatus {
+	return LocalReplyStatusDefault
 }
 
 // HttpFilterFactory is the factory interface for creating stream plugins.

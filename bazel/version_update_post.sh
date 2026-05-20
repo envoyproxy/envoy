@@ -4,27 +4,47 @@ set -e
 set -o pipefail
 
 
-EXISTING_DATE="$("${JQ}" -r ".${DEP}.release_date" "${DEP_DATA}")"
-DATE_SEARCH="release_date = \"${EXISTING_DATE}\","
 DEP_CHECK="${DEP_CHECK:-tools/dependency/check}"
 
+# Derive the companion deps.yaml from VERSION_FILE.
+# VERSION_FILE is always <dir>/repository_locations.bzl, so:
+#   bazel/repository_locations.bzl     -> bazel/deps.yaml
+#   api/bazel/repository_locations.bzl -> api/bazel/deps.yaml
+DEPS_YAML="${VERSION_FILE%/repository_locations.bzl}/deps.yaml"
+
+if [[ ! -f "$DEPS_YAML" ]]; then
+    echo "ERROR: Expected deps YAML not found: ${DEPS_YAML}" >&2
+    exit 1
+fi
+
+# Read the current release_date directly from the dependency JSON data.
+# shellcheck disable=SC2016
+EXISTING_DATE="$("$JQ" -r --arg dep "$DEP" '.[$dep].release_date' "$DEP_DATA")"
+
+if [[ -z "$EXISTING_DATE" || "$EXISTING_DATE" == "null" ]]; then
+    echo "ERROR: Could not find release_date for '${DEP}' in DEP_DATA" >&2
+    exit 1
+fi
+
 find_date_line () {
-    local match match_ln date_match_ln
-    # This needs to find the correct date to replace
-    match="$(\
-        grep -n "${DEP_SEARCH}" "${VERSION_FILE}" \
-        | cut -d: -f-2)"
-    match_ln="$(\
-        echo "${match}" \
-        | cut -d: -f1)"
-    match_ln="$((match_ln + 1))"
+    local dep_ln date_match_ln
+    # Find the line number of the dep's top-level YAML key (e.g. "bazel_gazelle:").
+    dep_ln="$(grep -n "^${DEP}:$" "$DEPS_YAML" | head -n1 | cut -d: -f1)"
+    if [[ -z "$dep_ln" ]]; then
+        echo "ERROR: Could not find dep block '${DEP}:' in ${DEPS_YAML}" >&2
+        exit 1
+    fi
+    # From that line forward, find the first matching release_date line.
     date_match_ln="$(\
-        tail -n "+${match_ln}" "${VERSION_FILE}" \
-        | grep -n "${DATE_SEARCH}" \
+        tail -n "+${dep_ln}" "$DEPS_YAML" \
+        | grep -n "^  release_date: \"${EXISTING_DATE}\"$" \
         | head -n1 \
         | cut -d: -f1)"
-    date_match_ln="$((match_ln + date_match_ln - 1))"
-    printf '%s' "$date_match_ln"
+    if [[ -z "$date_match_ln" ]]; then
+        echo "ERROR: Could not find release_date line for '${DEP}' in ${DEPS_YAML}" >&2
+        exit 1
+    fi
+    printf '%s' "$((dep_ln + date_match_ln - 1))"
 }
 
 update_date () {
@@ -33,7 +53,7 @@ update_date () {
     search="$2"
     replace="$3"
     echo "Updating date(${match_ln}): ${search} -> ${replace}"
-    sed -i "${match_ln}s/${search}/${replace}/" "$VERSION_FILE"
+    sed -i "${match_ln}s/${search}/${replace}/" "$DEPS_YAML"
 }
 
 get_new_date () {

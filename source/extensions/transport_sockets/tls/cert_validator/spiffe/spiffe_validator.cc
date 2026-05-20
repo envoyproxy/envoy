@@ -92,7 +92,7 @@ parseTrustBundles(absl::string_view trust_bundle_mapping_str) {
                 return false;
               }
               const auto& certs = key->getStringArray("x5c");
-              if (!certs.ok() || (*certs).size() == 0) {
+              if (!certs.ok() || (*certs).empty()) {
                 parsing_status = absl::InvalidArgumentError(fmt::format(
                     "missing or empty 'x5c' field found in keys for domain: '{}'", domain_name));
                 return false;
@@ -162,7 +162,10 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
         // SAN types. See the discussion: https://github.com/envoyproxy/envoy/issues/15392
         // TODO(pradeepcrao): Throw an exception when a non-URI matcher is encountered after the
         // deprecated field match_subject_alt_names is removed
-        subject_alt_name_matchers_.emplace_back(createStringSanMatcher(matcher, context));
+        auto status_or_matcher = createStringSanMatcher(matcher, context);
+        SET_AND_RETURN_IF_NOT_OK(status_or_matcher.status(), creation_status);
+
+        subject_alt_name_matchers_.emplace_back(std::move(*status_or_matcher));
       }
     }
   }
@@ -289,11 +292,10 @@ absl::StatusOr<int> SPIFFEValidator::initializeSslContexts(std::vector<SSL_CTX*>
   return SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
 }
 
-bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(X509& leaf_cert,
-                                                           STACK_OF(X509)* cert_chain,
-                                                           X509_VERIFY_PARAM* verify_param,
-                                                           absl::string_view workload_trust_domain,
-                                                           std::string& error_details) {
+bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
+    X509& leaf_cert, STACK_OF(X509)* cert_chain, X509_VERIFY_PARAM* verify_param,
+    absl::string_view workload_trust_domain, std::string& error_details,
+    std::vector<bssl::UniquePtr<X509>>& validated_chain) {
   if (!SPIFFEValidator::certificatePrecheck(&leaf_cert)) {
     error_details = "verify cert failed: cert precheck";
     stats_.fail_verify_error_.inc();
@@ -324,6 +326,15 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(X509& leaf_cert,
                                  Utility::getX509VerificationErrorInfo(new_store_ctx.get()));
     stats_.fail_verify_error_.inc();
     return false;
+  }
+
+  // Capture the validated chain built by X509_verify_cert.
+  STACK_OF(X509)* verified_chain = X509_STORE_CTX_get0_chain(new_store_ctx.get());
+  if (verified_chain != nullptr) {
+    for (size_t i = 0; i < sk_X509_num(verified_chain); i++) {
+      X509* cert = sk_X509_value(verified_chain, i);
+      validated_chain.emplace_back(bssl::UpRef(cert));
+    }
   }
 
   // Do SAN matching.
@@ -368,11 +379,13 @@ ValidationResults SPIFFEValidator::doVerifyCertChain(
   }
   absl::string_view workload_trust_domain = obj ? obj->asString() : "";
   std::string error_details;
-  bool verified = verifyCertChainUsingTrustBundleStore(
-      *leaf_cert, &cert_chain, SSL_CTX_get0_param(&ssl_ctx), workload_trust_domain, error_details);
+  std::vector<bssl::UniquePtr<X509>> validated_chain;
+  bool verified =
+      verifyCertChainUsingTrustBundleStore(*leaf_cert, &cert_chain, SSL_CTX_get0_param(&ssl_ctx),
+                                           workload_trust_domain, error_details, validated_chain);
   return verified ? ValidationResults{ValidationResults::ValidationStatus::Successful,
                                       Envoy::Ssl::ClientValidationStatus::Validated, absl::nullopt,
-                                      absl::nullopt}
+                                      absl::nullopt, std::move(validated_chain)}
                   : ValidationResults{ValidationResults::ValidationStatus::Failed,
                                       Envoy::Ssl::ClientValidationStatus::Failed, absl::nullopt,
                                       error_details};

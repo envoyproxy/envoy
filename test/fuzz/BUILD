@@ -72,7 +72,6 @@ envoy_cc_test_library(
     deps = [
         ":common_proto_cc_proto",
         "//source/common/common:empty_string",
-        "//source/common/common:logger_lib",
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib_header",

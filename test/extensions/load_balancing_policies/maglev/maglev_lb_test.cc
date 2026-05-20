@@ -57,12 +57,17 @@ TEST(MaglevTableLogMaglevTableTest, MaglevTableLogMaglevTableTest) {
   NormalizedHostWeightVector normalized_host_weights = {{host1, 1}};
 
   {
-    CompactMaglevTable table(normalized_host_weights, 1, 2, true, stats);
+    OriginalMaglevTable table(normalized_host_weights, 1, 2, true, stats);
     table.logMaglevTable(true);
   }
 
   {
     CompactMaglevTable table(normalized_host_weights, 1, 2, true, stats);
+    table.logMaglevTable(true);
+  }
+
+  {
+    DegenerateMaglevTable table(normalized_host_weights, 1, 2, true, stats);
     table.logMaglevTable(true);
   }
 }
@@ -130,6 +135,93 @@ TEST_F(MaglevLoadBalancerTest, LbDestructedBeforeFactory) {
   EXPECT_NE(nullptr, factory->create(lb_params_));
 }
 
+// The thread-aware factory updates the worker LB in place via a member update callback on the
+// worker priority set, so the cluster manager should not recreate the worker LB on host changes.
+TEST_F(MaglevLoadBalancerTest, FactoryDoesNotRecreateOnHostChange) {
+  init(7);
+  EXPECT_FALSE(lb_->factory()->recreateOnHostChange());
+}
+
+// Worker LB instances pick up new factory state when the worker priority set fires a member
+// update, without needing to be recreated.
+TEST_F(MaglevLoadBalancerTest, WorkerLbRefreshesOnMemberUpdate) {
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90")};
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks({}, {});
+  init(7);
+
+  // The worker LB is created once and keeps a reference to the factory.
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
+  EXPECT_EQ(host_set_.hosts_[0], lb->chooseHost(nullptr).host);
+
+  // Replace the host set. host_set_.runCallbacks fires the main priority set's callbacks, which
+  // recomputes the factory state on the main thread.
+  auto new_host = makeTestHost(info_, "tcp://127.0.0.1:91");
+  host_set_.hosts_ = {new_host};
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks({}, {});
+
+  // The worker LB still references the previous per-priority state until its own priority set
+  // fires the member update.
+  EXPECT_EQ("127.0.0.1:90", lb->chooseHost(nullptr).host->address()->asString());
+
+  // Simulate the worker priority set firing the member update on the worker. The worker LB must
+  // refresh its cached state from the factory.
+  worker_priority_set_.member_update_cb_helper_.runCallbacks({}, {});
+
+  EXPECT_EQ(new_host, lb->chooseHost(nullptr).host);
+}
+
+// Multiple worker LBs share the same factory; each refreshes independently when its own priority
+// set fires a member update.
+TEST_F(MaglevLoadBalancerTest, MultipleWorkerLbsRefreshIndependently) {
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90")};
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks({}, {});
+  init(7);
+
+  NiceMock<MockPrioritySet> worker_priority_set_a;
+  NiceMock<MockPrioritySet> worker_priority_set_b;
+  LoadBalancerParams params_a{worker_priority_set_a, {}};
+  LoadBalancerParams params_b{worker_priority_set_b, {}};
+
+  LoadBalancerPtr lb_a = lb_->factory()->create(params_a);
+  LoadBalancerPtr lb_b = lb_->factory()->create(params_b);
+
+  EXPECT_EQ(host_set_.hosts_[0], lb_a->chooseHost(nullptr).host);
+  EXPECT_EQ(host_set_.hosts_[0], lb_b->chooseHost(nullptr).host);
+
+  auto new_host = makeTestHost(info_, "tcp://127.0.0.1:91");
+  host_set_.hosts_ = {new_host};
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks({}, {});
+
+  // Only refresh worker A; worker B keeps the previous state until its own priority set fires.
+  worker_priority_set_a.member_update_cb_helper_.runCallbacks({}, {});
+  EXPECT_EQ(new_host, lb_a->chooseHost(nullptr).host);
+  EXPECT_EQ("127.0.0.1:90", lb_b->chooseHost(nullptr).host->address()->asString());
+
+  worker_priority_set_b.member_update_cb_helper_.runCallbacks({}, {});
+  EXPECT_EQ(new_host, lb_b->chooseHost(nullptr).host);
+}
+
+// The worker LB unregisters its member update callback on destruction; firing the worker priority
+// set's callback after the LB is gone must not touch freed memory.
+TEST_F(MaglevLoadBalancerTest, WorkerLbCallbackUnregisteredOnDestruction) {
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90")};
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks({}, {});
+  init(7);
+
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
+  EXPECT_EQ(host_set_.hosts_[0], lb->chooseHost(nullptr).host);
+
+  lb.reset();
+
+  // Must be a no-op rather than calling into freed memory.
+  worker_priority_set_.member_update_cb_helper_.runCallbacks({}, {});
+}
+
 // Throws an exception if table size is not a prime number.
 TEST_F(MaglevLoadBalancerTest, NoPrimeNumber) {
   EXPECT_THROW_WITH_MESSAGE(init(8), EnvoyException,
@@ -146,6 +238,25 @@ TEST_F(MaglevLoadBalancerTest, DefaultMaglevTableSize) {
   createLb();
   EXPECT_EQ(defaultValue, lb_->tableSize());
 };
+
+TEST_F(MaglevLoadBalancerTest, SingleHost) {
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90")};
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks({}, {});
+  init(7);
+
+  EXPECT_EQ("maglev_lb.min_entries_per_host", lb_->stats().min_entries_per_host_.name());
+  EXPECT_EQ("maglev_lb.max_entries_per_host", lb_->stats().max_entries_per_host_.name());
+  EXPECT_EQ(1, lb_->stats().min_entries_per_host_.value());
+  EXPECT_EQ(1, lb_->stats().max_entries_per_host_.value());
+
+  // Always selects the single host: 127.0.0.1:90
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
+  for (uint32_t i = 0; i < 5; ++i) {
+    TestLoadBalancerContext context(i);
+    EXPECT_EQ(host_set_.hosts_[0], lb->chooseHost(&context).host);
+  }
+}
 
 // Basic sanity tests.
 TEST_F(MaglevLoadBalancerTest, Basic) {
@@ -508,6 +619,21 @@ TEST_F(MaglevLoadBalancerTest, Weighted) {
     TestLoadBalancerContext context(i);
     EXPECT_EQ(host_set_.hosts_[expected_assignments[i % expected_assignments.size()]],
               lb->chooseHost(&context).host);
+  }
+}
+
+TEST_F(MaglevLoadBalancerTest, WeightedSingleHost) {
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", 7)};
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks({}, {});
+  init(17);
+  EXPECT_EQ(1, lb_->stats().min_entries_per_host_.value());
+  EXPECT_EQ(1, lb_->stats().max_entries_per_host_.value());
+
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
+  for (uint32_t i = 0; i < 17; ++i) {
+    TestLoadBalancerContext context(i);
+    EXPECT_EQ(host_set_.hosts_[0], lb->chooseHost(&context).host);
   }
 }
 

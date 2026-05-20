@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -32,6 +33,19 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Oauth2 {
+
+/**
+ * Constant OAuth2 related HTTP headers with x-envoy prefix.
+ */
+class OAuth2HeaderValues {
+public:
+  const char* prefix() const { return ThreadSafeSingleton<Http::PrefixValue>::get().prefix(); }
+
+  const Http::LowerCaseString OAuthStatus{absl::StrCat(prefix(), "-oauth-status")};
+  const Http::LowerCaseString OAuthFailureReason{absl::StrCat(prefix(), "-oauth-failure-reason")};
+};
+
+using OAuth2Headers = ConstSingleton<OAuth2HeaderValues>;
 
 class OAuth2Client;
 
@@ -79,7 +93,8 @@ private:
   COUNTER(oauth_passthrough)                                                                       \
   COUNTER(oauth_success)                                                                           \
   COUNTER(oauth_refreshtoken_success)                                                              \
-  COUNTER(oauth_refreshtoken_failure)
+  COUNTER(oauth_refreshtoken_failure)                                                              \
+  COUNTER(oauth_allow_failed_passthrough)
 
 /**
  * Wrapper struct filter stats. @see stats_macros.h
@@ -132,7 +147,8 @@ struct CookieNames {
  * This class encapsulates all data needed for the filter to operate so that we don't pass around
  * raw protobufs and other arbitrary data.
  */
-class FilterConfig : public Logger::Loggable<Logger::Id::oauth2> {
+class FilterConfig : public Router::RouteSpecificFilterConfig,
+                     public Logger::Loggable<Logger::Id::oauth2> {
 public:
   FilterConfig(const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config,
                Server::Configuration::CommonFactoryContext& context,
@@ -148,6 +164,9 @@ public:
   const std::vector<Http::HeaderUtility::HeaderDataPtr>& denyRedirectMatchers() const {
     return deny_redirect_header_matchers_;
   }
+  const std::vector<Http::HeaderUtility::HeaderDataPtr>& allowFailedMatchers() const {
+    return allow_failed_header_matchers_;
+  }
   const HttpUri& oauthTokenEndpoint() const { return oauth_token_endpoint_; }
   const Http::Utility::Url& authorizationEndpointUrl() const { return authorization_endpoint_url_; }
   const std::string& endSessionEndpoint() const { return end_session_endpoint_; }
@@ -159,7 +178,13 @@ public:
   const Matchers::PathMatcher& signoutPath() const { return signout_path_; }
   std::string clientSecret() const { return secret_reader_->clientSecret(); }
   std::string hmacSecret() const { return secret_reader_->hmacSecret(); }
-  FilterStats& stats() { return stats_; }
+  // The secrets are loaded asynchronously if per-route configurations are used, so the filter needs
+  // to check if the secrets are available before processing the request.
+  bool requiredSecretsAvailable() const {
+    return !secret_reader_->hmacSecret().empty() &&
+           (auth_type_ == AuthType::TlsClientAuth || !secret_reader_->clientSecret().empty());
+  }
+  FilterStats& stats() const { return stats_; }
   const std::string& encodedResourceQueryParams() const { return encoded_resource_query_params_; }
   const CookieNames& cookieNames() const { return cookie_names_; }
   const std::string& cookieDomain() const { return cookie_domain_; }
@@ -223,11 +248,12 @@ private:
   const Matchers::PathMatcher redirect_matcher_;
   const Matchers::PathMatcher signout_path_;
   std::shared_ptr<SecretReader> secret_reader_;
-  FilterStats stats_;
+  mutable FilterStats stats_;
   const std::string encoded_auth_scopes_;
   const std::string encoded_resource_query_params_;
   const std::vector<Http::HeaderUtility::HeaderDataPtr> pass_through_header_matchers_;
   const std::vector<Http::HeaderUtility::HeaderDataPtr> deny_redirect_header_matchers_;
+  const std::vector<Http::HeaderUtility::HeaderDataPtr> allow_failed_header_matchers_;
   const CookieNames cookie_names_;
   const std::string cookie_domain_;
   const AuthType auth_type_;
@@ -320,8 +346,13 @@ class OAuth2Filter : public Http::PassThroughFilter,
                      FilterCallbacks,
                      Logger::Loggable<Logger::Id::oauth2> {
 public:
-  OAuth2Filter(FilterConfigSharedPtr config, std::unique_ptr<OAuth2Client>&& oauth_client,
-               TimeSource& time_source, Random::RandomGenerator& random);
+  using OAuth2ClientFactory = std::function<std::shared_ptr<OAuth2Client>(const FilterConfig&)>;
+  using ValidatorFactory =
+      std::function<std::shared_ptr<CookieValidator>(TimeSource&, const FilterConfig&)>;
+
+  OAuth2Filter(FilterConfigSharedPtr default_config, OAuth2ClientFactory oauth_client_factory,
+               ValidatorFactory validator_factory, TimeSource& time_source,
+               Random::RandomGenerator& random);
 
   // Http::PassThroughFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
@@ -336,17 +367,19 @@ public:
                                    const std::string& refresh_token,
                                    std::chrono::seconds expires_in) override;
 
-  void onRefreshAccessTokenFailure() override;
+  Http::FilterHeadersStatus onRefreshAccessTokenFailure() override;
 
-  // a catch-all function used for request failures. we don't retry, as a user can simply refresh
-  // the page in the case of a network blip.
-  void sendUnauthorizedResponse(const std::string& details) override;
+  // Handles unauthorized requests by checking allow_failed_matcher and either continuing
+  // the request as unauthorized (if matcher matches) or sending an unauthorized response.
+  // This is a catch-all function for request failures. We don't retry, as a user can simply
+  // refresh the page in the case of a network blip.
+  Http::FilterHeadersStatus handleOAuthFailure(const std::string& reason,
+                                               const std::string& extra_details = "") override;
 
   void finishGetAccessTokenFlow();
   void finishRefreshAccessTokenFlow();
   void updateTokens(const std::string& access_token, const std::string& id_token,
                     const std::string& refresh_token, std::chrono::seconds expires_in);
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
   friend class OAuth2Test;
@@ -368,15 +401,19 @@ private:
   Http::RequestHeaderMap* request_headers_{nullptr};
   bool was_refresh_token_flow_{false};
 
-  std::unique_ptr<OAuth2Client> oauth_client_;
-  FilterConfigSharedPtr config_;
+  std::shared_ptr<OAuth2Client> oauth_client_;
+  FilterConfigSharedPtr default_config_;
+  const FilterConfig* config_{nullptr};
+  OAuth2ClientFactory oauth_client_factory_;
+  ValidatorFactory validator_factory_;
   TimeSource& time_source_;
   Random::RandomGenerator& random_;
+
+  void resolveAndSetActiveConfig();
 
   // Determines whether or not the current request can skip the entire OAuth flow (HMAC is valid,
   // connection is mTLS, etc.)
   bool canSkipOAuth(Http::RequestHeaderMap& headers) const;
-  bool canRedirectToOAuthServer(Http::RequestHeaderMap& headers) const;
   void redirectToOAuthServer(Http::RequestHeaderMap& headers);
 
   Http::FilterHeadersStatus signOutUser(const Http::RequestHeaderMap& headers) const;
@@ -403,6 +440,12 @@ private:
   std::string encryptToken(const std::string& token) const;
   std::string decryptToken(const std::string& encrypted_token) const;
   void removeOAuthFlowCookies(Http::RequestHeaderMap& headers) const;
+  void removeOAuthTokenCookies(Http::RequestHeaderMap& headers) const;
+  bool shouldAllowFailed(const Http::RequestHeaderMap& headers) const;
+  bool shouldDenyRedirect(const Http::RequestHeaderMap& headers) const;
+  void continueWithFailedOAuth(const std::string& reason, const std::string& extra_details = "");
+  void sendUnauthorizedResponse(const std::string& details);
+  void sendSecretsNotReadyResponse(const std::string& details);
 };
 
 } // namespace Oauth2

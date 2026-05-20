@@ -40,7 +40,6 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//source/common/tcp:async_tcp_client_lib",
         "//test/common/upstream:utility_lib",
-        "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/tcp:tcp_mocks",
         "//test/mocks/upstream:cluster_info_mocks",

@@ -44,7 +44,7 @@ void FileEventImpl::setEnabled(uint32_t events) {
                                                 io_source_.hasReceivedEof())) {
     events_to_notify |= Event::FileReadyType::Read;
   }
-  if ((events & Event::FileReadyType::Write) && io_source_.isWritable()) {
+  if ((events & Event::FileReadyType::Write) && io_source_.isWriteUnblocked()) {
     events_to_notify |= Event::FileReadyType::Write;
   }
   if ((events & Event::FileReadyType::Closed) && io_source_.hasReceivedEof()) {

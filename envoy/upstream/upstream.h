@@ -217,6 +217,21 @@ public:
       const envoy::config::core::v3::Metadata* metadata) const PURE;
 
   /**
+   * Create a dedicated connection for ORCA out-of-band load reporting per gRFC A51
+   * (xds.service.orca.v3.OpenRcaService), separate from request and health-check pools.
+   * Dials the address returned by orcaReportingAddress().
+   * @param dispatcher supplies the owning dispatcher.
+   * @param transport_socket_options supplies the transport options that will be set on the new
+   * connection.
+   * @param metadata when non-null drives transport socket factory resolution.
+   * @return the connection data.
+   */
+  virtual CreateConnectionData createOrcaReportingConnection(
+      Event::Dispatcher& dispatcher,
+      Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+      const envoy::config::core::v3::Metadata* metadata) const PURE;
+
+  /**
    * @return host specific gauges.
    */
   virtual std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>
@@ -323,6 +338,19 @@ public:
    * Set true to disable active health check for the host.
    */
   virtual void setDisableActiveHealthCheck(bool disable_active_health_check) PURE;
+
+  /**
+   * Store the HTTP status code from the last active health check response.
+   * Used by HDS to report richer health state to the control plane.
+   * 0 means no response has been recorded yet.
+   */
+  virtual void setLastHealthCheckHttpStatus(uint64_t) PURE;
+
+  /**
+   * @return the HTTP status code from the last active health check response, or
+   * 0 if no response has been recorded.
+   */
+  virtual absl::optional<uint64_t> lastHealthCheckHttpStatus() const PURE;
 };
 
 using HostConstSharedPtr = std::shared_ptr<const Host>;
@@ -738,6 +766,7 @@ public:
   COUNTER(upstream_rq_completed)                                                                   \
   COUNTER(upstream_rq_maintenance_mode)                                                            \
   COUNTER(upstream_rq_max_duration_reached)                                                        \
+  COUNTER(upstream_rq_active_overflow)                                                             \
   COUNTER(upstream_rq_pending_failure_eject)                                                       \
   COUNTER(upstream_rq_pending_overflow)                                                            \
   COUNTER(upstream_rq_pending_total)                                                               \
@@ -751,6 +780,7 @@ public:
   COUNTER(upstream_rq_retry_overflow)                                                              \
   COUNTER(upstream_rq_retry_success)                                                               \
   COUNTER(upstream_rq_rx_reset)                                                                    \
+  COUNTER(upstream_rq_rx_reset_no_error)                                                           \
   COUNTER(upstream_rq_timeout)                                                                     \
   COUNTER(upstream_rq_total)                                                                       \
   COUNTER(upstream_rq_tx_reset)                                                                    \

@@ -116,27 +116,37 @@ enum class Reporter {
 };
 
 // Detect if peer info read is completed by TCP metadata exchange.
+// Checks for WorkloadMetadataObject key (set atomically with CelState by peer_metadata filter).
 bool peerInfoRead(Reporter reporter, const StreamInfo::FilterState& filter_state) {
   const auto& filter_state_key =
       reporter == Reporter::ServerSidecar || reporter == Reporter::ServerGateway
-          ? Istio::Common::DownstreamPeer
-          : Istio::Common::UpstreamPeer;
+          ? Istio::Common::DownstreamPeerObj
+          : Istio::Common::UpstreamPeerObj;
   return filter_state.hasDataWithName(filter_state_key) ||
          filter_state.hasDataWithName(Istio::Common::NoPeer);
 }
 
 absl::optional<Istio::Common::WorkloadMetadataObject>
 peerInfo(Reporter reporter, const StreamInfo::FilterState& filter_state) {
-  const auto& filter_state_key =
+  const auto& cel_state_key =
       reporter == Reporter::ServerSidecar || reporter == Reporter::ServerGateway
           ? Istio::Common::DownstreamPeer
           : Istio::Common::UpstreamPeer;
-  // This's a workaround before FilterStateObject support operation like `.labels['role']`.
-  // The workaround is to use CelState to store the peer metadata.
-  // Rebuild the WorkloadMetadataObject from the CelState.
+  const auto& obj_key = reporter == Reporter::ServerSidecar || reporter == Reporter::ServerGateway
+                            ? Istio::Common::DownstreamPeerObj
+                            : Istio::Common::UpstreamPeerObj;
+
+  // Try reading as WorkloadMetadataObject first (new format, stored under *_obj key)
+  const auto* peer_info =
+      filter_state.getDataReadOnly<Istio::Common::WorkloadMetadataObject>(obj_key);
+  if (peer_info) {
+    return *peer_info;
+  }
+
+  // Fall back to CelState for backward compatibility with older deployments
   const auto* cel_state =
       filter_state.getDataReadOnly<Envoy::Extensions::Filters::Common::Expr::CelState>(
-          filter_state_key);
+          cel_state_key);
   if (!cel_state) {
     return {};
   }
@@ -146,7 +156,7 @@ peerInfo(Reporter reporter, const StreamInfo::FilterState& filter_state) {
     return {};
   }
 
-  Istio::Common::WorkloadMetadataObject peer_info(
+  Istio::Common::WorkloadMetadataObject result(
       extractString(obj, Istio::Common::InstanceNameToken),
       extractString(obj, Istio::Common::ClusterNameToken),
       extractString(obj, Istio::Common::NamespaceNameToken),
@@ -156,8 +166,20 @@ peerInfo(Reporter reporter, const StreamInfo::FilterState& filter_state) {
       extractString(obj, Istio::Common::AppNameToken),
       extractString(obj, Istio::Common::AppVersionToken),
       Istio::Common::fromSuffix(extractString(obj, Istio::Common::WorkloadTypeToken)),
-      extractString(obj, Istio::Common::IdentityToken));
-  return peer_info;
+      extractString(obj, Istio::Common::IdentityToken),
+      extractString(obj, Istio::Common::RegionToken), extractString(obj, Istio::Common::ZoneToken));
+
+  // Extract labels from the "labels" field
+  const auto& labels_it = obj.fields().find(Istio::Common::LabelsToken);
+  if (labels_it != obj.fields().end() && labels_it->second.has_struct_value()) {
+    std::vector<std::pair<std::string, std::string>> labels;
+    for (const auto& label : labels_it->second.struct_value().fields()) {
+      labels.push_back({std::string(label.first), std::string(label.second.string_value())});
+    }
+    result.setLabels(labels);
+  }
+
+  return result;
 }
 
 // Process-wide context shared with all filter instances.

@@ -19,6 +19,8 @@ namespace PeakEwma {
  * for thread-safe access. Workers write samples, main thread processes them.
  */
 struct PeakEwmaHostLbPolicyData : public Upstream::HostLbPolicyData {
+  bool receivesOrcaLoadReport() const override { return false; }
+
   // Constructor that accepts configurable buffer size
   explicit PeakEwmaHostLbPolicyData(size_t max_samples);
 

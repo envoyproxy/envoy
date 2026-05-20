@@ -71,6 +71,7 @@ constexpr absl::string_view URISanPeerCertificate = "uri_san_peer_certificate";
 constexpr absl::string_view DNSSanLocalCertificate = "dns_san_local_certificate";
 constexpr absl::string_view DNSSanPeerCertificate = "dns_san_peer_certificate";
 constexpr absl::string_view SHA256PeerCertificateDigest = "sha256_peer_certificate_digest";
+constexpr absl::string_view PeerCertificate = "peer_certificate";
 constexpr absl::string_view DownstreamTransportFailureReason = "transport_failure_reason";
 
 // Source properties
@@ -89,6 +90,7 @@ constexpr absl::string_view UpstreamTransportFailureReason = "transport_failure_
 constexpr absl::string_view UpstreamRequestAttemptCount = "request_attempt_count";
 constexpr absl::string_view UpstreamConnectionPoolReadyDuration = "cx_pool_ready_duration";
 constexpr absl::string_view UpstreamNumEndpoints = "num_endpoints";
+constexpr absl::string_view UpstreamServerName = "server_name";
 
 // xDS configuration context properties
 constexpr absl::string_view XDS = "xds";

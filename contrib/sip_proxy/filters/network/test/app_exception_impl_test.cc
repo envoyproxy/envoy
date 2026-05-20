@@ -11,6 +11,7 @@ namespace SipProxy {
 
 TEST(AppExceptionImplTest, CopyConstructor) {
   AppException app_ex(AppExceptionType::InternalError, "msg");
+  // NOLINTNEXTLINE(performance-unnecessary-copy-initialization)
   AppException copy(app_ex);
 
   EXPECT_EQ(app_ex.type_, copy.type_);

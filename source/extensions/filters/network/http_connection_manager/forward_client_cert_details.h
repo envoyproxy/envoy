@@ -24,9 +24,10 @@ class ForwardClientCertAction
                                  Http::ForwardClientCertActionConfig> {
 public:
   ForwardClientCertAction(Http::ForwardClientCertType forward_type,
-                          std::vector<Http::ClientCertDetailsType> details)
+                          std::vector<Http::ClientCertDetailsType> details,
+                          Http::ClientCertFormat format)
       : forward_client_cert_type_(forward_type),
-        set_current_client_cert_details_(std::move(details)) {}
+        set_current_client_cert_details_(std::move(details)), client_cert_format_(format) {}
 
   Http::ForwardClientCertType forwardClientCertType() const override {
     return forward_client_cert_type_;
@@ -36,9 +37,12 @@ public:
     return set_current_client_cert_details_;
   }
 
+  Http::ClientCertFormat clientCertFormat() const override { return client_cert_format_; }
+
 private:
   const Http::ForwardClientCertType forward_client_cert_type_;
   const std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
+  const Http::ClientCertFormat client_cert_format_{};
 };
 
 /**
@@ -95,6 +99,13 @@ createForwardClientCertMatcher(const xds::type::matcher::v3::Matcher& matcher_co
 Http::ForwardClientCertType
 convertForwardClientCertDetailsType(envoy::extensions::filters::network::http_connection_manager::
                                         v3::HttpConnectionManager::ForwardClientCertDetails type);
+
+/**
+ * Convert proto ForwardClientCertFormat enum to Http::ClientCertFormat.
+ */
+Http::ClientCertFormat
+convertForwardClientCertFormat(envoy::extensions::filters::network::http_connection_manager::v3::
+                                   HttpConnectionManager::ForwardClientCertFormat format);
 
 /**
  * Convert proto SetCurrentClientCertDetails to vector of Http::ClientCertDetailsType.

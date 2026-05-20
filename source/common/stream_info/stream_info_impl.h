@@ -336,7 +336,10 @@ struct StreamInfoImpl : public StreamInfo {
   }
   Router::VirtualHostConstSharedPtr virtualHostSharedPtr() const override { return vhost_; }
 
-  Router::RouteConstSharedPtr route() const override { return route_; }
+  OptRef<const Router::Route> route() const override {
+    return makeOptRefFromPtr<const Router::Route>(route_.get());
+  }
+  Router::RouteConstSharedPtr routeSharedPtr() const override { return route_; }
 
   envoy::config::core::v3::Metadata& dynamicMetadata() override { return metadata_; };
   const envoy::config::core::v3::Metadata& dynamicMetadata() const override { return metadata_; };
@@ -459,7 +462,7 @@ struct StreamInfoImpl : public StreamInfo {
     response_flags_.insert(response_flags_.end(), other_response_flags.begin(),
                            other_response_flags.end());
     health_check_request_ = info.healthCheck();
-    route_ = info.route();
+    route_ = info.routeSharedPtr();
     vhost_ = info.virtualHostSharedPtr();
     metadata_ = info.dynamicMetadata();
     filter_state_ = info.filterState();
@@ -583,7 +586,7 @@ private:
   bool should_scheme_match_upstream_{false};
   bool should_drain_connection_{false};
   bool is_shadow_{false};
-  absl::optional<uint32_t> codec_stream_id_{};
+  absl::optional<uint32_t> codec_stream_id_;
 };
 
 } // namespace StreamInfo

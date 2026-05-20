@@ -29,10 +29,8 @@ class RetryStateImpl : public RetryState {
 public:
   static std::unique_ptr<RetryStateImpl>
   create(const RetryPolicy& route_policy, Http::RequestHeaderMap& request_headers,
-         const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-         RouteStatsContextOptRef route_stats_context,
-         Server::Configuration::CommonFactoryContext& context, Event::Dispatcher& dispatcher,
-         Upstream::ResourcePriority priority);
+         const Upstream::ClusterInfo& cluster, Server::Configuration::CommonFactoryContext& context,
+         Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority);
   ~RetryStateImpl() override;
 
   /**
@@ -96,13 +94,13 @@ public:
   }
 
   uint32_t hostSelectionMaxAttempts() const override { return host_selection_max_attempts_; }
+  DoRetryType doRetryType() const override { return do_retry_type_; }
 
   bool isAutomaticallyConfiguredForHttp3() const { return auto_configured_for_http3_; }
 
 private:
   RetryStateImpl(const RetryPolicy& route_policy, Http::RequestHeaderMap& request_headers,
-                 const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                 RouteStatsContextOptRef route_stats_context,
+                 const Upstream::ClusterInfo& cluster,
                  Server::Configuration::CommonFactoryContext& context,
                  Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority,
                  bool auto_configured_for_http3);
@@ -119,8 +117,6 @@ private:
   RetryStatus shouldRetry(RetryDecision would_retry, DoRetryCallback callback);
 
   const Upstream::ClusterInfo& cluster_;
-  const VirtualCluster* vcluster_;
-  RouteStatsContextOptRef route_stats_context_;
   Runtime::Loader& runtime_;
   Random::RandomGenerator& random_;
   Event::Dispatcher& dispatcher_;
@@ -129,18 +125,19 @@ private:
   Event::SchedulableCallbackPtr next_loop_callback_;
   Event::TimerPtr retry_timer_;
   BackOffStrategyPtr backoff_strategy_;
-  BackOffStrategyPtr ratelimited_backoff_strategy_{};
+  BackOffStrategyPtr ratelimited_backoff_strategy_;
   std::vector<Upstream::RetryHostPredicateSharedPtr> retry_host_predicates_;
   Upstream::RetryPrioritySharedPtr retry_priority_;
   std::vector<uint32_t> retriable_status_codes_;
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
-  std::vector<ResetHeaderParserSharedPtr> reset_headers_{};
+  std::vector<ResetHeaderParserSharedPtr> reset_headers_;
   std::chrono::milliseconds reset_max_interval_{};
 
   // Keep small members (bools, enums and int32s) at the end of class, to reduce alignment overhead.
   uint32_t retry_on_{};
   uint32_t retries_remaining_{};
   uint32_t host_selection_max_attempts_;
+  DoRetryType do_retry_type_{DoRetryType::Immediately};
   Upstream::ResourcePriority priority_;
   const bool auto_configured_for_http3_{};
 };

@@ -210,18 +210,19 @@ void FaultFilter::maybeSetupResponseRateLimit(const Http::RequestHeaderMap& requ
 
   config_->stats().response_rl_injected_.inc();
 
-  response_limiter_ = std::make_unique<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter>(
-      rate_kbps.value(), encoder_callbacks_->bufferLimit(),
+  response_limiter_ = std::make_unique<Common::StreamRateLimiter>(
+      encoder_callbacks_->bufferLimit(),
       [this] { encoder_callbacks_->onEncoderFilterAboveWriteBufferHighWatermark(); },
       [this] { encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark(); },
       [this](Buffer::Instance& data, bool end_stream) {
         encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream);
       },
       [this] { encoder_callbacks_->continueEncoding(); },
-      [](uint64_t, bool, std::chrono::milliseconds) {
+      [](uint64_t, uint64_t, std::chrono::milliseconds) {
         // write stats callback.
       },
-      config_->timeSource(), decoder_callbacks_->dispatcher(), decoder_callbacks_->scope());
+      decoder_callbacks_->dispatcher(), decoder_callbacks_->scope(),
+      Common::StreamRateLimiter::simpleTokenBucket(rate_kbps.value(), config_->timeSource()));
 }
 
 bool FaultFilter::faultOverflow() {
@@ -484,7 +485,7 @@ bool FaultFilter::matchesTargetUpstreamCluster() {
   bool matches = true;
 
   if (!fault_settings_->upstreamCluster().empty()) {
-    Router::RouteConstSharedPtr route = decoder_callbacks_->route();
+    const auto route = decoder_callbacks_->route();
     matches = route && route->routeEntry() &&
               (route->routeEntry()->clusterName() == fault_settings_->upstreamCluster());
   }

@@ -118,6 +118,20 @@ envoy.regex_engines.hyperscan:
   - envoy.regex_engines
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.stat_sinks.kafka:
+  categories:
+  - envoy.stats_sinks
+  security_posture: data_plane_agnostic
+  status: alpha
+  type_urls:
+  - envoy.extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig
+envoy.stat_sinks.wasm_filter:
+  categories:
+  - envoy.stats_sinks
+  security_posture: data_plane_agnostic
+  status: alpha
+  type_urls:
+  - envoy.extensions.stat_sinks.wasm_filter.v3.WasmFilterStatsSinkConfig
 envoy.tap_sinks.udp_sink:
   categories:
   - envoy.filters.http
@@ -163,6 +177,13 @@ envoy.filters.http.peer_metadata:
   status: alpha
   type_urls:
   - io.istio.http.peer_metadata.Config
+envoy.filters.network.peer_metadata:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.network.peer_metadata.v3.Config
 envoy.filters.network.metadata_exchange:
   categories:
   - envoy.filters.network
@@ -191,3 +212,11 @@ envoy.load_balancing_policies.peak_ewma:
   status: alpha
   type_urls:
   - envoy.extensions.load_balancing_policies.peak_ewma.v3alpha.PeakEwma
+envoy.bootstrap.reverse_tunnel.reverse_tunnel_reporting_service:
+  categories:
+  - envoy.bootstrap
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.reverse_tunnel_reporters.v3alpha.reporters.EventReporterConfig
+  - envoy.extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.GrpcClientConfig

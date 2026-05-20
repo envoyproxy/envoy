@@ -15,6 +15,7 @@ envoy_cc_contrib_extension(
     srcs = ["peer_metadata.cc"],
     hdrs = ["peer_metadata.h"],
     deps = [
+        "//contrib/istio/filters/common/source:hashable_string_lib",
         "//contrib/istio/filters/common/source:metadata_object_lib",
         "//contrib/istio/filters/common/source:workload_discovery_lib",
         "//envoy/http:filter_interface",

@@ -1,6 +1,7 @@
 #include <thread>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.pb.h"
 #include "envoy/extensions/filters/network/reverse_tunnel/v3/reverse_tunnel.pb.h"
 #include "envoy/extensions/transport_sockets/internal_upstream/v3/internal_upstream.pb.h"
@@ -8,6 +9,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 
+#include "test/common/http/http2/http2_frame.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/test_common/logging.h"
@@ -15,6 +17,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -181,6 +185,13 @@ typed_config:
   }
 
   void runEndToEndReverseConnectionHandshakeScenario();
+  void addDrainingAwareReverseConnectionHcmListener(uint32_t reverse_connection_count = 1);
+  void completeReverseTunnelHandshake(FakeRawConnection& connection) const;
+  void startHttp2Session(FakeRawConnection& connection) const;
+  static FakeRawConnection::ValidatorFunction
+  waitForHttp2FrameType(Http::Http2::Http2Frame::Type type);
+  static const char* frameTypeToString(Http::Http2::Http2Frame::Type type);
+  static void logHttp2Frames(absl::string_view label, const std::string& data);
 
   std::string downstream_handshake_request_path_ =
       std::string(Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
@@ -192,6 +203,154 @@ typed_config:
   // Set log level to debug for this test class.
   LogLevelSetter log_level_setter_ = LogLevelSetter(spdlog::level::trace);
 };
+
+void ReverseTunnelFilterIntegrationTest::addDrainingAwareReverseConnectionHcmListener(
+    uint32_t reverse_connection_count) {
+  config_helper_.addConfigModifier(
+      [reverse_connection_count](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        bootstrap.mutable_static_resources()->clear_listeners();
+
+        const std::string listener_yaml = fmt::format(R"EOF(
+name: reverse_connection_listener
+address:
+  socket_address:
+    address: "rc://e2e-node:e2e-cluster:e2e-tenant@cluster_0:{}"
+    port_value: 0
+    resolver_name: envoy.resolvers.reverse_connection
+filter_chains:
+- filters:
+  - name: envoy.filters.network.reverse_tunnel_drain_aware_http_connection_manager
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.reverse_tunnel.v3.DrainAwareHttpConnectionManager
+      hcm_config:
+        stat_prefix: reverse_connection_hcm
+        codec_type: HTTP2
+        http2_protocol_options: {{}}
+        route_config:
+          name: local_route
+          virtual_hosts:
+          - name: local_service
+            domains: ["*"]
+            routes:
+            - match:
+                prefix: "/"
+              direct_response:
+                status: 200
+        http_filters:
+        - name: envoy.filters.http.router
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+)EOF",
+                                                      reverse_connection_count);
+
+        auto* listener = bootstrap.mutable_static_resources()->add_listeners();
+        TestUtility::loadFromYaml(listener_yaml, *listener);
+      });
+}
+
+void ReverseTunnelFilterIntegrationTest::completeReverseTunnelHandshake(
+    FakeRawConnection& connection) const {
+  std::string handshake_request;
+  ASSERT_TRUE(connection.waitForData(FakeRawConnection::waitForInexactMatch("\r\n\r\n"),
+                                     &handshake_request));
+  EXPECT_NE(handshake_request.find("GET /reverse_connections/request HTTP/1.1"), std::string::npos);
+  EXPECT_NE(handshake_request.find("x-envoy-reverse-tunnel-node-id: e2e-node"), std::string::npos);
+  EXPECT_NE(handshake_request.find("x-envoy-reverse-tunnel-cluster-id: e2e-cluster"),
+            std::string::npos);
+  EXPECT_NE(handshake_request.find("x-envoy-reverse-tunnel-tenant-id: e2e-tenant"),
+            std::string::npos);
+
+  ASSERT_TRUE(connection.write("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"));
+}
+
+void ReverseTunnelFilterIntegrationTest::startHttp2Session(FakeRawConnection& connection) const {
+  ASSERT_TRUE(connection.write(Http::Http2::Http2Frame::Preamble, false));
+  ASSERT_TRUE(
+      connection.write(std::string(Http::Http2::Http2Frame::makeEmptySettingsFrame()), false));
+
+  std::string server_preface;
+  ASSERT_TRUE(connection.waitForData(
+      FakeRawConnection::waitForAtLeastBytes(Http::Http2::Http2Frame::HeaderSize),
+      &server_preface));
+  connection.clearData();
+
+  ASSERT_TRUE(connection.write(std::string(Http::Http2::Http2Frame::makeEmptySettingsFrame(
+                                   Http::Http2::Http2Frame::SettingsFlags::Ack)),
+                               false));
+}
+
+FakeRawConnection::ValidatorFunction
+ReverseTunnelFilterIntegrationTest::waitForHttp2FrameType(Http::Http2::Http2Frame::Type type) {
+  return [type](const std::string& data) -> bool {
+    size_t offset = 0;
+    while (offset + Http::Http2::Http2Frame::HeaderSize <= data.size()) {
+      Http::Http2::Http2Frame frame;
+      const absl::string_view frame_view(data.data() + offset, Http::Http2::Http2Frame::HeaderSize);
+      frame.setHeader(frame_view);
+      const size_t total_size = Http::Http2::Http2Frame::HeaderSize + frame.payloadSize();
+      if (offset + total_size > data.size()) {
+        return false;
+      }
+      if (frame.type() == type) {
+        return true;
+      }
+      offset += total_size;
+    }
+    return false;
+  };
+}
+
+const char*
+ReverseTunnelFilterIntegrationTest::frameTypeToString(Http::Http2::Http2Frame::Type type) {
+  switch (type) {
+  case Http::Http2::Http2Frame::Type::Data:
+    return "DATA";
+  case Http::Http2::Http2Frame::Type::Headers:
+    return "HEADERS";
+  case Http::Http2::Http2Frame::Type::Priority:
+    return "PRIORITY";
+  case Http::Http2::Http2Frame::Type::RstStream:
+    return "RST_STREAM";
+  case Http::Http2::Http2Frame::Type::Settings:
+    return "SETTINGS";
+  case Http::Http2::Http2Frame::Type::PushPromise:
+    return "PUSH_PROMISE";
+  case Http::Http2::Http2Frame::Type::Ping:
+    return "PING";
+  case Http::Http2::Http2Frame::Type::GoAway:
+    return "GOAWAY";
+  case Http::Http2::Http2Frame::Type::WindowUpdate:
+    return "WINDOW_UPDATE";
+  case Http::Http2::Http2Frame::Type::Continuation:
+    return "CONTINUATION";
+  case Http::Http2::Http2Frame::Type::Metadata:
+    return "METADATA";
+  }
+  return "UNKNOWN";
+}
+
+void ReverseTunnelFilterIntegrationTest::logHttp2Frames(absl::string_view label,
+                                                        const std::string& data) {
+  ENVOY_LOG_MISC(debug, "reverse_tunnel_test: {} observed {} bytes", label, data.size());
+  size_t offset = 0;
+  while (offset + Http::Http2::Http2Frame::HeaderSize <= data.size()) {
+    Http::Http2::Http2Frame frame;
+    const absl::string_view frame_view(data.data() + offset, Http::Http2::Http2Frame::HeaderSize);
+    frame.setHeader(frame_view);
+    const size_t full_frame_size = Http::Http2::Http2Frame::HeaderSize + frame.payloadSize();
+    if (offset + full_frame_size > data.size()) {
+      ENVOY_LOG_MISC(debug,
+                     "reverse_tunnel_test: {} has trailing partial frame at offset {} "
+                     "(need {}, have {})",
+                     label, offset, full_frame_size, data.size() - offset);
+      break;
+    }
+
+    ENVOY_LOG_MISC(debug, "reverse_tunnel_test: {} frame type={} payload={} stream_id={}", label,
+                   frameTypeToString(frame.type()), frame.payloadSize(), frame.streamId());
+    offset += full_frame_size;
+  }
+}
 
 void ReverseTunnelFilterIntegrationTest::runEndToEndReverseConnectionHandshakeScenario() {
   const uint32_t upstream_port = GetParam() == Network::Address::IpVersion::v4 ? 15000 : 15001;
@@ -257,17 +416,17 @@ void ReverseTunnelFilterIntegrationTest::runEndToEndReverseConnectionHandshakeSc
   ENVOY_LOG_MISC(info, "Waiting for reverse connections to be established.");
   timeSystem().advanceTimeWait(std::chrono::milliseconds(1000));
 
-  test_server_->waitForGaugeGe("reverse_tunnel_acceptor.nodes.e2e-node", 1);
-  test_server_->waitForGaugeGe("reverse_tunnel_acceptor.clusters.e2e-cluster", 1);
+  test_server_->waitForGauge("reverse_tunnel_acceptor.nodes.e2e-node", Ge(1));
+  test_server_->waitForGauge("reverse_tunnel_acceptor.clusters.e2e-cluster", Ge(1));
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 
   BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "POST", "/drain_listeners", "", Http::CodecType::HTTP1, GetParam());
   EXPECT_TRUE(admin_response->complete());
   EXPECT_EQ("200", admin_response->headers().getStatusValue());
 
-  test_server_->waitForCounterEq("listener_manager.listener_stopped", 2);
+  test_server_->waitForCounter("listener_manager.listener_stopped", Eq(2));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ReverseTunnelFilterIntegrationTest,
@@ -454,7 +613,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, BasicReverseTunnelHandshake) {
   tcp_client->waitForData("HTTP/1.1 200 OK");
 
   // Verify stats show successful reverse tunnel handshake.
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 
   // Send a second request to test socket caching for different node IDs.
   IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("listener_0"));
@@ -465,7 +624,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, BasicReverseTunnelHandshake) {
   tcp_client2->waitForData("HTTP/1.1 200 OK");
 
   // Verify additional handshake was processed.
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 2);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(2));
 
   tcp_client->close();
   tcp_client2->close();
@@ -489,6 +648,62 @@ TEST_P(ReverseTunnelFilterIntegrationTest, EndToEndReverseConnectionHandshakeCus
   runEndToEndReverseConnectionHandshakeScenario();
 }
 
+TEST_P(ReverseTunnelFilterIntegrationTest, DrainingAwareHcmSendsGoAwayOnReverseConnections) {
+  DISABLE_IF_ADMIN_DISABLED;
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+  drain_time_ = std::chrono::seconds(1);
+  addDrainingAwareReverseConnectionHcmListener(/*reverse_connection_count=*/2);
+  initialize();
+
+  FakeRawConnectionPtr reverse_conn_1;
+  FakeRawConnectionPtr reverse_conn_2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(reverse_conn_1));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(reverse_conn_2));
+
+  completeReverseTunnelHandshake(*reverse_conn_1);
+  completeReverseTunnelHandshake(*reverse_conn_2);
+
+  // Give the reverse connection wrapper time to detach its temporary HTTP/1 handshake codec
+  // before the test starts sending HTTP/2 bytes on the same socket.
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+
+  startHttp2Session(*reverse_conn_1);
+  startHttp2Session(*reverse_conn_2);
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+  reverse_conn_1->clearData();
+  reverse_conn_2->clearData();
+  BufferingStreamDecoderPtr admin_response =
+      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/drain_listeners?graceful",
+                                         "", Http::CodecType::HTTP1, GetParam());
+  ASSERT_TRUE(admin_response->complete());
+  ASSERT_EQ("200", admin_response->headers().getStatusValue());
+
+  std::string raw_data_conn_1;
+  std::string raw_data_conn_2;
+  ASSERT_TRUE(reverse_conn_1->waitForData(
+      FakeRawConnection::waitForAtLeastBytes(Http::Http2::Http2Frame::HeaderSize), &raw_data_conn_1,
+      std::chrono::milliseconds(2000)));
+  ASSERT_TRUE(reverse_conn_2->waitForData(
+      FakeRawConnection::waitForAtLeastBytes(Http::Http2::Http2Frame::HeaderSize), &raw_data_conn_2,
+      std::chrono::milliseconds(2000)));
+  const testing::AssertionResult goaway_conn_1 = reverse_conn_1->waitForData(
+      waitForHttp2FrameType(Http::Http2::Http2Frame::Type::GoAway), &raw_data_conn_1);
+  ASSERT_TRUE(goaway_conn_1);
+  logHttp2Frames("conn1 goaway received", raw_data_conn_1);
+
+  const testing::AssertionResult goaway_conn_2 = reverse_conn_2->waitForData(
+      waitForHttp2FrameType(Http::Http2::Http2Frame::Type::GoAway), &raw_data_conn_2);
+  ASSERT_TRUE(goaway_conn_2);
+  logHttp2Frames("conn2 goaway received", raw_data_conn_2);
+
+  EXPECT_TRUE(reverse_conn_1->close());
+  EXPECT_TRUE(reverse_conn_2->close());
+  // Advance simulated time past the 1s drain_time so the graceful drain completion timer fires.
+  timeSystem().advanceTimeWait(std::chrono::seconds(2));
+  // Confirm the full chain completed: workers stopped the listener and called.
+  test_server_->waitForCounter("listener_manager.listener_stopped", Ge(1));
+}
+
 // Test validation with static expected values.
 TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithStaticValuesSuccess) {
   const std::string validation_config = R"(
@@ -509,7 +724,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithStaticValuesSuccess) {
   tcp_client->waitForData("HTTP/1.1 200 OK");
   tcp_client->close();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 }
 
 // Test validation with static expected values.
@@ -531,7 +746,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithStaticValuesFailure) {
   tcp_client->waitForData("HTTP/1.1 403 Forbidden");
   tcp_client->waitForDisconnect();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Ge(1));
 }
 
 // Test validation with only node_id validation.
@@ -552,7 +767,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationOnlyNodeId) {
   tcp_client1->waitForData("HTTP/1.1 200 OK");
   tcp_client1->close();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 
   // Failure: node_id doesn't match.
   std::string http_request_fail = createHttpRequestWithRtHeaders(
@@ -563,7 +778,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationOnlyNodeId) {
   tcp_client2->waitForData("HTTP/1.1 403 Forbidden");
   tcp_client2->waitForDisconnect();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Ge(1));
 }
 
 // Test validation with only cluster_id validation.
@@ -584,7 +799,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationOnlyClusterId) {
   tcp_client1->waitForData("HTTP/1.1 200 OK");
   tcp_client1->close();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 
   // Failure: cluster_id doesn't match.
   std::string http_request_fail = createHttpRequestWithRtHeaders(
@@ -595,7 +810,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationOnlyClusterId) {
   tcp_client2->waitForData("HTTP/1.1 403 Forbidden");
   tcp_client2->waitForDisconnect();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Ge(1));
 }
 
 // Test validation with only tenant_id validation.
@@ -616,7 +831,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationOnlyTenantId) {
   tcp_client1->waitForData("HTTP/1.1 200 OK");
   tcp_client1->close();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 
   // Failure: tenant_id doesn't match.
   std::string http_request_fail = createHttpRequestWithRtHeaders(
@@ -627,7 +842,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationOnlyTenantId) {
   tcp_client2->waitForData("HTTP/1.1 403 Forbidden");
   tcp_client2->waitForDisconnect();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Ge(1));
 }
 
 // Test validation with empty format strings. In this case validation is skipped.
@@ -650,7 +865,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithEmptyFormatters) {
   tcp_client->waitForData("HTTP/1.1 200 OK");
   tcp_client->close();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 }
 
 // Test validation with dynamic metadata emission.
@@ -673,7 +888,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithDynamicMetadataEmission
   tcp_client->waitForData("HTTP/1.1 200 OK");
   tcp_client->close();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 }
 
 // Test validation with multiple formatters in format string.
@@ -697,7 +912,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithComplexFormatString) {
 
   // Ensure the validation_failed counter is updated.
   test_server_->waitForCounterExists("reverse_tunnel.handshake.validation_failed");
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Ge(1));
 }
 
 // Test validation passes when formatter returns empty and actual value is empty.
@@ -718,7 +933,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithBothValuesMatching) {
   tcp_client->waitForData("HTTP/1.1 200 OK");
   tcp_client->close();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 }
 
 // Test validation with FILTER_STATE formatter.
@@ -777,7 +992,7 @@ typed_config:
   tcp_client->waitForData("HTTP/1.1 200 OK");
   tcp_client->close();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 }
 
 // Test validation with FILTER_STATE formatter.
@@ -835,7 +1050,7 @@ typed_config:
   tcp_client->waitForData("HTTP/1.1 403 Forbidden");
   tcp_client->waitForDisconnect();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Ge(1));
 }
 
 // Helper network filter to set dynamic metadata for testing.
@@ -966,7 +1181,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithDynamicMetadataSuccess)
   tcp_client->waitForData("HTTP/1.1 200 OK");
   tcp_client->close();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 }
 
 // Test validation with DYNAMIC_METADATA formatter.
@@ -1017,7 +1232,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithDynamicMetadataFailure)
   tcp_client->waitForData("HTTP/1.1 403 Forbidden");
   tcp_client->waitForDisconnect();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Ge(1));
 }
 
 // Test validation with mixed FILTER_STATE and DYNAMIC_METADATA formatters.
@@ -1088,7 +1303,7 @@ typed_config:
   tcp_client->waitForData("HTTP/1.1 200 OK");
   tcp_client->close();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 }
 
 // Test validation with mixed formatters.
@@ -1159,7 +1374,7 @@ typed_config:
   tcp_client->waitForData("HTTP/1.1 403 Forbidden");
   tcp_client->waitForDisconnect();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Ge(1));
 }
 
 // Test validation with mixed formatters.
@@ -1230,7 +1445,7 @@ typed_config:
   tcp_client->waitForData("HTTP/1.1 403 Forbidden");
   tcp_client->waitForDisconnect();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Ge(1));
 }
 
 // Test end-to-end tenant isolation flow.
@@ -1270,7 +1485,7 @@ cluster_type:
   initialize();
 
   test_server_->waitUntilListenersReady();
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
 
   std::string http_request = createHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
                                                             "node1", "cluster1", "tenant1");
@@ -1280,7 +1495,7 @@ cluster_type:
   tcp_client->waitForData("HTTP/1.1 200 OK");
   tcp_client->close();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 }
 
 // Test multiple tenants are isolated correctly.
@@ -1320,7 +1535,7 @@ cluster_type:
   initialize();
 
   test_server_->waitUntilListenersReady();
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
 
   std::string http_request_tenant_a = createHttpRequestWithRtHeaders(
       "GET", "/reverse_connections/request", "node-a", "cluster-a", "tenant-a");
@@ -1338,7 +1553,7 @@ cluster_type:
   tcp_client_b->waitForData("HTTP/1.1 200 OK");
   tcp_client_b->close();
 
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 2);
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(2));
 }
 
 // Test startup validation fails when tenant isolation enabled but tenant_id_format missing.

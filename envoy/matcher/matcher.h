@@ -83,6 +83,7 @@ enum class MatchResult {
 };
 
 // Prints a human-readable string representing the MatchResult.
+// NOLINTNEXTLINE(readability-identifier-naming)
 inline static std::string MatchResultToString(MatchResult match_result) {
   switch (match_result) {
   case MatchResult::Matched:
@@ -337,8 +338,9 @@ public:
   }
 
   static DataInputGetResult
+  // NOLINTNEXTLINE(readability-identifier-naming)
   NoData(DataAvailability data_availability = DataAvailability::AllDataAvailable) {
-    return DataInputGetResult(absl::monostate(), data_availability);
+    return {absl::monostate(), data_availability};
   }
 
   /**
@@ -346,21 +348,24 @@ public:
    *duration of matching. Use CreateString when a string must be constructed.
    **/
   static DataInputGetResult
+  // NOLINTNEXTLINE(readability-identifier-naming)
   CreateStringView(absl::string_view data,
                    DataAvailability data_availability = DataAvailability::AllDataAvailable) {
-    return DataInputGetResult(data, data_availability);
+    return {data, data_availability};
   }
 
   static DataInputGetResult
+  // NOLINTNEXTLINE(readability-identifier-naming)
   CreateString(std::string&& data,
                DataAvailability data_availability = DataAvailability::AllDataAvailable) {
-    return DataInputGetResult(std::move(data), data_availability);
+    return {std::move(data), data_availability};
   }
 
   static DataInputGetResult
+  // NOLINTNEXTLINE(readability-identifier-naming)
   CreateCustom(std::shared_ptr<CustomMatchData>&& data,
                DataAvailability data_availability = DataAvailability::AllDataAvailable) {
-    return DataInputGetResult(std::move(data), data_availability);
+    return {std::move(data), data_availability};
   }
 
 private:

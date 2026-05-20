@@ -433,11 +433,14 @@ TEST_F(FilterManagerTest, SetAndGetUpstreamOverrideHost) {
       }));
   filter_manager_->createDownstreamFilterChain();
 
-  decoder_filter->callbacks_->setUpstreamOverrideHost(std::make_pair("1.2.3.4", true));
+  decoder_filter->callbacks_->setUpstreamOverrideHost(
+      Upstream::LoadBalancerContext::OverrideHost{"1.2.3.4", true});
 
-  auto override_host = decoder_filter->callbacks_->upstreamOverrideHost();
-  EXPECT_EQ(override_host.value().first, "1.2.3.4");
-  EXPECT_TRUE(override_host.value().second);
+  OptRef<const Upstream::LoadBalancerContext::OverrideHost> override_host =
+      decoder_filter->callbacks_->upstreamOverrideHost();
+  EXPECT_TRUE(override_host.has_value());
+  EXPECT_EQ(override_host->host, "1.2.3.4");
+  EXPECT_TRUE(override_host->strict);
 
   filter_manager_->destroyFilters();
 };
@@ -462,7 +465,8 @@ TEST_F(FilterManagerTest, GetRouteLevelFilterConfig) {
   NiceMock<MockDownstreamStreamFilterCallbacks> downstream_callbacks;
   ON_CALL(filter_manager_callbacks_, downstreamCallbacks)
       .WillByDefault(Return(OptRef<DownstreamStreamFilterCallbacks>{downstream_callbacks}));
-  ON_CALL(downstream_callbacks, route(_)).WillByDefault(Return(route));
+  ON_CALL(downstream_callbacks, route(_))
+      .WillByDefault(Return(makeOptRefFromPtr<const Router::Route>(route.get())));
 
   // Get a valid config by the custom filter name.
   EXPECT_CALL(*route, mostSpecificPerFilterConfig(testing::Eq("custom-name")))
@@ -512,10 +516,10 @@ TEST_F(FilterManagerTest, GetRouteLevelFilterConfigForNullRoute) {
   NiceMock<MockDownstreamStreamFilterCallbacks> downstream_callbacks;
   ON_CALL(filter_manager_callbacks_, downstreamCallbacks)
       .WillByDefault(Return(OptRef<DownstreamStreamFilterCallbacks>{downstream_callbacks}));
-  EXPECT_CALL(downstream_callbacks, route(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(downstream_callbacks, route(_)).WillOnce(Return(OptRef<const Router::Route>{}));
   decoder_filter->callbacks_->mostSpecificPerFilterConfig();
 
-  EXPECT_CALL(downstream_callbacks, route(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(downstream_callbacks, route(_)).WillOnce(Return(OptRef<const Router::Route>{}));
   decoder_filter->callbacks_->perFilterConfigs();
 
   filter_manager_->destroyFilters();

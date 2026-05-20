@@ -37,6 +37,7 @@
 #include "test/server/utility.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/escaping.h"
@@ -3501,6 +3502,186 @@ filter_chains:
   manager_->listeners().front().get().listenerScope().counterFromString("foo").inc();
 
   EXPECT_EQ(1UL, server_.stats_store_.counterFromString("listener.test_prefix.foo").value());
+}
+
+// Listener without stats matcher metadata: all stats are created normally.
+TEST_P(ListenerManagerImplTest, StatsMatcherNoMetadata) {
+  const std::string yaml = R"EOF(
+stat_prefix: test_prefix
+address:
+  socket_address:
+    address: "::1"
+    port_value: 10000
+filter_chains:
+- filters: []
+  )EOF";
+
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  auto& scope = manager_->listeners().front().get().listenerScope();
+
+  // Without a stats matcher, any stat name is accepted.
+  EXPECT_NE("", scope.counterFromString("foo").name());
+  EXPECT_NE("", scope.counterFromString("bar").name());
+}
+
+TEST_P(ListenerManagerImplTest, StatsMatcherMetadataButNoMatcherAndDisableStrictCheck) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.strict_stats_matcher_unpacked", "false"}});
+
+  const std::string yaml = R"EOF(
+stat_prefix: test_prefix
+address:
+  socket_address:
+    address: "::1"
+    port_value: 10000
+metadata:
+  typed_filter_metadata:
+    envoy.stats_matcher:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        fields:
+          foo:
+            string_value: "bar"
+filter_chains:
+- filters: []
+  )EOF";
+
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  auto& scope = manager_->listeners().front().get().listenerScope();
+
+  // The presence of metadata that does not conform to a stats matcher should not impact stat
+  // creation.
+  // This is edge case that should never happen in practice but we want to make sure that
+  // it doesn't cause any problems if it does.
+  EXPECT_NE("", scope.counterFromString("foo").name());
+  EXPECT_NE("", scope.counterFromString("bar").name());
+}
+
+// Listener has metadata but no stats matcher, this should be rejected.
+TEST_P(ListenerManagerImplTest, StatsMatcherMetadataButNoMatcher) {
+  const std::string yaml = R"EOF(
+stat_prefix: test_prefix
+address:
+  socket_address:
+    address: "::1"
+    port_value: 10000
+metadata:
+  typed_filter_metadata:
+    envoy.stats_matcher:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        fields:
+          foo:
+            string_value: "bar"
+filter_chains:
+- filters: []
+  )EOF";
+
+  EXPECT_THROW(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException);
+}
+
+// Invalid stats matcher configuration will be rejected.
+TEST_P(ListenerManagerImplTest, StatsMatcherInvalidConfig) {
+  const std::string yaml = R"EOF(
+stat_prefix: test_prefix
+address:
+  socket_address:
+    address: "::1"
+    port_value: 10000
+metadata:
+  typed_filter_metadata:
+    envoy.stats_matcher:
+      "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
+      exclusion_list:
+        patterns: []
+filter_chains:
+- filters: []
+  )EOF";
+
+  // PGV will throw an exception if the config is invalid.
+  EXPECT_THROW(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException);
+}
+
+// Listener with reject_all stats matcher: no stats are created.
+TEST_P(ListenerManagerImplTest, StatsMatcherRejectAll) {
+  const std::string yaml = R"EOF(
+stat_prefix: test_prefix
+address:
+  socket_address:
+    address: "::1"
+    port_value: 10000
+metadata:
+  typed_filter_metadata:
+    envoy.stats_matcher:
+      "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
+      reject_all: true
+filter_chains:
+- filters: []
+  )EOF";
+
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  auto& scope = manager_->listeners().front().get().listenerScope();
+
+  // With reject_all, no stats are created for this listener.
+  EXPECT_EQ("", scope.counterFromString("foo").name());
+  EXPECT_EQ("", scope.counterFromString("bar").name());
+}
+
+// Listener with inclusion list: only stats matching the prefix are created.
+TEST_P(ListenerManagerImplTest, StatsMatcherInclusionList) {
+  const std::string yaml = R"EOF(
+stat_prefix: test_prefix
+address:
+  socket_address:
+    address: "::1"
+    port_value: 10000
+metadata:
+  typed_filter_metadata:
+    envoy.stats_matcher:
+      "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
+      inclusion_list:
+        patterns:
+          - prefix: "listener.test_prefix.foo"
+filter_chains:
+- filters: []
+  )EOF";
+
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  auto& scope = manager_->listeners().front().get().listenerScope();
+
+  // "listener.test_prefix.foo" matches the inclusion prefix — accepted.
+  EXPECT_NE("", scope.counterFromString("foo").name());
+  // "listener.test_prefix.bar" does not match the inclusion prefix — rejected.
+  EXPECT_EQ("", scope.counterFromString("bar").name());
+}
+
+// Listener with exclusion list: stats matching the prefix are not created.
+TEST_P(ListenerManagerImplTest, StatsMatcherExclusionList) {
+  const std::string yaml = R"EOF(
+stat_prefix: test_prefix
+address:
+  socket_address:
+    address: "::1"
+    port_value: 10000
+metadata:
+  typed_filter_metadata:
+    envoy.stats_matcher:
+      "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
+      exclusion_list:
+        patterns:
+          - prefix: "listener.test_prefix.bar"
+filter_chains:
+- filters: []
+  )EOF";
+
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  auto& scope = manager_->listeners().front().get().listenerScope();
+
+  // "listener.test_prefix.foo" does not match the exclusion prefix — accepted.
+  EXPECT_NE("", scope.counterFromString("foo").name());
+  // "listener.test_prefix.bar" matches the exclusion prefix — rejected.
+  EXPECT_EQ("", scope.counterFromString("bar").name());
 }
 
 TEST_P(ListenerManagerImplTest, DuplicateAddressDontBind) {

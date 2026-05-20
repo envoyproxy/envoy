@@ -4,6 +4,7 @@
 #include <set>
 
 #include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
@@ -411,9 +412,11 @@ private:
 class DefaultListenerManagerFactoryImpl : public ListenerManagerFactory {
 public:
   std::unique_ptr<ListenerManager>
-  createListenerManager(Instance& server, std::unique_ptr<ListenerComponentFactory>&& factory,
+  createListenerManager(const Protobuf::Message& config, Instance& server,
+                        std::unique_ptr<ListenerComponentFactory>&& factory,
                         WorkerFactory& worker_factory, bool enable_dispatcher_stats,
                         Quic::QuicStatNames& quic_stat_names) override {
+    (void)config;
     return std::make_unique<ListenerManagerImpl>(server, std::move(factory), worker_factory,
                                                  enable_dispatcher_stats, quic_stat_names);
   }
@@ -421,7 +424,7 @@ public:
     return Config::ServerExtensionValues::get().DEFAULT_LISTENER;
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::config::listener::v3::ListenerManager>();
+    return std::make_unique<envoy::config::bootstrap::v3::ListenerManager>();
   }
 };
 

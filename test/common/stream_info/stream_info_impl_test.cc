@@ -325,7 +325,7 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     stream_info.healthCheck(true);
     EXPECT_TRUE(stream_info.healthCheck());
 
-    EXPECT_EQ(nullptr, stream_info.route());
+    EXPECT_FALSE(stream_info.route().has_value());
     EXPECT_FALSE(stream_info.virtualHost().has_value());
 
     std::shared_ptr<NiceMock<Router::MockVirtualHost>> vhost =
@@ -339,7 +339,7 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     std::shared_ptr<NiceMock<Router::MockRoute>> route =
         std::make_shared<NiceMock<Router::MockRoute>>();
     stream_info.route_ = route;
-    EXPECT_EQ(route, stream_info.route());
+    EXPECT_EQ(route.get(), stream_info.route().ptr());
 
     stream_info.filterState()->setData("test", std::make_unique<TestIntAccessor>(1),
                                        FilterState::StateType::ReadOnly,
@@ -496,8 +496,8 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   EXPECT_EQ(s1.requestComplete(), s2.requestComplete());
   EXPECT_EQ(s1.responseFlags(), s2.responseFlags());
   EXPECT_EQ(s1.healthCheck(), s2.healthCheck());
-  EXPECT_NE(s1.route(), nullptr);
-  EXPECT_EQ(s1.route(), s2.route());
+  EXPECT_TRUE(s1.route().has_value());
+  EXPECT_EQ(s1.route().ptr(), s2.route().ptr());
   EXPECT_EQ(
       Config::Metadata::metadataValue(&s1.dynamicMetadata(), "com.test", "test_key").string_value(),
       Config::Metadata::metadataValue(&s2.dynamicMetadata(), "com.test", "test_key")

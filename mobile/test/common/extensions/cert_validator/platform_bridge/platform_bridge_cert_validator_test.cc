@@ -13,7 +13,6 @@
 #include "test/common/tls/cert_validator/test_common.h"
 #include "test/common/tls/ssl_test_utility.h"
 #include "test/common/tls/test_data/san_dns2_cert_info.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/thread/mocks.h"
 #include "test/test_common/environment.h"

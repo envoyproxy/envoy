@@ -45,6 +45,7 @@ RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
           absl::InvalidArgumentError("hits_addend must contain either a format or a number");
       return;
     }
+    is_negative_hits_ = config.hits_addend().is_negative_hits();
   }
 
   if (config.has_stage() || !config.disable_key().empty()) {
@@ -221,6 +222,9 @@ void RateLimitPolicy::populateDescriptors(const Http::RequestHeaderMap& headers,
   } else if (hits_addend_.has_value()) {
     descriptor.hits_addend_ = hits_addend_.value();
   }
+
+  // Populate is_negative.
+  descriptor.is_negative_hits_ = is_negative_hits_;
 
   // Populate enable_x_rate_limit_headers.
   descriptor.x_ratelimit_option_ = x_ratelimit_option_;

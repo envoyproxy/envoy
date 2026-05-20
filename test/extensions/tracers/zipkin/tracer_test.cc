@@ -7,7 +7,6 @@
 #include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 
 #include "test/mocks/common.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -584,6 +583,13 @@ TEST_F(ZipkinTracerTest, FinishNotSampledSpan) {
   // Creates a root-span with a CS annotation
   SpanPtr span = tracer.startSpan(config, "my_span", timestamp);
   span->setSampled(false);
+
+  // exportedSpan() must track sampled state
+  EXPECT_FALSE(span->exportedSpan());
+  span->setSampled(true);
+  EXPECT_TRUE(span->exportedSpan());
+  span->setSampled(false);
+
   span->finishSpan();
 
   // Test if the reporter's reportSpan method was NOT called upon finishing the span

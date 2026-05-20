@@ -8,6 +8,7 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/io_socket_error_impl.h"
@@ -21,9 +22,9 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -222,37 +223,6 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, GetSocket) {
 
   // Test that getSocket() works before close() is called.
   EXPECT_EQ(handle->fdDoNotUse(), 42);
-}
-
-// Test ignoreCloseAndShutdown() functionality.
-TEST_F(DownstreamReverseConnectionIOHandleTest, IgnoreCloseAndShutdown) {
-  auto handle = createHandle(io_handle_.get(), "test_key");
-
-  // Initially, close and shutdown should work normally
-  // Test shutdown before ignoring - we don't check the result since it depends on base
-  // implementation
-  handle->shutdown(SHUT_RDWR);
-
-  // Now enable ignore mode
-  handle->ignoreCloseAndShutdown();
-
-  // Test that close() is ignored when flag is set
-  auto close_result = handle->close();
-  EXPECT_EQ(close_result.err_, nullptr); // Should return success but do nothing
-
-  // Test that shutdown() is ignored when flag is set
-  auto shutdown_result2 = handle->shutdown(SHUT_RDWR);
-  EXPECT_EQ(shutdown_result2.return_value_, 0);
-  EXPECT_EQ(shutdown_result2.errno_, 0);
-
-  // Test different shutdown modes are all ignored
-  auto shutdown_rd = handle->shutdown(SHUT_RD);
-  EXPECT_EQ(shutdown_rd.return_value_, 0);
-  EXPECT_EQ(shutdown_rd.errno_, 0);
-
-  auto shutdown_wr = handle->shutdown(SHUT_WR);
-  EXPECT_EQ(shutdown_wr.return_value_, 0);
-  EXPECT_EQ(shutdown_wr.errno_, 0);
 }
 
 TEST_F(DownstreamReverseConnectionIOHandleTest, OnPingMessageWritesRpingToSocket) {
@@ -566,6 +536,81 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadEchoDisabledAndErrorHandling
     EXPECT_EQ(result.err_, nullptr);    // No error, just EOF
     EXPECT_EQ(buffer.length(), 0);
   }
+}
+
+// Verify that close() + destructor results in exactly one FD close syscall.
+TEST_F(DownstreamReverseConnectionIOHandleTest, CloseAndDestructorNoDoubleClose) {
+  int fds[2];
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
+  os_fd_t target_fd = fds[0];
+
+  NiceMock<Api::MockOsSysCalls> mock_os_syscalls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&mock_os_syscalls);
+  EXPECT_CALL(mock_os_syscalls, close(target_fd)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+
+  auto mock_socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+  mock_socket->io_handle_ = std::make_unique<Network::IoSocketHandleImpl>(target_fd);
+  EXPECT_CALL(*mock_socket, ioHandle()).WillRepeatedly(ReturnRef(*mock_socket->io_handle_));
+
+  auto handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
+      std::move(mock_socket), io_handle_.get(), "CloseAndDestructorNoDoubleClose");
+  handle->close();
+  handle.reset();
+
+  ::close(fds[1]);
+}
+
+// Verify that calling close() twice results in exactly one FD close.
+TEST_F(DownstreamReverseConnectionIOHandleTest, DoubleCloseCallNoDoubleClose) {
+  int fds[2];
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
+  os_fd_t target_fd = fds[0];
+
+  NiceMock<Api::MockOsSysCalls> mock_os_syscalls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&mock_os_syscalls);
+  EXPECT_CALL(mock_os_syscalls, close(target_fd)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+
+  auto mock_socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+  mock_socket->io_handle_ = std::make_unique<Network::IoSocketHandleImpl>(target_fd);
+  EXPECT_CALL(*mock_socket, ioHandle()).WillRepeatedly(ReturnRef(*mock_socket->io_handle_));
+
+  auto handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
+      std::move(mock_socket), io_handle_.get(), "CloseAndDestructorNoDoubleClose");
+  handle->close();
+  handle->close();
+  handle.reset();
+
+  ::close(fds[1]);
+}
+
+// Verify that calling close() twice results in exactly one FD close.
+TEST_F(DownstreamReverseConnectionIOHandleTest, DoubleShutdownCallNoDoubleClose) {
+  int fds[2];
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
+  os_fd_t target_fd = fds[0];
+
+  NiceMock<Api::MockOsSysCalls> mock_os_syscalls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&mock_os_syscalls);
+  EXPECT_CALL(mock_os_syscalls, close(target_fd)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+
+  auto mock_socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+  mock_socket->io_handle_ = std::make_unique<Network::IoSocketHandleImpl>(target_fd);
+  EXPECT_CALL(*mock_socket, ioHandle()).WillRepeatedly(ReturnRef(*mock_socket->io_handle_));
+
+  auto handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
+      std::move(mock_socket), io_handle_.get(), "CloseAndDestructorNoDoubleClose");
+  handle->shutdown(0);
+  handle->shutdown(0);
+
+  // After close(), owned_socket_ is null so shutdown() returns {0,0}.
+  handle->close();
+  auto result = handle->shutdown(0);
+  EXPECT_EQ(result.return_value_, 0);
+  EXPECT_EQ(result.errno_, 0);
+
+  handle.reset();
+
+  ::close(fds[1]);
 }
 
 } // namespace ReverseConnection

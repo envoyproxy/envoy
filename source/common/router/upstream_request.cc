@@ -88,14 +88,8 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
                        : nullptr,
                    StreamInfo::FilterState::LifeSpan::FilterChain),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
-      upstream_canary_(false), router_sent_end_stream_(false), encode_trailers_(false),
-      retried_(false), awaiting_headers_(true), outlier_detection_timeout_recorded_(false),
-      create_per_try_timeout_on_request_complete_(false), paused_for_connect_(false),
-      paused_for_websocket_(false), reset_stream_(false),
       record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()),
-      cleaned_up_(false), had_upstream_(false),
-      stream_options_({can_send_early_data, can_use_http3}), grpc_rq_success_deferred_(false),
-      enable_half_close_(enable_half_close) {
+      stream_options_({can_send_early_data, can_use_http3}), enable_half_close_(enable_half_close) {
   // Get tracing config once and reuse it.
   auto tracing_config = parent_.callbacks()->tracingConfig();
 
@@ -141,7 +135,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   }
 
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
-  stream_info_.route_ = parent_.callbacks()->route();
+  stream_info_.route_ = parent_.callbacks()->routeSharedPtr();
   stream_info_.upstreamInfo()->setUpstreamHost(upstream_host);
   parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
 
@@ -479,15 +473,18 @@ void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
                                     absl::string_view transport_failure_reason) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
-  if (span_ != nullptr) {
-    // Add tags about reset.
-    span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
-    span_->setTag(Tracing::Tags::get().ErrorReason, Http::Utility::resetReasonToString(reason));
+  if (reason != Http::StreamResetReason::RemoteResetNoError) {
+    if (span_ != nullptr) {
+      // Add tags about reset.
+      span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+      span_->setTag(Tracing::Tags::get().ErrorReason, Http::Utility::resetReasonToString(reason));
+    }
+
+    stream_info_.setResponseFlag(Filter::streamResetReasonToResponseFlag(reason));
   }
   clearRequestEncoder();
   awaiting_headers_ = false;
 
-  stream_info_.setResponseFlag(Filter::streamResetReasonToResponseFlag(reason));
   parent_.onUpstreamReset(reason, transport_failure_reason, *this);
 }
 

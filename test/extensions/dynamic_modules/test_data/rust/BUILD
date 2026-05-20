@@ -12,6 +12,8 @@ package(default_visibility = [
     "//test/extensions/upstreams/http/dynamic_modules:__pkg__",
 ])
 
+exports_files(["Cargo.toml"])
+
 test_program(name = "no_op")
 
 test_program(name = "network_no_op")
@@ -40,6 +42,8 @@ test_program(name = "bootstrap_init_target_test")
 
 test_program(name = "bootstrap_timer_test")
 
+test_program(name = "bootstrap_file_watcher_test")
+
 test_program(name = "bootstrap_admin_handler_test")
 
 test_program(name = "bootstrap_cluster_lifecycle_test")
@@ -55,3 +59,5 @@ test_program(name = "access_log_integration_test")
 test_program(name = "upstream_http_tcp_bridge")
 
 test_program(name = "cluster_integration_test")
+
+test_program(name = "cluster_filter_state_test")

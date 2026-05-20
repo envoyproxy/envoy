@@ -81,6 +81,13 @@ TEST_F(McpFilterTest, SseRequestWithMultipleAcceptValues) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
 }
 
+// Test SSE request with wildcard accept
+TEST_F(McpFilterTest, SseRequestWithWildcardAccept) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"accept", "*/*"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+}
+
 // Test non-SSE GET request passes through in PASS_THROUGH mode
 TEST_F(McpFilterTest, NonSseGetRequestPassThrough) {
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"accept", "text/html"}};
@@ -116,6 +123,14 @@ TEST_F(McpFilterTest, PostWithoutProperAcceptHeaders) {
       {"accept", "application/json"}}; // Missing text/event-stream
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+}
+
+// Test POST request with wildcard accept
+TEST_F(McpFilterTest, PostWithWildcardAccept) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {"content-type", "application/json"}, {"accept", "*/*"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
 // Test REJECT_NO_MCP mode - reject non-MCP traffic

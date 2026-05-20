@@ -141,6 +141,17 @@ message HttpConnectionManager {
     UNESCAPE_AND_FORWARD = 4;
   }
 
+  // The format to use when writing the
+  // :ref:`config_http_conn_man_headers_x-forwarded-client-cert` (XFCC) header value.
+  enum ForwardClientCertFormat {
+    // Use the :ref:`text format <config_http_conn_man_headers_x-forwarded-client-cert_text>`.
+    // This is the default.
+    TEXT = 0;
+
+    // Use the :ref:`JSON format <config_http_conn_man_headers_x-forwarded-client-cert_json>`.
+    JSON = 1;
+  }
+
   // [#next-free-field: 14]
   message Tracing {
     option (udpa.annotations.versioning).previous_message_type =
@@ -272,7 +283,7 @@ message HttpConnectionManager {
     repeated config.core.v3.CidrRange cidr_ranges = 2;
   }
 
-  // [#next-free-field: 7]
+  // [#next-free-field: 8]
   message SetCurrentClientCertDetails {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager."
@@ -301,14 +312,26 @@ message HttpConnectionManager {
     // Whether to forward the URI type Subject Alternative Name of the client cert. Defaults to
     // false.
     bool uri = 5;
+
+    // The format for the header. When the :ref:`forward_client_cert_details
+    // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_client_cert_details>`
+    // is APPEND_FORWARD and an existing XFCC header is present, the format of the existing header
+    // is used. The configured format is used when there is no existing header value
+    // (APPEND_FORWARD with no prior XFCC header, or SANITIZE_SET which always replaces the value).
+    ForwardClientCertFormat format = 7;
   }
 
-  // The configuration for forwarding client cert details.
+  // The configuration for forwarding client cert details, used as the action config in a
+  // :ref:`forward_client_cert_matcher
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_client_cert_matcher>`.
   message ForwardClientCertConfig {
     // How to handle the XFCC header.
     ForwardClientCertDetails forward_client_cert_details = 1;
 
-    // How to set the current client cert details.
+    // The fields in the client certificate to forward. See
+    // :ref:`set_current_client_cert_details
+    // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.set_current_client_cert_details>`
+    // for details.
     SetCurrentClientCertDetails set_current_client_cert_details = 2;
   }
 

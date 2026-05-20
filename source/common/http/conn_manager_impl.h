@@ -312,7 +312,8 @@ private:
 
     // DownstreamStreamFilterCallbacks
     void setRoute(Router::RouteConstSharedPtr route) override;
-    Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
+    OptRef<const Router::Route> route(const Router::RouteCallback& cb) override;
+    Router::RouteConstSharedPtr routeSharedPtr(const Router::RouteCallback& cb) override;
     void clearRouteCache() override;
     void refreshRouteCluster() override;
     void requestRouteConfigUpdate(
@@ -664,6 +665,8 @@ private:
   Server::ThreadLocalOverloadState& overload_state_;
   Server::LoadShedPoint* accept_new_http_stream_{nullptr};
   Server::LoadShedPoint* hcm_ondata_creating_codec_{nullptr};
+  Server::LoadShedPoint* should_send_go_away_on_dispatch_{nullptr};
+  Server::LoadShedPoint* should_send_go_away_and_close_on_dispatch_{nullptr};
   // References into the overload manager thread local state map. Using these lets us avoid a
   // map lookup in the hot path of processing each request.
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;

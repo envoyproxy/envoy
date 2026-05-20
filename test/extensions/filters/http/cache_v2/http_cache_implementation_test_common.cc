@@ -10,7 +10,6 @@
 
 #include "test/extensions/filters/http/cache_v2/mocks.h"
 #include "test/mocks/http/mocks.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "absl/cleanup/cleanup.h"
@@ -380,7 +379,7 @@ TEST_P(HttpCacheImplementationTest, ReadingFromBodyDuringInsert) {
   pumpDispatcher();
   Mock::VerifyAndClearExpectations(mock_progress_receiver.get());
   MockFunction<void(Buffer::InstancePtr, EndStream)> mock_body_callback;
-  EXPECT_CALL(mock_body_callback, Call(Pointee(BufferStringEqual("Hello ")), EndStream::More));
+  EXPECT_CALL(mock_body_callback, Call(Pointee(BufferString("Hello ")), EndStream::More));
   cache_reader->getBody(dispatcher(), AdjustedByteRange(0, 6), mock_body_callback.AsStdFunction());
   pumpDispatcher();
   Mock::VerifyAndClearExpectations(&mock_body_callback);
@@ -388,7 +387,7 @@ TEST_P(HttpCacheImplementationTest, ReadingFromBodyDuringInsert) {
   EXPECT_CALL(*mock_progress_receiver, onBodyInserted(RangeIs(6, 11), true));
   get_body_2(std::make_unique<Buffer::OwnedImpl>("World"), EndStream::End);
   pumpDispatcher();
-  EXPECT_CALL(mock_body_callback, Call(Pointee(BufferStringEqual("Hello World")), EndStream::More));
+  EXPECT_CALL(mock_body_callback, Call(Pointee(BufferString("Hello World")), EndStream::More));
   cache_reader->getBody(dispatcher(), AdjustedByteRange(0, 11), mock_body_callback.AsStdFunction());
   pumpDispatcher();
   Mock::VerifyAndClearExpectations(&mock_body_callback);

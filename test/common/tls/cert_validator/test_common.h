@@ -53,6 +53,8 @@ public:
   }
   absl::string_view certificateValidationError() const override { return cert_validation_error_; }
 
+  void setValidatedCertChain(std::vector<bssl::UniquePtr<X509>>) override {}
+
 private:
   Envoy::Ssl::ClientValidationStatus status_;
   Ssl::ValidateStatus validate_result_{Ssl::ValidateStatus::NotStarted};

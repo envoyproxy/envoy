@@ -614,6 +614,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   forward_client_cert_ = convertForwardClientCertDetailsType(config.forward_client_cert_details());
+  forward_client_cert_format_ =
+      convertForwardClientCertFormat(config.set_current_client_cert_details().format());
   set_current_client_cert_details_ =
       convertSetCurrentClientCertDetails(config.set_current_client_cert_details());
 

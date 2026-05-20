@@ -447,9 +447,9 @@ TEST_F(FileServerFilterTest, GetRequestPausesWhenOverBufferLimit) {
     EXPECT_CALL(*mock_file_handle_, stat);
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), false));
     EXPECT_CALL(*mock_file_handle_, read(_, 0, chunk1.length(), _));
-    EXPECT_CALL(decoder_callbacks_, encodeData(BufferStringEqual(chunk1), false));
+    EXPECT_CALL(decoder_callbacks_, encodeData(BufferString(chunk1), false));
     EXPECT_CALL(*mock_file_handle_, read(_, chunk1.length(), chunk2.length(), _));
-    EXPECT_CALL(decoder_callbacks_, encodeData(BufferStringEqual(chunk2), true));
+    EXPECT_CALL(decoder_callbacks_, encodeData(BufferString(chunk2), true));
   }
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter->decodeHeaders(request_headers, true));
   struct stat stat_result = {};
@@ -501,9 +501,9 @@ TEST_F(FileServerFilterTest, BufferLimitsDontPauseIfClearedBeforeActionCompletes
     EXPECT_CALL(*mock_file_handle_, stat);
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), false));
     EXPECT_CALL(*mock_file_handle_, read(_, 0, chunk1.length(), _));
-    EXPECT_CALL(decoder_callbacks_, encodeData(BufferStringEqual(chunk1), false));
+    EXPECT_CALL(decoder_callbacks_, encodeData(BufferString(chunk1), false));
     EXPECT_CALL(*mock_file_handle_, read(_, chunk1.length(), chunk2.length(), _));
-    EXPECT_CALL(decoder_callbacks_, encodeData(BufferStringEqual(chunk2), true));
+    EXPECT_CALL(decoder_callbacks_, encodeData(BufferString(chunk2), true));
   }
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter->decodeHeaders(request_headers, true));
   struct stat stat_result = {};

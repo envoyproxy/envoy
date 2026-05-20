@@ -71,7 +71,7 @@ void Allocator::debugPrint() {
 template <class BaseClass> class StatsSharedImpl : public MetricImpl<BaseClass> {
 public:
   StatsSharedImpl(StatName name, Allocator& alloc, StatName tag_extracted_name,
-                  const StatNameTagVector& stat_name_tags)
+                  StatNameTagSpan stat_name_tags)
       : MetricImpl<BaseClass>(name, tag_extracted_name, stat_name_tags, alloc.symbolTable()),
         alloc_(alloc) {}
 
@@ -141,7 +141,7 @@ protected:
 class CounterImpl : public StatsSharedImpl<Counter> {
 public:
   CounterImpl(StatName name, Allocator& alloc, StatName tag_extracted_name,
-              const StatNameTagVector& stat_name_tags)
+              StatNameTagSpan stat_name_tags)
       : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {}
 
   void removeFromSetLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
@@ -171,7 +171,7 @@ private:
 class GaugeImpl : public StatsSharedImpl<Gauge> {
 public:
   GaugeImpl(StatName name, Allocator& alloc, StatName tag_extracted_name,
-            const StatNameTagVector& stat_name_tags, ImportMode import_mode)
+            StatNameTagSpan stat_name_tags, ImportMode import_mode)
       : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {
     switch (import_mode) {
     case ImportMode::Accumulate:
@@ -272,7 +272,7 @@ private:
 class TextReadoutImpl : public StatsSharedImpl<TextReadout> {
 public:
   TextReadoutImpl(StatName name, Allocator& alloc, StatName tag_extracted_name,
-                  const StatNameTagVector& stat_name_tags)
+                  StatNameTagSpan stat_name_tags)
       : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {}
 
   void removeFromSetLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
@@ -299,7 +299,7 @@ private:
 };
 
 CounterSharedPtr Allocator::makeCounter(StatName name, StatName tag_extracted_name,
-                                        const StatNameTagVector& stat_name_tags) {
+                                        StatNameTagSpan stat_name_tags) {
   Thread::LockGuard lock(mutex_);
   ASSERT(gauges_.find(name) == gauges_.end());
   ASSERT(text_readouts_.find(name) == text_readouts_.end());
@@ -318,8 +318,7 @@ CounterSharedPtr Allocator::makeCounter(StatName name, StatName tag_extracted_na
 }
 
 GaugeSharedPtr Allocator::makeGauge(StatName name, StatName tag_extracted_name,
-                                    const StatNameTagVector& stat_name_tags,
-                                    Gauge::ImportMode import_mode) {
+                                    StatNameTagSpan stat_name_tags, Gauge::ImportMode import_mode) {
   Thread::LockGuard lock(mutex_);
   ASSERT(counters_.find(name) == counters_.end());
   ASSERT(text_readouts_.find(name) == text_readouts_.end());
@@ -339,7 +338,7 @@ GaugeSharedPtr Allocator::makeGauge(StatName name, StatName tag_extracted_name,
 }
 
 TextReadoutSharedPtr Allocator::makeTextReadout(StatName name, StatName tag_extracted_name,
-                                                const StatNameTagVector& stat_name_tags) {
+                                                StatNameTagSpan stat_name_tags) {
   Thread::LockGuard lock(mutex_);
   ASSERT(counters_.find(name) == counters_.end());
   ASSERT(gauges_.find(name) == gauges_.end());
@@ -367,7 +366,7 @@ bool Allocator::isMutexLockedForTest() {
 }
 
 Counter* Allocator::makeCounterInternal(StatName name, StatName tag_extracted_name,
-                                        const StatNameTagVector& stat_name_tags) {
+                                        StatNameTagSpan stat_name_tags) {
   return new CounterImpl(name, *this, tag_extracted_name, stat_name_tags);
 }
 

@@ -8,7 +8,6 @@
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/ext_proc/ext_proc_integration_common.h"
 #include "test/integration/http_integration.h"
-#include "test/mocks/http/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/string_view.h"

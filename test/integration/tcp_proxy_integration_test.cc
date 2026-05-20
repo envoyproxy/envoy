@@ -1,6 +1,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/platform.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -24,10 +25,13 @@
 #include "test/integration/utility.h"
 #include "test/test_common/registry.h"
 
+#include "absl/functional/any_invocable.h"
 #include "gtest/gtest.h"
 
 using testing::_;
 using testing::AtLeast;
+using testing::Eq;
+using testing::Ge;
 using testing::Invoke;
 using testing::MatchesRegex;
 using testing::NiceMock;
@@ -68,8 +72,8 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   // Any time an associated connection is destroyed, it increments both counters.
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy_with_active_rq", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy_with_active_rq", Ge(1));
 
   IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("tcp_proxy"));
   FakeRawConnectionPtr fake_upstream_connection2;
@@ -96,8 +100,8 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamTls) {
 
   EXPECT_EQ("world", tcp_client->data());
   // Any time an associated connection is destroyed, it increments both counters.
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy_with_active_rq", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy_with_active_rq", Ge(1));
 }
 
 // Test proxying data in both directions, and that all data is flushed properly
@@ -282,7 +286,8 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamFlush) {
 
   ASSERT_TRUE(fake_upstream_connection->write(data, true));
 
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_flow_control_paused_reading_total", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_paused_reading_total",
+                               Ge(1));
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_flow_control_resumed_reading_total")
                 ->value(),
             0);
@@ -321,7 +326,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlush) {
 
   ASSERT_TRUE(tcp_client->write(data, true, true, std::chrono::milliseconds(30000)));
 
-  test_server_->waitForGaugeEq("tcp.tcpproxy_stats.upstream_flush_active", 1);
+  test_server_->waitForGauge("tcp.tcpproxy_stats.upstream_flush_active", Eq(1));
   ASSERT_TRUE(fake_upstream_connection->readDisable(false));
   ASSERT_TRUE(fake_upstream_connection->waitForData(data.size()));
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
@@ -329,7 +334,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlush) {
   tcp_client->waitForHalfClose();
 
   EXPECT_EQ(test_server_->counter("tcp.tcpproxy_stats.upstream_flush_total")->value(), 1);
-  test_server_->waitForGaugeEq("tcp.tcpproxy_stats.upstream_flush_active", 0);
+  test_server_->waitForGauge("tcp.tcpproxy_stats.upstream_flush_active", Eq(0));
 }
 
 // Test that Envoy doesn't crash or assert when shutting down with an upstream flush active
@@ -352,7 +357,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlushEnvoyExit) {
 
   ASSERT_TRUE(tcp_client->write(data, true));
 
-  test_server_->waitForGaugeEq("tcp.tcpproxy_stats.upstream_flush_active", 1);
+  test_server_->waitForGauge("tcp.tcpproxy_stats.upstream_flush_active", Eq(1));
   test_server_.reset();
   ASSERT_TRUE(fake_upstream_connection->close());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
@@ -571,16 +576,61 @@ TEST_P(TcpProxyIntegrationTest, AccessLogUpstreamDetectedCloseType) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   // Wait for the upstream to close to ensure we get the correct close type.
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy_remote", 1,
-                                 TestUtility::DefaultTimeout * 100);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy_remote", Ge(1),
+                               TestUtility::DefaultTimeout * 100);
 
   // Downstream should be closed by proxy.
   tcp_client->close();
 
   // Guarantee client is done writing to the log.
   auto log_result = waitForAccessLog(access_log_path);
-  EXPECT_THAT(log_result, testing::Eq("RemoteReset"));
+  EXPECT_THAT(log_result, Eq("RemoteReset"));
 }
+
+// Verifies that upstream RST is propagated to downstream as RST (default behavior).
+#if ENVOY_PLATFORM_ENABLE_SEND_RST
+TEST_P(TcpProxyIntegrationTest, UpstreamRstPropagation) {
+  std::string access_log_path = TestEnvironment::temporaryPath(
+      fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
+                  TestUtility::uniqueFilename()));
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+    auto* access_log = tcp_proxy_config.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "%UPSTREAM_DETECTED_CLOSE_TYPE%");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+  enableHalfClose(false);
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  ASSERT_TRUE(tcp_client->write("hello"));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+
+  // Upstream sends RST.
+  ASSERT_TRUE(fake_upstream_connection->close(Network::ConnectionCloseType::AbortReset));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+
+  // Downstream should receive RST (disconnect without half-close).
+  tcp_client->waitForDisconnect();
+
+  auto log_result = waitForAccessLog(access_log_path);
+  EXPECT_THAT(log_result, Eq("RemoteReset"));
+}
+#endif
 
 // Verifies that access log value for `UPSTREAM_LOCAL_CLOSE_REASON` matches
 // the failure message when there is a session idle timeout.
@@ -929,12 +979,12 @@ TEST_P(TcpProxyIntegrationTest, TestPerClientIdletimeout) {
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   // Platforms could prevent ActiveTcpClient construction unless we explicitly wait for it.
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Ge(1));
 
   tcp_client->close();
 
   // Two pre-connections are closed by idle timers.
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 2);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Ge(2));
 }
 
 TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
@@ -1304,7 +1354,7 @@ void TcpProxyMetadataMatchIntegrationTest::expectEndpointToMatchRoute(
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForDisconnect();
 
-  test_server_->waitForCounterGe("cluster.cluster_0.lb_subsets_selected", 1);
+  test_server_->waitForCounter("cluster.cluster_0.lb_subsets_selected", Ge(1));
 }
 
 // Verifies connection failure.
@@ -1317,8 +1367,8 @@ void TcpProxyMetadataMatchIntegrationTest::expectEndpointNotToMatchRoute(
   // e.g. on 'envoy-linux (bazel compile_time_options)' and 'envoy-linux (bazel release)'
   // tcp_client->waitForDisconnect();
 
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_none_healthy", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.lb_subsets_selected", 0);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_none_healthy", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.lb_subsets_selected", Eq(0));
 
   tcp_client->close();
 }
@@ -1653,7 +1703,7 @@ TEST_P(TcpProxySslIntegrationTest, SslConnectionDataEarlyReadNotCached) {
   log_result = waitForAccessLog(access_log_path, 1, false);
   EXPECT_EQ(log_result,
             "san=spiffe://lyft.com/frontend-team,http://frontend.lyft.com "
-            "fingerprint=7346b3836cfc41385351191b5e6163f1a69704cfdf0a03634ed2019128e6fdc4");
+            "fingerprint=c07e14fc43b9c7b3d92f1004f91d3a9e071d9c93a58afc76b4c14303ae3a0f34");
 }
 
 // Test that a half-close on the downstream side is proxied correctly.
@@ -1791,7 +1841,7 @@ TEST_P(MysqlIntegrationTest, DisconnectDetected) {
 
   // Close the prefetched connection.
   ASSERT_TRUE(fake_upstream_connection1->close());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Ge(1));
 
   tcp_client->close();
 }
@@ -1937,11 +1987,11 @@ TEST_P(TcpProxyReceiveBeforeConnectIntegrationTest, ReceiveBeforeConnectEarlyDat
   // Until total data size > 6 is received, the PauseFilter stops the iteration. Downstream counter
   // is incremented, but no connection attempt to upstream is made.
   ASSERT_TRUE(tcp_client->write("hello"));
-  test_server_->waitForCounterEq("tcp.tcpproxy_stats.downstream_cx_total", 1);
+  test_server_->waitForCounter("tcp.tcpproxy_stats.downstream_cx_total", Eq(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
 
   ASSERT_TRUE(tcp_client->write("world"));
-  test_server_->waitForCounterEq("tcp.tcpproxy_stats.early_data_received_count_total", 1);
+  test_server_->waitForCounter("tcp.tcpproxy_stats.early_data_received_count_total", Eq(1));
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
 
@@ -1977,13 +2027,13 @@ TEST_P(TcpProxyReceiveBeforeConnectIntegrationTest, UpstreamBufferHighWatermark)
 
   // PauseFilter stops the iteration until sufficient data is received.
   ASSERT_TRUE(tcp_client->write(data.substr(0, upstream_buffer_limit - 1)));
-  test_server_->waitForCounterEq("tcp.tcpproxy_stats.downstream_cx_total", 1);
+  test_server_->waitForCounter("tcp.tcpproxy_stats.downstream_cx_total", Eq(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
 
   // Downstream sends more data. PauseFilter allows the iteration to continue, upstream connection
   // is established. The buffered early data is sent to the upstream.
   ASSERT_TRUE(tcp_client->write(data.substr(upstream_buffer_limit - 1)));
-  test_server_->waitForCounterEq("tcp.tcpproxy_stats.early_data_received_count_total", 1);
+  test_server_->waitForCounter("tcp.tcpproxy_stats.early_data_received_count_total", Eq(1));
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
 
@@ -2480,16 +2530,17 @@ TEST_P(TcpProxySslIntegrationTest, OnDownstreamTlsHandshakeModeWithEarlyData) {
   // buffer. This allows us to track the bytes actually written to the socket.
   EXPECT_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
       .Times(AtLeast(1))
-      .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
-                           std::function<void()> above_overflow) -> Buffer::Instance* {
-        client_write_buffer =
-            new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
-        ON_CALL(*client_write_buffer, move(_))
-            .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::baseMove));
-        ON_CALL(*client_write_buffer, drain(_))
-            .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::trackDrains));
-        return client_write_buffer;
-      }));
+      .WillOnce(
+          Invoke([&](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                     absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+            client_write_buffer = new NiceMock<MockWatermarkBuffer>(
+                std::move(below_low), std::move(above_high), std::move(above_overflow));
+            ON_CALL(*client_write_buffer, move(_))
+                .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::baseMove));
+            ON_CALL(*client_write_buffer, drain(_))
+                .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::trackDrains));
+            return client_write_buffer;
+          }));
 
   // Set up the SSL client.
   Network::Address::InstanceConstSharedPtr address =
@@ -3068,6 +3119,65 @@ TEST_P(TcpProxyIntegrationTest, DownstreamClosedWithEndStreamNoData) {
 
   // Close without sending data but with end_stream=true (FIN).
   tcp_client->close();
+}
+
+// Test route delayed route selection based on filter state
+TEST_P(TcpProxyIntegrationTest, DelayRouteSelectionWithSetFilterStateOnData) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.tcp_proxy_delay_route_selection",
+                                    "true");
+  fake_upstreams_count_ = 2;
+  config_helper_.addNetworkFilter(R"EOF(
+name: envoy.filters.network.set_filter_state
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config
+  on_downstream_data:
+  - object_key: envoy.tcp_proxy.cluster
+    format_string:
+      text_format_source:
+        inline_string: "cluster_1"
+)EOF");
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Add cluster_1 configuration (cluster_0 already exists by default)
+    auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+    cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    cluster->set_name("cluster_1");
+
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* filter = filter_chain->mutable_filters(1);
+
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+    filter->typed_config().UnpackTo(&tcp_proxy);
+
+    tcp_proxy.set_upstream_connect_mode(
+        envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+    tcp_proxy.mutable_max_early_data_bytes()->set_value(1024);
+
+    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+  });
+
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // Wait to ensure no connection is established without data.
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_FALSE(fake_upstreams_[1]->waitForRawConnection(fake_upstream_connection,
+                                                        std::chrono::milliseconds(1000)));
+
+  // Now send actual data.
+  ASSERT_TRUE(tcp_client->write("data"));
+
+  // Connection should now be established.
+  ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(4));
+
+  tcp_client->close();
+
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_cx_total")->value());
+  EXPECT_EQ(1, test_server_->counter("tcp.tcpproxy_stats.route_delayed_total")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
 }
 
 } // namespace Envoy

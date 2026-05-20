@@ -32,9 +32,10 @@ ExactConnectionBalancerImpl::pickTargetHandler(BalancedConnectionHandler&) {
       }
     }
 
-    min_connection_handler->incNumConnections(); // NOLINT(clang-analyzer-core.CallAndMessage)
+    min_connection_handler->preIncNumConnections(); // NOLINT(clang-analyzer-core.CallAndMessage)
   }
 
+  min_connection_handler->postIncNumConnections();
   return *min_connection_handler;
 }
 

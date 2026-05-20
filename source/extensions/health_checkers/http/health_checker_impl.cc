@@ -213,8 +213,7 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSessio
       local_connection_info_provider_(std::make_shared<Network::ConnectionInfoSetterImpl>(
           Network::Utility::getCanonicalIpv4LoopbackAddress(),
           Network::Utility::getCanonicalIpv4LoopbackAddress())),
-      protocol_(codecClientTypeToProtocol(parent_.codec_client_type_)), expect_reset_(false),
-      reuse_connection_(false), request_in_flight_(false) {}
+      protocol_(codecClientTypeToProtocol(parent_.codec_client_type_)) {}
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::~HttpActiveHealthCheckSession() {
   ASSERT(client_ == nullptr);
@@ -418,6 +417,11 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
   request_in_flight_ = false;
+
+  // Store the raw HTTP response code on the host for HDS metadata reporting.
+  if (response_headers_ != nullptr) {
+    host_->setLastHealthCheckHttpStatus(Http::Utility::getResponseStatus(*response_headers_));
+  }
 
   switch (healthCheckResult()) {
   case HealthCheckResult::Succeeded:

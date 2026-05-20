@@ -245,6 +245,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/common:minimal_logger_lib",
+        "//source/common/version:version_string_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
     ],
@@ -632,6 +633,21 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "inline_map_speed_test_benchmark_test",
     benchmark_binary = "inline_map_speed_test",
+)
+
+envoy_cc_benchmark_binary(
+    name = "linked_object_speed_test",
+    srcs = ["linked_object_speed_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/common:linked_object",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "linked_object_speed_test_benchmark_test",
+    benchmark_binary = "linked_object_speed_test",
 )
 
 envoy_cc_test(

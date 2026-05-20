@@ -20,6 +20,29 @@ message MySQLProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.mysql_proxy.v1alpha1.MySQLProxy";
 
+  // Downstream SSL operational modes.
+  enum SSLMode {
+    // Do not terminate SSL session initiated by a client.
+    // The MySQL proxy filter will pass all encrypted and unencrypted packets to the upstream server.
+    DISABLE = 0;
+
+    // The MySQL proxy filter will terminate SSL session initiated by a client
+    // and close downstream connections that do not initiate SSL.
+    // The filter will mediate ``caching_sha2_password`` RSA authentication when
+    // the upstream MySQL server requires full authentication over the plaintext connection.
+    // The filter chain must use :ref:`starttls transport socket
+    // <envoy_v3_api_msg_extensions.transport_sockets.starttls.v3.StartTlsConfig>`.
+    REQUIRE = 1;
+
+    // The MySQL proxy filter will accept downstream client's encryption settings.
+    // If the client wants to use clear-text, Envoy will not enforce SSL encryption.
+    // If the client wants to use encryption, Envoy will terminate SSL and mediate
+    // ``caching_sha2_password`` RSA authentication when needed.
+    // The filter chain must use :ref:`starttls transport socket
+    // <envoy_v3_api_msg_extensions.transport_sockets.starttls.v3.StartTlsConfig>`.
+    ALLOW = 2;
+  }
+
   // The human readable prefix to use when emitting :ref:`statistics
   // <config_network_filters_mysql_proxy_stats>`.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
@@ -27,4 +50,10 @@ message MySQLProxy {
   // [#not-implemented-hide:] The optional path to use for writing MySQL access logs.
   // If the access log field is empty, access logs will not be written.
   string access_log = 2;
+
+  // Controls whether to terminate SSL sessions initiated by downstream clients.
+  // If enabled, the filter chain must use
+  // :ref:`starttls transport socket <envoy_v3_api_msg_extensions.transport_sockets.starttls.v3.StartTlsConfig>`.
+  // Defaults to ``DISABLE``.
+  SSLMode downstream_ssl = 3;
 }

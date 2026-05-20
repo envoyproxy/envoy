@@ -515,7 +515,8 @@ TEST_F(ConnectionHandlerTest, RemoveListenerDuringRebalance) {
     post_cb = std::move(cb);
   });
   Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
-  current_handler->incNumConnections();
+  current_handler->preIncNumConnections();
+  current_handler->postIncNumConnections();
 #ifndef NDEBUG
   EXPECT_CALL(*access_log_, log(_, _));
 #endif
@@ -791,7 +792,8 @@ TEST_F(ConnectionHandlerTest, RebalanceWithMultiAddressListener) {
   EXPECT_CALL(*access_log_, log(_, _));
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
 
-  current_handler1->incNumConnections();
+  current_handler1->preIncNumConnections();
+  current_handler1->postIncNumConnections();
   listener_callbacks1->onAccept(std::make_unique<NiceMock<Network::MockConnectionSocket>>());
 
   // Send connection to the second listener, expect mock_connection_balancer2 will be called.
@@ -801,7 +803,8 @@ TEST_F(ConnectionHandlerTest, RebalanceWithMultiAddressListener) {
   EXPECT_CALL(*access_log_, log(_, _));
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
 
-  current_handler2->incNumConnections();
+  current_handler2->preIncNumConnections();
+  current_handler2->postIncNumConnections();
   listener_callbacks2->onAccept(std::make_unique<NiceMock<Network::MockConnectionSocket>>());
 
   EXPECT_CALL(*mock_connection_balancer1, unregisterHandler(_));
@@ -2328,7 +2331,8 @@ TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdate) {
       << "new listener should be inplace added and callback should not change";
 
   Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
-  current_handler->incNumConnections();
+  current_handler->preIncNumConnections();
+  current_handler->postIncNumConnections();
 
   EXPECT_CALL(*mock_connection_balancer, pickTargetHandler(_))
       .WillOnce(ReturnRef(*current_handler));

@@ -21,7 +21,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/stateful_session:config",
         "//source/server:generic_factory_context_lib",
-        "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/http:stateful_session_mock",
         "//test/mocks/server:factory_context_mocks",
@@ -59,7 +58,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/stateful_session:config",
         "//test/mocks/http:stateful_session_mock",
         "//test/mocks/server:factory_context_mocks",
-        "//test/mocks/server:instance_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ],

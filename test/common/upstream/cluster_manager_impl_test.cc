@@ -19,7 +19,6 @@
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/http/conn_pool.h"
 #include "test/mocks/matcher/mocks.h"
-#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/mocks/upstream/load_balancer_context.h"
@@ -1621,7 +1620,8 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestNoOverrideHost) {
 
   auto to_create = new Tcp::ConnectionPool::MockInstance();
 
-  EXPECT_CALL(context, overrideHostToSelect()).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(context, overrideHostToSelect())
+      .WillOnce(Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>()));
 
   EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(to_create));
   EXPECT_CALL(*to_create, addIdleCallback(_));
@@ -1637,9 +1637,10 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithOverrideHost) {
 
   auto to_create = new Tcp::ConnectionPool::MockInstance();
 
+  Upstream::LoadBalancerContext::OverrideHost override_host_11001{"127.0.0.1:11001", false};
   EXPECT_CALL(context, overrideHostToSelect())
-      .WillRepeatedly(Return(absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>(
-          std::make_pair("127.0.0.1:11001", false))));
+      .WillRepeatedly(
+          Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host_11001)));
 
   EXPECT_CALL(factory_, allocateTcpConnPool_(_))
       .WillOnce(testing::Invoke([&](HostConstSharedPtr host) {
@@ -1667,10 +1668,10 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithNonExistingHost) {
 
   auto to_create = new Tcp::ConnectionPool::MockInstance();
 
+  Upstream::LoadBalancerContext::OverrideHost override_host_non_existing{"127.0.0.2:12345", false};
   EXPECT_CALL(context, overrideHostToSelect())
-      .WillRepeatedly(Return(absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>(
-          // Return non-existing host. Let the LB choose the host.
-          std::make_pair("127.0.0.2:12345", false))));
+      .WillRepeatedly(Return(
+          OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host_non_existing)));
 
   EXPECT_CALL(factory_, allocateTcpConnPool_(_))
       .WillOnce(testing::Invoke([&](HostConstSharedPtr host) {
@@ -1689,11 +1690,10 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithNonExistingHostStrict) 
   createWithBasicStaticCluster();
   NiceMock<MockLoadBalancerContext> context;
 
+  Upstream::LoadBalancerContext::OverrideHost override_host_strict{"127.0.0.2:12345", true};
   EXPECT_CALL(context, overrideHostToSelect())
-      .WillRepeatedly(Return(absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>(
-          // Return non-existing host and indicate strict mode.
-          // LB should not be allowed to choose host.
-          std::make_pair("127.0.0.2:12345", true))));
+      .WillRepeatedly(
+          Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host_strict)));
 
   // Requested upstream host 127.0.0.2:12345 is not part of the cluster.
   // Connection pool should not be created.
@@ -1702,6 +1702,23 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithNonExistingHostStrict) 
   auto opt_cp = cluster_manager_->getThreadLocalCluster("cluster_1")
                     ->tcpConnPool(ResourcePriority::Default, &context);
   EXPECT_FALSE(opt_cp.has_value());
+}
+
+TEST_F(ClusterManagerImplTest, StrictOverrideHostNotFoundReturnsCustomFailureStatus) {
+  createWithBasicStaticCluster();
+  NiceMock<MockLoadBalancerContext> context;
+
+  // Non-existing host with strict mode and custom failure status (421).
+  Upstream::LoadBalancerContext::OverrideHost override_host{"127.0.0.2:12345", true,
+                                                            Http::Code::MisdirectedRequest};
+  EXPECT_CALL(context, overrideHostToSelect())
+      .WillRepeatedly(
+          Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host)));
+
+  auto result = cluster_manager_->getThreadLocalCluster("cluster_1")->chooseHost(&context);
+  EXPECT_EQ(nullptr, result.host);
+  ASSERT_TRUE(result.failure_status.has_value());
+  EXPECT_EQ(Http::Code::MisdirectedRequest, result.failure_status.value());
 }
 
 TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToConnPool) {

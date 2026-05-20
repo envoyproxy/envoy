@@ -4,6 +4,7 @@
 #include <iterator>
 #include <memory>
 #include <set>
+#include <thread>
 
 #include "envoy/registry/registry.h"
 
@@ -13,6 +14,7 @@
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/dynamic_modules/util.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
@@ -776,13 +778,13 @@ TEST(ABIImpl, metadata) {
 
   // No namespace.
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   envoy::config::core::v3::Metadata metadata;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
   EXPECT_CALL(callbacks, clusterInfo())
       .WillRepeatedly(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
-  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(OptRef<const Router::Route>{}));
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
       .WillRepeatedly(testing::ReturnRef(metadata));
@@ -899,13 +901,13 @@ TEST(ABIImpl, metadata_bool) {
 
   // With stream info.
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   envoy::config::core::v3::Metadata metadata;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
   EXPECT_CALL(callbacks, clusterInfo())
       .WillRepeatedly(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
-  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(OptRef<const Router::Route>{}));
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
       .WillRepeatedly(testing::ReturnRef(metadata));
@@ -974,13 +976,13 @@ TEST(ABIImpl, metadata_keys) {
 
   // With stream info.
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   envoy::config::core::v3::Metadata metadata;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
   EXPECT_CALL(callbacks, clusterInfo())
       .WillRepeatedly(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
-  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(OptRef<const Router::Route>{}));
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
       .WillRepeatedly(testing::ReturnRef(metadata));
@@ -1037,13 +1039,13 @@ TEST(ABIImpl, metadata_namespaces) {
 
   // With stream info.
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   envoy::config::core::v3::Metadata metadata;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
   EXPECT_CALL(callbacks, clusterInfo())
       .WillRepeatedly(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
-  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(OptRef<const Router::Route>{}));
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
       .WillRepeatedly(testing::ReturnRef(metadata));
@@ -1105,13 +1107,13 @@ TEST(ABIImpl, metadata_list) {
 
   // With stream info.
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   envoy::config::core::v3::Metadata metadata;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
   EXPECT_CALL(callbacks, clusterInfo())
       .WillRepeatedly(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
-  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(OptRef<const Router::Route>{}));
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
       .WillRepeatedly(testing::ReturnRef(metadata));
@@ -1250,7 +1252,7 @@ TEST(ABIImpl, attribute_bool) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   filter.setDecoderFilterCallbacks(callbacks);
 
@@ -1306,7 +1308,7 @@ TEST(ABIImpl, filter_state) {
   // With stream info but non existing key.
   const std::string non_existing_key = "non_existing";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   EXPECT_CALL(stream_info, filterState())
       .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
@@ -1339,7 +1341,7 @@ TEST(ABIImpl, filter_state_typed) {
 
   // With stream info.
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   EXPECT_CALL(stream_info, filterState())
       .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
@@ -1360,7 +1362,7 @@ TEST(ABIImpl, filter_state_typed_no_factory) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   EXPECT_CALL(stream_info, filterState())
       .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
@@ -1376,7 +1378,7 @@ TEST(ABIImpl, filter_state_typed_bad_value) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   EXPECT_CALL(stream_info, filterState())
       .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
@@ -1392,7 +1394,7 @@ TEST(ABIImpl, filter_state_typed_non_existing_key) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   EXPECT_CALL(stream_info, filterState())
       .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
@@ -1408,7 +1410,7 @@ TEST(ABIImpl, filter_state_typed_non_serializable) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   EXPECT_CALL(stream_info, filterState())
       .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
@@ -1439,7 +1441,7 @@ TEST(ABIImpl, RequestBody) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   filter.setDecoderFilterCallbacks(callbacks);
 
@@ -1553,7 +1555,7 @@ TEST(ABIImpl, BufferedRequestBody) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   filter.setDecoderFilterCallbacks(callbacks);
 
@@ -1662,7 +1664,7 @@ TEST(ABIImpl, ResponseBody) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   Http::MockStreamEncoderFilterCallbacks callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   filter.setEncoderFilterCallbacks(callbacks);
 
@@ -1776,7 +1778,7 @@ TEST(ABIImpl, BufferedResponseBody) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   Http::MockStreamEncoderFilterCallbacks callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   filter.setEncoderFilterCallbacks(callbacks);
 
@@ -1887,7 +1889,7 @@ TEST(ABIImpl, ClearRouteCache) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   filter.setDecoderFilterCallbacks(callbacks);
   Http::MockDownstreamStreamFilterCallbacks downstream_callbacks;
@@ -1902,7 +1904,7 @@ TEST(ABIImpl, GetAttributes) {
   DynamicModuleHttpFilter filter_without_callbacks{nullptr, symbol_table, 0};
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   envoy::config::core::v3::Metadata metadata;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
@@ -2420,7 +2422,7 @@ TEST(ABIImpl, Stats) {
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_InvalidLabels);
 
   // test stat creation after freezing
-  filter_config->stat_creation_frozen_ = true;
+  filter_config->stat_creation_frozen_.store(true, std::memory_order_release);
   result = envoy_dynamic_module_callback_http_filter_config_define_counter(
       filter_config.get(), {counter_vec_name.data(), counter_vec_name.size()},
       counter_vec_labels.data(), counter_vec_labels.size(), &counter_vec_id);
@@ -2783,8 +2785,8 @@ TEST_F(DynamicModuleHttpFilterTest, SetUpstreamOverrideHostSuccess) {
   std::string host = "10.0.0.1:8080";
   EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(testing::_))
       .WillOnce(testing::Invoke([&host](Upstream::LoadBalancerContext::OverrideHost override_host) {
-        EXPECT_EQ(override_host.first, host);
-        EXPECT_TRUE(override_host.second);
+        EXPECT_EQ(override_host.host, host);
+        EXPECT_TRUE(override_host.strict);
       }));
 
   EXPECT_TRUE(envoy_dynamic_module_callback_http_set_upstream_override_host(
@@ -2795,8 +2797,8 @@ TEST_F(DynamicModuleHttpFilterTest, SetUpstreamOverrideHostNonStrict) {
   std::string host = "192.168.1.1:9000";
   EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(testing::_))
       .WillOnce(testing::Invoke([&host](Upstream::LoadBalancerContext::OverrideHost override_host) {
-        EXPECT_EQ(override_host.first, host);
-        EXPECT_FALSE(override_host.second);
+        EXPECT_EQ(override_host.host, host);
+        EXPECT_FALSE(override_host.strict);
       }));
 
   EXPECT_TRUE(envoy_dynamic_module_callback_http_set_upstream_override_host(
@@ -2983,17 +2985,100 @@ TEST_F(DynamicModuleHttpFilterTest, SetBufferLimitNoCallbacks) {
   envoy_dynamic_module_callback_http_set_buffer_limit(filter_no_callbacks.get(), 2048);
 }
 
-TEST_F(DynamicModuleHttpFilterTest, WatermarkCallbacksAutoRegisteredAndCleanedUp) {
-  // Create a new filter with callbacks.
-  auto filter = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table_, 3);
+// Lifecycle tests that exercise the ordering of setDecoderFilterCallbacks() relative to
+// initializeInModuleFilter(). Each test body constructs and sequences the filter itself so it
+// can pick the ordering under test.
+class DynamicModuleHttpFilterLifecycleTest : public testing::Test {
+public:
+  void SetUp() override {
+    auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
+    ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+    auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
+        "test_filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
+        *stats_scope_, context_);
+    ASSERT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
+    filter_config_ = filter_config_or_status.value();
+  }
 
-  // Watermark callbacks should be automatically registered when decoder callbacks are set.
+  Stats::SymbolTableImpl symbol_table_;
+  Stats::IsolatedStoreImpl stats_store_;
+  Stats::ScopeSharedPtr stats_scope_{stats_store_.createScope("")};
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  DynamicModuleHttpFilterConfigSharedPtr filter_config_;
+};
+
+// Production ordering: addStreamFilter() wires callbacks before initializeInModuleFilter()
+// runs. Registration must land on init, not on the setter, and the paired remove must fire on
+// destroy.
+TEST_F(DynamicModuleHttpFilterLifecycleTest, WatermarkRegistersAtInitAndCleanedUpAtDestroy) {
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_, symbol_table_, 0);
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+
+  EXPECT_CALL(decoder_callbacks, addDownstreamWatermarkCallbacks(testing::_)).Times(0);
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  filter->setEncoderFilterCallbacks(encoder_callbacks);
+  testing::Mock::VerifyAndClearExpectations(&decoder_callbacks);
+
+  EXPECT_CALL(decoder_callbacks, addDownstreamWatermarkCallbacks(testing::Ref(*filter)));
+  filter->initializeInModuleFilter();
+  testing::Mock::VerifyAndClearExpectations(&decoder_callbacks);
+
+  EXPECT_CALL(decoder_callbacks, removeDownstreamWatermarkCallbacks(testing::Ref(*filter)));
+  filter->onDestroy();
+}
+
+// Inverted ordering used by callers that run initializeInModuleFilter() before
+// setDecoderFilterCallbacks(). Registration must still land, this time on the setter side.
+TEST_F(DynamicModuleHttpFilterLifecycleTest, WatermarkRegistersAtSetCallbacksWhenInitRanFirst) {
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_, symbol_table_, 0);
+
+  filter->initializeInModuleFilter();
+
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   EXPECT_CALL(decoder_callbacks, addDownstreamWatermarkCallbacks(testing::Ref(*filter)));
   filter->setDecoderFilterCallbacks(decoder_callbacks);
+  testing::Mock::VerifyAndClearExpectations(&decoder_callbacks);
 
-  // Destroy should clean up watermark callbacks.
   EXPECT_CALL(decoder_callbacks, removeDownstreamWatermarkCallbacks(testing::Ref(*filter)));
+  filter->onDestroy();
+}
+
+// Regression for the production crash: the FilterManager synchronously replays
+// onAboveWriteBufferHighWatermark() into the callback from inside
+// addDownstreamWatermarkCallbacks(). The replay must only reach the filter after
+// in_module_filter_ is set, so the ASSERT in onAboveWriteBufferHighWatermark holds.
+TEST_F(DynamicModuleHttpFilterLifecycleTest, WatermarkSyncReplayDoesNotFireBeforeInit) {
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_, symbol_table_, 0);
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+
+  EXPECT_CALL(decoder_callbacks, addDownstreamWatermarkCallbacks(testing::_)).Times(0);
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  filter->setEncoderFilterCallbacks(encoder_callbacks);
+  testing::Mock::VerifyAndClearExpectations(&decoder_callbacks);
+
+  EXPECT_CALL(decoder_callbacks, addDownstreamWatermarkCallbacks(testing::Ref(*filter)))
+      .WillOnce(testing::Invoke(
+          [](Http::DownstreamWatermarkCallbacks& cb) { cb.onAboveWriteBufferHighWatermark(); }));
+  filter->initializeInModuleFilter();
+  testing::Mock::VerifyAndClearExpectations(&decoder_callbacks);
+
+  EXPECT_CALL(decoder_callbacks, removeDownstreamWatermarkCallbacks(testing::Ref(*filter)));
+  filter->onDestroy();
+}
+
+// onDestroy() must skip removeDownstreamWatermarkCallbacks() when registration never happened;
+// the underlying remove asserts the callback was previously added.
+TEST_F(DynamicModuleHttpFilterLifecycleTest,
+       OnDestroySkipsRemoveWhenDecoderCallbacksSetButInitNeverRan) {
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_, symbol_table_, 0);
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  EXPECT_CALL(decoder_callbacks, removeDownstreamWatermarkCallbacks(testing::_)).Times(0);
   filter->onDestroy();
 }
 
@@ -3354,7 +3439,7 @@ TEST(ABIImpl, ReceivedBufferedRequestBody) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   filter.setDecoderFilterCallbacks(callbacks);
 
@@ -3378,7 +3463,7 @@ TEST(ABIImpl, ReceivedBufferedResponseBody) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   NiceMock<Http::MockStreamEncoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   filter.setEncoderFilterCallbacks(callbacks);
 
@@ -3396,6 +3481,182 @@ TEST(ABIImpl, ReceivedBufferedResponseBody) {
   // current_response_body_ is the same as encodingBuffer() - received buffered body.
   EXPECT_CALL(callbacks, encodingBuffer()).WillRepeatedly(testing::Return(&current_body));
   EXPECT_TRUE(envoy_dynamic_module_callback_http_received_buffered_response_body(&filter));
+}
+
+// =============================================================================
+// Tests for scheduler callbacks.
+// =============================================================================
+
+class DynamicModuleHttpFilterSchedulerTest : public testing::Test {
+public:
+  void SetUp() override {
+    ON_CALL(context_, mainThreadDispatcher())
+        .WillByDefault(testing::ReturnRef(main_thread_dispatcher_));
+    ON_CALL(decoder_callbacks_, dispatcher())
+        .WillByDefault(testing::ReturnRef(worker_thread_dispatcher_));
+
+    auto dynamic_module = Envoy::Extensions::DynamicModules::newDynamicModule(
+        testSharedObjectPath("no_op", "c"), false);
+    ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+
+    auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
+        "test_filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
+        *stats_store_.rootScope(), context_);
+    ASSERT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
+    filter_config_ = filter_config_or_status.value();
+
+    filter_ = std::make_shared<DynamicModuleHttpFilter>(filter_config_, symbol_table_, 0);
+    filter_->initializeInModuleFilter();
+  }
+
+  void TearDown() override { filter_.reset(); }
+
+  void* filterPtr() { return static_cast<void*>(filter_.get()); }
+  void* configPtr() { return static_cast<void*>(filter_config_.get()); }
+
+  Stats::SymbolTableImpl symbol_table_;
+  Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
+  NiceMock<Event::MockDispatcher> worker_thread_dispatcher_{"worker_0"};
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  DynamicModuleHttpFilterConfigSharedPtr filter_config_;
+  std::shared_ptr<DynamicModuleHttpFilter> filter_;
+};
+
+// Verifies that `commit` posts to the dispatcher cached when decoder callbacks are wired.
+TEST_F(DynamicModuleHttpFilterSchedulerTest, HttpFilterSchedulerCommitPostsToWorkerDispatcher) {
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  auto* scheduler = envoy_dynamic_module_callback_http_filter_scheduler_new(filterPtr());
+  ASSERT_NE(nullptr, scheduler);
+
+  Event::PostCb captured_cb;
+  EXPECT_CALL(worker_thread_dispatcher_, post(testing::_))
+      .WillOnce(testing::Invoke([&](Event::PostCb cb) { captured_cb = std::move(cb); }));
+
+  envoy_dynamic_module_callback_http_filter_scheduler_commit(scheduler, 123);
+  ASSERT_TRUE(captured_cb);
+  captured_cb();
+
+  envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
+}
+
+// Verifies that `commit` is a no-op when the filter weak_ptr can no longer be locked.
+TEST_F(DynamicModuleHttpFilterSchedulerTest, HttpFilterSchedulerCommitAfterFilterDestroyedIsNoOp) {
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  auto* scheduler = envoy_dynamic_module_callback_http_filter_scheduler_new(filterPtr());
+  ASSERT_NE(nullptr, scheduler);
+
+  filter_.reset();
+
+  EXPECT_CALL(worker_thread_dispatcher_, post(testing::_)).Times(0);
+  envoy_dynamic_module_callback_http_filter_scheduler_commit(scheduler, 123);
+
+  envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
+}
+
+// Verifies that `commit` is a no-op after `onDestroy()` clears the cached dispatcher.
+TEST_F(DynamicModuleHttpFilterSchedulerTest, HttpFilterSchedulerCommitAfterOnDestroyIsNoOp) {
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  auto* scheduler = envoy_dynamic_module_callback_http_filter_scheduler_new(filterPtr());
+  ASSERT_NE(nullptr, scheduler);
+
+  filter_->onDestroy();
+
+  EXPECT_CALL(worker_thread_dispatcher_, post(testing::_)).Times(0);
+  envoy_dynamic_module_callback_http_filter_scheduler_commit(scheduler, 123);
+
+  envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
+}
+
+// Verifies that `commit` is a no-op when decoder callbacks have not been wired and no dispatcher
+// has been cached.
+TEST_F(DynamicModuleHttpFilterSchedulerTest,
+       HttpFilterSchedulerCommitWithoutDecoderCallbacksIsNoOp) {
+  auto* scheduler = envoy_dynamic_module_callback_http_filter_scheduler_new(filterPtr());
+  ASSERT_NE(nullptr, scheduler);
+
+  EXPECT_CALL(worker_thread_dispatcher_, post(testing::_)).Times(0);
+  envoy_dynamic_module_callback_http_filter_scheduler_commit(scheduler, 123);
+
+  envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
+}
+
+// Verifies that the config scheduler `commit` posts to the main thread dispatcher.
+TEST_F(DynamicModuleHttpFilterSchedulerTest, HttpFilterConfigSchedulerCommitPostsToMainDispatcher) {
+  auto* scheduler = envoy_dynamic_module_callback_http_filter_config_scheduler_new(configPtr());
+  ASSERT_NE(nullptr, scheduler);
+
+  Event::PostCb captured_cb;
+  EXPECT_CALL(main_thread_dispatcher_, post(testing::_))
+      .WillOnce(testing::Invoke([&](Event::PostCb cb) { captured_cb = std::move(cb); }));
+
+  envoy_dynamic_module_callback_http_filter_config_scheduler_commit(scheduler, 456);
+  ASSERT_TRUE(captured_cb);
+  captured_cb();
+
+  envoy_dynamic_module_callback_http_filter_config_scheduler_delete(scheduler);
+}
+
+// Verifies that the config scheduler `commit` is a no-op after the config has been destroyed.
+TEST_F(DynamicModuleHttpFilterSchedulerTest,
+       HttpFilterConfigSchedulerCommitAfterConfigDestroyedIsNoOp) {
+  auto* scheduler = envoy_dynamic_module_callback_http_filter_config_scheduler_new(configPtr());
+  ASSERT_NE(nullptr, scheduler);
+
+  filter_.reset();
+  filter_config_.reset();
+
+  EXPECT_CALL(main_thread_dispatcher_, post(testing::_)).Times(0);
+  envoy_dynamic_module_callback_http_filter_config_scheduler_commit(scheduler, 456);
+
+  envoy_dynamic_module_callback_http_filter_config_scheduler_delete(scheduler);
+}
+
+// Verifies `commit()` from a foreign thread after `onDestroy()` is a safe no-op. Run under
+// `--config=tsan` to confirm no data race on `decoder_callbacks_`.
+TEST_F(DynamicModuleHttpFilterSchedulerTest,
+       HttpFilterSchedulerCommitFromForeignThreadAfterDestroyIsNoOp) {
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  auto* scheduler = envoy_dynamic_module_callback_http_filter_scheduler_new(filterPtr());
+  ASSERT_NE(nullptr, scheduler);
+
+  filter_->onDestroy();
+
+  EXPECT_CALL(worker_thread_dispatcher_, post(testing::_)).Times(0);
+
+  std::thread foreign(
+      [&]() { envoy_dynamic_module_callback_http_filter_scheduler_commit(scheduler, 999); });
+  foreign.join();
+
+  envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
+}
+
+// Verifies `commit()` from a foreign thread before destroy posts via the cached dispatcher and
+// that the lambda re-locks the weak_ptr correctly.
+TEST_F(DynamicModuleHttpFilterSchedulerTest,
+       HttpFilterSchedulerCommitFromForeignThreadBeforeDestroyPosts) {
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  auto* scheduler = envoy_dynamic_module_callback_http_filter_scheduler_new(filterPtr());
+  ASSERT_NE(nullptr, scheduler);
+
+  Event::PostCb captured_cb;
+  EXPECT_CALL(worker_thread_dispatcher_, post(testing::_))
+      .WillOnce(testing::Invoke([&](Event::PostCb cb) { captured_cb = std::move(cb); }));
+
+  std::thread foreign(
+      [&]() { envoy_dynamic_module_callback_http_filter_scheduler_commit(scheduler, 42); });
+  foreign.join();
+
+  ASSERT_TRUE(captured_cb);
+  captured_cb();
+
+  envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
 }
 
 } // namespace HttpFilters

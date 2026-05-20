@@ -242,7 +242,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for CombinedHttpFilter {
           envoy_filter.send_response(
             503,
             &[("x-error-reason", b"service_not_onboarded")],
-            Some(format!("service '{}' is not onboarded", svc).as_bytes()),
+            Some(format!("service '{svc}' is not onboarded").as_bytes()),
             Some("service_not_onboarded"),
           );
           abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration

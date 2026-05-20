@@ -4,7 +4,7 @@
 #include "source/extensions/filters/common/set_filter_state/filter_config.h"
 #include "source/server/generic_factory_context.h"
 
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -253,7 +253,6 @@ TEST_F(ConfigTest, SetValueUpstreamSharedOnce) {
   const auto objects = info_.filterState()->objectsSharedWithUpstreamConnection();
   EXPECT_EQ(1, objects->size());
   EXPECT_EQ(StreamSharing::None, objects->at(0).stream_sharing_);
-  EXPECT_EQ(StateType::Mutable, objects->at(0).state_type_);
   EXPECT_EQ("foo", objects->at(0).name_);
   EXPECT_EQ(foo, objects->at(0).data_.get());
 }
@@ -275,7 +274,6 @@ TEST_F(ConfigTest, SetValueUpstreamSharedTransitive) {
   const auto objects = info_.filterState()->objectsSharedWithUpstreamConnection();
   EXPECT_EQ(1, objects->size());
   EXPECT_EQ(StreamSharing::SharedWithUpstreamConnection, objects->at(0).stream_sharing_);
-  EXPECT_EQ(StateType::ReadOnly, objects->at(0).state_type_);
   EXPECT_EQ("foo", objects->at(0).name_);
   EXPECT_EQ(foo, objects->at(0).data_.get());
 }

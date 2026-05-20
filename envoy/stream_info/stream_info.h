@@ -283,6 +283,7 @@ struct LocalCloseReasonValues {
   const std::string TransportSocketTimeout = "transport_socket_timeout";
   const std::string TriggeredDelayedCloseTimeout = "triggered_delayed_close_timeout";
   const std::string TcpProxyInitializationFailure = "tcp_initializion_failure:";
+  const std::string TcpProxyDrainClose = "tcp_proxy_drain_close";
   const std::string TcpSessionIdleTimeout = "tcp_session_idle_timeout";
   const std::string MaxConnectionDurationReached = "max_connection_duration_reached";
   const std::string ClosingUpstreamTcpDueToDownstreamRemoteClose =
@@ -924,9 +925,15 @@ public:
   virtual const Network::ConnectionInfoProvider& downstreamAddressProvider() const PURE;
 
   /**
-   * @return const Router::RouteConstSharedPtr Get the route selected for this request.
+   * @return OptRef<const Router::Route> Get the route selected for this request.
    */
-  virtual Router::RouteConstSharedPtr route() const PURE;
+  virtual OptRef<const Router::Route> route() const PURE;
+
+  /**
+   * @return Router::RouteConstSharedPtr Get the route selected for this request, extended to
+   * allow a caller to extend or transfer ownership.
+   */
+  virtual Router::RouteConstSharedPtr routeSharedPtr() const PURE;
 
   /**
    * @return OptRef<const Router::VirtualHost> Get the virtual host selected for this request.

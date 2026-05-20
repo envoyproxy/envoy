@@ -195,7 +195,7 @@ public:
       return wrapped_->upstreamTransportSocketOptions();
     }
 
-    absl::optional<OverrideHost> overrideHostToSelect() const override {
+    OptRef<const OverrideHost> overrideHostToSelect() const override {
       return wrapped_->overrideHostToSelect();
     }
     void onAsyncHostSelection(Upstream::HostConstSharedPtr&&, std::string&&) override {}

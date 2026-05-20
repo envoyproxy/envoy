@@ -61,7 +61,7 @@ DynamicModuleHttpPerRouteFilterConfig::~DynamicModuleHttpPerRouteFilterConfig() 
 }
 
 absl::StatusOr<DynamicModuleHttpPerRouteFilterConfigConstSharedPtr>
-newDynamicModuleHttpPerRouteConfig(const absl::string_view per_route_config_name,
+newDynamicModuleHttpPerRouteConfig(const absl::string_view filter_name,
                                    const absl::string_view filter_config,
                                    Extensions::DynamicModules::DynamicModulePtr dynamic_module) {
   auto constructor =
@@ -74,9 +74,8 @@ newDynamicModuleHttpPerRouteConfig(const absl::string_view per_route_config_name
       "envoy_dynamic_module_on_http_filter_per_route_config_destroy");
   RETURN_IF_NOT_OK_REF(destroy.status());
 
-  const void* filter_config_envoy_ptr =
-      (*constructor.value())({per_route_config_name.data(), per_route_config_name.size()},
-                             {filter_config.data(), filter_config.size()});
+  const void* filter_config_envoy_ptr = (*constructor.value())(
+      {filter_name.data(), filter_name.size()}, {filter_config.data(), filter_config.size()});
   if (filter_config_envoy_ptr == nullptr) {
     return absl::InvalidArgumentError("Failed to initialize per-route dynamic module");
   }
@@ -215,7 +214,12 @@ absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilte
   }
 
   config->terminal_filter_ = terminal_filter;
-  config->stat_creation_frozen_ = true;
+  // Release-store: pairs with the acquire-loads in the per-request ``define_*`` callbacks
+  // (in abi_impl.cc) so a worker thread that observes ``stat_creation_frozen_=true`` is
+  // guaranteed to also observe all preceding writes to ``config``. Defends against an
+  // adversarial module spawning a worker inside ``on_http_filter_config_new`` that reads the
+  // flag before the C++-side shared_ptr publication establishes happens-before.
+  config->stat_creation_frozen_.store(true, std::memory_order_release);
 
   config->in_module_config_ = filter_config_envoy_ptr;
   config->on_http_filter_config_destroy_ = on_config_destroy.value();

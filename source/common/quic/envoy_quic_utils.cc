@@ -147,6 +147,8 @@ quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetRea
   case Http::StreamResetReason::Http1PrematureUpstreamHalfClose:
     IS_ENVOY_BUG("H/1 premature response reset is not applicable to H/3.");
     break;
+  case Http::StreamResetReason::RemoteResetNoError:
+    return quic::QUIC_STREAM_NO_ERROR;
   }
 
   ENVOY_LOG_MISC(error, absl::StrCat("Unknown reset reason: ", reason));
@@ -409,6 +411,9 @@ void convertQuicConfig(const envoy::config::core::v3::QuicProtocolOptions& confi
   if (config.has_idle_network_timeout()) {
     quic_config.SetIdleNetworkTimeout(quic::QuicTimeDelta::FromSeconds(
         DurationUtil::durationToSeconds(config.idle_network_timeout())));
+  }
+  if (config.has_enable_scone()) {
+    quic_config.set_parse_scone_packets(config.enable_scone().value());
   }
 }
 

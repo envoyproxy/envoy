@@ -19,8 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // peer telemetry attributes for consumption by the telemetry filters.
 // [#next-free-field: 7]
 message Config {
-  // DEPRECATED.
-  // This method uses ``baggage`` header encoding.
+  // This method uses ``baggage`` header encoding. Only used for HTTP CONNECT tunnels.
   message Baggage {
   }
 
@@ -42,6 +41,18 @@ message Config {
     bool skip_external_clusters = 1;
   }
 
+  // This method extracts peer metadata from the upstream filter state if it's available.
+  //
+  // Upstream filter state could be populated by multiple means in general, but in practice the
+  // intention here is that upstream PeerMetadata filter will populate the filter state with peer
+  // details extracted from the baggage header sent in response.
+  //
+  // Naturally this metadata discovery method only makes sense for upstream peer metadata discovery.
+  message UpstreamFilterState {
+    // Upstream filter state key that will be used to store peer metadata.
+    string peer_metadata_key = 1;
+  }
+
   // An exhaustive list of the derivation methods.
   message DiscoveryMethod {
     oneof method_specifier {
@@ -50,6 +61,8 @@ message Config {
       WorkloadDiscovery workload_discovery = 2;
 
       IstioHeaders istio_headers = 3;
+
+      UpstreamFilterState upstream_filter_state = 4;
     }
   }
 
@@ -57,6 +70,8 @@ message Config {
   message PropagationMethod {
     oneof method_specifier {
       IstioHeaders istio_headers = 1;
+
+      Baggage baggage = 2;
     }
   }
 

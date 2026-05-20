@@ -46,11 +46,16 @@ public:
   CreateConnectionData createConnection(
       Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
       Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const override;
+  Upstream::Host::CreateConnectionData createOrcaReportingConnection(
+      Event::Dispatcher& dispatcher,
+      Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+      const envoy::config::core::v3::Metadata* metadata) const override;
 
   // Upstream::HostDescription
   SharedConstAddressVector addressListOrNull() const override;
   Network::Address::InstanceConstSharedPtr address() const override;
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override;
+  Network::Address::InstanceConstSharedPtr orcaReportingAddress() const override;
 
 protected:
   LogicalHost(
@@ -121,6 +126,10 @@ public:
     // Should never be called since real hosts are used only for forwarding.
     return nullptr;
   }
+  Network::Address::InstanceConstSharedPtr orcaReportingAddress() const override {
+    // Should never be called since real hosts are used only for forwarding.
+    return nullptr;
+  }
   absl::optional<MonotonicTime> lastHcPassTime() const override {
     return logical_host_->lastHcPassTime();
   }
@@ -133,7 +142,10 @@ public:
     return logical_host_->resolveTransportSocketFactory(dest_address, metadata,
                                                         transport_socket_options);
   }
-  OptRef<HostLbPolicyData> lbPolicyData() const override { return logical_host_->lbPolicyData(); }
+  size_t lbPolicyDataCount() const override { return logical_host_->lbPolicyDataCount(); }
+  OptRef<HostLbPolicyData> lbPolicyDataAt(size_t index) const override {
+    return logical_host_->lbPolicyDataAt(index);
+  }
 
   // Upstream:HostDescription mutators are all no-ops, because logical_host_ is
   // const. These should never be called except during coverage tests.
@@ -149,7 +161,7 @@ public:
   void canary(bool) override {}
   void setLastHcPassTime(MonotonicTime) override {}
   void priority(uint32_t) override {}
-  void setLbPolicyData(HostLbPolicyDataPtr) override {}
+  void addLbPolicyData(HostLbPolicyDataPtr) override {}
 
 private:
   const Network::Address::InstanceConstSharedPtr address_;

@@ -1,7 +1,15 @@
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 
+#include "source/common/access_log/access_log_impl.h"
+#include "source/common/network/socket_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/stream_info/uint64_accessor_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
+#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
+#include "source/server/generic_factory_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -10,6 +18,50 @@ namespace ReverseConnection {
 
 // Static warning flag for reverse tunnel detailed stats activation.
 static bool reverse_tunnel_detailed_stats_warning_logged = false;
+
+namespace {
+
+void setStringMetadataField(Protobuf::Struct& metadata, absl::string_view key,
+                            absl::string_view value) {
+  (*metadata.mutable_fields())[std::string(key)].set_string_value(std::string(value));
+}
+
+void setNumberMetadataField(Protobuf::Struct& metadata, absl::string_view key, double value) {
+  (*metadata.mutable_fields())[std::string(key)].set_number_value(value);
+}
+
+void maybeSetStringFilterState(StreamInfo::FilterState& filter_state, absl::string_view key,
+                               absl::string_view value) {
+  if (value.empty() || filter_state.hasDataWithName(key)) {
+    return;
+  }
+
+  filter_state.setData(key, std::make_shared<Router::StringAccessorImpl>(value),
+                       StreamInfo::FilterState::StateType::ReadOnly,
+                       StreamInfo::FilterState::LifeSpan::Connection);
+}
+
+void maybeSetUint64FilterState(StreamInfo::FilterState& filter_state, absl::string_view key,
+                               uint64_t value) {
+  if (filter_state.hasDataWithName(key)) {
+    return;
+  }
+
+  filter_state.setData(key, std::make_shared<StreamInfo::UInt64AccessorImpl>(value),
+                       StreamInfo::FilterState::StateType::ReadOnly,
+                       StreamInfo::FilterState::LifeSpan::Connection);
+}
+
+absl::string_view socketStateForEvent(absl::string_view event,
+                                      const ReverseTunnelLifecycleInfo& lifecycle) {
+  if (event == kLifecycleEventSocketHandoff) {
+    return kLifecycleSocketStateHandedOff;
+  }
+
+  return lifecycle.handed_off_to_upstream ? kLifecycleSocketStateInUse : kLifecycleSocketStateIdle;
+}
+
+} // namespace
 
 // UpstreamSocketThreadLocal implementation
 UpstreamSocketThreadLocal::UpstreamSocketThreadLocal(Event::Dispatcher& dispatcher,
@@ -38,6 +90,135 @@ UpstreamSocketThreadLocal::UpstreamSocketThreadLocal(Event::Dispatcher& dispatch
   }
 }
 
+ReverseTunnelAcceptorExtension::~ReverseTunnelAcceptorExtension() {
+  // Reset the TLS slot before other members (especially access_logs_) are destroyed.
+  // Without this, the implicit member destruction order destroys access_logs_ before tls_slot_,
+  // and the UpstreamSocketManager destructor (triggered by tls_slot_ teardown) calls
+  // emitSyntheticLifecycleLog() which accesses the already-destroyed access_logs_, causing a
+  // segfault under GCC.
+  tls_slot_.reset();
+}
+
+ReverseTunnelAcceptorExtension::ReverseTunnelAcceptorExtension(
+    ReverseTunnelAcceptor& sock_interface, Server::Configuration::ServerFactoryContext& context,
+    const envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+        UpstreamReverseConnectionSocketInterface& config)
+    : Envoy::Network::SocketInterfaceExtension(sock_interface), context_(context),
+      socket_interface_(&sock_interface) {
+  stat_prefix_ = PROTOBUF_GET_STRING_OR_DEFAULT(config, stat_prefix, "reverse_tunnel_acceptor");
+  const uint32_t cfg_threshold = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, ping_failure_threshold, 3);
+  ping_failure_threshold_ = std::max<uint32_t>(1, cfg_threshold);
+  enable_detailed_stats_ = config.enable_detailed_stats();
+  enable_tenant_isolation_ =
+      config.has_enable_tenant_isolation() ? config.enable_tenant_isolation().value() : false;
+
+  Server::GenericFactoryContextImpl generic_context(context_, context_.messageValidationVisitor());
+  for (const auto& access_log_config : config.access_log()) {
+    access_logs_.push_back(
+        AccessLog::AccessLogFactory::fromProto(access_log_config, generic_context));
+  }
+
+  ENVOY_LOG(debug,
+            "ReverseTunnelAcceptorExtension: creating upstream reverse connection socket "
+            "interface with stat_prefix: {}, tenant_isolation: {}, access_logs: {}",
+            stat_prefix_, enable_tenant_isolation_, access_logs_.size());
+
+  if (config.has_reporter_config()) {
+    auto& reporter_factory =
+        Config::Utility::getAndCheckFactoryByName<ReverseTunnelReporterFactory>(
+            config.reporter_config().name());
+    auto reporter_config = Config::Utility::translateAnyToFactoryConfig(
+        config.reporter_config().typed_config(), context_.messageValidationVisitor(),
+        reporter_factory);
+
+    reporter_ = reporter_factory.createReporter(context, std::move(reporter_config));
+  }
+
+  if (socket_interface_ != nullptr) {
+    socket_interface_->extension_ = this;
+  }
+}
+
+void ReverseTunnelAcceptorExtension::emitSyntheticLifecycleLog(
+    absl::string_view event, const ReverseTunnelLifecycleInfo& lifecycle, TimeSource& time_source,
+    AccessLog::AccessLogType access_log_type, absl::string_view handoff_kind,
+    absl::string_view close_reason, const LifecycleLogMetadata& extra_metadata) const {
+  if (access_logs_.empty()) {
+    return;
+  }
+
+  auto connection_info_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
+      lifecycle.local_address, lifecycle.remote_address);
+  StreamInfo::StreamInfoImpl stream_info(time_source, connection_info_provider,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
+
+  populateLifecycleStreamInfo(stream_info, lifecycle, event, handoff_kind, close_reason,
+                              extra_metadata);
+  stream_info.onRequestComplete();
+  emitLifecycleLog(Formatter::Context(nullptr, nullptr, nullptr, {}, access_log_type), stream_info);
+}
+
+void ReverseTunnelAcceptorExtension::emitConnectionLifecycleLog(
+    absl::string_view event, StreamInfo::StreamInfo& stream_info,
+    const ReverseTunnelLifecycleInfo& lifecycle, AccessLog::AccessLogType access_log_type,
+    absl::string_view handoff_kind, absl::string_view close_reason,
+    const LifecycleLogMetadata& extra_metadata) const {
+  if (access_logs_.empty()) {
+    return;
+  }
+
+  populateLifecycleStreamInfo(stream_info, lifecycle, event, handoff_kind, close_reason,
+                              extra_metadata);
+  emitLifecycleLog(Formatter::Context(nullptr, nullptr, nullptr, {}, access_log_type), stream_info);
+}
+
+void ReverseTunnelAcceptorExtension::emitLifecycleLog(
+    const Formatter::Context& log_context, const StreamInfo::StreamInfo& stream_info) const {
+  for (const auto& access_log : access_logs_) {
+    access_log->log(log_context, stream_info);
+  }
+}
+
+void ReverseTunnelAcceptorExtension::populateLifecycleStreamInfo(
+    StreamInfo::StreamInfo& stream_info, const ReverseTunnelLifecycleInfo& lifecycle,
+    absl::string_view event, absl::string_view handoff_kind, absl::string_view close_reason,
+    const LifecycleLogMetadata& extra_metadata) const {
+  if (const auto& filter_state = stream_info.filterState(); filter_state != nullptr) {
+    maybeSetStringFilterState(*filter_state, kFilterStateNodeId, lifecycle.node_id);
+    maybeSetStringFilterState(*filter_state, kFilterStateClusterId, lifecycle.cluster_id);
+    maybeSetStringFilterState(*filter_state, kFilterStateTenantId, lifecycle.tenant_id);
+    maybeSetStringFilterState(*filter_state, kFilterStateWorker, lifecycle.worker);
+    if (lifecycle.fd >= 0) {
+      maybeSetUint64FilterState(*filter_state, kFilterStateFd, lifecycle.fd);
+    }
+  }
+
+  Protobuf::Struct metadata;
+  setStringMetadataField(metadata, "event", event);
+  setStringMetadataField(metadata, "node_id", lifecycle.node_id);
+  setStringMetadataField(metadata, "cluster_id", lifecycle.cluster_id);
+  setStringMetadataField(metadata, "tenant_id", lifecycle.tenant_id);
+  setStringMetadataField(metadata, "worker", lifecycle.worker);
+  setStringMetadataField(metadata, "socket_state", socketStateForEvent(event, lifecycle));
+  if (!handoff_kind.empty()) {
+    setStringMetadataField(metadata, "handoff_kind", handoff_kind);
+  }
+  if (!close_reason.empty()) {
+    setStringMetadataField(metadata, "close_reason", close_reason);
+    stream_info.setConnectionTerminationDetails(close_reason);
+  }
+  if (lifecycle.fd >= 0) {
+    setNumberMetadataField(metadata, "fd", lifecycle.fd);
+  }
+  for (const auto& [key, value] : extra_metadata) {
+    if (!value.empty()) {
+      setStringMetadataField(metadata, key, value);
+    }
+  }
+
+  stream_info.setDynamicMetadata(std::string(kAccessLogMetadataNamespace), metadata);
+}
+
 // ReverseTunnelAcceptorExtension implementation
 void ReverseTunnelAcceptorExtension::onServerInitialized(Server::Instance&) {
   // Initialize the reporter.
@@ -56,16 +237,19 @@ void ReverseTunnelAcceptorExtension::onServerInitialized(Server::Instance&) {
   // Create thread-local slot for the dispatcher and socket manager.
   tls_slot_ = ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>::makeUnique(context_.threadLocal());
 
+  const uint32_t ping_failure_threshold = ping_failure_threshold_;
+  const bool enable_tenant_isolation = enable_tenant_isolation_;
   // Set up the thread-local dispatcher and socket manager.
-  tls_slot_->set([this](Event::Dispatcher& dispatcher) {
-    auto tls = std::make_shared<UpstreamSocketThreadLocal>(dispatcher, this);
-    // Propagate configured miss threshold and tenant isolation into the socket manager.
-    if (tls->socketManager()) {
-      tls->socketManager()->setMissThreshold(ping_failure_threshold_);
-      tls->socketManager()->setTenantIsolationEnabled(enable_tenant_isolation_);
-    }
-    return tls;
-  });
+  tls_slot_->set(
+      [this, ping_failure_threshold, enable_tenant_isolation](Event::Dispatcher& dispatcher) {
+        auto tls = std::make_shared<UpstreamSocketThreadLocal>(dispatcher, this);
+        // Propagate configured miss threshold and tenant isolation into the socket manager.
+        if (auto* socket_manager = tls->socketManager(); socket_manager != nullptr) {
+          socket_manager->setMissThreshold(ping_failure_threshold);
+          socket_manager->setTenantIsolationEnabled(enable_tenant_isolation);
+        }
+        return tls;
+      });
 }
 
 // Get thread-local registry for the current thread.

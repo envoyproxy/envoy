@@ -24,6 +24,7 @@ namespace Envoy {
 namespace {
 
 using OnDemandScopedRdsIntegrationTest = ScopedRdsIntegrationTest;
+using testing::Ge;
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, OnDemandScopedRdsIntegrationTest,
                          DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
@@ -67,7 +68,7 @@ key:
                                      {"Addr", "x-foo-key=foo"}});
   createRdsStream("foo_route1");
   sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+  test_server_->waitForCounter("http.config_test.rds.foo_route1.update_success", Ge(1));
 
   waitForNextUpstreamRequest();
   // Send response headers, and end_stream if there is no response body.
@@ -276,7 +277,7 @@ key:
   initialize();
   registerTestServerPorts({"http"});
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+  test_server_->waitForCounter("http.config_test.rds.foo_route1.update_success", Ge(1));
   cleanupUpstreamAndDownstream();
   // "foo" request should succeed because the foo scope is loaded eagerly by default.
   // "bar" request will initialize rds provider on demand and also succeed.
@@ -327,7 +328,7 @@ key:
                                      {":authority", "sni.lyft.com"},
                                      {":scheme", "http"},
                                      {"Addr", "x-foo-key=foo"}});
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_attempt", 1);
+  test_server_->waitForCounter("http.config_test.rds.foo_route1.update_attempt", Ge(1));
   // Close the connection and destroy the active stream.
   cleanupUpstreamAndDownstream();
   // Push rds update, on demand updated callback is post to worker thread.
@@ -335,7 +336,7 @@ key:
   // locked.
   createRdsStream("foo_route1");
   sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+  test_server_->waitForCounter("http.config_test.rds.foo_route1.update_success", Ge(1));
 }
 
 class OnDemandVhdsIntegrationTest : public VhdsIntegrationTest {

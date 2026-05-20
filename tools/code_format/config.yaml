@@ -41,6 +41,7 @@ paths:
   - bazel/external/http_parser/
   - bazel/rbe/toolchains/configs/
   - bazel-
+  - compat/openssl/
   - build
   - contrib/contrib_build_config.bzl
   - examples/wasm-cc
@@ -104,6 +105,7 @@ paths:
     - source/extensions/watchdog/profile_action/config.cc
     - source/common/router/route_config_update_receiver_impl.cc
     - source/common/upstream/upstream_impl.cc
+    - source/common/matcher/actions/string_returning_action.cc
     - source/common/network/listen_socket_impl.cc
     - source/common/network/io_socket_handle_base_impl.cc
     - source/common/network/address_impl.cc
@@ -328,9 +330,12 @@ paths:
     include:
     - api/bazel/cc_proto_descriptor_library/file_descriptor_generator.cc
     - contrib/config/source/kv_store_xds_delegate.cc
+    - contrib/kafka/stat_sinks/source/kafka_stats_sink_impl.cc
     - contrib/istio/filters/network/metadata_exchange/source/metadata_exchange.cc
     - contrib/istio/filters/network/metadata_exchange/test/metadata_exchange_test.cc
     - contrib/istio/filters/http/peer_metadata/source/peer_metadata.cc
+    - contrib/istio/filters/network/peer_metadata/source/peer_metadata.cc
+    - contrib/istio/filters/network/peer_metadata/test/peer_metadata_test.cc
     - source/common/protobuf/utility.h
     - source/common/protobuf/utility.cc
     - source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc
@@ -378,6 +383,9 @@ paths:
     - source/extensions/common/wasm/context.h
     - source/extensions/common/wasm/context.cc
     - source/extensions/common/wasm/foreign.cc
+    - contrib/stat_sinks/wasm_filter/source/wasm_filter_stat_sink_impl.cc
+    - contrib/stat_sinks/wasm_filter/test/test_data/stats_filter_plugin.cc
+    - contrib/stat_sinks/wasm_filter/test/wasm_filter_stat_sink_integration_test.cc
     - source/extensions/common/wasm/wasm.h
     - source/extensions/common/wasm/wasm.cc
     - source/extensions/common/wasm/wasm_vm.h
@@ -387,6 +395,7 @@ paths:
     - test/extensions/common/wasm/wasm_test.cc
     - test/extensions/dynamic_modules/test_data/cpp/http_integration_test.cc
     - test/extensions/dynamic_modules/test_data/cpp/http.cc
+    - test/extensions/dynamic_modules/test_data/cpp/network_integration_test.cc
     - test/extensions/stats_sinks/wasm/wasm_stat_sink_test.cc
     - test/test_common/wasm_base.h
 
