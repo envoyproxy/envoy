@@ -49,7 +49,7 @@ EnvoyDeterministicConnectionIdGeneratorFactory::createQuicConnectionIdGenerator(
       quic::kQuicDefaultConnectionIdLength);
 }
 
-Network::Socket::OptionConstSharedPtr
+absl::StatusOr<Network::Socket::OptionConstSharedPtr>
 EnvoyDeterministicConnectionIdGeneratorFactory::createCompatibleLinuxBpfSocketOption(
     uint32_t concurrency) {
 #if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
@@ -93,7 +93,8 @@ EnvoyDeterministicConnectionIdGeneratorFactory::createCompatibleLinuxBpfSocketOp
       absl::string_view(reinterpret_cast<char*>(&prog_), sizeof(prog_)));
 #else
   UNREFERENCED_PARAMETER(concurrency);
-  return nullptr;
+  return absl::UnimplementedError(
+      "envoy.quic.deterministic_connection_id_generator is not implemented on this platform");
 #endif
 }
 

@@ -311,7 +311,7 @@ QuicConnectionIdGeneratorPtr Factory::createQuicConnectionIdGenerator(uint32_t w
   return std::make_unique<QuicLbConnectionIdGenerator>(*tls_slot_, worker_id);
 }
 
-Network::Socket::OptionConstSharedPtr
+absl::StatusOr<Network::Socket::OptionConstSharedPtr>
 Factory::createCompatibleLinuxBpfSocketOption(uint32_t concurrency) {
 #if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
   filter_ = {
@@ -336,7 +336,8 @@ Factory::createCompatibleLinuxBpfSocketOption(uint32_t concurrency) {
       absl::string_view(reinterpret_cast<char*>(&prog_), sizeof(prog_)));
 #else
   UNREFERENCED_PARAMETER(concurrency);
-  return nullptr;
+  return absl::UnimplementedError(
+      "envoy.quic.connection_id_generator.quic_lb is not implemented on this platform");
 #endif
 }
 
