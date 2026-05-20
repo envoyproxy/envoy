@@ -826,6 +826,20 @@ void ConnectionImpl::onReadReady() {
     result.action_ = PostIoAction::Close;
   }
 
+  // For a user-space io_handle (internal listener), an EOF read can mean either a graceful write
+  // half-close (peer shutdown(WR)) or a full peer close(). The transport read result flags the
+  // latter via remote_close_. A full close must become a remote close so tcp_proxy tunneling does
+  // not leave the connection half-open and leak the upstream CONNECT stream. This is a clean
+  // remote close, not an error, so the detected close type is left as the default (Normal). Real
+  // sockets never set remote_close_, so the branch is a no-op for them.
+  if (enable_half_close_ && result.end_stream_read_ && result.remote_close_ &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.internal_listener_peer_destroyed_propagation")) {
+    ENVOY_CONN_LOG(debug, "peer fully closed under half-close; treating as remote close", *this);
+    result.end_stream_read_ = false;
+    result.action_ = PostIoAction::Close;
+  }
+
   read_end_stream_ |= result.end_stream_read_;
   if (result.bytes_processed_ != 0 || result.end_stream_read_ ||
       (latched_dispatch_buffered_data && read_buffer_->length() > 0)) {
