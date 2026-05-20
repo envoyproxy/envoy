@@ -182,6 +182,8 @@ private:
 class NetworkExtProcFilter : public Envoy::Network::Filter,
                              ExternalProcessorCallbacks,
                              Envoy::Logger::Loggable<Envoy::Logger::Id::ext_proc> {
+  friend class NetworkExtProcFilterAccessor;
+
 public:
   // The result of an attempt to open the stream
   enum class StreamOpenState {
