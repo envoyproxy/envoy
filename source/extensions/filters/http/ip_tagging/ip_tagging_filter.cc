@@ -138,7 +138,7 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
   if (scope_ == nullptr) {
     scope_ = scope.createScope("");
   }
-  const uint64_t key = std::hash<std::string>()(ip_tags_datasource.filename());
+  const size_t key = std::hash<std::string>()(ip_tags_datasource.filename());
   auto it = ip_tags_registry_.find(key);
   if (it != ip_tags_registry_.end()) {
     if (std::shared_ptr<IpTagsProvider> provider = it->second.lock()) {

@@ -109,7 +109,7 @@ private:
 using IpTagsProviderSharedPtr = std::shared_ptr<IpTagsProvider>;
 
 /**
- * A singleton that de-duplicates IpTagsProvider instances by datasource filename so two
+ * A singleton that de-duplicates IpTagsProvider instances by data source filename so two
  * filter configs pointing at the same file share one provider (and thus one parsed trie).
  */
 class IpTagsRegistrySingleton : public Envoy::Singleton::Instance {
@@ -125,7 +125,7 @@ public:
 
 private:
   // Each provider stores a shared_ptr to this singleton, keeping the singleton alive
-  // until no provider remains. Key is a hash of the datasource filename.
+  // until no provider remains. Key is a hash of the data source filename.
   absl::flat_hash_map<size_t, std::weak_ptr<IpTagsProvider>> ip_tags_registry_;
   // Shared stats scope used by every provider this singleton creates. Lazily
   // initialized as a child of the first caller's scope and kept alive by the
@@ -157,7 +157,7 @@ public:
   FilterRequestType requestType() const { return request_type_; }
 
   // Returns the current snapshot. For the inline (static) path this is the snapshot
-  // built at construction; for the datasource path it is the snapshot currently
+  // built at construction; for the data source path it is the snapshot currently
   // published by the file watcher. The filter pulls this once per request so the trie
   // and stats it uses come from the same reload.
   LoadedIpTagsSharedPtr loadedIpTags() const {
@@ -200,7 +200,7 @@ private:
   const std::shared_ptr<IpTagsRegistrySingleton> ip_tags_registry_;
   // Set only on the inline path.
   LoadedIpTagsSharedPtr static_ip_tags_;
-  // Set only on the datasource path.
+  // Set only on the data source path.
   std::shared_ptr<IpTagsProvider> provider_;
 };
 
