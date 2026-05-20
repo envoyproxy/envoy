@@ -157,6 +157,18 @@ TEST(StateTest, ConsolidateOne) {
   EXPECT_EQ(chunk.length, 5);
 }
 
+TEST(StateTest, Clear) {
+  ChunkQueue queue;
+  Buffer::OwnedImpl data1("Hello");
+  queue.push(data1, false);
+  Buffer::OwnedImpl data2("World");
+  queue.push(data2, true);
+  EXPECT_FALSE(queue.empty());
+  queue.clear();
+  EXPECT_TRUE(queue.empty());
+  EXPECT_EQ(queue.receivedData().length(), 0);
+}
+
 } // namespace
 } // namespace ExternalProcessing
 } // namespace HttpFilters
