@@ -419,6 +419,24 @@ INSTANTIATE_TEST_SUITE_P(RedisSingleServerRequestTest, RedisSingleServerRequestT
 INSTANTIATE_TEST_SUITE_P(RedisSimpleRequestCommandHandlerMixedCaseTests,
                          RedisSingleServerRequestTest, testing::Values("INCR", "inCrBY"));
 
+TEST_F(RedisSingleServerRequestTest, HExpireSuccess) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"hexpire", "hello", "10", "fields", "1", "field1"});
+  makeRequest("hello", std::move(request));
+  EXPECT_NE(nullptr, handle_);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.hexpire.latency"),
+                          10));
+  respond();
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hexpire.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hexpire.success").value());
+}
+
 TEST_F(RedisSingleServerRequestTest, PingSuccess) {
   InSequence s;
 

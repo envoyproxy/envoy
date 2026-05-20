@@ -29,8 +29,9 @@ struct SupportedCommands {
         "bitcount", "bitfield", "bitfield_ro", "bitpos", "decr", "decrby", "dump", "expire",
         "expireat", "geoadd", "geodist", "geohash", "geopos", "georadius_ro",
         "georadiusbymember_ro", "geosearch", "get", "getbit", "getdel", "getex", "getrange",
-        "getset", "hdel", "hexists", "hget", "hgetall", "hincrby", "hincrbyfloat", "hkeys", "hlen",
-        "hmget", "hmset", "hscan", "hset", "hsetnx", "hstrlen", "hvals", "incr", "incrby",
+        "getset", "hdel", "hexists", "hexpire", "hexpireat", "hget", "hgetall", "hincrby",
+        "hincrbyfloat", "hkeys", "hlen", "hmget", "hmset", "hpersist", "hpexpire", "hpexpireat",
+        "hpttl", "hscan", "hset", "hsetnx", "hstrlen", "httl", "hvals", "incr", "incrby",
         "incrbyfloat", "lindex", "linsert", "llen", "lmove", "lpop", "lpush", "lpushx", "lrange",
         "lrem", "lset", "ltrim", "persist", "pexpire", "pexpireat", "pfadd", "pfcount", "psetex",
         "pttl", "publish", "restore", "rpop", "rpush", "rpushx", "sadd", "scard", "set", "setbit",
@@ -170,8 +171,9 @@ struct SupportedCommands {
   static const absl::flat_hash_set<std::string>& writeCommands() {
     CONSTRUCT_ON_FIRST_USE(
         absl::flat_hash_set<std::string>, "append", "bitfield", "decr", "decrby", "del", "discard",
-        "exec", "expire", "expireat", "eval", "evalsha", "geoadd", "getdel", "hdel", "hincrby",
-        "hincrbyfloat", "hmset", "hset", "hsetnx", "incr", "incrby", "incrbyfloat", "linsert",
+        "exec", "expire", "expireat", "eval", "evalsha", "geoadd", "getdel", "hdel", "hexpire",
+        "hexpireat", "hincrby", "hincrbyfloat", "hmset", "hpersist", "hpexpire", "hpexpireat",
+        "hset", "hsetnx", "incr", "incrby", "incrbyfloat", "linsert",
         "lmove", "lpop", "lpush", "lpushx", "lrem", "lset", "ltrim", "mset", "multi", "persist",
         "pexpire", "pexpireat", "pfadd", "psetex", "restore", "rpop", "rpush", "rpushx", "sadd",
         "set", "setbit", "setex", "setnx", "setrange", "spop", "srem", "zadd", "zincrby", "touch",
