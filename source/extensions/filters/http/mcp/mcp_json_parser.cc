@@ -777,9 +777,10 @@ const Protobuf::Value* McpJsonParser::getNestedValue(const std::string& dotted_p
 
 void McpJsonParser::reset() {
   metadata_.Clear();
-  extractor_.reset();
   stream_parser_.reset();
+  extractor_.reset();
   parsing_started_ = false;
+  all_fields_collected_ = false;
 }
 
 } // namespace Mcp

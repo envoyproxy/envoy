@@ -46,12 +46,17 @@ public:
   CreateConnectionData createConnection(
       Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
       Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const override;
+  Upstream::Host::CreateConnectionData createOrcaReportingConnection(
+      Event::Dispatcher& dispatcher,
+      Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+      const envoy::config::core::v3::Metadata* metadata) const override;
 
   // Upstream::HostDescription
   SharedConstAddressVector addressListOrNull() const override;
   Network::Address::InstanceConstSharedPtr address() const override;
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override;
   absl::string_view observabilityName() const override { return {}; }
+  Network::Address::InstanceConstSharedPtr orcaReportingAddress() const override;
 
 protected:
   LogicalHost(
@@ -120,6 +125,10 @@ public:
     return logical_host_->localityZoneStatName();
   }
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
+    // Should never be called since real hosts are used only for forwarding.
+    return nullptr;
+  }
+  Network::Address::InstanceConstSharedPtr orcaReportingAddress() const override {
     // Should never be called since real hosts are used only for forwarding.
     return nullptr;
   }

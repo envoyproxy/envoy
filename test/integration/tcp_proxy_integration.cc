@@ -1,5 +1,6 @@
 #include "test/integration/tcp_proxy_integration.h"
 
+#include "absl/functional/any_invocable.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -32,16 +33,17 @@ BaseTcpProxySslIntegrationTest::ClientSslConnection::ClientSslConnection(
   // buffer. This allows us to track the bytes actually written to the socket.
   EXPECT_CALL(*parent.mock_buffer_factory_, createBuffer_(_, _, _))
       .Times(::testing::AtLeast(1))
-      .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
-                           std::function<void()> above_overflow) -> Buffer::Instance* {
-        client_write_buffer_ =
-            new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
-        ON_CALL(*client_write_buffer_, move(_))
-            .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
-        ON_CALL(*client_write_buffer_, drain(_))
-            .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
-        return client_write_buffer_;
-      }));
+      .WillOnce(
+          Invoke([&](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                     absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+            client_write_buffer_ = new NiceMock<MockWatermarkBuffer>(
+                std::move(below_low), std::move(above_high), std::move(above_overflow));
+            ON_CALL(*client_write_buffer_, move(_))
+                .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
+            ON_CALL(*client_write_buffer_, drain(_))
+                .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
+            return client_write_buffer_;
+          }));
   // Set up the SSL client.
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(parent.version_, parent.lookupPort("tcp_proxy"));

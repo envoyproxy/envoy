@@ -70,20 +70,23 @@ public:
 
   void initialize() override {
     EXPECT_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
-        .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
-                             std::function<void()> above_overflow) -> Buffer::Instance* {
-          client_write_buffer_ =
-              new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
-          ON_CALL(*client_write_buffer_, move(_))
-              .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
-          ON_CALL(*client_write_buffer_, drain(_))
-              .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
-          return client_write_buffer_;
-        }))
-        .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
-                             std::function<void()> above_overflow) -> Buffer::Instance* {
-          return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
-        }));
+        .WillOnce(
+            Invoke([&](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                       absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+              client_write_buffer_ = new NiceMock<MockWatermarkBuffer>(
+                  std::move(below_low), std::move(above_high), std::move(above_overflow));
+              ON_CALL(*client_write_buffer_, move(_))
+                  .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
+              ON_CALL(*client_write_buffer_, drain(_))
+                  .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
+              return client_write_buffer_;
+            }))
+        .WillOnce(
+            Invoke([&](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                       absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+              return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
+                                                 std::move(above_overflow));
+            }));
 
     // Create raw buffer and TLS transport socket factories.
     auto raw_config =
@@ -647,20 +650,23 @@ public:
 
   void initialize() override {
     EXPECT_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
-        .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
-                             std::function<void()> above_overflow) -> Buffer::Instance* {
-          client_write_buffer_ =
-              new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
-          ON_CALL(*client_write_buffer_, move(_))
-              .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
-          ON_CALL(*client_write_buffer_, drain(_))
-              .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
-          return client_write_buffer_;
-        }))
-        .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
-                                  std::function<void()> above_overflow) -> Buffer::Instance* {
-          return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
-        }));
+        .WillOnce(
+            Invoke([&](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                       absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+              client_write_buffer_ = new NiceMock<MockWatermarkBuffer>(
+                  std::move(below_low), std::move(above_high), std::move(above_overflow));
+              ON_CALL(*client_write_buffer_, move(_))
+                  .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
+              ON_CALL(*client_write_buffer_, drain(_))
+                  .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
+              return client_write_buffer_;
+            }))
+        .WillRepeatedly(
+            Invoke([](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                      absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+              return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
+                                                 std::move(above_overflow));
+            }));
 
     auto raw_config =
         std::make_unique<envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer>();
