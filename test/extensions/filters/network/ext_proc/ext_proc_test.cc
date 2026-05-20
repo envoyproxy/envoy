@@ -1329,7 +1329,6 @@ TEST_F(NetworkExtProcFilterTest, LoggingInfoOnError) {
   EXPECT_EQ(logging_info->lastCallStatus(), Grpc::Status::WellKnownGrpcStatus::ResourceExhausted);
 }
 
-<<<<<<< HEAD
 // Test close_stream_to_ext_proc_server functionality
 TEST_F(NetworkExtProcFilterTest, CloseSidestream) {
   auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
@@ -1441,7 +1440,7 @@ TEST_F(NetworkExtProcFilterTest, CloseSidestreamMultipleOutstandingBalancedCallb
 
   // Verify stream closed counter
   EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_closed"));
-=======
+}
 TEST_F(NetworkExtProcFilterTest, ReceiveDynamicMetadataAllowed) {
   std::vector<std::string> receiving_namespaces = {"test-namespace"};
   envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
@@ -1496,7 +1495,6 @@ TEST_F(NetworkExtProcFilterTest, ReceiveDynamicMetadataNotAllowed) {
   EXPECT_CALL(stream_info_, setDynamicMetadata("other-namespace", _)).Times(0);
 
   filter_->onReceiveMessage(std::move(response));
->>>>>>> main
 }
 
 } // namespace
