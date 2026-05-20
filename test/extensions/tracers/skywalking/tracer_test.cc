@@ -136,7 +136,7 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
     EXPECT_EQ("status_code", span_object.tags().at(2).key());
     EXPECT_EQ("200", span_object.tags().at(2).value());
 
-    EXPECT_EQ(Tracing::Tags::get().Error, span_object.tags().at(3).key());
+    EXPECT_EQ(Tracing::Tags::get().Error.name(), span_object.tags().at(3).key());
     EXPECT_EQ(Tracing::Tags::get().True, span_object.tags().at(3).value());
 
     EXPECT_EQ("url", span_object.tags().at(4).key());
