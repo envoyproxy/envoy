@@ -215,6 +215,7 @@ For details on each command's usage see the official
   HEXISTS, Hash
   HEXPIRE, Hash
   HEXPIREAT, Hash
+  HEXPIRETIME, Hash
   HGET, Hash
   HGETALL, Hash
   HINCRBY, Hash
@@ -226,6 +227,7 @@ For details on each command's usage see the official
   HPERSIST, Hash
   HPEXPIRE, Hash
   HPEXPIREAT, Hash
+  HPEXPIRETIME, Hash
   HPTTL, Hash
   HRANDFIELD, Hash
   HSCAN, Hash

@@ -549,6 +549,44 @@ TEST_F(RedisSingleServerRequestTest, HPTtlSuccess) {
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.hpttl.success").value());
 }
 
+TEST_F(RedisSingleServerRequestTest, HExpireTimeSuccess) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  // HEXPIRETIME key FIELDS numfields field [field ...]
+  makeBulkStringArray(*request, {"hexpiretime", "hello", "fields", "1", "field1"});
+  makeRequest("hello", std::move(request));
+  EXPECT_NE(nullptr, handle_);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.hexpiretime.latency"),
+                          10));
+  respond();
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hexpiretime.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hexpiretime.success").value());
+}
+
+TEST_F(RedisSingleServerRequestTest, HPExpireTimeSuccess) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  // HPEXPIRETIME key FIELDS numfields field [field ...]
+  makeBulkStringArray(*request, {"hpexpiretime", "hello", "fields", "1", "field1"});
+  makeRequest("hello", std::move(request));
+  EXPECT_NE(nullptr, handle_);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.hpexpiretime.latency"),
+                          10));
+  respond();
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hpexpiretime.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hpexpiretime.success").value());
+}
+
 // Verify write classification: hexpire/hexpireat/hpexpire/hpexpireat/hpersist are write commands.
 TEST_F(RedisSingleServerRequestTest, HashFieldExpiryWriteCommandsClassification) {
   for (const std::string& cmd :
@@ -560,7 +598,7 @@ TEST_F(RedisSingleServerRequestTest, HashFieldExpiryWriteCommandsClassification)
 
 // Verify read classification: httl/hpttl are read commands (not in writeCommands).
 TEST_F(RedisSingleServerRequestTest, HashFieldExpiryReadCommandsClassification) {
-  for (const std::string& cmd : {"httl", "hpttl"}) {
+  for (const std::string& cmd : {"httl", "hpttl", "hexpiretime", "hpexpiretime"}) {
     EXPECT_TRUE(Common::Redis::SupportedCommands::isReadCommand(cmd))
         << cmd << " should be classified as a read command";
   }
