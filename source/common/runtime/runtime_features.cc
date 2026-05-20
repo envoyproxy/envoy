@@ -38,6 +38,7 @@ RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
 RUNTIME_GUARD(envoy_reloadable_features_cel_message_serialize_text_format);
 RUNTIME_GUARD(envoy_reloadable_features_coalesce_lb_rebuilds_on_batch_update);
 RUNTIME_GUARD(envoy_reloadable_features_codec_client_enable_idle_timer_only_when_connected);
+RUNTIME_GUARD(envoy_reloadable_features_decouple_explicit_drain_pools_and_dns_refresh);
 RUNTIME_GUARD(envoy_reloadable_features_dfp_cluster_resolves_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
 RUNTIME_GUARD(envoy_reloadable_features_enable_cel_regex_precompilation);
@@ -71,6 +72,7 @@ RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_add_verification_status_header);
 RUNTIME_GUARD(envoy_reloadable_features_map_http_stream_reset_to_tcp_rst);
 RUNTIME_GUARD(envoy_reloadable_features_mcp_filter_use_new_metadata_namespace);
+RUNTIME_GUARD(envoy_reloadable_features_mobile_use_network_observer_registry);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_cleanup_cookies);
 RUNTIME_GUARD(envoy_reloadable_features_odcds_over_ads_fix);
@@ -87,6 +89,7 @@ RUNTIME_GUARD(envoy_reloadable_features_quic_fix_defer_logging_miss_for_half_clo
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
 // @danzh2010 or @RyanTheOptimist before removing.
 RUNTIME_GUARD(envoy_reloadable_features_quic_send_server_preferred_address_to_all_clients);
+RUNTIME_GUARD(envoy_reloadable_features_quic_signal_headers_only_to_http1_backend);
 RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_reads_fixed_number_packets);
 RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_socket_use_address_cache_for_read);
 RUNTIME_GUARD(envoy_reloadable_features_rbac_match_headers_individually);
@@ -166,6 +169,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_quic_brok
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_srtt);
 // TODO(abeyad): Evaluate and make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_initial_rtt_estimate);
+// TODO(abeyad): Flip to true after prod testing. Advanced filtering applies to all IP reserved
+// range addresses.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_mobile_ipv6_probe_advanced_filtering);
 // TODO(botengyao): flip to true after canarying the feature internally without problems.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_connection_close_through_filter_manager);
 // TODO(adisuissa): flip to true after all xDS types use the new subscription
