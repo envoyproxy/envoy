@@ -11,10 +11,10 @@ To support these use cases, Envoy allows :ref:`configuring a formatting scheme f
 <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.header_key_format>`, which will have Envoy
 transform the header keys during serialization.
 
-To configure this formatting on response headers, specify the format in the
+To configure this formatting on upstream request headers, specify the format in the
 :ref:`http_protocol_options
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.http_protocol_options>`.
-To configure this for upstream request headers, specify the formatting in
+To configure this for downstream response headers, specify the formatting in
 :ref:`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` in
 the cluster's
 :ref:`extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`.
