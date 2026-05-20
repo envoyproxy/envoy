@@ -781,7 +781,6 @@ bool envoy_dynamic_module_callback_listener_filter_set_filter_state(
 
   // TODO(wbpcode): check whether the key already exists and whether overwriting is allowed.
   callbacks->filterState().setData(key_str, std::make_shared<Router::StringAccessorImpl>(value_str),
-                                   StreamInfo::FilterState::StateType::ReadOnly,
                                    StreamInfo::FilterState::LifeSpan::Connection);
   return true;
 }

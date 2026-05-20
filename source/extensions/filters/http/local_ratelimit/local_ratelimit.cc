@@ -247,8 +247,7 @@ Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getPerConnectionR
         used_config_->descriptors(), used_config_->consumeDefaultTokenBucket());
 
     decoder_callbacks_->streamInfo().filterState()->setData(
-        PerConnectionRateLimiter::key(), limiter, StreamInfo::FilterState::StateType::ReadOnly,
-        StreamInfo::FilterState::LifeSpan::Connection);
+        PerConnectionRateLimiter::key(), limiter, StreamInfo::FilterState::LifeSpan::Connection);
     return const_cast<Filters::Common::LocalRateLimit::LocalRateLimiterImpl&>(limiter->value());
   }
 

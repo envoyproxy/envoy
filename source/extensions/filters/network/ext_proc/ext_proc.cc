@@ -110,7 +110,6 @@ void NetworkExtProcFilter::initializeLoggingInfo() {
           NetworkFilterNames::get().NetworkExternalProcessor)) {
     filter_state->setData(NetworkFilterNames::get().NetworkExternalProcessor,
                           std::make_shared<NetworkExtProcLoggingInfo>(),
-                          Envoy::StreamInfo::FilterState::StateType::Mutable,
                           Envoy::StreamInfo::FilterState::LifeSpan::Connection);
   }
 

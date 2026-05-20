@@ -317,8 +317,7 @@ void CompressorFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallba
   } else {
     auto registry_ptr = std::make_unique<CompressorRegistry>();
     registry_ptr->filter_configs_.push_back(config_);
-    filter_state->setData(key, std::move(registry_ptr),
-                          StreamInfo::FilterState::StateType::Mutable);
+    filter_state->setData(key, std::move(registry_ptr));
   }
 }
 
@@ -708,8 +707,7 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::ResponseHeaderMap& he
   // No cached decision found, so decide now.
   std::unique_ptr<CompressorFilter::EncodingDecision> decision = chooseEncoding(headers);
   bool result = shouldCompress(*decision);
-  filter_state->setData(encoding_decision_key, std::move(decision),
-                        StreamInfo::FilterState::StateType::ReadOnly);
+  filter_state->setData(encoding_decision_key, std::move(decision));
   return result;
 }
 
