@@ -235,7 +235,7 @@ TEST(OtlpLogUtilsTest, AddFilterStateToAttributesFromDownstream) {
 
   stream_info.filter_state_->setData(
       "downstream_key", std::make_unique<Router::StringAccessorImpl>("downstream_value"),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+      StreamInfo::FilterState::LifeSpan::FilterChain);
 
   std::vector<std::string> filter_state_objects = {"downstream_key"};
   addFilterStateToAttributes(stream_info, filter_state_objects, log_entry);
@@ -274,7 +274,7 @@ TEST(OtlpLogUtilsTest, AddFilterStateToAttributesDownstreamPrecedence) {
   // Add to downstream.
   stream_info.filter_state_->setData(
       "same_key", std::make_unique<Router::StringAccessorImpl>("downstream_wins"),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+      StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Add to upstream.
   auto upstream_filter_state =

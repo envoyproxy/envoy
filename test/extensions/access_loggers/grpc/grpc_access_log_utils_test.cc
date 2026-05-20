@@ -83,7 +83,6 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest, FilterStateFromDownstream) {
   auto state = std::make_unique<::Envoy::Extensions::Filters::Common::Expr::CelState>(prototype);
   state->setValue("value_from_downstream_peer");
   stream_info.filter_state_->setData("downstream_peer", std::move(state),
-                                     StreamInfo::FilterState::StateType::Mutable,
                                      StreamInfo::FilterState::LifeSpan::Connection);
 
   Formatter::Context formatter_context;
@@ -161,7 +160,6 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest,
       std::make_unique<::Envoy::Extensions::Filters::Common::Expr::CelState>(prototype);
   downstream_state->setValue("value_from_downstream_peer");
   stream_info.filter_state_->setData("same_key", std::move(downstream_state),
-                                     StreamInfo::FilterState::StateType::Mutable,
                                      StreamInfo::FilterState::LifeSpan::Connection);
 
   auto upstream_state =
