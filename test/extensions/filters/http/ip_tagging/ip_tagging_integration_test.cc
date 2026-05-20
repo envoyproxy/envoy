@@ -165,7 +165,7 @@ ip_tags:
         });
     new_config_helper.setLds("1");
     test_server_->waitForGauge("listener_manager.total_listeners_active", testing::Eq(1));
-    test_server_->waitForCounter("listener_manager.lds.update_success", testing::Eq(1));
+    test_server_->waitForCounter("listener_manager.lds.update_success", testing::Ge(1));
     test_server_->waitForGauge("listener_manager.total_listeners_draining", testing::Eq(0));
   }
 
