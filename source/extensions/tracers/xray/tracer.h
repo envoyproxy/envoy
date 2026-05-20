@@ -94,6 +94,7 @@ public:
    * Adds a key-value pair to either the Span's annotations or metadata.
    * An allowlist of keys are added to the annotations, everything else is added to the metadata.
    */
+  using Tracing::Span::setTag;
   void setTag(absl::string_view name, absl::string_view value) override;
 
   /**

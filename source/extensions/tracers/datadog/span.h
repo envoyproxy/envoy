@@ -36,6 +36,7 @@ public:
   const datadog::tracing::Optional<datadog::tracing::Span>& impl() const;
 
   // Envoy::Tracing::Span
+  using Tracing::Span::setTag;
   void setOperation(absl::string_view operation) override;
   void setTag(absl::string_view name, absl::string_view value) override;
   void log(SystemTime, const std::string&) override;
