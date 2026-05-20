@@ -1,7 +1,6 @@
 #include "test/fuzz/fuzz_runner.h"
 
 #include <cstdlib>
-#include <ranges>
 
 #include "source/common/common/thread.h"
 #include "source/common/common/utility.h"

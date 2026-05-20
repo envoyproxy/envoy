@@ -1312,7 +1312,7 @@ TEST_F(GlobalClientTest, TestResponseBucketMissingId) {
 
 class LocalClientTest : public GlobalClientTest {
 protected:
-  LocalClientTest() : {}
+  LocalClientTest() = default;
 
   void SetUp() override {
     GlobalClientTest::SetUp();
