@@ -189,7 +189,7 @@ void HostUtility::forEachHostMetric(
           absl::string_view endpoint_observability_name = host->observabilityName();
           Network::Address::InstanceConstSharedPtr address;
           if (endpoint_observability_name.empty()) {
-            // Only logic host will have empty observability name for now.
+            // Only logical host will have empty observability name for now.
             address = host->address();
             endpoint_observability_name = address->asStringView();
           }

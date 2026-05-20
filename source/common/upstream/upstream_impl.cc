@@ -2222,7 +2222,7 @@ void PriorityStateManager::registerHostForPriority(
           lb_endpoint.load_balancing_weight().value(),
           parent_.constLocalitySharedPool()->getObject(locality_lb_endpoint.locality()),
           lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority(),
-          lb_endpoint.health_status(), address_list, lb_endpoint.endpoint().stat_name()),
+          lb_endpoint.health_status(), address_list, lb_endpoint.endpoint().observability_name()),
       std::unique_ptr<HostImpl>));
   registerHostForPriority(host, locality_lb_endpoint);
 }
