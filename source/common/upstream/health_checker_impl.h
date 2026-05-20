@@ -53,18 +53,12 @@ struct HealthCheckerEqualTo {
 class HealthCheckerFactoryContextImpl : public Server::Configuration::HealthCheckerFactoryContext {
 public:
   HealthCheckerFactoryContextImpl(Upstream::Cluster& cluster,
-                                  Server::Configuration::ServerFactoryContext& server_context,
-                                  HostHealthMapper host_health_mapper = {},
-                                  const std::string& stat_prefix = "")
+                                  Server::Configuration::ServerFactoryContext& server_context)
       : cluster_(cluster), runtime_(server_context.runtime()),
         dispatcher_(server_context.mainThreadDispatcher()),
         validation_visitor_(server_context.messageValidationVisitor()),
         log_manager_(server_context.accessLogManager()), api_(server_context.api()),
-        server_context_(server_context),
-        host_health_mapper_(host_health_mapper
-                                ? std::move(host_health_mapper)
-                                : HostHealthMapper{[](Host& host) -> HostHealth& { return host; }}),
-        stat_prefix_(stat_prefix) {}
+        server_context_(server_context) {}
   Upstream::Cluster& cluster() override { return cluster_; }
   Envoy::Runtime::Loader& runtime() override { return runtime_; }
   Event::Dispatcher& mainThreadDispatcher() override { return dispatcher_; }
@@ -79,10 +73,6 @@ public:
     event_logger_ = std::move(event_logger);
   }
 
-  HostHealthMapper hostHealthMapper() override { return host_health_mapper_; }
-
-  const std::string& statPrefix() const override { return stat_prefix_; }
-
   Server::Configuration::ServerFactoryContext& serverFactoryContext() override {
     return server_context_;
   };
@@ -96,8 +86,6 @@ private:
   Api::Api& api_;
   HealthCheckEventLoggerPtr event_logger_;
   Server::Configuration::ServerFactoryContext& server_context_;
-  HostHealthMapper host_health_mapper_;
-  std::string stat_prefix_;
 };
 
 /**
@@ -116,11 +104,9 @@ public:
    * @param server_context reference to the Server context object
    * @return a health checker.
    */
-  static absl::StatusOr<HealthCheckerSharedPtr> create(
-      const envoy::config::core::v3::HealthCheck& health_check_config, Upstream::Cluster& cluster,
-      Server::Configuration::ServerFactoryContext& server_context,
-      Server::Configuration::HealthCheckerFactoryContext::HostHealthMapper host_health_mapper = {},
-      const std::string& stat_prefix = "");
+  static absl::StatusOr<HealthCheckerSharedPtr>
+  create(const envoy::config::core::v3::HealthCheck& health_check_config,
+         Upstream::Cluster& cluster, Server::Configuration::ServerFactoryContext& server_context);
 };
 
 /**

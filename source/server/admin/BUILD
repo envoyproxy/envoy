@@ -345,6 +345,7 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/upstream:host_utility_lib",
+        "//source/extensions/health_checkers/multi:health_checker_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
     ],
 )

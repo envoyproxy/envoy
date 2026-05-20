@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package envoy.extensions.health_checkers.multi.v3;
+
+import "envoy/config/core/v3/health_check.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.health_checkers.multi.v3";
+option java_outer_classname = "MultiProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/health_checkers/multi/v3;multiv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Multiple Health Checkers]
+// Multiple health checker :ref:`configuration overview <config_health_checkers_multi>`.
+// [#extension: envoy.health_checkers.multi]
+
+// Configuration for the multiple health checker extension.
+// All configured health checks must pass for a host to be considered healthy.
+message Multi {
+  // The individual health checks to run. At least two must be specified.
+  repeated config.core.v3.HealthCheck health_checks = 1;
+}

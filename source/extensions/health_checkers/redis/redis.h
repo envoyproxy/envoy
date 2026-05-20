@@ -46,9 +46,7 @@ public:
           aws_iam_config,
       const absl::optional<Extensions::NetworkFilters::Common::Redis::AwsIamAuthenticator::
                                AwsIamAuthenticatorSharedPtr>
-          aws_iam_authenticator,
-      Server::Configuration::HealthCheckerFactoryContext::HostHealthMapper host_health_mapper = {},
-      const std::string& stat_prefix = "");
+          aws_iam_authenticator);
 
   static const NetworkFilters::Common::Redis::RespValue& pingHealthCheckRequest() {
     static HealthCheckRequest* request = new HealthCheckRequest();

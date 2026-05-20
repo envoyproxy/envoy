@@ -137,11 +137,14 @@ public:
 using HostHandlePtr = std::unique_ptr<HostHandle>;
 
 /**
- * A hosts health status.
+ * An upstream host.
  */
-class HostHealth {
+class Host : virtual public HostDescription {
 public:
-  virtual ~HostHealth() = default;
+  struct CreateConnectionData {
+    Network::ClientConnectionPtr connection_;
+    HostDescriptionConstSharedPtr host_description_;
+  };
 
   // We use an X-macro here to make it easier to verify that all the enum values are accounted for.
   // clang-format off
@@ -178,32 +181,6 @@ public:
   enum class HealthFlag { HEALTH_FLAG_ENUM_VALUES(DECLARE_ENUM) };
 
 #undef DECLARE_ENUM
-
-  /**
-   * Atomically clear a health flag for a host. Flags are specified in HealthFlags.
-   */
-  virtual void healthFlagClear(HealthFlag flag) PURE;
-
-  /**
-   * Atomically get whether a health flag is set for a host. Flags are specified in HealthFlags.
-   */
-  virtual bool healthFlagGet(HealthFlag flag) const PURE;
-
-  /**
-   * Atomically set a health flag for a host. Flags are specified in HealthFlags.
-   */
-  virtual void healthFlagSet(HealthFlag flag) PURE;
-};
-
-/**
- * An upstream host.
- */
-class Host : virtual public HostDescription, public HostHealth {
-public:
-  struct CreateConnectionData {
-    Network::ClientConnectionPtr connection_;
-    HostDescriptionConstSharedPtr host_description_;
-  };
 
   /**
    * @return host specific counters.
@@ -244,6 +221,21 @@ public:
    */
   virtual std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>
   gauges() const PURE;
+
+  /**
+   * Atomically clear a health flag for a host. Flags are specified in HealthFlags.
+   */
+  virtual void healthFlagClear(HealthFlag flag) PURE;
+
+  /**
+   * Atomically get whether a health flag is set for a host. Flags are specified in HealthFlags.
+   */
+  virtual bool healthFlagGet(HealthFlag flag) const PURE;
+
+  /**
+   * Atomically set a health flag for a host. Flags are specified in HealthFlags.
+   */
+  virtual void healthFlagSet(HealthFlag flag) PURE;
 
   /**
    * Atomically get multiple health flags that are set for a host. Flags are specified
