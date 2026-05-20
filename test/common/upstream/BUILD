@@ -621,6 +621,7 @@ envoy_cc_test(
         "//test/mocks/upstream:health_checker_mocks",
         "//test/mocks/upstream:priority_set_mocks",
         "//test/mocks/upstream:thread_aware_load_balancer_mocks",
+        "//test/mocks/upstream:transport_socket_match_mocks",
         "//test/mocks/upstream:typed_load_balancer_factory_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
