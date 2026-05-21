@@ -230,6 +230,13 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 #endif
 
   Http::RequestDecoder* decoder = request_decoder_->get().ptr();
+  if (end_stream && Runtime::runtimeFeatureEnabled(
+                        "envoy.reloadable_features.quic_validate_headers_only_content_length")) {
+    updateReceivedContentBytes(0, true);
+    if (stream_error() != quic::QUIC_STREAM_NO_ERROR) {
+      return;
+    }
+  }
   if (decoder != nullptr) {
     decoder->decodeHeaders(std::move(headers), /*end_stream=*/end_stream);
   }
