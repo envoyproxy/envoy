@@ -821,6 +821,12 @@ OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr default_config,
       validator_factory_(std::move(validator_factory)), time_source_(time_source), random_(random) {
 }
 
+void OAuth2Filter::onDestroy() {
+  if (oauth_client_ != nullptr) {
+    oauth_client_->cancel();
+  }
+}
+
 void OAuth2Filter::resolveAndSetActiveConfig() {
   const auto* route_specific_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(decoder_callbacks_);
