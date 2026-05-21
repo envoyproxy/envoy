@@ -2363,6 +2363,87 @@ TEST_P(ProtocolIntegrationTest, MissingStatusStreamError) {
   EXPECT_EQ("502", response->headers().getStatusValue());
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, CookiesAreSubjectToHeaderMapSizeLimit) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  // Set limit to 4K but allow 8K headers
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_max_request_headers_kb()->set_value(4);
+        hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(8000);
+      });
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    setMaxRequestHeadersKb(96);
+    setMaxRequestHeadersCount(8000);
+  }
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "sni.lyft.com"},
+                                                 {"content-length", "0"}};
+  // in oghttp2, there's a hardcoded HPACK decode buffer limit of 32k, if we
+  // trigger that limit, the connection is torn down instead of our intended
+  // behavior of stream reset.
+  for (int i = 0; i < 1000; i++) {
+    request_headers.addCopy("cookie", fmt::sprintf("a%x=b", i));
+  }
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("431", response->headers().getStatusValue());
+  } else {
+    ASSERT_TRUE(response->waitForReset());
+    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+  }
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, CookiesAreSubjectToHeaderMapCountLimit) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  uint32_t max_count = 2010;
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        // Make the size limit high enough, but the count low
+        hcm.mutable_max_request_headers_kb()->set_value(256);
+        hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(128);
+      });
+  setMaxRequestHeadersCount(max_count);
+  if (downstreamProtocol() == Http::CodecType::HTTP2 &&
+      GetParam().http2_implementation == Http2Impl::Oghttp2) {
+    GTEST_SKIP() << "testing oghttp2 cookie count enforcement not backported beyond 1.37";
+  }
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "sni.lyft.com"},
+                                                 {"content-length", "0"}};
+  for (int i = 0; i < 200; i++) {
+    request_headers.addCopy("cookie", fmt::sprintf("a%x=b", i));
+  }
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("431", response->headers().getStatusValue());
+  } else {
+    ASSERT_TRUE(response->waitForReset());
+    EXPECT_EQ(response->resetReason(), Http::StreamResetReason::RemoteReset);
+
+    if (downstreamProtocol() == Http::CodecType::HTTP2) {
+      Stats::Store& stats = test_server_->server().stats();
+      EXPECT_EQ(1L, TestUtility::findCounter(stats, "http2.header_overflow")->value());
+      EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("too_many_headers"));
+      codec_client_->close();
+    }
+  }
+}
+
 // Validate that lots of tiny cookies doesn't cause a DoS (single cookie header).
 TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingConcatenated) {
   if (downstreamProtocol() == Http::CodecType::HTTP3) {
