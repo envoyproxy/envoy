@@ -218,8 +218,11 @@ void HickoryDnsResolver::onResolveComplete(uint64_t query_id,
 }
 
 ActiveDnsQuery* HickoryDnsResolver::resolveSrv(const std::string& dns_name ABSL_ATTRIBUTE_UNUSED,
-                                               ResolveCb callback ABSL_ATTRIBUTE_UNUSED) {
+                                               ResolveCb callback) {
   ENVOY_LOG(warn, "Hickory DNS resolver does not support SRV records (not implemented)");
+  dispatcher_.post([callback = std::move(callback)]() {
+    callback(ResolutionStatus::Failure, "SRV records not supported", {});
+  });
   return nullptr;
 }
 

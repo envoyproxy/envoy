@@ -679,14 +679,20 @@ void DnsResolverImpl::PendingSrvResolution::startResolution() {
       this, &ares_query_id_);
 
   if (dnsrecStatus != ARES_SUCCESS) {
-    parent_.stats_.pending_resolutions_.dec();
-    parent_.stats_.resolve_total_.inc();
-    parent_.chargeGetAddrInfoErrorStats(dnsrecStatus, 0);
+    if (!completed_) {
+      // ares_query_dnsrec rejected the query without firing the callback synchronously.
+      parent_.stats_.pending_resolutions_.dec();
+      parent_.stats_.resolve_total_.inc();
+      parent_.chargeGetAddrInfoErrorStats(dnsrecStatus, 0);
 
-    ENVOY_LOG_EVENT(debug, "cares_srv_resolution_failure",
-                    "dns query for {} failed with c-ares status {:#06x}: \"{}\"", dns_name_,
-                    static_cast<int>(dnsrecStatus), ares_strerror(dnsrecStatus));
-    finishResolve();
+      ENVOY_LOG_EVENT(debug, "cares_srv_resolution_failure",
+                      "dns query for {} failed with c-ares status {:#06x}: \"{}\"", dns_name_,
+                      static_cast<int>(dnsrecStatus), ares_strerror(dnsrecStatus));
+      completed_ = true;
+      finishResolve();
+    }
+    // else: ares_query_dnsrec fired the callback synchronously before returning, which already
+    // decremented the stat and called finishResolve(). Nothing more to do.
   }
 }
 
@@ -719,6 +725,10 @@ void DnsResolverImpl::PendingSrvResolution::onAresSrvCallback(ares_status_t stat
     finishResolve();
     return;
   }
+
+  // Mark resolution complete so that startResolution() knows the callback was already fired
+  // (e.g., synchronously by ares_query_dnsrec for invalid names) and avoids double-decrement.
+  completed_ = true;
 
   if (status == ARES_SUCCESS) {
     std::list<DnsResponse> srv_records;
