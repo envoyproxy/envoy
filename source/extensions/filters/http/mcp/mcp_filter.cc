@@ -418,9 +418,8 @@ Http::FilterDataStatus McpFilter::completeParsing() {
       (*metadata.mutable_fields())[std::string(Filters::Common::Mcp::McpConstants::IS_MCP_REQUEST)]
           .set_bool_value(is_mcp_request_);
       if (is_exceeding_limit_) {
-        (*metadata
-              .mutable_fields())[std::string(
-            Filters::Common::Mcp::McpConstants::IS_EXCEEDING_LIMIT)]
+        (*metadata.mutable_fields())[std::string(
+                                         Filters::Common::Mcp::McpConstants::IS_EXCEEDING_LIMIT)]
             .set_bool_value(true);
       }
       decoder_callbacks_->streamInfo().setDynamicMetadata(config_->metadataNamespace(), metadata);
