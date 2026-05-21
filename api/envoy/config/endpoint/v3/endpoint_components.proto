@@ -105,7 +105,7 @@ message Endpoint {
   //
   // .. note::
   //
-  //   This field make no sense for logical DNS host implementation for now.
+  //   This field is ignored for logical DNS host implementation..
   //
   // This is useful when there are duplicate addresses in the cluster, for example when multiple
   // endpoints share the same address but have different hostnames or metadata.
