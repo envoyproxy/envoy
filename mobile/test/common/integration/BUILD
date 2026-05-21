@@ -141,6 +141,7 @@ envoy_cc_test_with_engine_builder(
     repository = "@envoy",
     deps = [
         ":xds_integration_test_lib",
+        "//library/common/api:external_api_lib",
         "@envoy//test/test_common:environment_lib",
         "@envoy//test/test_common:test_runtime_lib",
         "@envoy//test/test_common:utility_lib",

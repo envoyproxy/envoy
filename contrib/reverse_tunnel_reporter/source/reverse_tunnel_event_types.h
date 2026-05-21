@@ -75,7 +75,7 @@ struct TunnelUpdates {
 // on sending the data alone.
 class ReverseTunnelReporterWithState : public ReverseTunnelReporter {
 public:
-  virtual ~ReverseTunnelReporterWithState() = default;
+  ~ReverseTunnelReporterWithState() override = default;
 
   virtual ReverseTunnelEvent::ConnectionsList getAllConnections() PURE;
 };

@@ -462,9 +462,9 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
     if (!filter_state.hasData<AccessLogState>(AccessLogState::key())) {
       // TODO(TAOXUY): Create a new PR that adds test coverage around any corner cases of which
       // level should be used, and adds this comment or an updated version.
-      filter_state.setData(
-          AccessLogState::key(), std::make_shared<AccessLogState>(shared_from_this()),
-          StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Request);
+      filter_state.setData(AccessLogState::key(),
+                           std::make_shared<AccessLogState>(shared_from_this()),
+                           StreamInfo::FilterState::LifeSpan::Request);
     }
     auto* state = filter_state.getDataMutable<AccessLogState>(AccessLogState::key());
 

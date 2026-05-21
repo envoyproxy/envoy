@@ -4,16 +4,16 @@ build-image:
   repo: docker.io/envoyproxy/envoy-build
   repo-gcr: gcr.io/envoy-ci/envoy-build
   # default ci caching (ci)
-  sha: afe3addcdb7a5177bcca77d041f079acf4a6c5fb32701aadb2ab96fd0933e0b2
-  sha-ci: afe3addcdb7a5177bcca77d041f079acf4a6c5fb32701aadb2ab96fd0933e0b2
-  sha-devtools: 420d53d577ba85245db3791255c53423ebc8869d7ca9940c0f29d1decba0c00a
-  sha-docker: 5fbafb6f366bc7815e9941f813854301ad4341d5dae4efc783bd1e3d602d58ba
-  sha-gcc: b344f62c6160304d002290f73339ac648b735c3700e28a1c6ad05d9fc2815cec
-  sha-mobile: 25ef9a9e8977150fe1278e7358307cd039bc90b0ebc5c16fea1a5cd566af4e38
-  sha-worker: 7189239fbbc3983b15840609b122a35ce228a1af83aa440b022b1c949adcc32a
+  sha: 58ec7bec0e349c7daff6a71c55fb05da62318637b13b647a4a0a96f02de28386
+  sha-ci: 58ec7bec0e349c7daff6a71c55fb05da62318637b13b647a4a0a96f02de28386
+  sha-devtools: 8ea83087c77726b02bc5b0eba79ce1ce94308c034833cd922a5ea0f3d5b1c610
+  sha-docker: b622172bea807adb401306ed60b86b5a892e77b2cba871a384724f9082ad5667
+  sha-gcc: 0adba37e34e6f42c45fa241e720c93197f5ed31d1dc76afd4880779933a91648
+  sha-mobile: 406eb40441ab5cc2ac8e6e9f7330f618ce91a8163d5f9ecaad6d4bd7b1661164
+  sha-worker: be284c733ef7aaba7c02b1a95e2c6760b09020840b99d9c3821ebe1293615c81
   # TODO: remove this dupe (currently used by ci request handler)
-  mobile-sha: 25ef9a9e8977150fe1278e7358307cd039bc90b0ebc5c16fea1a5cd566af4e38
-  tag: 99bbf423a0d1ff5a7332fb1e23bd62b90754fcd2
+  mobile-sha: 406eb40441ab5cc2ac8e6e9f7330f618ce91a8163d5f9ecaad6d4bd7b1661164
+  tag: v0.1.4
 
 config:
   envoy:

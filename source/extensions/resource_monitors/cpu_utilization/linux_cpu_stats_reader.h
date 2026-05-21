@@ -55,7 +55,7 @@ class LinuxContainerCpuStatsReader : public CpuStatsReader {
 public:
   using ContainerStatsReaderPtr = std::unique_ptr<LinuxContainerCpuStatsReader>;
 
-  virtual ~LinuxContainerCpuStatsReader() = default;
+  ~LinuxContainerCpuStatsReader() override = default;
 
   /**
    * Create the appropriate cgroup stats reader.

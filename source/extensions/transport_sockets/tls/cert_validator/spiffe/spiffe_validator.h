@@ -97,7 +97,7 @@ private:
 
   std::string ca_file_name_;
   std::shared_ptr<SpiffeData> spiffe_data_;
-  std::vector<SanMatcherPtr> subject_alt_name_matchers_{};
+  std::vector<SanMatcherPtr> subject_alt_name_matchers_;
   SslStats& stats_;
   TimeSource& time_source_;
   using SpiffeTrustBundles = Config::DataSource::ProviderSingleton<SpiffeData>;

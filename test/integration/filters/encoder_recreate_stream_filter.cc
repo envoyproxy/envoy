@@ -32,7 +32,7 @@ public:
 
     decoder_callbacks_->streamInfo().filterState()->setData(
         "test_key", std::make_unique<Router::StringAccessorImpl>("test_value"),
-        StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
+        StreamInfo::FilterState::LifeSpan::Request);
 
     if (decoder_callbacks_->recreateStream(nullptr)) {
       return ::Envoy::Http::FilterHeadersStatus::StopIteration;

@@ -227,7 +227,7 @@ protected:
   // shutdown_ has 3 states. A absl::nullopt indicates the socket has not been shutdown, a false
   // value represents the socket wants to be shutdown but the shutdown has not been performed or
   // completed, and a true value means the socket has been shutdown.
-  absl::optional<bool> shutdown_{};
+  absl::optional<bool> shutdown_;
   // If there is in progress write_or_shutdown_req_ during closing, a write timeout timer may be
   // setup to cancel the write_or_shutdown_req_, either a write request or a shutdown request. So
   // we can make sure all SQEs bounding to the iouring socket is completed and the socket can be

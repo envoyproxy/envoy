@@ -48,7 +48,7 @@ public:
 
 protected:
   // Points to the actual connection pool to create streams from.
-  absl::optional<Envoy::Upstream::HttpPoolData> pool_data_{};
+  absl::optional<Envoy::Upstream::HttpPoolData> pool_data_;
   Envoy::Http::ConnectionPool::Cancellable* conn_pool_stream_handle_{};
   Router::GenericConnectionPoolCallbacks* callbacks_{};
 };

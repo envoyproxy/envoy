@@ -35,6 +35,7 @@ struct DynamicModuleThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBa
     Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams params) override {
       return std::make_unique<DynamicModuleLoadBalancer>(handle_, params.priority_set);
     }
+    bool recreateOnHostChange() const override { return false; }
 
     DynamicModuleClusterHandleSharedPtr handle_;
   };
@@ -190,7 +191,6 @@ DynamicModuleCluster::DynamicModuleCluster(const envoy::config::cluster::v3::Clu
                                            Upstream::ClusterFactoryContext& context,
                                            absl::Status& creation_status)
     : ClusterImplBase(cluster, context, creation_status), config_(std::move(config)),
-      in_module_cluster_(nullptr),
       dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       server_context_(context.serverFactoryContext()) {
 
@@ -474,7 +474,7 @@ size_t DynamicModuleCluster::removeHosts(const std::vector<Upstream::HostSharedP
   }
 
   // Build the remaining host list and update the priority set once.
-  ASSERT(priority_set_.hostSetsPerPriority().size() >= 1);
+  ASSERT(!priority_set_.hostSetsPerPriority().empty());
   const auto& first_host_set = priority_set_.getOrCreateHostSet(0);
 
   // Build a set of removed host pointers for O(1) lookup.
@@ -642,7 +642,7 @@ bool DynamicModuleLoadBalancer::withActiveInstance(
 
 DynamicModuleLoadBalancer::DynamicModuleLoadBalancer(
     const DynamicModuleClusterHandleSharedPtr& handle, const Upstream::PrioritySet& priority_set)
-    : handle_(handle), priority_set_(priority_set), in_module_lb_(nullptr) {
+    : handle_(handle), priority_set_(priority_set) {
   // Register before invoking any module hook so a concurrent async host selection completion can
   // validate its raw pointer against a live instance.
   registerActiveDynamicModuleLoadBalancer(this);

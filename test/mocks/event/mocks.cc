@@ -1,5 +1,6 @@
 #include "mocks.h"
 
+#include "absl/functional/any_invocable.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -38,10 +39,12 @@ MockDispatcher::MockDispatcher(const std::string& name) : name_(name) {
   });
 
   ON_CALL(buffer_factory_, createBuffer_(_, _, _))
-      .WillByDefault(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
-                               std::function<void()> above_overflow) -> Buffer::Instance* {
-        return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
-      }));
+      .WillByDefault(
+          Invoke([](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                    absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+            return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
+                                               std::move(above_overflow));
+          }));
   ON_CALL(*this, isThreadSafe()).WillByDefault([thread_factory, thread_id]() {
     return thread_factory->currentThreadId() == thread_id;
   });

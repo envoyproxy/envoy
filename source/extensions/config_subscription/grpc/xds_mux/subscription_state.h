@@ -130,7 +130,7 @@ protected:
   UntypedConfigUpdateCallbacks& callbacks_;
   Event::Dispatcher& dispatcher_;
   bool dynamic_context_changed_{};
-  std::string control_plane_identifier_{};
+  std::string control_plane_identifier_;
   XdsConfigTrackerOptRef xds_config_tracker_;
   XdsResourcesDelegateOptRef xds_resources_delegate_;
   const std::string target_xds_authority_;

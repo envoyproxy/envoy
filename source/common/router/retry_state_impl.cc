@@ -368,6 +368,7 @@ RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_he
   }
 
   if ((retry_on_ & RetryPolicy::RETRY_ON_RETRIABLE_4XX)) {
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
     Http::Code code = static_cast<Http::Code>(response_status);
     if (code == Http::Code::Conflict) {
       return RetryDecision::RetryWithBackoff;
@@ -430,7 +431,8 @@ RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason,
   ASSERT(!disable_http3);
   // First check "never retry" conditions so we can short circuit (we never
   // retry if the reset reason is overflow).
-  if (reset_reason == Http::StreamResetReason::Overflow) {
+  if (reset_reason == Http::StreamResetReason::Overflow ||
+      reset_reason == Http::StreamResetReason::RemoteResetNoError) {
     return RetryDecision::NoRetry;
   }
 
