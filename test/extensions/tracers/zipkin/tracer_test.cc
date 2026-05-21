@@ -741,7 +741,7 @@ TEST_F(ZipkinTracerTest, TimestampTraceIds) {
   // Verify timestamp is approximately correct (within 1 second)
   uint32_t expected_timestamp =
       static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::seconds>(
-                                time_system_.monotonicTime().time_since_epoch())
+                                time_system_.systemTime().time_since_epoch())
                                 .count());
   EXPECT_LE(std::abs(static_cast<int32_t>(extracted_timestamp - expected_timestamp)), 1);
 
@@ -783,7 +783,7 @@ TEST_F(ZipkinTracerTest, TimestampTraceIds128bit) {
 
   uint32_t expected_timestamp =
       static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::seconds>(
-                                time_system_.monotonicTime().time_since_epoch())
+                                time_system_.systemTime().time_since_epoch())
                                 .count());
 
   // High part should have the timestamp prefix

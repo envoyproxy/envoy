@@ -19,7 +19,7 @@ uint64_t Tracer::generateTraceId() {
     // [32-bit epoch seconds][32-bit random]
     const uint32_t epoch_seconds =
         static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::seconds>(
-                                  time_source_.monotonicTime().time_since_epoch())
+                                  time_source_.systemTime().time_since_epoch())
                                   .count());
     const uint32_t random_part = static_cast<uint32_t>(random_generator_.random());
 
