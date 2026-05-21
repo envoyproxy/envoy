@@ -1824,7 +1824,7 @@ TEST_F(McpJsonParserTest, TrailingGarbageRejected) {
 TEST(McpParserConfigTest, DefaultSecuritySettings) {
   McpParserConfig config = McpParserConfig::createDefault();
 
-  EXPECT_TRUE(config.rejectDuplicateKeys());
+  EXPECT_FALSE(config.rejectDuplicateKeys());
 }
 
 } // namespace

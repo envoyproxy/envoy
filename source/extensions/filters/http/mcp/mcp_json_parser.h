@@ -96,7 +96,7 @@ private:
   absl::flat_hash_set<std::string> always_extract_;
 
   // Security settings
-  bool reject_duplicate_keys_{true};
+  bool reject_duplicate_keys_{false};
 
   FieldRequirements default_requirements_;
   absl::flat_hash_map<std::string, FieldRequirements> method_requirements_;

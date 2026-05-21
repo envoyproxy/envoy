@@ -113,9 +113,9 @@ message Mcp {
   // If unset (default), do not extract or inject baggage.
   BaggagePropagationConfig propagate_baggage = 7;
 
-  // When true (default), reject requests that contain duplicate JSON keys at any
+  // When true, reject requests that contain duplicate JSON keys at any
   // nesting level. RFC 8259 Section 4 states that names within an object SHOULD be
-  // unique. No legitimate MCP client should send duplicate keys.
+  // unique. Defaults to false (last-key-wins / last-win).
   google.protobuf.BoolValue reject_duplicate_keys = 8;
 }
 

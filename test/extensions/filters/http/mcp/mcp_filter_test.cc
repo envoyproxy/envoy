@@ -549,7 +549,62 @@ TEST_F(McpFilterTest, BodyLimitPassThroughWithoutMetadata) {
   EXPECT_TRUE(filter_state_obj->isExceedingLimit());
 }
 
+// Test that if reject_duplicate_keys is explicitly set to true in the config,
+// the filter rejects requests containing duplicate JSON keys.
+TEST_F(McpFilterTest, DuplicateKeyRejectionEnabledConfig) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_reject_duplicate_keys()->set_value(true);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  // Send JSON body containing duplicate keys
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "tool1"}, "params": {"name": "tool2"}})";
+  Buffer::OwnedImpl buffer(json);
+
+  // Expect request to be rejected with BadRequest due to duplicate keys
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest, "duplicate JSON keys detected", _, _, _));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+  EXPECT_EQ(1u, config_->stats().duplicate_keys_rejected_.value());
+}
+
+// Test that duplicate JSON keys are allowed by default (last-key-wins behavior)
+// and do not trigger rejection.
+TEST_F(McpFilterTest, DuplicateKeyAllowedByDefault) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  // Send JSON body containing duplicate keys
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "tool1"}, "params": {"name": "tool2"}})";
+  Buffer::OwnedImpl buffer(json);
+
+  // Expect request to be allowed through (no rejection calls)
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+  EXPECT_EQ(0u, config_->stats().duplicate_keys_rejected_.value());
+}
 
 // Test that truncated JSON with end_stream is rejected in REJECT_NO_MCP mode.
 TEST_F(McpFilterTest, PartialJsonEndStreamRejectMode) {

@@ -120,7 +120,7 @@ McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3
 
   parser_config_.setRejectDuplicateKeys(proto_config.has_reject_duplicate_keys()
                                             ? proto_config.reject_duplicate_keys().value()
-                                            : true); // Default: reject duplicate keys
+                                            : false); // Default: last-key-wins / last-win
 }
 
 bool McpFilter::isValidMcpDeleteRequest(const Http::RequestHeaderMap& headers) const {
