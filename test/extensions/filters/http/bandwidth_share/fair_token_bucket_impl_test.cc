@@ -162,20 +162,20 @@ TEST_F(ClientTest, RunWithAggressiveThreadsToEnsureNoDeadlocks) {
     bool acting = true;
     absl::optional<Client> client;
   } threads[10];
-  for (auto& i : threads) {
-    i.client.emplace(bucket_, "foo", 1);
-    i.thread = std::thread([&mu, &total_consumed, thread = &threads[i]] {
+  for (auto& thread : threads) {
+    thread.client.emplace(bucket_, "foo", 1);
+    thread.thread = std::thread([&mu, &total_consumed, &thread] {
       while (true) {
-        uint64_t got = thread->client->consume(1000);
+        uint64_t got = thread.client->consume(1000);
         {
           absl::MutexLock lock(mu);
-          thread->acting = false;
-          thread->consumed += got;
+          thread.acting = false;
+          thread.consumed += got;
           total_consumed += got;
           if (total_consumed >= 100000) {
             break;
           }
-          mu.Await(absl::Condition(&thread->acting));
+          mu.Await(absl::Condition(&thread.acting));
         }
       }
     });
