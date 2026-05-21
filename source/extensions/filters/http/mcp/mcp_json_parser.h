@@ -266,7 +266,6 @@ private:
   std::unique_ptr<McpFieldExtractor> extractor_;
   std::unique_ptr<ProtobufUtil::converter::JsonStreamParser> stream_parser_;
   bool parsing_started_{false};
-
 };
 
 // Compatibility aliases

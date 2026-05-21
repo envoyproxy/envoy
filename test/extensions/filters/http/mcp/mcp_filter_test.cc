@@ -461,7 +461,8 @@ TEST_F(McpFilterTest, PartialJsonEndStreamPassThroughMode) {
 }
 
 // Test that malformed JSON with length exactly equal to max_request_body_size and end_stream=true
-// is rejected in PASS_THROUGH mode, because the client terminated the stream and no further data exists.
+// is rejected in PASS_THROUGH mode, because the client terminated the stream and no further data
+// exists.
 TEST_F(McpFilterTest, PartialJsonEndStreamPassThroughModeExactlyAtLimit) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
@@ -485,7 +486,8 @@ TEST_F(McpFilterTest, PartialJsonEndStreamPassThroughModeExactlyAtLimit) {
   Buffer::OwnedImpl buffer(json);
 
   // Even in PASS_THROUGH mode, it must be rejected because the total body length matches
-  // the limit, end_stream is true, and the JSON is genuinely malformed (not truncated by the limit).
+  // the limit, end_stream is true, and the JSON is genuinely malformed (not truncated by the
+  // limit).
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Http::Code::BadRequest,
                              "reached end_stream or configured body size, don't get enough data.",
@@ -494,13 +496,14 @@ TEST_F(McpFilterTest, PartialJsonEndStreamPassThroughModeExactlyAtLimit) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 }
 
-// Test that if a request in PASS_THROUGH mode exceeds the size limit before extracting any MCP metadata,
-// the filter still populates the is_exceeding_limit and is_mcp_request metadata flags in both the dynamic metadata
-// and the FilterState.
+// Test that if a request in PASS_THROUGH mode exceeds the size limit before extracting any MCP
+// metadata, the filter still populates the is_exceeding_limit and is_mcp_request metadata flags in
+// both the dynamic metadata and the FilterState.
 TEST_F(McpFilterTest, BodyLimitPassThroughWithoutMetadata) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
-  proto_config.set_request_storage_mode(envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA_AND_FILTER_STATE);
+  proto_config.set_request_storage_mode(
+      envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA_AND_FILTER_STATE);
   proto_config.mutable_max_request_body_size()->set_value(20); // Extremely small limit
 
   config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
@@ -517,7 +520,8 @@ TEST_F(McpFilterTest, BodyLimitPassThroughWithoutMetadata) {
 
   // Body starts with a very long key so that it exceeds 20 bytes and cuts off before
   // the JSON parses jsonrpc/method or closes the root object.
-  std::string json = R"({"oversized_key_before_jsonrpc": "some very long value that exceeds twenty bytes", "jsonrpc": "2.0"})";
+  std::string json =
+      R"({"oversized_key_before_jsonrpc": "some very long value that exceeds twenty bytes", "jsonrpc": "2.0"})";
   Buffer::OwnedImpl buffer(json);
 
   // In PASS_THROUGH mode, the request is allowed through.
@@ -627,7 +631,6 @@ TEST_F(McpFilterTest, TrailingGarbageRejectedInFilter) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
   EXPECT_EQ(1u, config_->stats().invalid_json_.value());
 }
-
 
 // Test that truncated JSON with end_stream is rejected in REJECT_NO_MCP mode.
 TEST_F(McpFilterTest, PartialJsonEndStreamRejectMode) {
@@ -1006,7 +1009,8 @@ TEST_F(McpFilterTest, BodySizeLimitInPassThroughModeMultiChunk) {
 
   // Second chunk: 20 bytes with end_stream = true.
   // The total body (90 bytes) exceeds the 80-byte limit.
-  // The final chunk contains valid characters, but parsing fails at finishParse() because it was cut off.
+  // The final chunk contains valid characters, but parsing fails at finishParse() because it was
+  // cut off.
   std::string chunk2 = R"(, "id": 1, "extra": )";
   ASSERT_EQ(chunk2.size(), 20);
   Buffer::OwnedImpl buffer2(chunk2);
@@ -1031,7 +1035,6 @@ TEST_F(McpFilterTest, BodySizeLimitInPassThroughModeMultiChunk) {
   ASSERT_NE(mcp_it, fields.end());
   EXPECT_TRUE(mcp_it->second.bool_value());
 }
-
 
 // Test route cache is NOT cleared by default when metadata is set
 TEST_F(McpFilterTest, RouteCacheNotClearedByDefault) {

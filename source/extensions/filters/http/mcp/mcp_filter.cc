@@ -411,8 +411,8 @@ Http::FilterDataStatus McpFilter::completeParsing() {
 
   if (should_store_metadata) {
     if (config_->shouldStoreToFilterState()) {
-      auto filter_state_obj =
-          std::make_shared<FilterStateObject>(parser_->getMethod(), metadata, is_mcp_request_, is_exceeding_limit_);
+      auto filter_state_obj = std::make_shared<FilterStateObject>(
+          parser_->getMethod(), metadata, is_mcp_request_, is_exceeding_limit_);
       decoder_callbacks_->streamInfo().filterState()->setData(
           std::string(FilterStateObject::FilterStateKey), std::move(filter_state_obj),
           StreamInfo::FilterState::LifeSpan::Request,
