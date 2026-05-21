@@ -466,7 +466,7 @@ TEST_F(McpFilterTest, PartialJsonEndStreamPassThroughModeExactlyAtLimit) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
 
-  std::string json = R"({"jsonrpc":"2.0","method":"tools/call","params":{"name":"x"")";
+  std::string json = R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "test")";
   const uint32_t max_size = json.size();
   proto_config.mutable_max_request_body_size()->set_value(max_size);
 
@@ -493,6 +493,62 @@ TEST_F(McpFilterTest, PartialJsonEndStreamPassThroughModeExactlyAtLimit) {
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 }
+
+// Test that if a request in PASS_THROUGH mode exceeds the size limit before extracting any MCP metadata,
+// the filter still populates the is_exceeding_limit and is_mcp_request metadata flags in both the dynamic metadata
+// and the FilterState.
+TEST_F(McpFilterTest, BodyLimitPassThroughWithoutMetadata) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_request_storage_mode(envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA_AND_FILTER_STATE);
+  proto_config.mutable_max_request_body_size()->set_value(20); // Extremely small limit
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(20));
+  filter_->decodeHeaders(headers, false);
+
+  // Body starts with a very long key so that it exceeds 20 bytes and cuts off before
+  // the JSON parses jsonrpc/method or closes the root object.
+  std::string json = R"({"oversized_key_before_jsonrpc": "some very long value that exceeds twenty bytes", "jsonrpc": "2.0"})";
+  Buffer::OwnedImpl buffer(json);
+
+  // In PASS_THROUGH mode, the request is allowed through.
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  Protobuf::Struct captured_metadata;
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce(testing::SaveArg<1>(&captured_metadata));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  // Verify that dynamic metadata still contains is_exceeding_limit and is_mcp_request
+  const auto& fields = captured_metadata.fields();
+
+  auto limit_it = fields.find(std::string(IS_EXCEEDING_LIMIT));
+  ASSERT_NE(limit_it, fields.end());
+  EXPECT_TRUE(limit_it->second.bool_value());
+
+  auto mcp_it = fields.find(std::string(IS_MCP_REQUEST));
+  ASSERT_NE(mcp_it, fields.end());
+  EXPECT_FALSE(mcp_it->second.bool_value());
+
+  // Verify that FilterStateObject still exists and is populated with the exceeding limit state
+  const auto* filter_state_obj =
+      decoder_callbacks_.stream_info_.filterState()->getDataReadOnly<McpFilterStateObject>(
+          std::string(McpFilterStateObject::FilterStateKey));
+  ASSERT_NE(filter_state_obj, nullptr);
+  EXPECT_FALSE(filter_state_obj->isMcpRequest());
+  EXPECT_TRUE(filter_state_obj->isExceedingLimit());
+}
+
 
 
 // Test that truncated JSON with end_stream is rejected in REJECT_NO_MCP mode.

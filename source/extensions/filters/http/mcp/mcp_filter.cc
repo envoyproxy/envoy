@@ -403,10 +403,13 @@ Http::FilterDataStatus McpFilter::completeParsing() {
     }
   }
 
-  if (!metadata.fields().empty()) {
+  const bool has_metadata = !metadata.fields().empty();
+  const bool should_store_metadata = has_metadata || is_exceeding_limit_;
+
+  if (should_store_metadata) {
     if (config_->shouldStoreToFilterState()) {
       auto filter_state_obj =
-          std::make_shared<FilterStateObject>(parser_->getMethod(), metadata, is_mcp_request_);
+          std::make_shared<FilterStateObject>(parser_->getMethod(), metadata, is_mcp_request_, is_exceeding_limit_);
       decoder_callbacks_->streamInfo().filterState()->setData(
           std::string(FilterStateObject::FilterStateKey), std::move(filter_state_obj),
           StreamInfo::FilterState::LifeSpan::Request,
@@ -425,7 +428,7 @@ Http::FilterDataStatus McpFilter::completeParsing() {
       ENVOY_LOG(debug, "MCP filter set dynamic metadata: {}", metadata.DebugString());
     }
 
-    if (config_->clearRouteCache()) {
+    if (config_->clearRouteCache() && has_metadata) {
       if (auto cb = decoder_callbacks_->downstreamCallbacks(); cb.has_value()) {
         cb->clearRouteCache();
         ENVOY_LOG(debug, "MCP filter cleared route cache for metadata-based routing");
