@@ -184,8 +184,6 @@ TEST_F(GcpAuthnFilterTest, DestroyFilter) {
   EXPECT_EQ(filter_->state(), GcpAuthnFilter::State::Complete);
 }
 
-
-
 TEST_F(GcpAuthnFilterTest, AudienceInvalidType) {
   setupMockObjects();
   setupFilterAndCallback();

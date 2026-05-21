@@ -27,9 +27,8 @@ public:
 
   void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 
-  void
-  fetchToken(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-             GcpAuthnClient::Callbacks& callbacks) override;
+  void fetchToken(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+                  GcpAuthnClient::Callbacks& callbacks) override;
   void cancel() override;
 
   // Http::AsyncClient::Callbacks implemented by this class.

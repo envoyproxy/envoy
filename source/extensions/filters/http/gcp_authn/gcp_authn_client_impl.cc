@@ -73,8 +73,7 @@ void GcpAuthnClientImpl::fetchToken(
     options.setBufferBodyForRetry(true);
   }
 
-  std::string final_url =
-      absl::StrReplaceAll(UrlString, {{"[AUDIENCE]", audience.url()}});
+  std::string final_url = absl::StrReplaceAll(UrlString, {{"[AUDIENCE]", audience.url()}});
   active_request_ =
       thread_local_cluster->httpAsyncClient().send(buildRequest(final_url), *this, options);
 }

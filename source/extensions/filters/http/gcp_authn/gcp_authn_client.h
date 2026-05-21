@@ -46,9 +46,8 @@ public:
    * @param audience the Audience proto containing the request details.
    * @param callbacks the callbacks to be notified when the token fetch completes.
    */
-  virtual void
-  fetchToken(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-             Callbacks& callbacks) PURE;
+  virtual void fetchToken(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+                          Callbacks& callbacks) PURE;
 
   /**
    * Cancel the active request.

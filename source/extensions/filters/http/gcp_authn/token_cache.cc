@@ -7,8 +7,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GcpAuthn {
 
-absl::optional<std::string> TokenCacheImpl::lookUp(
-    const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience) {
+absl::optional<std::string>
+TokenCacheImpl::lookUp(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience) {
   uint64_t key = MessageUtil::hash(audience);
   typename LRUCache::ScopedLookup lookup(&lru_cache_, key);
   if (lookup.found()) {
