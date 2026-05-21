@@ -469,7 +469,7 @@ TEST_F(McpJsonParserTest, FieldExtractionWithObjectField) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_TRUE(parser_->isAllFieldsCollected()); // Verify parsing completed
+  EXPECT_TRUE(parser_->isParsingComplete()); // Verify parsing completed
 
   // Verify params.ref was extracted correctly
   const auto* ref = parser_->getNestedValue("params.ref");
@@ -708,7 +708,7 @@ TEST_F(McpJsonParserTest, MetaAsRequiredFieldExtraction) {
   // Since _meta is required (not optional), hasOptionalFields should be false
   EXPECT_FALSE(parser->hasOptionalFields());
   // All required fields were found, parsing completed
-  EXPECT_TRUE(parser->isAllFieldsCollected());
+  EXPECT_TRUE(parser->isParsingComplete());
   EXPECT_TRUE(parser->hasAllRequiredFields());
 
   // Verify extracted fields
@@ -1717,7 +1717,7 @@ TEST_F(McpJsonParserTest, MultiChunkDuplicateKeyDetection) {
   EXPECT_TRUE(parser->isValidMcpRequest());
 
   // CRITICAL: The parser must NOT have stopped yet — the root object hasn't closed.
-  EXPECT_FALSE(parser->isAllFieldsCollected());
+  EXPECT_FALSE(parser->isParsingComplete());
 
   // Chunk 2: Contains a duplicate "params" key (the JPP attack payload).
   std::string chunk2 = R"(, "params": {"name": "execute_shell", "arguments": {"cmd": "rm -rf /"}})";
@@ -1725,7 +1725,7 @@ TEST_F(McpJsonParserTest, MultiChunkDuplicateKeyDetection) {
   EXPECT_OK(parser->parse(chunk2));
 
   // Still not done — root object hasn't closed yet
-  EXPECT_FALSE(parser->isAllFieldsCollected());
+  EXPECT_FALSE(parser->isParsingComplete());
 
   // Chunk 3: Close the root object
   std::string chunk3 = "}";
@@ -1733,7 +1733,7 @@ TEST_F(McpJsonParserTest, MultiChunkDuplicateKeyDetection) {
   EXPECT_OK(parser->parse(chunk3));
 
   // NOW the root object closed, parser should be done
-  EXPECT_TRUE(parser->isAllFieldsCollected());
+  EXPECT_TRUE(parser->isParsingComplete());
 
   // The duplicate "params" key from chunk 2 must be detected
   EXPECT_TRUE(parser->hasDuplicateKeys());
@@ -1797,7 +1797,7 @@ TEST_F(McpJsonParserTest, MultiChunkJppDetected) {
   EXPECT_OK(parser_->parse(chunk1));
 
   // Parser should NOT have stopped — root object hasn't closed
-  EXPECT_FALSE(parser_->isAllFieldsCollected());
+  EXPECT_FALSE(parser_->isParsingComplete());
 
   EXPECT_OK(parser_->parse(chunk2));
 

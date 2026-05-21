@@ -302,7 +302,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
       auto status = parser_->parse({start, len});
       bytes_parsed_ += len;
 
-      if (parser_->isAllFieldsCollected()) {
+      if (parser_->isParsingComplete()) {
         ENVOY_LOG(debug, "mcp parse complete: found all fields");
         return completeParsing();
       }
@@ -320,7 +320,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
     }
   }
 
-  // If we are here, we haven't collected all fields yet.
+  // If we are here, parsing is not yet complete (root object hasn't closed).
   bool size_limit_hit = (max_size > 0 && bytes_parsed_ == max_size);
   if (end_stream || size_limit_hit) {
     if (size_limit_hit) {
@@ -328,17 +328,14 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
     }
     auto final_status = parser_->finishParse();
     if (!final_status.ok()) {
-      if (size_limit_hit && parser_->hasAllRequiredFields()) {
-        // Required fields found within limit — proceed with partial marker
-        ENVOY_LOG(debug, "size limit hit but required fields found with full body");
-        return completeParsing();
-      }
       if (size_limit_hit && !shouldRejectRequest()) {
-        // PASS_THROUGH mode: allow even if incomplete, mark as partial
+        // PASS_THROUGH mode: size limit caused truncation, allow through.
         ENVOY_LOG(debug, "size limit hit in PASS_THROUGH mode; proceeding with partial parse");
         return completeParsing();
       }
-      config_->stats().body_too_large_.inc();
+      if (size_limit_hit) {
+        config_->stats().body_too_large_.inc();
+      }
       handleParseError("reached end_stream or configured body size, don't get enough data.");
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }

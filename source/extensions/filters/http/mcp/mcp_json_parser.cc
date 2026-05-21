@@ -700,7 +700,6 @@ absl::Status McpJsonParser::parse(absl::string_view data) {
   ENVOY_LOG(trace, "status ok: {}, {}", status.ok(), status.message());
   if (extractor_->shouldStopParsing()) {
     ENVOY_LOG(trace, "Parsing complete - root object closed");
-    all_fields_collected_ = true;
     return finishParse();
   }
   return status;
@@ -765,7 +764,6 @@ void McpJsonParser::reset() {
   stream_parser_.reset();
   extractor_.reset();
   parsing_started_ = false;
-  all_fields_collected_ = false;
 }
 
 } // namespace Mcp

@@ -254,7 +254,7 @@ TEST_F(McpFilterTest, DynamicMetadataContainsIsMcpRequest) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
-// Test buffering behavior for streaming data
+// Test that malformed JSON is always rejected regardless of traffic mode
 TEST_F(McpFilterTest, PartialNoJsonData) {
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {"content-type", "application/json"},
@@ -265,7 +265,7 @@ TEST_F(McpFilterTest, PartialNoJsonData) {
 
   Buffer::OwnedImpl buffer("partial data");
 
-  // Not end_stream, should buffer
+  // Malformed JSON — always rejected even in PASS_THROUGH mode.
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 }
 
@@ -423,6 +423,59 @@ TEST_F(McpFilterTest, RequestBodyExceedingLimitRejectWhenNotEnoughData) {
   std::string json = R"({"jsonrpc": "2.0", "me)";
   Buffer::OwnedImpl buffer(json);
 
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             "reached end_stream or configured body size, don't get enough data.",
+                             _, _, _));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+}
+
+// Test that truncated JSON with end_stream is rejected even in PASS_THROUGH mode.
+// Truncation here is caused by the client (not by size limit), so data is bad.
+TEST_F(McpFilterTest, PartialJsonEndStreamPassThroughMode) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  // Truncated JSON — end_stream=true but root object never closed, no size limit.
+  std::string json = R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "test")";
+  Buffer::OwnedImpl buffer(json);
+
+  // Client-sent truncated data — rejected even in PASS_THROUGH mode.
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             "reached end_stream or configured body size, don't get enough data.",
+                             _, _, _));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+}
+
+// Test that truncated JSON with end_stream is rejected in REJECT_NO_MCP mode.
+TEST_F(McpFilterTest, PartialJsonEndStreamRejectMode) {
+  setupRejectMode();
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  // Truncated JSON — end_stream=true but root object never closed.
+  std::string json = R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "test")";
+  Buffer::OwnedImpl buffer(json);
+
+  // REJECT_NO_MCP mode: rejects incomplete JSON.
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Http::Code::BadRequest,
                              "reached end_stream or configured body size, don't get enough data.",

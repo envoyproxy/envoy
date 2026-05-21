@@ -236,7 +236,8 @@ public:
   // Check if this is a valid MCP request
   bool isValidMcpRequest() const;
 
-  bool isAllFieldsCollected() const { return all_fields_collected_; }
+  // Check if parsing is complete (root JSON object has closed)
+  bool isParsingComplete() const { return extractor_ && extractor_->shouldStopParsing(); }
 
   // Check if optional fields are configured for the current method
   bool hasOptionalFields();
@@ -265,7 +266,7 @@ private:
   std::unique_ptr<McpFieldExtractor> extractor_;
   std::unique_ptr<ProtobufUtil::converter::JsonStreamParser> stream_parser_;
   bool parsing_started_{false};
-  bool all_fields_collected_{false};
+
 };
 
 // Compatibility aliases
