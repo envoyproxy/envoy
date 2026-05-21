@@ -15,6 +15,7 @@
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/integration/filters/common.h"
 #include "test/integration/http_integration.h"
+#include "test/extensions/filters/http/ext_proc/ext_proc_test_filters.pb.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 
@@ -199,7 +200,7 @@ protected:
   void initializeLogConfig(std::string& access_log_path);
   void prependExtProcCompositeFilter(const Protobuf::Message& match_input);
 
-  std::unique_ptr<SimpleFilterConfig<DynamicMetadataToHeadersFilter>> simple_filter_config_;
+  std::unique_ptr<UniqueSimpleFilterConfig<DynamicMetadataToHeadersFilter, test::extensions::filters::http::ext_proc::DynamicMetadataToHeadersFilterConfig>> simple_filter_config_;
   std::unique_ptr<
       Envoy::Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory>>
       registration_;

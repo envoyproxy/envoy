@@ -53,7 +53,11 @@ public:
             nanos: 10000000
           http_filters:
           - name: envoy.filters.http.on_demand
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           codec_type: HTTP2
           access_log:
             name: accesslog
@@ -357,6 +361,8 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryWorksWithNoRecreateStream) 
                     "integration", {});
   config_helper_.prependFilter(R"EOF(
     name: add-header-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.AddHeaderEmptyFilterConfig
   )EOF");
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -405,6 +411,8 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryWorksWithRecreateStream) {
                     "integration", {});
   config_helper_.prependFilter(R"EOF(
     name: add-header-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.AddHeaderEmptyFilterConfig
   )EOF");
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -2308,6 +2316,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, OdCdsScopedRdsIntegrationTest,
 TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateSuccessRDSThenCDS) {
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
     )EOF");
   addOnDemandConfig(OdCdsIntegrationHelper::createOnDemandConfig(
       OdCdsIntegrationHelper::createOdCdsConfigSource("odcds_cluster"), 2500));
@@ -2325,6 +2335,8 @@ TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateSuccessRDSThenCDS) {
 TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateSuccessRDSThenCDSInVHost) {
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
     )EOF");
   initialize();
 
@@ -2340,6 +2352,8 @@ TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateSuccessRDSThenCDSInVHost) {
 TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateSuccessRDSThenCDSInRoute) {
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
     )EOF");
   initialize();
 
@@ -2354,6 +2368,8 @@ TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateSuccessRDSThenCDSInRoute) {
 TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateFailsBecauseOdCdsIsDisabled) {
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
     )EOF");
   initialize();
 
@@ -2370,6 +2386,8 @@ TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateFailsBecauseOdCdsIsDisabled)
 TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateFailsBecauseOdCdsIsDisabledInVHost) {
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
     )EOF");
   addOnDemandConfig(OdCdsIntegrationHelper::createOnDemandConfig(
       OdCdsIntegrationHelper::createOdCdsConfigSource("odcds_cluster"), 2500));
@@ -2387,6 +2405,8 @@ TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateFailsBecauseOdCdsIsDisabledI
 TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateFailsBecauseOdCdsIsDisabledInRoute) {
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
     )EOF");
   addOnDemandConfig(OdCdsIntegrationHelper::createOnDemandConfig(
       OdCdsIntegrationHelper::createOdCdsConfigSource("odcds_cluster"), 2500));
@@ -2405,6 +2425,8 @@ TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateFailsBecauseOdCdsIsDisabledI
 TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateFailsBecauseOdCdsIsDisabledInRoute2) {
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
     )EOF");
   initialize();
 

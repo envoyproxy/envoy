@@ -123,9 +123,11 @@ TEST_P(MultiplexedIntegrationTest, Http3StreamInfoDownstreamHandshakeTiming) {
     return;
   }
 
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -1960,9 +1962,13 @@ TEST_P(MultiplexedIntegrationTest, TestEncode1xxHeaders) {
 TEST_P(MultiplexedIntegrationTest, TestEncode1xxHeadersWithLocalReplyDuringData) {
   std::string local_reply_during_decode_config = R"EOF(
   name: local-reply-during-decode
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.LocalReplyDuringDecodeConfig
   )EOF";
   std::string add_response_metadata_config = R"EOF(
   name: response-metadata-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.ResponseMetadataFilterConfig
   )EOF";
   config_helper_.prependFilter(local_reply_during_decode_config);
   config_helper_.prependFilter(add_response_metadata_config);
