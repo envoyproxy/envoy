@@ -242,8 +242,9 @@ public:
             } else if (metric.has_histogram() && metric.histogram().data_points_size() > 0) {
               attributes = &metric.histogram().data_points()[0].attributes();
             }
-            if (attributes == nullptr)
+            if (attributes == nullptr) {
               return std::string("");
+            }
             std::vector<std::pair<std::string, std::string>> attrs;
             for (const auto& attr : *attributes) {
               attrs.push_back({attr.key(), attr.value().string_value()});
@@ -262,16 +263,18 @@ public:
   void sortDataPoints(opentelemetry::proto::metrics::v1::Metric& metric) {
     auto sort_by_attr = [](const auto& a, const auto& b) {
       auto get_attr_str = [](const auto& dp) {
-        if (dp.attributes().empty())
+        if (dp.attributes().empty()) {
           return std::string("");
+        }
         std::vector<std::string> attrs;
         for (const auto& attr : dp.attributes()) {
           attrs.push_back(attr.key() + "=" + attr.value().string_value());
         }
         std::sort(attrs.begin(), attrs.end());
         std::string res;
-        for (const auto& s : attrs)
+        for (const auto& s : attrs) {
           res += s + ";";
+        }
         return res;
       };
       return get_attr_str(a) < get_attr_str(b);
@@ -1513,8 +1516,8 @@ public:
 
     std::vector<double> supported_quantiles_;
     std::vector<double> computed_quantiles_;
-    std::vector<double> supported_buckets_{};
-    std::vector<uint64_t> computed_buckets_{};
+    std::vector<double> supported_buckets_;
+    std::vector<uint64_t> computed_buckets_;
     uint64_t sample_count_{0};
     double sample_sum_{0};
   };

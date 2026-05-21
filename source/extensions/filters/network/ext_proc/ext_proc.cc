@@ -110,7 +110,6 @@ void NetworkExtProcFilter::initializeLoggingInfo() {
           NetworkFilterNames::get().NetworkExternalProcessor)) {
     filter_state->setData(NetworkFilterNames::get().NetworkExternalProcessor,
                           std::make_shared<NetworkExtProcLoggingInfo>(),
-                          Envoy::StreamInfo::FilterState::StateType::Mutable,
                           Envoy::StreamInfo::FilterState::LifeSpan::Connection);
   }
 
@@ -369,6 +368,17 @@ void NetworkExtProcFilter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&
   handleConnectionStatus(*response);
   if (processing_complete_) {
     return;
+  }
+
+  if (response->has_dynamic_metadata()) {
+    const auto& response_metadata = response->dynamic_metadata();
+    for (const auto& [key, value] : response_metadata.fields()) {
+      if (config_->untypedReceivingMetadataNamespaces().contains(key)) {
+        if (value.has_struct_value()) {
+          read_callbacks_->connection().streamInfo().setDynamicMetadata(key, value.struct_value());
+        }
+      }
+    }
   }
 
   if (response->has_read_data()) {

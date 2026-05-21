@@ -26,7 +26,6 @@ ActiveTcpSocket::ActiveTcpSocket(ActiveStreamListenerBase& listener,
     stream_info_->filterState()->setData(
         Network::DownstreamNetworkNamespace::key(),
         std::make_unique<Network::DownstreamNetworkNamespace>(*network_namespace),
-        StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
   }
 

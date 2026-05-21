@@ -20,7 +20,7 @@ public:
         registered_dns_factory_(dns_resolver_factory_) {}
 
   void createUpstreams() override { HttpIntegrationTest::createUpstreams(); }
-  struct address {
+  struct Address {
     uint32_t address_;
     absl::string_view first_address_string_;
   };
@@ -37,7 +37,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, LogicalHostIntegrationTest,
 // The test is by mocking the DNS resolver to return multiple different
 // addresses, also config dns_refresh_rate to be extremely fast.
 TEST_P(LogicalHostIntegrationTest, LogicalDNSRaceCrashTest) {
-  auto address_ptr = std::make_shared<address>();
+  auto address_ptr = std::make_shared<Address>();
   address_ptr->address_ = 0;
   // first_address_string_ is used to make connections. It needs
   // to match with the IpVersion of the test.
