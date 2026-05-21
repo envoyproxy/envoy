@@ -5,12 +5,11 @@
 #include "envoy/extensions/http/custom_response/redirect_policy/v3/redirect_policy.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/stream_info/filter_state.h"
+#include "test/extensions/filters/http/custom_response/custom_response_test_filters.pb.h"
 
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/custom_response/policy.h"
 #include "source/extensions/http/custom_response/redirect_policy/redirect_policy.h"
-
-// #include "test/integration/filters/common.h"
 
 #include "absl/strings/string_view.h"
 

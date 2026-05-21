@@ -43,5 +43,6 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/data/tap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
     ],
 )
