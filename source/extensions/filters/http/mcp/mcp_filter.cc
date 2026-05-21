@@ -321,19 +321,21 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
   }
 
   // If we are here, parsing is not yet complete (root object hasn't closed).
-  bool size_limit_hit = (max_size > 0 && bytes_parsed_ == max_size);
+  const bool size_limit_hit = (max_size > 0 && bytes_parsed_ == max_size);
+  const bool truncated_by_limit = size_limit_hit && (data.length() > max_size || !end_stream);
+
   if (end_stream || size_limit_hit) {
-    if (size_limit_hit) {
+    if (truncated_by_limit) {
       is_exceeding_limit_ = true;
     }
     auto final_status = parser_->finishParse();
     if (!final_status.ok()) {
-      if (size_limit_hit && !shouldRejectRequest()) {
+      if (truncated_by_limit && !shouldRejectRequest()) {
         // PASS_THROUGH mode: size limit caused truncation, allow through.
         ENVOY_LOG(debug, "size limit hit in PASS_THROUGH mode; proceeding with partial parse");
         return completeParsing();
       }
-      if (size_limit_hit) {
+      if (truncated_by_limit) {
         config_->stats().body_too_large_.inc();
       }
       handleParseError("reached end_stream or configured body size, don't get enough data.");

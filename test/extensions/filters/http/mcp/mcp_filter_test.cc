@@ -460,6 +460,41 @@ TEST_F(McpFilterTest, PartialJsonEndStreamPassThroughMode) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 }
 
+// Test that malformed JSON with length exactly equal to max_request_body_size and end_stream=true
+// is rejected in PASS_THROUGH mode, because the client terminated the stream and no further data exists.
+TEST_F(McpFilterTest, PartialJsonEndStreamPassThroughModeExactlyAtLimit) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+
+  std::string json = R"({"jsonrpc":"2.0","method":"tools/call","params":{"name":"x"")";
+  const uint32_t max_size = json.size();
+  proto_config.mutable_max_request_body_size()->set_value(max_size);
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(max_size));
+  filter_->decodeHeaders(headers, false);
+
+  Buffer::OwnedImpl buffer(json);
+
+  // Even in PASS_THROUGH mode, it must be rejected because the total body length matches
+  // the limit, end_stream is true, and the JSON is genuinely malformed (not truncated by the limit).
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             "reached end_stream or configured body size, don't get enough data.",
+                             _, _, _));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+}
+
+
 // Test that truncated JSON with end_stream is rejected in REJECT_NO_MCP mode.
 TEST_F(McpFilterTest, PartialJsonEndStreamRejectMode) {
   setupRejectMode();
