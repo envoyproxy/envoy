@@ -106,9 +106,9 @@ message Mcp {
   //
   // The baggage field is validated according to the spec at ``https://www.w3.org/TR/baggage/``.
   //
-  // Note that this is independent of ``propagate_trace_context``.
-  // Also note that if this is set, the downstream request's baggage header will be overwritten if
-  // the MCP request body contains a valid baggage field.
+  // Note that this is independent of ``propagate_trace_context``. Also note that if this is
+  // set, the downstream request's baggage header will be overwritten if the MCP request
+  // body contains a valid baggage field.
   //
   // If unset (default), do not extract or inject baggage.
   BaggagePropagationConfig propagate_baggage = 7;
