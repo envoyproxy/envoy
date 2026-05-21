@@ -84,6 +84,8 @@ protected:
     });
   }
 
+  void TearDown() override { http_client_.shutdownApiListener(); }
+
   struct StreamCallbacksCalled {
     uint32_t on_headers_calls_{0};
     uint32_t on_data_calls_{0};
@@ -271,7 +273,7 @@ TEST_P(ClientTest, BasicStreamData) {
   // test data functionality.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(*request_decoder_, decodeData(BufferStringEqual("request body"), true));
+  EXPECT_CALL(*request_decoder_, decodeData(BufferString("request body"), true));
   resumeDataIfEarlyResume(20); // Resume before data arrives.
   http_client_.sendData(stream_, std::move(request_data), true);
   resumeDataIfLateResume(20); // Resume after data arrives.
@@ -356,7 +358,7 @@ TEST_P(ClientTest, MultipleDataStream) {
   // Send request data.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(*request_decoder_, decodeData(BufferStringEqual("request body1"), false));
+  EXPECT_CALL(*request_decoder_, decodeData(BufferString("request body1"), false));
   http_client_.sendData(stream_, std::move(request_data1), false);
   EXPECT_EQ(callbacks_called.on_send_window_available_calls_, 0);
   if (explicit_flow_control_) {
@@ -369,7 +371,7 @@ TEST_P(ClientTest, MultipleDataStream) {
   // Send second request data.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(*request_decoder_, decodeData(BufferStringEqual("request body2"), true));
+  EXPECT_CALL(*request_decoder_, decodeData(BufferString("request body2"), true));
   http_client_.sendData(stream_, std::move(request_data2), true);
   // The stream is done: no further on_send_window_available calls should happen.
   EXPECT_EQ(callbacks_called.on_send_window_available_calls_, explicit_flow_control_ ? 1 : 0);
@@ -1014,7 +1016,6 @@ TEST_P(ClientTest, SaveLatestStreamIntelPopulatesScone) {
   scone_state->scone_max_kbps = 100;
   scone_state->timestamp_ms = 12345;
   stream_info_.filter_state_->setData(Quic::SconeStateKey, scone_state,
-                                      StreamInfo::FilterState::StateType::Mutable,
                                       StreamInfo::FilterState::LifeSpan::Connection);
 
   auto stream_ptr = getDirectStream(stream_);
@@ -1036,7 +1037,6 @@ TEST_P(ClientTest, SaveLatestStreamIntelPersistsScone) {
   scone_state->scone_max_kbps = 100;
   scone_state->timestamp_ms = 12345;
   stream_info_.filter_state_->setData(Quic::SconeStateKey, scone_state,
-                                      StreamInfo::FilterState::StateType::Mutable,
                                       StreamInfo::FilterState::LifeSpan::Connection);
 
   auto stream_ptr = getDirectStream(stream_);
@@ -1071,7 +1071,6 @@ TEST_P(ClientTest, SaveLatestStreamIntelWithZeroSconeValue) {
   scone_state->scone_max_kbps = 0;
   scone_state->timestamp_ms = 12345;
   stream_info_.filter_state_->setData(Quic::SconeStateKey, scone_state,
-                                      StreamInfo::FilterState::StateType::Mutable,
                                       StreamInfo::FilterState::LifeSpan::Connection);
 
   auto stream_ptr = getDirectStream(stream_);

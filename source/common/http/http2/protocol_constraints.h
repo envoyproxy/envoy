@@ -18,6 +18,7 @@ namespace Http {
 namespace Http2 {
 
 // Frame types as inherited from nghttp2 and preserved for oghttp2
+// NOLINTBEGIN(readability-identifier-naming)
 enum FrameType {
   OGHTTP2_DATA_FRAME_TYPE,
   OGHTTP2_HEADERS_FRAME_TYPE,
@@ -30,6 +31,7 @@ enum FrameType {
   OGHTTP2_WINDOW_UPDATE_FRAME_TYPE,
   OGHTTP2_CONTINUATION_FRAME_TYPE,
 };
+// NOLINTEND(readability-identifier-naming)
 
 //  Class for detecting abusive peers and validating additional constraints imposed by Envoy.
 //  This class does not check protocol compliance with the H/2 standard, as this is checked by

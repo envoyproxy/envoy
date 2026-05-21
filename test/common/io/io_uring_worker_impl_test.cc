@@ -693,6 +693,55 @@ TEST(IoUringWorkerImplTest, NoEnableReadOnConnectError) {
   delete static_cast<Request*>(connect_req);
 }
 
+class ReproSocket : public IoUringSocketEntry {
+public:
+  ReproSocket(os_fd_t fd, IoUringWorkerImpl& parent)
+      : IoUringSocketEntry(fd, parent, [](uint32_t) { return absl::OkStatus(); }, false) {}
+
+  void onRead(Request* req, int32_t result, bool injected) override {
+    IoUringSocketEntry::onRead(req, result, injected);
+    if (injected) {
+      cleanup();
+    }
+  }
+
+  void write(Buffer::Instance&) override {}
+  uint64_t write(const Buffer::RawSlice*, uint64_t) override { return 0; }
+  void shutdown(int) override {}
+};
+
+class IoUringWorkerRepro : public IoUringWorkerImpl {
+public:
+  using IoUringWorkerImpl::IoUringWorkerImpl;
+  IoUringSocket& addReproSocket(os_fd_t fd) {
+    return addSocket(std::make_unique<ReproSocket>(fd, *this));
+  }
+};
+
+TEST(IoUringWorkerImplTest, DoubleFreeOnSocketCloseDuringInjectedCompletion) {
+  if (!isIoUringSupported()) {
+    GTEST_SKIP() << "io_uring not supported on this kernel";
+  }
+
+  Event::MockDispatcher dispatcher;
+  auto io_uring = std::make_unique<IoUringImpl>(64, false);
+  Event::FileReadyCb file_event_callback;
+  EXPECT_CALL(dispatcher, createFileEvent_(_, _, _, _))
+      .WillOnce(testing::DoAll(testing::SaveArg<1>(&file_event_callback),
+                               testing::ReturnNew<testing::NiceMock<Event::MockFileEvent>>()));
+
+  IoUringWorkerRepro worker(std::move(io_uring), 8192, 1000, dispatcher);
+  os_fd_t fd = 1;
+  auto& socket = worker.addReproSocket(fd);
+
+  worker.injectCompletion(socket, Request::RequestType::Read, 0);
+
+  EXPECT_CALL(dispatcher, deferredDelete_(testing::_));
+  file_event_callback(Event::FileReadyType::Read).IgnoreError();
+
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+}
+
 } // namespace
 } // namespace Io
 } // namespace Envoy

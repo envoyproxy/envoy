@@ -11,10 +11,6 @@ involved and how Envoy plays a role, read the CNCF
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/1266/badge)](https://bestpractices.coreinfrastructure.org/projects/1266)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/envoyproxy/envoy/badge)](https://securityscorecards.dev/viewer/?uri=github.com/envoyproxy/envoy)
 [![CLOMonitor](https://img.shields.io/endpoint?url=https://clomonitor.io/api/projects/cncf/envoy/badge)](https://clomonitor.io/projects/cncf/envoy)
-[![Azure Pipelines](https://dev.azure.com/cncf/envoy/_apis/build/status/11?branchName=main)](https://dev.azure.com/cncf/envoy/_build/latest?definitionId=11&branchName=main)
-[![Fuzzing Status](https://oss-fuzz-build-logs.storage.googleapis.com/badges/envoy.svg)](https://bugs.chromium.org/p/oss-fuzz/issues/list?sort=-opened&can=1&q=proj:envoy)
-[![Jenkins](https://powerci.osuosl.org/buildStatus/icon?job=build-envoy-static-master&subject=ppc64le%20build)](https://powerci.osuosl.org/job/build-envoy-static-master/)
-[![Jenkins](https://ibmz-ci.osuosl.org/buildStatus/icon?job=Envoy_IBMZ_CI&subject=s390x%20build)](https://ibmz-ci.osuosl.org/job/Envoy_IBMZ_CI/)
 
 ## Documentation
 
@@ -86,16 +82,27 @@ There has been several third party engagements focused on Envoy security:
 
 ### Reporting security vulnerabilities
 
-If you've found a vulnerability or a potential vulnerability in Envoy please let us know at
-[envoy-security](mailto:envoy-security@googlegroups.com). We'll send a confirmation
-email to acknowledge your report, and we'll send an additional email when we've identified the issue
-positively or negatively.
+If you've found a vulnerability or a potential vulnerability in Envoy, please
+[open a GitHub Security Advisory](https://github.com/envoyproxy/envoy/security/advisories/new).
+This is the preferred reporting channel, as the reports can be triaged directly on GitHub.
+
+Alternatively, you may email [envoy-security@googlegroups.com](mailto:envoy-security@googlegroups.com).
 
 For further details please see our complete [security release process](SECURITY.md).
+
+### OSS fuzzing
+
+[![Fuzzing Status](https://oss-fuzz-build-logs.storage.googleapis.com/badges/envoy.svg)](https://bugs.chromium.org/p/oss-fuzz/issues/list?sort=-opened&can=1&q=proj:envoy)
 
 ### ppc64le builds
 
 Builds for the ppc64le architecture or using aws-lc are not covered by the envoy security policy. The ppc64le architecture is currently best-effort and not maintained by the Envoy maintainers.
+
+[![Jenkins](https://powerci.osuosl.org/buildStatus/icon?job=build-envoy-static-master&subject=ppc64le%20build)](https://powerci.osuosl.org/job/build-envoy-static-master/)
+
+### Other builds
+
+[![Jenkins](https://ibmz-ci.osuosl.org/buildStatus/icon?job=Envoy_IBMZ_CI&subject=s390x%20build)](https://ibmz-ci.osuosl.org/job/Envoy_IBMZ_CI/)
 
 ## Releases
 

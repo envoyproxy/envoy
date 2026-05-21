@@ -58,9 +58,13 @@ public:
       : ZoneAwareLoadBalancerBase(priority_set, nullptr, lb_stats, runtime, random,
                                   healthy_panic_threshold, locality_config) {}
   void runInvalidLocalitySourceType() {
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
     localitySourceType(static_cast<LoadBalancerBase::HostAvailability>(123));
   }
-  void runInvalidSourceType() { sourceType(static_cast<LoadBalancerBase::HostAvailability>(123)); }
+  void runInvalidSourceType() {
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
+    sourceType(static_cast<LoadBalancerBase::HostAvailability>(123));
+  }
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override { PANIC("not implemented"); }
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { PANIC("not implemented"); }
 };

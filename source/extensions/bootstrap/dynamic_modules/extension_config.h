@@ -93,7 +93,7 @@ public:
                                         Server::Configuration::ServerFactoryContext& context,
                                         Stats::Store& stats_store);
 
-  ~DynamicModuleBootstrapExtensionConfig();
+  ~DynamicModuleBootstrapExtensionConfig() override;
 
   /**
    * This is called when an event is scheduled via
@@ -395,6 +395,11 @@ public:
   // Stats scope for metric creation.
   const Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNamePool stat_name_pool_;
+  // We only allow the module to create stats during on_bootstrap_extension_config_new, and not
+  // later from worker threads, so that we don't have to wrap stat_name_pool_ in a lock.
+  // Per-request label values use a stack-local Stats::StatNameDynamicPool in the increment
+  // callbacks (see abi_impl.cc).
+  bool stat_creation_frozen_ = false;
 
   // Temporary storage for the admin response body. Set by the
   // envoy_dynamic_module_callback_bootstrap_extension_admin_set_response callback during

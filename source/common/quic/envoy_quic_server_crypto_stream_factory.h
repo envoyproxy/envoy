@@ -7,7 +7,6 @@
 #include "quiche/quic/core/crypto/quic_crypto_server_config.h"
 #include "quiche/quic/core/quic_crypto_server_stream_base.h"
 #include "quiche/quic/core/quic_session.h"
-#include "quiche/quic/core/tls_server_handshaker.h"
 
 namespace Envoy {
 namespace Quic {

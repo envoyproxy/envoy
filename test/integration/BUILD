@@ -1845,7 +1845,7 @@ envoy_cc_test(
     size = "large",
     srcs = ["overload_integration_test.cc"],
     rbe_pool = "6gig",
-    shard_count = 4,
+    shard_count = 8,
     tags = [
         "cpu:3",
     ],
@@ -2085,6 +2085,7 @@ envoy_cc_test(
         "//source/common/tls:context_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/network/common:factory_base_lib",
+        "//source/extensions/filters/network/set_filter_state:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/load_balancing_policies/subset:config",
         "//source/extensions/transport_sockets/tls:config",

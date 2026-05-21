@@ -444,6 +444,7 @@ std::string InfoCmdAggregateResponseHandler::bytesToHuman(uint64_t bytes) {
     snprintf(buffer, sizeof(buffer), "%" PRIu64 "B", bytes);
   }
 
+  // NOLINTNEXTLINE(modernize-return-braced-init-list)
   return std::string(buffer);
 }
 

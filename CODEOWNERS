@@ -160,7 +160,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/stat_sinks/graphite_statsd @vaccarium @mattklein123
 /*/extensions/stat_sinks/hystrix @trabetti @paul-r-gall
 /*/extensions/stat_sinks/metrics_service @ramaraochavali @paul-r-gall
-/*/extensions/stat_sinks/open_telemetry @ohadvano @mattklein123
+/*/extensions/stat_sinks/open_telemetry @ohadvano @mattklein123 @kyessenov
 # webassembly stat-sink extensions
 /*/extensions/stat_sinks/wasm @mpwarres @kyessenov @lizan
 /*/extensions/resource_monitors/injected_resource @eziskind @yanavlasov
@@ -356,7 +356,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # Thrift to metadata
 /*/extensions/filters/http/thrift_to_metadata @JuniorHsu @zuercher
 # IP tagging
-/*/extensions/filters/http/ip_tagging @zuercher @JuniorHsu
+/*/extensions/filters/http/ip_tagging @zuercher @JuniorHsu @nezdolik
 # Header to metadata
 /*/extensions/filters/http/header_to_metadata @zuercher @JuniorHsu
 # Json to metadata

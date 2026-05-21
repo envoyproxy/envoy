@@ -363,6 +363,9 @@ TEST(NullTracerTest, BasicFunctionality) {
   span_ptr->log(SystemTime(), "fake_event");
   span_ptr->useLocalDecision();
 
+  // NullSpan is never exported
+  EXPECT_FALSE(span_ptr->exportedSpan());
+
   EXPECT_NE(nullptr, span_ptr->spawnChild(config, "foo", SystemTime()));
 }
 

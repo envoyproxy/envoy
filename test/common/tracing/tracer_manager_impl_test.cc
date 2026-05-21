@@ -2,7 +2,7 @@
 #include "source/common/tracing/tracer_impl.h"
 #include "source/common/tracing/tracer_manager_impl.h"
 
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/server/tracer_factory.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"

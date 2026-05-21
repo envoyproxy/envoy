@@ -457,7 +457,9 @@ envoy_dynamic_module_callback_http_filter_config_define_counter(
     envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
     size_t* counter_id_ptr) {
   auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
-  if (filter_config->stat_creation_frozen_) {
+  // Acquire-load pairs with the release-store in the factory's
+  // ``newDynamicModuleHttpFilterConfig``. See filter_config.h for the memory-order contract.
+  if (filter_config->stat_creation_frozen_.load(std::memory_order_acquire)) {
     return envoy_dynamic_module_type_metrics_result_Frozen;
   }
   absl::string_view name_view(name.ptr, name.length);
@@ -517,7 +519,9 @@ envoy_dynamic_module_callback_http_filter_config_define_gauge(
     envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
     size_t* gauge_id_ptr) {
   auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
-  if (filter_config->stat_creation_frozen_) {
+  // Acquire-load pairs with the release-store in the factory's
+  // ``newDynamicModuleHttpFilterConfig``. See filter_config.h for the memory-order contract.
+  if (filter_config->stat_creation_frozen_.load(std::memory_order_acquire)) {
     return envoy_dynamic_module_type_metrics_result_Frozen;
   }
   absl::string_view name_view(name.ptr, name.length);
@@ -630,7 +634,9 @@ envoy_dynamic_module_callback_http_filter_config_define_histogram(
     envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
     size_t* histogram_id_ptr) {
   auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
-  if (filter_config->stat_creation_frozen_) {
+  // Acquire-load pairs with the release-store in the factory's
+  // ``newDynamicModuleHttpFilterConfig``. See filter_config.h for the memory-order contract.
+  if (filter_config->stat_creation_frozen_.load(std::memory_order_acquire)) {
     return envoy_dynamic_module_type_metrics_result_Frozen;
   }
   absl::string_view name_view(name.ptr, name.length);
@@ -1261,8 +1267,7 @@ bool envoy_dynamic_module_callback_http_set_filter_state_bytes(
   absl::string_view key_view(key.ptr, key.length);
   absl::string_view value_view(value.ptr, value.length);
   stream_info->filterState()->setData(key_view,
-                                      std::make_unique<Router::StringAccessorImpl>(value_view),
-                                      StreamInfo::FilterState::StateType::ReadOnly);
+                                      std::make_unique<Router::StringAccessorImpl>(value_view));
   return true;
 }
 
@@ -1318,8 +1323,7 @@ bool envoy_dynamic_module_callback_http_set_filter_state_typed(
     return false;
   }
 
-  stream_info->filterState()->setData(key_view, std::move(object),
-                                      StreamInfo::FilterState::StateType::Mutable);
+  stream_info->filterState()->setData(key_view, std::move(object));
   return true;
 }
 

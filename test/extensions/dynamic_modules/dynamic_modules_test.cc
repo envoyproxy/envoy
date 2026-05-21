@@ -1,10 +1,14 @@
 #include <fstream>
 
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/hex.h"
+#include "source/common/crypto/utility.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/ascii.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -230,6 +234,100 @@ TEST(NewDynamicModuleFromBytes, InvalidBytes) {
 
   // The invalid file should have been cleaned up.
   EXPECT_FALSE(std::filesystem::exists(temp_path));
+}
+
+TEST(VerifyFileSha256, RoundTripWithComputedDigest) {
+  const std::filesystem::path tmp =
+      std::filesystem::temp_directory_path() / "envoy_verify_sha256_round_trip.bin";
+  const std::string contents = "the quick brown fox jumps over the lazy dog";
+  {
+    std::ofstream out(tmp, std::ios::binary);
+    out << contents;
+  }
+  Buffer::OwnedImpl hash_buffer(contents);
+  const std::string expected_hex =
+      Hex::encode(Common::Crypto::UtilitySingleton::get().getSha256Digest(hash_buffer));
+  EXPECT_TRUE(verifyFileSha256(tmp, expected_hex).ok());
+  std::filesystem::remove(tmp);
+}
+
+TEST(VerifyFileSha256, MismatchReturnsFailedPrecondition) {
+  const std::filesystem::path tmp =
+      std::filesystem::temp_directory_path() / "envoy_verify_sha256_mismatch.bin";
+  {
+    std::ofstream out(tmp, std::ios::binary);
+    out << "envoy";
+  }
+  const std::string wrong_sha = "0000000000000000000000000000000000000000000000000000000000000000";
+  auto status = verifyFileSha256(tmp, wrong_sha);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.code(), absl::StatusCode::kFailedPrecondition);
+  EXPECT_THAT(std::string(status.message()), testing::HasSubstr("SHA256 mismatch"));
+  EXPECT_THAT(std::string(status.message()), testing::HasSubstr(wrong_sha));
+  std::filesystem::remove(tmp);
+}
+
+TEST(VerifyFileSha256, MissingFileReturnsInternal) {
+  const std::filesystem::path missing =
+      std::filesystem::temp_directory_path() / "envoy_verify_sha256_missing.bin";
+  std::filesystem::remove(missing);
+  ASSERT_FALSE(std::filesystem::exists(missing));
+  auto status =
+      verifyFileSha256(missing, "0000000000000000000000000000000000000000000000000000000000000000");
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.code(), absl::StatusCode::kInternal);
+  EXPECT_THAT(std::string(status.message()),
+              testing::HasSubstr("Failed to open file for SHA256 verification"));
+}
+
+TEST(VerifyFileSha256, EmptyFileMatchesEmptyDigest) {
+  const std::filesystem::path tmp =
+      std::filesystem::temp_directory_path() / "envoy_verify_sha256_empty.bin";
+  { std::ofstream out(tmp, std::ios::binary); }
+  // SHA256 of the empty input.
+  const std::string empty_sha = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+  EXPECT_TRUE(verifyFileSha256(tmp, empty_sha).ok());
+  std::filesystem::remove(tmp);
+}
+
+TEST(VerifyFileSha256, LargeFileExceedingChunkSize) {
+  // Force the helper through multiple iterations of its 64 KiB read loop. 200 KiB picks up
+  // three full chunks plus a partial tail, exercising the streaming `SHA256_Update` path.
+  const std::filesystem::path tmp =
+      std::filesystem::temp_directory_path() / "envoy_verify_sha256_large.bin";
+  std::string contents(200 * 1024, '\0');
+  for (size_t i = 0; i < contents.size(); ++i) {
+    contents[i] = static_cast<char>(i & 0xFF);
+  }
+  {
+    std::ofstream out(tmp, std::ios::binary);
+    out.write(contents.data(), contents.size());
+  }
+  Buffer::OwnedImpl hash_buffer(contents);
+  const std::string expected_hex =
+      Hex::encode(Common::Crypto::UtilitySingleton::get().getSha256Digest(hash_buffer));
+  EXPECT_TRUE(verifyFileSha256(tmp, expected_hex).ok());
+  std::filesystem::remove(tmp);
+}
+
+TEST(VerifyFileSha256, MixedCaseExpectedHexNormalised) {
+  const std::filesystem::path tmp =
+      std::filesystem::temp_directory_path() / "envoy_verify_sha256_mixed_case.bin";
+  const std::string contents = "case-insensitive-hash";
+  {
+    std::ofstream out(tmp, std::ios::binary);
+    out << contents;
+  }
+  Buffer::OwnedImpl hash_buffer(contents);
+  std::string expected_hex =
+      Hex::encode(Common::Crypto::UtilitySingleton::get().getSha256Digest(hash_buffer));
+  // Upper-case the expected hex and verify it still matches (the helper lower-cases before
+  // comparing).
+  for (char& c : expected_hex) {
+    c = absl::ascii_toupper(c);
+  }
+  EXPECT_TRUE(verifyFileSha256(tmp, expected_hex).ok());
+  std::filesystem::remove(tmp);
 }
 
 TEST(NewDynamicModuleFromBytes, RepeatedLoadReusesDlopenHandle) {

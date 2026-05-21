@@ -141,7 +141,7 @@ private:
    * @param path The escaped path string from `mountinfo`.
    * @return The unescaped path string.
    */
-  static std::string unescapePath(const std::string& path);
+  static std::string unescapePath(absl::string_view path);
 
   /**
    * Constructs complete `cgroup` path by combining mount point and process assignment.
