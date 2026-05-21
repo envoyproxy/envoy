@@ -1,4 +1,5 @@
 #include <string>
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
@@ -19,9 +20,9 @@ public:
   }
 };
 
-class ClearRouteCacheFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class ClearRouteCacheFilterConfig : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<test::integration::filters::ClearRouteCacheFilterConfig> {
 public:
-  ClearRouteCacheFilterConfig() : EmptyHttpFilterConfig("clear-route-cache") {}
+  ClearRouteCacheFilterConfig() : UniqueEmptyHttpFilterConfig<test::integration::filters::ClearRouteCacheFilterConfig>("clear-route-cache") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&, Server::Configuration::FactoryContext&) override {

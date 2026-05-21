@@ -1,4 +1,5 @@
 #include <string>
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
@@ -67,11 +68,11 @@ public:
 };
 
 constexpr char InvalidHeaderFilter::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<InvalidHeaderFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<InvalidHeaderFilter, test::integration::filters::InvalidHeaderFilterConfig>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     decoder_register_;
 constexpr char InvalidHeaderFilter::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<InvalidHeaderFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<InvalidHeaderFilter, test::integration::filters::InvalidHeaderFilterConfig>,
                                  Server::Configuration::UpstreamHttpFilterConfigFactory>
     decoder_register_upstream_;
 

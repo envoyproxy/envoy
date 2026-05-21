@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include "test/integration/filters/test_filters.pb.h"
 #include <string>
 
 #include "envoy/http/filter.h"
@@ -37,9 +38,9 @@ using StreamTeeSharedPtr = std::shared_ptr<StreamTee>;
 
 // Inject a specific instance of this factory in order to leverage the same
 // instance used by Envoy to inspect internally.
-class StreamTeeFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class StreamTeeFilterConfig : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<test::integration::filters::StreamTeeFilterConfig> {
 public:
-  StreamTeeFilterConfig() : EmptyHttpFilterConfig("stream-tee-filter") {}
+  StreamTeeFilterConfig() : UniqueEmptyHttpFilterConfig<test::integration::filters::StreamTeeFilterConfig>("stream-tee-filter") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&, Server::Configuration::FactoryContext&) override;

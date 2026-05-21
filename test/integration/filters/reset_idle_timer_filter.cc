@@ -1,4 +1,5 @@
 #include <string>
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
@@ -19,9 +20,9 @@ public:
   }
 };
 
-class ResetIdleTimerFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class ResetIdleTimerFilterConfig : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<test::integration::filters::ResetIdleTimerFilterConfig> {
 public:
-  ResetIdleTimerFilterConfig() : EmptyHttpFilterConfig("reset-idle-timer-filter") {}
+  ResetIdleTimerFilterConfig() : UniqueEmptyHttpFilterConfig<test::integration::filters::ResetIdleTimerFilterConfig>("reset-idle-timer-filter") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&, Server::Configuration::FactoryContext&) override {

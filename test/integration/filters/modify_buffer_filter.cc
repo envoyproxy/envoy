@@ -1,4 +1,5 @@
 #include <string>
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
@@ -43,9 +44,9 @@ public:
   }
 };
 
-class ModifyBufferFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class ModifyBufferFilterConfig : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<test::integration::filters::ModifyBufferFilterConfig> {
 public:
-  ModifyBufferFilterConfig() : EmptyHttpFilterConfig("modify-buffer-filter") {}
+  ModifyBufferFilterConfig() : UniqueEmptyHttpFilterConfig<test::integration::filters::ModifyBufferFilterConfig>("modify-buffer-filter") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&, Server::Configuration::FactoryContext&) override {

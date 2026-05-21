@@ -1,4 +1,5 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "test/integration/filters/common.h"
 
@@ -16,10 +17,10 @@ public:
   }
 };
 
-static Registry::RegisterFactory<SimpleFilterConfig<EncodeHeadersReturnStopIterationFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<EncodeHeadersReturnStopIterationFilter, test::integration::filters::EncodeHeadersReturnStopIterationFilterConfig>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
-static Registry::RegisterFactory<SimpleFilterConfig<EncodeHeadersReturnStopIterationFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<EncodeHeadersReturnStopIterationFilter, test::integration::filters::EncodeHeadersReturnStopIterationFilterConfig>,
                                  Server::Configuration::UpstreamHttpFilterConfigFactory>
     register_upstream_;
 

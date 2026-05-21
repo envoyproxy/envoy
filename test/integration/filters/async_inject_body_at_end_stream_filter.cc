@@ -1,4 +1,5 @@
 #include <string>
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
@@ -93,7 +94,7 @@ private:
   Envoy::Buffer::OwnedImpl response_buffer_;
 };
 
-static Registry::RegisterFactory<SimpleFilterConfig<AsyncInjectBodyAtEndStreamFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<AsyncInjectBodyAtEndStreamFilter, test::integration::filters::AsyncInjectBodyAtEndStreamFilterConfig>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 } // namespace Envoy

@@ -1,4 +1,5 @@
 #include "envoy/http/filter.h"
+#include "test/integration/filters/test_filters.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -55,10 +56,10 @@ public:
 };
 
 constexpr char MetadataControlFilter::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<MetadataControlFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<MetadataControlFilter, test::integration::filters::MetadataControlFilterConfig>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
-static Registry::RegisterFactory<SimpleFilterConfig<MetadataControlFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<MetadataControlFilter, test::integration::filters::MetadataControlFilterConfig>,
                                  Server::Configuration::UpstreamHttpFilterConfigFactory>
     register_upstream_;
 

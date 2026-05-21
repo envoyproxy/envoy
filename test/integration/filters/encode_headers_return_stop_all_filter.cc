@@ -1,4 +1,5 @@
 #include <chrono>
+#include "test/integration/filters/test_filters.pb.h"
 #include <string>
 
 #include "envoy/event/timer.h"
@@ -97,10 +98,10 @@ private:
 };
 
 constexpr char EncodeHeadersReturnStopAllFilter::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<EncodeHeadersReturnStopAllFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<EncodeHeadersReturnStopAllFilter, test::integration::filters::EncodeHeadersReturnStopAllFilterConfig>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
-static Registry::RegisterFactory<SimpleFilterConfig<EncodeHeadersReturnStopAllFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<EncodeHeadersReturnStopAllFilter, test::integration::filters::EncodeHeadersReturnStopAllFilterConfig>,
                                  Server::Configuration::UpstreamHttpFilterConfigFactory>
     register_upstream_;
 

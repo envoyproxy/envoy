@@ -1,4 +1,5 @@
 #include <string>
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
@@ -34,10 +35,9 @@ public:
   }
 };
 
-class EncoderDecoderBufferFilterConfig
-    : public Extensions::HttpFilters::Common::EmptyHttpDualFilterConfig {
+class EncoderDecoderBufferFilterConfig : public Extensions::HttpFilters::Common::UniqueEmptyHttpDualFilterConfig<test::integration::filters::EncoderDecoderBufferFilterConfig> {
 public:
-  EncoderDecoderBufferFilterConfig() : EmptyHttpDualFilterConfig("encoder-decoder-buffer-filter") {}
+  EncoderDecoderBufferFilterConfig() : UniqueEmptyHttpDualFilterConfig<test::integration::filters::EncoderDecoderBufferFilterConfig>("encoder-decoder-buffer-filter") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createDualFilter(const std::string&, Server::Configuration::ServerFactoryContext&) override {

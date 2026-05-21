@@ -1,4 +1,5 @@
 #include "envoy/registry/registry.h"
+#include "test/integration/filters/test_filters.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "source/extensions/filters/http/common/pass_through_filter.h"
@@ -41,10 +42,10 @@ private:
 };
 
 constexpr char CallDecodeDataOnceFilter::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<CallDecodeDataOnceFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<CallDecodeDataOnceFilter, test::integration::filters::CallDecodedataOnceFilterConfig>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
-static Registry::RegisterFactory<SimpleFilterConfig<CallDecodeDataOnceFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<CallDecodeDataOnceFilter, test::integration::filters::CallDecodedataOnceFilterConfig>,
                                  Server::Configuration::UpstreamHttpFilterConfigFactory>
     register_upstream_;
 

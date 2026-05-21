@@ -1,4 +1,5 @@
 #include <chrono>
+#include "test/integration/filters/test_filters.pb.h"
 #include <string>
 
 #include "envoy/event/timer.h"
@@ -48,7 +49,7 @@ public:
 
 // perform static registration
 constexpr char EncoderRecreateStreamFilter::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<EncoderRecreateStreamFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<EncoderRecreateStreamFilter, test::integration::filters::EncoderRecreateStreamFilterConfig>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 

@@ -1,4 +1,5 @@
 #include <string>
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
@@ -46,10 +47,10 @@ public:
 
 constexpr char WaitForWholeRequestAndResponseStreamFilter::name[];
 
-static Registry::RegisterFactory<SimpleFilterConfig<WaitForWholeRequestAndResponseStreamFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<WaitForWholeRequestAndResponseStreamFilter, test::integration::filters::WaitForWholeRequestAndResponseFilterConfig>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     encoder_register_;
-static Registry::RegisterFactory<SimpleFilterConfig<WaitForWholeRequestAndResponseStreamFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<WaitForWholeRequestAndResponseStreamFilter, test::integration::filters::WaitForWholeRequestAndResponseFilterConfig>,
                                  Server::Configuration::UpstreamHttpFilterConfigFactory>
     encoder_register_upstream_;
 } // namespace Envoy

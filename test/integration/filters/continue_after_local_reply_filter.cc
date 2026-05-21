@@ -1,4 +1,5 @@
 #include "envoy/registry/registry.h"
+#include "test/integration/filters/test_filters.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "source/extensions/filters/http/common/pass_through_filter.h"
@@ -23,7 +24,7 @@ public:
 };
 
 constexpr char ContinueAfterLocalReplyFilter::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<ContinueAfterLocalReplyFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<ContinueAfterLocalReplyFilter, test::integration::filters::ContinueAfterLocalReplyFilterConfig>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 

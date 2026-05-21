@@ -1,4 +1,5 @@
 #include <memory>
+#include "test/integration/filters/test_filters.pb.h"
 #include <string>
 
 #include "envoy/http/filter.h"
@@ -53,9 +54,9 @@ private:
   Stats::StatNameManagedStorage stat_name_;
 };
 
-class EdsReadyFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class EdsReadyFilterConfig : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<test::integration::filters::EdsReadyFilterConfig> {
 public:
-  EdsReadyFilterConfig() : EmptyHttpFilterConfig("eds-ready-filter") {}
+  EdsReadyFilterConfig() : UniqueEmptyHttpFilterConfig<test::integration::filters::EdsReadyFilterConfig>("eds-ready-filter") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&,

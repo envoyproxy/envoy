@@ -1,4 +1,5 @@
 #include <string>
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
@@ -21,10 +22,9 @@ public:
   }
 };
 
-class Encode1xxLocalReplyFilterConfig
-    : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class Encode1xxLocalReplyFilterConfig : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<test::integration::filters::Encode1xxLocalReplyFilterConfig> {
 public:
-  Encode1xxLocalReplyFilterConfig() : EmptyHttpFilterConfig("encode1xx-local-reply-filter") {}
+  Encode1xxLocalReplyFilterConfig() : UniqueEmptyHttpFilterConfig<test::integration::filters::Encode1xxLocalReplyFilterConfig>("encode1xx-local-reply-filter") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&, Server::Configuration::FactoryContext&) override {

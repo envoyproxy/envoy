@@ -2033,6 +2033,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
+        "//test/integration/filters:test_filters_proto_cc_proto",
         "//envoy/registry",
         "//source/common/grpc:common_lib",
         "//test/config:v2_link_hacks",

@@ -1,4 +1,5 @@
 #include <chrono>
+#include "test/integration/filters/test_filters.pb.h"
 #include <string>
 
 #include "envoy/event/timer.h"
@@ -34,7 +35,7 @@ public:
 };
 
 constexpr char AddEncodeMetadataFilter::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<AddEncodeMetadataFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<AddEncodeMetadataFilter, test::integration::filters::AddMetadataEncodeHeadersFilterConfig>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 

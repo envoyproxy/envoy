@@ -1,4 +1,5 @@
 #include "test/integration/filters/process_context_filter.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 #include <memory>
 #include <string>
@@ -36,9 +37,9 @@ private:
   ProcessObjectForFilter& process_object_;
 };
 
-class ProcessContextFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class ProcessContextFilterConfig : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<test::integration::filters::ProcessContextFilterConfig> {
 public:
-  ProcessContextFilterConfig() : EmptyHttpFilterConfig("process-context-filter") {}
+  ProcessContextFilterConfig() : UniqueEmptyHttpFilterConfig<test::integration::filters::ProcessContextFilterConfig>("process-context-filter") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&,

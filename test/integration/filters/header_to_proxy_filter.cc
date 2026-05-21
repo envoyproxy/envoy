@@ -1,4 +1,5 @@
 #include <string>
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
@@ -34,9 +35,9 @@ public:
   }
 };
 
-class HeaderToProxyFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class HeaderToProxyFilterConfig : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<test::integration::filters::HeaderToProxyFilterConfig> {
 public:
-  HeaderToProxyFilterConfig() : EmptyHttpFilterConfig("header-to-proxy-filter") {}
+  HeaderToProxyFilterConfig() : UniqueEmptyHttpFilterConfig<test::integration::filters::HeaderToProxyFilterConfig>("header-to-proxy-filter") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&, Server::Configuration::FactoryContext&) override {

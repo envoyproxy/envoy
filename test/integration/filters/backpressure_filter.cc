@@ -1,4 +1,5 @@
 #include <string>
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
@@ -38,9 +39,9 @@ private:
   bool below_write_buffer_low_watermark_called_{false};
 };
 
-class BackpressureConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class BackpressureConfig : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<test::integration::filters::BackpressureFilterConfig> {
 public:
-  BackpressureConfig() : EmptyHttpFilterConfig("backpressure-filter") {}
+  BackpressureConfig() : UniqueEmptyHttpFilterConfig<test::integration::filters::BackpressureFilterConfig>("backpressure-filter") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&, Server::Configuration::FactoryContext&) override {

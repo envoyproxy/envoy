@@ -1,4 +1,5 @@
 #include <string>
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
@@ -50,9 +51,9 @@ private:
   bool has_refreshed_cluster_info_{};
 };
 
-class RefreshRouteClusterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class RefreshRouteClusterConfig : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<test::integration::filters::RefreshRouteClusterConfig> {
 public:
-  RefreshRouteClusterConfig() : EmptyHttpFilterConfig("refresh-route-cluster") {}
+  RefreshRouteClusterConfig() : UniqueEmptyHttpFilterConfig<test::integration::filters::RefreshRouteClusterConfig>("refresh-route-cluster") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&, Server::Configuration::FactoryContext&) override {

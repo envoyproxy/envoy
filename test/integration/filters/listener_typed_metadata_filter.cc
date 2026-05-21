@@ -1,4 +1,5 @@
 #include "envoy/http/filter.h"
+#include "test/integration/filters/test_filters.pb.h"
 #include "envoy/network/listener.h"
 #include "envoy/registry/registry.h"
 
@@ -52,10 +53,9 @@ public:
   }
 };
 
-class ListenerTypedMetadataFilterFactory
-    : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class ListenerTypedMetadataFilterFactory : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<test::integration::filters::ListenerTypedMetadataFilterConfig> {
 public:
-  ListenerTypedMetadataFilterFactory() : EmptyHttpFilterConfig(std::string(kFilterName)) {}
+  ListenerTypedMetadataFilterFactory() : UniqueEmptyHttpFilterConfig<test::integration::filters::ListenerTypedMetadataFilterConfig>(std::string(kFilterName)) {}
 
 private:
   absl::StatusOr<Http::FilterFactoryCb>

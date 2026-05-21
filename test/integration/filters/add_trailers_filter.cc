@@ -1,4 +1,5 @@
 #include <string>
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
@@ -31,10 +32,9 @@ public:
   }
 };
 
-class AddTrailersStreamFilterConfig
-    : public Extensions::HttpFilters::Common::EmptyHttpDualFilterConfig {
+class AddTrailersStreamFilterConfig : public Extensions::HttpFilters::Common::UniqueEmptyHttpDualFilterConfig<test::integration::filters::AddTrailersFilterConfig> {
 public:
-  AddTrailersStreamFilterConfig() : EmptyHttpDualFilterConfig("add-trailers-filter") {}
+  AddTrailersStreamFilterConfig() : UniqueEmptyHttpDualFilterConfig<test::integration::filters::AddTrailersFilterConfig>("add-trailers-filter") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createDualFilter(const std::string&, Server::Configuration::ServerFactoryContext&) override {

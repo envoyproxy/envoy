@@ -1,4 +1,5 @@
 #include <string>
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
@@ -44,10 +45,10 @@ private:
 
 constexpr char AddInvalidDataFilter::name[];
 
-static Registry::RegisterFactory<SimpleFilterConfig<AddInvalidDataFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<AddInvalidDataFilter, test::integration::filters::AddInvalidDataFilterConfig>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     encoder_register_;
-static Registry::RegisterFactory<SimpleFilterConfig<AddInvalidDataFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<AddInvalidDataFilter, test::integration::filters::AddInvalidDataFilterConfig>,
                                  Server::Configuration::UpstreamHttpFilterConfigFactory>
     encoder_register_upstream_;
 } // namespace Envoy

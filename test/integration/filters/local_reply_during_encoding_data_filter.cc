@@ -1,4 +1,5 @@
 #include <string>
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
@@ -23,10 +24,10 @@ public:
 };
 
 constexpr char LocalReplyDuringEncodeData::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<LocalReplyDuringEncodeData>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<LocalReplyDuringEncodeData, test::integration::filters::LocalReplyDuringEncodeDataConfig>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
-static Registry::RegisterFactory<SimpleFilterConfig<LocalReplyDuringEncodeData>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<LocalReplyDuringEncodeData, test::integration::filters::LocalReplyDuringEncodeDataConfig>,
                                  Server::Configuration::UpstreamHttpFilterConfigFactory>
     register_upstream_;
 

@@ -1,4 +1,5 @@
 #include <string>
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
@@ -62,11 +63,9 @@ private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_;
 };
 
-class SdsGenericSecretTestFilterConfig
-    : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class SdsGenericSecretTestFilterConfig : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<test::integration::filters::SdsGenericSecretTestConfig> {
 public:
-  SdsGenericSecretTestFilterConfig()
-      : Extensions::HttpFilters::Common::EmptyHttpFilterConfig("sds-generic-secret-test") {}
+  SdsGenericSecretTestFilterConfig() : Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<test::integration::filters::SdsGenericSecretTestConfig>("sds-generic-secret-test") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&,
@@ -112,7 +111,11 @@ public:
       ConfigHelper::setHttp2(*sds_cluster);
     });
 
-    config_helper_.prependFilter("{ name: sds-generic-secret-test }");
+    config_helper_.prependFilter(R"EOF(
+      name: sds-generic-secret-test
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.SdsGenericSecretTestConfig
+    )EOF");
 
     create_xds_upstream_ = true;
     HttpIntegrationTest::initialize();
@@ -193,7 +196,11 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()), registration_(factory_) {}
 
   void initialize() override {
-    config_helper_.prependFilter("{ name: sds-generic-secret-test }");
+    config_helper_.prependFilter(R"EOF(
+      name: sds-generic-secret-test
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.SdsGenericSecretTestConfig
+    )EOF");
     HttpIntegrationTest::initialize();
   }
 
@@ -263,7 +270,11 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()), registration_(factory_) {}
 
   void initialize() override {
-    config_helper_.prependFilter("{ name: sds-generic-secret-test }");
+    config_helper_.prependFilter(R"EOF(
+      name: sds-generic-secret-test
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.SdsGenericSecretTestConfig
+    )EOF");
     HttpIntegrationTest::initialize();
   }
 

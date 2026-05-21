@@ -1,0 +1,5 @@
+syntax = "proto3";
+
+package test.extensions.quic.proof_source;
+
+message PendingProofSourceConfig {}

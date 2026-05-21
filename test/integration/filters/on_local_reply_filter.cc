@@ -1,4 +1,5 @@
 #include <string>
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
@@ -44,9 +45,9 @@ public:
   bool dual_reply_{};
 };
 
-class OnLocalReplyFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpDualFilterConfig {
+class OnLocalReplyFilterConfig : public Extensions::HttpFilters::Common::UniqueEmptyHttpDualFilterConfig<test::integration::filters::OnLocalReplyFilterConfig> {
 public:
-  OnLocalReplyFilterConfig() : EmptyHttpDualFilterConfig("on-local-reply-filter") {}
+  OnLocalReplyFilterConfig() : UniqueEmptyHttpDualFilterConfig<test::integration::filters::OnLocalReplyFilterConfig>("on-local-reply-filter") {}
   absl::StatusOr<Http::FilterFactoryCb>
   createDualFilter(const std::string&, Server::Configuration::ServerFactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {

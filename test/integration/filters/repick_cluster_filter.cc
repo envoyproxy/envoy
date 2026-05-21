@@ -1,4 +1,5 @@
 #include "test/integration/filters/repick_cluster_filter.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 #include <string>
 
@@ -26,9 +27,9 @@ public:
   }
 };
 
-class RepickClusterFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class RepickClusterFilterConfig : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<test::integration::filters::RepickClusterFilterConfig> {
 public:
-  RepickClusterFilterConfig() : EmptyHttpFilterConfig("repick-cluster-filter") {}
+  RepickClusterFilterConfig() : UniqueEmptyHttpFilterConfig<test::integration::filters::RepickClusterFilterConfig>("repick-cluster-filter") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&, Server::Configuration::FactoryContext&) override {

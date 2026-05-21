@@ -848,7 +848,11 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithClusterHeaderWithFilt
   initialConfigSetup("", "cluster_header_1");
 
   // Add a filter to set cluster_header in headers.
-  config_helper_.addFilter("name: repick-cluster-filter");
+  config_helper_.addFilter(R"EOF(
+    name: repick-cluster-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.RepickClusterFilterConfig
+  )EOF");
 
   initialize();
   sendRequestAndValidateResponse();

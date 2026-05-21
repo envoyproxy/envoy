@@ -1,4 +1,5 @@
 #include <string>
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "envoy/registry/registry.h"
 
@@ -65,9 +66,9 @@ private:
   Event::TimerPtr timer_;
 };
 
-class RandomPauseFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class RandomPauseFilterConfig : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<test::integration::filters::RandomPauseFilterConfig> {
 public:
-  RandomPauseFilterConfig() : EmptyHttpFilterConfig("random-pause-filter") {}
+  RandomPauseFilterConfig() : UniqueEmptyHttpFilterConfig<test::integration::filters::RandomPauseFilterConfig>("random-pause-filter") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&, Server::Configuration::FactoryContext&) override {

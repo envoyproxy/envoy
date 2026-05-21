@@ -1,4 +1,5 @@
 #include "envoy/registry/registry.h"
+#include "test/integration/filters/test_filters.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "source/common/protobuf/protobuf.h"
@@ -151,7 +152,7 @@ public:
 };
 
 constexpr char StreamInfoToHeadersFilter::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<StreamInfoToHeadersFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<StreamInfoToHeadersFilter, test::integration::filters::StreamInfoToHeadersFilterConfig>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 

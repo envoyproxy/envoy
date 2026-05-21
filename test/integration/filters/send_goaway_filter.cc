@@ -1,4 +1,5 @@
 #include <string>
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
@@ -72,7 +73,7 @@ private:
 };
 
 constexpr char GoAwayDuringDecoding::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<GoAwayDuringDecoding>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<GoAwayDuringDecoding, test::integration::filters::SendGoawayFilterConfig>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 

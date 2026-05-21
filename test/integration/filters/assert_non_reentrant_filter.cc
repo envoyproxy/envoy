@@ -1,4 +1,5 @@
 #include <string>
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
@@ -41,10 +42,10 @@ private:
 
 constexpr char AssertNonReentrantFilter::name[];
 
-static Registry::RegisterFactory<SimpleFilterConfig<AssertNonReentrantFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<AssertNonReentrantFilter, test::integration::filters::AssertNonReentrantFilterConfig>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     encoder_register_;
-static Registry::RegisterFactory<SimpleFilterConfig<AssertNonReentrantFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<AssertNonReentrantFilter, test::integration::filters::AssertNonReentrantFilterConfig>,
                                  Server::Configuration::UpstreamHttpFilterConfigFactory>
     encoder_register_upstream_;
 } // namespace Envoy

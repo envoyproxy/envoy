@@ -1,4 +1,5 @@
 #include "envoy/registry/registry.h"
+#include "test/integration/filters/test_filters.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "source/extensions/filters/http/common/pass_through_filter.h"
@@ -28,10 +29,10 @@ public:
   }
 };
 
-static Registry::RegisterFactory<SimpleFilterConfig<RemoveResponseTrailersFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<RemoveResponseTrailersFilter, test::integration::filters::RemoveResponseTrailersFilterConfig>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
-static Registry::RegisterFactory<SimpleFilterConfig<RemoveResponseTrailersFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<RemoveResponseTrailersFilter, test::integration::filters::RemoveResponseTrailersFilterConfig>,
                                  Server::Configuration::UpstreamHttpFilterConfigFactory>
     register_upstream_;
 

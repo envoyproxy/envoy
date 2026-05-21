@@ -1,4 +1,5 @@
 #include <string>
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
@@ -75,10 +76,10 @@ private:
   bool response_encoded_{};
 };
 
-static Registry::RegisterFactory<SimpleFilterConfig<StopIterationHeadersInjectBodyFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<StopIterationHeadersInjectBodyFilter, test::integration::filters::StopIterationHeadersInjectBodyFilterConfig>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
-static Registry::RegisterFactory<SimpleFilterConfig<StopIterationHeadersInjectBodyFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<StopIterationHeadersInjectBodyFilter, test::integration::filters::StopIterationHeadersInjectBodyFilterConfig>,
                                  Server::Configuration::UpstreamHttpFilterConfigFactory>
     register_upstream_;
 } // namespace Envoy

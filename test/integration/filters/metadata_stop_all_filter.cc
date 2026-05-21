@@ -1,4 +1,5 @@
 #include <chrono>
+#include "test/integration/filters/test_filters.pb.h"
 #include <string>
 
 #include "envoy/event/timer.h"
@@ -66,7 +67,7 @@ private:
 };
 
 constexpr char MetadataStopAllFilter::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<MetadataStopAllFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<MetadataStopAllFilter, test::integration::filters::MetadataStopAllFilterConfig>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 

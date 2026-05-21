@@ -1,4 +1,5 @@
 #include <string>
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
@@ -25,10 +26,10 @@ public:
   }
 };
 
-static Registry::RegisterFactory<SimpleFilterConfig<StopInHeadersContinueInBodyFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<StopInHeadersContinueInBodyFilter, test::integration::filters::StopInHeadersContinueInBodyFilterConfig>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
-static Registry::RegisterFactory<SimpleFilterConfig<StopInHeadersContinueInBodyFilter>,
+static Registry::RegisterFactory<UniqueSimpleFilterConfig<StopInHeadersContinueInBodyFilter, test::integration::filters::StopInHeadersContinueInBodyFilterConfig>,
                                  Server::Configuration::UpstreamHttpFilterConfigFactory>
     register_upstream_;
 } // namespace Envoy
