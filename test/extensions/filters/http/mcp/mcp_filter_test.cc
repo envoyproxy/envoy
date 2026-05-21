@@ -606,6 +606,29 @@ TEST_F(McpFilterTest, DuplicateKeyAllowedByDefault) {
   EXPECT_EQ(0u, config_->stats().duplicate_keys_rejected_.value());
 }
 
+// Test that a complete MCP JSON object followed by trailing garbage in the same data chunk
+// is correctly rejected with BadRequest by the filter.
+TEST_F(McpFilterTest, TrailingGarbageRejectedInFilter) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "calculator"}, "id": 1} trailing garbage)";
+  Buffer::OwnedImpl buffer(json);
+
+  // The filter must reject the request because of trailing garbage in the chunk
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest, "not a valid JSON", _, _, _));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+  EXPECT_EQ(1u, config_->stats().invalid_json_.value());
+}
+
+
 // Test that truncated JSON with end_stream is rejected in REJECT_NO_MCP mode.
 TEST_F(McpFilterTest, PartialJsonEndStreamRejectMode) {
   setupRejectMode();
@@ -950,6 +973,65 @@ TEST_F(McpFilterTest, BodySizeLimitInPassThroughMode) {
   ASSERT_NE(method_it, fields.end());
   EXPECT_EQ(method_it->second.string_value(), "tools/call");
 }
+
+// Test body size check in PASS_THROUGH mode in a multi-chunk request.
+// Ensures that when the final chunk pushes the cumulative byte count to the limit,
+// the filter correctly identifies it as a limit truncation (setting is_exceeding_limit)
+// and allows the request through.
+TEST_F(McpFilterTest, BodySizeLimitInPassThroughModeMultiChunk) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  // Limit set to 80 bytes.
+  proto_config.mutable_max_request_body_size()->set_value(80);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(80));
+  filter_->decodeHeaders(headers, false);
+
+  // First chunk: 74 bytes of valid JSON prefix (jsonrpc + method + params.name)
+  std::string chunk1 =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "calculator")";
+  ASSERT_EQ(chunk1.size(), 74);
+  Buffer::OwnedImpl buffer1(chunk1);
+
+  // Should continue buffering
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer1, false));
+
+  // Second chunk: 20 bytes with end_stream = true.
+  // The total body (90 bytes) exceeds the 80-byte limit.
+  // The final chunk contains valid characters, but parsing fails at finishParse() because it was cut off.
+  std::string chunk2 = R"(, "id": 1, "extra": )";
+  ASSERT_EQ(chunk2.size(), 20);
+  Buffer::OwnedImpl buffer2(chunk2);
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  Protobuf::Struct captured_metadata;
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce(testing::SaveArg<1>(&captured_metadata));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer2, true));
+
+  // Verify dynamic metadata contents.
+  const auto& fields = captured_metadata.fields();
+
+  // is_exceeding_limit must be true — body exceeded configured max.
+  auto limit_it = fields.find(std::string(IS_EXCEEDING_LIMIT));
+  ASSERT_NE(limit_it, fields.end());
+  EXPECT_TRUE(limit_it->second.bool_value());
+
+  // is_mcp_request should be true — jsonrpc + method were successfully parsed within the limit.
+  auto mcp_it = fields.find(std::string(IS_MCP_REQUEST));
+  ASSERT_NE(mcp_it, fields.end());
+  EXPECT_TRUE(mcp_it->second.bool_value());
+}
+
 
 // Test route cache is NOT cleared by default when metadata is set
 TEST_F(McpFilterTest, RouteCacheNotClearedByDefault) {

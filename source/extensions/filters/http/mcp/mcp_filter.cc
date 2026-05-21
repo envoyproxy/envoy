@@ -289,6 +289,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
             bytes_parsed_, end_stream);
 
   const uint32_t max_size = getMaxRequestBodySize();
+  uint32_t bytes_parsed_in_this_call = 0;
 
   for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     const char* start = static_cast<const char*>(slice.mem_);
@@ -301,17 +302,18 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
     if (len > 0) {
       auto status = parser_->parse({start, len});
       bytes_parsed_ += len;
-
-      if (parser_->isParsingComplete()) {
-        ENVOY_LOG(debug, "mcp parse complete: found all fields");
-        return completeParsing();
-      }
+      bytes_parsed_in_this_call += len;
 
       if (!status.ok()) {
         config_->stats().invalid_json_.inc();
         decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "not a valid JSON", nullptr,
                                            absl::nullopt, "mcp_filter_not_jsonrpc");
         return Http::FilterDataStatus::StopIterationNoBuffer;
+      }
+
+      if (parser_->isParsingComplete()) {
+        ENVOY_LOG(debug, "mcp parse complete: found all fields");
+        return completeParsing();
       }
     }
 
@@ -322,7 +324,8 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
 
   // If we are here, parsing is not yet complete (root object hasn't closed).
   const bool size_limit_hit = (max_size > 0 && bytes_parsed_ == max_size);
-  const bool truncated_by_limit = size_limit_hit && (data.length() > max_size || !end_stream);
+  const bool truncated_by_limit =
+      size_limit_hit && (bytes_parsed_in_this_call < data.length() || !end_stream);
 
   if (end_stream || size_limit_hit) {
     if (truncated_by_limit) {
@@ -362,7 +365,7 @@ Http::FilterDataStatus McpFilter::completeParsing() {
 
   ENVOY_LOG(debug, "parsing complete: is_mcp={}, bytes_parsed={}", is_mcp_request_, bytes_parsed_);
 
-  // Check for duplicate keys — reject if configured (default: reject)
+  // Check for duplicate keys — reject if configured.
   if (parser_->hasDuplicateKeys() && config_->rejectDuplicateKeys()) {
     ENVOY_LOG(warn, "rejecting request with duplicate JSON keys");
     config_->stats().duplicate_keys_rejected_.inc();
