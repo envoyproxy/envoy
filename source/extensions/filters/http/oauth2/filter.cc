@@ -780,6 +780,12 @@ OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
   oauth_client_->setCallbacks(*this);
 }
 
+void OAuth2Filter::onDestroy() {
+  if (oauth_client_ != nullptr) {
+    oauth_client_->cancel();
+  }
+}
+
 void OAuth2Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   PassThroughDecoderFilter::setDecoderFilterCallbacks(callbacks);
   oauth_client_->setDecoderFilterCallbacks(callbacks);
