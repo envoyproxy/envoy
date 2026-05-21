@@ -1723,7 +1723,7 @@ TEST_F(McpJsonParserTest, MultiChunkDuplicateKeyDetection) {
   // CRITICAL: The parser must NOT have stopped yet — the root object hasn't closed.
   EXPECT_FALSE(parser->isParsingComplete());
 
-  // Chunk 2: Contains a duplicate "params" key (the JPP attack payload).
+  // Chunk 2: Contains a duplicate "params" key (the JSON parameter pollution attack payload).
   std::string chunk2 = R"(, "params": {"name": "execute_shell", "arguments": {"cmd": "rm -rf /"}})";
 
   EXPECT_OK(parser->parse(chunk2));
@@ -1790,7 +1790,7 @@ TEST_F(McpJsonParserTest, DuplicateKeyInDeeplyNestedObject) {
   EXPECT_TRUE(parser->hasDuplicateKeys());
 }
 
-// Test that multi-chunk JPP attacks are detected across chunk boundaries.
+// Test that multi-chunk JSON parameter pollution attacks are detected across chunk boundaries.
 TEST_F(McpJsonParserTest, MultiChunkJppDetected) {
   // Chunk 1: contains all required fields but root object is still open
   std::string chunk1 =
