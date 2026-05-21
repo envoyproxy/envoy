@@ -31,9 +31,6 @@ struct GcpAuthnFilterStats {
   ALL_GCP_AUTHN_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-using FilterConfigSharedPtr =
-    std::shared_ptr<const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig>;
-
 class GcpAuthnFilter : public Http::PassThroughFilter,
                        public GcpAuthnClient::Callbacks,
                        public Logger::Loggable<Logger::Id::filter> {
@@ -43,12 +40,15 @@ public:
   // it or has completed.
   enum class State { NotStarted, Calling, Complete };
 
-  GcpAuthnFilter(FilterConfigSharedPtr filter_config,
+  GcpAuthnFilter(const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config,
+                 absl::optional<std::string> client_cert_fingerprint,
                  Server::Configuration::FactoryContext& context, const std::string& stats_prefix,
                  TokenCacheImpl<JwtToken>* token_cache)
-      : filter_config_(std::move(filter_config)), context_(context),
-        client_(std::make_unique<GcpAuthnClientImpl>(*filter_config_, context_)),
-        stats_(generateStats(stats_prefix, context_.scope())), jwt_token_cache_(token_cache) {}
+      : config_(config), context_(context),
+        client_(std::make_unique<GcpAuthnClientImpl>(config_, context_)),
+        stats_(generateStats(stats_prefix, context_.scope())),
+        client_cert_fingerprint_(std::move(client_cert_fingerprint)),
+        jwt_token_cache_(token_cache) {}
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
@@ -58,6 +58,7 @@ public:
 
   State state() { return state_; }
   GcpAuthnFilterStats& stats() { return stats_; }
+  const absl::optional<std::string>& clientCertFingerprintForTest() const { return client_cert_fingerprint_; }
 
   ~GcpAuthnFilter() override = default;
 
@@ -66,7 +67,7 @@ private:
     return {ALL_GCP_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, stats_prefix))};
   }
 
-  FilterConfigSharedPtr filter_config_;
+  const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config_;
   Server::Configuration::FactoryContext& context_;
   std::unique_ptr<GcpAuthnClient> client_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
@@ -78,6 +79,7 @@ private:
   bool initiating_call_{};
   State state_{State::NotStarted};
   std::string audience_str_;
+  const absl::optional<std::string> client_cert_fingerprint_;
   // This cache is optional (it will be nullptr if no cache configuration) and not owned by the
   // filter (thread local storage).
   TokenCacheImpl<JwtToken>* jwt_token_cache_;

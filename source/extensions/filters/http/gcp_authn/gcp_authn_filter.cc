@@ -74,7 +74,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
       if (token != nullptr) {
         // If token is found in the cache, we add the token string to the request directly and
         // continue the filter chain iteration.
-        addTokenToRequest(hdrs, token->jwt_, filter_config_->token_header());
+        addTokenToRequest(hdrs, token->jwt_, config_.token_header());
         return FilterHeadersStatus::Continue;
       }
     }
@@ -109,7 +109,7 @@ void GcpAuthnFilter::onComplete(absl::StatusOr<std::string> token) {
       // `Authorization: Bearer ID_TOKEN` header).
       std::string token_str = *token;
       if (request_header_map_ != nullptr) {
-        addTokenToRequest(*request_header_map_, token_str, filter_config_->token_header());
+        addTokenToRequest(*request_header_map_, token_str, config_.token_header());
       } else {
         ENVOY_LOG(debug, "No request header to be modified.");
       }

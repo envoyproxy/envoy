@@ -72,7 +72,11 @@ envoy_cc_extension(
     hdrs = ["filter_config.h"],
     deps = [
         ":gcp_authn",
+        ":crypto_utils",
         "//envoy/registry",
+        "//envoy/secret:secret_manager_interface",
+        "//envoy/thread_local:thread_local_interface",
+        "//source/common/common:matchers_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/gcp_authn/v3:pkg_cc_proto",
     ],

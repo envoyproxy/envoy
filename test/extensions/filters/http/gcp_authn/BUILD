@@ -16,13 +16,19 @@ envoy_extension_cc_test(
     name = "filter_config_test",
     size = "small",
     srcs = ["filter_config_test.cc"],
+    data = [
+        "//test/common/tls/test_data:certs",
+    ],
     extension_names = ["envoy.filters.http.gcp_authn"],
     rbe_pool = "6gig",
     deps = [
         "//source/common/http:message_lib",
+        "//source/extensions/filters/http/gcp_authn",
         "//source/extensions/filters/http/gcp_authn:config",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:environment_lib",
         "@envoy_api//envoy/extensions/filters/http/gcp_authn/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
@@ -31,6 +37,9 @@ envoy_extension_cc_test(
     name = "gcp_authn_filter_test",
     size = "small",
     srcs = ["gcp_authn_filter_test.cc"],
+    data = [
+        "//test/common/tls/test_data:certs",
+    ],
     extension_names = ["envoy.filters.http.gcp_authn"],
     rbe_pool = "6gig",
     deps = [
@@ -40,8 +49,10 @@ envoy_extension_cc_test(
         "//test/common/http:common_lib",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/filters/http/gcp_authn/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 

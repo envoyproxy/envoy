@@ -9,6 +9,8 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
+import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
+import "envoy/type/matcher/v3/string.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -23,7 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.gcp_authn]
 
 // Filter configuration.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message GcpAuthnFilterConfig {
   // The HTTP URI to fetch tokens from GCE Metadata Server(https://cloud.google.com/compute/docs/metadata/overview).
   // The URL format is "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]"
@@ -59,6 +61,18 @@ message GcpAuthnFilterConfig {
     lt {seconds: 4294967296}
     gte {}
   }];
+
+  // Configuration for binding tokens to a client certificate.
+  TokenBindingConfig token_binding_config = 7;
+}
+
+// Configuration for binding tokens to a client certificate.
+message TokenBindingConfig {
+  // The secret config for the client certificate used for mTLS.
+  transport_sockets.tls.v3.SdsSecretConfig client_certificate = 1 [(validate.rules).message = {required: true}];
+
+  // Subject Alternative Name (SAN) matchers to validate the client certificate.
+  repeated type.matcher.v3.StringMatcher client_certificate_san_matchers = 2;
 }
 
 // Audience is the URL of the receiving service that performs token authentication.
