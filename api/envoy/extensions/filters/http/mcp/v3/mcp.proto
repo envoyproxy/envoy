@@ -73,10 +73,8 @@ message Mcp {
   // Only the first ``max_request_body_size`` bytes are parsed for MCP attribute extraction.
   //
   // When the body exceeds this limit:
-  // - In ``PASS_THROUGH`` mode: the request is allowed through with an ``is_exceeding_limit``
-  //   marker in the dynamic metadata, indicating that the MCP payload was only partially parsed.
-  // - In ``REJECT_NO_MCP`` mode: the request is rejected with ``400 Bad Request`` because
-  //   the complete root JSON object must fit within the size limit.
+  // - In ``PASS_THROUGH`` mode: the request is allowed through with an ``is_exceeding_limit`` marker in the dynamic metadata, indicating that the MCP payload was only partially parsed.
+  // - In ``REJECT_NO_MCP`` mode: the request is rejected with ``400 Bad Request`` because the complete root JSON object must fit within the size limit.
   //
   // It defaults to 8KB (8192 bytes) and the maximum allowed value is 10MB (10485760 bytes).
   //
