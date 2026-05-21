@@ -1809,6 +1809,17 @@ TEST_F(McpJsonParserTest, MultiChunkJppDetected) {
   EXPECT_TRUE(parser_->hasDuplicateKeys());
 }
 
+// Test that a valid, complete MCP JSON object followed by trailing garbage in the same data chunk
+// is correctly rejected by the parser.
+TEST_F(McpJsonParserTest, TrailingGarbageRejected) {
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "calculator"}, "id": 1} trailing garbage)";
+
+  // Parse should fail because of trailing garbage in the chunk.
+  auto status = parser_->parse(json);
+  EXPECT_FALSE(status.ok());
+}
+
 // Test that default config has correct security settings.
 TEST(McpParserConfigTest, DefaultSecuritySettings) {
   McpParserConfig config = McpParserConfig::createDefault();

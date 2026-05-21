@@ -240,7 +240,7 @@ bool McpFieldExtractor::checkDuplicateKey(absl::string_view name) {
   auto& current_scope = scope_key_sets_.back();
   if (!current_scope.insert(std::string(name)).second) {
     has_duplicate_keys_ = true;
-    ENVOY_LOG(warn, "duplicate JSON key detected: '{}' at path '{}'", name, current_path_cache_);
+    ENVOY_LOG(debug, "duplicate JSON key detected: '{}' at path '{}'", name, current_path_cache_);
     return true;
   }
   return false;
@@ -698,6 +698,9 @@ absl::Status McpJsonParser::parse(absl::string_view data) {
 
   auto status = stream_parser_->Parse(data);
   ENVOY_LOG(trace, "status ok: {}, {}", status.ok(), status.message());
+  if (!status.ok()) {
+    return status;
+  }
   if (extractor_->shouldStopParsing()) {
     ENVOY_LOG(trace, "Parsing complete - root object closed");
     return finishParse();
