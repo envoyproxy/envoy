@@ -358,6 +358,7 @@ public:
   // Http::PassThroughFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override;
+  void onDestroy() override;
 
   // FilterCallbacks
   void onGetAccessTokenSuccess(const std::string& access_code, const std::string& id_token,
