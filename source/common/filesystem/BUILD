@@ -113,7 +113,6 @@ envoy_cc_library(
         "//conditions:default": "inotify",
     }),
     deps = [
-        "//bazel/foreign_cc:event",
         "//envoy/api:api_interface",
         "//envoy/event:dispatcher_interface",
         "//source/common/buffer:buffer_lib",
@@ -128,5 +127,8 @@ envoy_cc_library(
             "//source/common/api:os_sys_calls_lib",
         ],
         "//conditions:default": [],
+    }) + select({
+        "//bazel:bzlmod_mode": ["@libevent"],
+        "//conditions:default": ["//bazel/foreign_cc:event"],
     }),
 )
