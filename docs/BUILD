@@ -193,7 +193,7 @@ genrule(
         "//tools:generate_version_histories",
         "@envoy//:VERSION.txt",
         "@envoy//changelogs",
-        "@envoy//changelogs:sections.yaml",
+        "@envoy//changelogs:changelogs.yaml",
     ],
 )
 

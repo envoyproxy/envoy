@@ -764,6 +764,7 @@ void McpJsonParser::reset() {
   stream_parser_.reset();
   extractor_.reset();
   parsing_started_ = false;
+  all_fields_collected_ = false;
 }
 
 } // namespace Mcp

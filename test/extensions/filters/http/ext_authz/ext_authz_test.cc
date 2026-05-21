@@ -5302,8 +5302,7 @@ TEST_P(EmitFilterStateTest, PreexistingFilterStateDifferentTypeMutable) {
       FilterConfigName,
       // This will not cast to ExtAuthzLoggingInfo, so when the filter tries to
       // getMutableData<ExtAuthzLoggingInfo>(...), it will return nullptr.
-      std::make_shared<TestObject>(), Envoy::StreamInfo::FilterState::StateType::Mutable,
-      Envoy::StreamInfo::FilterState::LifeSpan::Request);
+      std::make_shared<TestObject>(), Envoy::StreamInfo::FilterState::LifeSpan::Request);
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
@@ -5323,7 +5322,6 @@ TEST_P(EmitFilterStateTest, PreexistingFilterStateSameTypeMutable) {
       // This will not cast to ExtAuthzLoggingInfo, so when the filter tries to
       // getMutableData<ExtAuthzLoggingInfo>(...), it will return nullptr.
       std::make_shared<ExtAuthzLoggingInfo>(absl::nullopt),
-      Envoy::StreamInfo::FilterState::StateType::Mutable,
       Envoy::StreamInfo::FilterState::LifeSpan::Request);
 
   Filters::Common::ExtAuthz::Response response{};

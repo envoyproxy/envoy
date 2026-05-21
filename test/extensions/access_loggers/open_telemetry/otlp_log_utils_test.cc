@@ -235,7 +235,7 @@ TEST(OtlpLogUtilsTest, AddFilterStateToAttributesFromDownstream) {
 
   stream_info.filter_state_->setData(
       "downstream_key", std::make_unique<Router::StringAccessorImpl>("downstream_value"),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+      StreamInfo::FilterState::LifeSpan::FilterChain);
 
   std::vector<std::string> filter_state_objects = {"downstream_key"};
   addFilterStateToAttributes(stream_info, filter_state_objects, log_entry);
@@ -253,9 +253,9 @@ TEST(OtlpLogUtilsTest, AddFilterStateToAttributesFromUpstream) {
 
   auto upstream_filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
-  upstream_filter_state->setData(
-      "upstream_key", std::make_unique<Router::StringAccessorImpl>("upstream_value"),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+  upstream_filter_state->setData("upstream_key",
+                                 std::make_unique<Router::StringAccessorImpl>("upstream_value"),
+                                 StreamInfo::FilterState::LifeSpan::FilterChain);
   stream_info.upstreamInfo()->setUpstreamFilterState(upstream_filter_state);
 
   std::vector<std::string> filter_state_objects = {"upstream_key"};
@@ -274,14 +274,14 @@ TEST(OtlpLogUtilsTest, AddFilterStateToAttributesDownstreamPrecedence) {
   // Add to downstream.
   stream_info.filter_state_->setData(
       "same_key", std::make_unique<Router::StringAccessorImpl>("downstream_wins"),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+      StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Add to upstream.
   auto upstream_filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
-  upstream_filter_state->setData(
-      "same_key", std::make_unique<Router::StringAccessorImpl>("upstream_loses"),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+  upstream_filter_state->setData("same_key",
+                                 std::make_unique<Router::StringAccessorImpl>("upstream_loses"),
+                                 StreamInfo::FilterState::LifeSpan::FilterChain);
   stream_info.upstreamInfo()->setUpstreamFilterState(upstream_filter_state);
 
   std::vector<std::string> filter_state_objects = {"same_key"};

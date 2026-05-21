@@ -415,17 +415,17 @@ void FilterConfig::setFilterState(StreamInfo::StreamInfo& info, bool downstream,
     auto pb = value.serializeAsProto();
     auto cel_state = std::make_unique<CelState>(FilterConfig::peerInfoPrototype());
     cel_state->setValue(absl::string_view(pb->SerializeAsString()));
-    info.filterState()->setData(
-        key, std::move(cel_state), StreamInfo::FilterState::StateType::Mutable,
-        StreamInfo::FilterState::LifeSpan::FilterChain, sharedWithUpstream());
+    info.filterState()->setData(key, std::move(cel_state),
+                                StreamInfo::FilterState::LifeSpan::FilterChain,
+                                sharedWithUpstream());
 
     // Also store WorkloadMetadataObject under a separate key for FIELD accessor support.
     // WorkloadMetadataObject implements hasFieldSupport() + getField() for
     // formatters using %FILTER_STATE(downstream_peer_obj:FIELD:fieldname)% syntax.
     auto workload_metadata = std::make_unique<PeerInfo>(value);
-    info.filterState()->setData(
-        obj_key, std::move(workload_metadata), StreamInfo::FilterState::StateType::Mutable,
-        StreamInfo::FilterState::LifeSpan::FilterChain, sharedWithUpstream());
+    info.filterState()->setData(obj_key, std::move(workload_metadata),
+                                StreamInfo::FilterState::LifeSpan::FilterChain,
+                                sharedWithUpstream());
   } else {
     ENVOY_LOG(debug, "Duplicate peer metadata, skipping");
   }

@@ -1267,8 +1267,7 @@ bool envoy_dynamic_module_callback_http_set_filter_state_bytes(
   absl::string_view key_view(key.ptr, key.length);
   absl::string_view value_view(value.ptr, value.length);
   stream_info->filterState()->setData(key_view,
-                                      std::make_unique<Router::StringAccessorImpl>(value_view),
-                                      StreamInfo::FilterState::StateType::ReadOnly);
+                                      std::make_unique<Router::StringAccessorImpl>(value_view));
   return true;
 }
 
@@ -1324,8 +1323,7 @@ bool envoy_dynamic_module_callback_http_set_filter_state_typed(
     return false;
   }
 
-  stream_info->filterState()->setData(key_view, std::move(object),
-                                      StreamInfo::FilterState::StateType::Mutable);
+  stream_info->filterState()->setData(key_view, std::move(object));
   return true;
 }
 
