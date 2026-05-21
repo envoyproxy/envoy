@@ -732,6 +732,12 @@ OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
   oauth_client_->setCallbacks(*this);
 }
 
+void OAuth2Filter::onDestroy() {
+  if (oauth_client_ != nullptr) {
+    oauth_client_->cancel();
+  }
+}
+
 /**
  * primary cases:
  * 1) pass through header is matching

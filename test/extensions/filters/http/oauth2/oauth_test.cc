@@ -526,6 +526,43 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenRetryPolicy) {
   client_->asyncGetAccessToken("a", "b", "c", "d", "e");
 }
 
+TEST_F(OAuth2ClientTest, CancelSuppressesLateOnSuccess) {
+  std::string json = R"EOF(
+    {
+      "access_token": "golden ticket",
+      "expires_in": 1000
+    }
+    )EOF";
+  Http::ResponseHeaderMapPtr mock_response_headers{new Http::TestResponseHeaderMapImpl{
+      {Http::Headers::get().Status.get(), "200"},
+      {Http::Headers::get().ContentType.get(), "application/json"},
+  }};
+  Http::ResponseMessagePtr mock_response(
+      new Http::ResponseMessageImpl(std::move(mock_response_headers)));
+  mock_response->body().add(json);
+
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks_.push_back(&cb);
+            return &request_;
+          }));
+
+  client_->setCallbacks(*mock_callbacks_);
+  client_->asyncGetAccessToken("a", "b", "c", "d", "e");
+
+  // cancel() should cancel the in-flight request.
+  EXPECT_CALL(request_, cancel());
+  client_->cancel();
+
+  // A late onSuccess arriving after cancel() must NOT invoke any filter callbacks.
+  EXPECT_CALL(*mock_callbacks_, onGetAccessTokenSuccess(_, _, _, _)).Times(0);
+  EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse(_)).Times(0);
+  ASSERT_TRUE(popPendingCallback(
+      [&](auto* callback) { callback->onSuccess(request_, std::move(mock_response)); }));
+}
+
 } // namespace Oauth2
 } // namespace HttpFilters
 } // namespace Extensions
