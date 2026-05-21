@@ -86,7 +86,7 @@ public:
     EXPECT_CALL(cert_validation_ctx_config_, autoSniSanMatch()).WillRepeatedly(Return(false));
     auto context_or_error = Extensions::TransportSockets::Tls::ClientContextImpl::create(
         *store_.rootScope(), client_context_config_, factory_context_);
-    THROW_IF_NOT_OK(context_or_error.status());
+    THROW_IF_NOT_OK_REF(context_or_error.status());
     verifier_ = std::make_unique<EnvoyQuicProofVerifier>(std::move(*context_or_error));
   }
 

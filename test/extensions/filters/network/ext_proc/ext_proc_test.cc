@@ -16,7 +16,6 @@ namespace ExtProc {
 namespace {
 
 using testing::_;
-using testing::ByMove;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnNull;

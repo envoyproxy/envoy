@@ -24,7 +24,7 @@ public:
 
   Api::ApiPtr api_;
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context_;
-  std::unique_ptr<IoUringWorkerFactoryImplTest> factory_{};
+  std::unique_ptr<IoUringWorkerFactoryImplTest> factory_;
   bool should_skip_{};
 };
 

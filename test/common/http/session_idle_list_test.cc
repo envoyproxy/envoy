@@ -21,11 +21,11 @@ namespace Http {
 class TestIdleSession : public IdleSessionInterface {
 public:
   TestIdleSession() = default;
-  virtual ~TestIdleSession() = default;
+  ~TestIdleSession() override = default;
 
   void TerminateIdleSession() override { is_closed_ = true; }
 
-  bool is_closed() const { return is_closed_; }
+  bool isClosed() const { return is_closed_; }
 
 private:
   bool is_closed_ = false;
@@ -83,8 +83,8 @@ TEST_F(SessionIdleListTest, TerminateIdleSessionsUpToMaxSessionsAllowed) {
   EXPECT_EQ(idle_list_.idle_sessions()->size(), 2);
   time_system_->advanceTimeWait(std::chrono::minutes(1));
   idle_list_.MaybeTerminateIdleSessions(/*is_saturated=*/false);
-  EXPECT_TRUE(session1.is_closed());
-  EXPECT_FALSE(session2.is_closed());
+  EXPECT_TRUE(session1.isClosed());
+  EXPECT_FALSE(session2.isClosed());
   EXPECT_FALSE(idle_list_.idle_sessions()->ContainsForTest(session1));
   EXPECT_TRUE(idle_list_.idle_sessions()->ContainsForTest(session2));
   EXPECT_EQ(idle_list_.idle_sessions()->size(), 1);
@@ -95,12 +95,12 @@ TEST_F(SessionIdleListTest, RespectMinTimeBeforeTermination) {
   idle_list_.AddSession(session1);
   time_system_->advanceTimeWait(std::chrono::seconds(59));
   idle_list_.MaybeTerminateIdleSessions(/*is_saturated=*/false);
-  EXPECT_FALSE(session1.is_closed());
+  EXPECT_FALSE(session1.isClosed());
   EXPECT_TRUE(idle_list_.idle_sessions()->ContainsForTest(session1));
 
   time_system_->advanceTimeWait(std::chrono::seconds(1));
   idle_list_.MaybeTerminateIdleSessions(/*is_saturated=*/false);
-  EXPECT_TRUE(session1.is_closed());
+  EXPECT_TRUE(session1.isClosed());
   EXPECT_FALSE(idle_list_.idle_sessions()->ContainsForTest(session1));
 }
 
@@ -119,9 +119,9 @@ TEST_F(SessionIdleListTest, TerminateMultipleSessionsByOrder) {
   // max_sessions_to_terminate_in_one_round = 2, so s1 and s2 should be
   // terminated.
   idle_list_.MaybeTerminateIdleSessions(/*is_saturated=*/false);
-  EXPECT_TRUE(session1.is_closed());
-  EXPECT_TRUE(session2.is_closed());
-  EXPECT_FALSE(session3.is_closed());
+  EXPECT_TRUE(session1.isClosed());
+  EXPECT_TRUE(session2.isClosed());
+  EXPECT_FALSE(session3.isClosed());
   EXPECT_FALSE(idle_list_.idle_sessions()->ContainsForTest(session1));
   EXPECT_FALSE(idle_list_.idle_sessions()->ContainsForTest(session2));
   EXPECT_TRUE(idle_list_.idle_sessions()->ContainsForTest(session3));
@@ -143,9 +143,9 @@ TEST_F(SessionIdleListTest, TerminateIdleSessionsWhenOverloaded) {
   // When ignore_min_time_before_termination_allowed_ is true, we should
   // terminate up to max_sessions_to_terminate_in_one_round_when_overload_
   // sessions, which is 2.
-  EXPECT_TRUE(session1.is_closed());
-  EXPECT_TRUE(session2.is_closed());
-  EXPECT_FALSE(session3.is_closed());
+  EXPECT_TRUE(session1.isClosed());
+  EXPECT_TRUE(session2.isClosed());
+  EXPECT_FALSE(session3.isClosed());
   EXPECT_FALSE(idle_list_.idle_sessions()->ContainsForTest(session1));
   EXPECT_FALSE(idle_list_.idle_sessions()->ContainsForTest(session2));
   EXPECT_TRUE(idle_list_.idle_sessions()->ContainsForTest(session3));

@@ -62,7 +62,7 @@ public:
   }
 
   Api::ApiPtr api_;
-  IoUringPtr io_uring_{};
+  IoUringPtr io_uring_;
   const bool should_skip_{};
 };
 

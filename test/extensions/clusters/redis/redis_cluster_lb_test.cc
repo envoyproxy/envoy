@@ -76,8 +76,9 @@ public:
     }
   }
 
-  static std::pair<std::string, Upstream::HostSharedPtr> makePair(Upstream::HostSharedPtr host) {
-    return std::make_pair(host->address()->asString(), std::move(host));
+  static std::pair<std::string, Upstream::HostSharedPtr>
+  makePair(const Upstream::HostSharedPtr& host) {
+    return {host->address()->asString(), host};
   }
 
   Upstream::HostMap generateHostMap(Upstream::HostVector& hosts) {
