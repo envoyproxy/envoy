@@ -4,6 +4,7 @@
 #include "source/extensions/filters/network/mongo_proxy/bson_impl.h"
 
 #include "test/test_common/printers.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -99,6 +100,52 @@ TEST(BsonImplTest, StringSizeObserved) {
   BufferHelper::writeInt32(buffer, hello.size() + 1);
   buffer.add(s, sizeof(s));
   EXPECT_TRUE(BufferHelper::removeString(buffer) == hello);
+}
+
+TEST(BsonImplTest, DeeplyNestedDestruction) {
+  DocumentSharedPtr root = DocumentImpl::create();
+  DocumentSharedPtr current = root;
+  for (int i = 0; i < 1000; i++) {
+    DocumentSharedPtr next = DocumentImpl::create();
+    current->addDocument("a", next);
+    current = next;
+  }
+
+  root = nullptr;
+}
+
+TEST(BsonImplTest, ParsingDepthLimit) {
+  Buffer::OwnedImpl data;
+  DocumentSharedPtr root = DocumentImpl::create();
+  DocumentSharedPtr current = root;
+  for (int i = 0; i < 200; i++) {
+    DocumentSharedPtr next = DocumentImpl::create();
+    current->addDocument("a", next);
+    current = next;
+  }
+
+  root->encode(data);
+
+  // Now try to parse it. It should throw because 200 > 128.
+  EXPECT_THROW_WITH_MESSAGE(DocumentImpl::create(data), EnvoyException,
+                            "BSON recursion limit exceeded");
+}
+
+TEST(BsonImplTest, ParsingDepthLimitJustBelow) {
+  Buffer::OwnedImpl data;
+  DocumentSharedPtr root = DocumentImpl::create();
+  DocumentSharedPtr current = root;
+  for (int i = 0; i < 128; i++) {
+    DocumentSharedPtr next = DocumentImpl::create();
+    current->addDocument("a", next);
+    current = next;
+  }
+
+  root->encode(data);
+
+  // This should be fine (128 <= 128).
+  DocumentSharedPtr parsed = DocumentImpl::create(data);
+  EXPECT_TRUE(*root == *parsed);
 }
 
 } // namespace Bson

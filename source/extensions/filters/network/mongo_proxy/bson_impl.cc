@@ -383,7 +383,11 @@ std::string FieldImpl::toString() const {
   return "";
 }
 
-void DocumentImpl::fromBuffer(Buffer::Instance& data) {
+void DocumentImpl::fromBuffer(Buffer::Instance& data, uint32_t depth) {
+  if (depth > MaxDepth) {
+    throw EnvoyException("BSON recursion limit exceeded");
+  }
+
   const ssize_t original_buffer_length = data.length();
   const int32_t message_length = BufferHelper::removeInt32(data);
   if (message_length <= 0 || message_length > original_buffer_length) {
@@ -438,13 +442,13 @@ void DocumentImpl::fromBuffer(Buffer::Instance& data) {
 
     case Field::Type::Document: {
       ENVOY_LOG(trace, "BSON document");
-      addDocument(key, DocumentImpl::create(data));
+      addDocument(key, DocumentImpl::create(data, depth + 1));
       break;
     }
 
     case Field::Type::Array: {
       ENVOY_LOG(trace, "BSON array");
-      addArray(key, DocumentImpl::create(data));
+      addArray(key, DocumentImpl::create(data, depth + 1));
       break;
     }
 

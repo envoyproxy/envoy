@@ -178,9 +178,9 @@ class DocumentImpl : public Document,
                      public std::enable_shared_from_this<DocumentImpl> {
 public:
   static DocumentSharedPtr create() { return DocumentSharedPtr{new DocumentImpl()}; }
-  static DocumentSharedPtr create(Buffer::Instance& data) {
+  static DocumentSharedPtr create(Buffer::Instance& data, uint32_t depth = 0) {
     std::shared_ptr<DocumentImpl> new_doc{new DocumentImpl()};
-    new_doc->fromBuffer(data);
+    new_doc->fromBuffer(data, depth);
     return new_doc;
   }
 
@@ -266,7 +266,9 @@ public:
 private:
   DocumentImpl() = default;
 
-  void fromBuffer(Buffer::Instance& data);
+  void fromBuffer(Buffer::Instance& data, uint32_t depth);
+
+  static constexpr uint32_t MaxDepth = 128;
 
   std::list<FieldPtr> fields_;
 };
