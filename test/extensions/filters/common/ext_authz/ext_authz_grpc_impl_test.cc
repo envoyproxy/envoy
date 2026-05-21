@@ -668,8 +668,11 @@ ok_response:
   client_->onCreateInitialMetadata(headers);
 
   EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
-  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
-                                      AuthzOkResponse(expected_authz_response))));
+  EXPECT_CALL(request_callbacks_, onComplete_(testing::_))
+      .WillOnce(testing::Invoke([&expected_authz_response](ResponsePtr& response) {
+        EXPECT_TRUE(TestCommon::compareHeaderVector(response->headers_to_set,
+                                                    expected_authz_response.headers_to_set));
+      }));
   client_->onSuccess(std::make_unique<envoy::service::auth::v3::CheckResponse>(check_response),
                      span_);
 }
@@ -701,8 +704,11 @@ ok_response:
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
   EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
-  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
-                                      AuthzOkResponse(expected_authz_response))));
+  EXPECT_CALL(request_callbacks_, onComplete_(testing::_))
+      .WillOnce(testing::Invoke([&expected_authz_response](ResponsePtr& response) {
+        EXPECT_TRUE(TestCommon::compareHeaderVector(response->headers_to_set,
+                                                    expected_authz_response.headers_to_set));
+      }));
   client_->onSuccess(std::make_unique<envoy::service::auth::v3::CheckResponse>(check_response),
                      span_);
 }

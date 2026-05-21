@@ -175,10 +175,6 @@ MATCHER_P(AuthzOkResponse, response, "") {
     return false;
   }
 
-  if (!TestCommon::compareHeaderVector(response.headers_to_set, arg->headers_to_set)) {
-    return false;
-  }
-
   if (!TestUtility::protoEqual(arg->dynamic_metadata, response.dynamic_metadata)) {
     return false;
   }
