@@ -1936,8 +1936,7 @@ TEST_F(HostImplTest, HostnameCanaryAndLocality) {
 TEST_F(HostImplTest, EmptyLocalityZoneStatName) {
   MockClusterMockPrioritySet cluster;
   std::unique_ptr<HostImpl> host = *HostImpl::create(
-      cluster.info_, "", *Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
-      nullptr, nullptr, 1,
+      cluster.info_, "", *Network::Utility::resolveUrl("tcp://10.0.0.1:1234"), nullptr, nullptr, 1,
       std::make_shared<const envoy::config::core::v3::Locality>(),
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
       envoy::config::core::v3::UNKNOWN);
