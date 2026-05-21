@@ -24,9 +24,11 @@ public:
 };
 
 template <class T, class ProtoType>
-class UniqueSimpleFilterConfig : public Extensions::HttpFilters::Common::UniqueEmptyHttpDualFilterConfig<ProtoType> {
+class UniqueSimpleFilterConfig
+    : public Extensions::HttpFilters::Common::UniqueEmptyHttpDualFilterConfig<ProtoType> {
 public:
-  UniqueSimpleFilterConfig() : Extensions::HttpFilters::Common::UniqueEmptyHttpDualFilterConfig<ProtoType>(T::name) {}
+  UniqueSimpleFilterConfig()
+      : Extensions::HttpFilters::Common::UniqueEmptyHttpDualFilterConfig<ProtoType>(T::name) {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createDualFilter(const std::string&, Server::Configuration::ServerFactoryContext&) override {

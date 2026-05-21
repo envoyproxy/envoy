@@ -1,8 +1,8 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
-#include "test/integration/filters/test_filters.pb.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 namespace Envoy {
 
@@ -39,8 +39,10 @@ public:
 };
 
 constexpr char DecodeDynamicMetadataFilter::name[];
-static Registry::RegisterFactory<UniqueSimpleFilterConfig<DecodeDynamicMetadataFilter, test::integration::filters::DecodeDynamicMetadataFilterConfig>,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<DecodeDynamicMetadataFilter,
+                             test::integration::filters::DecodeDynamicMetadataFilterConfig>,
+    Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 
 } // namespace Envoy

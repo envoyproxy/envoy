@@ -2,4 +2,5 @@ syntax = "proto3";
 
 package test.mocks.upstream;
 
-message TestRetryPriorityConfig {}
+message TestRetryPriorityConfig {
+}

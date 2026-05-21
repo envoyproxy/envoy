@@ -2,4 +2,5 @@ syntax = "proto3";
 
 package test.extensions.http.header_formatters.preserve_case;
 
-message PreserveCaseFilterConfig {}
+message PreserveCaseFilterConfig {
+}

@@ -1,5 +1,4 @@
 #include <string>
-#include "test/integration/filters/test_filters.pb.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
@@ -8,6 +7,7 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 namespace Envoy {
 
@@ -80,9 +80,13 @@ public:
   }
 };
 
-class AddMetadataStreamFilterConfig : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<test::integration::filters::ResponseMetadataFilterConfig> {
+class AddMetadataStreamFilterConfig
+    : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<
+          test::integration::filters::ResponseMetadataFilterConfig> {
 public:
-  AddMetadataStreamFilterConfig() : UniqueEmptyHttpFilterConfig<test::integration::filters::ResponseMetadataFilterConfig>("response-metadata-filter") {}
+  AddMetadataStreamFilterConfig()
+      : UniqueEmptyHttpFilterConfig<test::integration::filters::ResponseMetadataFilterConfig>(
+            "response-metadata-filter") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&, Server::Configuration::FactoryContext&) override {

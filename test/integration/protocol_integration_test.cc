@@ -4885,8 +4885,9 @@ TEST_P(DownstreamProtocolIntegrationTest, ValidateUpstreamHeaders) {
     autonomous_upstream_ = true;
   }
   useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.prependFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
-                               "\"type.googleapis.com/test.integration.filters.InvalidHeaderFilterConfig\" } }");
+  config_helper_.prependFilter(
+      "{ name: invalid-header-filter, typed_config: { \"@type\": "
+      "\"type.googleapis.com/test.integration.filters.InvalidHeaderFilterConfig\" } }");
 
   initialize();
 
@@ -4914,8 +4915,9 @@ TEST_P(ProtocolIntegrationTest, ValidateUpstreamMixedCaseHeaders) {
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
     testing_upstream_intentionally_ = true;
   }
-  config_helper_.prependFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
-                               "\"type.googleapis.com/test.integration.filters.InvalidHeaderFilterConfig\" } }");
+  config_helper_.prependFilter(
+      "{ name: invalid-header-filter, typed_config: { \"@type\": "
+      "\"type.googleapis.com/test.integration.filters.InvalidHeaderFilterConfig\" } }");
 
   initialize();
 
@@ -4963,8 +4965,9 @@ TEST_P(ProtocolIntegrationTest, ValidateUpstreamHeadersWithOverride) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
 
   config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
-  config_helper_.prependFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
-                               "\"type.googleapis.com/test.integration.filters.InvalidHeaderFilterConfig\" } }");
+  config_helper_.prependFilter(
+      "{ name: invalid-header-filter, typed_config: { \"@type\": "
+      "\"type.googleapis.com/test.integration.filters.InvalidHeaderFilterConfig\" } }");
 
   initialize();
 

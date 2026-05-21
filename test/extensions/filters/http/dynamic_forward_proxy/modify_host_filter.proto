@@ -2,4 +2,5 @@ syntax = "proto3";
 
 package test.extensions.filters.http.dynamic_forward_proxy;
 
-message ModifyHostFilterConfig {}
+message ModifyHostFilterConfig {
+}

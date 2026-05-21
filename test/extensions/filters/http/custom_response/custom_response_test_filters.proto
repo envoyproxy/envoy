@@ -2,5 +2,7 @@ syntax = "proto3";
 
 package test.extensions.filters.http.custom_response;
 
-message LocalReplyDuringDecodeIfNotCerConfig {}
-message LocalReplyDuringEncodeIfNotCerConfig {}
+message LocalReplyDuringDecodeIfNotCerConfig {
+}
+message LocalReplyDuringEncodeIfNotCerConfig {
+}

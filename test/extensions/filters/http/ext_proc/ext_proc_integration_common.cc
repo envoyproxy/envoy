@@ -168,8 +168,9 @@ void ExtProcIntegrationTest::initializeConfig(
 
     // Add dynamic_metadata_to_headers filter to inject dynamic metadata used for testing
     if (config_option.add_response_processor) {
-      simple_filter_config_ =
-          std::make_unique<UniqueSimpleFilterConfig<DynamicMetadataToHeadersFilter, test::extensions::filters::http::ext_proc::DynamicMetadataToHeadersFilterConfig>>();
+      simple_filter_config_ = std::make_unique<UniqueSimpleFilterConfig<
+          DynamicMetadataToHeadersFilter,
+          test::extensions::filters::http::ext_proc::DynamicMetadataToHeadersFilterConfig>>();
       registration_ = std::make_unique<
           Envoy::Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory>>(
           *simple_filter_config_);

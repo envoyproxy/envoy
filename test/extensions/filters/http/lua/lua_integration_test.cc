@@ -5,13 +5,13 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 
+#include "test/extensions/filters/http/lua/lua_test_filter.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
-#include "test/extensions/filters/http/lua/lua_test_filter.pb.h"
 
 using testing::Eq;
 using testing::Ge;

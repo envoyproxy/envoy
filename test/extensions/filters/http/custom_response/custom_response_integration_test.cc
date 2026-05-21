@@ -707,7 +707,10 @@ name: local-reply-during-decode-if-not-cer
 typed_config:
   "@type": type.googleapis.com/test.extensions.filters.http.custom_response.LocalReplyDuringDecodeIfNotCerConfig
 )EOF");
-  UniqueSimpleFilterConfig<LocalReplyDuringDecodeIfNotCER, test::extensions::filters::http::custom_response::LocalReplyDuringDecodeIfNotCerConfig> factory;
+  UniqueSimpleFilterConfig<
+      LocalReplyDuringDecodeIfNotCER,
+      test::extensions::filters::http::custom_response::LocalReplyDuringDecodeIfNotCerConfig>
+      factory;
   Envoy::Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration(
       factory);
   initialize();
@@ -730,7 +733,10 @@ name: local-reply-during-decode-if-not-cer
 typed_config:
   "@type": type.googleapis.com/test.extensions.filters.http.custom_response.LocalReplyDuringDecodeIfNotCerConfig
 )EOF");
-  UniqueSimpleFilterConfig<LocalReplyDuringDecodeIfNotCER, test::extensions::filters::http::custom_response::LocalReplyDuringDecodeIfNotCerConfig> factory;
+  UniqueSimpleFilterConfig<
+      LocalReplyDuringDecodeIfNotCER,
+      test::extensions::filters::http::custom_response::LocalReplyDuringDecodeIfNotCerConfig>
+      factory;
   Envoy::Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration(
       factory);
   // Add route with header matcher

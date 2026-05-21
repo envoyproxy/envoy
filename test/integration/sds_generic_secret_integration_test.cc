@@ -1,5 +1,4 @@
 #include <string>
-#include "test/integration/filters/test_filters.pb.h"
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
@@ -12,6 +11,7 @@
 
 #include "test/config/v2_link_hacks.h"
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
+#include "test/integration/filters/test_filters.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/utility.h"
 #include "test/test_common/registry.h"
@@ -63,9 +63,13 @@ private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_;
 };
 
-class SdsGenericSecretTestFilterConfig : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<test::integration::filters::SdsGenericSecretTestConfig> {
+class SdsGenericSecretTestFilterConfig
+    : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<
+          test::integration::filters::SdsGenericSecretTestConfig> {
 public:
-  SdsGenericSecretTestFilterConfig() : Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<test::integration::filters::SdsGenericSecretTestConfig>("sds-generic-secret-test") {}
+  SdsGenericSecretTestFilterConfig()
+      : Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<
+            test::integration::filters::SdsGenericSecretTestConfig>("sds-generic-secret-test") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&,

@@ -1,4 +1,5 @@
 #include "envoy/config/metrics/v3/stats.pb.h"
+
 #include "test/integration/http_protocol_integration.h"
 
 using testing::HasSubstr;

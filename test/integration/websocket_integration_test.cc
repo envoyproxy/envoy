@@ -362,7 +362,8 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
           name: envoy.filters.http.router
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-        )EOF", *filter_list_back);
+        )EOF",
+                                  *filter_list_back);
       });
   initialize();
 

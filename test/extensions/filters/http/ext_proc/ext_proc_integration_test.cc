@@ -8,8 +8,8 @@
 #include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.h"
 #include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3/mapped_attribute_builder.pb.h"
-#include "envoy/network/address.h"
 #include "envoy/extensions/retry/host/previous_hosts/v3/previous_hosts.pb.h"
+#include "envoy/network/address.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "envoy/type/v3/http_status.pb.h"
 

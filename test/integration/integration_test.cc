@@ -552,7 +552,8 @@ TEST_P(IntegrationTest, RouterRetryOnResetBeforeRequestBeforeHeaders) {
     name: buffer-continue-filter
     typed_config:
       "@type": type.googleapis.com/test.integration.filters.BufferContinueFilterConfig
-  )EOF", false);
+  )EOF",
+                               false);
   testRouterRetryOnResetBeforeRequestBeforeHeaders();
 }
 

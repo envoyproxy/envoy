@@ -2,11 +2,11 @@
 
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
+#include "test/extensions/http/header_formatters/preserve_case/preserve_case_filter.pb.h"
 #include "test/integration/filters/common.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
-#include "test/extensions/http/header_formatters/preserve_case/preserve_case_filter.pb.h"
 
 namespace Envoy {
 namespace {
@@ -105,7 +105,10 @@ public:
     HttpIntegrationTest::initialize();
   }
 
-  UniqueSimpleFilterConfig<PreserveCaseFilter, test::extensions::http::header_formatters::preserve_case::PreserveCaseFilterConfig> factory_;
+  UniqueSimpleFilterConfig<
+      PreserveCaseFilter,
+      test::extensions::http::header_formatters::preserve_case::PreserveCaseFilterConfig>
+      factory_;
   Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration_;
 };
 

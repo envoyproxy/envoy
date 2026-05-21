@@ -2,5 +2,7 @@ syntax = "proto3";
 
 package test.extensions.filters.http.lua;
 
-message TestTypedMetadataFilterConfig {}
-message PPV2TypedMetadataFilterConfig {}
+message TestTypedMetadataFilterConfig {
+}
+message PPV2TypedMetadataFilterConfig {
+}

@@ -94,9 +94,11 @@ private:
 };
 
 template <class ProtoType>
-class UniqueEmptyHttpDualFilterConfig : public UniqueEmptyHttpFilterConfig<ProtoType>, public UpstreamFilterConfig {
+class UniqueEmptyHttpDualFilterConfig : public UniqueEmptyHttpFilterConfig<ProtoType>,
+                                        public UpstreamFilterConfig {
 public:
-  UniqueEmptyHttpDualFilterConfig(const std::string& name) : UniqueEmptyHttpFilterConfig<ProtoType>(name) {}
+  UniqueEmptyHttpDualFilterConfig(const std::string& name)
+      : UniqueEmptyHttpFilterConfig<ProtoType>(name) {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string& stat_prefix,

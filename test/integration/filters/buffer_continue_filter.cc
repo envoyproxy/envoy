@@ -1,5 +1,4 @@
 #include <string>
-#include "test/integration/filters/test_filters.pb.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
@@ -8,6 +7,7 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 namespace Envoy {
 
@@ -55,9 +55,13 @@ private:
   uint64_t data_total_{0};
 };
 
-class BufferContinueFilterConfig : public Extensions::HttpFilters::Common::UniqueEmptyHttpDualFilterConfig<test::integration::filters::BufferContinueFilterConfig> {
+class BufferContinueFilterConfig
+    : public Extensions::HttpFilters::Common::UniqueEmptyHttpDualFilterConfig<
+          test::integration::filters::BufferContinueFilterConfig> {
 public:
-  BufferContinueFilterConfig() : UniqueEmptyHttpDualFilterConfig<test::integration::filters::BufferContinueFilterConfig>("buffer-continue-filter") {}
+  BufferContinueFilterConfig()
+      : UniqueEmptyHttpDualFilterConfig<test::integration::filters::BufferContinueFilterConfig>(
+            "buffer-continue-filter") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createDualFilter(const std::string&, Server::Configuration::ServerFactoryContext&) override {

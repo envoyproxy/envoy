@@ -1,5 +1,4 @@
 #include <chrono>
-#include "test/integration/filters/test_filters.pb.h"
 #include <string>
 
 #include "envoy/event/timer.h"
@@ -13,6 +12,7 @@
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "gtest/gtest.h"
 
@@ -49,8 +49,10 @@ public:
 
 // perform static registration
 constexpr char EncoderRecreateStreamFilter::name[];
-static Registry::RegisterFactory<UniqueSimpleFilterConfig<EncoderRecreateStreamFilter, test::integration::filters::EncoderRecreateStreamFilterConfig>,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<EncoderRecreateStreamFilter,
+                             test::integration::filters::EncoderRecreateStreamFilterConfig>,
+    Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 
 } // namespace Envoy

@@ -343,7 +343,6 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
   config_helper_.renameListener("http");
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
 
-
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {

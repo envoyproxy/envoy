@@ -2,9 +2,10 @@
 
 #include "envoy/upstream/retry.h"
 
+#include "test/mocks/upstream/upstream_mocks.pb.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "test/mocks/upstream/upstream_mocks.pb.h"
 #include "retry_priority.h"
 
 namespace Envoy {

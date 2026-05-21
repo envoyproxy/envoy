@@ -1,5 +1,4 @@
 #include <string>
-#include "test/integration/filters/test_filters.pb.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
@@ -11,6 +10,7 @@
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 namespace Envoy {
 
@@ -73,8 +73,10 @@ private:
 };
 
 constexpr char GoAwayDuringDecoding::name[];
-static Registry::RegisterFactory<UniqueSimpleFilterConfig<GoAwayDuringDecoding, test::integration::filters::SendGoawayFilterConfig>,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<GoAwayDuringDecoding,
+                             test::integration::filters::SendGoawayFilterConfig>,
+    Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 
 } // namespace Envoy

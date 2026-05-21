@@ -1,5 +1,4 @@
 #include <string>
-#include "test/integration/filters/test_filters.pb.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
@@ -8,6 +7,7 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 namespace Envoy {
 
@@ -39,9 +39,12 @@ private:
   bool below_write_buffer_low_watermark_called_{false};
 };
 
-class BackpressureConfig : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<test::integration::filters::BackpressureFilterConfig> {
+class BackpressureConfig : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<
+                               test::integration::filters::BackpressureFilterConfig> {
 public:
-  BackpressureConfig() : UniqueEmptyHttpFilterConfig<test::integration::filters::BackpressureFilterConfig>("backpressure-filter") {}
+  BackpressureConfig()
+      : UniqueEmptyHttpFilterConfig<test::integration::filters::BackpressureFilterConfig>(
+            "backpressure-filter") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&, Server::Configuration::FactoryContext&) override {

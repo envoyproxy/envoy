@@ -4,6 +4,7 @@
 
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/quic/envoy_quic_proof_source_factory_interface.h"
+
 #include "test/extensions/quic/proof_source/pending_proof_source.pb.h"
 
 namespace Envoy {
