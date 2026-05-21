@@ -2,11 +2,10 @@
 
 #include "envoy/network/address.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/common/safe_memcpy.h"
-#include "source/common/network/address_impl.h"
-#include "source/common/network/utility.h"
-#include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
 
+#include "absl/strings/str_cat.h"
 #include "ares.h"
 
 namespace Envoy {
@@ -281,6 +280,12 @@ DnsQueryRecordPtr DnsMessageParser::parseDnsQueryRecord(const Buffer::InstancePt
     return nullptr;
   }
 
+  if (record_name.size() > MAX_NAME_LENGTH) {
+    // Sanity check the parser. This code should not be reachable.
+    IS_ENVOY_BUG(absl::StrCat("Query name is too large: ", record_name.size()));
+    return nullptr;
+  }
+
   // After reading the name we should have data for the record type and class
   if (available_bytes < 2 * sizeof(uint16_t)) {
     ENVOY_LOG(debug,
@@ -501,8 +506,7 @@ void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
       // encoded query names, we should not end up with a non-conforming name here.
       //
       // See Section 2.3.4 of https://tools.ietf.org/html/rfc1035
-      RELEASE_ASSERT(query->name_.size() < MAX_NAME_LENGTH,
-                     "Query name is too large for serialization");
+      ASSERT(query->name_.size() <= MAX_NAME_LENGTH, "Query name is too large for serialization");
 
       // Serialize answer records whose names and types match the query
       if (answer->first == query->name_ && answer->second->type_ == query->type_) {
