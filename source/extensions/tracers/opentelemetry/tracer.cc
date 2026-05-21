@@ -198,17 +198,11 @@ void Span::setTag(const Tracing::Tag& tag, absl::string_view value) {
     setSpanStatusFromHttp(span_, value);
   }
 
-  const auto stability_opt_in = parent_tracer_.otelSemconvStabilityOptIn();
-
-  if (stability_opt_in == envoy::config::trace::v3::OpenTelemetryConfig::UNKNOWN ||
-      stability_opt_in == envoy::config::trace::v3::OpenTelemetryConfig::LEGACY ||
-      stability_opt_in == envoy::config::trace::v3::OpenTelemetryConfig::LEGACY_AND_SEMCONV) {
+  if (parent_tracer_.emitLegacyTags()) {
     setAttribute(tag.name(), value);
   }
 
-  if ((stability_opt_in == envoy::config::trace::v3::OpenTelemetryConfig::SEMCONV ||
-       stability_opt_in == envoy::config::trace::v3::OpenTelemetryConfig::LEGACY_AND_SEMCONV) &&
-      tag.name() != tag.semConvName()) {
+  if (parent_tracer_.emitSemanticConventionTags() && tag.name() != tag.semConvName()) {
     setAttribute(tag.semConvName(), value);
   }
 }
@@ -231,12 +225,16 @@ Tracer::Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_s
                Event::Dispatcher& dispatcher, OpenTelemetryTracerStats tracing_stats,
                const ResourceConstSharedPtr resource, SamplerSharedPtr sampler,
                uint64_t max_cache_size,
-               envoy::config::trace::v3::OpenTelemetryConfig::OtelSemconvStabilityOptIn
+               const envoy::config::trace::v3::OpenTelemetryConfig::OtelSemconvStabilityOptIn&
                    otel_semconv_stability_opt_in)
     : exporter_(std::move(exporter)), time_source_(time_source), random_(random), runtime_(runtime),
       tracing_stats_(tracing_stats), resource_(resource), sampler_(sampler),
       max_cache_size_(max_cache_size),
-      otel_semconv_stability_opt_in_(otel_semconv_stability_opt_in) {
+      emit_legacy_tags_(!otel_semconv_stability_opt_in.has_emit_legacy_tags() ||
+                        otel_semconv_stability_opt_in.emit_legacy_tags().value()),
+      emit_semantic_convention_tags_(
+          otel_semconv_stability_opt_in.has_emit_semantic_convention_tags() &&
+          otel_semconv_stability_opt_in.emit_semantic_convention_tags().value()) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     tracing_stats_.timer_flushed_.inc();
     flushSpans();

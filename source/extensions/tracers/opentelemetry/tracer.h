@@ -41,7 +41,7 @@ public:
          Random::RandomGenerator& random, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
          OpenTelemetryTracerStats tracing_stats, const ResourceConstSharedPtr resource,
          SamplerSharedPtr sampler, uint64_t max_cache_size,
-         envoy::config::trace::v3::OpenTelemetryConfig::OtelSemconvStabilityOptIn
+         const envoy::config::trace::v3::OpenTelemetryConfig::OtelSemconvStabilityOptIn&
              otel_semconv_stability_opt_in);
 
   void sendSpan(::opentelemetry::proto::trace::v1::Span& span);
@@ -58,10 +58,8 @@ public:
                              OptRef<const Tracing::TraceContext> trace_context,
                              OTelSpanKind span_kind);
 
-  envoy::config::trace::v3::OpenTelemetryConfig::OtelSemconvStabilityOptIn
-  otelSemconvStabilityOptIn() const {
-    return otel_semconv_stability_opt_in_;
-  }
+  bool emitLegacyTags() const { return emit_legacy_tags_; }
+  bool emitSemanticConventionTags() const { return emit_semantic_convention_tags_; }
 
 private:
   /**
@@ -83,8 +81,8 @@ private:
   const ResourceConstSharedPtr resource_;
   SamplerSharedPtr sampler_;
   uint64_t max_cache_size_;
-  const envoy::config::trace::v3::OpenTelemetryConfig::OtelSemconvStabilityOptIn
-      otel_semconv_stability_opt_in_;
+  const bool emit_legacy_tags_;
+  const bool emit_semantic_convention_tags_;
 };
 
 /**

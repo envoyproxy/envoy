@@ -70,6 +70,10 @@ public:
    */
   operator absl::string_view() const { return name_; }
 
+  bool operator==(const Tag& other) const {
+    return id_ == other.id_ && name_ == other.name_ && sem_conv_name_ == other.sem_conv_name_;
+  }
+
 private:
   const std::string name_;
   const TagName id_;

@@ -53,7 +53,7 @@ static absl::string_view valueOrDefault(const Http::HeaderEntry* header,
   return (header != nullptr) ? header->value().getStringView() : default_value;
 }
 
-static void addTagIfNotNull(Span& span, absl::string_view tag, const Http::HeaderEntry* entry) {
+static void addTagIfNotNull(Span& span, const Tag& tag, const Http::HeaderEntry* entry) {
   if (entry != nullptr) {
     span.setTag(tag, entry->value().getStringView());
   }

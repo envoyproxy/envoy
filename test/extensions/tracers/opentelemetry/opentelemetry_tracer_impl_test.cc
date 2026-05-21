@@ -1246,8 +1246,9 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithSemanticConventions) {
     grpc_service:
       envoy_grpc:
         cluster_name: fake-cluster
-      timeout: 0.250s
-    otel_semconv_stability_opt_in: SEMCONV
+    otel_semconv_stability_opt_in:
+      emit_legacy_tags: false
+      emit_semantic_convention_tags: true
     )EOF";
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
@@ -1326,8 +1327,9 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithSemanticConventionsDup) {
     grpc_service:
       envoy_grpc:
         cluster_name: fake-cluster
-      timeout: 0.250s
-    otel_semconv_stability_opt_in: LEGACY_AND_SEMCONV
+    otel_semconv_stability_opt_in:
+      emit_legacy_tags: true
+      emit_semantic_convention_tags: true
     )EOF";
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
@@ -1405,8 +1407,9 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithLegacyOptIn) {
     grpc_service:
       envoy_grpc:
         cluster_name: fake-cluster
-      timeout: 0.250s
-    otel_semconv_stability_opt_in: LEGACY
+    otel_semconv_stability_opt_in:
+      emit_legacy_tags: true
+      emit_semantic_convention_tags: false
     )EOF";
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);

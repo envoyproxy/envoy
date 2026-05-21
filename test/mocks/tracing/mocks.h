@@ -37,6 +37,7 @@ public:
   using Span::setTag;
   MOCK_METHOD(void, setOperation, (absl::string_view operation));
   MOCK_METHOD(void, setTag, (absl::string_view name, absl::string_view value));
+  MOCK_METHOD(void, setTag, (const Tag& tag, absl::string_view value));
   MOCK_METHOD(void, log, (SystemTime timestamp, const std::string& event));
   MOCK_METHOD(void, finishSpan, ());
   MOCK_METHOD(void, injectContext,
