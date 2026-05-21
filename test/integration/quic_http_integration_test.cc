@@ -1999,5 +1999,45 @@ TEST_P(QuicHttpIntegrationTest, QuicListenerFilterReceivesFirstPacketWithCmsg) {
   EXPECT_GT(std::stoi(metrics.at(2)), 0);
 }
 
+TEST_P(QuicHttpIntegrationTest, InconsistentContentLengthHeadersOnlyDisabled) {
+  useAccessLog("%RESPONSE_CODE% %RESPONSE_CODE_DETAILS% %RESPONSE_FLAGS%");
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+
+  // Adjust stream idle timeout to 1 second to timeout faster during request hanging.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_stream_idle_timeout()->set_seconds(1); });
+
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.quic_validate_headers_only_content_length", "false");
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},
+      {":path", "/test/long/url"},
+      {":authority", "sni.lyft.com"},
+      {":scheme", "http"},
+      {"content-length", "10"} // Inconsistent content-length
+  };
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  // Since the flag is disabled, Envoy forwards the request to the H1 backend.
+  // The autonomous upstream will receive it, but will hang waiting for the body.
+  // Envoy's stream idle timeout should trigger after 1s and return 504 Gateway Timeout.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("504", response->headers().getStatusValue());
+
+  // Verify access log contains 504 response code, stream_idle_timeout, and SI flag (entry index 0)
+  std::string log = waitForAccessLog(access_log_name_, 0);
+  EXPECT_THAT(log, testing::HasSubstr("504 stream_idle_timeout SI"));
+
+  codec_client_->close();
+}
+
 } // namespace Quic
 } // namespace Envoy
