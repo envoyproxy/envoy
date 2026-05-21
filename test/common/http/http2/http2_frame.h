@@ -265,6 +265,18 @@ public:
   // Headers are directly encoded
   void appendStaticHeader(StaticHeaderIndex index);
   void appendHeaderWithoutIndexing(StaticHeaderIndex index, absl::string_view value);
+  void appendHeaderWithIncrementalIndexing(StaticHeaderIndex index, absl::string_view value) {
+    size_t start_size = data_.size();
+    appendHpackInt(static_cast<uint8_t>(index), 0x3f);
+    data_[start_size] |= 0x40;
+    appendHpackInt(value.size(), 0x7f);
+    appendData(value);
+  }
+  void appendIndexedHeader(uint32_t index) {
+    size_t start_size = data_.size();
+    appendHpackInt(index, 0x7f);
+    data_[start_size] |= 0x80;
+  }
 
 private:
   void buildHeader(Type type, uint32_t payload_size = 0, uint8_t flags = 0, uint32_t stream_id = 0);
