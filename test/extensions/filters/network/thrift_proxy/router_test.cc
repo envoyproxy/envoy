@@ -641,8 +641,8 @@ public:
   Registry::InjectFactory<NamedTransportConfigFactory> transport_register_;
   Registry::InjectFactory<NamedProtocolConfigFactory> protocol_register_;
 
-  std::function<void(MockTransport*)> mock_transport_cb_{};
-  std::function<void(MockProtocol*)> mock_protocol_cb_{};
+  std::function<void(MockTransport*)> mock_transport_cb_;
+  std::function<void(MockProtocol*)> mock_protocol_cb_;
 
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
@@ -657,8 +657,8 @@ public:
   NiceMock<ThriftFilters::MockDecoderFilterCallbacks> callbacks_;
   NiceMock<MockTransport>* transport_{};
   NiceMock<MockProtocol>* protocol_{};
-  std::vector<NiceMock<MockTransport>*> all_transports_{};
-  std::vector<NiceMock<MockProtocol>*> all_protocols_{};
+  std::vector<NiceMock<MockTransport>*> all_transports_;
+  std::vector<NiceMock<MockProtocol>*> all_protocols_;
   int32_t transports_requested_{};
   int32_t protocols_requested_{};
   NiceMock<MockRoute>* route_{};

@@ -26,7 +26,6 @@ public:
       decoder_callbacks_->streamInfo().filterState()->setData(
           Network::Http11ProxyInfoFilterState::key(),
           std::make_unique<Network::Http11ProxyInfoFilterState>(hostname, address),
-          StreamInfo::FilterState::StateType::ReadOnly,
           StreamInfo::FilterState::LifeSpan::FilterChain);
       request_headers.remove(connect_proxy);
     }

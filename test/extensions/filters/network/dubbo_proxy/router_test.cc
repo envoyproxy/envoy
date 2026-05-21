@@ -374,8 +374,8 @@ public:
   Registry::InjectFactory<NamedSerializerConfigFactory> serializer_register_;
   Registry::InjectFactory<NamedProtocolConfigFactory> protocol_register_;
 
-  std::function<void(MockSerializer*)> mock_serializer_cb_{};
-  std::function<void(MockProtocol*)> mock_protocol_cb_{};
+  std::function<void(MockSerializer*)> mock_serializer_cb_;
+  std::function<void(MockProtocol*)> mock_protocol_cb_;
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   NiceMock<Network::MockClientConnection> connection_;

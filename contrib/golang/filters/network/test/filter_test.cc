@@ -89,8 +89,7 @@ TEST_F(FilterTest, FilterState) {
   initialize();
   EXPECT_CALL(*dso_.get(), envoyGoFilterOnDownstreamConnection(_, _, _, _));
   filter_->onNewConnection();
-  filter_->setFilterState("filterStateKey", "filterStateValue",
-                          static_cast<int>(StreamInfo::FilterState::StateType::Mutable),
+  filter_->setFilterState("filterStateKey", "filterStateValue", 0 /* unused state_type */,
                           static_cast<int>(StreamInfo::FilterState::LifeSpan::Connection),
                           static_cast<int>(StreamInfo::StreamSharingMayImpactPooling::None));
   GoString str;

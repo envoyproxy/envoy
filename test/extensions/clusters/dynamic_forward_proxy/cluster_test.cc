@@ -125,10 +125,10 @@ public:
   Upstream::MockLoadBalancerContext* setFilterStateHostAndReturnContext(const std::string& host) {
     StreamInfo::FilterStateSharedPtr filter_state = lb_context_.requestStreamInfo()->filterState();
 
-    filter_state->setData(
-        "envoy.upstream.dynamic_host", std::make_shared<Router::StringAccessorImpl>(host),
-        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection,
-        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+    filter_state->setData("envoy.upstream.dynamic_host",
+                          std::make_shared<Router::StringAccessorImpl>(host),
+                          StreamInfo::FilterState::LifeSpan::Connection,
+                          StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
 
     return &lb_context_;
   }
