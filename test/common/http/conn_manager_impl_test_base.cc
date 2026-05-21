@@ -53,7 +53,6 @@ public:
   absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
     return parent_.maxConnectionDuration();
   }
-  absl::optional<double> drainPercentage() const override { return parent_.drainPercentage(); }
   bool http1SafeMaxConnectionDuration() const override {
     return parent_.http1SafeMaxConnectionDuration();
   }

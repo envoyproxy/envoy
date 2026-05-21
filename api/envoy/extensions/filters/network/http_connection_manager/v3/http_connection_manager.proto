@@ -39,7 +39,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 64]
+// [#next-free-field: 63]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -675,24 +675,6 @@ message HttpConnectionManager {
   // <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration_jitter>`,
   // but applied to the drain grace timer rather than the connection duration timer.
   type.v3.Percent drain_timeout_jitter = 62;
-
-  // When :ref:`max_connection_duration
-  // <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>` fires,
-  // only this percentage of eligible connections are drained in the current round. For the
-  // remaining connections, the connection duration timer is reset (with jitter, if
-  // configured via ``max_connection_duration_jitter``) and they wait for the next round.
-  // This bounds the number of simultaneous reconnects when many long-lived connections share
-  // the same duration limit, by spreading drains across multiple cycles. Must be in the
-  // range [0.0, 100.0].
-  //
-  // * ``100`` (or unset): all connections drain on every round (current behavior).
-  // * ``0``: no connections drain (the duration timer keeps resetting; effectively disables
-  //   ``max_connection_duration``-triggered draining).
-  // * ``25``: roughly 25% of a cohort drains per round; the rest reset.
-  //
-  // Per-connection randomization is used, so the realized fraction is statistical, not exact.
-  // This field is ignored if ``max_connection_duration`` is not set.
-  type.v3.Percent drain_percentage = 63;
 
   // The delayed close timeout is for downstream connections managed by the HTTP connection manager.
   // It is defined as a grace period after connection close processing has been locally initiated

@@ -43,7 +43,6 @@ namespace Http {
   COUNTER(downstream_cx_http3_total)                                                               \
   COUNTER(downstream_cx_idle_timeout)                                                              \
   COUNTER(downstream_cx_max_duration_reached)                                                      \
-  COUNTER(downstream_cx_max_duration_drain_skipped)                                                \
   COUNTER(downstream_cx_max_requests_reached)                                                      \
   COUNTER(downstream_cx_overload_disable_keepalive)                                                \
   COUNTER(downstream_cx_protocol_error)                                                            \
@@ -260,13 +259,6 @@ public:
    *         implementation detail and not exposed as a separate interface method.
    */
   virtual std::chrono::milliseconds drainTimeout() const PURE;
-
-  /**
-   * @return optional drain percentage. When set, only this fraction of connections are drained
-   *         per max_connection_duration cycle; the rest have their duration timer reset and
-   *         wait for the next round. Bounds the number of simultaneous reconnects.
-   */
-  virtual absl::optional<double> drainPercentage() const PURE;
 
   /**
    * @return FilterChainFactory& the HTTP level filter factory to build the connection's filter

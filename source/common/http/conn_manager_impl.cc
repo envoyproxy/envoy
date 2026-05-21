@@ -793,24 +793,6 @@ void ConnectionManagerImpl::onIdleTimeout() {
 void ConnectionManagerImpl::onConnectionDurationTimeout() {
   ENVOY_CONN_LOG(debug, "max connection duration reached", read_callbacks_->connection());
   stats_.named_.downstream_cx_max_duration_reached_.inc();
-  // drain_percentage: only drain this fraction of connections per cycle. For the rest, reset
-  // the duration timer and wait for the next round.
-  // Semantics: 100 (or unset) = drain all (current behavior); 0 = never drain (always reset);
-  // intermediate values give probabilistic per-connection draining.
-  const auto& drain_pct = config_->drainPercentage();
-  if (drain_pct.has_value() && drain_pct.value() < 100 && codec_ &&
-      drain_state_ == DrainState::NotDraining) {
-    // Roll a uniform integer in [0, 99] and drain only when roll < drain_percentage.
-    // the rest reset their timer.
-    const uint64_t roll = random_generator_.random() % 100;
-    if (roll >= static_cast<uint64_t>(drain_pct.value())) {
-      ENVOY_CONN_LOG(debug, "drain_percentage skip: resetting duration timer",
-                     read_callbacks_->connection());
-      stats_.named_.downstream_cx_max_duration_drain_skipped_.inc();
-      connection_duration_timer_->enableTimer(config_->maxConnectionDuration().value());
-      return;
-    }
-  }
   if (!codec_) {
     // Attempt to write out buffered data one last time and issue a local close if successful.
     doConnectionClose(Network::ConnectionCloseType::FlushWrite,

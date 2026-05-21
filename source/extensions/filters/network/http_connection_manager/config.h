@@ -176,7 +176,6 @@ public:
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   bool isRoutable() const override { return true; }
   absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override;
-  absl::optional<double> drainPercentage() const override { return drain_percentage_; }
   bool http1SafeMaxConnectionDuration() const override {
     return http1_safe_max_connection_duration_;
   }
@@ -340,7 +339,6 @@ private:
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
   absl::optional<double> max_connection_duration_jitter_percentage_;
-  absl::optional<double> drain_percentage_;
   const bool http1_safe_max_connection_duration_;
   absl::optional<std::chrono::milliseconds> max_stream_duration_;
   std::chrono::milliseconds stream_idle_timeout_;

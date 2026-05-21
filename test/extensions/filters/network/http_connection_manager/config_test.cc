@@ -1208,51 +1208,6 @@ TEST_F(HttpConnectionManagerConfigTest, DrainTimeoutJitterDefault) {
   EXPECT_EQ(5000, config.drainTimeout().count());
 }
 
-// Validate drain_percentage is parsed from HCM config.
-TEST_F(HttpConnectionManagerConfigTest, DrainPercentage) {
-  const std::string yaml_string = R"EOF(
-  stat_prefix: ingress_http
-  common_http_protocol_options:
-    max_connection_duration: 10s
-  drain_percentage:
-    value: 25.0
-  route_config:
-    name: local_route
-  http_filters:
-  - name: envoy.filters.http.router
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-  )EOF";
-
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
-                                     &scoped_routes_config_provider_manager_, tracer_manager_,
-                                     filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
-  ASSERT_TRUE(config.drainPercentage().has_value());
-  EXPECT_EQ(25.0, config.drainPercentage().value());
-}
-
-// Validate that drain_percentage defaults to unset.
-TEST_F(HttpConnectionManagerConfigTest, DrainPercentageDefault) {
-  const std::string yaml_string = R"EOF(
-  stat_prefix: ingress_http
-  route_config:
-    name: local_route
-  http_filters:
-  - name: envoy.filters.http.router
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-  )EOF";
-
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
-                                     &scoped_routes_config_provider_manager_, tracer_manager_,
-                                     filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
-  EXPECT_FALSE(config.drainPercentage().has_value());
-}
-
 // Validate that idle_timeout set in common_http_protocol_options is used.
 TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeout) {
   const std::string yaml_string = R"EOF(

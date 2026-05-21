@@ -145,7 +145,6 @@ public:
     }
     return duration;
   }
-  absl::optional<double> drainPercentage() const override { return drain_percentage_; }
   bool http1SafeMaxConnectionDuration() const override {
     return http1_safe_max_connection_duration_;
   }
@@ -327,7 +326,6 @@ public:
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
   absl::optional<double> max_connection_duration_jitter_percentage_;
-  absl::optional<double> drain_percentage_;
   absl::optional<double> drain_timeout_jitter_percentage_;
   bool http1_safe_max_connection_duration_{false};
   std::chrono::milliseconds stream_idle_timeout_{};
