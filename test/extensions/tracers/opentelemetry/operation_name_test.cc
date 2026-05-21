@@ -22,7 +22,7 @@ public:
 protected:
   NiceMock<Tracing::MockConfig> config;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  Tracing::TestTraceContextImpl trace_context{};
+  Tracing::TestTraceContextImpl trace_context;
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
 };

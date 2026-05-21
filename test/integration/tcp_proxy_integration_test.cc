@@ -2017,8 +2017,9 @@ TEST_P(TcpProxyReceiveBeforeConnectIntegrationTest, UpstreamBufferHighWatermark)
 
   config_helper_.setBufferLimits(upstream_buffer_limit, downstream_buffer_limit);
   std::string data;
-  for (uint32_t i = 0; i < data_size / 4; i++)
+  for (uint32_t i = 0; i < data_size / 4; i++) {
     data += "abcd";
+  }
 
   initialize();
   FakeRawConnectionPtr fake_upstream_connection;

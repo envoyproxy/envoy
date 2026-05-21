@@ -33,7 +33,7 @@ namespace {
 using ResponseValidator = Utils::DnsResponseValidator;
 
 Api::IoCallUint64Result makeNoError(uint64_t rc) {
-  return Api::IoCallUint64Result(rc, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+  return {rc, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 }
 
 // Test access logger that captures formatted output using DNS custom commands

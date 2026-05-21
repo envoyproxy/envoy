@@ -96,3 +96,5 @@ areas:
     title: tls
   wasm:
     title: wasm
+  dns:
+    title: dns

@@ -2610,8 +2610,8 @@ TEST_P(TcpProxyTest, SetDynamicTLVWithStartTime) {
   const std::string timestamp_value(tlvs[0].value.begin(), tlvs[0].value.end());
   EXPECT_FALSE(timestamp_value.empty());
   // Should contain date-like characters.
-  EXPECT_TRUE(timestamp_value.find("-") != std::string::npos ||
-              timestamp_value.find(":") != std::string::npos);
+  EXPECT_TRUE(timestamp_value.find('-') != std::string::npos ||
+              timestamp_value.find(':') != std::string::npos);
 }
 
 // Test buffer overflow behavior - should only readDisable, not re-trigger connection.

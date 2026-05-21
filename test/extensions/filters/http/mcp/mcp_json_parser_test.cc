@@ -17,8 +17,6 @@ namespace Mcp {
 namespace {
 
 using ::testing::HasSubstr;
-using ::testing::IsEmpty;
-using ::testing::Not;
 using namespace Filters::Common::Mcp::McpConstants;
 
 class McpJsonParserTest : public testing::Test {

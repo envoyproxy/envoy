@@ -18,8 +18,8 @@ namespace Envoy {
 struct StreamTee {
   virtual ~StreamTee() = default;
   mutable absl::Mutex mutex_;
-  Buffer::OwnedImpl request_body_ ABSL_GUARDED_BY(mutex_){};
-  Buffer::OwnedImpl response_body_ ABSL_GUARDED_BY(mutex_){};
+  Buffer::OwnedImpl request_body_ ABSL_GUARDED_BY(mutex_);
+  Buffer::OwnedImpl response_body_ ABSL_GUARDED_BY(mutex_);
   bool decode_end_stream_ ABSL_GUARDED_BY(mutex_){false};
   bool encode_end_stream_ ABSL_GUARDED_BY(mutex_){false};
   Http::RequestHeaderMapPtr request_headers_ ABSL_GUARDED_BY(mutex_){nullptr};

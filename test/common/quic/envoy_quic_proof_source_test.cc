@@ -236,7 +236,7 @@ public:
     }
     ASSERT_TRUE(secret_update_callback_ != nullptr);
     absl::Status callback_status = secret_update_callback_();
-    THROW_IF_NOT_OK(callback_status);
+    THROW_IF_NOT_OK_REF(callback_status);
     ASSERT_TRUE(callback_status.ok());
   }
 
