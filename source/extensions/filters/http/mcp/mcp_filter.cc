@@ -428,7 +428,7 @@ Http::FilterDataStatus McpFilter::completeParsing() {
       ENVOY_LOG(debug, "MCP filter set dynamic metadata: {}", metadata.DebugString());
     }
 
-    if (config_->clearRouteCache() && has_metadata) {
+    if (config_->clearRouteCache()) {
       if (auto cb = decoder_callbacks_->downstreamCallbacks(); cb.has_value()) {
         cb->clearRouteCache();
         ENVOY_LOG(debug, "MCP filter cleared route cache for metadata-based routing");
