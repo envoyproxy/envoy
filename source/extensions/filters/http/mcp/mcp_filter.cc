@@ -116,7 +116,12 @@ McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3
       parser_config_(proto_config.has_parser_config()
                          ? McpParserConfig::fromProto(proto_config.parser_config())
                          : McpParserConfig::createDefault()),
-      stats_(generateStats(stats_prefix, scope)) {}
+      stats_(generateStats(stats_prefix, scope)) {
+
+  parser_config_.setRejectDuplicateKeys(proto_config.has_reject_duplicate_keys()
+                                            ? proto_config.reject_duplicate_keys().value()
+                                            : true); // Default: reject duplicate keys
+}
 
 bool McpFilter::isValidMcpDeleteRequest(const Http::RequestHeaderMap& headers) const {
   // DELETE is only meaningful for MCP session termination when MCP-Session-Id is present.
@@ -298,7 +303,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
       bytes_parsed_ += len;
 
       if (parser_->isAllFieldsCollected()) {
-        ENVOY_LOG(debug, "mcp early parse termination: found all fields");
+        ENVOY_LOG(debug, "mcp parse complete: found all fields");
         return completeParsing();
       }
 
@@ -318,10 +323,19 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
   // If we are here, we haven't collected all fields yet.
   bool size_limit_hit = (max_size > 0 && bytes_parsed_ == max_size);
   if (end_stream || size_limit_hit) {
+    if (size_limit_hit) {
+      is_exceeding_limit_ = true;
+    }
     auto final_status = parser_->finishParse();
     if (!final_status.ok()) {
-      if (size_limit_hit && parser_->hasOptionalFields() && parser_->hasAllRequiredFields()) {
-        ENVOY_LOG(debug, "size limit hit before optional fields; proceeding with partial parse");
+      if (size_limit_hit && parser_->hasAllRequiredFields()) {
+        // Required fields found within limit — proceed with partial marker
+        ENVOY_LOG(debug, "size limit hit but required fields found with full body");
+        return completeParsing();
+      }
+      if (size_limit_hit && !shouldRejectRequest()) {
+        // PASS_THROUGH mode: allow even if incomplete, mark as partial
+        ENVOY_LOG(debug, "size limit hit in PASS_THROUGH mode; proceeding with partial parse");
         return completeParsing();
       }
       config_->stats().body_too_large_.inc();
@@ -348,6 +362,15 @@ Http::FilterDataStatus McpFilter::completeParsing() {
   is_mcp_request_ = parser_->isValidMcpRequest();
 
   ENVOY_LOG(debug, "parsing complete: is_mcp={}, bytes_parsed={}", is_mcp_request_, bytes_parsed_);
+
+  // Check for duplicate keys — reject if configured (default: reject)
+  if (parser_->hasDuplicateKeys() && config_->rejectDuplicateKeys()) {
+    ENVOY_LOG(warn, "rejecting request with duplicate JSON keys");
+    config_->stats().duplicate_keys_rejected_.inc();
+    decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "duplicate JSON keys detected",
+                                       nullptr, absl::nullopt, "mcp_filter_duplicate_keys");
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
 
   if (!is_mcp_request_ && shouldRejectRequest()) {
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,

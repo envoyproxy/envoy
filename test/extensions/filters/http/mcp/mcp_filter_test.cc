@@ -406,6 +406,7 @@ TEST_F(McpFilterTest, RequestBodyExceedingLimitContinues) {
 TEST_F(McpFilterTest, RequestBodyExceedingLimitRejectWhenNotEnoughData) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.mutable_max_request_body_size()->set_value(20); // Very small limit
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
   config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
   filter_ = std::make_unique<McpFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -542,10 +543,9 @@ TEST_F(McpFilterTest, OptionalMetaFieldExtractedWithPartialParsing) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
-// Test that chunk-by-chunk parsing does NOT trigger early stop when optional fields
-// (like params._meta) are configured. The parser should continue buffering to look
-// for optional fields even after all required fields are found.
-TEST_F(McpFilterTest, ChunkByChunkParsingNoEarlyStopWithOptionalFields) {
+// Test that chunk-by-chunk parsing continues buffering when optional fields
+// (like params._meta) are configured, even after all required fields are found.
+TEST_F(McpFilterTest, ChunkByChunkParsingWithOptionalFields) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
 
   auto* parser_config = proto_config.mutable_parser_config();
@@ -571,7 +571,7 @@ TEST_F(McpFilterTest, ChunkByChunkParsingNoEarlyStopWithOptionalFields) {
       R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "mytool", )";
   Buffer::OwnedImpl buffer1(chunk1);
 
-  // Should NOT early stop - must continue buffering to look for optional _meta
+  // Should continue buffering — root object hasn't closed yet
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer1, false));
 
   // Second chunk: contains _meta
@@ -701,7 +701,7 @@ TEST_F(McpFilterTest, BufferLimitNotSetWhenDisabled) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
-// Test body size check in PASS_THROUGH mode - reject when required fields are beyond the limit
+// Test body size check in PASS_THROUGH mode - allows request with is_exceeding_limit marker
 TEST_F(McpFilterTest, BodySizeLimitInPassThroughMode) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
@@ -718,16 +718,16 @@ TEST_F(McpFilterTest, BodySizeLimitInPassThroughMode) {
   EXPECT_CALL(decoder_callbacks_, setBufferLimit(50));
   filter_->decodeHeaders(headers, false);
 
-  // JSON body with required fields (jsonrpc, method, id) in the first 50 bytes.
+  // JSON body that exceeds 50-byte limit.
   std::string json =
       R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value with lots of data"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
 
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Http::Code::BadRequest,
-                             "reached end_stream or configured body size, don't get enough data.",
-                             _, _, _));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+  // In PASS_THROUGH mode, request is allowed through with is_exceeding_limit marker
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
 // Test route cache is NOT cleared by default when metadata is set
@@ -895,7 +895,7 @@ TEST_F(McpFilterTest, PartialValidJsonBuffers) {
   filter_->decodeHeaders(headers, false);
 
   // Send partial JSON with a method that requires params (tools/call requires params.name)
-  // This ensures early stop is not triggered immediately.
+  // Root object hasn't closed yet, so parsing continues.
   std::string json = R"({"jsonrpc": "2.0", "method": "tools/call")";
   Buffer::OwnedImpl buffer(json);
 
@@ -903,8 +903,8 @@ TEST_F(McpFilterTest, PartialValidJsonBuffers) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer, false));
 }
 
-// Test that non-JSON-RPC JSON stops buffering immediately after root object closes
-TEST_F(McpFilterTest, NonMcpJsonEarlyStopInPassThroughMode) {
+// Test that non-JSON-RPC JSON completes parsing after root object closes
+TEST_F(McpFilterTest, NonMcpJsonCompletesInPassThroughMode) {
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {"content-type", "application/json"},
                                          {"accept", "application/json"},
@@ -920,8 +920,8 @@ TEST_F(McpFilterTest, NonMcpJsonEarlyStopInPassThroughMode) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
 }
 
-// Test multi-chunk non-MCP JSON.
-TEST_F(McpFilterTest, NonMcpJsonMultiChunkEarlyStop) {
+// Test multi-chunk non-MCP JSON completes after root closes.
+TEST_F(McpFilterTest, NonMcpJsonMultiChunkCompletion) {
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {"content-type", "application/json"},
                                          {"accept", "application/json"},
@@ -938,8 +938,8 @@ TEST_F(McpFilterTest, NonMcpJsonMultiChunkEarlyStop) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer2, false));
 }
 
-// Test that non-MCP JSON is rejected early in REJECT_NO_MCP mode after root closes.
-TEST_F(McpFilterTest, NonMcpJsonEarlyStopInRejectMode) {
+// Test that non-MCP JSON is rejected in REJECT_NO_MCP mode after root closes.
+TEST_F(McpFilterTest, NonMcpJsonRejectedInRejectMode) {
   setupRejectMode();
 
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
