@@ -46,7 +46,6 @@ static void bmGetOrCreateEnvoyAddressInstanceNoCache(benchmark::State& state) {
   std::vector<sockaddr_storage> addresses = Test::getSockAddrSampleAddresses(/*count=*/4);
   IoSocketHandleImplTestWrapper wrapper(/*cache_size=*/0);
   for (auto _ : state) {
-    benchmark::DoNotOptimize(_);
     for (int i = 0; i < 50; ++i) {
       benchmark::DoNotOptimize(wrapper.getOrCreateEnvoyAddressInstances(addresses[0]));
       benchmark::DoNotOptimize(wrapper.getOrCreateEnvoyAddressInstances(addresses[1]));
@@ -59,7 +58,6 @@ static void bmGetOrCreateEnvoyAddressInstanceConnectedSocket(benchmark::State& s
   std::vector<sockaddr_storage> addresses = Test::getSockAddrSampleAddresses(/*count=*/4);
   IoSocketHandleImplTestWrapper wrapper(/*cache_size=*/4);
   for (auto _ : state) {
-    benchmark::DoNotOptimize(_);
     for (int i = 0; i < 50; ++i) {
       benchmark::DoNotOptimize(wrapper.getOrCreateEnvoyAddressInstances(addresses[0]));
       benchmark::DoNotOptimize(wrapper.getOrCreateEnvoyAddressInstances(addresses[1]));
@@ -72,7 +70,6 @@ static void bmGetOrCreateEnvoyAddressInstanceUnconnectedSocket(benchmark::State&
   std::vector<sockaddr_storage> addresses = Test::getSockAddrSampleAddresses(/*count=*/100);
   IoSocketHandleImplTestWrapper wrapper(/*cache_size=*/4);
   for (auto _ : state) {
-    benchmark::DoNotOptimize(_);
     for (const sockaddr_storage& ss : addresses) {
       benchmark::DoNotOptimize(wrapper.getOrCreateEnvoyAddressInstances(ss));
     }
@@ -84,7 +81,6 @@ static void bmGetOrCreateEnvoyAddressInstanceUnconnectedSocketLargerCache(benchm
   std::vector<sockaddr_storage> addresses = Test::getSockAddrSampleAddresses(/*count=*/100);
   IoSocketHandleImplTestWrapper wrapper(/*cache_size=*/50);
   for (auto _ : state) {
-    benchmark::DoNotOptimize(_);
     for (const sockaddr_storage& ss : addresses) {
       benchmark::DoNotOptimize(wrapper.getOrCreateEnvoyAddressInstances(ss));
     }

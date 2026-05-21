@@ -94,6 +94,7 @@ protected:
       cache_->clear();
     }
     for (bool i : in_cache) {
+      const bool _ = i;
       assert(!i);
     }
   }
