@@ -880,5 +880,27 @@ TEST_F(EnvoyQuicClientStreamTest, ResetStreamWithHttpDatagramHandler) {
 
 #endif
 
+TEST_F(EnvoyQuicClientStreamTest, InconsistentContentLengthHeadersOnly) {
+  const auto result = quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/true);
+  EXPECT_TRUE(result.ok());
+
+  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
+      .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& headers, bool) {
+        EXPECT_EQ("200", headers->getStatusValue());
+      }));
+  EXPECT_CALL(stream_decoder_, decodeData(_, _)).Times(0);
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::ProtocolError, _));
+
+  spdy_response_headers_["content-length"] = "10"; // Non-zero content-length
+
+  std::string payload = spdyHeaderToHttp3StreamPayload(spdy_response_headers_);
+  quic::QuicStreamFrame frame(stream_id_, true, 0, payload); // fin = true
+  quic_stream_->OnStreamFrame(frame);
+
+  EXPECT_TRUE(quic_stream_->rst_sent());
+  EXPECT_EQ(Http3ResponseCodeDetailValues::inconsistent_content_length,
+            quic_stream_->responseDetails());
+}
+
 } // namespace Quic
 } // namespace Envoy
