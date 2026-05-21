@@ -701,11 +701,13 @@ TEST_F(McpFilterTest, BufferLimitNotSetWhenDisabled) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
-// Test body size check in PASS_THROUGH mode - allows request with is_exceeding_limit marker
+// Test body size check in PASS_THROUGH mode - allows request through and verifies
+// dynamic metadata contains is_exceeding_limit, is_mcp_request, and parsed fields.
 TEST_F(McpFilterTest, BodySizeLimitInPassThroughMode) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
-  proto_config.mutable_max_request_body_size()->set_value(50); // Small limit
+  // Set limit so that jsonrpc, method, and params.name are parsed but the full body exceeds it.
+  proto_config.mutable_max_request_body_size()->set_value(80);
   config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
   filter_ = std::make_unique<McpFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -715,19 +717,39 @@ TEST_F(McpFilterTest, BodySizeLimitInPassThroughMode) {
                                          {"accept", "application/json"},
                                          {"accept", "text/event-stream"}};
 
-  EXPECT_CALL(decoder_callbacks_, setBufferLimit(50));
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(80));
   filter_->decodeHeaders(headers, false);
 
-  // JSON body that exceeds 50-byte limit.
+  // JSON body exceeds 80-byte limit. First 80 bytes cover jsonrpc, method, and params.name.
   std::string json =
-      R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value with lots of data"}, "id": 1})";
+      R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "calculator"}, "id": 1, "extra": "data"})";
   Buffer::OwnedImpl buffer(json);
 
-  // In PASS_THROUGH mode, request is allowed through with is_exceeding_limit marker
+  // In PASS_THROUGH mode, request is allowed through (no rejection).
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _));
+  Protobuf::Struct captured_metadata;
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce(testing::SaveArg<1>(&captured_metadata));
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  // Verify dynamic metadata contents.
+  const auto& fields = captured_metadata.fields();
+
+  // is_exceeding_limit must be true — body exceeded configured max.
+  auto limit_it = fields.find(std::string(IS_EXCEEDING_LIMIT));
+  ASSERT_NE(limit_it, fields.end());
+  EXPECT_TRUE(limit_it->second.bool_value());
+
+  // is_mcp_request should be true — jsonrpc + method were within the limit.
+  auto mcp_it = fields.find(std::string(IS_MCP_REQUEST));
+  ASSERT_NE(mcp_it, fields.end());
+  EXPECT_TRUE(mcp_it->second.bool_value());
+
+  // method should be extracted (within the 80-byte limit).
+  auto method_it = fields.find("method");
+  ASSERT_NE(method_it, fields.end());
+  EXPECT_EQ(method_it->second.string_value(), "tools/call");
 }
 
 // Test route cache is NOT cleared by default when metadata is set
