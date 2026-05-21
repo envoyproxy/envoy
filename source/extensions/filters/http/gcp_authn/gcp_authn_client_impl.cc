@@ -37,7 +37,7 @@ Http::RequestMessagePtr buildRequest(absl::string_view url) {
 } // namespace
 
 void GcpAuthnClientImpl::fetchToken(
-    const envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest& token_request,
+    const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
     GcpAuthnClient::Callbacks& callbacks) {
   // Cancel any active requests.
   cancel();
@@ -74,7 +74,7 @@ void GcpAuthnClientImpl::fetchToken(
   }
 
   std::string final_url =
-      absl::StrReplaceAll(UrlString, {{"[AUDIENCE]", token_request.jwt().audience()}});
+      absl::StrReplaceAll(UrlString, {{"[AUDIENCE]", audience.url()}});
   active_request_ =
       thread_local_cluster->httpAsyncClient().send(buildRequest(final_url), *this, options);
 }

@@ -184,61 +184,9 @@ TEST_F(GcpAuthnFilterTest, DestroyFilter) {
   EXPECT_EQ(filter_->state(), GcpAuthnFilter::State::Complete);
 }
 
-TEST_F(GcpAuthnFilterTest, GcpTokenRequestSuccess) {
-  setupMockObjects();
-  setupFilterAndCallback();
 
-  // Set up new mock filter metadata using GcpTokenRequest.
-  cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_));
 
-  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
-  token_request.mutable_jwt()->set_audience("test_audience_new");
-
-  (*metadata_
-        .mutable_typed_filter_metadata())[std::string(
-                                              Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-      .PackFrom(token_request);
-  ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
-
-  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
-            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
-
-  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
-      {":status", "200"},
-  }));
-  Envoy::Http::ResponseMessagePtr response(
-      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
-  response->body().add(std::string(GoodTokenStr));
-
-  EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  client_callback_->onSuccess(client_request_, std::move(response));
-}
-
-TEST_F(GcpAuthnFilterTest, GcpTokenRequestPgvValidationFailed) {
-  setupMockObjects();
-  setupFilterAndCallback();
-
-  // Set up mock filter metadata using an invalid GcpTokenRequest (audience is empty, violating
-  // min_len: 1).
-  cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_));
-
-  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
-  token_request.mutable_jwt()->set_audience(""); // empty, invalid!
-
-  (*metadata_
-        .mutable_typed_filter_metadata())[std::string(
-                                              Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-      .PackFrom(token_request);
-  ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
-
-  // The filter should fail validation, log, fail open, and return Continue.
-  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true), Http::FilterHeadersStatus::Continue);
-  EXPECT_EQ(filter_->stats().retrieve_audience_failed_.value(), 1);
-}
-
-TEST_F(GcpAuthnFilterTest, GcpTokenRequestInvalidType) {
+TEST_F(GcpAuthnFilterTest, AudienceInvalidType) {
   setupMockObjects();
   setupFilterAndCallback();
 
@@ -255,7 +203,7 @@ TEST_F(GcpAuthnFilterTest, GcpTokenRequestInvalidType) {
       .PackFrom(invalid_proto);
   ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
 
-  // The filter should fail to unpack both types, return nullopt, fail open, and return Continue.
+  // The filter should fail to unpack, return nullopt, fail open, and return Continue.
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true), Http::FilterHeadersStatus::Continue);
   EXPECT_EQ(filter_->stats().retrieve_audience_failed_.value(), 1);
 }
@@ -285,8 +233,8 @@ TEST_F(GcpAuthnFilterTest, CacheHit) {
   TokenCacheImpl cache(cache_config, context_.serverFactoryContext().timeSource());
 
   // Populate the cache directly with a valid token.
-  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
-  token_request.mutable_jwt()->set_audience("test");
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.set_url("test");
 
   // Expiration in the future so the cache hit is valid.
   uint64_t far_future_exp =
@@ -294,7 +242,7 @@ TEST_F(GcpAuthnFilterTest, CacheHit) {
   auto token = std::make_unique<GcpToken>();
   token->token = "cached_token";
   token->expires_at = far_future_exp;
-  cache.insert(token_request, std::move(token));
+  cache.insert(audience, std::move(token));
 
   setupFilterAndCallback(&cache);
 
@@ -335,9 +283,9 @@ TEST_F(GcpAuthnFilterTest, CacheMissAndInsert) {
 
   // After fetch completes, the token must be automatically inserted into the cache!
   // Verify by performing a lookup in the cache and asserting it is found!
-  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
-  token_request.mutable_jwt()->set_audience("test");
-  auto cached_val = cache.lookUp(token_request);
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.set_url("test");
+  auto cached_val = cache.lookUp(audience);
   EXPECT_TRUE(cached_val.has_value());
   EXPECT_EQ(cached_val.value(), std::string(GoodTokenStr));
 }

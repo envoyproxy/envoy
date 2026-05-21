@@ -77,7 +77,7 @@ private:
 
   bool initiating_call_{};
   State state_{State::NotStarted};
-  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request_;
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience_;
   // This cache is optional (it will be nullptr if no cache configuration) and not owned by the
   // filter (thread local storage).
   TokenCacheImpl* jwt_token_cache_;

@@ -47,36 +47,36 @@ public:
 
 TEST_F(TokenCacheTest, ValidToken) {
   EXPECT_EQ(token_cache_->capacity(), 100);
-  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
-  token_request.mutable_jwt()->set_audience("http://example_service");
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.set_url("http://example_service");
 
   auto token = std::make_unique<GcpToken>();
   token->token = "foo";
   token->expires_at = ExpTime;
 
-  token_cache_->insert(token_request, std::move(token));
-  auto found_token = token_cache_->lookUp(token_request);
+  token_cache_->insert(audience, std::move(token));
+  auto found_token = token_cache_->lookUp(audience);
   EXPECT_TRUE(found_token.has_value());
   EXPECT_EQ(found_token.value(), "foo");
 }
 
 TEST_F(TokenCacheTest, ExpiredToken) {
-  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
-  token_request.mutable_jwt()->set_audience("http://example_service");
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.set_url("http://example_service");
 
   auto token = std::make_unique<GcpToken>();
   token->token = "foo";
   token->expires_at = 1205005587; // Sat Mar 08 2008 14:46:27 GMT-0500
 
-  token_cache_->insert(token_request, std::move(token));
-  auto found_token = token_cache_->lookUp(token_request);
+  token_cache_->insert(audience, std::move(token));
+  auto found_token = token_cache_->lookUp(audience);
   EXPECT_FALSE(found_token.has_value());
 }
 
 // Test the token with the clock skew.
 TEST_F(TokenCacheTest, TokenWithClockSkew) {
-  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
-  token_request.mutable_jwt()->set_audience("http://example_service");
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.set_url("http://example_service");
 
   // Set the time to exp_time + 1s.
   // i.e., The expiration time in the token is Sun May 29 2033 13:36:41 GMT and the time we
@@ -88,8 +88,8 @@ TEST_F(TokenCacheTest, TokenWithClockSkew) {
   token->token = "foo";
   token->expires_at = ExpTime;
 
-  token_cache_->insert(token_request, std::move(token));
-  auto found_token = token_cache_->lookUp(token_request);
+  token_cache_->insert(audience, std::move(token));
+  auto found_token = token_cache_->lookUp(audience);
   EXPECT_FALSE(found_token.has_value());
 
   // Set the time to exp_time - 1s.
@@ -98,27 +98,27 @@ TEST_F(TokenCacheTest, TokenWithClockSkew) {
   token2->token = "foo";
   token2->expires_at = ExpTime;
 
-  token_cache_->insert(token_request, std::move(token2));
-  found_token = token_cache_->lookUp(token_request);
+  token_cache_->insert(audience, std::move(token2));
+  found_token = token_cache_->lookUp(audience);
   EXPECT_TRUE(found_token.has_value());
   EXPECT_EQ(found_token.value(), "foo");
 }
 
 TEST_F(TokenCacheTest, TokenWithoutExpiration) {
-  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest token_request;
-  token_request.mutable_jwt()->set_audience("http://example_service");
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.set_url("http://example_service");
 
   auto token = std::make_unique<GcpToken>();
   token->token = "foo";
   token->expires_at = 0; // 0 indicates no expiration
 
-  token_cache_->insert(token_request, std::move(token));
+  token_cache_->insert(audience, std::move(token));
 
   // Advance the simulated clock by a huge amount (e.g. 10 years)
   time_system_.setSystemTime(std::chrono::system_clock::from_time_t(ExpTime + 315360000));
 
   // The lookup should still find the token since it has no expiration!
-  auto found_token = token_cache_->lookUp(token_request);
+  auto found_token = token_cache_->lookUp(audience);
   EXPECT_TRUE(found_token.has_value());
   EXPECT_EQ(found_token.value(), "foo");
 }
@@ -129,12 +129,12 @@ TEST_F(TokenCacheTest, LruEviction) {
   config.mutable_cache_size()->set_value(2);
   auto small_cache = std::make_unique<TokenCacheImpl>(config, time_system_);
 
-  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest req1;
-  req1.mutable_jwt()->set_audience("http://service1");
-  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest req2;
-  req2.mutable_jwt()->set_audience("http://service2");
-  envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest req3;
-  req3.mutable_jwt()->set_audience("http://service3");
+  envoy::extensions::filters::http::gcp_authn::v3::Audience req1;
+  req1.set_url("http://service1");
+  envoy::extensions::filters::http::gcp_authn::v3::Audience req2;
+  req2.set_url("http://service2");
+  envoy::extensions::filters::http::gcp_authn::v3::Audience req3;
+  req3.set_url("http://service3");
 
   // Insert first two entries.
   auto t1 = std::make_unique<GcpToken>();

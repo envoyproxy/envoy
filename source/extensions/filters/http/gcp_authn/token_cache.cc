@@ -8,8 +8,8 @@ namespace HttpFilters {
 namespace GcpAuthn {
 
 absl::optional<std::string> TokenCacheImpl::lookUp(
-    const envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest& token_request) {
-  uint64_t key = MessageUtil::hash(token_request);
+    const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience) {
+  uint64_t key = MessageUtil::hash(audience);
   typename LRUCache::ScopedLookup lookup(&lru_cache_, key);
   if (lookup.found()) {
     GcpToken* const found_token = lookup.value();
@@ -29,9 +29,9 @@ absl::optional<std::string> TokenCacheImpl::lookUp(
 }
 
 void TokenCacheImpl::insert(
-    const envoy::extensions::filters::http::gcp_authn::v3::GcpTokenRequest& token_request,
+    const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
     std::unique_ptr<GcpToken> token) {
-  uint64_t key = MessageUtil::hash(token_request);
+  uint64_t key = MessageUtil::hash(audience);
   // Release the token to transfer the ownership.
   lru_cache_.insert(key, token.release(), 1);
 }
