@@ -101,7 +101,7 @@ message Endpoint {
 
   // Optional alternative stat name for this endpoint. If not specified, the main address will be used
   // as the stat name and be extracted as ``envoy.endpoint_address`` tag value in generated stats.
-  // If specified, the ``stat_name`` here will be used to replace the main address.
+  // If specified, the ``observability_name`` here will be used to replace the main address.
   //
   // .. note::
   //
