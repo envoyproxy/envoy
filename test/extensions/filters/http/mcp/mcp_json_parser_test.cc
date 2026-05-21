@@ -387,8 +387,12 @@ TEST_F(McpJsonParserTest, PartialParsingEscapeSequence) {
 
   auto status = parser_->parse(json1);
 
-  // Parse fails due to incomplete escape sequence (invalid JSON)
-  EXPECT_FALSE(status.ok());
+  // In streaming mode, Parse() of a partial chunk succeeds because it expects more data.
+  EXPECT_OK(status);
+
+  // The parsing fails on finishParse() due to the incomplete escape sequence.
+  auto finish_status = parser_->finishParse();
+  EXPECT_FALSE(finish_status.ok());
   EXPECT_TRUE(parser_->isValidMcpRequest());
 }
 
