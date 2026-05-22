@@ -40,10 +40,11 @@ public:
   // it or has completed.
   enum class State { NotStarted, Calling, Complete };
 
-  GcpAuthnFilter(const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config,
-                 absl::optional<std::string> client_cert_fingerprint,
-                 Server::Configuration::FactoryContext& context, const std::string& stats_prefix,
-                 TokenCacheImpl<JwtToken>* token_cache)
+  GcpAuthnFilter(
+      const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config,
+      absl::optional<std::string> client_cert_fingerprint,
+      Server::Configuration::FactoryContext& context, const std::string& stats_prefix,
+      TokenCacheImpl<JwtToken>* token_cache)
       : config_(config), context_(context),
         client_(std::make_unique<GcpAuthnClientImpl>(config_, context_)),
         stats_(generateStats(stats_prefix, context_.scope())),
@@ -58,7 +59,9 @@ public:
 
   State state() { return state_; }
   GcpAuthnFilterStats& stats() { return stats_; }
-  const absl::optional<std::string>& clientCertFingerprintForTest() const { return client_cert_fingerprint_; }
+  const absl::optional<std::string>& clientCertFingerprintForTest() const {
+    return client_cert_fingerprint_;
+  }
 
   ~GcpAuthnFilter() override = default;
 

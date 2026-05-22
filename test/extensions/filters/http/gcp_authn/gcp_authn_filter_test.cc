@@ -1,16 +1,16 @@
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "source/common/http/header_map_impl.h"
+#include "source/extensions/filters/http/gcp_authn/filter_config.h"
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_client_impl.h"
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_filter.h"
-#include "source/extensions/filters/http/gcp_authn/filter_config.h"
 
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/gcp_authn/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
-#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -70,7 +70,8 @@ public:
     if (filter_config_->protoConfig().has_token_binding_config()) {
       fingerprint = filter_config_->clientCertFingerprint();
     }
-    filter_ = std::make_unique<GcpAuthnFilter>(filter_config_->protoConfig(), fingerprint, context_, "stats", nullptr);
+    filter_ = std::make_unique<GcpAuthnFilter>(filter_config_->protoConfig(), fingerprint, context_,
+                                               "stats", nullptr);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
@@ -283,14 +284,14 @@ TEST_F(GcpAuthnFilterTest, DestroyFilter) {
 }
 
 TEST_F(GcpAuthnFilterTest, TokenBindingConfigFingerprint) {
-  const std::string cert_pem = TestEnvironment::readFileToStringForTest(
-      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/non_spiffe_san_cert.pem"));
+  const std::string cert_pem = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/non_spiffe_san_cert.pem"));
 
   envoy::extensions::transport_sockets::tls::v3::Secret secret;
   secret.set_name("client_cert_secret");
   auto* tls_cert = secret.mutable_tls_certificate();
   tls_cert->mutable_certificate_chain()->set_inline_string(cert_pem);
-  
+
   // Add static secret to secret manager
   auto status = context_.server_factory_context_.secretManager().addStaticSecret(secret);
   EXPECT_TRUE(status.ok());
@@ -315,10 +316,10 @@ TEST_F(GcpAuthnFilterTest, TokenBindingConfigFingerprint) {
   // Verify that clientCertFingerprint() is computed successfully
   std::string fingerprint = filter_config_->clientCertFingerprint();
   EXPECT_FALSE(fingerprint.empty());
-  
+
   // Instantiate the filter.
   setupFilterAndCallback();
-  
+
   // Verify that the filter populated its fingerprint data member
   EXPECT_EQ(filter_->clientCertFingerprintForTest(), absl::make_optional(fingerprint));
 }

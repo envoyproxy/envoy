@@ -3,10 +3,10 @@
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.h"
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.validate.h"
 #include "envoy/secret/secret_provider.h"
-#include "envoy/thread_local/thread_local.h"
-#include "source/common/common/matchers.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/thread_local/thread_local.h"
 
+#include "source/common/common/matchers.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_filter.h"
 
@@ -17,8 +17,9 @@ namespace GcpAuthn {
 
 class FilterConfig : public Logger::Loggable<Logger::Id::filter> {
 public:
-  FilterConfig(const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& proto_config,
-               Server::Configuration::FactoryContext& context);
+  FilterConfig(
+      const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& proto_config,
+      Server::Configuration::FactoryContext& context);
 
   const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& protoConfig() const {
     return proto_config_;
@@ -32,9 +33,7 @@ public:
     return proto_config_.cache_config();
   }
 
-  bool has_retry_policy() const {
-    return proto_config_.has_retry_policy();
-  }
+  bool has_retry_policy() const { return proto_config_.has_retry_policy(); }
 
   const envoy::config::core::v3::RetryPolicy& retry_policy() const {
     return proto_config_.retry_policy();

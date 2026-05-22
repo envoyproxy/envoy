@@ -71,8 +71,8 @@ envoy_cc_extension(
     srcs = ["filter_config.cc"],
     hdrs = ["filter_config.h"],
     deps = [
-        ":gcp_authn",
         ":crypto_utils",
+        ":gcp_authn",
         "//envoy/registry",
         "//envoy/secret:secret_manager_interface",
         "//envoy/thread_local:thread_local_interface",

@@ -1,15 +1,14 @@
 #include "source/extensions/filters/http/gcp_authn/filter_config.h"
 
-#include "envoy/secret/secret_manager.h"
-#include "source/extensions/filters/http/gcp_authn/crypto_utils.h"
-
 #include <memory>
 
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.h"
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.validate.h"
 #include "envoy/registry/registry.h"
+#include "envoy/secret/secret_manager.h"
 
 #include "source/common/http/utility.h"
+#include "source/extensions/filters/http/gcp_authn/crypto_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -31,8 +30,7 @@ Http::FilterFactoryCb GcpAuthnFilterFactory::createFilterFactoryFromProtoTyped(
     THROW_IF_NOT_OK(Http::Utility::validateCoreRetryPolicy(config.retry_policy()));
   }
 
-  FilterConfigSharedPtr filter_config =
-      std::make_shared<FilterConfig>(config, context);
+  FilterConfigSharedPtr filter_config = std::make_shared<FilterConfig>(config, context);
 
   return [config, stats_prefix, &context, token_cache = std::move(token_cache),
           filter_config =
@@ -52,29 +50,27 @@ Http::FilterFactoryCb GcpAuthnFilterFactory::createFilterFactoryFromProtoTyped(
  */
 REGISTER_FACTORY(GcpAuthnFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
 
-FilterConfig::FilterConfig(const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& proto_config,
-                           Server::Configuration::FactoryContext& context)
+FilterConfig::FilterConfig(
+    const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& proto_config,
+    Server::Configuration::FactoryContext& context)
     : proto_config_(proto_config), context_(context),
       tls_slot_(context.serverFactoryContext().threadLocal()) {
-  
-  tls_slot_.set([](Event::Dispatcher&) {
-    return std::make_shared<ThreadLocalFingerprint>("");
-  });
+
+  tls_slot_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalFingerprint>(""); });
 
   if (proto_config_.has_token_binding_config()) {
     const auto& binding_config = proto_config_.token_binding_config();
-    
+
     for (const auto& matcher : binding_config.client_certificate_san_matchers()) {
       san_matchers_.emplace_back(matcher, context_.serverFactoryContext());
     }
-    
+
     const auto& client_cert = binding_config.client_certificate();
     if (client_cert.has_sds_config()) {
-      tls_cert_provider_ = context.serverFactoryContext()
-                               .secretManager()
-                               .findOrCreateTlsCertificateProvider(
-                                   client_cert.sds_config(), client_cert.name(),
-                                   context.serverFactoryContext(), context.initManager(), true);
+      tls_cert_provider_ =
+          context.serverFactoryContext().secretManager().findOrCreateTlsCertificateProvider(
+              client_cert.sds_config(), client_cert.name(), context.serverFactoryContext(),
+              context.initManager(), true);
     } else {
       tls_cert_provider_ =
           context.serverFactoryContext().secretManager().findStaticTlsCertificateProvider(
@@ -109,10 +105,11 @@ void FilterConfig::updateFingerprint() {
     if (fingerprint_or_error.ok()) {
       fingerprint = fingerprint_or_error.value();
     } else {
-      ENVOY_LOG_MISC(warn, "Failed to get certificate fingerprint: {}", fingerprint_or_error.status().message());
+      ENVOY_LOG_MISC(warn, "Failed to get certificate fingerprint: {}",
+                     fingerprint_or_error.status().message());
     }
   }
-  
+
   tls_slot_.set([fingerprint](Envoy::Event::Dispatcher&) {
     return std::make_shared<ThreadLocalFingerprint>(fingerprint);
   });
