@@ -35,6 +35,7 @@ jobs:
     uses: ./.github/workflows/_load_env.yml
     with:
       branch-name: patches/main
+      cache-docker: false
 
   deflake:
     secrets:
