@@ -96,7 +96,8 @@ public:
    * @return std::string the redirect URL if this DirectResponseEntry is a redirect,
    *         or an empty string otherwise.
    */
-  virtual std::string newUri(const Http::RequestHeaderMap& headers) const PURE;
+  virtual std::string newUri(const Http::RequestHeaderMap& headers,
+                             const StreamInfo::StreamInfo& stream_info) const PURE;
 
   /**
    * Format the response body for direct responses. Users should pass

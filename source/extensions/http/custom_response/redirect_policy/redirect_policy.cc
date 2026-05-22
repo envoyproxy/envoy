@@ -90,14 +90,14 @@ RedirectPolicy::RedirectPolicy(
         absl::StrCat("#fragment is not supported for custom response. Specified path_redirect is ",
                      redirect_action_->path_redirect_));
   }
-  if (config.has_redirect_action() && !config.redirect_action().path_redirect_format().empty()) {
-    auto formatter_or = Envoy::Formatter::FormatterImpl::create(
-        config.redirect_action().path_redirect_format(), true);
+  if (config.has_redirect_action() && !config.redirect_action().path_rewrite().empty()) {
+    auto formatter_or =
+        Envoy::Formatter::FormatterImpl::create(config.redirect_action().path_rewrite(), true);
     if (!formatter_or.ok()) {
-      throw EnvoyException(absl::StrCat("Failed to create path_redirect_format formatter: ",
+      throw EnvoyException(absl::StrCat("Failed to create path_rewrite formatter: ",
                                         formatter_or.status().message()));
     }
-    path_redirect_formatter_ = std::move(formatter_or.value());
+    redirect_path_rewrite_formatter_ = std::move(formatter_or.value());
   }
 }
 
@@ -178,10 +178,10 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
 
   ::Envoy::Http::Utility::Url absolute_url;
   std::string uri;
-  if (path_redirect_formatter_ != nullptr) {
+  if (redirect_path_rewrite_formatter_ != nullptr) {
     uri = ::Envoy::Http::Utility::newUriWithFormatter(
         ::Envoy::makeOptRefFromPtr(redirect_action_.get()), *downstream_headers,
-        *path_redirect_formatter_, decoder_callbacks->streamInfo());
+        *redirect_path_rewrite_formatter_, decoder_callbacks->streamInfo());
   }
   if (uri.empty()) {
     uri = uri_ ? *uri_ : ::Envoy::Http::Utility::newUri(*redirect_action_, *downstream_headers);

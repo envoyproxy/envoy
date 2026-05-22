@@ -242,7 +242,8 @@ const std::string& OriginalConnectPort::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.router.original_connect_port");
 }
 
-std::string SslRedirector::newUri(const Http::RequestHeaderMap& headers) const {
+std::string SslRedirector::newUri(const Http::RequestHeaderMap& headers,
+                                  const StreamInfo::StreamInfo&) const {
   return Http::Utility::createSslRedirectPath(headers);
 }
 
@@ -774,15 +775,15 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
               redirect_config_->path_redirect_);
   }
 
-  if (route.has_redirect() && !route.redirect().path_redirect_format().empty()) {
+  if (route.has_redirect() && !route.redirect().path_rewrite().empty()) {
     auto formatter_or =
-        Envoy::Formatter::FormatterImpl::create(route.redirect().path_redirect_format(), true);
+        Envoy::Formatter::FormatterImpl::create(route.redirect().path_rewrite(), true);
     if (!formatter_or.ok()) {
       creation_status = absl::InvalidArgumentError(
-          absl::StrCat("Failed to create path_redirect_format formatter: ", formatter_or.status()));
+          absl::StrCat("Failed to create path_rewrite formatter: ", formatter_or.status()));
       return;
     }
-    path_redirect_formatter_ = std::move(formatter_or.value());
+    redirect_path_rewrite_formatter_ = std::move(formatter_or.value());
   }
 
   if (!route.stat_prefix().empty()) {
@@ -858,7 +859,7 @@ bool RouteEntryImplBase::isRedirect() const {
   return !redirect_config_->host_redirect_.empty() || !redirect_config_->path_redirect_.empty() ||
          !redirect_config_->prefix_rewrite_redirect_.empty() ||
          redirect_config_->regex_rewrite_redirect_ != nullptr ||
-         path_redirect_formatter_ != nullptr;
+         redirect_path_rewrite_formatter_ != nullptr;
 }
 
 bool RouteEntryImplBase::matchRoute(const RouteMatchContext& route_match_context,
@@ -1113,15 +1114,14 @@ std::string RouteEntryImplBase::currentUrlPathAfterRewriteWithMatchedPath(
                                     regex_rewrite_.get(), regex_rewrite_substitution_);
 }
 
-std::string RouteEntryImplBase::newUri(const Http::RequestHeaderMap& headers) const {
+std::string RouteEntryImplBase::newUri(const Http::RequestHeaderMap& headers,
+                                       const StreamInfo::StreamInfo& stream_info) const {
   ASSERT(isDirectResponse());
   const auto redirect_config_ref = ::Envoy::makeOptRefFromPtr(
       const_cast<const ::Envoy::Http::Utility::RedirectConfig*>(redirect_config_.get()));
-  if (path_redirect_formatter_ != nullptr) {
-    StreamInfo::StreamInfoImpl stream_info(time_source_, nullptr,
-                                           StreamInfo::FilterState::LifeSpan::Request);
-    return ::Envoy::Http::Utility::newUriWithFormatter(redirect_config_ref, headers,
-                                                       *path_redirect_formatter_, stream_info);
+  if (redirect_path_rewrite_formatter_ != nullptr) {
+    return ::Envoy::Http::Utility::newUriWithFormatter(
+        redirect_config_ref, headers, *redirect_path_rewrite_formatter_, stream_info);
   }
   return ::Envoy::Http::Utility::newUri(redirect_config_ref, headers);
 }

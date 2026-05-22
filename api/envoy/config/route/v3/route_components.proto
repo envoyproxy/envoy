@@ -1943,12 +1943,12 @@ message RedirectAction {
     //
     // .. code-block:: yaml
     //
-    //   path_redirect_format: "/new/%REQ(x-version)%"
+    //   path_rewrite: "/new/%REQ(x-version)%"
     //
     // Would redirect to ``/new/v2`` given a request header ``x-version: v2``.
     // If the substitution produces an empty string the path redirect is ignored
     // and the original path is preserved.
-    string path_redirect_format = 10;
+    string path_rewrite = 10;
   }
 
   // The HTTP status code to use in the redirect response. The default response

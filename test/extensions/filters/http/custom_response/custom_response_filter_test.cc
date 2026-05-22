@@ -243,7 +243,7 @@ TEST_F(CustomResponseFilterTest, PathRedirectFormat) {
           "@type": type.googleapis.com/envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy
           redirect_action:
             host_redirect: "redirect.example.com"
-            path_redirect_format: "/new/%REQ(x-version)%"
+            path_rewrite: "/new/%REQ(x-version)%"
           status_code: 302
 )EOF");
   setupFilterAndCallback();
@@ -274,9 +274,9 @@ TEST_F(CustomResponseFilterTest, PathRedirectFormatInvalid) {
           "@type": type.googleapis.com/envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy
           redirect_action:
             host_redirect: "redirect.example.com"
-            path_redirect_format: "/new/%INVALID_COMMAND_WITH_NO_CLOSING"
+            path_rewrite: "/new/%INVALID_COMMAND_WITH_NO_CLOSING"
 )EOF"),
-                          EnvoyException, "Failed to create path_redirect_format formatter");
+                          EnvoyException, "Failed to create path_rewrite formatter");
 }
 
 } // namespace

@@ -533,7 +533,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
           std::string new_uri;
           ASSERT(downstream_headers_ != nullptr);
           if (downstream_headers_->Path()) {
-            new_uri = direct_response->newUri(*downstream_headers_);
+            new_uri = direct_response->newUri(*downstream_headers_, callbacks_->streamInfo());
           }
           // See https://tools.ietf.org/html/rfc7231#section-7.1.2.
           const auto add_location =
