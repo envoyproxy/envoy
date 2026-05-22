@@ -13,6 +13,10 @@
 # TODO: Adding just to test android
 startup --host_jvm_args=-Xmx3g
 startup --host_jvm_args="-DBAZEL_TRACK_SOURCE_DIRECTORIES=1"
+# Suppress sun.misc.Unsafe "terminally deprecated" warnings from protobuf in remote_java_tools.
+# The protobuf library bundled in JavaBuilder_deploy.jar uses sun.misc.Unsafe, which JDK 23+
+# warns about (JEP 471). This is not fixable until protobuf migrates away from Unsafe.
+startup --host_jvm_args=--sun-misc-unsafe-memory-access=allow
 
 
 #############################################################################
