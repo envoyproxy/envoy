@@ -1254,7 +1254,7 @@ public:
 
   envoy::config::listener::v3::Listener listener_config_;
   FakeHttpConnectionPtr lds_connection_;
-  FakeStreamPtr lds_stream_{};
+  FakeStreamPtr lds_stream_;
 };
 
 TEST_P(ListenerFilterIntegrationTest, InspectDataFilterDrainData) {

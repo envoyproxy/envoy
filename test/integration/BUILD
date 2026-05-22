@@ -1845,7 +1845,7 @@ envoy_cc_test(
     size = "large",
     srcs = ["overload_integration_test.cc"],
     rbe_pool = "6gig",
-    shard_count = 4,
+    shard_count = 8,
     tags = [
         "cpu:3",
     ],

@@ -184,6 +184,9 @@ void MultiplexedActiveClientBase::onStreamReset(Http::StreamResetReason reason) 
   case StreamResetReason::RemoteReset:
     parent_.host()->cluster().trafficStats()->upstream_rq_rx_reset_.inc();
     break;
+  case StreamResetReason::RemoteResetNoError:
+    parent_.host()->cluster().trafficStats()->upstream_rq_rx_reset_no_error_.inc();
+    break;
   case StreamResetReason::LocalRefusedStreamReset:
   case StreamResetReason::RemoteRefusedStreamReset:
   case StreamResetReason::Overflow:

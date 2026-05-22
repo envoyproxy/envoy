@@ -1,16 +1,25 @@
 """High level asyncio client built on top of the Envoy Mobile bindings."""
 
 import asyncio
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Protocol, Union
 
 from .. import envoy_engine
-from ..envoy_engine import EngineBuilder
 
 from .executor import AsyncioExecutor, Executor
 from .response import ClientResponseError, Response
 from .utils import (
     normalize_request,
 )
+
+
+class EngineBuilderLike(Protocol):
+    def set_on_engine_running(self, closure: Callable[[], None]) -> "EngineBuilderLike":
+        """Set callback to be invoked when engine is running."""
+        ...
+
+    def build(self) -> Any:
+        """Build and return the engine instance."""
+        ...
 
 
 class AsyncClient:
@@ -25,11 +34,11 @@ class AsyncClient:
     Use as an async context manager: ``async with AsyncClient(engine_builder) as client:``
     """
 
-    def __init__(self, engine_builder: EngineBuilder) -> None:
+    def __init__(self, engine_builder: EngineBuilderLike) -> None:
         """Construct a new AsyncClient.
 
         Args:
-            engine_builder: A pre-configured EngineBuilder to finalize and build.
+            engine_builder: A pre-configured EngineBuilder (or compatible builder object) to finalize and build.
         """
         self._engine_builder = engine_builder
         self._engine = None

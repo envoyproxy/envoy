@@ -141,9 +141,8 @@ public:
       std::chrono::milliseconds fallback_interval = std::chrono::milliseconds::zero(),
       int fallback_count = 0) {
     all_timers_ = std::vector<Event::MockTimer*>(1 + expiration_count + fallback_count);
-    for (size_t i = 0; i < all_timers_.size(); ++i) {
-      auto* timer_ptr = new Event::MockTimer(dispatcher_);
-      all_timers_[i] = timer_ptr;
+    for (auto*& timer_ptr : all_timers_) {
+      timer_ptr = new Event::MockTimer(dispatcher_);
       // Prepare the timer to be either a reporting or expiration timer.
       EXPECT_CALL(*timer_ptr, enableTimer(_, _))
           .WillOnce([&, report_interval, expiration_interval, expiration_count, fallback_interval,
@@ -173,8 +172,9 @@ public:
   }
 
   inline static Event::MockTimer* assertMockTimer(Event::Timer* timer) {
-    if (timer == nullptr)
+    if (timer == nullptr) {
       return nullptr;
+    }
     return dynamic_cast<Event::MockTimer*>(timer);
   }
 
@@ -229,8 +229,8 @@ public:
   // Note: all expiration timers that are still running at the end of the test
   // will cause a failure, so tests must verify expiration behaviors.
   std::vector<Event::MockTimer*> all_timers_;
-  absl::flat_hash_set<Event::MockTimer*> expiration_timers_ = {};
-  absl::flat_hash_set<Event::MockTimer*> fallback_timers_ = {};
+  absl::flat_hash_set<Event::MockTimer*> expiration_timers_;
+  absl::flat_hash_set<Event::MockTimer*> fallback_timers_;
   Event::MockDispatcher* dispatcher_ = &context_.server_factory_context_.dispatcher_;
 };
 

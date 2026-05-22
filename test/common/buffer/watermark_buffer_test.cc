@@ -85,7 +85,7 @@ TEST_F(WatermarkBufferTest, PrependToEmptyBuffer) {
   EXPECT_EQ(0, times_high_watermark_called_);
   EXPECT_EQ(suffix.size(), buffer_.length());
 
-  buffer_.prepend(prefix.data());
+  buffer_.prepend(prefix);
   EXPECT_EQ(1, times_high_watermark_called_);
   EXPECT_EQ(suffix.size() + prefix.size(), buffer_.length());
 
