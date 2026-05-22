@@ -224,12 +224,14 @@ public:
    * @param transport_socket_options supplies the transport options that will be set on the new
    * connection.
    * @param metadata when non-null drives transport socket factory resolution.
+   * @param address_override when non-null, dials this address instead of orcaReportingAddress().
    * @return the connection data.
    */
   virtual CreateConnectionData createOrcaReportingConnection(
       Event::Dispatcher& dispatcher,
       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-      const envoy::config::core::v3::Metadata* metadata) const PURE;
+      const envoy::config::core::v3::Metadata* metadata,
+      Network::Address::InstanceConstSharedPtr address_override = nullptr) const PURE;
 
   /**
    * @return host specific gauges.

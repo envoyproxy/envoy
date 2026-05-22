@@ -24,11 +24,8 @@ void configureClusterLoadBalancingPolicy(envoy::config::cluster::v3::Cluster& cl
   auto* policy = cluster.mutable_load_balancing_policy();
 
   // Configure WRR-Locality LB policy on the cluster level, with a
-  // ClientSideWeightedRoundRobinLoadBalancer per-locality LB policy that disables the
-  // ClientSideWeightedRoundRobinLoadBalancer out-of-band endpoint reporting. This is because it is
-  // currently the only per-locality LB policy that works with WRR-Locality. Note that the field
-  // `enable_oob_load_report` isn't being used at the moment in Envoy, making this configuration
-  // the default ClientSideWeightedRoundRobinLoadBalancer settings.
+  // ClientSideWeightedRoundRobin per-locality LB policy that explicitly disables out-of-band
+  // ORCA reporting. It is currently the only per-locality LB policy that works with WRR-Locality.
   const std::string policy_yaml = R"EOF(
       policies:
       - typed_extension_config:
@@ -41,7 +38,8 @@ void configureClusterLoadBalancingPolicy(envoy::config::cluster::v3::Cluster& cl
                     name: envoy.load_balancing_policies.weighted_round_robin
                     typed_config:
                         "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin
-                        enable_oob_load_report: false
+                        oob_reporting_config:
+                          disabled: true
       )EOF";
 
   TestUtility::loadFromYaml(policy_yaml, *policy);

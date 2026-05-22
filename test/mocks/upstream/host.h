@@ -167,7 +167,8 @@ public:
   CreateConnectionData
   createOrcaReportingConnection(Event::Dispatcher& dispatcher,
                                 Network::TransportSocketOptionsConstSharedPtr,
-                                const envoy::config::core::v3::Metadata*) const override {
+                                const envoy::config::core::v3::Metadata*,
+                                Network::Address::InstanceConstSharedPtr) const override {
     MockCreateConnectionData data = createConnection_(dispatcher, nullptr);
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }

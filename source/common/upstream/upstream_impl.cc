@@ -606,13 +606,16 @@ Host::CreateConnectionData HostImplBase::createHealthCheckConnection(
 Host::CreateConnectionData HostImplBase::createOrcaReportingConnection(
     Event::Dispatcher& dispatcher,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-    const envoy::config::core::v3::Metadata* metadata) const {
-  const auto orca_address = orcaReportingAddress();
+    const envoy::config::core::v3::Metadata* metadata,
+    Network::Address::InstanceConstSharedPtr address_override) const {
+  const auto orca_address = address_override != nullptr ? address_override : orcaReportingAddress();
   Network::UpstreamTransportSocketFactory& factory =
       (metadata != nullptr)
           ? resolveTransportSocketFactory(orca_address, metadata, transport_socket_options)
           : transportSocketFactory();
-  return createConnection(dispatcher, cluster(), orca_address, addressListOrNull(), factory,
+  // The OOB stream dials a single address; the happy-eyeballs address list is
+  // intentionally not used.
+  return createConnection(dispatcher, cluster(), orca_address, /*address_list_or_null=*/{}, factory,
                           /*options=*/nullptr, transport_socket_options, shared_from_this());
 }
 

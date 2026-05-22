@@ -213,13 +213,18 @@ public:
 
   void TearDown() override { cleanupOobStreams(); }
 
-  void initializeConfig() {
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
-      ASSERT(cluster_0->name() == "cluster_0");
-      auto* endpoint = cluster_0->mutable_load_assignment()->mutable_endpoints()->Mutable(0);
+  void
+  initializeConfig(absl::string_view oob_config_yaml = "enable_oob_load_report: true\n"
+                                                       "                  oob_reporting_period:\n"
+                                                       "                      seconds: 1") {
+    std::string oob_config_yaml_str(oob_config_yaml);
+    config_helper_.addConfigModifier(
+        [oob_config_yaml_str](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
+          ASSERT(cluster_0->name() == "cluster_0");
+          auto* endpoint = cluster_0->mutable_load_assignment()->mutable_endpoints()->Mutable(0);
 
-      constexpr absl::string_view endpoints_yaml = R"EOF(
+          constexpr absl::string_view endpoints_yaml = R"EOF(
           lb_endpoints:
           - endpoint:
               address:
@@ -232,29 +237,28 @@ public:
                   address: {}
                   port_value: 0
           )EOF";
-      const std::string local_address = Network::Test::getLoopbackAddressString(GetParam());
-      TestUtility::loadFromYaml(fmt::format(endpoints_yaml, local_address, local_address),
-                                *endpoint);
+          const std::string local_address = Network::Test::getLoopbackAddressString(GetParam());
+          TestUtility::loadFromYaml(fmt::format(endpoints_yaml, local_address, local_address),
+                                    *endpoint);
 
-      auto* policy = cluster_0->mutable_load_balancing_policy();
-      const std::string policy_yaml = R"EOF(
+          auto* policy = cluster_0->mutable_load_balancing_policy();
+          const std::string policy_yaml = fmt::format(R"EOF(
           policies:
           - typed_extension_config:
               name: envoy.load_balancing_policies.client_side_weighted_round_robin
               typed_config:
                   "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin
-                  enable_oob_load_report: true
-                  oob_reporting_period:
-                      seconds: 1
+                  {}
                   blackout_period:
                       seconds: 1
                   weight_expiration_period:
                       seconds: 180
                   weight_update_period:
                       seconds: 1
-          )EOF";
-      TestUtility::loadFromYaml(policy_yaml, *policy);
-    });
+          )EOF",
+                                                      oob_config_yaml_str);
+          TestUtility::loadFromYaml(policy_yaml, *policy);
+        });
     HttpIntegrationTest::initialize();
   }
 
@@ -316,6 +320,21 @@ TEST_P(ClientSideWeightedRoundRobinOobIntegrationTest, OobReportsApplyWeights) {
   respondToOobStreams(/*host0_qps=*/100.0, /*host1_qps=*/1000.0);
 
   // Verify the OOB plumbing is alive and reporting.
+  test_server_->waitForCounter("cluster.cluster_0.lb_orca_oob.reports_received", Ge(2));
+  test_server_->waitForGauge("cluster.cluster_0.lb_orca_oob.active_sessions", Eq(2));
+}
+
+// Verify that `oob_reporting_config { reporting_period { seconds: 1 } }` is
+// functionally equivalent to the deprecated `enable_oob_load_report: true` +
+// `oob_reporting_period`: Envoy opens one OOB stream per upstream host and the
+// cluster-scoped `lb_orca_oob.*` stats reflect the active sessions and
+// received reports.
+TEST_P(ClientSideWeightedRoundRobinOobIntegrationTest, OobReportingConfigAppliesWeights) {
+  initializeConfig("oob_reporting_config:\n"
+                   "                      reporting_period:\n"
+                   "                          seconds: 1");
+  respondToOobStreams(/*host0_qps=*/100.0, /*host1_qps=*/1000.0);
+
   test_server_->waitForCounter("cluster.cluster_0.lb_orca_oob.reports_received", Ge(2));
   test_server_->waitForGauge("cluster.cluster_0.lb_orca_oob.active_sessions", Eq(2));
 }

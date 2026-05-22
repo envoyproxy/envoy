@@ -9,6 +9,8 @@
 #include "source/extensions/load_balancing_policies/client_side_weighted_round_robin/client_side_weighted_round_robin_lb.h"
 #include "source/extensions/load_balancing_policies/common/factory_base.h"
 
+#include "absl/status/status.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolicies {
@@ -37,6 +39,12 @@ public:
   loadConfig(Server::Configuration::ServerFactoryContext& context,
              const Protobuf::Message& config) override {
     const auto& lb_config = dynamic_cast<const ClientSideWeightedRoundRobinLbProto&>(config);
+    if (lb_config.has_oob_reporting_config() &&
+        (lb_config.has_enable_oob_load_report() || lb_config.has_oob_reporting_period())) {
+      return absl::InvalidArgumentError(
+          "Only one of oob_reporting_config or the deprecated enable_oob_load_report/"
+          "oob_reporting_period fields may be set.");
+    }
     return Upstream::LoadBalancerConfigPtr{new Upstream::ClientSideWeightedRoundRobinLbConfig(
         lb_config, context.mainThreadDispatcher(), context.threadLocal())};
   }

@@ -116,19 +116,23 @@ Upstream::Host::CreateConnectionData LogicalHost::createConnection(
 Upstream::Host::CreateConnectionData LogicalHost::createOrcaReportingConnection(
     Event::Dispatcher& dispatcher,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-    const envoy::config::core::v3::Metadata* metadata) const {
-  const Network::Address::InstanceConstSharedPtr address = orcaReportingAddress();
-  const SharedConstAddressVector address_list_or_null = addressListOrNull();
-  // Use override_transport_socket_options if set, otherwise use the passed options.
-  const auto& effective_options = override_transport_socket_options_ != nullptr
-                                      ? override_transport_socket_options_
-                                      : transport_socket_options;
+    const envoy::config::core::v3::Metadata* metadata,
+    Network::Address::InstanceConstSharedPtr address_override) const {
+  const Network::Address::InstanceConstSharedPtr address =
+      address_override != nullptr ? address_override : orcaReportingAddress();
+  // OrcaOobManager passes forced HTTP/2 ALPN which is required for OOB streams. A
+  // non-null override_transport_socket_options_ would clobber it, so the combination
+  // is unsupported.
+  ASSERT(override_transport_socket_options_ == nullptr);
   Network::UpstreamTransportSocketFactory& factory =
-      (metadata != nullptr) ? resolveTransportSocketFactory(address, metadata, effective_options)
-                            : transportSocketFactory();
+      (metadata != nullptr)
+          ? resolveTransportSocketFactory(address, metadata, transport_socket_options)
+          : transportSocketFactory();
+  // The OOB stream dials a single address; the happy-eyeballs address list is
+  // intentionally not used.
   return HostImplBase::createConnection(
-      dispatcher, cluster(), address, address_list_or_null, factory,
-      /*options=*/nullptr, effective_options,
+      dispatcher, cluster(), address, /*address_list_or_null=*/{}, factory,
+      /*options=*/nullptr, transport_socket_options,
       std::make_shared<RealHostDescription>(address, shared_from_this()));
 }
 

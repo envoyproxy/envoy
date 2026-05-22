@@ -4,8 +4,10 @@
 #include <memory>
 
 #include "envoy/common/random_generator.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
+#include "envoy/extensions/load_balancing_policies/common/v3/common.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
@@ -41,6 +43,24 @@ struct OrcaOobStats {
   ALL_ORCA_OOB_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
+// Default ORCA OOB load reporting interval, applied when reporting_period is unset.
+constexpr uint64_t kDefaultOobReportingPeriodMs = 10000;
+
+// Parsed, validated form of OrcaOobReportingConfig consumed by OrcaOobManager.
+// Reusable by any load balancing policy that drives ORCA OOB reporting.
+struct OrcaOobManagerConfig {
+  std::chrono::milliseconds reporting_period{kDefaultOobReportingPeriodMs};
+  uint32_t port_value{0};
+  std::string authority;
+  // Synthetic endpoint metadata carrying transport_socket_match_criteria under
+  // the "envoy.transport_socket_match" key; nullptr when no criteria are set.
+  std::shared_ptr<const envoy::config::core::v3::Metadata> transport_socket_match_metadata;
+};
+
+// Translates the proto config into OrcaOobManagerConfig, applying defaults.
+OrcaOobManagerConfig parseOrcaOobManagerConfig(
+    const envoy::extensions::load_balancing_policies::common::v3::OrcaOobReportingConfig& proto);
+
 /**
  * Cluster-level manager owning per-host ORCA OOB streams. Modeled on
  * source/extensions/health_checkers/grpc/health_checker_impl.h: per-host nested OobSession holds
@@ -51,10 +71,9 @@ struct OrcaOobStats {
  */
 class OrcaOobManager : protected Logger::Loggable<Logger::Id::upstream> {
 public:
-  OrcaOobManager(std::chrono::milliseconds reporting_period,
-                 const Upstream::PrioritySet& priority_set, Event::Dispatcher& dispatcher,
-                 Random::RandomGenerator& random, Stats::Scope& stats_scope,
-                 OrcaLoadReportHandlerSharedPtr report_handler);
+  OrcaOobManager(OrcaOobManagerConfig config, const Upstream::PrioritySet& priority_set,
+                 Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
+                 Stats::Scope& stats_scope, OrcaLoadReportHandlerSharedPtr report_handler);
   virtual ~OrcaOobManager();
 
   // Iterate priority set, open a session per existing host, register member-update callback.
@@ -152,7 +171,10 @@ private:
 
   static OrcaOobStats generateOrcaOobStats(Stats::Scope& scope);
 
-  const std::chrono::milliseconds reporting_period_;
+  const OrcaOobManagerConfig config_;
+  // Forced ALPN ("h2") for every OOB connection: OOB reporting is always
+  // gRPC over HTTP/2 regardless of the main host's negotiated protocol.
+  const Network::TransportSocketOptionsConstSharedPtr alpn_options_;
   const Upstream::PrioritySet& priority_set_;
   OrcaLoadReportHandlerSharedPtr report_handler_;
   Envoy::Common::CallbackHandlePtr member_update_cb_;
