@@ -261,8 +261,9 @@ protected:
   bool expectDeniedRequest(int expected_status_code,
                            std::vector<std::pair<std::string, std::string>> expected_headers = {},
                            std::string expected_body = "") {
-    if (!response_->waitForEndStream())
+    if (!response_->waitForEndStream()) {
       return false;
+    }
     EXPECT_TRUE(response_->complete());
     EXPECT_EQ(response_->headers().getStatusValue(), absl::StrCat(expected_status_code));
 
@@ -285,8 +286,9 @@ protected:
   }
 
   bool expectAllowedRequest() {
-    if (!response_->waitForEndStream())
+    if (!response_->waitForEndStream()) {
       return false;
+    }
     EXPECT_TRUE(response_->complete());
 
     EXPECT_EQ(response_->headers().getStatusValue(), "200");
@@ -296,8 +298,7 @@ protected:
     return true;
   }
 
-  envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig
-      proto_config_{};
+  envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig proto_config_;
   Network::Address::InstanceConstSharedPtr traffic_endpoint_;
   AutonomousUpstream* traffic_upstream_;
   Cluster* traffic_cluster_;

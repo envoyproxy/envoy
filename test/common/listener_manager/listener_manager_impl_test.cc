@@ -4214,17 +4214,17 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithFilterStateM
   auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
   EXPECT_EQ(filter_chain, nullptr);
 
-  stream_info_.filterState()->setData(
-      "unknown_key", std::make_shared<Router::StringAccessorImpl>("unknown_value"),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+  stream_info_.filterState()->setData("unknown_key",
+                                      std::make_shared<Router::StringAccessorImpl>("unknown_value"),
+                                      StreamInfo::FilterState::LifeSpan::Connection);
 
   // Filter state set to a non-matching key - no match.
   filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
   EXPECT_EQ(filter_chain, nullptr);
 
-  stream_info_.filterState()->setData(
-      "filter_state_key", std::make_shared<Router::StringAccessorImpl>("unknown_value"),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+  stream_info_.filterState()->setData("filter_state_key",
+                                      std::make_shared<Router::StringAccessorImpl>("unknown_value"),
+                                      StreamInfo::FilterState::LifeSpan::Connection);
 
   // Filter state set to a matching key but unknown value - no match.
   filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
@@ -4232,7 +4232,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithFilterStateM
 
   stream_info_.filterState()->setData(
       "filter_state_key", std::make_shared<Router::StringAccessorImpl>("filter_state_value"),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   // Known filter state key and matching value - using 1st filter chain.
   filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
@@ -5363,18 +5363,18 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithFilterSta
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_EQ(filter_chain->name(), "foo");
 
-  stream_info_.filterState()->setData(
-      "unknown_key", std::make_shared<Router::StringAccessorImpl>("unknown_value"),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+  stream_info_.filterState()->setData("unknown_key",
+                                      std::make_shared<Router::StringAccessorImpl>("unknown_value"),
+                                      StreamInfo::FilterState::LifeSpan::Connection);
 
   // Filter state set to a non-matching key - no match.
   filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_EQ(filter_chain->name(), "foo");
 
-  stream_info_.filterState()->setData(
-      "filter_state_key", std::make_shared<Router::StringAccessorImpl>("unknown_value"),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+  stream_info_.filterState()->setData("filter_state_key",
+                                      std::make_shared<Router::StringAccessorImpl>("unknown_value"),
+                                      StreamInfo::FilterState::LifeSpan::Connection);
 
   // Filter state set to a matching key but unknown value - no match.
   filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
@@ -5383,7 +5383,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithFilterSta
 
   stream_info_.filterState()->setData(
       "filter_state_key", std::make_shared<Router::StringAccessorImpl>("filter_state_value"),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   // Known filter state key and matching value - using 1st filter chain.
   filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);

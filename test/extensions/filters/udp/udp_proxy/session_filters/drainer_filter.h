@@ -44,7 +44,7 @@ public:
     read_callbacks_->streamInfo().filterState()->setData(
         "test.udp_session.drainer.on_session_complete",
         std::make_shared<Envoy::Router::StringAccessorImpl>("session_complete"),
-        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection,
+        StreamInfo::FilterState::LifeSpan::Connection,
         StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   }
 

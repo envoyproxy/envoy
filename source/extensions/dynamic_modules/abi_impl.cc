@@ -761,6 +761,14 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_cluster_lb_context_get_
   return false;
 }
 
+__attribute__((weak)) uint64_t envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr, envoy_dynamic_module_type_host_stat) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_context_get_host_stat: "
+               "not implemented in this context");
+  return 0;
+}
+
 __attribute__((weak)) envoy_dynamic_module_type_cluster_scheduler_module_ptr
 envoy_dynamic_module_callback_cluster_scheduler_new(envoy_dynamic_module_type_cluster_envoy_ptr) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_scheduler_new: "

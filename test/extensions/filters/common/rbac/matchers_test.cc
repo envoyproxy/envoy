@@ -808,8 +808,7 @@ TEST(FilterStateMatcher, FilterStateMatcher) {
   matcher.mutable_string_match()->set_prefix("test");
 
   checkMatcher(FilterStateMatcher(matcher, context), false, conn, header, info);
-  filter_state.setData("test.key", std::make_shared<TestObject>(),
-                       StreamInfo::FilterState::StateType::ReadOnly);
+  filter_state.setData("test.key", std::make_shared<TestObject>());
   checkMatcher(FilterStateMatcher(matcher, context), true, conn, header, info);
 }
 
@@ -1194,8 +1193,7 @@ TEST(PrincipalMatcher, UrlPathAndFilterState) {
 
   NiceMock<StreamInfo::MockStreamInfo> info;
   StreamInfo::FilterStateImpl filter_state_impl(StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state_impl.setData("test.key", std::make_shared<TestObject>(),
-                            StreamInfo::FilterState::StateType::ReadOnly);
+  filter_state_impl.setData("test.key", std::make_shared<TestObject>());
   EXPECT_CALL(Const(info), filterState()).WillRepeatedly(ReturnRef(filter_state_impl));
 
   auto matcher_filter_state = Matcher::create(principal_filter_state, factory_context);

@@ -715,7 +715,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
         std::make_shared<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
             downstream_connection.connectionInfoProvider().remoteAddress(),
             downstream_connection.connectionInfoProvider().localAddress(), tlvs}),
-        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+        StreamInfo::FilterState::LifeSpan::Connection);
   } else if (config_->sharedConfig()->proxyProtocolTlvMergePolicy() !=
              envoy::extensions::filters::network::tcp_proxy::v3::ADD_IF_ABSENT) {
     // Existing state found and merge policy is not ADD_IF_ABSENT - merge TLVs.
@@ -759,7 +759,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
         std::make_shared<Network::ProxyProtocolFilterState>(Network::ProxyProtocolDataWithVersion{
             {existing_data.src_addr_, existing_data.dst_addr_, merged_tlvs},
             existing_data.version_}),
-        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+        StreamInfo::FilterState::LifeSpan::Connection);
   }
   // else: ADD_IF_ABSENT policy with existing state - keep existing state as-is.
   transport_socket_options_ =
@@ -1040,9 +1040,9 @@ void TunnelingConfigHelperImpl::propagateResponseHeaders(
   if (!propagate_response_headers_) {
     return;
   }
-  filter_state->setData(
-      TunnelResponseHeaders::key(), std::make_shared<TunnelResponseHeaders>(std::move(headers)),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state->setData(TunnelResponseHeaders::key(),
+                        std::make_shared<TunnelResponseHeaders>(std::move(headers)),
+                        StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 void TunnelingConfigHelperImpl::propagateResponseTrailers(
@@ -1051,9 +1051,9 @@ void TunnelingConfigHelperImpl::propagateResponseTrailers(
   if (!propagate_response_trailers_) {
     return;
   }
-  filter_state->setData(
-      TunnelResponseTrailers::key(), std::make_shared<TunnelResponseTrailers>(std::move(trailers)),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state->setData(TunnelResponseTrailers::key(),
+                        std::make_shared<TunnelResponseTrailers>(std::move(trailers)),
+                        StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 void Filter::onConnectTimeout() {

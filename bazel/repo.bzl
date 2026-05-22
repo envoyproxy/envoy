@@ -66,23 +66,29 @@ def _envoy_repo_impl(repository_ctx):
     """
 
     # parse container information for use in RBE
-    json_result = repository_ctx.execute([
-        repository_ctx.path(repository_ctx.attr.yq),
-        repository_ctx.path(repository_ctx.attr.envoy_ci_config),
-        "-ojson",
-    ])
-    if json_result.return_code != 0:
-        fail("yq failed: {}".format(json_result.stderr))
-    repository_ctx.file("ci-config.json", json_result.stdout)
-    config_data = json.decode(repository_ctx.read("ci-config.json"))
+    ci_config = repository_ctx.read(repository_ctx.path(repository_ctx.attr.envoy_ci_config))
+    build_image = {}
+    in_build_image = False
+    for line in ci_config.split("\n"):
+        if line.strip() == "build-image:":
+            in_build_image = True
+            continue
+        if in_build_image:
+            if not line.strip() or line.startswith("  #"):
+                continue
+            if not line.startswith("  "):
+                break
+            parts = line.strip().split(": ", 1)
+            if len(parts) == 2:
+                build_image[parts[0]] = parts[1]
     repository_ctx.file("containers.bzl", CONTAINERS.format(
-        repo = config_data["build-image"]["repo"],
-        repo_gcr = config_data["build-image"]["repo-gcr"],
-        sha = config_data["build-image"]["sha"],
-        sha_gcc = config_data["build-image"]["sha-gcc"],
-        sha_mobile = config_data["build-image"]["sha-mobile"],
-        sha_worker = config_data["build-image"]["sha-worker"],
-        tag = config_data["build-image"]["tag"],
+        repo = build_image["repo"],
+        repo_gcr = build_image["repo-gcr"],
+        sha = build_image["sha"],
+        sha_gcc = build_image["sha-gcc"],
+        sha_mobile = build_image["sha-mobile"],
+        sha_worker = build_image["sha-worker"],
+        tag = build_image["tag"],
     ))
     repo_version_path = repository_ctx.path(repository_ctx.attr.envoy_version)
     api_version_path = repository_ctx.path(repository_ctx.attr.envoy_api_version)
@@ -305,7 +311,6 @@ _envoy_repo = repository_rule(
         "envoy_version": attr.label(default = "@envoy//:VERSION.txt"),
         "envoy_api_version": attr.label(default = "@envoy//:API_VERSION.txt"),
         "envoy_ci_config": attr.label(default = "@envoy//:.github/config.yml"),
-        "yq": attr.label(default = "@yq"),
     },
     environ = ["BAZEL_LLVM_PATH", "BAZEL_USE_HOST_SYSROOT"],
 )

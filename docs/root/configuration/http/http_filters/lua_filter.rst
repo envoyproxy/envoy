@@ -1369,7 +1369,7 @@ Sets a filter state object by name using a registered :ref:`object factory <well
 * ``factoryKey`` is a string that specifies the registered ``ObjectFactory`` name used to create the object. See :ref:`well-known filter state objects <well_known_filter_state>` for the list of available factory keys.
 * ``payload`` is a string passed to the factory's ``createFromBytes`` method.
 
-The object is stored as read-only with filter chain lifespan and no upstream sharing.
+The object is stored with filter chain lifespan and no upstream sharing.
 
 Raises a Lua error if the factory key is not registered or if the factory fails to create an object from the given payload.
 
