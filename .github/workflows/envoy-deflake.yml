@@ -33,6 +33,8 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/_load_env.yml
+    with:
+      branch-name: patches/main
 
   deflake:
     secrets:
