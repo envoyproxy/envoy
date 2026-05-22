@@ -8,6 +8,7 @@
 #include "source/common/common/byte_order.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/hex.h"
+#include "source/common/common/safe_memcpy.h"
 #include "source/common/common/utility.h"
 
 namespace Envoy {
@@ -133,9 +134,8 @@ void BufferHelper::writeCString(Buffer::Instance& data, const std::string& value
 }
 
 void BufferHelper::writeDouble(Buffer::Instance& data, double value) {
-  static_assert(sizeof(double) == sizeof(int64_t), "invalid type size");
   int64_t to_write;
-  std::memcpy(&to_write, &value, sizeof(to_write));
+  safeMemcpy(&to_write, &value);
   writeInt64(data, to_write);
 }
 
