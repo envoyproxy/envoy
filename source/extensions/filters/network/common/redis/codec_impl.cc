@@ -632,6 +632,9 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
         } else if (pending_integer_.integer_ == 0) {
           state_ = State::ValueComplete;
         } else {
+          if (pending_integer_.integer_ > MaxArraySize) {
+            throw ProtocolError("array size exceeds limit");
+          }
           std::vector<RespValue> values(pending_integer_.integer_);
           current_value.value_->asArray().swap(values);
           pending_value_stack_.push_front({&current_value.value_->asArray()[0], 0});

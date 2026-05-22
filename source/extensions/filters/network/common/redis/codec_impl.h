@@ -14,6 +14,10 @@ namespace NetworkFilters {
 namespace Common {
 namespace Redis {
 
+// The maximum allowed size of a RESP array. This prevents remote clients from triggering
+// uncontrolled upfront vector memory allocation OOM crashes via large array header counts.
+constexpr uint64_t MaxArraySize = 2000000;
+
 /**
  * Decoder implementation of https://redis.io/topics/protocol
  *

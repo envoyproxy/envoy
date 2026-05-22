@@ -1,5 +1,7 @@
 #include <vector>
 
+#include "absl/strings/str_cat.h"
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/extensions/filters/network/common/redis/codec_impl.h"
@@ -842,6 +844,11 @@ TEST_F(RedisEncoderDecoderImplTest, InvalidInlineCommandSingleQuoting5) {
 
 TEST_F(RedisEncoderDecoderImplTest, InvalidInterjectedInlineCommand) {
   buffer_.add("*1\r\nECHO\r\n");
+  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, ArraySizeLimitExceeded) {
+  buffer_.add(absl::StrCat("*", MaxArraySize + 1, "\r\n"));
   EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
 }
 
