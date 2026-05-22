@@ -17,10 +17,8 @@ uint64_t Tracer::generateTraceId(SystemTime timestamp) {
   if (timestamp_trace_ids_) {
     // Generate timestamp-prefixed 64-bit value:
     // [32-bit epoch seconds][32-bit random]
-    const uint32_t epoch_seconds =
-        static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::seconds>(
-                                  timestamp.time_since_epoch())
-                                  .count());
+    const uint32_t epoch_seconds = static_cast<uint32_t>(
+        std::chrono::duration_cast<std::chrono::seconds>(timestamp.time_since_epoch()).count());
     const uint32_t random_part = static_cast<uint32_t>(random_generator_.random());
 
     // Combine: timestamp in upper 32 bits, random in lower 32 bits
