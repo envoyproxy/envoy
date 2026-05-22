@@ -4,8 +4,9 @@
 
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.h"
 
-#include "absl/status/statusor.h"
 #include "source/common/protobuf/utility.h"
+
+#include "absl/status/statusor.h"
 
 namespace Envoy {
 namespace Extensions {
