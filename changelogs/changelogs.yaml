@@ -94,6 +94,8 @@ areas:
     title: tcp_proxy
   tls:
     title: tls
+  tracing:
+    title: tracing
   wasm:
     title: wasm
   dns:
