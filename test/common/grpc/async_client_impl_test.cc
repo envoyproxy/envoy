@@ -448,8 +448,7 @@ TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitializedWithoutStreamInfo) {
 
   EXPECT_CALL(parent_span, spawnChild_(_, "async helloworld.Greeter.SayHello egress", _))
       .WillOnce(Return(child_span));
-  EXPECT_CALL(*child_span,
-              setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
   EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamCluster, Eq("test_cluster")));
   EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamAddress, Eq("test_cluster")));
   EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().GrpcStatusCode, Eq("13")));
@@ -488,8 +487,7 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpStartFail) {
   Tracing::MockSpan* child_span{new Tracing::MockSpan()};
   EXPECT_CALL(active_span, spawnChild_(_, "async helloworld.Greeter.SayHello egress", _))
       .WillOnce(Return(child_span));
-  EXPECT_CALL(*child_span,
-              setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
   EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamCluster, Eq("test_cluster")));
   EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamAddress, Eq("test_cluster")));
   EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().GrpcStatusCode, Eq("14")));
@@ -562,8 +560,7 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpSendHeadersFail) {
   Tracing::MockSpan* child_span{new Tracing::MockSpan()};
   EXPECT_CALL(active_span, spawnChild_(_, "async helloworld.Greeter.SayHello egress", _))
       .WillOnce(Return(child_span));
-  EXPECT_CALL(*child_span,
-              setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
   EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamCluster, Eq("test_cluster")));
   EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UpstreamAddress, Eq("test_cluster")));
   EXPECT_CALL(*child_span, injectContext(_, _));
