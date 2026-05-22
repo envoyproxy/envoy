@@ -5,14 +5,12 @@
 
 #include "source/common/protobuf/utility.h"
 
+#include "test/extensions/quic/proof_source/pending_proof_source.pb.h"
 #include "test/integration/base_overload_integration_test.h"
 #include "test/integration/filters/block_filter.pb.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/ssl_utility.h"
 #include "test/test_common/test_runtime.h"
-#ifdef ENVOY_ENABLE_QUIC
-#include "test/extensions/quic/proof_source/pending_proof_source.pb.h"
-#endif
 
 #include "absl/strings/str_cat.h"
 
@@ -630,14 +628,9 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseIdleHttpConnectionsDuringHa
                                     ->mutable_udp_listener_config()
                                     ->mutable_quic_options()
                                     ->mutable_proof_source_config();
-#ifdef ENVOY_ENABLE_QUIC
     proof_source_config->set_name("envoy.quic.proof_source.pending_signing");
     test::extensions::quic::proof_source::PendingProofSourceConfig config;
     proof_source_config->mutable_typed_config()->PackFrom(config);
-#else
-    proof_source_config->set_name("envoy.quic.proof_source.pending_signing");
-    proof_source_config->mutable_typed_config();
-#endif
   });
   initializeOverloadManager(
       TestUtility::parseYaml<envoy::config::overload::v3::ScaleTimersOverloadActionConfig>(R"EOF(
@@ -701,14 +694,9 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseMaxDurationHttpConnectionsD
                                     ->mutable_udp_listener_config()
                                     ->mutable_quic_options()
                                     ->mutable_proof_source_config();
-#ifdef ENVOY_ENABLE_QUIC
     proof_source_config->set_name("envoy.quic.proof_source.pending_signing");
     test::extensions::quic::proof_source::PendingProofSourceConfig config;
     proof_source_config->mutable_typed_config()->PackFrom(config);
-#else
-    proof_source_config->set_name("envoy.quic.proof_source.pending_signing");
-    proof_source_config->mutable_typed_config();
-#endif
   });
   initializeOverloadManager(
       TestUtility::parseYaml<envoy::config::overload::v3::ScaleTimersOverloadActionConfig>(R"EOF(
