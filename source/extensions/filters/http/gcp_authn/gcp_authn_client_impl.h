@@ -43,6 +43,7 @@ private:
   Server::Configuration::FactoryContext& context_;
   Http::AsyncClient::Request* active_request_{};
   GcpAuthnClient::Callbacks* callbacks_{};
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience_;
 };
 
 } // namespace GcpAuthn

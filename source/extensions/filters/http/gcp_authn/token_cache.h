@@ -29,8 +29,7 @@ public:
 
   absl::optional<std::string>
   lookUp(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience);
-  void insert(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-              std::unique_ptr<GcpToken> token);
+  void insert(std::unique_ptr<GcpToken> token);
 
   uint64_t capacity() { return lru_cache_.maxSize(); }
 

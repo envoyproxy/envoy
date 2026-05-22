@@ -5,7 +5,7 @@
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.h"
 
 #include "absl/status/statusor.h"
-#include "absl/types/optional.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -13,11 +13,20 @@ namespace HttpFilters {
 namespace GcpAuthn {
 
 struct GcpToken {
+  GcpToken() = default;
+  GcpToken(std::string token, uint64_t expires_at)
+      : token(std::move(token)), expires_at(expires_at) {}
+  GcpToken(std::string token, uint64_t expires_at,
+           envoy::extensions::filters::http::gcp_authn::v3::Audience audience)
+      : token(std::move(token)), expires_at(expires_at), audience(std::move(audience)) {}
+
   std::string token;
   uint64_t expires_at{0}; // Expiration time in seconds since epoch.
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
 
   bool operator==(const GcpToken& other) const {
-    return token == other.token && expires_at == other.expires_at;
+    return token == other.token && expires_at == other.expires_at &&
+           Protobuf::util::MessageDifferencer::Equals(audience, other.audience);
   }
 };
 

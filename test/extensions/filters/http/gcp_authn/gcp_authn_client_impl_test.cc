@@ -116,7 +116,7 @@ TEST_F(GcpAuthnClientImplTest, Success) {
       new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
   response->body().add(std::string(GoodTokenStr));
 
-  GcpToken expected_token{std::string(GoodTokenStr), ExpTime};
+  GcpToken expected_token{std::string(GoodTokenStr), ExpTime, audience};
   EXPECT_CALL(request_callbacks_, onComplete(absl::StatusOr<GcpToken>(expected_token)));
   client_callback_->onSuccess(client_request_, std::move(response));
 }

@@ -53,8 +53,9 @@ TEST_F(TokenCacheTest, ValidToken) {
   auto token = std::make_unique<GcpToken>();
   token->token = "foo";
   token->expires_at = ExpTime;
+  token->audience = audience;
 
-  token_cache_->insert(audience, std::move(token));
+  token_cache_->insert(std::move(token));
   auto found_token = token_cache_->lookUp(audience);
   EXPECT_TRUE(found_token.has_value());
   EXPECT_EQ(found_token.value(), "foo");
@@ -67,8 +68,9 @@ TEST_F(TokenCacheTest, ExpiredToken) {
   auto token = std::make_unique<GcpToken>();
   token->token = "foo";
   token->expires_at = 1205005587; // Sat Mar 08 2008 14:46:27 GMT-0500
+  token->audience = audience;
 
-  token_cache_->insert(audience, std::move(token));
+  token_cache_->insert(std::move(token));
   auto found_token = token_cache_->lookUp(audience);
   EXPECT_FALSE(found_token.has_value());
 }
@@ -87,8 +89,9 @@ TEST_F(TokenCacheTest, TokenWithClockSkew) {
   auto token = std::make_unique<GcpToken>();
   token->token = "foo";
   token->expires_at = ExpTime;
+  token->audience = audience;
 
-  token_cache_->insert(audience, std::move(token));
+  token_cache_->insert(std::move(token));
   auto found_token = token_cache_->lookUp(audience);
   EXPECT_FALSE(found_token.has_value());
 
@@ -97,8 +100,9 @@ TEST_F(TokenCacheTest, TokenWithClockSkew) {
   auto token2 = std::make_unique<GcpToken>();
   token2->token = "foo";
   token2->expires_at = ExpTime;
+  token2->audience = audience;
 
-  token_cache_->insert(audience, std::move(token2));
+  token_cache_->insert(std::move(token2));
   found_token = token_cache_->lookUp(audience);
   EXPECT_TRUE(found_token.has_value());
   EXPECT_EQ(found_token.value(), "foo");
@@ -111,8 +115,9 @@ TEST_F(TokenCacheTest, TokenWithoutExpiration) {
   auto token = std::make_unique<GcpToken>();
   token->token = "foo";
   token->expires_at = 0; // 0 indicates no expiration
+  token->audience = audience;
 
-  token_cache_->insert(audience, std::move(token));
+  token_cache_->insert(std::move(token));
 
   // Advance the simulated clock by a huge amount (e.g. 10 years)
   time_system_.setSystemTime(std::chrono::system_clock::from_time_t(ExpTime + 315360000));
@@ -140,12 +145,14 @@ TEST_F(TokenCacheTest, LruEviction) {
   auto t1 = std::make_unique<GcpToken>();
   t1->token = "token1";
   t1->expires_at = ExpTime;
-  small_cache->insert(req1, std::move(t1));
+  t1->audience = req1;
+  small_cache->insert(std::move(t1));
 
   auto t2 = std::make_unique<GcpToken>();
   t2->token = "token2";
   t2->expires_at = ExpTime;
-  small_cache->insert(req2, std::move(t2));
+  t2->audience = req2;
+  small_cache->insert(std::move(t2));
 
   // Verify both are present.
   EXPECT_TRUE(small_cache->lookUp(req1).has_value());
@@ -155,7 +162,8 @@ TEST_F(TokenCacheTest, LruEviction) {
   auto t3 = std::make_unique<GcpToken>();
   t3->token = "token3";
   t3->expires_at = ExpTime;
-  small_cache->insert(req3, std::move(t3));
+  t3->audience = req3;
+  small_cache->insert(std::move(t3));
 
   // Verify req1 is evicted, while req2 and req3 are still present.
   EXPECT_FALSE(small_cache->lookUp(req1).has_value());

@@ -13,6 +13,10 @@ TokenCacheImpl::lookUp(const envoy::extensions::filters::http::gcp_authn::v3::Au
   typename LRUCache::ScopedLookup lookup(&lru_cache_, key);
   if (lookup.found()) {
     GcpToken* const found_token = lookup.value();
+    // Verify that there is no hash collision by doing a deep comparison on the Audience message.
+    if (!Protobuf::util::MessageDifferencer::Equals(found_token->audience, audience)) {
+      return absl::nullopt;
+    }
     // Verify the validness of the token by checking its expiration time field.
     if (found_token->expires_at > 0 &&
         DateUtil::nowToSeconds(time_source_) + JwtVerify::kClockSkewInSecond >
@@ -28,10 +32,8 @@ TokenCacheImpl::lookUp(const envoy::extensions::filters::http::gcp_authn::v3::Au
   return absl::nullopt;
 }
 
-void TokenCacheImpl::insert(
-    const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-    std::unique_ptr<GcpToken> token) {
-  uint64_t key = MessageUtil::hash(audience);
+void TokenCacheImpl::insert(std::unique_ptr<GcpToken> token) {
+  uint64_t key = MessageUtil::hash(token->audience);
   // Release the token to transfer the ownership.
   lru_cache_.insert(key, token.release(), 1);
 }

@@ -43,6 +43,7 @@ void GcpAuthnClientImpl::fetchToken(
   cancel();
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
+  audience_ = audience;
 
   const std::string cluster =
       config_.cluster().empty() ? config_.http_uri().cluster() : config_.cluster();
@@ -89,7 +90,7 @@ void GcpAuthnClientImpl::onSuccess(const Http::AsyncClient::Request&,
       std::string token_str = response->bodyAsString();
       JwtVerify::Jwt jwt;
       if (jwt.parseFromString(token_str) == JwtVerify::Status::Ok) {
-        callbacks_->onComplete(GcpToken{token_str, jwt.exp_});
+        callbacks_->onComplete(GcpToken{token_str, jwt.exp_, audience_});
       } else {
         onError("Failed to parse identity token/JWT.");
       }

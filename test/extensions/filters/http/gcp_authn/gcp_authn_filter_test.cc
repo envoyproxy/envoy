@@ -240,7 +240,8 @@ TEST_F(GcpAuthnFilterTest, CacheHit) {
   auto token = std::make_unique<GcpToken>();
   token->token = "cached_token";
   token->expires_at = far_future_exp;
-  cache.insert(audience, std::move(token));
+  token->audience = audience;
+  cache.insert(std::move(token));
 
   setupFilterAndCallback(&cache);
 

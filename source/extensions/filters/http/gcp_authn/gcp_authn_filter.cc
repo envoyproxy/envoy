@@ -128,7 +128,7 @@ void GcpAuthnFilter::onComplete(absl::StatusOr<GcpToken> token) {
       }
       if (jwt_token_cache_ != nullptr) {
         // Insert the token into cache along with the ownership transfer.
-        jwt_token_cache_->insert(audience_, std::make_unique<GcpToken>(token_val));
+        jwt_token_cache_->insert(std::make_unique<GcpToken>(token_val));
       }
     } else {
       ENVOY_LOG(error, "Failed to fetch token: {}", token.status().message());
