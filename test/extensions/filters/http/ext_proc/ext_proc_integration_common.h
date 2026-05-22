@@ -43,9 +43,13 @@ using test::integration::filters::LoggingTestFilterConfig;
 
 struct ConfigOptions {
   enum class FilterSetup {
+    // NOLINTNEXTLINE(readability-identifier-naming)
     kNone,
+    // NOLINTNEXTLINE(readability-identifier-naming)
     kDownstream,
+    // NOLINTNEXTLINE(readability-identifier-naming)
     kCompositeMatchOnRequestHeaders,
+    // NOLINTNEXTLINE(readability-identifier-naming)
     kCompositeMatchOnResponseHeaders,
   };
 
@@ -102,6 +106,7 @@ protected:
       envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config,
       const std::string& ext_proc_filter_name);
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   bool IsEnvoyGrpc() { return std::get<1>(GetParam()) == Envoy::Grpc::ClientType::EnvoyGrpc; }
 
   void setPerRouteConfig(Route* route, const ExtProcPerRoute& cfg);
@@ -206,10 +211,10 @@ protected:
   std::unique_ptr<TestOnProcessingResponseFactory> processing_response_factory_;
   std::unique_ptr<Envoy::Registry::InjectFactory<OnProcessingResponseFactory>>
       processing_response_factory_registration_;
-  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
-  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_1_{};
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_;
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_1_;
   bool protocol_config_encoded_ = false;
-  ProtocolConfiguration protocol_config_{};
+  ProtocolConfiguration protocol_config_;
   uint32_t max_message_timeout_ms_{0};
   std::vector<FakeUpstream*> grpc_upstreams_;
   FakeHttpConnectionPtr processor_connection_;

@@ -381,7 +381,6 @@ void ActiveStreamFilterBase::sendLocalReply(
     streamInfo().filterState()->setData(
         LocalReplyFilterStateKey,
         std::make_shared<LocalReplyOwnerObject>(filter_context_.config_name),
-        StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::FilterChain);
   }
 

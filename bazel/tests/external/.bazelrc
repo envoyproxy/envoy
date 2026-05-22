@@ -15,6 +15,7 @@ run --color=yes
 
 common --enable_workspace
 common --noenable_bzlmod
+common --noincompatible_disallow_empty_glob
 
 build --workspace_status_command="bash get_workspace_status"
 build --incompatible_strict_action_env

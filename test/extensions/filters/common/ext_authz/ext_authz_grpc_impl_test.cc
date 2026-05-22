@@ -316,7 +316,7 @@ TEST_F(ExtAuthzGrpcClientTest, GrpcCallFailureDoesNotSetStatusCode) {
   // Expected: status_code should be unset (0), not Forbidden.
   auto expected_response = Response{};
   expected_response.status = CheckStatus::Error;
-  expected_response.status_code = static_cast<Http::Code>(0); // Unset
+  expected_response.status_code = {}; // Unset
   expected_response.grpc_status = grpc_status;
 
   envoy::service::auth::v3::CheckRequest request;

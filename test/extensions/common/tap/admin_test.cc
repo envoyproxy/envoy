@@ -9,7 +9,7 @@
 
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/admin_stream.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 

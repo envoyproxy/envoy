@@ -89,8 +89,22 @@ HickoryPendingResolution::HickoryPendingResolution(HickoryDnsResolver& parent,
     : callback_(std::move(callback)), query_id_(query_id), dns_name_(dns_name), parent_(parent) {}
 
 void HickoryPendingResolution::cancel(CancelReason) {
-  cancelled_ = true;
+  ASSERT(parent_.dispatcher_.isThreadSafe());
+
+  // Drop the Rust-side query state. The Rust cancel implementation flips the per-query
+  // `AtomicBool` so any in-flight Tokio task observes the cancellation and skips invoking
+  // the resolve-complete callback. The resolver pointer is unused by the cancel FFI; only
+  // the query pointer is consumed.
   parent_.config_->on_dns_resolve_cancel_(parent_.resolver_module_ptr_, query_module_ptr_);
+  query_module_ptr_ = nullptr;
+
+  // Reconcile shell state synchronously so the gauge tracks reality and the
+  // `HickoryPendingResolution` object is not leaked. Per the `ActiveDnsQuery::cancel()`
+  // contract, callers must treat the pointer as invalidated after this returns. A late
+  // `onResolveComplete` for this `query_id` will find no map entry and safely no-op.
+  parent_.stats_.pending_resolutions_.dec();
+  parent_.pending_queries_.erase(query_id_);
+  delete this;
 }
 
 // -- HickoryDnsResolver -------------------------------------------------------
@@ -110,25 +124,27 @@ HickoryDnsResolver::HickoryDnsResolver(HickoryDnsResolverConfigSharedPtr config,
 }
 
 HickoryDnsResolver::~HickoryDnsResolver() {
-  // Step 1: Set the C++ shutdown flag so the ABI callback called from `Tokio` threads
-  // will not post to the dispatcher. This provides TSAN-visible synchronization since
-  // the Rust code is not instrumented by TSAN.
+  // Step 1: Set the C++ shutdown flag so the ABI callback called from Tokio threads
+  // skips posting to the dispatcher. The posted lambda also locks a `weak_ptr` to this
+  // resolver as the final use-after-free guard.
   shutting_down_.store(true, std::memory_order_release);
 
-  // Step 2: Destroy the module resolver, which shuts down the `Tokio` runtime and
-  // blocks until all worker threads have exited.
+  // Step 2: Destroy the module resolver. The Rust `Drop` impl signals its own
+  // shutting-down flag and then performs `runtime.shutdown_timeout(5s)`, waiting up to
+  // five seconds for Tokio tasks to finish; any tasks still running when the timeout
+  // expires are dropped.
   config_->on_dns_resolver_destroy_(resolver_module_ptr_);
 
-  // Step 3: Free Rust-side query objects for all remaining pending queries, and delete
-  // the C++ pending resolution objects. Already-cancelled queries have their Rust-side
-  // objects freed by the cancel() call, so only free non-cancelled ones. Decrement the
-  // pending_resolutions gauge for each query since their callbacks will never arrive.
+  // Step 3: Free Rust-side query objects for all remaining pending queries and delete
+  // the C++ pending resolution objects. Cancelled queries are not present here: they
+  // were removed and freed by `HickoryPendingResolution::cancel()`. Decrement the
+  // `pending_resolutions` gauge for each remaining query since their callbacks will
+  // never arrive.
   for (auto& [id, pending] : pending_queries_) {
     stats_.pending_resolutions_.dec();
-    if (!pending->cancelled_) {
-      // Safe: on_dns_resolve_cancel_ does not dereference the resolver pointer.
-      config_->on_dns_resolve_cancel_(resolver_module_ptr_, pending->query_module_ptr_);
-    }
+    // Safe: the Rust cancel FFI ignores the resolver pointer; only the query box is
+    // consumed. See `envoy_dynamic_module_on_dns_resolve_cancel` in the Rust SDK.
+    config_->on_dns_resolve_cancel_(resolver_module_ptr_, pending->query_module_ptr_);
     delete pending;
   }
   pending_queries_.clear();
@@ -190,12 +206,6 @@ void HickoryDnsResolver::onResolveComplete(uint64_t query_id,
   stats_.resolve_total_.inc();
   stats_.pending_resolutions_.dec();
 
-  if (pending->cancelled_) {
-    ENVOY_LOG(debug, "dropping cancelled query [{}]", pending->dns_name_);
-    delete pending;
-    return;
-  }
-
   const auto envoy_status = status == envoy_dynamic_module_type_dns_resolution_status_Completed
                                 ? ResolutionStatus::Completed
                                 : ResolutionStatus::Failure;
@@ -208,8 +218,8 @@ void HickoryDnsResolver::onResolveComplete(uint64_t query_id,
               response.size());
   }
 
-  // Free the Rust-side query object. The cancel ABI function takes ownership and drops it.
-  // Calling cancel on an already-completed query is harmless (it only sets the AtomicBool).
+  // Free the Rust-side query object now that its task has produced a result. The cancel
+  // ABI function takes ownership of the boxed query and drops it.
   config_->on_dns_resolve_cancel_(resolver_module_ptr_, pending->query_module_ptr_);
   pending->query_module_ptr_ = nullptr;
 
@@ -234,6 +244,7 @@ void HickoryDnsResolver::chargeGetAddrInfoErrorStats(absl::string_view details) 
 absl::StatusOr<DnsResolverSharedPtr> HickoryDnsResolverFactory::createDnsResolver(
     Event::Dispatcher& dispatcher, Api::Api& api,
     const envoy::config::core::v3::TypedExtensionConfig& typed_config) const {
+  ASSERT(dispatcher.isThreadSafe());
   envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig proto_config;
   RETURN_IF_NOT_OK(Envoy::MessageUtil::unpackTo(typed_config.typed_config(), proto_config));
 
@@ -260,11 +271,21 @@ void envoy_dynamic_module_callback_dns_resolve_complete(
   auto* resolver = const_cast<Envoy::Network::HickoryDnsResolver*>(
       static_cast<const Envoy::Network::HickoryDnsResolver*>(resolver_envoy_ptr));
 
-  // Check the C++ shutdown flag before accessing any resolver state. This provides
-  // TSAN-visible synchronization for accesses from `Tokio` worker threads.
+  // Fast path: if the resolver is already shutting down, skip the response copy entirely.
+  // The Rust task is expected to observe the Rust-side shutdown flag and bail out before
+  // reaching this callback, but this guard also covers the narrow window where the C++
+  // destructor has set the flag while the callback is in flight on a Tokio thread.
   if (resolver->shutting_down_.load(std::memory_order_acquire)) {
     return;
   }
+
+  // The resolver storage is kept alive across this FFI call because
+  // `on_dns_resolver_destroy_` (invoked from the C++ destructor) blocks on
+  // `runtime.shutdown_timeout(5s)` until in-flight FFI calls return. Capture a
+  // `weak_ptr` so the posted lambda does not extend the resolver's lifetime; if the
+  // dispatcher fails to drain the lambda before the resolver is destroyed, the
+  // lambda's `lock()` returns `nullptr` and the callback is safely skipped.
+  std::weak_ptr<Envoy::Network::HickoryDnsResolver> weak_resolver = resolver->weak_from_this();
 
   const std::string details_str = (details.ptr != nullptr && details.length > 0)
                                       ? std::string(details.ptr, details.length)
@@ -283,8 +304,13 @@ void envoy_dynamic_module_callback_dns_resolve_complete(
     }
   }
 
-  resolver->dispatcher_.post([resolver, query_id, status, details = std::move(details_str),
+  resolver->dispatcher_.post([weak_resolver = std::move(weak_resolver), query_id, status,
+                              details = std::move(details_str),
                               response = std::move(response)]() mutable {
-    resolver->onResolveComplete(query_id, status, details, std::move(response));
+    // If the resolver was destroyed between `post()` and now, `lock()` returns `nullptr`
+    // and the lambda exits safely without touching freed memory.
+    if (auto resolver_shared = weak_resolver.lock()) {
+      resolver_shared->onResolveComplete(query_id, status, details, std::move(response));
+    }
   });
 }

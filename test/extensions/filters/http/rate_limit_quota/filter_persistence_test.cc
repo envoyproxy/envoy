@@ -280,7 +280,7 @@ protected:
   }
 
   envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig
-      rlqs_filter_config_{};
+      rlqs_filter_config_;
 
   struct FakeRlqsUpstreamRefs {
     Network::Address::InstanceConstSharedPtr rlqs_endpoint_ = nullptr;
@@ -291,7 +291,7 @@ protected:
     FakeStreamPtr rlqs_stream_ = nullptr;
     Cluster* rlqs_cluster_ = nullptr;
   };
-  std::vector<FakeRlqsUpstreamRefs> rlqs_upstreams_{};
+  std::vector<FakeRlqsUpstreamRefs> rlqs_upstreams_;
 
   Network::Address::InstanceConstSharedPtr traffic_endpoint_ = nullptr;
   AutonomousUpstream* traffic_upstream_ = nullptr;
