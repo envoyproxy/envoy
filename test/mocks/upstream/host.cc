@@ -59,7 +59,7 @@ MockHostDescription::MockHostDescription()
         if (index >= lb_policy_datas_.size()) {
           return {};
         }
-        return OptRef<HostLbPolicyData>(*lb_policy_datas_[index]);
+        return {*lb_policy_datas_[index]};
       }));
 }
 
@@ -88,7 +88,7 @@ MockHost::MockHost() : socket_factory_(new testing::NiceMock<Network::MockTransp
         if (index >= lb_policy_datas_.size()) {
           return {};
         }
-        return OptRef<HostLbPolicyData>(*lb_policy_datas_[index]);
+        return {*lb_policy_datas_[index]};
       }));
 }
 

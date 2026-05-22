@@ -42,7 +42,6 @@ bool envoy_dynamic_module_callback_cert_validator_set_filter_state(
 
   config->current_callbacks_->connection().streamInfo().filterState()->setData(
       key_str, std::make_shared<Envoy::Router::StringAccessorImpl>(value_str),
-      Envoy::StreamInfo::FilterState::StateType::ReadOnly,
       Envoy::StreamInfo::FilterState::LifeSpan::Connection);
   return true;
 }

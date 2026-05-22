@@ -101,9 +101,10 @@ TEST_F(HttpConnectionManagerConfigTest, AllDependenciesSatisfiedOk) {
   ChefFilterFactory cf;
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
 
-  HttpConnectionManagerConfig(hcm_config, context_, date_provider_, route_config_provider_manager_,
-                              &scoped_routes_config_provider_manager_, tracer_manager_,
-                              filter_config_provider_manager_, creation_status_);
+  HttpConnectionManagerConfig give_me_a_name(
+      hcm_config, context_, date_provider_, route_config_provider_manager_,
+      &scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_,
+      creation_status_);
   ASSERT_TRUE(creation_status_.ok());
 }
 
@@ -116,9 +117,10 @@ TEST_F(HttpConnectionManagerConfigTest, UnusedProvidencyOk) {
   PantryFilterFactory pf;
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rf(pf);
 
-  HttpConnectionManagerConfig(hcm_config, context_, date_provider_, route_config_provider_manager_,
-                              &scoped_routes_config_provider_manager_, tracer_manager_,
-                              filter_config_provider_manager_, creation_status_);
+  HttpConnectionManagerConfig give_me_a_name(
+      hcm_config, context_, date_provider_, route_config_provider_manager_,
+      &scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_,
+      creation_status_);
   ASSERT_TRUE(creation_status_.ok());
 }
 

@@ -124,7 +124,10 @@ envoy_cc_test_library(
 envoy_cc_test_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
-    hdrs = ["utility.h"],
+    hdrs = [
+        "enum_test_utils.h",
+        "utility.h",
+    ],
     deps = [
         ":file_system_for_test_lib",
         ":logging_lib",
@@ -155,6 +158,7 @@ envoy_cc_test_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:stats_lib",
         "//test/mocks/stats:stats_mocks",
+        "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",

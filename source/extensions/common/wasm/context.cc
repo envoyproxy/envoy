@@ -1098,9 +1098,7 @@ WasmResult Context::setProperty(std::string_view path, std::string_view value) {
             : *it->second.get(); // NOLINT
     auto state_ptr = std::make_unique<CelState>(prototype);
     state = state_ptr.get();
-    stream_info->filterState()->setData(key, std::move(state_ptr),
-                                        StreamInfo::FilterState::StateType::Mutable,
-                                        prototype.life_span_);
+    stream_info->filterState()->setData(key, std::move(state_ptr), prototype.life_span_);
   }
   if (!state->setValue(toAbslStringView(value))) {
     return WasmResult::BadArgument;
@@ -1126,8 +1124,7 @@ WasmResult Context::setEnvoyFilterState(std::string_view path, std::string_view 
     return WasmResult::NotFound;
   }
 
-  stream_info->filterState()->setData(path, std::move(object),
-                                      StreamInfo::FilterState::StateType::Mutable, life_span);
+  stream_info->filterState()->setData(path, std::move(object), life_span);
   return WasmResult::Ok;
 }
 

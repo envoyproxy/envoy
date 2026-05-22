@@ -191,7 +191,7 @@ void RouterTestBase::setNumPreviousRedirect(uint32_t num_previous_redirects) {
   callbacks_.streamInfo().filterState()->setData(
       "num_internal_redirects",
       std::make_shared<StreamInfo::UInt32AccessorImpl>(num_previous_redirects),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Request);
+      StreamInfo::FilterState::LifeSpan::Request);
 }
 
 void RouterTestBase::setIncludeAttemptCountInRequest(bool include) {

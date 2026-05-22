@@ -17,6 +17,7 @@ envoy_cc_test(
     srcs = ["absl_status_to_http_status_test.cc"],
     deps = [
         "//source/extensions/filters/http/file_server:absl_status_to_http_status",
+        "//test/test_common:utility_lib",
     ],
 )
 

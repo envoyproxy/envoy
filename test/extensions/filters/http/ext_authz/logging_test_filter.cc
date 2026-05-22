@@ -22,7 +22,7 @@ namespace ExternalProcessing {
 using test::integration::filters::LoggingTestFilterConfig;
 
 Grpc::Status::WellKnownGrpcStatus
-GrpcStatusFromProto(LoggingTestFilterConfig::GrpcStatus grpc_status) {
+grpcStatusFromProto(LoggingTestFilterConfig::GrpcStatus grpc_status) {
   switch (grpc_status) {
   case LoggingTestFilterConfig::OK:
     return Grpc::Status::WellKnownGrpcStatus::Ok;
@@ -110,7 +110,7 @@ public:
       EXPECT_EQ(ext_authz_logging_info->upstreamHost()->cluster().name(), expected_cluster_name_);
       if (expect_grpc_status_ != LoggingTestFilterConfig::UNSPECIFIED) {
         ASSERT_TRUE(ext_authz_logging_info->grpcStatus().has_value());
-        EXPECT_EQ(ext_authz_logging_info->grpcStatus(), GrpcStatusFromProto(expect_grpc_status_));
+        EXPECT_EQ(ext_authz_logging_info->grpcStatus(), grpcStatusFromProto(expect_grpc_status_));
       } else {
         EXPECT_FALSE(ext_authz_logging_info->grpcStatus().has_value());
       }
