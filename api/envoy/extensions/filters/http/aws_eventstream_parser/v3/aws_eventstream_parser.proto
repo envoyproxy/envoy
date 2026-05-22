@@ -5,6 +5,7 @@ package envoy.extensions.filters.http.aws_eventstream_parser.v3;
 import "envoy/config/core/v3/extension.proto";
 
 import "google/protobuf/struct.proto";
+import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
 
@@ -77,7 +78,8 @@ message AwsEventstreamParser {
     //
     // When all header rules AND all content parser rules have stop_processing_after_matches
     // limits set and all limits are satisfied, the filter stops processing the stream entirely.
-    uint32 stop_processing_after_matches = 4 [(validate.rules).uint32 = {lte: 1}];
+    google.protobuf.UInt32Value stop_processing_after_matches = 4
+        [(validate.rules).uint32 = {lte: 1}];
   }
 
   // Rules for processing AWS EventStream streams and extracting metadata.

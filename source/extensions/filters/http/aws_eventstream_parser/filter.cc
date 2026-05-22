@@ -200,8 +200,9 @@ void Filter::processMessageHeaders(
     auto& state = header_rule_states_[i];
 
     // Skip rules that have already reached their match limit.
-    if (rule.stop_processing_after_matches() > 0 &&
-        state.match_count >= rule.stop_processing_after_matches()) {
+    if (rule.has_stop_processing_after_matches() &&
+        rule.stop_processing_after_matches().value() > 0 &&
+        state.match_count >= rule.stop_processing_after_matches().value()) {
       continue;
     }
 
@@ -384,10 +385,11 @@ void Filter::writeMetadata() {
 bool Filter::allHeaderRulesSatisfied() const {
   const auto& rules = config_->headerRules();
   for (int i = 0; i < rules.size(); ++i) {
-    if (rules[i].stop_processing_after_matches() == 0) {
+    if (!rules[i].has_stop_processing_after_matches() ||
+        rules[i].stop_processing_after_matches().value() == 0) {
       return false;
     }
-    if (header_rule_states_[i].match_count < rules[i].stop_processing_after_matches()) {
+    if (header_rule_states_[i].match_count < rules[i].stop_processing_after_matches().value()) {
       return false;
     }
   }
