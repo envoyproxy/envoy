@@ -161,36 +161,21 @@ message ConsistentHashingLbConfig {
   repeated config.route.v3.RouteAction.HashPolicy hash_policy = 3;
 }
 
-// Out-of-band (OOB) ORCA load reporting configuration. OOB reporting opens a
-// dedicated ``xds.service.orca.v3.OpenRcaService`` gRPC/HTTP2 stream to each
-// upstream host. This message is shared by load balancing policies that consume
-// ORCA load reports (e.g. :ref:`client_side_weighted_round_robin
+// Connection overrides for the ORCA out-of-band (OOB) reporting stream, used by
+// load balancing policies that consume ORCA load reports (e.g.
+// :ref:`client_side_weighted_round_robin
 // <envoy_v3_api_msg_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin>`).
-//
-// How this configuration is interpreted -- in particular whether its presence
-// enables OOB reporting -- is defined by the documentation of the field that
-// embeds it.
-// [#next-free-field: 6]
+// Whether and when OOB reporting runs is controlled by the embedding policy.
 message OrcaOobReportingConfig {
-  // If true, out-of-band reporting is disabled even though this message is
-  // present. Lets a control plane keep the configuration block while turning
-  // OOB reporting off.
-  bool disabled = 1;
-
-  // Load reporting interval to request from the server. The server may report
-  // less frequently than requested. Defaults to 10 seconds. If set, must be
-  // greater than 1 millisecond.
-  google.protobuf.Duration reporting_period = 2 [(validate.rules).duration = {gt {nanos: 1000000}}];
-
   // Optional alternative port for the OOB reporting connection, for example an
   // ORCA reporting sidecar listening on a dedicated port. If 0 or unset, the
   // port of the host's ORCA reporting address is used. Ignored for non-IP
   // (pipe/UDS) host addresses.
-  uint32 port_value = 3 [(validate.rules).uint32 = {lte: 65535}];
+  uint32 port_value = 1 [(validate.rules).uint32 = {lte: 65535}];
 
   // Value of the ``:authority`` header on the OOB gRPC stream. If empty, the
   // endpoint hostname is used, then the host address, then the cluster name.
-  string authority = 4
+  string authority = 2
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
   // Optional key/value pairs used to select a transport socket from the
@@ -199,5 +184,5 @@ message OrcaOobReportingConfig {
   // for the OOB connection. If unset, or if no match is found, the cluster's
   // default transport socket is used. ALPN ``h2`` is always forced on the OOB
   // connection regardless of this setting.
-  google.protobuf.Struct transport_socket_match_criteria = 5;
+  google.protobuf.Struct transport_socket_match_criteria = 3;
 }

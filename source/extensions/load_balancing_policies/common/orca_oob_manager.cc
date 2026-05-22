@@ -36,11 +36,9 @@ constexpr uint64_t kInactivityWatchdogMultiplier = 3;
 constexpr uint32_t kMaxOrcaReportFrameBytes = 64 * 1024;
 } // namespace
 
-OrcaOobManagerConfig parseOrcaOobManagerConfig(
-    const envoy::extensions::load_balancing_policies::common::v3::OrcaOobReportingConfig& proto) {
-  OrcaOobManagerConfig config;
-  config.reporting_period = std::chrono::milliseconds(
-      PROTOBUF_GET_MS_OR_DEFAULT(proto, reporting_period, kDefaultOobReportingPeriodMs));
+void mergeOrcaOobConnectionOverrides(
+    const envoy::extensions::load_balancing_policies::common::v3::OrcaOobReportingConfig& proto,
+    OrcaOobManagerConfig& config) {
   config.port_value = proto.port_value();
   config.authority = proto.authority();
   if (proto.has_transport_socket_match_criteria()) {
@@ -50,7 +48,6 @@ OrcaOobManagerConfig parseOrcaOobManagerConfig(
         proto.transport_socket_match_criteria();
     config.transport_socket_match_metadata = std::move(metadata);
   }
-  return config;
 }
 
 OrcaOobManager::OrcaOobManager(OrcaOobManagerConfig config,
@@ -64,9 +61,7 @@ OrcaOobManager::OrcaOobManager(OrcaOobManagerConfig config,
           /*override_alpn=*/std::vector<std::string>{"h2"})),
       priority_set_(priority_set), report_handler_(std::move(report_handler)),
       oob_stats_(generateOrcaOobStats(stats_scope)) {
-  // reporting_period is always positive: the new field is validated > 1ms (so it
-  // cannot truncate to 0 in milliseconds) and the deprecated path clamps
-  // non-positive values. Sessions rely on it being > 0.
+  // Callers clamp non-positive periods to the default; sessions need > 0.
   ASSERT(config_.reporting_period.count() > 0);
 }
 
@@ -147,9 +142,7 @@ OrcaOobManager::OobSession::OobSession(OrcaOobManager& parent, Upstream::HostCon
   attempt_timer_->enableTimer(initial_delay);
   inactivity_timer_ =
       parent_.dispatcher_.createTimer([this]() { handleTransientFailure("inactivity timeout"); });
-  // Sessions are only created for hosts in a priority set, which always have a
-  // resolved address; the only orcaReportingAddress() impl returning nullptr is
-  // RealHostDescription, which is forwarding-only and never in a priority set.
+  // Hosts in a priority set always have a resolved address.
   const Network::Address::InstanceConstSharedPtr orca_address = host_->orcaReportingAddress();
   ASSERT(orca_address != nullptr);
   if (parent_.config_.port_value != 0 && orca_address->ip() == nullptr) {
@@ -263,8 +256,7 @@ void OrcaOobManager::OobSession::connectAndStream() {
   ASSERT(codec_client_ == nullptr);
   resetState();
 
-  // Apply the policy-level port override to the OOB reporting address. Skipped
-  // for non-IP (pipe/UDS) hosts.
+  // Apply port override; skip for non-IP (pipe/UDS) hosts.
   const Network::Address::InstanceConstSharedPtr orca_address = host_->orcaReportingAddress();
   ASSERT(orca_address != nullptr);
   Network::Address::InstanceConstSharedPtr address_override;
@@ -276,10 +268,9 @@ void OrcaOobManager::OobSession::connectAndStream() {
   Upstream::Host::CreateConnectionData connection_data = host_->createOrcaReportingConnection(
       parent_.dispatcher_, parent_.alpn_options_,
       parent_.config_.transport_socket_match_metadata.get(), address_override);
-  // Derive :scheme from the actual OOB connection's transport, which (via
-  // transport_socket_match_criteria) may differ from the cluster default. ssl()
-  // is read at connection construction; a transport that becomes secure only
-  // after connect (e.g. STARTTLS) is not a supported OOB transport.
+  // Derive :scheme from the actual OOB connection, which may differ from the
+  // cluster default via transport_socket_match_criteria. Reads ssl() at
+  // construction; post-connect TLS upgrades (e.g. STARTTLS) not supported.
   const bool secure_transport =
       connection_data.connection_ != nullptr && connection_data.connection_->ssl() != nullptr;
   codec_client_ = parent_.createCodecClient(connection_data);

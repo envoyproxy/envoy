@@ -43,23 +43,23 @@ struct OrcaOobStats {
   ALL_ORCA_OOB_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
-// Default ORCA OOB load reporting interval, applied when reporting_period is unset.
+// Default ORCA OOB load reporting interval.
 constexpr uint64_t kDefaultOobReportingPeriodMs = 10000;
 
-// Parsed, validated form of OrcaOobReportingConfig consumed by OrcaOobManager.
-// Reusable by any load balancing policy that drives ORCA OOB reporting.
+// Resolved configuration consumed by OrcaOobManager.
 struct OrcaOobManagerConfig {
   std::chrono::milliseconds reporting_period{kDefaultOobReportingPeriodMs};
   uint32_t port_value{0};
   std::string authority;
-  // Synthetic endpoint metadata carrying transport_socket_match_criteria under
-  // the "envoy.transport_socket_match" key; nullptr when no criteria are set.
+  // Endpoint metadata carrying transport_socket_match_criteria under the
+  // "envoy.transport_socket_match" key; nullptr when unset.
   std::shared_ptr<const envoy::config::core::v3::Metadata> transport_socket_match_metadata;
 };
 
-// Translates the proto config into OrcaOobManagerConfig, applying defaults.
-OrcaOobManagerConfig parseOrcaOobManagerConfig(
-    const envoy::extensions::load_balancing_policies::common::v3::OrcaOobReportingConfig& proto);
+// Populates the connection-override fields of `config` from `proto`.
+void mergeOrcaOobConnectionOverrides(
+    const envoy::extensions::load_balancing_policies::common::v3::OrcaOobReportingConfig& proto,
+    OrcaOobManagerConfig& config);
 
 /**
  * Cluster-level manager owning per-host ORCA OOB streams. Modeled on
@@ -172,8 +172,7 @@ private:
   static OrcaOobStats generateOrcaOobStats(Stats::Scope& scope);
 
   const OrcaOobManagerConfig config_;
-  // Forced ALPN ("h2") for every OOB connection: OOB reporting is always
-  // gRPC over HTTP/2 regardless of the main host's negotiated protocol.
+  // Forced ALPN "h2"; OOB reporting is always gRPC/HTTP2.
   const Network::TransportSocketOptionsConstSharedPtr alpn_options_;
   const Upstream::PrioritySet& priority_set_;
   OrcaLoadReportHandlerSharedPtr report_handler_;

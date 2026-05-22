@@ -7,7 +7,6 @@ import "envoy/extensions/load_balancing_policies/common/v3/common.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -49,20 +48,12 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message ClientSideWeightedRoundRobin {
   // Whether to enable out-of-band utilization reporting collection from
   // the endpoints. By default, per-request utilization reporting is used.
-  // This field is deprecated; use :ref:`oob_reporting_config
-  // <envoy_v3_api_field_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin.oob_reporting_config>`
-  // instead.
-  google.protobuf.BoolValue enable_oob_load_report = 1
-      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+  google.protobuf.BoolValue enable_oob_load_report = 1;
 
   // Load reporting interval to request from the server. Note that the
   // server may not provide reports as frequently as the client requests.
   // Used only when enable_oob_load_report is true. Default is 10 seconds.
-  // This field is deprecated; use :ref:`oob_reporting_config
-  // <envoy_v3_api_field_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin.oob_reporting_config>`
-  // instead.
-  google.protobuf.Duration oob_reporting_period = 2
-      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+  google.protobuf.Duration oob_reporting_period = 2;
 
   // A given endpoint must report load metrics continuously for at least
   // this long before the endpoint weight will be used. This avoids
@@ -98,10 +89,8 @@ message ClientSideWeightedRoundRobin {
   // If this configuration is not set, slow start will not be not enabled.
   common.v3.SlowStartConfig slow_start_config = 8;
 
-  // Out-of-band ORCA load reporting configuration. Setting this field enables
-  // out-of-band reporting (unless :ref:`disabled
-  // <envoy_v3_api_field_extensions.load_balancing_policies.common.v3.OrcaOobReportingConfig.disabled>`
-  // is true) and replaces the deprecated ``enable_oob_load_report`` and
-  // ``oob_reporting_period`` fields. Cannot be set alongside either.
+  // Optional overrides for the OOB reporting connection (alternative port,
+  // ``:authority``, transport socket selection). Honored only when
+  // ``enable_oob_load_report`` is true.
   common.v3.OrcaOobReportingConfig oob_reporting_config = 9;
 }

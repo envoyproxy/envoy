@@ -120,9 +120,8 @@ Upstream::Host::CreateConnectionData LogicalHost::createOrcaReportingConnection(
     Network::Address::InstanceConstSharedPtr address_override) const {
   const Network::Address::InstanceConstSharedPtr address =
       address_override != nullptr ? address_override : orcaReportingAddress();
-  // OrcaOobManager passes forced HTTP/2 ALPN which is required for OOB streams. A
-  // non-null override_transport_socket_options_ would clobber it, so the combination
-  // is unsupported.
+  // OrcaOobManager passes forced HTTP/2 ALPN; override_transport_socket_options_
+  // would clobber it.
   ASSERT(override_transport_socket_options_ == nullptr);
   Network::UpstreamTransportSocketFactory& factory =
       (metadata != nullptr)

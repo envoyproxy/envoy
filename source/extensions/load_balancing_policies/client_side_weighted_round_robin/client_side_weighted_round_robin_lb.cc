@@ -43,22 +43,17 @@ ClientSideWeightedRoundRobinLbConfig::ClientSideWeightedRoundRobinLbConfig(
   weight_update_period =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(lb_proto, weight_update_period, 1000));
 
-  // oob_reporting_config supersedes the deprecated enable_oob_load_report /
-  // oob_reporting_period fields, which are honored only when it is unset.
+  oob_enabled = lb_proto.enable_oob_load_report().value();
+  // oob_reporting_period has no proto validation; clamp non-positive to default.
+  const int64_t period_ms = PROTOBUF_GET_MS_OR_DEFAULT(
+      lb_proto, oob_reporting_period,
+      Extensions::LoadBalancingPolicies::Common::kDefaultOobReportingPeriodMs);
+  oob_manager_config.reporting_period = std::chrono::milliseconds(
+      period_ms > 0 ? period_ms
+                    : Extensions::LoadBalancingPolicies::Common::kDefaultOobReportingPeriodMs);
   if (lb_proto.has_oob_reporting_config()) {
-    oob_enabled = !lb_proto.oob_reporting_config().disabled();
-    oob_manager_config = Extensions::LoadBalancingPolicies::Common::parseOrcaOobManagerConfig(
-        lb_proto.oob_reporting_config());
-  } else {
-    // Deprecated path: only the reporting period carries over. oob_reporting_period
-    // is not validated as positive, so clamp non-positive values to the default.
-    oob_enabled = lb_proto.enable_oob_load_report().value();
-    const int64_t period_ms = PROTOBUF_GET_MS_OR_DEFAULT(
-        lb_proto, oob_reporting_period,
-        Extensions::LoadBalancingPolicies::Common::kDefaultOobReportingPeriodMs);
-    oob_manager_config.reporting_period = std::chrono::milliseconds(
-        period_ms > 0 ? period_ms
-                      : Extensions::LoadBalancingPolicies::Common::kDefaultOobReportingPeriodMs);
+    Extensions::LoadBalancingPolicies::Common::mergeOrcaOobConnectionOverrides(
+        lb_proto.oob_reporting_config(), oob_manager_config);
   }
 
   if (lb_proto.has_slow_start_config()) {
