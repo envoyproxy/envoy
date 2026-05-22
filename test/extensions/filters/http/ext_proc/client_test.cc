@@ -8,6 +8,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -341,9 +342,35 @@ TEST_F(ExtProcStreamTest, ClientStartError) {
   EXPECT_NE(stream, nullptr);
 
   EXPECT_CALL(client_manager_, getOrCreateRawAsyncClientWithHashKey(_, _, _))
-      .WillOnce(Return(absl::InvalidArgumentError("error")));
+      .WillOnce(Return(absl::InvalidArgumentError("creation-error")));
   stream = client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
   EXPECT_EQ(stream, nullptr);
+  // With the default runtime guard on, the client surfaces the failure via onGrpcError so the
+  // consuming filter can honor failure_mode_allow.
+  EXPECT_EQ(grpc_status_, Grpc::Status::WellKnownGrpcStatus::Internal);
+  EXPECT_THAT(grpc_error_message_, testing::HasSubstr("creation-error"));
+}
+
+TEST_F(ExtProcStreamTest, ClientStartErrorGuardDisabled) {
+  // Operators that depended on the legacy silent-ignore behavior can opt out by setting
+  // envoy.reloadable_features.ext_proc_report_client_creation_error to false. In that case
+  // start() returns nullptr without invoking onGrpcError (matching pre-fix behavior).
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ext_proc_report_client_creation_error", "false"}});
+
+  Http::AsyncClient::ParentContext parent_context;
+  parent_context.stream_info = &stream_info_;
+  auto options = Http::AsyncClient::StreamOptions().setParentContext(parent_context);
+  auto stream = client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
+  EXPECT_NE(stream, nullptr);
+
+  EXPECT_CALL(client_manager_, getOrCreateRawAsyncClientWithHashKey(_, _, _))
+      .WillOnce(Return(absl::InvalidArgumentError("creation-error")));
+  stream = client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
+  EXPECT_EQ(stream, nullptr);
+  EXPECT_EQ(grpc_status_, Grpc::Status::WellKnownGrpcStatus::Ok);
+  EXPECT_EQ(grpc_error_message_, "");
 }
 
 } // namespace
