@@ -1,1 +1,1 @@
-gcp_authn: added support for token binding configuration in the GCP Authentication filter, allowing tracking of mTLS client certificates and caching of their fingerprints.
+gcp_authn: added support for token binding configuration in the GCP Authentication filter, allowing tracking of mTLS client certificates and caching of their fingerprints. Note that bound token support in the filter itself is not yet implemented and will be added in a subsequent change.
