@@ -19,7 +19,7 @@ namespace Tcp {
 
 class CustomMockClientConnection : public Network::MockClientConnection {
 public:
-  ~CustomMockClientConnection() {
+  ~CustomMockClientConnection() override {
     if (state_ != Connection::State::Closed) {
       raiseEvent(Network::ConnectionEvent::LocalClose);
     }

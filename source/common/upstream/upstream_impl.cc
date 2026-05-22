@@ -603,6 +603,19 @@ Host::CreateConnectionData HostImplBase::createHealthCheckConnection(
                           transport_socket_options, shared_from_this());
 }
 
+Host::CreateConnectionData HostImplBase::createOrcaReportingConnection(
+    Event::Dispatcher& dispatcher,
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+    const envoy::config::core::v3::Metadata* metadata) const {
+  const auto orca_address = orcaReportingAddress();
+  Network::UpstreamTransportSocketFactory& factory =
+      (metadata != nullptr)
+          ? resolveTransportSocketFactory(orca_address, metadata, transport_socket_options)
+          : transportSocketFactory();
+  return createConnection(dispatcher, cluster(), orca_address, addressListOrNull(), factory,
+                          /*options=*/nullptr, transport_socket_options, shared_from_this());
+}
+
 absl::optional<Network::Address::InstanceConstSharedPtr> HostImplBase::maybeGetProxyRedirectAddress(
     const Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
     HostDescriptionConstSharedPtr host,

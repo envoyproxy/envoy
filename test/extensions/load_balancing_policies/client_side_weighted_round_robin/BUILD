@@ -48,6 +48,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.load_balancing_policies.client_side_weighted_round_robin"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/grpc:common_lib",
         "//source/common/protobuf",
         "//source/extensions/load_balancing_policies/client_side_weighted_round_robin:config",
         "//test/integration:http_integration_lib",

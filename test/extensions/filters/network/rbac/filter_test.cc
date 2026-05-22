@@ -33,9 +33,7 @@ public:
     Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
   }
 
-  RoleBasedAccessControlNetworkFilterTest() {
-    // No per-logger log level setting needed
-  }
+  RoleBasedAccessControlNetworkFilterTest() = default;
 
   void
   setupPolicy(bool with_policy = true, bool continuous = false,

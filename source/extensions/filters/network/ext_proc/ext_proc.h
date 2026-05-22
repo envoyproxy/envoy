@@ -14,6 +14,8 @@
 
 #include "source/extensions/filters/network/ext_proc/client_impl.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -104,6 +106,9 @@ public:
         typed_forwarding_namespaces_(
             config.metadata_options().forwarding_namespaces().typed().begin(),
             config.metadata_options().forwarding_namespaces().typed().end()),
+        untyped_receiving_namespaces_(
+            config.metadata_options().receiving_namespaces().untyped().begin(),
+            config.metadata_options().receiving_namespaces().untyped().end()),
         stats_(generateStats(config.stat_prefix(), scope)),
         message_timeout_(std::chrono::milliseconds(
             PROTOBUF_GET_MS_OR_DEFAULT(config, message_timeout, DefaultMessageTimeoutMs))) {};
@@ -124,6 +129,10 @@ public:
     return typed_forwarding_namespaces_;
   }
 
+  const absl::flat_hash_set<std::string>& untypedReceivingMetadataNamespaces() const {
+    return untyped_receiving_namespaces_;
+  }
+
   const NetworkExtProcStats& stats() const { return stats_; }
 
   const std::chrono::milliseconds& messageTimeout() const { return message_timeout_; }
@@ -141,6 +150,7 @@ private:
   const envoy::config::core::v3::GrpcService grpc_service_;
   const std::vector<std::string> untyped_forwarding_namespaces_;
   const std::vector<std::string> typed_forwarding_namespaces_;
+  const absl::flat_hash_set<std::string> untyped_receiving_namespaces_;
   NetworkExtProcStats stats_;
   const std::chrono::milliseconds message_timeout_;
 };
