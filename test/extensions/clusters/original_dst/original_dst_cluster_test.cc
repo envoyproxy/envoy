@@ -1295,9 +1295,8 @@ TEST_F(OriginalDstClusterTest, ClusterTypeConfigBadHttpHeader) {
         http_header_name: x-custom-dst
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(
-      setupFromYaml(yaml, false), EnvoyException,
-      "ORIGINAL_DST cluster: invalid config http_header_name=x-custom-dst");
+  EXPECT_THROW_WITH_REGEX(setupFromYaml(yaml, false), EnvoyException,
+                          "ORIGINAL_DST cluster: invalid config http_header_name=x-custom-dst");
 }
 
 } // namespace

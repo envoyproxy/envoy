@@ -6,6 +6,7 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/original_dst/v3/original_dst.pb.h"
+#include "envoy/extensions/clusters/original_dst/v3/original_dst.pb.validate.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
