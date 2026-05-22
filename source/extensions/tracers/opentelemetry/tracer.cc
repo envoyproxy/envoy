@@ -1,9 +1,9 @@
 #include "source/extensions/tracers/opentelemetry/tracer.h"
 
+#include <algorithm>
+#include <array>
 #include <cstdint>
 #include <string>
-
-#include "absl/container/flat_hash_set.h"
 
 #include "envoy/config/trace/v3/opentelemetry.pb.h"
 
@@ -165,9 +165,9 @@ convertGrpcStatusToTraceStatusCode(::opentelemetry::proto::trace::v1::Span_SpanK
 
 void Span::setTag(absl::string_view name, absl::string_view value) {
   if (name == Tracing::Tags::get().HttpMethod) {
-    static const absl::flat_hash_set<absl::string_view> known_methods{
+    static constexpr std::array<absl::string_view, 10> KnownMethods{
         "CONNECT", "DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT", "QUERY", "TRACE"};
-    if (!known_methods.contains(value)) {
+    if (std::find(KnownMethods.begin(), KnownMethods.end(), value) == KnownMethods.end()) {
       value = "_OTHER";
     }
   }
