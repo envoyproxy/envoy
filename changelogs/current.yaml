@@ -1,5 +1,4 @@
 date: Pending
-<<<<<<< fix/40221-health-check-status-code
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
