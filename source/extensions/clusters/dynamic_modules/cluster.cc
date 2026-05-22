@@ -35,6 +35,7 @@ struct DynamicModuleThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBa
     Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams params) override {
       return std::make_unique<DynamicModuleLoadBalancer>(handle_, params.priority_set);
     }
+    bool recreateOnHostChange() const override { return false; }
 
     DynamicModuleClusterHandleSharedPtr handle_;
   };

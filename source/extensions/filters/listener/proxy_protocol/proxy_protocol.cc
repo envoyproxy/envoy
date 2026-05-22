@@ -309,7 +309,6 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
               {socket.connectionInfoProvider().remoteAddress(),
                socket.connectionInfoProvider().localAddress(), parsed_tlvs_},
               absl::make_optional(header_version_)}),
-          StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::Connection);
     } else {
       ENVOY_LOG(
@@ -327,7 +326,6 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
               {proxy_protocol_header_.value().remote_address_,
                proxy_protocol_header_.value().local_address_, parsed_tlvs_},
               absl::make_optional(header_version_)}),
-          StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::Connection);
     }
   }
@@ -624,7 +622,6 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
           auto new_obj = std::make_unique<TlvFilterStateObject>();
           tlv_filter_state_obj = new_obj.get();
           cb_->filterState().setData(kFilterStateKey, std::move(new_obj),
-                                     StreamInfo::FilterState::StateType::ReadOnly,
                                      StreamInfo::FilterState::LifeSpan::Connection);
           ENVOY_LOG(trace, "proxy_protocol: Created TLV FilterState object");
         }

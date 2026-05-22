@@ -145,7 +145,7 @@ public:
 
   struct MockCreateConnectionData {
     Network::ClientConnection* connection_{};
-    HostDescriptionConstSharedPtr host_description_{};
+    HostDescriptionConstSharedPtr host_description_;
   };
 
   CreateConnectionData

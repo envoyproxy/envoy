@@ -61,6 +61,10 @@ load("@envoy//bazel:toolchains.bzl", "envoy_toolchains")
 
 envoy_toolchains()
 
+load("@rules_android//:prereqs.bzl", "rules_android_prereqs")
+
+rules_android_prereqs()
+
 load("@envoy_mobile//bazel:envoy_mobile_dependencies.bzl", "envoy_mobile_dependencies")
 
 envoy_mobile_dependencies()
@@ -93,7 +97,7 @@ load("//bazel:android_configure.bzl", "android_configure")
 
 android_configure(
     name = "local_config_android",
-    build_tools_version = "30.0.2",
+    build_tools_version = "35.0.0",
     ndk_api_level = 23,
     sdk_api_level = 30,
 )
@@ -101,6 +105,9 @@ android_configure(
 load("@local_config_android//:android_configure.bzl", "android_workspace")
 
 android_workspace()
+
+register_toolchains("@rules_android//toolchains/android:all")
+register_toolchains("@rules_android//toolchains/android_sdk:all")
 
 load("@com_github_buildbuddy_io_rules_xcodeproj//xcodeproj:repositories.bzl", "xcodeproj_rules_dependencies")
 

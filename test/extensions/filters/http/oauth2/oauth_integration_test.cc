@@ -97,6 +97,7 @@ std::string decrypt(absl::string_view encrypted, absl::string_view secret) {
   // Resize to actual plaintext length
   plaintext.resize(plaintext_len);
 
+  // NOLINTNEXTLINE(modernize-return-braced-init-list)
   return std::string(plaintext.begin(), plaintext.end());
 }
 

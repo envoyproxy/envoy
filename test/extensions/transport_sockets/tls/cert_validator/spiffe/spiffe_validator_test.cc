@@ -106,7 +106,7 @@ public:
     config_ = std::make_unique<TestCertificateValidationContextConfig>(
         typed_conf, allow_expired_certificate_, san_matchers_);
 
-    if (trust_bundle_file != "") {
+    if (!trust_bundle_file.empty()) {
       EXPECT_CALL(factory_context_.dispatcher_, createFilesystemWatcher_())
           .WillRepeatedly(testing::Invoke([trust_bundle_file] {
             Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
@@ -174,7 +174,7 @@ public:
 private:
   bool allow_expired_certificate_{false};
   TestCertificateValidationContextConfigPtr config_;
-  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers_{};
+  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers_;
   Stats::TestUtil::TestStore store_;
   SslStats stats_;
   Event::TestRealTimeSystem time_system_;
