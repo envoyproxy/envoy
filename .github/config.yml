@@ -1,0 +1,206 @@
+agent-ubuntu: ubuntu-24.04
+build-image:
+  # Authoritative configuration for build image/s
+  repo: docker.io/envoyproxy/envoy-build
+  repo-gcr: gcr.io/envoy-ci/envoy-build
+  # default ci caching (ci)
+  sha: 1133b78586d5764929a46d024e74f5f9b200828d5b2c7e987377818f4a31cac2
+  sha-ci: 1133b78586d5764929a46d024e74f5f9b200828d5b2c7e987377818f4a31cac2
+  sha-devtools: 37d5b16264319c1d0991de02eb9b488016ed9b3c5a04df97e041b99a45d9ed39
+  sha-docker: 588854d3e7e72a7ebd89a92f5ce99af687e6fdd77239afbe0b9ef6cf430c53fd
+  sha-gcc: 4b63777fd1fdf0c5b8d00a0f19840c28839ed2c85d1b8f51354c26e4516bcaf5
+  sha-mobile: 70f936a9770ddb75943c760fe7a28deb53226cced31289412bb850ad8e7cb8de
+  sha-worker: e539b366b3385c83b1a9b6bda377d399caee596565419fab0cfac6993610177c
+  # TODO: remove this dupe (currently used by ci request handler)
+  mobile-sha: 70f936a9770ddb75943c760fe7a28deb53226cced31289412bb850ad8e7cb8de
+  tag: v0.1.5
+
+config:
+  envoy:
+    icon: >-
+      [![](https://avatars.githubusercontent.com/u/30125649?s=24&v=4)](#)
+
+checks:
+  # Checks: this configures which _checks_ will be activated or skipped
+  #
+  # The configured _names_ need to match the checks configured for the repo
+  #
+  # Any check that is marked as `required` but is not triggered by the run
+  # config above in a given CI run is marked as `skipped`
+  #
+  # For example if macos is marked as `required: true` but then has a path
+  # selection that means its doesnt run the check will be `skipped` and pass
+  checks:
+    name: Envoy/Checks
+    on-run:
+    - check-build
+    - check-build-openssl
+    - check-coverage
+    - check-runtime
+    - check-san
+    required: true
+  macos:
+    name: Envoy/macOS
+    required: true
+    on-run:
+    - build-macos
+  prechecks:
+    name: Envoy/Prechecks
+    on-run:
+    - precheck-deps
+    - precheck-external
+    - precheck-format
+    - precheck-publish
+    - precheck-publish-config
+    required: true
+    # yamllint disable rule:line-length
+    advice:
+      general: |
+        ### Ensuring your commits are signed off
+
+        You can set up DCO using Envoy's git hooks.
+
+        ### Git hooks
+
+        To set this up, do the following:
+
+          ```console
+          $ ./support/bootstrap
+          ```
+
+          If you only want the DCO check you can do the following to disable the
+          other hooks
+
+          ```console
+          $ echo NO_VERIFY=1 > .env
+          ```
+      deps: |
+        ### Advice on updating dependencies
+
+        General information about Envoy's depdendencies [can be found here](https://github.com/envoyproxy/envoy/blob/main/DEPENDENCY_POLICY.md)
+      format: |
+        ### Advice on correct formatting
+
+        Envoy ensures a minimum standard for all files in the repository.
+
+        You are strongly advised to heed the following CI notice:
+
+          ```console
+            Please fix your editor to ensure:
+
+              - no trailing whitespace
+              - no preceding mixed tabs/spaces
+              - all files end with a newline
+          ```
+    # yamllint enable rule:line-length
+
+run:
+  build-macos:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - api/**/*
+    - bazel/**/*
+    - ci/**/*
+    - configs/**/*
+    - contrib/**/*
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
+  check-build:
+    paths:
+    - "**/*"
+  check-build-openssl:
+    paths:
+    - "**/*"
+  check-coverage:
+    paths:
+    - "**/*"
+  check-runtime:
+    paths:
+    - source/server/cgroup_cpu_util.*
+    - test/server/*cgroup*
+    # this can be switched to always run once related ci lands.
+    push: paths
+  check-san:
+    paths:
+    - "**/*"
+  precheck-deps:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - .github/dependabot.yml
+    - bazel/BUILD
+    - tools/dependency/*
+    - "**/*.bzl"
+    - "**/requirements.txt"
+    - "**/go.mod"
+    - "**/Dockerfile*"
+    push: paths
+  precheck-external:
+    paths:
+    - "**/*"
+  precheck-format:
+    paths:
+    - "**/*"
+  precheck-publish:
+    paths:
+    - "**/*"
+  precheck-publish-config:
+    paths:
+    - "**/*"
+
+tables:
+  env:
+    collapse: true
+    title: Environment
+    table-title: Request variables
+    filter: |
+      .request
+      | del(.["build-image" as $prefix | keys[] | select(startswith($prefix))])
+      | del(.["version" as $prefix | keys[] | select(startswith($prefix))])
+      | .actor  = "<img src=\"\(.actor.icon)\" alt=\"\(.actor.name)\" width=\"18\" height=\"18\">  @\(.actor.name)"
+  build-image:
+    collapse: true
+    title: Build image
+    table-title: Container image/s (as used in this CI run)
+    filter: |
+      "https://hub.docker.com/r/envoyproxy/envoy-build/tags?page=1&name=" as $dockerLink
+      | .request["build-image"]
+      | del(.changed)
+      | with_entries(
+          .value as $v
+          | ($v | split(":") | .[1] | split("@") | .[0]) as $tag
+          | .value = "[\($v | split("@") | .[0])](\($dockerLink)\($tag))")
+  build-image-current:
+    collapse: true
+    title: Build image (current)
+    table-title: Current or previous container image
+    filter: |
+      "https://hub.docker.com/r/envoyproxy/envoy-build/tags?page=1&name=" as $dockerLink
+      | if .request["build-image"].changed then
+          .request["build-image-current"]
+          | with_entries(
+              .value as $v
+              | ($v | split(":") | .[1] | split("@") | .[0]) as $tag
+              | .value = "[\($v | split("@") | .[0])](\($dockerLink)\($tag))")
+        else {} end
+  version:
+    collapse: true
+    title: Version
+    table-title: Envoy version (as used in this CI run)
+    filter: |
+      .request.version
+      | del(.changed)
+  version-current:
+    collapse: true
+    title: Version (current)
+    table-title: Current or previous version
+    filter: |
+      if .request.version.changed then
+        .request["version-current"]
+      else
+        {}
+      end
