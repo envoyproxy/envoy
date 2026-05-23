@@ -313,17 +313,13 @@ TEST_F(DnsSrvClusterTest, OneHostnameOneIp) {
   a_callback1(Network::DnsResolver::ResolutionStatus::Completed, "",
               TestUtility::makeDnsResponse({"1.2.3.4"}, srv_ttl));
 
-  // ASSERT_TRUE(a_callback2 != nullptr);
-  // a_callback2(Network::DnsResolver::ResolutionStatus::Failure, "dns timeout",
-  // TestUtility::makeDnsResponse({}, srv_ttl));
-
   const auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   ASSERT_EQ(hosts.size(), 2);
 
   EXPECT_EQ(hosts[0]->priority(), srv_priority);
   EXPECT_EQ(hosts[0]->weight(), srv_weight);
-  // this host adds before DNS is called, becuase it's already an IP. Hence, it appears first in the
-  // list.
+  // this host adds before DNS is called, becuase it's already an IP.
+  // Hence, it appears first in the list.
   EXPECT_EQ(hosts[0]->address()->ip()->addressAsString(), "5.6.7.8");
   EXPECT_EQ(hosts[0]->address()->ip()->port(), srv_port);
 

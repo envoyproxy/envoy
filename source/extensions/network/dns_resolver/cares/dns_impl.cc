@@ -698,16 +698,21 @@ void DnsResolverImpl::PendingSrvResolution::startResolution() {
 
 void DnsResolverImpl::PendingSrvResolution::onAresSrvCallback(ares_status_t status, size_t timeouts,
                                                               const ares_dns_record_t* dnsrec) {
-
-  unsigned int aresAnswerQueryId = ares_dns_record_get_id(dnsrec);
-  ENVOY_LOG(debug, "onAresSrvCallback: status={}, timeouts={}, query id={}, answer query id={}",
-            static_cast<int>(status), timeouts, ares_query_id_, aresAnswerQueryId);
-  ASSERT(ares_query_id_ == aresAnswerQueryId);
-
   parent_.stats_.resolve_total_.inc();
   parent_.stats_.pending_resolutions_.dec();
 
-  if (status != ARES_SUCCESS) {
+  const bool aresSuccess = (status == ARES_SUCCESS) && (dnsrec != nullptr);
+
+  // ares_dns_record_get_id won't crash if dnsrec is NULL but it will return zero
+  unsigned int aresAnswerQueryId = ares_dns_record_get_id(dnsrec);
+
+  ENVOY_LOG(
+      debug,
+      "onAresSrvCallback: status={}, success={}, timeouts={}, query id={}, answer query id={}",
+      static_cast<int>(status), aresSuccess, timeouts, ares_query_id_, aresAnswerQueryId);
+  ASSERT(ares_query_id_ == aresAnswerQueryId || dnsrec == nullptr);
+
+  if (!aresSuccess) {
     parent_.chargeGetAddrInfoErrorStats(status, timeouts);
     ENVOY_LOG_EVENT(debug, "cares_srv_resolution_failure",
                     "dns resolution for {} failed with c-ares status {:#06x}: \"{}\"", dns_name_,
@@ -730,7 +735,7 @@ void DnsResolverImpl::PendingSrvResolution::onAresSrvCallback(ares_status_t stat
   // (e.g., synchronously by ares_query_dnsrec for invalid names) and avoids double-decrement.
   completed_ = true;
 
-  if (status == ARES_SUCCESS) {
+  if (aresSuccess) {
     std::list<DnsResponse> srv_records;
     for (size_t i = 0; i < ares_dns_record_rr_cnt(dnsrec, ARES_SECTION_ANSWER); i++) {
       const ares_dns_rr_t* rr = ares_dns_record_rr_get_const(dnsrec, ARES_SECTION_ANSWER, i);
