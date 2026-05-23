@@ -2,6 +2,7 @@
 
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "source/common/listener_manager/active_stream_listener_base.h"
 #include "source/common/network/address_impl.h"
@@ -82,6 +83,26 @@ void ActiveInternalListener::newActiveConnection(
         debug, "new connection from {}", *active_connection->connection_,
         active_connection->connection_->connectionInfoProvider().remoteAddress()->asString());
     active_connection->connection_->addConnectionCallbacks(*active_connection);
+
+    // Register a pre-close hook on the user-space IoHandle so that filter
+    // state objects marked SharedWithDownstreamConnectionOnClose are captured
+    // into the shared PassthroughState before this (inner-side) connection
+    // tears down. The peer (outer-side) connection will merge them into its
+    // own filter state when its transport socket is torn down.
+    //
+    // Capture filter_state by value so the lambda remains safe if it fires
+    // from the IoHandle destructor after the owning Connection has gone away.
+    auto& connection = *active_connection->connection_;
+    auto* io_handle =
+        dynamic_cast<Extensions::IoSocket::UserSpace::IoHandle*>(&connection.getSocket()->ioHandle());
+    if (io_handle != nullptr && io_handle->passthroughState()) {
+      io_handle->addOnPreCloseCallback(
+          [passthrough_state = io_handle->passthroughState(),
+           filter_state = connection.streamInfo().filterState()]() {
+            passthrough_state->captureReverse(*filter_state);
+          });
+    }
+
     LinkedList::moveIntoList(std::move(active_connection), active_connections.connections_);
   }
 }

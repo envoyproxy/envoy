@@ -159,6 +159,11 @@ message TcpProxy {
 
     // Save response headers to the downstream connection's filter state for consumption
     // by network filters. The filter state key is ``envoy.tcp_proxy.propagate_response_headers``.
+    //
+    // When the tcp_proxy is on the inner side of an internal-listener boundary, the captured
+    // filter state object is additionally reverse-propagated to the outer (downstream)
+    // connection's filter state at upstream close, making it readable by HTTP filters on the
+    // downstream HCM via ``%UPSTREAM_FILTER_STATE(envoy.tcp_proxy.propagate_response_headers)%``.
     bool propagate_response_headers = 4;
 
     // The path used with the POST method. The default path is ``/``. If this field is specified and
@@ -168,6 +173,9 @@ message TcpProxy {
 
     // Save response trailers to the downstream connection's filter state for consumption
     // by network filters. The filter state key is ``envoy.tcp_proxy.propagate_response_trailers``.
+    //
+    // See the note on ``propagate_response_headers`` above regarding reverse propagation across
+    // an internal-listener boundary.
     bool propagate_response_trailers = 6;
 
     // The configuration of the request ID extension used for generation, validation, and

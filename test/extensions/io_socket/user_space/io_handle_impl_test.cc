@@ -21,6 +21,73 @@ namespace IoSocket {
 namespace UserSpace {
 namespace {
 
+class ReverseSimpleType : public StreamInfo::FilterState::Object {
+public:
+  explicit ReverseSimpleType(int v) : value_(v) {}
+  int value() const { return value_; }
+
+private:
+  int value_;
+};
+
+TEST(PassthroughStateImplReverse, RoundTripsSingleMarkedObject) {
+  PassthroughStateImpl state;
+  StreamInfo::FilterStateImpl inner(StreamInfo::FilterState::LifeSpan::Connection);
+  auto value = std::make_shared<ReverseSimpleType>(42);
+  inner.setData("reverse.test.key", value, StreamInfo::FilterState::LifeSpan::Connection,
+                StreamInfo::StreamSharingMayImpactPooling::SharedWithDownstreamConnectionOnClose);
+  state.captureReverse(inner);
+
+  StreamInfo::FilterStateImpl outer(StreamInfo::FilterState::LifeSpan::Connection);
+  state.mergeReverse(outer);
+
+  const auto* got = outer.getDataReadOnly<ReverseSimpleType>("reverse.test.key");
+  ASSERT_NE(got, nullptr);
+  EXPECT_EQ(got->value(), 42);
+}
+
+TEST(PassthroughStateImplReverse, MergeReverseDoesNotOverwriteExistingName) {
+  PassthroughStateImpl state;
+  StreamInfo::FilterStateImpl inner(StreamInfo::FilterState::LifeSpan::Connection);
+  auto inner_value = std::make_shared<ReverseSimpleType>(1);
+  inner.setData("reverse.test.key", inner_value, StreamInfo::FilterState::LifeSpan::Connection,
+                StreamInfo::StreamSharingMayImpactPooling::SharedWithDownstreamConnectionOnClose);
+  state.captureReverse(inner);
+
+  StreamInfo::FilterStateImpl outer(StreamInfo::FilterState::LifeSpan::Connection);
+  auto outer_existing = std::make_shared<ReverseSimpleType>(99);
+  outer.setData("reverse.test.key", outer_existing, StreamInfo::FilterState::LifeSpan::Connection);
+
+  state.mergeReverse(outer);
+
+  const auto* got = outer.getDataReadOnly<ReverseSimpleType>("reverse.test.key");
+  ASSERT_NE(got, nullptr);
+  EXPECT_EQ(got->value(), 99); // existing value preserved
+}
+
+TEST(PassthroughStateImplReverse, CaptureWithNoMarkedObjectsIsNoOp) {
+  PassthroughStateImpl state;
+  StreamInfo::FilterStateImpl inner(StreamInfo::FilterState::LifeSpan::Connection);
+  inner.setData("not.marked", std::make_shared<ReverseSimpleType>(7),
+                StreamInfo::FilterState::LifeSpan::Connection);
+  state.captureReverse(inner);
+
+  StreamInfo::FilterStateImpl outer(StreamInfo::FilterState::LifeSpan::Connection);
+  state.mergeReverse(outer);
+  EXPECT_FALSE(outer.hasDataWithName("not.marked"));
+}
+
+TEST(IoHandleImplPreCloseCallback, FiresExactlyOnceOnClose) {
+  auto pair = IoHandleFactory::createIoHandlePair();
+  int call_count = 0;
+  pair.first->addOnPreCloseCallback([&call_count]() { ++call_count; });
+  pair.first->close();
+  EXPECT_EQ(call_count, 1);
+  // A second close (e.g. via dtor) must not refire callbacks because close()
+  // asserts !closed_; pair.first will be destroyed at end of scope with closed_=true.
+}
+
+
 constexpr int CONNECTED = 0;
 
 MATCHER(IsInvalidAddress, "") {

@@ -18,10 +18,17 @@ public:
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
+  void closeSocket(Network::ConnectionEvent event, bool abort_reset) override;
 
 private:
   std::unique_ptr<envoy::config::core::v3::Metadata> metadata_;
   StreamInfo::FilterState::Objects filter_state_objects_;
+
+  // Captured at setTransportSocketCallbacks time. Used at closeSocket time to
+  // pull reverse-propagated filter state objects from the shared
+  // PassthroughState into this connection's stream info.
+  Network::TransportSocketCallbacks* transport_callbacks_{nullptr};
+  IoSocket::UserSpace::PassthroughStateSharedPtr passthrough_state_{nullptr};
 };
 
 } // namespace InternalUpstream

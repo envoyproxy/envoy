@@ -68,6 +68,14 @@ IoHandleImpl::~IoHandleImpl() {
 Api::IoCallUint64Result IoHandleImpl::close() {
   ASSERT(!closed_);
   if (!closed_) {
+    // Fire pre-close callbacks before notifying the peer or tearing down the
+    // file event. This lets the owning connection (e.g. inside the internal
+    // listener) capture filter state into the shared PassthroughState while
+    // the connection's stream info is still queryable.
+    auto callbacks = std::move(pre_close_callbacks_);
+    for (auto& cb : callbacks) {
+      cb();
+    }
     if (peer_handle_) {
       ENVOY_LOG(trace, "socket {} close before peer {} closes.", static_cast<void*>(this),
                 static_cast<void*>(peer_handle_));
@@ -391,6 +399,32 @@ void PassthroughStateImpl::mergeInto(envoy::config::core::v3::Metadata& metadata
   metadata_ = nullptr;
   filter_state_objects_.clear();
   state_ = State::Done;
+}
+
+void PassthroughStateImpl::captureReverse(const StreamInfo::FilterState& filter_state) {
+  ASSERT(reverse_state_ == ReverseState::Created);
+  auto objects = filter_state.objectsSharedWithDownstreamConnectionOnClose();
+  if (objects) {
+    reverse_filter_state_objects_ = std::move(*objects);
+  }
+  reverse_state_ = ReverseState::Captured;
+}
+
+void PassthroughStateImpl::mergeReverse(StreamInfo::FilterState& filter_state) {
+  ASSERT(reverse_state_ == ReverseState::Created || reverse_state_ == ReverseState::Captured);
+  for (const auto& object : reverse_filter_state_objects_) {
+    // Skip if the recipient already has data for this name; reverse propagation
+    // is opportunistic and must not overwrite an existing entry.
+    if (filter_state.hasDataWithName(object.name_)) {
+      ENVOY_LOG(debug, "reverse-passthrough skipping filter state '{}' (already set on recipient)",
+                object.name_);
+      continue;
+    }
+    filter_state.setData(object.name_, object.data_, StreamInfo::FilterState::LifeSpan::Connection,
+                         object.stream_sharing_);
+  }
+  reverse_filter_state_objects_.clear();
+  reverse_state_ = ReverseState::Done;
 }
 
 std::pair<IoHandleImplPtr, IoHandleImplPtr>
