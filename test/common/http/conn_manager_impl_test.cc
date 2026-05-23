@@ -1632,14 +1632,15 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
       .WillByDefault(Return(&route_config_provider_.route_config_->route_->route_tracing_));
 
   EXPECT_CALL(*span, finishSpan());
-  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(testing::An<absl::string_view>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(testing::An<const Tracing::Tag&>(), _)).Times(testing::AnyNumber());
   // Verify tag is set based on the request headers.
-  EXPECT_CALL(*span, setTag(Eq(":method"), Eq("GET")));
+  EXPECT_CALL(*span, setTag(":method", Eq("GET")));
   for (const TracingTagSuite& s : tracing_tag_cases) {
-    EXPECT_CALL(*span, setTag(Eq(s.tag), Eq(s.tag_value)));
+    EXPECT_CALL(*span, setTag(s.tag, Eq(s.tag_value)));
   }
   // Verify if the activeSpan interface returns reference to the current span.
-  EXPECT_CALL(*span, setTag(Eq("service-cluster"), Eq("scoobydoo")));
+  EXPECT_CALL(*span, setTag("service-cluster", Eq("scoobydoo")));
   EXPECT_CALL(
       runtime_.snapshot_,
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
@@ -1749,7 +1750,9 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanAndTraceDecisionRefreshA
         filter->callbacks_->route();
 
         EXPECT_CALL(*span, finishSpan());
-        EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+        EXPECT_CALL(*span, setTag(testing::An<absl::string_view>(), _)).Times(testing::AnyNumber());
+        EXPECT_CALL(*span, setTag(testing::An<const Tracing::Tag&>(), _))
+            .Times(testing::AnyNumber());
 
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
@@ -1825,7 +1828,9 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanAndTraceDecisionRefreshA
         filter->callbacks_->route();
 
         EXPECT_CALL(*span, finishSpan());
-        EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+        EXPECT_CALL(*span, setTag(testing::An<absl::string_view>(), _)).Times(testing::AnyNumber());
+        EXPECT_CALL(*span, setTag(testing::An<const Tracing::Tag&>(), _))
+            .Times(testing::AnyNumber());
 
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
@@ -1906,7 +1911,9 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanButDisableTraceDecisionR
         filter->callbacks_->route();
 
         EXPECT_CALL(*span, finishSpan());
-        EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+        EXPECT_CALL(*span, setTag(testing::An<absl::string_view>(), _)).Times(testing::AnyNumber());
+        EXPECT_CALL(*span, setTag(testing::An<const Tracing::Tag&>(), _))
+            .Times(testing::AnyNumber());
 
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
@@ -1940,7 +1947,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowWithHcmOperati
       .Times(AtLeast(1))
       .WillRepeatedly(Return(&route_config_provider_.route_config_->route_->route_tracing_));
   EXPECT_CALL(*span, finishSpan());
-  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(testing::An<absl::string_view>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(testing::An<const Tracing::Tag&>(), _)).Times(testing::AnyNumber());
   EXPECT_CALL(
       runtime_.snapshot_,
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
@@ -2005,7 +2013,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowWithRouteOpera
   route_config_provider_.route_config_->route_->route_tracing_.upstream_operation_ =
       Formatter::FormatterImpl::create("route_upstream_op").value();
   EXPECT_CALL(*span, finishSpan());
-  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(testing::An<absl::string_view>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(testing::An<const Tracing::Tag&>(), _)).Times(testing::AnyNumber());
   EXPECT_CALL(
       runtime_.snapshot_,
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
@@ -2074,7 +2083,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowWithOperationF
   route_config_provider_.route_config_->route_->route_tracing_.upstream_operation_ =
       Formatter::FormatterImpl::create("route_upstream_op").value();
   EXPECT_CALL(*span, finishSpan());
-  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(testing::An<absl::string_view>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(testing::An<const Tracing::Tag&>(), _)).Times(testing::AnyNumber());
   EXPECT_CALL(
       runtime_.snapshot_,
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
@@ -2142,7 +2152,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
           [&](const Tracing::Span& apply_to_span) -> void { EXPECT_EQ(span, &apply_to_span); }));
   EXPECT_EQ(true, route_config_provider_.route_config_->route_->decorator_.propagate());
   EXPECT_CALL(*span, finishSpan());
-  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(testing::An<absl::string_view>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(testing::An<const Tracing::Tag&>(), _)).Times(testing::AnyNumber());
   EXPECT_CALL(
       runtime_.snapshot_,
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
@@ -2212,7 +2223,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
       .WillOnce(Invoke(
           [&](const Tracing::Span& apply_to_span) -> void { EXPECT_EQ(span, &apply_to_span); }));
   EXPECT_CALL(*span, finishSpan());
-  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(testing::An<absl::string_view>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(testing::An<const Tracing::Tag&>(), _)).Times(testing::AnyNumber());
   EXPECT_CALL(
       runtime_.snapshot_,
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
@@ -2280,7 +2292,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
       .WillOnce(Invoke(
           [&](const Tracing::Span& apply_to_span) -> void { EXPECT_EQ(span, &apply_to_span); }));
   EXPECT_CALL(*span, finishSpan());
-  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(testing::An<absl::string_view>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(testing::An<const Tracing::Tag&>(), _)).Times(testing::AnyNumber());
   EXPECT_CALL(
       runtime_.snapshot_,
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
@@ -2367,7 +2380,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
           [&](const Tracing::Span& apply_to_span) -> void { EXPECT_EQ(span, &apply_to_span); }));
   EXPECT_EQ(true, route_config_provider_.route_config_->route_->decorator_.propagate());
   EXPECT_CALL(*span, finishSpan());
-  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(testing::An<absl::string_view>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(testing::An<const Tracing::Tag&>(), _)).Times(testing::AnyNumber());
   EXPECT_CALL(
       runtime_.snapshot_,
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
@@ -2455,7 +2469,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
       .WillOnce(Invoke(
           [&](const Tracing::Span& apply_to_span) -> void { EXPECT_EQ(span, &apply_to_span); }));
   EXPECT_CALL(*span, finishSpan());
-  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(testing::An<absl::string_view>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(testing::An<const Tracing::Tag&>(), _)).Times(testing::AnyNumber());
   EXPECT_CALL(
       runtime_.snapshot_,
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
@@ -2542,7 +2557,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
       .WillOnce(Invoke(
           [&](const Tracing::Span& apply_to_span) -> void { EXPECT_EQ(span, &apply_to_span); }));
   EXPECT_CALL(*span, finishSpan());
-  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(testing::An<absl::string_view>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(testing::An<const Tracing::Tag&>(), _)).Times(testing::AnyNumber());
   EXPECT_CALL(
       runtime_.snapshot_,
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
@@ -3333,7 +3349,8 @@ TEST_F(HttpConnectionManagerImplTest, SkipFinalizeDownstreamSpanWhenNotRecording
   EXPECT_CALL(*span, exportedSpan()).WillRepeatedly(Return(false));
 
   // finalizeDownstreamSpan-owned methods must not fire when not wanted
-  EXPECT_CALL(*span, setTag(_, _)).Times(0);
+  EXPECT_CALL(*span, setTag(testing::An<absl::string_view>(), _)).Times(0);
+  EXPECT_CALL(*span, setTag(testing::An<const Tracing::Tag&>(), _)).Times(0);
   EXPECT_CALL(*span, log(_, _)).Times(0);
   // but finishSpan must still be called
   EXPECT_CALL(*span, finishSpan());
@@ -3808,7 +3825,9 @@ TEST_F(HttpConnectionManagerImplTest, BufferLimitAndRefresh) {
 
   // The initial route buffer limit is not valid value and the limit from underlying stream
   // will be used.
-  { EXPECT_EQ(122U, decoder_filters_[0]->callbacks_->bufferLimit()); }
+  {
+    EXPECT_EQ(122U, decoder_filters_[0]->callbacks_->bufferLimit());
+  }
 
   // Less buffer limit from route entry will not be applied.
   {

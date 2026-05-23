@@ -302,7 +302,7 @@ public:
     fake_stream_->startGrpcStream();
     helloworld::HelloReply reply;
     reply.set_message(HELLO_REPLY);
-    EXPECT_CALL(*child_span_, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("0")));
+    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().GrpcStatusCode, Eq("0")));
     EXPECT_CALL(*this, onSuccess_(HelloworldReplyEq(HELLO_REPLY), _)).WillExitIfNeeded();
     EXPECT_CALL(*child_span_, finishSpan());
     dispatcher_helper_.setStreamEventPending();
@@ -492,12 +492,11 @@ public:
     EXPECT_CALL(active_span, spawnChild_(_, "async helloworld.Greeter.SayHello egress", _))
         .WillOnce(Return(request->child_span_));
     EXPECT_CALL(*request->child_span_,
-                setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
-    EXPECT_CALL(*request->child_span_,
-                setTag(Eq(Tracing::Tags::get().UpstreamAddress), Not(IsEmpty())))
+                setTag(Tracing::Tags::get().UpstreamCluster, Eq("fake_cluster")));
+    EXPECT_CALL(*request->child_span_, setTag(Tracing::Tags::get().UpstreamAddress, Not(IsEmpty())))
         .Times(AtMost(1));
     EXPECT_CALL(*request->child_span_,
-                setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
+                setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
     EXPECT_CALL(*request->child_span_, injectContext(_, _));
 
     request->grpc_request_ = grpc_client_->send(*method_descriptor_, request_msg, *request,

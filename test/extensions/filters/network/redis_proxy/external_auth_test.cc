@@ -73,7 +73,7 @@ TEST_F(GrpcExternalAuthClientTest, SuccessOk) {
   client_->authenticateExternal(request_callback_, pending_request_, stream_info_, "username",
                                 "password");
 
-  EXPECT_CALL(span_, setTag(Eq("redis_auth_status"), Eq("redis_auth_ok")));
+  EXPECT_CALL(span_, setTag("redis_auth_status", Eq("redis_auth_ok")));
   EXPECT_CALL(request_callback_, onAuthenticateExternal_(_, _));
   client_->onSuccess(std::move(response), span_);
 }
@@ -98,7 +98,7 @@ TEST_F(GrpcExternalAuthClientTest, SuccessPermissionDenied) {
   client_->authenticateExternal(request_callback_, pending_request_, stream_info_, "username",
                                 "password");
 
-  EXPECT_CALL(span_, setTag(Eq("redis_auth_status"), Eq("redis_auth_unauthorized")));
+  EXPECT_CALL(span_, setTag("redis_auth_status", Eq("redis_auth_unauthorized")));
   EXPECT_CALL(request_callback_, onAuthenticateExternal_(_, _));
   client_->onSuccess(std::move(response), span_);
 }
@@ -123,7 +123,7 @@ TEST_F(GrpcExternalAuthClientTest, SuccessUnauthenticated) {
   client_->authenticateExternal(request_callback_, pending_request_, stream_info_, "username",
                                 "password");
 
-  EXPECT_CALL(span_, setTag(Eq("redis_auth_status"), Eq("redis_auth_unauthorized")));
+  EXPECT_CALL(span_, setTag("redis_auth_status", Eq("redis_auth_unauthorized")));
   EXPECT_CALL(request_callback_, onAuthenticateExternal_(_, _));
   client_->onSuccess(std::move(response), span_);
 }
@@ -150,7 +150,7 @@ TEST_F(GrpcExternalAuthClientTest, SuccessUnknown) {
   client_->authenticateExternal(request_callback_, pending_request_, stream_info_, "username",
                                 "password");
 
-  EXPECT_CALL(span_, setTag(Eq("redis_auth_status"), Eq("redis_auth_error")));
+  EXPECT_CALL(span_, setTag("redis_auth_status", Eq("redis_auth_error")));
   EXPECT_CALL(request_callback_, onAuthenticateExternal_(_, _));
   client_->onSuccess(std::move(response), span_);
 }
@@ -169,7 +169,7 @@ TEST_F(GrpcExternalAuthClientTest, Failure) {
   client_->authenticateExternal(request_callback_, pending_request_, stream_info_, "username",
                                 "password");
 
-  EXPECT_CALL(span_, setTag(Eq("redis_auth_status"), Eq("redis_auth_error")));
+  EXPECT_CALL(span_, setTag("redis_auth_status", Eq("redis_auth_error")));
   EXPECT_CALL(request_callback_, onAuthenticateExternal_(_, _));
   client_->onFailure(Grpc::Status::Unknown, "error message", span_);
 

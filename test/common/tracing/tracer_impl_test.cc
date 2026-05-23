@@ -107,9 +107,9 @@ protected:
       auto custom_tag_ptr = CustomTagUtility::createCustomTag(custom_tag);
       custom_tags.emplace(custom_tag_ptr->tag(), custom_tag_ptr);
       if (cas.set) {
-        EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), Eq(cas.value)));
+        EXPECT_CALL(span, setTag(custom_tag.tag(), Eq(cas.value)));
       } else {
-        EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), _)).Times(0);
+        EXPECT_CALL(span, setTag(custom_tag.tag(), _)).Times(0);
       }
     }
 
@@ -175,14 +175,14 @@ TEST_F(FinalizerImplTest, TestAll) {
   stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
 
   {
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster),
+    EXPECT_CALL(span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+    EXPECT_CALL(span, setTag(Tracing::Tags::get().ResponseFlags, Eq("-")));
+    EXPECT_CALL(span, setTag(Tracing::Tags::get().UpstreamCluster,
                              Eq("my_upstream_cluster_from_cluster_info")));
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamClusterName),
+    EXPECT_CALL(span, setTag(Tracing::Tags::get().UpstreamClusterName,
                              Eq("my_upstream_cluster_observable_from_cluster_info")));
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), _));
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress),
+    EXPECT_CALL(span, setTag(Tracing::Tags::get().UpstreamAddress, _));
+    EXPECT_CALL(span, setTag(Tracing::Tags::get().PeerAddress,
                              Eq("10.0.0.1:443"))); // Upstream address as 'peer.address'
 
     const auto log_timestamp =
@@ -211,15 +211,15 @@ TEST_F(FinalizerImplTest, TestAll) {
   }
 
   {
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress),
+    EXPECT_CALL(span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+    EXPECT_CALL(span, setTag(Tracing::Tags::get().ResponseFlags, Eq("-")));
+    EXPECT_CALL(span, setTag(Tracing::Tags::get().PeerAddress,
                              remote_address->asString())); // Downstream address as 'peer.address'
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster),
+    EXPECT_CALL(span, setTag(Tracing::Tags::get().UpstreamCluster,
                              Eq("my_upstream_cluster_from_cluster_info")));
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamClusterName),
+    EXPECT_CALL(span, setTag(Tracing::Tags::get().UpstreamClusterName,
                              Eq("my_upstream_cluster_observable_from_cluster_info")));
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), _));
+    EXPECT_CALL(span, setTag(Tracing::Tags::get().UpstreamAddress, _));
 
     const auto log_timestamp =
         start_timestamp + std::chrono::duration_cast<SystemTime::duration>(*nanoseconds);
@@ -293,14 +293,14 @@ TEST_F(FinalizerImplTest, TestAllWithLegacyRequestHeader) {
   stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
 
   {
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster),
+    EXPECT_CALL(span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+    EXPECT_CALL(span, setTag(Tracing::Tags::get().ResponseFlags, Eq("-")));
+    EXPECT_CALL(span, setTag(Tracing::Tags::get().UpstreamCluster,
                              Eq("my_upstream_cluster_from_cluster_info")));
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamClusterName),
+    EXPECT_CALL(span, setTag(Tracing::Tags::get().UpstreamClusterName,
                              Eq("my_upstream_cluster_observable_from_cluster_info")));
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), _));
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress),
+    EXPECT_CALL(span, setTag(Tracing::Tags::get().UpstreamAddress, _));
+    EXPECT_CALL(span, setTag(Tracing::Tags::get().PeerAddress,
                              Eq("10.0.0.1:443"))); // Upstream address as 'peer.address'
 
     const auto log_timestamp =
@@ -413,8 +413,9 @@ TEST_F(TracerImplTest, BasicFunctionalityNodeSet) {
   NiceMock<MockSpan>* span = new NiceMock<MockSpan>();
   const std::string operation_name = "egress test";
   EXPECT_CALL(*driver_, startSpan_(_, _, _, operation_name, _)).WillOnce(Return(span));
-  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(*span, setTag(Eq(Tracing::Tags::get().NodeId), Eq("node_name")));
+  EXPECT_CALL(*span, setTag(testing::An<absl::string_view>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(testing::An<const Tracing::Tag&>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(Tracing::Tags::get().NodeId, Eq("node_name")));
 
   tracer_->startSpan(config_, trace_context_, stream_info_, {Reason::Sampling, true});
 }
@@ -426,8 +427,9 @@ TEST_F(TracerImplTest, ChildGrpcUpstreamSpanTest) {
   NiceMock<MockSpan>* span = new NiceMock<MockSpan>();
   const std::string operation_name = "egress test";
   EXPECT_CALL(*driver_, startSpan_(_, _, _, operation_name, _)).WillOnce(Return(span));
-  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(*span, setTag(Eq(Tracing::Tags::get().NodeId), Eq("node_name")));
+  EXPECT_CALL(*span, setTag(testing::An<absl::string_view>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(testing::An<const Tracing::Tag&>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(Tracing::Tags::get().NodeId, Eq("node_name")));
 
   auto parent_span =
       tracer_->startSpan(config_, trace_context_, stream_info_, {Reason::Sampling, true});
@@ -452,18 +454,20 @@ TEST_F(TracerImplTest, ChildGrpcUpstreamSpanTest) {
   EXPECT_CALL(*cluster_info_, name()).WillOnce(ReturnRef(cluster_name));
   EXPECT_CALL(*cluster_info_, observabilityName()).WillOnce(ReturnRef(ob_cluster_name));
 
-  EXPECT_CALL(*second_span, setTag(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
+  EXPECT_CALL(*second_span, setTag(testing::An<absl::string_view>(), _))
+      .Times(testing::AnyNumber());
+  EXPECT_CALL(*second_span, setTag(testing::An<const Tracing::Tag&>(), _))
+      .Times(testing::AnyNumber());
+  EXPECT_CALL(*second_span, setTag(Tracing::Tags::get().HttpProtocol, Eq("HTTP/2")));
+  EXPECT_CALL(*second_span, setTag(Tracing::Tags::get().UpstreamAddress, Eq(expected_ip + ":0")));
+  EXPECT_CALL(*second_span, setTag(Tracing::Tags::get().PeerAddress, Eq(expected_ip + ":0")));
+  EXPECT_CALL(*second_span, setTag(Tracing::Tags::get().UpstreamCluster, Eq("fake cluster")));
   EXPECT_CALL(*second_span,
-              setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq(expected_ip + ":0")));
-  EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip + ":0")));
-  EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake cluster")));
-  EXPECT_CALL(*second_span,
-              setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("ob fake cluster")));
-  EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
-  EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("14")));
-  EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("unavailable")));
-  EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
+              setTag(Tracing::Tags::get().UpstreamClusterName, Eq("ob fake cluster")));
+  EXPECT_CALL(*second_span, setTag(Tracing::Tags::get().HttpStatusCode, Eq("200")));
+  EXPECT_CALL(*second_span, setTag(Tracing::Tags::get().GrpcStatusCode, Eq("14")));
+  EXPECT_CALL(*second_span, setTag(Tracing::Tags::get().GrpcMessage, Eq("unavailable")));
+  EXPECT_CALL(*second_span, setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True));
 
   HttpTracerUtility::onUpstreamResponseHeaders(*child_span, &response_headers_);
   HttpTracerUtility::onUpstreamResponseTrailers(*child_span, &response_trailers_);

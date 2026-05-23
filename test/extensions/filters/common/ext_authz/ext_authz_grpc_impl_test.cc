@@ -95,7 +95,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOk) {
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
 
-  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  EXPECT_CALL(span_, setTag("ext_authz_status", Eq("ext_authz_ok")));
   EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
                                       AuthzResponseNoAttributes(authz_response))));
   client_->onSuccess(std::move(check_response), span_);
@@ -138,7 +138,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithAllAtributes) {
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
 
-  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  EXPECT_CALL(span_, setTag("ext_authz_status", Eq("ext_authz_ok")));
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
   client_->onSuccess(std::move(check_response), span_);
@@ -167,7 +167,7 @@ TEST_F(ExtAuthzGrpcClientTest, IndifferentToInvalidHeaders) {
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
 
-  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  EXPECT_CALL(span_, setTag("ext_authz_status", Eq("ext_authz_ok")));
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
   client_->onSuccess(std::move(check_response), span_);
@@ -192,7 +192,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDenied) {
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
   EXPECT_EQ(nullptr, headers.RequestId());
-  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_unauthorized")));
+  EXPECT_CALL(span_, setTag("ext_authz_status", Eq("ext_authz_unauthorized")));
   EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
                                       AuthzResponseNoAttributes(authz_response))));
 
@@ -218,7 +218,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedGrpcUnknownStatus) {
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
   EXPECT_EQ(nullptr, headers.RequestId());
-  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_unauthorized")));
+  EXPECT_CALL(span_, setTag("ext_authz_status", Eq("ext_authz_unauthorized")));
   EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
                                       AuthzResponseNoAttributes(authz_response))));
 
@@ -248,7 +248,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedWithAllAttributes) {
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
   EXPECT_EQ(nullptr, headers.RequestId());
-  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_unauthorized")));
+  EXPECT_CALL(span_, setTag("ext_authz_status", Eq("ext_authz_unauthorized")));
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(authz_response))));
 
@@ -282,7 +282,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedWithEmptyDeniedResponseStatus)
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
   EXPECT_EQ(nullptr, headers.RequestId());
-  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_unauthorized")));
+  EXPECT_CALL(span_, setTag("ext_authz_status", Eq("ext_authz_unauthorized")));
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(authz_response))));
 
@@ -379,7 +379,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationErrorWithAllAttributes) {
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
   EXPECT_EQ(nullptr, headers.RequestId());
-  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_error")));
+  EXPECT_CALL(span_, setTag("ext_authz_status", Eq("ext_authz_error")));
   EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
                                       AuthzErrorResponseWithAttributes(authz_response))));
 
@@ -410,7 +410,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationErrorWithEmptyErrorResponseStatus) {
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
   EXPECT_EQ(nullptr, headers.RequestId());
-  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_error")));
+  EXPECT_CALL(span_, setTag("ext_authz_status", Eq("ext_authz_error")));
   EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
                                       AuthzErrorResponseWithAttributes(authz_response))));
 
@@ -435,7 +435,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationErrorNoAttributes) {
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
   EXPECT_EQ(nullptr, headers.RequestId());
-  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_error")));
+  EXPECT_CALL(span_, setTag("ext_authz_status", Eq("ext_authz_error")));
   EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
                                       AuthzErrorResponseWithAttributes(authz_response))));
 
@@ -477,7 +477,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithDynamicMetadata) {
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
 
-  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  EXPECT_CALL(span_, setTag("ext_authz_status", Eq("ext_authz_ok")));
   EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
                                       AuthzResponseNoAttributes(authz_response))));
   client_->onSuccess(std::move(check_response), span_);
@@ -519,7 +519,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithQueryParameters) {
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
 
-  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  EXPECT_CALL(span_, setTag("ext_authz_status", Eq("ext_authz_ok")));
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
   client_->onSuccess(std::move(check_response), span_);
@@ -579,7 +579,7 @@ ok_response:
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
 
-  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  EXPECT_CALL(span_, setTag("ext_authz_status", Eq("ext_authz_ok")));
   EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
                                       AuthzOkResponse(expected_authz_response))));
   client_->onSuccess(std::make_unique<envoy::service::auth::v3::CheckResponse>(check_response),
@@ -628,7 +628,7 @@ ok_response:
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
 
-  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  EXPECT_CALL(span_, setTag("ext_authz_status", Eq("ext_authz_ok")));
   EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
                                       AuthzOkResponse(expected_authz_response))));
   client_->onSuccess(std::make_unique<envoy::service::auth::v3::CheckResponse>(check_response),
@@ -671,7 +671,7 @@ ok_response:
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
 
-  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  EXPECT_CALL(span_, setTag("ext_authz_status", Eq("ext_authz_ok")));
   EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
                                       AuthzOkResponse(expected_authz_response))));
   client_->onSuccess(std::make_unique<envoy::service::auth::v3::CheckResponse>(check_response),

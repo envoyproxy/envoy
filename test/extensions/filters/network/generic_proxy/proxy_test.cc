@@ -1852,11 +1852,17 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithTracing) {
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
   absl::flat_hash_map<std::string, std::string> final_tags;
-  EXPECT_CALL(*span, setTag(_, _))
+  EXPECT_CALL(*span, setTag(testing::An<absl::string_view>(), _))
       .WillRepeatedly(
           testing::Invoke([&final_tags](absl::string_view key, absl::string_view value) {
             final_tags[key] = std::string(value);
           }));
+  EXPECT_CALL(*span, setTag(testing::An<const Tracing::Tag&>(), _))
+      .WillRepeatedly(
+          testing::Invoke([&final_tags](const Tracing::Tag& key, absl::string_view value) {
+            final_tags[key.name()] = std::string(value);
+          }));
+
   EXPECT_CALL(*span, finishSpan());
 
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
@@ -1920,7 +1926,8 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithTracingAndSamplingToTrue) {
 
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
-  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(testing::An<absl::string_view>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(testing::An<const Tracing::Tag&>(), _)).Times(testing::AnyNumber());
   EXPECT_CALL(*span, finishSpan());
 
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));

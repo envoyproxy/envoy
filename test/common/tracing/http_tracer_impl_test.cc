@@ -55,9 +55,9 @@ protected:
       auto custom_tag_ptr = CustomTagUtility::createCustomTag(custom_tag);
       custom_tags_.emplace(custom_tag_ptr->tag(), custom_tag_ptr);
       if (cas.set) {
-        EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), Eq(cas.value)));
+        EXPECT_CALL(span, setTag(custom_tag.tag(), Eq(cas.value)));
       } else {
-        EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), _)).Times(0);
+        EXPECT_CALL(span, setTag(custom_tag.tag(), _)).Times(0);
       }
     }
 
@@ -105,11 +105,12 @@ TEST_F(HttpConnManFinalizerImplTest, OriginalAndLongPath) {
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
-  EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpUrl), Eq(path_prefix + expected_path)));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpMethod), Eq("GET")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
+  EXPECT_CALL(span, setTag(testing::An<absl::string_view>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(span, setTag(testing::An<const Tracing::Tag&>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpUrl, Eq(path_prefix + expected_path)));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpMethod, Eq("GET")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpProtocol, Eq("HTTP/2")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().PeerAddress, Eq(expected_ip)));
 
   expectSetCustomTags({});
 
@@ -138,11 +139,12 @@ TEST_F(HttpConnManFinalizerImplTest, NoGeneratedId) {
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
-  EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpUrl), Eq(path_prefix + expected_path)));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpMethod), Eq("GET")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
+  EXPECT_CALL(span, setTag(testing::An<absl::string_view>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(span, setTag(testing::An<const Tracing::Tag&>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpUrl, Eq(path_prefix + expected_path)));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpMethod, Eq("GET")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpProtocol, Eq("HTTP/2")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().PeerAddress, Eq(expected_ip)));
 
   expectSetCustomTags({});
 
@@ -170,11 +172,12 @@ TEST_F(HttpConnManFinalizerImplTest, Connect) {
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
-  EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpUrl), Eq("")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpMethod), Eq("CONNECT")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
+  EXPECT_CALL(span, setTag(testing::An<absl::string_view>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(span, setTag(testing::An<const Tracing::Tag&>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpUrl, Eq("")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpMethod, Eq("CONNECT")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpProtocol, Eq("HTTP/2")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().PeerAddress, Eq(expected_ip)));
 
   expectSetCustomTags({});
 
@@ -193,15 +196,15 @@ TEST_F(HttpConnManFinalizerImplTest, NullRequestHeadersAndNullRouteEntry) {
   EXPECT_CALL(stream_info, upstreamClusterInfo())
       .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}));
 
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseSize), Eq("11")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().RequestSize), Eq("10")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), _)).Times(0);
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), _)).Times(0);
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamClusterName), _)).Times(0);
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpStatusCode, Eq("0")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().ResponseSize, Eq("11")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().ResponseFlags, Eq("-")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().RequestSize, Eq("10")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().UpstreamAddress, _)).Times(0);
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().UpstreamCluster, _)).Times(0);
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().UpstreamClusterName, _)).Times(0);
 
   expectSetCustomTags({{"{ tag: a, request_header: { name: X-Ax } }", false, ""},
                        {R"EOF(
@@ -279,15 +282,15 @@ TEST_F(HttpConnManFinalizerImplTest, UpstreamClusterTagSetAlthoughNoUpstreamInfo
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
 
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("my_upstream_cluster")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamClusterName),
-                           Eq("my_upstream_cluster_observable")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseSize), Eq("11")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().RequestSize), Eq("10")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().UpstreamCluster, Eq("my_upstream_cluster")));
+  EXPECT_CALL(
+      span, setTag(Tracing::Tags::get().UpstreamClusterName, Eq("my_upstream_cluster_observable")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpStatusCode, Eq("0")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().ResponseSize, Eq("11")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().ResponseFlags, Eq("-")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().RequestSize, Eq("10")));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, nullptr, nullptr, nullptr, stream_info, config);
 }
@@ -302,14 +305,14 @@ TEST_F(HttpConnManFinalizerImplTest, NoUpstreamClusterTagSetWhenNoClusterInfo) {
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
 
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), _)).Times(0);
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamClusterName), _)).Times(0);
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseSize), Eq("11")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().RequestSize), Eq("10")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().UpstreamCluster, _)).Times(0);
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().UpstreamClusterName, _)).Times(0);
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpStatusCode, Eq("0")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().ResponseSize, Eq("11")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().ResponseFlags, Eq("-")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().RequestSize, Eq("10")));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, nullptr, nullptr, nullptr, stream_info, config);
 }
@@ -329,28 +332,28 @@ TEST_F(HttpConnManFinalizerImplTest, SpanOptionalHeaders) {
   stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
   // Check that span is populated correctly.
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GuidXRequestId), Eq("id")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpUrl), Eq("https:///test")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpMethod), Eq("GET")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UserAgent), Eq("-")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().DownstreamCluster), Eq("-")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().RequestSize), Eq("10")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().GuidXRequestId, Eq("id")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpUrl, Eq("https:///test")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpMethod, Eq("GET")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().UserAgent, Eq("-")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpProtocol, Eq("HTTP/1.0")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().DownstreamCluster, Eq("-")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().RequestSize, Eq("10")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().PeerAddress, Eq(expected_ip)));
 
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(100));
   stream_info.upstreamInfo()->setUpstreamHost(nullptr);
 
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseSize), Eq("100")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), _)).Times(0);
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), "fake_cluster"));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamClusterName), "observability_name"));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpStatusCode, Eq("0")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().ResponseSize, Eq("100")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().ResponseFlags, Eq("-")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().UpstreamAddress, _)).Times(0);
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().UpstreamCluster, "fake_cluster"));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().UpstreamClusterName, "observability_name"));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
                                             &response_trailers, stream_info, config);
@@ -367,9 +370,9 @@ TEST_F(HttpConnManFinalizerImplTest, UnixDomainSocketPeerAddressTag) {
   stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
   // Check that the PeerAddress is populated correctly for Unix domain sockets.
-  EXPECT_CALL(span, setTag(_, _)).Times(AnyNumber());
-  EXPECT_CALL(span,
-              setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(remote_address->logicalName())));
+  EXPECT_CALL(span, setTag(testing::An<absl::string_view>(), _)).Times(AnyNumber());
+  EXPECT_CALL(span, setTag(testing::An<const Tracing::Tag&>(), _)).Times(AnyNumber());
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().PeerAddress, Eq(remote_address->logicalName())));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
                                             &response_trailers, stream_info, config);
@@ -412,7 +415,8 @@ ree:
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(100));
   EXPECT_CALL(*host_, metadata()).WillRepeatedly(Return(host_metadata));
 
-  EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(span, setTag(testing::An<absl::string_view>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(span, setTag(testing::An<const Tracing::Tag&>(), _)).Times(testing::AnyNumber());
 
   expectSetCustomTags({
       {"{ tag: aa, literal: { value: a } }", true, "a"},
@@ -518,15 +522,15 @@ TEST_F(HttpConnManFinalizerImplTest, SpanPopulatedFailureResponse) {
   stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
   // Check that span is populated correctly.
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GuidXRequestId), Eq("id")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpUrl), Eq("http://api/test")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpMethod), Eq("GET")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UserAgent), Eq("agent")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().DownstreamCluster), Eq("downstream_cluster")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().RequestSize), Eq("10")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GuidXClientTraceId), Eq("client_trace_id")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().GuidXRequestId, Eq("id")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpUrl, Eq("http://api/test")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpMethod, Eq("GET")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().UserAgent, Eq("agent")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpProtocol, Eq("HTTP/1.0")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().DownstreamCluster, Eq("downstream_cluster")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().RequestSize, Eq("10")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().GuidXClientTraceId, Eq("client_trace_id")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().PeerAddress, Eq(expected_ip)));
 
   EXPECT_CALL(config, verbose).WillOnce(Return(false));
   EXPECT_CALL(config, maxPathTagLength).WillOnce(Return(256));
@@ -536,14 +540,14 @@ TEST_F(HttpConnManFinalizerImplTest, SpanPopulatedFailureResponse) {
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(100));
   stream_info.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRequestTimeout);
 
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("503")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseSize), Eq("100")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("UT")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), _)).Times(0);
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), "fake_cluster"));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamClusterName), "observability_name"));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpStatusCode, Eq("503")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().ResponseSize, Eq("100")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().ResponseFlags, Eq("UT")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().UpstreamAddress, _)).Times(0);
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().UpstreamCluster, "fake_cluster"));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().UpstreamClusterName, "observability_name"));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
                                             &response_trailers, stream_info, config);
@@ -574,25 +578,24 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcOkStatus) {
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
   stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().DownstreamCluster), Eq("-")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
-  EXPECT_CALL(span,
-              setTag(Eq(Tracing::Tags::get().HttpUrl), Eq("http://example.com:80/pb.Foo/Bar")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UserAgent), Eq("-")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().RequestSize), Eq("10")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseSize), Eq("11")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpMethod), Eq("POST")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcPath), Eq("/pb.Foo/Bar")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcAuthority), Eq("example.com:80")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcContentType), Eq("application/grpc")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("0")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().DownstreamCluster, Eq("-")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().UpstreamCluster, Eq("fake_cluster")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().UpstreamClusterName, Eq("observability_name")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpUrl, Eq("http://example.com:80/pb.Foo/Bar")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().UserAgent, Eq("-")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().RequestSize, Eq("10")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().ResponseSize, Eq("11")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().ResponseFlags, Eq("-")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpMethod, Eq("POST")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpProtocol, Eq("HTTP/2")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpStatusCode, Eq("200")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().GrpcPath, Eq("/pb.Foo/Bar")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().GrpcAuthority, Eq("example.com:80")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().GrpcContentType, Eq("application/grpc")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().GrpcStatusCode, Eq("0")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().GrpcMessage, Eq("")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().PeerAddress, Eq(expected_ip)));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
                                             &response_trailers, stream_info, config);
@@ -628,18 +631,19 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcErrorTag) {
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
   stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
-  EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpMethod), Eq("POST")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcPath), Eq("/pb.Foo/Bar")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcAuthority), Eq("example.com:80")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcContentType), Eq("application/grpc")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcTimeout), Eq("10s")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("14")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("unavailable")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
+  EXPECT_CALL(span, setTag(testing::An<absl::string_view>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(span, setTag(testing::An<const Tracing::Tag&>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpMethod, Eq("POST")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpProtocol, Eq("HTTP/2")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpStatusCode, Eq("200")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().GrpcPath, Eq("/pb.Foo/Bar")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().GrpcAuthority, Eq("example.com:80")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().GrpcContentType, Eq("application/grpc")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().GrpcTimeout, Eq("10s")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().GrpcStatusCode, Eq("14")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().GrpcMessage, Eq("unavailable")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().PeerAddress, Eq(expected_ip)));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
                                             &response_trailers, stream_info, config);
@@ -675,17 +679,18 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcTrailersOnly) {
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
   stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
-  EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpMethod), Eq("POST")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcPath), Eq("/pb.Foo/Bar")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcAuthority), Eq("example.com:80")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcContentType), Eq("application/grpc")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("14")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("unavailable")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
+  EXPECT_CALL(span, setTag(testing::An<absl::string_view>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(span, setTag(testing::An<const Tracing::Tag&>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpMethod, Eq("POST")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpProtocol, Eq("HTTP/2")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().HttpStatusCode, Eq("200")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().GrpcPath, Eq("/pb.Foo/Bar")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().GrpcAuthority, Eq("example.com:80")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().GrpcContentType, Eq("application/grpc")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().GrpcStatusCode, Eq("14")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().GrpcMessage, Eq("unavailable")));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True));
+  EXPECT_CALL(span, setTag(Tracing::Tags::get().PeerAddress, Eq(expected_ip)));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
                                             &response_trailers, stream_info, config);
@@ -707,13 +712,14 @@ TEST_F(HttpConnManFinalizerImplTest, CustomTagOverwritesCommonTag) {
   envoy::type::tracing::v3::CustomTag custom_tag;
   TestUtility::loadFromYaml(custom_tag_str, custom_tag);
   custom_tags_.emplace(custom_tag.tag(), CustomTagUtility::createCustomTag(custom_tag));
-  EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(span, setTag(testing::An<absl::string_view>(), _)).Times(testing::AnyNumber());
+  EXPECT_CALL(span, setTag(testing::An<const Tracing::Tag&>(), _)).Times(testing::AnyNumber());
 
   {
     // ensure our setTag(..., "override_component") happens later, taking precedence
     InSequence s;
-    EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), Eq(Tracing::Tags::get().Proxy)));
-    EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), "override_component"));
+    EXPECT_CALL(span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
+    EXPECT_CALL(span, setTag(custom_tag.tag(), "override_component"));
   }
 
   expectSetCustomTags({});
