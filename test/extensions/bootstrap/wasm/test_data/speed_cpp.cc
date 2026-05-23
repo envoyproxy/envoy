@@ -83,7 +83,7 @@ bool base64Decode(const std::basic_string<char>& input, std::vector<uint8_t>* ou
     return false;
   }
   size_t padding = 0;
-  if (input.length()) {
+  if (!input.empty()) {
     if (input[input.length() - 1] == padCharacter) {
       padding++;
     }

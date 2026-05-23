@@ -10,10 +10,11 @@ namespace {
 
 class ExtractorTestJsonRpcParserConfig : public JsonRpcParserConfig {
 public:
-  ExtractorTestJsonRpcParserConfig() { initializeDefaults(); }
+  ExtractorTestJsonRpcParserConfig() { initializeDefaultsImpl(); }
 
 protected:
-  void initializeDefaults() override {
+  void initializeDefaults() override { initializeDefaultsImpl(); }
+  void initializeDefaultsImpl() {
     always_extract_.insert("id");
     always_extract_.insert("jsonrpc");
     always_extract_.insert("method");

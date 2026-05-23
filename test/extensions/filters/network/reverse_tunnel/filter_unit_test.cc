@@ -70,7 +70,7 @@ protected:
   }
 
 public:
-  ReverseTunnelFilterUnitTest() : stats_store_(), overload_manager_() {
+  ReverseTunnelFilterUnitTest() {
     // Prepare proto config with defaults.
     proto_config_.set_request_path("/reverse_connections/request");
     proto_config_.set_request_method(envoy::config::core::v3::GET);
@@ -1379,7 +1379,7 @@ TEST_F(ReverseTunnelFilterUnitTest, VariousHttpMalformations) {
       // Invalid characters in headers
       "GET /reverse_connections/request HTTP/1.1\r\nHo\x00st: test\r\n\r\n"};
 
-  for (size_t i = 0; i < malformed_requests.size(); ++i) {
+  for (const auto& malformed_request : malformed_requests) {
     // Create new filter for each test to avoid state issues
     auto test_filter = std::make_unique<ReverseTunnelFilter>(config_, *stats_store_.rootScope(),
                                                              overload_manager_);
@@ -1395,7 +1395,7 @@ TEST_F(ReverseTunnelFilterUnitTest, VariousHttpMalformations) {
 
     test_filter->initializeReadFilterCallbacks(test_callbacks);
 
-    Buffer::OwnedImpl request(malformed_requests[i]);
+    Buffer::OwnedImpl request(malformed_request);
     EXPECT_EQ(Network::FilterStatus::StopIteration, test_filter->onData(request, false));
   }
 }
@@ -1542,7 +1542,7 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest, ProcessAcceptedConnectionReportsConn
 TEST_F(ReverseTunnelFilterUnitTest, SystematicHttpErrorPatterns) {
   auto patterns = HttpErrorHelper::getHttpErrorPatterns();
 
-  for (size_t i = 0; i < patterns.size(); ++i) {
+  for (const auto& pattern : patterns) {
     // Create new filter for each test to avoid state pollution
     auto error_filter = std::make_unique<ReverseTunnelFilter>(config_, *stats_store_.rootScope(),
                                                               overload_manager_);
@@ -1564,7 +1564,7 @@ TEST_F(ReverseTunnelFilterUnitTest, SystematicHttpErrorPatterns) {
     error_filter->initializeReadFilterCallbacks(error_callbacks);
 
     // Test this error pattern
-    Buffer::OwnedImpl error_request(patterns[i]);
+    Buffer::OwnedImpl error_request(pattern);
     EXPECT_EQ(Network::FilterStatus::StopIteration, error_filter->onData(error_request, false));
   }
 }

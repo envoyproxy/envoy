@@ -121,7 +121,6 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
 #endif
 
   streamInfo().filterState()->setData(SconeStateKey, std::make_shared<SconeState>(),
-                                      StreamInfo::FilterState::StateType::Mutable,
                                       StreamInfo::FilterState::LifeSpan::Connection);
 }
 

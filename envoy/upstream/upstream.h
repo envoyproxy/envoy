@@ -217,6 +217,21 @@ public:
       const envoy::config::core::v3::Metadata* metadata) const PURE;
 
   /**
+   * Create a dedicated connection for ORCA out-of-band load reporting per gRFC A51
+   * (xds.service.orca.v3.OpenRcaService), separate from request and health-check pools.
+   * Dials the address returned by orcaReportingAddress().
+   * @param dispatcher supplies the owning dispatcher.
+   * @param transport_socket_options supplies the transport options that will be set on the new
+   * connection.
+   * @param metadata when non-null drives transport socket factory resolution.
+   * @return the connection data.
+   */
+  virtual CreateConnectionData createOrcaReportingConnection(
+      Event::Dispatcher& dispatcher,
+      Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+      const envoy::config::core::v3::Metadata* metadata) const PURE;
+
+  /**
    * @return host specific gauges.
    */
   virtual std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>

@@ -250,6 +250,14 @@ pub trait ClusterLbContext {
   /// the next call to `get_filter_state_typed` on the same worker thread, or until the end of
   /// the current host-selection callback, whichever comes first.
   fn get_filter_state_typed<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
+
+  /// Returns the value of a per-host stat for the given host pointer. The module must ensure
+  /// `host` still belongs to the cluster's host set. Returns 0 if the host pointer is null.
+  fn get_host_stat(
+    &self,
+    host: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+    stat: abi::envoy_dynamic_module_type_host_stat,
+  ) -> u64;
 }
 
 /// Envoy-side cluster operations available to the module.
@@ -1890,6 +1898,20 @@ impl ClusterLbContext for ClusterLbContextImpl {
       Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
     } else {
       None
+    }
+  }
+
+  fn get_host_stat(
+    &self,
+    host: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+    stat: abi::envoy_dynamic_module_type_host_stat,
+  ) -> u64 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+        self.raw_context,
+        host,
+        stat,
+      )
     }
   }
 }

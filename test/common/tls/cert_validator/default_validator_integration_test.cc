@@ -151,8 +151,7 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidationFailedDepthWithTrustRootOn
 class TestSanListenerFilter : public Network::ListenerFilter {
 public:
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override {
-    cb.filterState().setData("test_san_filter_state", nullptr,
-                             StreamInfo::FilterState::StateType::ReadOnly);
+    cb.filterState().setData("test_san_filter_state", nullptr);
     return Network::FilterStatus::Continue;
   }
   size_t maxReadBytes() const override { return 0; }
