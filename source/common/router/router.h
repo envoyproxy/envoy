@@ -499,8 +499,8 @@ public:
     const Network::Connection* conn = downstreamConnection();
     // Async-client-driven router invocations (ext_authz, ratelimit side calls,
     // mirror/shadow) have a null downstream connection. Previously this path
-    // unconditionally dereferenced `conn` to compose the per-connection seed,
-    // which crashed the worker. Skip the connection-derived seed and degrade
+    // would unconditionally dereference `conn` to compose the per-connection
+    // seed, which crashed the worker. Skip the connection-derived seed and degrade
     // to a stable empty seed for those callers; the resulting cookie value is
     // hashed identically across all such async invocations, which preserves
     // hash-stability requirements for the cookie hash policy.
