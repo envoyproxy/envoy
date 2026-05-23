@@ -88,10 +88,10 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
           absl::string_view new_data) mutable -> absl::StatusOr<std::shared_ptr<LoadedIpTags>> {
         IPTagsProto ip_tags_proto;
         if (absl::EndsWith(datasource_filename, MessageUtil::FileExtensions::get().Yaml)) {
+          // TODO(nezdolik) remove string casting once yaml utility has been migrated to
+          // string_view.
           auto data = std::string(new_data);
           auto load_status =
-              // TODO(nezdolik) remove string casting once yaml utility has been migrated to
-              // string_view.
               MessageUtil::loadFromYamlNoThrow(data, ip_tags_proto, validation_visitor);
           if (!load_status.ok()) {
             return load_status;
@@ -246,7 +246,7 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap&
 
   // Pull the current snapshot once so the trie lookup and stats updates that follow
   // come from the same reload, even if a file watcher publishes a new snapshot mid-call.
-  LoadedIpTagsSharedPtr loaded = config_->loadedIpTags();
+  LoadedIpTagsConstSharedPtr loaded = config_->loadedIpTags();
   if (loaded == nullptr) {
     return Http::FilterHeadersStatus::Continue;
   }

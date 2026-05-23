@@ -20,7 +20,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::InvokeWithoutArgs;
 using testing::Return;
 
 namespace Envoy {
@@ -40,7 +39,7 @@ public:
 
   static void resetTrie(IpTaggingFilterConfig& filter_config) {
     if (filter_config.static_ip_tags_) {
-      filter_config.static_ip_tags_->trie.reset();
+      const_cast<LoadedIpTags*>(filter_config.static_ip_tags_.get())->trie.reset();
     }
   }
 };

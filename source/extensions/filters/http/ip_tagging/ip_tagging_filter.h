@@ -81,7 +81,7 @@ struct LoadedIpTags {
   IpTagsStatsSharedPtr stats;
 };
 
-using LoadedIpTagsSharedPtr = std::shared_ptr<LoadedIpTags>;
+using LoadedIpTagsConstSharedPtr = std::shared_ptr<const LoadedIpTags>;
 
 /**
  * Owns the file-watched DataSourceProvider that produces a new LoadedIpTags on every
@@ -98,7 +98,7 @@ public:
 
   ~IpTagsProvider();
 
-  LoadedIpTagsSharedPtr loadedIpTags() const { return data_source_provider_->data(); }
+  LoadedIpTagsConstSharedPtr loadedIpTags() const { return data_source_provider_->data(); }
 
 private:
   Envoy::Config::DataSource::DataSourceProviderPtr<LoadedIpTags> data_source_provider_;
@@ -160,7 +160,7 @@ public:
   // built at construction; for the data source path it is the snapshot currently
   // published by the file watcher. The filter pulls this once per request so the trie
   // and stats it uses come from the same reload.
-  LoadedIpTagsSharedPtr loadedIpTags() const {
+  LoadedIpTagsConstSharedPtr loadedIpTags() const {
     return provider_ ? provider_->loadedIpTags() : static_ip_tags_;
   }
 
@@ -199,7 +199,7 @@ private:
   // Keeps the registry singleton alive as long as any of its providers are in use.
   const std::shared_ptr<IpTagsRegistrySingleton> ip_tags_registry_;
   // Set only on the inline path.
-  LoadedIpTagsSharedPtr static_ip_tags_;
+  LoadedIpTagsConstSharedPtr static_ip_tags_;
   // Set only on the data source path.
   std::shared_ptr<IpTagsProvider> provider_;
 };
@@ -232,6 +232,7 @@ private:
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   // Used for testing only.
   mutable Thread::ThreadSynchronizer synchronizer_;
+  // Allow the unit test to have access to private members.
   friend class IpTaggingFilterPeer;
 };
 
