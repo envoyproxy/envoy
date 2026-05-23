@@ -2573,6 +2573,36 @@ TEST_F(StaticClusterImplTest, LoadAssignmentNonEmptyHostnameWithHealthChecks) {
   EXPECT_FALSE(cluster->info()->addedViaApi());
 }
 
+TEST_F(StaticClusterImplTest, LoadAssignmentEndpointStatName) {
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            observability_name: shared.backend/a
+            address:
+              socket_address:
+                address: 10.0.0.1
+                port_value: 443
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
+
+  cluster->initialize([] { return absl::OkStatus(); });
+
+  ASSERT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ("shared.backend/a",
+            cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->observabilityName());
+}
+
 TEST_F(StaticClusterImplTest, LoadAssignmentMultiplePriorities) {
   const std::string yaml = R"EOF(
     name: staticcluster
