@@ -14,21 +14,11 @@ class SemanticConventionTagValues {
 public:
   const std::string HttpRequestMethod = "http.request.method";
   const std::string HttpResponseStatusCode = "http.response.status_code";
-  const std::string ErrorType = "error.type";
   const std::string UrlFull = "url.full";
-  const std::string UrlPath = "url.path";
-  const std::string UrlScheme = "url.scheme";
   const std::string HttpRequestResendCount = "http.request.resend_count";
   const std::string HttpRequestSize = "http.request.body.size";
   const std::string HttpResponseSize = "http.response.body.size";
-  const std::string ClientAddress = "client.address";
-  const std::string ClientPort = "client.port";
-  const std::string ServerAddress = "server.address";
-  const std::string ServerPort = "server.port";
-  const std::string NetworkProtocolName = "network.protocol.name";
   const std::string NetworkPeerAddress = "network.peer.address";
-  const std::string NetworkPeerPort = "network.peer.port";
-  const std::string NetworkProtocolVersion = "network.protocol.version";
   const std::string UserAgentOriginal = "user_agent.original";
 };
 
