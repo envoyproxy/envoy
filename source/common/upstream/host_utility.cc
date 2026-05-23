@@ -186,12 +186,20 @@ void HostUtility::forEachHostMetric(
 
       for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
         for (auto& host : host_set->hosts()) {
+          absl::string_view endpoint_observability_name = host->observabilityName();
+          Network::Address::InstanceConstSharedPtr address;
+          if (endpoint_observability_name.empty()) {
+            // Only logical host will have empty observability name for now.
+            address = host->address();
+            endpoint_observability_name = address->asStringView();
+          }
 
           Stats::TagVector tags;
           tags.reserve(fixed_tags.size() + 3);
           tags.insert(tags.end(), fixed_tags.begin(), fixed_tags.end());
           tags.emplace_back(Stats::Tag{Envoy::Config::TagNames::get().CLUSTER_NAME, cluster_name});
-          tags.emplace_back(Stats::Tag{"envoy.endpoint_address", host->address()->asString()});
+          tags.emplace_back(
+              Stats::Tag{"envoy.endpoint_address", std::string(endpoint_observability_name)});
 
           const auto& hostname = host->hostname();
           if (!hostname.empty()) {
@@ -200,10 +208,9 @@ void HostUtility::forEachHostMetric(
 
           auto set_metric_metadata = [&](absl::string_view metric_name,
                                          Stats::PrimitiveMetricMetadata& metric) {
-            metric.setName(
-                absl::StrCat("cluster.", cluster_name, ".endpoint.",
-                             Stats::Utility::sanitizeStatsName(host->address()->asStringView()),
-                             ".", metric_name));
+            metric.setName(absl::StrCat(
+                "cluster.", cluster_name, ".endpoint.",
+                Stats::Utility::sanitizeStatsName(endpoint_observability_name), ".", metric_name));
             metric.setTagExtractedName(absl::StrCat("cluster.endpoint.", metric_name));
             metric.setTags(tags);
 

@@ -40,7 +40,7 @@ public:
   }
 
 protected:
-  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor config_{};
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor config_;
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Upstream::MockClusterManager& cm_{context_.cluster_manager_};
   std::unique_ptr<ExtProcHttpClient> client_;

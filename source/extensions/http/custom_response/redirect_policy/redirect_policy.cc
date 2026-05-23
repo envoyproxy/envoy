@@ -222,7 +222,7 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
       "envoy.filters.http.custom_response",
       std::make_shared<::Envoy::Extensions::HttpFilters::CustomResponse::CustomResponseFilterState>(
           const_cast<RedirectPolicy*>(this)->shared_from_this(), original_response_code),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
+      StreamInfo::FilterState::LifeSpan::Request);
   restore_original_headers.cancel();
   decoder_callbacks->recreateStream(nullptr);
 

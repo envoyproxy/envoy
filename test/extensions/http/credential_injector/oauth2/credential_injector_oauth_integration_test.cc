@@ -125,8 +125,8 @@ resources:
     encodeGoodJsonResponseBody();
   }
 
-  FakeHttpConnectionPtr fake_oauth2_connection_{};
-  FakeStreamPtr oauth2_request_{};
+  FakeHttpConnectionPtr fake_oauth2_connection_;
+  FakeStreamPtr oauth2_request_;
   std::string request_body_;
 };
 
