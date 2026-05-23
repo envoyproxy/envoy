@@ -650,6 +650,7 @@ com_google_protobuf:
   - com_google_protobuf_protoc_osx_aarch_64
   - com_google_protobuf_protoc_osx_x86_64
   - com_google_protobuf_protoc_win64
+  - zlib
   cpe: "cpe:2.3:a:google:protobuf:*"
   license: "Protocol Buffers"
   license_url: "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE"
@@ -1281,9 +1282,15 @@ rules_java:
   project_name: "Java rules for Bazel"
   project_desc: "Bazel rules for the Java language"
   project_url: "https://github.com/bazelbuild/rules_java/"
-  release_date: "2025-03-25"
+  release_date: "2026-02-24"
   use_category:
   - build
+  - dataplane_core
+  - dataplane_ext
+  - observability_ext
+  - controlplane
+  - api
+  - other
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/rules_java/blob/{version}/LICENSE"
 
@@ -1365,6 +1372,12 @@ rules_shell:
   release_date: "2026-03-23"
   use_category:
   - build
+  - dataplane_core
+  - dataplane_ext
+  - observability_ext
+  - controlplane
+  - api
+  - other
   license: "Apache-2.0"
   license_url: "https://github.com/protocolbuffers/rules_shell/blob/{version}/LICENSE"
 

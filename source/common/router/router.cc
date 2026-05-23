@@ -687,16 +687,14 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     if (!parsed_authority.is_ip_address_ && upstream_http_protocol_options->auto_sni() &&
         !filter_state->hasDataWithName(Network::UpstreamServerName::key())) {
       filter_state->setData(Network::UpstreamServerName::key(),
-                            std::make_unique<Network::UpstreamServerName>(parsed_authority.host_),
-                            StreamInfo::FilterState::StateType::Mutable);
+                            std::make_unique<Network::UpstreamServerName>(parsed_authority.host_));
     }
 
     if (upstream_http_protocol_options->auto_san_validation() &&
         !filter_state->hasDataWithName(Network::UpstreamSubjectAltNames::key())) {
       filter_state->setData(Network::UpstreamSubjectAltNames::key(),
                             std::make_unique<Network::UpstreamSubjectAltNames>(
-                                std::vector<std::string>{std::string(parsed_authority.host_)}),
-                            StreamInfo::FilterState::StateType::Mutable);
+                                std::vector<std::string>{std::string(parsed_authority.host_)}));
     }
   }
 
@@ -2215,7 +2213,6 @@ bool Filter::convertRequestHeadersForInternalRedirect(
     num_internal_redirect = state.get();
 
     filter_state->setData(NumInternalRedirectsFilterStateName, std::move(state),
-                          StreamInfo::FilterState::StateType::Mutable,
                           StreamInfo::FilterState::LifeSpan::Request);
   }
 

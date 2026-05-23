@@ -4704,7 +4704,7 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespStreamedTes
     ProcessingRequest body_request;
     ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, body_request));
     ASSERT_TRUE(body_request.has_request_body());
-    body_received = absl::StrCat(body_received, body_request.request_body().body());
+    absl::StrAppend(&body_received, body_request.request_body().body());
     end_stream = body_request.request_body().end_of_stream();
     total_body_msg_count++;
   }

@@ -19,15 +19,23 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
+# Bazel 8 no longer sets PYTHON_RUNFILES; use RUNFILES_DIR or the
+# conventional <script>.runfiles path.
+if [[ -n "${RUNFILES_DIR:-}" ]]; then
+    RUNFILES="${RUNFILES_DIR}"
+elif [[ -d "${BASH_SOURCE[0]}.runfiles" ]]; then
+    RUNFILES="${BASH_SOURCE[0]}.runfiles"
+else
+    echo "WARNING: Unable to find runfiles directory" >&2
+    exit 1
+fi
+
 find_file() {
-    # kinda wierd to use PYTHON_RUNFILES but that is what is available in the
-    # bazel generator customization
-    find "${PYTHON_RUNFILES}" \( -type f -o -type l \) -name "${1}" -path "*/tools/coverage/**/*" | head -1
+    find "${RUNFILES}" \( -type f -o -type l \) -name "${1}" -path "*/tools/coverage/**/*" | head -1
 }
 
 find_external_file() {
-    # Find files in external repositories (not under tools/coverage)
-    find "${PYTHON_RUNFILES}" \( -type f -o -type l \) -name "${1}" | head -1
+    find "${RUNFILES}" \( -type f -o -type l \) -name "${1}" | head -1
 }
 
 GRCOV="$(find_file grcov_bin)"

@@ -852,7 +852,7 @@ uint32_t ExtProcIntegrationTest::serverReceiveBodyDuplexStreamed(absl::string_vi
           ADD_FAILURE() << "Expected response body message but got unexpected message type";
           return total_req_body_msg;
         }
-        body_received = absl::StrCat(body_received, body_request.response_body().body());
+        absl::StrAppend(&body_received, body_request.response_body().body());
         end_stream = body_request.response_body().end_of_stream();
         total_req_body_msg++;
       }
@@ -864,7 +864,7 @@ uint32_t ExtProcIntegrationTest::serverReceiveBodyDuplexStreamed(absl::string_vi
           ADD_FAILURE() << "Expected request body message but got unexpected message type";
           return total_req_body_msg;
         }
-        body_received = absl::StrCat(body_received, body_request.request_body().body());
+        absl::StrAppend(&body_received, body_request.request_body().body());
         end_stream = body_request.request_body().end_of_stream();
         total_req_body_msg++;
       }

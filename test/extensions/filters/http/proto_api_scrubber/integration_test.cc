@@ -54,8 +54,7 @@ public:
     const std::string key = kFilterStateLabelKey;
     const std::string value = kFilterStateLabelValue;
     decoder_callbacks_->streamInfo().filterState()->setData(
-        key, std::make_shared<::Envoy::Router::StringAccessorImpl>(value),
-        ::Envoy::StreamInfo::FilterState::StateType::ReadOnly);
+        key, std::make_shared<::Envoy::Router::StringAccessorImpl>(value));
     return ::Envoy::Http::FilterHeadersStatus::Continue;
   }
 };
