@@ -410,6 +410,44 @@ TEST_F(DnsSrvClusterTest, DontWaitForDNSOnInit) {
   EXPECT_EQ(hosts[0]->address()->ip()->port(), 9000);
 }
 
+// Verifies that destroying the cluster while A/AAAA queries are in-flight cancels them.
+// The SRV callback fires (clearing DnsSrvCluster::active_dns_query_) and starts A/AAAA
+// resolution via ResolveTarget. Destroying the cluster before the A/AAAA callback arrives
+// must trigger ResolveTarget::~ResolveTarget to cancel the outstanding query.
+TEST_F(DnsSrvClusterTest, DestroyDuringPendingAaaaQuery) {
+  resolve_timer_ = new Event::MockTimer(&server_context_.dispatcher_);
+
+  Network::DnsResolver::ResolveCb srv_callback;
+  expectResolveSrv("_local_service._tcp.service.consul.", srv_callback);
+
+  Network::DnsResolver::ResolveCb a_callback;
+  expectResolve("svc.example.com", Network::DnsLookupFamily::All, a_callback);
+
+  createCluster();
+
+  // Fire SRV response — starts A/AAAA query, clears DnsSrvCluster::active_dns_query_.
+  srv_callback(Network::DnsResolver::ResolutionStatus::Completed, "",
+               {{0, 1, 9000, "svc.example.com", std::chrono::seconds(42)}});
+
+  // A/AAAA query still pending. Destroying the cluster must cancel it via ResolveTarget dtor.
+  EXPECT_CALL(active_dns_query_, cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
+  cluster_.reset();
+}
+
+// Verifies that destroying the cluster while an SRV query is in-flight cancels the query.
+TEST_F(DnsSrvClusterTest, DestroyDuringPendingSrvQuery) {
+  resolve_timer_ = new Event::MockTimer(&server_context_.dispatcher_);
+
+  Network::DnsResolver::ResolveCb srv_callback;
+  expectResolveSrv("_local_service._tcp.service.consul.", srv_callback);
+
+  createCluster();
+
+  // The SRV query is still pending. Destroying the cluster must cancel it.
+  EXPECT_CALL(active_dns_query_, cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
+  cluster_.reset();
+}
+
 } // namespace Clusters
 } // namespace Extensions
 } // namespace Envoy
