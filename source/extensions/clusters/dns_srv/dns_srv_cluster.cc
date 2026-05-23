@@ -234,7 +234,9 @@ void DnsSrvCluster::ResolveList::targetResolved(ResolveTarget* target,
   resolved_targets_.push_back(std::move(*p));
   active_targets_.erase(p);
 
-  dns_ttl_refresh_rate_ = std::min(dns_ttl_refresh_rate_, dns_ttl);
+  if (dns_ttl >= std::chrono::seconds(1)) {
+    dns_ttl_refresh_rate_ = std::min(dns_ttl_refresh_rate_, dns_ttl);
+  }
 
   maybeAllResolved();
 }

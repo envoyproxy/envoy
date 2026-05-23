@@ -107,7 +107,7 @@ TEST_F(DnsSrvClusterTest, CreateClusterWithMinimalConfig) {
   constexpr uint32_t srv_priority = 0;
   constexpr uint32_t srv_weight = 1;
   constexpr uint32_t srv_port = 9000;
-  constexpr std::chrono::seconds srv_ttl{42};
+  constexpr std::chrono::seconds srv_ttl{40};
 
   expectResolveTimer();
 
@@ -144,7 +144,7 @@ TEST_F(DnsSrvClusterTest, SameIpTwice) {
   constexpr uint32_t srv_weight = 1;
   constexpr uint32_t srv_port1 = 9000;
   constexpr uint32_t srv_port2 = 9001;
-  constexpr std::chrono::seconds srv_ttl{42};
+  constexpr std::chrono::seconds srv_ttl{40};
 
   expectResolveTimer();
 
@@ -197,7 +197,7 @@ TEST_F(DnsSrvClusterTest, TwoDifferentHostnames) {
   constexpr uint32_t srv_weight = 1;
   constexpr uint32_t srv_port1 = 9000;
   constexpr uint32_t srv_port2 = 9001;
-  constexpr std::chrono::seconds srv_ttl{42};
+  constexpr std::chrono::seconds srv_ttl{40};
 
   expectResolveTimer();
 
@@ -247,7 +247,7 @@ TEST_F(DnsSrvClusterTest, TwoDifferentHostnamesOneFails) {
   constexpr uint32_t srv_priority = 0;
   constexpr uint32_t srv_weight = 1;
   constexpr uint32_t srv_port = 9000;
-  constexpr std::chrono::seconds srv_ttl{42};
+  constexpr std::chrono::seconds srv_ttl{40};
 
   expectResolveTimer();
 
@@ -290,7 +290,7 @@ TEST_F(DnsSrvClusterTest, OneHostnameOneIp) {
   constexpr uint32_t srv_priority = 0;
   constexpr uint32_t srv_weight = 1;
   constexpr uint32_t srv_port = 9000;
-  constexpr std::chrono::seconds srv_ttl{42};
+  constexpr std::chrono::seconds srv_ttl{40};
 
   expectResolveTimer();
 
@@ -333,7 +333,7 @@ TEST_F(DnsSrvClusterTest, TwoIps) {
   constexpr uint32_t srv_priority = 0;
   constexpr uint32_t srv_weight = 1;
   constexpr uint32_t srv_port = 9000;
-  constexpr std::chrono::seconds srv_ttl{42};
+  constexpr std::chrono::seconds srv_ttl{40};
 
   expectResolveTimer();
 
@@ -361,6 +361,48 @@ TEST_F(DnsSrvClusterTest, TwoIps) {
   EXPECT_EQ(hosts[1]->weight(), srv_weight);
   EXPECT_EQ(hosts[1]->address()->ip()->addressAsString(), "5.6.7.8");
   EXPECT_EQ(hosts[1]->address()->ip()->port(), srv_port);
+}
+
+// Verifies that when respect_dns_ttl is enabled the refresh timer is armed with the TTL
+// returned in the A/AAAA response rather than the static dns_refresh_rate.
+TEST_F(DnsSrvClusterTest, RespectDnsTtl) {
+  static constexpr char yaml[] = R"EOF(
+    name: test_cluster
+    connect_timeout: 1s
+    dns_lookup_family: ALL
+    respect_dns_ttl: true
+    cluster_type:
+      name: envoy.clusters.dns_srv
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.dns_srv.v3.DnsSrvClusterConfig
+        srv_name: "_local_service._tcp.service.consul."
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.cares
+  )EOF";
+
+  constexpr std::chrono::seconds srv_ttl{40};
+
+  resolve_timer_ = new Event::MockTimer(&server_context_.dispatcher_);
+  EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(40000), _));
+
+  Network::DnsResolver::ResolveCb srv_callback;
+  expectResolveSrv("_local_service._tcp.service.consul.", srv_callback);
+
+  Network::DnsResolver::ResolveCb a_callback;
+  expectResolve("svc.example.com", Network::DnsLookupFamily::All, a_callback);
+
+  createCluster(yaml);
+
+  srv_callback(Network::DnsResolver::ResolutionStatus::Completed, "",
+               {{0, 1, 9000, "svc.example.com", srv_ttl}});
+
+  a_callback(Network::DnsResolver::ResolutionStatus::Completed, "",
+             TestUtility::makeDnsResponse({"1.2.3.4"}, srv_ttl));
+
+  const auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  ASSERT_EQ(hosts.size(), 1);
+  EXPECT_EQ(hosts[0]->address()->ip()->addressAsString(), "1.2.3.4");
+  EXPECT_EQ(hosts[0]->address()->ip()->port(), 9000);
 }
 
 TEST_F(DnsSrvClusterTest, DontWaitForDNSOnInit) {
