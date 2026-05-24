@@ -211,6 +211,8 @@ private:
     Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
       return std::make_unique<LbImpl>();
     }
+
+    bool recreateOnHostChangeDeprecated() const override { return false; }
   };
 };
 

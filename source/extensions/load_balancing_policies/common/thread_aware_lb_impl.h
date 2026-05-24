@@ -171,7 +171,7 @@ private:
     // Uses the per-worker params to create the thread-aware LB instance, including the worker
     // priority_set used to register member-update callbacks.
     LoadBalancerPtr create(LoadBalancerParams) override;
-    bool recreateOnHostChange() const override { return false; }
+    bool recreateOnHostChangeDeprecated() const override { return false; }
 
     ClusterLbStats& stats_;
     Random::RandomGenerator& random_;

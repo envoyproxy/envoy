@@ -40,7 +40,7 @@ public:
     return std::make_unique<DynamicModuleLoadBalancer>(config_, params.priority_set, cluster_name_);
   }
 
-  bool recreateOnHostChange() const override { return false; }
+  bool recreateOnHostChangeDeprecated() const override { return false; }
 
 private:
   DynamicModuleLbConfigSharedPtr config_;
