@@ -679,20 +679,9 @@ void DnsResolverImpl::PendingSrvResolution::startResolution() {
       this, &ares_query_id_);
 
   if (dnsrecStatus != ARES_SUCCESS) {
-    if (!completed_) {
-      // ares_query_dnsrec rejected the query without firing the callback synchronously.
-      parent_.stats_.pending_resolutions_.dec();
-      parent_.stats_.resolve_total_.inc();
-      parent_.chargeGetAddrInfoErrorStats(dnsrecStatus, 0);
-
-      ENVOY_LOG_EVENT(debug, "cares_srv_resolution_failure",
-                      "dns query for {} failed with c-ares status {:#06x}: \"{}\"", dns_name_,
-                      static_cast<int>(dnsrecStatus), ares_strerror(dnsrecStatus));
-      completed_ = true;
-      finishResolve();
-    }
-    // else: ares_query_dnsrec fired the callback synchronously before returning, which already
-    // decremented the stat and called finishResolve(). Nothing more to do.
+    ENVOY_LOG_EVENT(debug, "cares_srv_resolution_failure",
+                    "dns query for {} failed with c-ares status {:#06x}: \"{}\"", dns_name_,
+                    static_cast<int>(dnsrecStatus), ares_strerror(dnsrecStatus));
   }
 }
 

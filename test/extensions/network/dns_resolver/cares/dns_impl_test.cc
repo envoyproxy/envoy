@@ -2020,6 +2020,19 @@ TEST_P(DnsImplTest, DnsSrvSyncResolutionFailure) {
              1 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
 }
 
+// Validates that an in-flight SRV query is properly cleaned up when the channel is destroyed,
+// triggering ARES_EDESTRUCTION branch in onAresSrvCallback.
+TEST_P(DnsImplTest, DnsSrvDestructCallback) {
+  EXPECT_NE(nullptr, resolveSrvWithExpectations("_foo._tcp.some.domain",
+                                                DnsResolver::ResolutionStatus::Failure, {}));
+
+  resetChannel();
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
+             1 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
+}
+
 class DnsImplFilterUnroutableFamiliesTest : public DnsImplTest {
 protected:
   bool filterUnroutableFamilies() const override { return true; }
