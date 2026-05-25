@@ -1423,6 +1423,7 @@ void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState 
                            ProcessingRequest& req) {
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              new_state, true);
+  state.setBodyChunkSent();
   sendRequest(state, std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 }
