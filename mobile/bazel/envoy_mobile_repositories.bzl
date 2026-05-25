@@ -75,14 +75,6 @@ def swift_repos():
 
 def kotlin_repos():
     http_archive(
-        name = "rules_java",
-        sha256 = "c0ee60f8757f140c157fc2c7af703d819514de6e025ebf70386d38bdd85fce83",
-        url = "https://github.com/bazelbuild/rules_java/releases/download/7.12.3/rules_java-7.12.3.tar.gz",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:rules_java.patch"],
-    )
-
-    http_archive(
         name = "rules_jvm_external",
         sha256 = "3afe5195069bd379373528899c03a3072f568d33bd96fe037bd43b1f590535e7",
         strip_prefix = "rules_jvm_external-6.6",
@@ -93,6 +85,8 @@ def kotlin_repos():
         name = "rules_kotlin",
         sha256 = "3b772976fec7bdcda1d84b9d39b176589424c047eb2175bed09aac630e50af43",
         urls = ["https://github.com/bazelbuild/rules_kotlin/releases/download/v1.9.6/rules_kotlin-v1.9.6.tar.gz"],
+        patch_args = ["-p1"],
+        patches = ["@envoy_mobile//bazel:rules_kotlin.patch"],
     )
 
     http_archive(
@@ -126,9 +120,9 @@ def kotlin_repos():
 def android_repos():
     http_archive(
         name = "rules_android",
-        urls = ["https://github.com/bazelbuild/rules_android/archive/refs/tags/v0.1.1.zip"],
-        sha256 = "cd06d15dd8bb59926e4d65f9003bfc20f9da4b2519985c27e190cddc8b7a7806",
-        strip_prefix = "rules_android-0.1.1",
+        urls = ["https://github.com/bazelbuild/rules_android/releases/download/v0.7.2/rules_android-v0.7.2.tar.gz"],
+        sha256 = "0da7198c7c8bac7e11e08dca3c434617b8593075858716595672e9aeefbef2a7",
+        strip_prefix = "rules_android-0.7.2",
     )
     http_archive(
         name = "rules_android_ndk",

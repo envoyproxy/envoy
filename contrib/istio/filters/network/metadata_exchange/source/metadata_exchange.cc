@@ -277,13 +277,11 @@ void MetadataExchangeFilter::updatePeer(const Istio::Common::WorkloadMetadataObj
 
   auto& filter_state = *read_callbacks_->connection().streamInfo().filterState();
   filter_state.setData(filter_state_key, std::move(peer_info),
-                       StreamInfo::FilterState::StateType::Mutable,
                        StreamInfo::FilterState::LifeSpan::Connection);
 
   // Also store WorkloadMetadataObject for FIELD accessor and peerInfoRead() detection
   auto workload_metadata = std::make_unique<Istio::Common::WorkloadMetadataObject>(value);
   filter_state.setData(obj_key, std::move(workload_metadata),
-                       StreamInfo::FilterState::StateType::Mutable,
                        StreamInfo::FilterState::LifeSpan::Connection);
 }
 
@@ -361,7 +359,7 @@ void MetadataExchangeFilter::setMetadataNotFoundFilterState() {
   }
   read_callbacks_->connection().streamInfo().filterState()->setData(
       Istio::Common::NoPeer, std::make_shared<StreamInfo::BoolAccessorImpl>(true),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 } // namespace MetadataExchange

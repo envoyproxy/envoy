@@ -167,9 +167,8 @@ OverrideHostLoadBalancer::LoadBalancerImpl::chooseHostInternal(LoadBalancerConte
     state_ptr = std::make_shared<OverrideHostFilterState>(getSelectedHosts(context));
     override_host_state = state_ptr.get();
 
-    context->requestStreamInfo()->filterState()->setData(
-        OverrideHostFilterState::kFilterStateKey, state_ptr,
-        StreamInfo::FilterState::StateType::Mutable);
+    context->requestStreamInfo()->filterState()->setData(OverrideHostFilterState::kFilterStateKey,
+                                                         state_ptr);
   }
 
   if (override_host_state->empty()) {

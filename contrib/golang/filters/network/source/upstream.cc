@@ -65,8 +65,7 @@ UpstreamConn::UpstreamConn(std::string addr, Dso::NetworkFilterDsoPtr dynamic_li
     throwEnvoyExceptionOrPanic(absl::StrCat("malformed IP address: ", addr));
   }
   stream_info_->filterState()->setData("envoy.network.transport_socket.original_dst_address",
-                                       address, StreamInfo::FilterState::StateType::ReadOnly,
-                                       StreamInfo::FilterState::LifeSpan::FilterChain,
+                                       address, StreamInfo::FilterState::LifeSpan::FilterChain,
                                        StreamInfo::StreamSharingMayImpactPooling::None);
 }
 

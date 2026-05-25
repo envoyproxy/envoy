@@ -137,7 +137,7 @@ public:
   std::string alpn_{""};
   std::string sigalgs_{""};
   Network::Address::IpList iplist_;
-  std::string path_{};
+  std::string path_;
 };
 
 class MockServerContextConfig : public ServerContextConfig {

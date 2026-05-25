@@ -236,16 +236,30 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
   return host;
 }
 
-LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create(LoadBalancerParams) {
-  auto lb = std::make_unique<LoadBalancerImpl>(stats_, random_, hash_policy_);
+void ThreadAwareLoadBalancerBase::LoadBalancerImpl::refresh() {
+  // The per priority state is shared across all threads and refreshed on main thread. We need to
+  // copy the latest per priority state to the worker thread load balancer instance under lock.
+  absl::ReaderMutexLock lock(factory_->mutex_);
+  healthy_per_priority_load_ = factory_->healthy_per_priority_load_;
+  degraded_per_priority_load_ = factory_->degraded_per_priority_load_;
+  per_priority_state_ = factory_->per_priority_state_;
+}
 
-  // We must protect current_lb_ via a RW lock since it is accessed and written to by multiple
-  // threads. All complex processing has already been precalculated however.
-  absl::ReaderMutexLock lock(mutex_);
-  lb->healthy_per_priority_load_ = healthy_per_priority_load_;
-  lb->degraded_per_priority_load_ = degraded_per_priority_load_;
-  lb->per_priority_state_ = per_priority_state_;
-  return lb;
+ThreadAwareLoadBalancerBase::LoadBalancerImpl::LoadBalancerImpl(
+    std::shared_ptr<LoadBalancerFactoryImpl> factory, ClusterLbStats& stats,
+    Random::RandomGenerator& random, HashPolicySharedPtr hash_policy,
+    const Upstream::PrioritySet& priority_set)
+    : factory_(std::move(factory)), stats_(stats), random_(random),
+      hash_policy_(std::move(hash_policy)) {
+  member_update_cb_ =
+      priority_set.addMemberUpdateCb([this](const HostVector&, const HostVector&) { refresh(); });
+  refresh();
+}
+
+LoadBalancerPtr
+ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create(LoadBalancerParams params) {
+  return std::make_unique<LoadBalancerImpl>(shared_from_this(), stats_, random_, hash_policy_,
+                                            params.priority_set);
 }
 
 double ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::hostOverloadFactor(

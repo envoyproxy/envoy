@@ -178,10 +178,10 @@ public:
   ConfigSharedPtr config_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   std::unique_ptr<Filter> filter_;
-  std::vector<std::shared_ptr<NiceMock<Upstream::MockHost>>> upstream_hosts_{};
-  std::vector<std::unique_ptr<NiceMock<Network::MockClientConnection>>> upstream_connections_{};
+  std::vector<std::shared_ptr<NiceMock<Upstream::MockHost>>> upstream_hosts_;
+  std::vector<std::unique_ptr<NiceMock<Network::MockClientConnection>>> upstream_connections_;
   std::vector<std::unique_ptr<NiceMock<Tcp::ConnectionPool::MockConnectionData>>>
-      upstream_connection_data_{};
+      upstream_connection_data_;
   std::vector<Tcp::ConnectionPool::Callbacks*> conn_pool_callbacks_;
   std::vector<std::unique_ptr<NiceMock<Envoy::ConnectionPool::MockCancellable>>> conn_pool_handles_;
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_;
@@ -191,8 +191,8 @@ public:
   Network::Address::InstanceConstSharedPtr upstream_remote_address_;
   std::list<std::function<Tcp::ConnectionPool::Cancellable*(Tcp::ConnectionPool::Cancellable*)>>
       new_connection_functions_;
-  Upstream::HostDescriptionConstSharedPtr upstream_host_{};
-  Upstream::ClusterInfoConstSharedPtr upstream_cluster_{};
+  Upstream::HostDescriptionConstSharedPtr upstream_host_;
+  Upstream::ClusterInfoConstSharedPtr upstream_cluster_;
   std::string redirect_records_data_ = "some data";
   TestScopedRuntime scoped_runtime_;
 };
