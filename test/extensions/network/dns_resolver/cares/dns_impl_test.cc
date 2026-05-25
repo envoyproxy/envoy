@@ -74,14 +74,14 @@ using SrvMap = absl::node_hash_map<std::string, SrvList>;
 class TestDnsServerQuery {
 public:
   TestDnsServerQuery(ConnectionPtr connection, const HostMap& hosts_a, const HostMap& hosts_aaaa,
-                     const CNameMap& cnames, const SrvMap& hosts_srv,
+                     const CNameMap& cnames, const SrvMap& hosts_srv, const HostMap& hosts_a_in_srv,
                      const std::chrono::seconds& record_ttl, const std::chrono::seconds& cname_ttl_,
                      bool refused, bool error_on_a, bool error_on_aaaa, bool error_on_srv_,
                      bool no_response)
       : connection_(std::move(connection)), hosts_a_(hosts_a), hosts_aaaa_(hosts_aaaa),
-        cnames_(cnames), hosts_srv_(hosts_srv), record_ttl_(record_ttl), cname_ttl_(cname_ttl_),
-        refused_(refused), error_on_a_(error_on_a), error_on_aaaa_(error_on_aaaa),
-        error_on_srv_(error_on_srv_), no_response_(no_response) {
+        cnames_(cnames), hosts_srv_(hosts_srv), hosts_a_in_srv_(hosts_a_in_srv),
+        record_ttl_(record_ttl), cname_ttl_(cname_ttl_), refused_(refused), error_on_a_(error_on_a),
+        error_on_aaaa_(error_on_aaaa), error_on_srv_(error_on_srv_), no_response_(no_response) {
     connection_->addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
   }
 
@@ -182,7 +182,13 @@ private:
           if (auto p = parent_.hosts_srv_.find(lookup_name); p != parent_.hosts_srv_.end()) {
             srvs = p->second;
           }
-          auto buf = createSrvResolutionBuffer(q_type, srvs, request, name_len, encoded_name);
+          IpList extra_a_ips;
+          if (auto p = parent_.hosts_a_in_srv_.find(lookup_name);
+              p != parent_.hosts_a_in_srv_.end()) {
+            extra_a_ips = p->second;
+          }
+          auto buf =
+              createSrvResolutionBuffer(q_type, srvs, extra_a_ips, request, name_len, encoded_name);
           if (!parent_.no_response_) {
             parent_.connection_->write(buf, false);
           }
@@ -388,12 +394,15 @@ private:
     }
 
     Buffer::OwnedImpl createSrvResolutionBuffer(const int q_type, const SrvList srvs,
-                                                unsigned char* request, long name_len,
-                                                const std::string& encoded_name) {
+                                                const IpList& extra_a_ips, unsigned char* request,
+                                                long name_len, const std::string& encoded_name) {
       Buffer::OwnedImpl write_buffer;
       const size_t qfield_size = name_len + QFIXEDSZ;
-      const size_t answer_byte_len = getAnswersLen(q_type, {}, name_len, "", srvs);
-      int answer_count = srvs.size();
+      const size_t a_records_byte_len =
+          extra_a_ips.size() * (name_len + RRFIXEDSZ + sizeof(in_addr));
+      const size_t answer_byte_len =
+          getAnswersLen(q_type, {}, name_len, "", srvs) + a_records_byte_len;
+      int answer_count = srvs.size() + static_cast<int>(extra_a_ips.size());
 
       ASSERT(q_type == T_SRV);
       // Write response header
@@ -402,6 +411,10 @@ private:
 
       for (const auto& srv : srvs) {
         writeSrvRecord(write_buffer, encoded_name, srv);
+      }
+
+      if (!extra_a_ips.empty()) {
+        writeAddrRecord(write_buffer, extra_a_ips, T_A, encoded_name);
       }
 
       return write_buffer;
@@ -414,6 +427,7 @@ private:
   const HostMap& hosts_aaaa_;
   const CNameMap& cnames_;
   const SrvMap& hosts_srv_;
+  const HostMap& hosts_a_in_srv_;
   const std::chrono::seconds& record_ttl_;
   const std::chrono::seconds& cname_ttl_;
   const bool refused_;
@@ -434,9 +448,10 @@ public:
   void onAccept(ConnectionSocketPtr&& socket) override {
     Network::ConnectionPtr new_connection = dispatcher_.createServerConnection(
         std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
-    TestDnsServerQuery* query = new TestDnsServerQuery(
-        std::move(new_connection), hosts_a_, hosts_aaaa_, cnames_, hosts_srv_, record_ttl_,
-        cname_ttl_, refused_, error_on_a_, error_on_aaaa_, error_on_srv_, no_response_);
+    TestDnsServerQuery* query =
+        new TestDnsServerQuery(std::move(new_connection), hosts_a_, hosts_aaaa_, cnames_,
+                               hosts_srv_, hosts_a_in_srv_, record_ttl_, cname_ttl_, refused_,
+                               error_on_a_, error_on_aaaa_, error_on_srv_, no_response_);
     queries_.emplace_back(query);
   }
 
@@ -457,6 +472,10 @@ public:
     hosts_srv_[hostname] = srv_records;
   }
 
+  void addARecordsInSrvResponse(const std::string& hostname, const IpList& ips) {
+    hosts_a_in_srv_[hostname] = ips;
+  }
+
   void addCName(const std::string& hostname, const std::string& cname) {
     cnames_[hostname] = cname;
   }
@@ -474,6 +493,7 @@ private:
   HostMap hosts_a_;
   HostMap hosts_aaaa_;
   SrvMap hosts_srv_;
+  HostMap hosts_a_in_srv_;
   CNameMap cnames_;
   std::chrono::seconds record_ttl_;
   std::chrono::seconds cname_ttl_;
@@ -1982,6 +2002,27 @@ TEST_P(DnsImplTest, DnsSrv) {
                                                         DnsResolver::ResolutionStatus::Completed));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 1 /*not_found*/,
+             0 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
+}
+
+// Validates that when the DNS server returns A records mixed with SRV records in the same
+// response, only the SRV records are extracted and the A records are silently ignored.
+// Normally, it's better to return the A-records: it's a normal behaviour, and would improve
+// resolution time. Keeping this for the next iteration to limit the scope if the current change.
+TEST_P(DnsImplTest, DnsSrvWithMixedARecords) {
+  server_->addSrvRecord(
+      "_unique_name._tcp.example.com",
+      {SrvResponse{/*priority_*/ 1, /*weight_*/ 2, /*port_*/ 8080,
+                   /*target_*/ "svc.example.com", /* ttl_ */ std::chrono::seconds(300)}});
+  // Include A records in the SRV response for the same name.
+  server_->addARecordsInSrvResponse("_unique_name._tcp.example.com", {"1.2.3.4", "5.6.7.8"});
+
+  EXPECT_NE(nullptr, resolveSrvWithExpectations("_unique_name._tcp.example.com",
+                                                DnsResolver::ResolutionStatus::Completed,
+                                                {"1 2 8080 svc.example.com"}));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
 }
 
