@@ -14,8 +14,11 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/fil
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Filter Chain]
-// Filter Chain :ref:`configuration overview <config_http_filters_filter_chain>`. This is Envoy
-// specific HTTP filter.
+// Filter Chain :ref:`configuration overview <config_http_filters_filter_chain>`.
+//
+// .. attention::
+//   This filter is specific to Envoy and is not supported in other xDS implementations.
+//
 // [#extension: envoy.filters.http.filter_chain]
 
 // Filter-level configuration for the filter chain filter. This filter acts as a wrapper
