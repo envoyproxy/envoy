@@ -490,6 +490,24 @@ TEST_F(DnsSrvClusterTest, DestroyDuringPendingSrvQuery) {
   cluster_.reset();
 }
 
+// Verifies that when the top-level SRV query fails, update_failure_ is incremented,
+// the refresh timer is rescheduled, and the host set remains empty.
+TEST_F(DnsSrvClusterTest, SrvResolutionFailureIncrementsStats) {
+  expectResolveTimer();
+
+  Network::DnsResolver::ResolveCb srv_callback;
+  expectResolveSrv("_local_service._tcp.service.consul.", srv_callback);
+
+  createCluster();
+
+  ASSERT_TRUE(srv_callback != nullptr);
+  srv_callback(Network::DnsResolver::ResolutionStatus::Failure, "dns timeout", {});
+
+  EXPECT_EQ(1, cluster_->info()->configUpdateStats().update_attempt_.value());
+  EXPECT_EQ(1, cluster_->info()->configUpdateStats().update_failure_.value());
+  EXPECT_TRUE(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().empty());
+}
+
 } // namespace Clusters
 } // namespace Extensions
 } // namespace Envoy
