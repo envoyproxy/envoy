@@ -1088,11 +1088,10 @@ TEST_F(LuaHttpFilterTest, HttpCallMultiSliceBody) {
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
   // Add body in multiple parts to create multiple buffer slices.
 
-  Buffer::OwnedImpl body;
-  body.appendSliceForTest("first");
-  body.appendSliceForTest("second");
-  body.appendSliceForTest("third");
-  response_message->body().move(body);
+  auto& response_body = static_cast<Buffer::OwnedImpl&>(response_message->body());
+  response_body.appendSliceForTest("first");
+  response_body.appendSliceForTest("second");
+  response_body.appendSliceForTest("third");
 
   ASSERT_EQ(3, response_message->body().getRawSlices().size());
 
