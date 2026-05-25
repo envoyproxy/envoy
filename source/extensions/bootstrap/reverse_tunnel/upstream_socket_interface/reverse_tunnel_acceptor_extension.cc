@@ -37,7 +37,6 @@ void maybeSetStringFilterState(StreamInfo::FilterState& filter_state, absl::stri
   }
 
   filter_state.setData(key, std::make_shared<Router::StringAccessorImpl>(value),
-                       StreamInfo::FilterState::StateType::ReadOnly,
                        StreamInfo::FilterState::LifeSpan::Connection);
 }
 
@@ -48,7 +47,6 @@ void maybeSetUint64FilterState(StreamInfo::FilterState& filter_state, absl::stri
   }
 
   filter_state.setData(key, std::make_shared<StreamInfo::UInt64AccessorImpl>(value),
-                       StreamInfo::FilterState::StateType::ReadOnly,
                        StreamInfo::FilterState::LifeSpan::Connection);
 }
 

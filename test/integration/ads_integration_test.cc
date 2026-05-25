@@ -2826,7 +2826,7 @@ TEST_P(AdsIntegrationTest, SrdsPausedDuringLds) {
 // ADS integration tests that exercise the ADS-replacement mechanism.
 class AdsReplacementIntegrationTest : public AdsIntegrationTest {
 public:
-  AdsReplacementIntegrationTest() {}
+  AdsReplacementIntegrationTest() = default;
 
   void createXdsUpstream() override {
     // Create the first ADS upstream.

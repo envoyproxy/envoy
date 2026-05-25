@@ -179,6 +179,8 @@ int reasonToReset(StreamResetReason reason, bool response_end_stream_sent) {
     return OGHTTP2_REFUSED_STREAM;
   case StreamResetReason::ConnectError:
     return OGHTTP2_CONNECT_ERROR;
+  case StreamResetReason::RemoteResetNoError:
+    return OGHTTP2_NO_ERROR;
   case StreamResetReason::ProtocolError:
     if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error")) {
       return OGHTTP2_NO_ERROR;
@@ -1527,42 +1529,56 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
     }
 
     if (should_reset_stream) {
-      StreamResetReason reason;
-      if (stream->reset_due_to_messaging_error_) {
-        // Unfortunately, the nghttp2 API makes it incredibly difficult to clearly understand
-        // the flow of resets. I.e., did the reset originate locally? Was it remote? Here,
-        // we attempt to track cases in which we sent a reset locally due to an invalid frame
-        // received from the remote. We only do that in two cases currently (HTTP messaging layer
-        // errors from https://tools.ietf.org/html/rfc7540#section-8 which nghttp2 is very strict
-        // about). In other cases we treat invalid frames as a protocol error and just kill
-        // the connection.
-
-        // Get ClientConnectionImpl or ServerConnectionImpl specific stream reset reason,
-        // depending whether the connection is upstream or downstream.
-        reason = getMessagingErrorResetReason();
+      // RFC 9113 Section 8.1: A server MAY send RST_STREAM(NO_ERROR) after sending
+      // a complete response. The complete response MUST NOT be discarded.
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_preserve_rst_no_error") &&
+          stream->remote_end_stream_ && error_code == OGHTTP2_NO_ERROR &&
+          !stream->reset_reason_.has_value()) {
+        if (stream->stream_manager_.hasBufferedBodyOrTrailers()) {
+          ENVOY_CONN_LOG(debug, "buffered onStreamClose for stream: {}", connection_, stream_id);
+          stream->stream_manager_.buffered_on_stream_close_ = true;
+          stats_.deferred_stream_close_.inc();
+          return okStatus();
+        }
+        stream->runResetCallbacks(StreamResetReason::RemoteResetNoError, absl::string_view());
       } else {
-        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error")) {
-          reason = errorCodeToResetReason(error_code);
-          if (error_code == OGHTTP2_REFUSED_STREAM) {
-            stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
-          } else {
-            stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
-          }
+        StreamResetReason reason;
+        if (stream->reset_due_to_messaging_error_) {
+          // Unfortunately, the nghttp2 API makes it incredibly difficult to clearly understand
+          // the flow of resets. I.e., did the reset originate locally? Was it remote? Here,
+          // we attempt to track cases in which we sent a reset locally due to an invalid frame
+          // received from the remote. We only do that in two cases currently (HTTP messaging layer
+          // errors from https://tools.ietf.org/html/rfc7540#section-8 which nghttp2 is very strict
+          // about). In other cases we treat invalid frames as a protocol error and just kill
+          // the connection.
+
+          // Get ClientConnectionImpl or ServerConnectionImpl specific stream reset reason,
+          // depending whether the connection is upstream or downstream.
+          reason = getMessagingErrorResetReason();
         } else {
-          if (error_code == OGHTTP2_REFUSED_STREAM) {
-            reason = StreamResetReason::RemoteRefusedStreamReset;
-            stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
-          } else {
-            if (error_code == OGHTTP2_CONNECT_ERROR) {
-              reason = StreamResetReason::ConnectError;
+          if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error")) {
+            reason = errorCodeToResetReason(error_code);
+            if (error_code == OGHTTP2_REFUSED_STREAM) {
+              stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
             } else {
-              reason = StreamResetReason::RemoteReset;
+              stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
             }
-            stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
+          } else {
+            if (error_code == OGHTTP2_REFUSED_STREAM) {
+              reason = StreamResetReason::RemoteRefusedStreamReset;
+              stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
+            } else {
+              if (error_code == OGHTTP2_CONNECT_ERROR) {
+                reason = StreamResetReason::ConnectError;
+              } else {
+                reason = StreamResetReason::RemoteReset;
+              }
+              stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
+            }
           }
         }
+        stream->runResetCallbacks(reason, absl::string_view());
       }
-      stream->runResetCallbacks(reason, absl::string_view());
 
     } else if (!stream->reset_reason_.has_value() &&
                stream->stream_manager_.hasBufferedBodyOrTrailers()) {
