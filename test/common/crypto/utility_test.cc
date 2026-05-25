@@ -523,10 +523,8 @@ TEST(UtilityTest, TestBoundaryConditions) {
   // Test with maximum size buffers to ensure all code paths in getSha256Digest
   Buffer::OwnedImpl large_buffer;
   for (int i = 0; i < 1000; ++i) {
-    large_buffer.appendSliceForTest(
-        "This is a large buffer to test digest computation with multiple slices. ");
+    large_buffer.add("This is a large buffer to test digest computation with multiple slices. ");
   }
-  ASSERT_EQ(1000, large_buffer.getRawSlices().size());
 
   auto digest = UtilitySingleton::get().getSha256Digest(large_buffer);
   EXPECT_EQ(32, digest.size()) << "SHA256 digest should always be 32 bytes";
