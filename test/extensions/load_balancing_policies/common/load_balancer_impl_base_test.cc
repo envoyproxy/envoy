@@ -24,6 +24,8 @@ public:
   using LoadBalancerBase::percentageDegradedLoad;
   using LoadBalancerBase::percentageLoad;
 
+  uint32_t totalHealthyHosts() const { return total_healthy_hosts_; }
+
   HostSelectionResponse chooseHost(LoadBalancerContext*) override { PANIC("not implemented"); }
 
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { PANIC("not implemented"); }
@@ -47,11 +49,15 @@ public:
       host_set.healthy_hosts_.push_back(host_set.hosts_[i]);
     }
     for (; i < (num_healthy_hosts + num_degraded_hosts); ++i) {
+      host_set.hosts_[i]->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
       host_set.degraded_hosts_.push_back(host_set.hosts_[i]);
     }
 
     for (; i < (num_healthy_hosts + num_degraded_hosts + num_excluded_hosts); ++i) {
       host_set.excluded_hosts_.push_back(host_set.hosts_[i]);
+    }
+    for (; i < num_hosts; ++i) {
+      host_set.hosts_[i]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
     }
     host_set.runCallbacks({}, {});
   }
@@ -669,6 +675,8 @@ TEST(LoadBalancerBaseCoalesceEnabledTest, LiveHealthFlagsTakePrecedenceOverStale
 
   MockHostSet& host_set = *priority_set.getMockHostSet(0);
   auto host = makeTestHost(info, "tcp://127.0.0.1:80");
+  host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
 
   // simulate the race: the host is actually healthy, but healthy_hosts_ is empty,
   // as if the FAIL snapshot arrived after the PASS snapshot
@@ -684,7 +692,142 @@ TEST(LoadBalancerBaseCoalesceEnabledTest, LiveHealthFlagsTakePrecedenceOverStale
   EXPECT_EQ(100, lb.percentageLoad(0));
 }
 
-TEST(LoadBalancerBaseCoalesceDisabledTest, StaleSnapshotUsedWhenCoalesceDisabled) {
+TEST(LoadBalancerBaseCoalesceEnabledTest, ExcludedHealthyHostNotCountedInLiveHealthPath) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update", "true"}});
+
+  Stats::IsolatedStoreImpl stats_store;
+  ClusterLbStatNames stat_names(stats_store.symbolTable());
+  ClusterLbStats stats(stat_names, *stats_store.rootScope());
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<MockPrioritySet> priority_set;
+  auto info = std::make_shared<NiceMock<MockClusterInfo>>();
+
+  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config;
+  TestLb lb(priority_set, stats, runtime, random, common_config);
+
+  MockHostSet& host_set = *priority_set.getMockHostSet(0);
+
+  auto healthy1 = makeTestHost(info, "tcp://127.0.0.1:80");
+  auto healthy2 = makeTestHost(info, "tcp://127.0.0.1:81");
+  auto excluded_host = makeTestHost(info, "tcp://127.0.0.1:82");
+  healthy1->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  healthy1->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  healthy2->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  healthy2->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  excluded_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  excluded_host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  ASSERT_EQ(Host::Health::Healthy, excluded_host->coarseHealth());
+
+  // excluded hosts are not in healthyHosts().
+  host_set.hosts_ = {healthy1, healthy2, excluded_host};
+  host_set.healthy_hosts_ = {healthy1, healthy2};
+  host_set.excluded_hosts_ = {excluded_host};
+
+  host_set.runCallbacks({}, {});
+
+  EXPECT_FALSE(lb.isInPanic(0));
+  EXPECT_EQ(100, lb.percentageLoad(0));
+}
+
+TEST(LoadBalancerBaseCoalesceEnabledTest, WeightedExcludedHealthyHostNotCountedInLiveHealthPath) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update", "true"}});
+
+  Stats::IsolatedStoreImpl stats_store;
+  ClusterLbStatNames stat_names(stats_store.symbolTable());
+  ClusterLbStats stats(stat_names, *stats_store.rootScope());
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<MockPrioritySet> priority_set;
+  auto info = std::make_shared<NiceMock<MockClusterInfo>>();
+
+  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config;
+  TestLb lb(priority_set, stats, runtime, random, common_config);
+
+  MockHostSet& host_set = *priority_set.getMockHostSet(0);
+  host_set.weighted_priority_health_ = true;
+
+  auto healthy_host = makeTestHost(info, "tcp://127.0.0.1:80");
+  healthy_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  healthy_host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  healthy_host->weight(4);
+
+  // excluded_host is Healthy by coarseHealth() but must be excluded from both
+  // healthy_weight and total_weight.
+  auto excluded_host = makeTestHost(info, "tcp://127.0.0.1:81");
+  excluded_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  excluded_host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  excluded_host->weight(6);
+  ASSERT_EQ(Host::Health::Healthy, excluded_host->coarseHealth());
+
+  auto unhealthy_host = makeTestHost(info, "tcp://127.0.0.1:82");
+  unhealthy_host->weight(5);
+  unhealthy_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  ASSERT_EQ(Host::Health::Unhealthy, unhealthy_host->coarseHealth());
+
+  host_set.hosts_ = {healthy_host, excluded_host, unhealthy_host};
+  host_set.healthy_hosts_ = {healthy_host};
+  host_set.excluded_hosts_ = {excluded_host};
+
+  host_set.runCallbacks({}, {});
+
+  EXPECT_FALSE(lb.isInPanic(0));
+  EXPECT_EQ(100, lb.percentageLoad(0));
+}
+
+TEST(LoadBalancerBaseCoalesceEnabledTest, MultiPriorityTotalHealthyHostsExcludesExcludedHosts) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update", "true"}});
+
+  Stats::IsolatedStoreImpl stats_store;
+  ClusterLbStatNames stat_names(stats_store.symbolTable());
+  ClusterLbStats stats(stat_names, *stats_store.rootScope());
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<MockPrioritySet> priority_set;
+  auto info = std::make_shared<NiceMock<MockClusterInfo>>();
+
+  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config;
+  TestLb lb(priority_set, stats, runtime, random, common_config);
+
+  // P=0: 2 healthy hosts.
+  MockHostSet& p0 = *priority_set.getMockHostSet(0);
+  auto p0_h1 = makeTestHost(info, "tcp://127.0.0.1:80");
+  p0_h1->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  p0_h1->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  auto p0_h2 = makeTestHost(info, "tcp://127.0.0.1:81");
+  p0_h2->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  p0_h2->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  p0.hosts_ = {p0_h1, p0_h2};
+  p0.healthy_hosts_ = {p0_h1, p0_h2};
+  p0.runCallbacks({}, {});
+
+  // P=1: 1 healthy host + 1 excluded-but-Healthy host.
+  // total_healthy_hosts should count only the non-excluded healthy host from P=1.
+  MockHostSet& p1 = *priority_set.getMockHostSet(1);
+  auto p1_healthy = makeTestHost(info, "tcp://127.0.0.1:80");
+  p1_healthy->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  p1_healthy->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  auto p1_excluded = makeTestHost(info, "tcp://127.0.0.1:81");
+  p1_excluded->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  p1_excluded->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  ASSERT_EQ(Host::Health::Healthy, p1_excluded->coarseHealth());
+  p1.hosts_ = {p1_healthy, p1_excluded};
+  p1.healthy_hosts_ = {p1_healthy};
+  p1.excluded_hosts_ = {p1_excluded};
+  p1.runCallbacks({}, {});
+
+  // total_healthy_hosts = 2 (P=0) + 1 (P=1 non-excluded) = 3.
+  EXPECT_EQ(3u, lb.totalHealthyHosts());
+}
+
+// This exists purely to lock in the pre-flag behavior so it doesn't silently change
+TEST(LoadBalancerBaseCoalesceDisabledTest, CoalesceDisabledKeepsLegacySnapshotBehavior) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update", "false"}});
