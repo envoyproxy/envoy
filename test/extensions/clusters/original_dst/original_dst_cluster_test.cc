@@ -1247,7 +1247,7 @@ TEST_F(OriginalDstClusterTest, ClusterTypeConfig) {
   EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
 
-  OriginalDstCluster::LoadBalancer lb(handle_);
+  OriginalDstCluster::LoadBalancer lb(handle_, cluster_->prioritySet());
   Event::PostCb post_cb;
 
   // HTTP header override with custom header name.
