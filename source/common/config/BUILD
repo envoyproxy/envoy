@@ -89,9 +89,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "grpc_mux_stream_event_tracker_lib",
+    hdrs = ["grpc_mux_stream_event_tracker.h"],
+    deps = [
+        "//envoy/config:grpc_mux_interface",
+        "//source/common/common:callback_impl_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "null_grpc_mux_lib",
     hdrs = ["null_grpc_mux_impl.h"],
     deps = [
+        ":grpc_mux_stream_event_tracker_lib",
         "//envoy/config:grpc_mux_interface",
     ],
 )

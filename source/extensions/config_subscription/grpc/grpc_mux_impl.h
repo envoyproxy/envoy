@@ -21,6 +21,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/api_version.h"
+#include "source/common/config/grpc_mux_stream_event_tracker.h"
 #include "source/common/config/resource_name.h"
 #include "source/common/config/ttl.h"
 #include "source/common/config/utility.h"
@@ -55,6 +56,11 @@ public:
   void shutdown() { shutdown_ = true; }
 
   void start() override;
+
+  Common::CallbackHandlePtr addStreamEventCallback(GrpcMuxStreamEventCallback callback) override {
+    return stream_event_tracker_.addStreamEventCallback(std::move(callback));
+  }
+  bool grpcStreamConnected() const override { return stream_event_tracker_.grpcStreamConnected(); }
 
   // GrpcMux
   ScopedResume pause(const std::string& type_url) override;
@@ -319,6 +325,8 @@ private:
   std::unique_ptr<std::queue<std::string>> request_queue_;
 
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
+
+  GrpcMuxStreamEventTracker stream_event_tracker_;
 
   bool started_{false};
   // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is

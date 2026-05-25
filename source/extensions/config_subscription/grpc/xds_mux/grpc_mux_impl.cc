@@ -323,6 +323,7 @@ void GrpcMuxImpl<S, F, RQ, RS>::handleEstablishedStream() {
   maybeUpdateQueueSizeStat(0);
   pausable_ack_queue_.clear();
   trySendDiscoveryRequests();
+  stream_event_tracker_.onStreamEstablished();
 }
 
 template <class S, class F, class RQ, class RS>
@@ -347,6 +348,7 @@ void GrpcMuxImpl<S, F, RQ, RS>::handleStreamEstablishmentFailure(
     }
   } while (all_subscribed.size() != subscriptions_.size());
   should_send_initial_resource_versions_ = next_attempt_may_send_initial_resource_version;
+  stream_event_tracker_.onStreamClosed();
 }
 
 template <class S, class F, class RQ, class RS>

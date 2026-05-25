@@ -2,6 +2,8 @@
 
 #include "envoy/config/grpc_mux.h"
 
+#include "source/common/config/grpc_mux_stream_event_tracker.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -10,6 +12,12 @@ class NullGrpcMuxImpl : public GrpcMux,
                         GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse> {
 public:
   void start() override {}
+
+  Common::CallbackHandlePtr addStreamEventCallback(GrpcMuxStreamEventCallback callback) override {
+    return stream_event_tracker_.addStreamEventCallback(std::move(callback));
+  }
+  bool grpcStreamConnected() const override { return stream_event_tracker_.grpcStreamConnected(); }
+
   ScopedResume pause(const std::string&) override {
     return std::make_unique<Cleanup>([] {});
   }
@@ -43,6 +51,9 @@ public:
   void onEstablishmentFailure(bool) override {}
   void onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&&,
                            ControlPlaneStats&) override {}
+
+private:
+  GrpcMuxStreamEventTracker stream_event_tracker_;
 };
 
 } // namespace Config

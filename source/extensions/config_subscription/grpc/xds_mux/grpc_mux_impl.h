@@ -20,6 +20,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/api_version.h"
+#include "source/common/config/grpc_mux_stream_event_tracker.h"
 #include "source/common/grpc/common.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_context.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_failover.h"
@@ -89,6 +90,12 @@ public:
   ScopedResume pause(const std::string& type_url) override;
   ScopedResume pause(const std::vector<std::string> type_urls) override;
   void start() override;
+
+  Common::CallbackHandlePtr addStreamEventCallback(GrpcMuxStreamEventCallback callback) override {
+    return stream_event_tracker_.addStreamEventCallback(std::move(callback));
+  }
+  bool grpcStreamConnected() const override { return stream_event_tracker_.grpcStreamConnected(); }
+
   const absl::flat_hash_map<std::string, std::unique_ptr<S>>& subscriptions() const {
     return subscriptions_;
   }
@@ -247,6 +254,8 @@ private:
   EdsResourcesCachePtr eds_resources_cache_;
   const std::string target_xds_authority_;
 
+  GrpcMuxStreamEventTracker stream_event_tracker_;
+
   // Used to track whether initial_resource_versions should be populated on the
   // next reconnection.
   bool should_send_initial_resource_versions_{true};
@@ -294,6 +303,11 @@ class NullGrpcMuxImpl : public GrpcMux {
 public:
   void start() override {}
 
+  Common::CallbackHandlePtr addStreamEventCallback(GrpcMuxStreamEventCallback callback) override {
+    return stream_event_tracker_.addStreamEventCallback(std::move(callback));
+  }
+  bool grpcStreamConnected() const override { return stream_event_tracker_.grpcStreamConnected(); }
+
   ScopedResume pause(const std::string&) override {
     return std::make_unique<Cleanup>([]() {});
   }
@@ -319,6 +333,9 @@ public:
 
   Upstream::LoadStatsReporter* loadStatsReporter() const override { return nullptr; }
   Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() override { return nullptr; }
+
+private:
+  GrpcMuxStreamEventTracker stream_event_tracker_;
 };
 
 } // namespace XdsMux

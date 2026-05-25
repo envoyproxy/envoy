@@ -65,6 +65,60 @@ TEST_P(GrpcSubscriptionImplTest, RemoteStreamClose) {
   EXPECT_TRUE(statsAre(2, 0, 0, 1, 0, 0, 0, ""));
 }
 
+// Validate that stream event callbacks are invoked on stream established and closed events.
+TEST_P(GrpcSubscriptionImplTest, StreamEventCallbacks) {
+  int established_count = 0;
+  int closed_count = 0;
+  auto handle = mux_->addStreamEventCallback([&](GrpcMuxStreamEvent event) {
+    if (event == GrpcMuxStreamEvent::Established) {
+      established_count++;
+    } else {
+      closed_count++;
+    }
+  });
+
+  // Start subscription, which establishes a stream.
+  startSubscription({"cluster0", "cluster1"});
+  EXPECT_EQ(established_count, 1);
+  EXPECT_EQ(closed_count, 0);
+  EXPECT_TRUE(mux_->grpcStreamConnected());
+
+  // Close stream.
+  EXPECT_CALL(callbacks_,
+              onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, _))
+      .Times(0);
+  EXPECT_CALL(*timer_, enableTimer(_, _));
+  EXPECT_CALL(random_, random());
+  onRemoteClose();
+  EXPECT_EQ(established_count, 1);
+  EXPECT_EQ(closed_count, 1);
+  EXPECT_FALSE(mux_->grpcStreamConnected());
+
+  // Re-establish the stream.
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({"cluster0", "cluster1"}, "", true);
+  timer_->invokeCallback();
+  EXPECT_EQ(established_count, 2);
+  EXPECT_EQ(closed_count, 1);
+  EXPECT_TRUE(mux_->grpcStreamConnected());
+
+  // Destroy the callback handle; further events should not increment counters.
+  handle.reset();
+  EXPECT_CALL(callbacks_,
+              onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, _))
+      .Times(0);
+  EXPECT_CALL(*timer_, enableTimer(_, _));
+  EXPECT_CALL(random_, random());
+  onRemoteClose();
+  EXPECT_EQ(established_count, 2);
+  EXPECT_EQ(closed_count, 1);
+
+  // Re-establish stream so the destructor can send a final message.
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({"cluster0", "cluster1"}, "", true);
+  timer_->invokeCallback();
+}
+
 // Validate that When the management server gets multiple requests for the same version, it can
 // ignore later ones. This allows the nonce to be used.
 TEST_P(GrpcSubscriptionImplTest, RepeatedNonce) {

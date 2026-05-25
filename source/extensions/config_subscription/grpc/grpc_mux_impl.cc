@@ -571,6 +571,7 @@ void GrpcMuxImpl::onStreamEstablished() {
   for (const auto& type_url : subscriptions_) {
     queueDiscoveryRequest(type_url);
   }
+  stream_event_tracker_.onStreamEstablished();
 }
 
 void GrpcMuxImpl::onEstablishmentFailure(bool) {
@@ -590,6 +591,7 @@ void GrpcMuxImpl::onEstablishmentFailure(bool) {
       api_state.second->previously_fetched_data_ = true;
     }
   }
+  stream_event_tracker_.onStreamClosed();
 }
 
 void GrpcMuxImpl::queueDiscoveryRequest(absl::string_view queue_item) {

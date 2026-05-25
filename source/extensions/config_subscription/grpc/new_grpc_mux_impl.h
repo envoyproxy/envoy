@@ -12,6 +12,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/config/api_version.h"
+#include "source/common/config/grpc_mux_stream_event_tracker.h"
 #include "source/common/config/resource_name.h"
 #include "source/common/grpc/common.h"
 #include "source/common/runtime/runtime_features.h"
@@ -46,6 +47,11 @@ public:
   static void shutdownAll();
 
   void shutdown() { shutdown_ = true; }
+
+  Common::CallbackHandlePtr addStreamEventCallback(GrpcMuxStreamEventCallback callback) override {
+    return stream_event_tracker_.addStreamEventCallback(std::move(callback));
+  }
+  bool grpcStreamConnected() const override { return stream_event_tracker_.grpcStreamConnected(); }
 
   GrpcMuxWatchPtr addWatch(const std::string& type_url,
                            const absl::flat_hash_set<std::string>& resources,
@@ -222,6 +228,9 @@ private:
   CustomConfigValidatorsPtr config_validators_;
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
   XdsConfigTrackerOptRef xds_config_tracker_;
+
+  GrpcMuxStreamEventTracker stream_event_tracker_;
+
   const bool skip_subsequent_node_;
   EdsResourcesCachePtr eds_resources_cache_;
   bool first_request_on_stream_{true};

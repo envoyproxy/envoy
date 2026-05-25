@@ -198,6 +198,7 @@ void NewGrpcMuxImpl::onStreamEstablished() {
   first_request_on_stream_ = true;
   pausable_ack_queue_.clear();
   trySendDiscoveryRequests();
+  stream_event_tracker_.onStreamEstablished();
 }
 
 void NewGrpcMuxImpl::onEstablishmentFailure(bool next_attempt_may_send_initial_resource_version) {
@@ -219,6 +220,7 @@ void NewGrpcMuxImpl::onEstablishmentFailure(bool next_attempt_may_send_initial_r
     }
   } while (all_subscribed.size() != subscriptions_.size());
   should_send_initial_resource_versions_ = next_attempt_may_send_initial_resource_version;
+  stream_event_tracker_.onStreamClosed();
 }
 
 void NewGrpcMuxImpl::onWriteable() { trySendDiscoveryRequests(); }

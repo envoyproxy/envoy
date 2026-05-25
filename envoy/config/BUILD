@@ -68,6 +68,7 @@ envoy_cc_library(
     deps = [
         ":eds_resources_cache_interface",
         ":subscription_interface",
+        "//envoy/common:callback",
         "//envoy/stats:stats_macros",
         "//envoy/upstream:load_stats_reporter_interface",
         "//source/common/common:cleanup_lib",

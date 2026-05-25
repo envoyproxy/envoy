@@ -136,6 +136,10 @@ public:
 
   MOCK_METHOD(EdsResourcesCacheOptRef, edsResourcesCache, ());
 
+  MOCK_METHOD(Common::CallbackHandlePtr, addStreamEventCallback,
+              (GrpcMuxStreamEventCallback callback), (override));
+  MOCK_METHOD(bool, grpcStreamConnected, (), (const, override));
+
   MOCK_METHOD(Upstream::LoadStatsReporter*, loadStatsReporter, (), (const, override));
   MOCK_METHOD(Upstream::LoadStatsReporter*, maybeCreateLoadStatsReporter, (), (override));
 

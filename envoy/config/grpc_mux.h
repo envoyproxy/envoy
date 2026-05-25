@@ -1,8 +1,10 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 
 #include "envoy/common/backoff_strategy.h"
+#include "envoy/common/callback.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/custom_config_validators.h"
@@ -19,6 +21,11 @@ namespace Envoy {
 namespace Config {
 
 using ScopedResume = std::unique_ptr<Cleanup>;
+
+enum class GrpcMuxStreamEvent { Established, Closed };
+
+using GrpcMuxStreamEventCallback = std::function<void(GrpcMuxStreamEvent)>;
+
 /**
  * All control plane related stats. @see stats_macros.h
  */
@@ -64,6 +71,18 @@ public:
    * Initiate stream with management server.
    */
   virtual void start() PURE;
+
+  /**
+   * Add a callback to observe gRPC mux stream lifecycle events.
+   * @return a handle that unregisters the callback when destroyed.
+   */
+  virtual Common::CallbackHandlePtr
+  addStreamEventCallback(GrpcMuxStreamEventCallback callback) PURE;
+
+  /**
+   * @return true if the mux currently has an established gRPC stream.
+   */
+  virtual bool grpcStreamConnected() const PURE;
 
   /**
    * Pause discovery requests for a given API type. This is useful when we're processing an update
