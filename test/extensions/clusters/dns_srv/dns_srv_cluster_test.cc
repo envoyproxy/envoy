@@ -508,6 +508,37 @@ TEST_F(DnsSrvClusterTest, SrvResolutionFailureIncrementsStats) {
   EXPECT_TRUE(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().empty());
 }
 
+// Verifies that specifying a DNS resolver other than c-ares causes InvalidArgumentError,
+// because only c-ares implements SRV resolution at the moment.
+TEST_F(DnsSrvClusterTest, NonCaresResolverReturnsInvalidArgumentError) {
+  static constexpr char yaml[] = R"EOF(
+    name: test_cluster
+    connect_timeout: 1s
+    dns_lookup_family: ALL
+    cluster_type:
+      name: envoy.clusters.dns_srv
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.dns_srv.v3.DnsSrvClusterConfig
+        srv_name: "_local_service._tcp.service.consul."
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = Upstream::parseClusterFromV3Yaml(yaml);
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+      server_context_, [this]() -> Network::DnsResolverSharedPtr { return dns_resolver_; }, nullptr,
+      false);
+
+  auto factory = Upstream::DnsSrvClusterFactory();
+  auto status_or_cluster = factory.create(cluster_config, factory_context);
+
+  ASSERT_FALSE(status_or_cluster.ok());
+  EXPECT_EQ(status_or_cluster.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(status_or_cluster.status().message(),
+              testing::HasSubstr("envoy.network.dns_resolver.getaddrinfo"));
+}
+
 } // namespace Clusters
 } // namespace Extensions
 } // namespace Envoy
