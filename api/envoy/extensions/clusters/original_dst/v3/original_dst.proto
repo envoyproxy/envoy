@@ -52,5 +52,5 @@ message OriginalDstCluster {
 
   // The dynamic metadata key to override destination address.
   // First the request metadata is considered, then the connection one.
-  envoy.type.metadata.v3.MetadataKey metadata_key = 4;
+  type.metadata.v3.MetadataKey metadata_key = 4;
 }
