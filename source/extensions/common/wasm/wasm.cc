@@ -189,6 +189,11 @@ void Wasm::registerCallbacks() {
       &proxy_wasm::ConvertFunctionWordToUint32<decltype(_fn), _fn>::convertFunctionWordToUint32)
   _REGISTER(resolve_dns);
 #undef _REGISTER
+  wasm_vm_->addFailCallback([this](proxy_wasm::FailState fail_state) {
+    if (fail_state == proxy_wasm::FailState::RuntimeError) {
+      lifecycle_stats_handler_.onEvent(WasmEvent::VmCrashed);
+    }
+  });
 }
 
 void Wasm::getFunctions() {
