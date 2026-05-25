@@ -62,7 +62,7 @@ message ServerInfo {
   bool hot_restart_initializing = 8;
 }
 
-// [#next-free-field: 43]
+// [#next-free-field: 44]
 message CommandLineOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.admin.v2alpha.CommandLineOptions";
@@ -208,4 +208,7 @@ message CommandLineOptions {
 
   // See :option:`--stats-tag` for details.
   repeated string stats_tag = 38;
+
+  // See :option:`--mongo-bson-max-depth` for details.
+  uint32 mongo_bson_max_depth = 43;
 }

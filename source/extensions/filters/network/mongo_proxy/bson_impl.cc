@@ -16,6 +16,8 @@ namespace NetworkFilters {
 namespace MongoProxy {
 namespace Bson {
 
+uint32_t DocumentImpl::MaxDepth = 128;
+
 int32_t BufferHelper::peekInt32(Buffer::Instance& data) {
   if (data.length() < sizeof(int32_t)) {
     throw EnvoyException("invalid buffer size");

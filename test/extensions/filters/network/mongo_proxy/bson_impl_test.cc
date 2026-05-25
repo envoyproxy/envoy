@@ -148,6 +148,31 @@ TEST(BsonImplTest, ParsingDepthLimitJustBelow) {
   EXPECT_TRUE(*root == *parsed);
 }
 
+TEST(BsonImplTest, ConfigurableParsingDepthLimit) {
+  const uint32_t original_max_depth = DocumentImpl::MaxDepth;
+
+  // Change the limit to something small.
+  DocumentImpl::MaxDepth = 10;
+
+  Buffer::OwnedImpl data;
+  DocumentSharedPtr root = DocumentImpl::create();
+  DocumentSharedPtr current = root;
+  for (int i = 0; i < 15; i++) {
+    DocumentSharedPtr next = DocumentImpl::create();
+    current->addDocument("a", next);
+    current = next;
+  }
+
+  root->encode(data);
+
+  // Now try to parse it. It should throw because 15 > 10.
+  EXPECT_THROW_WITH_MESSAGE(DocumentImpl::create(data), EnvoyException,
+                            "BSON recursion limit exceeded");
+
+  // Restore the original limit.
+  DocumentImpl::MaxDepth = original_max_depth;
+}
+
 } // namespace Bson
 } // namespace MongoProxy
 } // namespace NetworkFilters

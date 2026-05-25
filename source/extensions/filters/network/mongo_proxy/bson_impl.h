@@ -263,12 +263,12 @@ public:
   std::string toString() const override;
   const std::list<FieldPtr>& values() const override { return fields_; }
 
+  static uint32_t MaxDepth;
+
 private:
   DocumentImpl() = default;
 
   void fromBuffer(Buffer::Instance& data, uint32_t depth);
-
-  static constexpr uint32_t MaxDepth = 128;
 
   std::list<FieldPtr> fields_;
 };

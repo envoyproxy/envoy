@@ -293,6 +293,11 @@ public:
    * responsibility of the caller to handle the duplicates.
    */
   virtual const Stats::TagVector& statsTags() const PURE;
+
+  /**
+   * @return uint32_t the max depth of BSON documents the Mongo proxy filter will decode.
+   */
+  virtual uint32_t mongoBsonMaxDepth() const PURE;
 };
 
 } // namespace Server

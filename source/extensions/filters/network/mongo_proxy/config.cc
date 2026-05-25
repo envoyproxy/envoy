@@ -8,6 +8,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/common/fmt.h"
+#include "source/extensions/filters/network/mongo_proxy/bson_impl.h"
 #include "source/extensions/filters/network/mongo_proxy/proxy.h"
 
 namespace Envoy {
@@ -18,6 +19,8 @@ namespace MongoProxy {
 Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
+
+  Bson::DocumentImpl::MaxDepth = context.serverFactoryContext().options().mongoBsonMaxDepth();
 
   ASSERT(!proto_config.stat_prefix().empty());
 

@@ -97,6 +97,9 @@ public:
   void setSkipDeprecatedLog(bool skip_deprecated_logs) {
     skip_deprecated_logs_ = skip_deprecated_logs;
   }
+  void setMongoBsonMaxDepth(uint32_t mongo_bson_max_depth) {
+    mongo_bson_max_depth_ = mongo_bson_max_depth;
+  }
 
   void setSocketPath(const std::string& socket_path) { socket_path_ = socket_path; }
 
@@ -153,6 +156,7 @@ public:
   bool coreDumpEnabled() const override { return core_dump_enabled_; }
   const Stats::TagVector& statsTags() const override { return stats_tags_; }
   bool cpusetThreadsEnabled() const override { return cpuset_threads_; }
+  uint32_t mongoBsonMaxDepth() const override { return mongo_bson_max_depth_; }
   const std::vector<std::string>& disabledExtensions() const override {
     return disabled_extensions_;
   }
@@ -221,6 +225,8 @@ private:
   std::vector<std::string> disabled_extensions_;
   Stats::TagVector stats_tags_;
   uint32_t count_{0};
+
+  uint32_t mongo_bson_max_depth_{128};
 
   // Initialization added here to avoid integration_admin_test failure caused by uninitialized
   // enable_fine_grain_logging_.
