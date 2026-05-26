@@ -13,7 +13,6 @@ FingerprintManager::FingerprintManager(
     const envoy::extensions::filters::http::gcp_authn::v3::TokenBindingConfig& config,
     Server::Configuration::FactoryContext& context)
     : config_(config), context_(context), tls_slot_(context.serverFactoryContext().threadLocal()) {
-
   tls_slot_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalFingerprint>(""); });
 
   for (const auto& matcher : config_.client_certificate_san_matchers()) {
