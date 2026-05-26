@@ -76,8 +76,8 @@ void MutationUtils::headersToProto(
                       &disallowed_headers](const Http::HeaderEntry& e) -> Http::HeaderMap::Iterate {
     if (headerCanBeForwarded(e.key().getStringView(), allowed_headers, disallowed_headers)) {
       auto* new_header = proto_out.add_headers();
-      new_header->set_key(std::string(e.key().getStringView()));
-      new_header->set_raw_value(std::string(e.value().getStringView()));
+      new_header->set_key(e.key().getStringView());
+      new_header->set_raw_value(e.value().getStringView());
     }
     return Http::HeaderMap::Iterate::Continue;
   });

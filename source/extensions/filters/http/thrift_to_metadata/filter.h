@@ -74,8 +74,8 @@ public:
 private:
   const ProtoRule rule_;
   const uint16_t rule_id_;
-  std::string method_name_{};
-  ThriftMetadataToProtobufValue protobuf_value_extracter_{};
+  std::string method_name_;
+  ThriftMetadataToProtobufValue protobuf_value_extracter_;
 };
 
 using Rules = std::vector<Rule>;

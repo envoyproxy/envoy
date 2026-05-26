@@ -939,7 +939,7 @@ TEST(Context, FilterStateAttributes) {
   const std::string missing = "missing_key";
 
   auto accessor = std::make_shared<Envoy::Router::StringAccessorImpl>(serialized);
-  filter_state.setData(key, accessor, StreamInfo::FilterState::StateType::ReadOnly);
+  filter_state.setData(key, accessor);
 
   EXPECT_EQ(0, wrapper.size());
 
@@ -967,7 +967,7 @@ TEST(Context, FilterStateAttributes) {
   cel_state->setValue(v.SerializeAsString());
   EXPECT_TRUE(cel_state->serializeAsString().has_value());
   const std::string cel_key = "cel_state_key";
-  filter_state.setData(cel_key, cel_state, StreamInfo::FilterState::StateType::ReadOnly);
+  filter_state.setData(cel_key, cel_state);
 
   {
     auto value = wrapper[CelValue::CreateStringView(cel_key)];
@@ -981,8 +981,7 @@ TEST(Context, FilterStateAttributes) {
   const std::string port_string = "port";
   filter_state.setData(address_key,
                        std::make_unique<Network::AddressObject>(
-                           std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11", 6666)),
-                       StreamInfo::FilterState::StateType::ReadOnly);
+                           std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11", 6666)));
   {
     auto value = wrapper[CelValue::CreateStringView(address_key)];
     ASSERT_TRUE(value.has_value());
@@ -1293,6 +1292,45 @@ TEST(Context, UpstreamEdgeCases) {
 
   {
     const auto value = upstream[CelValue::CreateStringView(UpstreamLocality)];
+    EXPECT_FALSE(value.has_value());
+  }
+}
+
+TEST(Context, UpstreamServerName) {
+  Protobuf::Arena arena;
+
+  {
+    // TLS connection with SNI set — returns actual SNI from connection.
+    NiceMock<StreamInfo::MockStreamInfo> info;
+    auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+    const std::string sni = "tls.example.com";
+    EXPECT_CALL(*ssl_info, sni()).WillRepeatedly(ReturnRef(sni));
+    info.upstreamInfo()->setUpstreamSslConnection(ssl_info);
+
+    UpstreamWrapper upstream(arena, info);
+    const auto value = upstream[CelValue::CreateStringView(UpstreamServerName)];
+    ASSERT_TRUE(value.has_value());
+    EXPECT_EQ("tls.example.com", value->StringOrDie().value());
+  }
+
+  {
+    // No TLS connection — returns empty.
+    NiceMock<StreamInfo::MockStreamInfo> info;
+    info.upstreamInfo()->setUpstreamSslConnection(nullptr);
+
+    UpstreamWrapper upstream(arena, info);
+    const auto value = upstream[CelValue::CreateStringView(UpstreamServerName)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    // No upstream info — returns empty.
+    NiceMock<StreamInfo::MockStreamInfo> info;
+    EXPECT_CALL(info, upstreamInfo())
+        .WillRepeatedly(Return(std::shared_ptr<StreamInfo::UpstreamInfo>(nullptr)));
+
+    UpstreamWrapper upstream(arena, info);
+    const auto value = upstream[CelValue::CreateStringView(UpstreamServerName)];
     EXPECT_FALSE(value.has_value());
   }
 }

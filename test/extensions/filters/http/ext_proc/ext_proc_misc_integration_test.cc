@@ -76,9 +76,9 @@ protected:
     ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
   }
 
-  bool IsEnvoyGrpc() { return std::get<1>(GetParam()) == Envoy::Grpc::ClientType::EnvoyGrpc; }
+  bool isEnvoyGrpc() { return std::get<1>(GetParam()) == Envoy::Grpc::ClientType::EnvoyGrpc; }
 
-  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_;
   FakeStreamPtr processor_stream_;
   FakeHttpConnectionPtr processor_connection_;
   std::vector<FakeUpstream*> grpc_upstreams_;
@@ -176,7 +176,7 @@ TEST_P(ExtProcStatusOnErrorIntegrationTest, MessageTimeoutReturnsGatewayTimeout)
   // Don't send a response to trigger timeout - just wait for the timeout to occur.
 
   // Let timeout occur.
-  test_server_->waitForCounterGe("http.config_test.ext_proc.message_timeouts", 1);
+  test_server_->waitForCounter("http.config_test.ext_proc.message_timeouts", testing::Ge(1));
 
   // Should return 504 Gateway Timeout instead of configured status_on_error.
   ASSERT_TRUE(response->waitForEndStream());

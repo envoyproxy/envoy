@@ -330,7 +330,6 @@ GenericUpstreamSharedPtr ProdGenericUpstreamFactory::createGenericUpstream(
       bound_upstream = new_bound_upstream.get();
       downstream_conn.streamInfo().filterState()->setData(
           RouterFilterName, std::move(new_bound_upstream),
-          StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::Connection);
     }
     return bound_upstream->shared_from_this();

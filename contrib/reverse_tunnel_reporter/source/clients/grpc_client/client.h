@@ -130,7 +130,7 @@ private:
 
   // grpc client and stream requirements
   Grpc::AsyncClient<StreamTunnelsReq, StreamTunnelsResp> async_client_;
-  Grpc::AsyncStream<StreamTunnelsReq> stream_{};
+  Grpc::AsyncStream<StreamTunnelsReq> stream_;
   const Protobuf::MethodDescriptor& service_method_;
 
   // timers

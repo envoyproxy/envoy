@@ -173,10 +173,10 @@ protected:
     EXPECT_EQ(std::to_string(status_code), response.headers().getStatusValue());
   }
 
-  bool IsEnvoyGrpc() { return std::get<1>(GetParam()) == Envoy::Grpc::ClientType::EnvoyGrpc; }
+  bool isEnvoyGrpc() { return std::get<1>(GetParam()) == Envoy::Grpc::ClientType::EnvoyGrpc; }
 
   void websocketExtProcTest() {
-    if (!IsEnvoyGrpc()) {
+    if (!isEnvoyGrpc()) {
       return;
     }
 
@@ -218,7 +218,7 @@ body_format:
     verifyDownstreamResponse(*response, 200);
   }
 
-  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_;
   std::vector<FakeUpstream*> grpc_upstreams_;
   FakeHttpConnectionPtr processor_connection_;
   FakeStreamPtr processor_stream_;
@@ -232,7 +232,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing, ExtProcMiscInte
 
 // Test sending empty last body chunk with end_of_stream = true.
 TEST_P(ExtProcMiscIntegrationTest, SendEmptyLastBodyChunk) {
-  if (IsEnvoyGrpc()) {
+  if (isEnvoyGrpc()) {
     return;
   }
 

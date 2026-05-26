@@ -322,7 +322,7 @@ public:
       host_selection_cancelable_->cancel();
       host_selection_cancelable_.reset();
     }
-
+    saw_local_reply_ = true;
     // Clean up the upstream_requests_.
     resetAll();
     return Http::LocalErrorStatus::Continue;
@@ -646,6 +646,9 @@ private:
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   RouteConstSharedPtr route_;
   const RouteEntry* route_entry_{};
+  // Expired clusters that we tried. Keep track of them to ensure they stay alive until the request
+  // is complete.
+  absl::InlinedVector<Upstream::ClusterInfoConstSharedPtr, 4> expired_clusters_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
   std::unique_ptr<Stats::StatNameDynamicStorage> alt_stat_prefix_;
   const VirtualCluster* request_vcluster_{};
@@ -695,12 +698,16 @@ private:
   bool request_buffer_overflowed_ : 1 = false;
   const bool allow_multiplexed_upstream_half_close_ : 1 = false;
   bool upstream_request_started_ : 1 = false;
+  // True if cross-cluster retry is enabled: refreshClusterOnRetry is set in the effective retry
+  // policy and there is no hedge policy (hedging is incompatible with cross-cluster retry).
+  bool cross_cluster_retry_ : 1 = false;
   // Indicate that ORCA report is received to process it only once in either response headers or
   // trailers.
   bool orca_load_report_received_ : 1 = false;
   // Cached runtime flag value for reject_early_connect_data to avoid evaluating it on every data
   // chunk.
   bool reject_early_connect_data_enabled_ : 1 = false;
+  bool saw_local_reply_ : 1 = false;
 };
 
 class ProdFilter : public Filter {

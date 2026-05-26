@@ -105,7 +105,7 @@ public:
                  grpc_stream_.get())
           ->currentStreamForTest();
     }
-    return *grpc_stream_.get();
+    return *grpc_stream_;
   }
 
 private:
@@ -262,7 +262,7 @@ private:
     TtlManager ttl_;
     // The identifier for the server that sent the most recent response, or
     // empty if there is none.
-    std::string control_plane_identifier_{};
+    std::string control_plane_identifier_;
     // If true, xDS resources were previously fetched from an xDS source or an xDS delegate.
     bool previously_fetched_data_{false};
   };

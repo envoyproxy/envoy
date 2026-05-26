@@ -5,7 +5,9 @@
 
 #include "source/extensions/filters/network/tcp_proxy/config.h"
 
+#include "test/common/formatter/command_extension.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -71,6 +73,64 @@ TEST(ConfigTest, ConfigTest) {
         filter->initializeReadFilterCallbacks(readFilterCallback);
       }));
   cb(connection);
+}
+
+TEST(ConfigTest, ConfigWithDrainCloseCheck) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  ConfigFactory factory;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config =
+      *dynamic_cast<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy*>(
+          factory.createEmptyConfigProto().get());
+  config.set_stat_prefix("prefix");
+  config.set_cluster("cluster");
+  config.mutable_check_drain_close()->set_value(true);
+
+  EXPECT_TRUE(factory.createFilterFactoryFromProto(config, context).ok());
+}
+
+TEST(ConfigTest, TunnelingConfigWithFormatters) {
+  Envoy::Formatter::TestCommandFactory test_factory;
+  Registry::InjectFactory<Envoy::Formatter::CommandParserFactory> register_factory(test_factory);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  ConfigFactory factory;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config =
+      *dynamic_cast<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy*>(
+          factory.createEmptyConfigProto().get());
+  config.set_stat_prefix("prefix");
+  config.set_cluster("cluster");
+  auto* tunneling = config.mutable_tunneling_config();
+  tunneling->set_hostname("example.com:80");
+
+  auto* header = tunneling->add_headers_to_add();
+  auto* hdr = header->mutable_header();
+  hdr->set_key("x-custom");
+  hdr->set_value("%COMMAND_EXTENSION()%");
+
+  auto* formatter = tunneling->add_formatters();
+  formatter->set_name("envoy.formatter.TestFormatter");
+  formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue());
+
+  EXPECT_TRUE(factory.createFilterFactoryFromProto(config, context).ok());
+}
+
+TEST(ConfigTest, TunnelingConfigWithUnknownFormatter) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  ConfigFactory factory;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config =
+      *dynamic_cast<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy*>(
+          factory.createEmptyConfigProto().get());
+  config.set_stat_prefix("prefix");
+  config.set_cluster("cluster");
+  auto* tunneling = config.mutable_tunneling_config();
+  tunneling->set_hostname("example.com:80");
+
+  auto* formatter = tunneling->add_formatters();
+  formatter->set_name("envoy.formatter.does_not_exist");
+  formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue());
+
+  EXPECT_THROW_WITH_REGEX(factory.createFilterFactoryFromProto(config, context).IgnoreError(),
+                          EnvoyException, "envoy.formatter.does_not_exist");
 }
 
 } // namespace TcpProxy

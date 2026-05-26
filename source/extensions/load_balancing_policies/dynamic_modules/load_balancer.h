@@ -46,7 +46,7 @@ private:
   DynamicModuleLbConfigSharedPtr config_;
   const Upstream::PrioritySet& priority_set_;
   std::string cluster_name_;
-  envoy_dynamic_module_type_lb_module_ptr in_module_lb_;
+  envoy_dynamic_module_type_lb_module_ptr in_module_lb_{nullptr};
 
   // Handle for the member update callback registration. Automatically unregisters on destruction.
   Envoy::Common::CallbackHandlePtr member_update_cb_;

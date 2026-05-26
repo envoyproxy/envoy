@@ -126,6 +126,7 @@ public:
   void OnStreamClosed(quic::QuicStreamId id) override;
 
   // IdleSessionInterface
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void TerminateIdleSession() override;
 
   using quic::QuicSession::PerformActionOnActiveStreams;
@@ -140,7 +141,6 @@ protected:
   // quic::QuicSession
   // Overridden to create stream as encoder and associate it with an decoder.
   quic::QuicSpdyStream* CreateIncomingStream(quic::QuicStreamId id) override;
-  quic::QuicSpdyStream* CreateIncomingStream(quic::PendingStream* pending) override;
   quic::QuicSpdyStream* CreateOutgoingBidirectionalStream() override;
 
   quic::HttpDatagramSupport LocalHttpDatagramSupport() override { return http_datagram_support_; }
@@ -150,12 +150,15 @@ protected:
   // Used by base class to access quic connection after initialization.
   const quic::QuicConnection* quicConnection() const override;
   quic::QuicConnection* quicConnection() override;
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void MaybeAddSessionToIdleList();
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void MaybeRemoveSessionFromIdleList();
 
 private:
   void setUpRequestDecoder(EnvoyQuicServerStream& stream);
   void ActivateStream(std::unique_ptr<quic::QuicStream> stream) override;
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void OnLastActiveStreamClosed();
 
   std::unique_ptr<EnvoyQuicServerConnection> quic_connection_;

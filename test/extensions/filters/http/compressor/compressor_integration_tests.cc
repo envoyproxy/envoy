@@ -16,6 +16,7 @@
 #include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -163,8 +164,8 @@ void WebsocketWithCompressorIntegrationTest::performUpgrade(
   auto encoder_decoder = codec_client_->startRequest(upgrade_request_headers);
   request_encoder_ = &encoder_decoder.first;
   response_ = std::move(encoder_decoder.second);
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_upgrades_total", 1);
-  test_server_->waitForGaugeGe("http.config_test.downstream_cx_upgrades_active", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_upgrades_total", Ge(1));
+  test_server_->waitForGauge("http.config_test.downstream_cx_upgrades_active", Ge(1));
 
   // Verify the upgrade was received upstream.
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));

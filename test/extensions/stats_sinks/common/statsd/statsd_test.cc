@@ -67,7 +67,7 @@ public:
 TEST_F(TcpStatsdSinkTest, EmptyFlush) {
   InSequence s;
   expectCreateConnection();
-  EXPECT_CALL(*connection_, write(BufferStringEqual(""), _));
+  EXPECT_CALL(*connection_, write(BufferString(""), _));
   sink_->flush(snapshot_);
 }
 
@@ -98,10 +98,10 @@ TEST_F(TcpStatsdSinkTest, BasicFlow) {
   snapshot_.host_gauges_.push_back(host_gauge_snap);
 
   expectCreateConnection();
-  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.test_counter:1|c\n"
-                                                    "envoy.test_host_counter:3|c\n"
-                                                    "envoy.test_gauge:2|g\n"
-                                                    "envoy.test_host_gauge:4|g\n"),
+  EXPECT_CALL(*connection_, write(BufferString("envoy.test_counter:1|c\n"
+                                               "envoy.test_host_counter:3|c\n"
+                                               "envoy.test_gauge:2|g\n"
+                                               "envoy.test_host_gauge:4|g\n"),
                                   _));
   sink_->flush(snapshot_);
 
@@ -115,7 +115,7 @@ TEST_F(TcpStatsdSinkTest, BasicFlow) {
 
   NiceMock<Stats::MockHistogram> timer;
   timer.name_ = "test_timer";
-  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.test_timer:5|ms\n"), _));
+  EXPECT_CALL(*connection_, write(BufferString("envoy.test_timer:5|ms\n"), _));
   sink_->onHistogramComplete(timer, 5);
 
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -130,28 +130,28 @@ TEST_F(TcpStatsdSinkTest, SiSuffix) {
   items.name_ = "items";
   items.unit_ = Stats::Histogram::Unit::Unspecified;
 
-  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.items:1|ms\n"), _));
+  EXPECT_CALL(*connection_, write(BufferString("envoy.items:1|ms\n"), _));
   sink_->onHistogramComplete(items, 1);
 
   NiceMock<Stats::MockHistogram> information;
   information.name_ = "information";
   information.unit_ = Stats::Histogram::Unit::Bytes;
 
-  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.information:2|ms\n"), _));
+  EXPECT_CALL(*connection_, write(BufferString("envoy.information:2|ms\n"), _));
   sink_->onHistogramComplete(information, 2);
 
   NiceMock<Stats::MockHistogram> duration_micro;
   duration_micro.name_ = "duration";
   duration_micro.unit_ = Stats::Histogram::Unit::Microseconds;
 
-  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.duration:3|ms\n"), _));
+  EXPECT_CALL(*connection_, write(BufferString("envoy.duration:3|ms\n"), _));
   sink_->onHistogramComplete(duration_micro, 3);
 
   NiceMock<Stats::MockHistogram> duration_milli;
   duration_milli.name_ = "duration";
   duration_milli.unit_ = Stats::Histogram::Unit::Milliseconds;
 
-  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.duration:4|ms\n"), _));
+  EXPECT_CALL(*connection_, write(BufferString("envoy.duration:4|ms\n"), _));
   sink_->onHistogramComplete(duration_milli, 4);
 
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -165,7 +165,7 @@ TEST_F(TcpStatsdSinkTest, ScaledPercent) {
   items.name_ = "items";
   items.unit_ = Stats::Histogram::Unit::Percent;
 
-  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.items:0.5|h\n"), _));
+  EXPECT_CALL(*connection_, write(BufferString("envoy.items:0.5|h\n"), _));
   sink_->onHistogramComplete(items, Stats::Histogram::PercentScale / 2);
 
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -205,7 +205,7 @@ TEST_F(TcpStatsdSinkTest, WithCustomPrefix) {
   snapshot_.counters_.push_back({1, counter});
 
   expectCreateConnection();
-  EXPECT_CALL(*connection_, write(BufferStringEqual("test_prefix.test_counter:1|c\n"), _));
+  EXPECT_CALL(*connection_, write(BufferString("test_prefix.test_counter:1|c\n"), _));
   sink_->flush(snapshot_);
 }
 
@@ -252,7 +252,7 @@ TEST_F(TcpStatsdSinkTest, Overflow) {
       ->info_->trafficStats()
       ->upstream_cx_tx_bytes_buffered_.set(1024 * 1024 * 15);
   expectCreateConnection();
-  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.test_counter:1|c\n"), _));
+  EXPECT_CALL(*connection_, write(BufferString("envoy.test_counter:1|c\n"), _));
   sink_->flush(snapshot_);
 
   // Raise and make sure we don't write and kill connection.

@@ -9,6 +9,7 @@ import (
 // For built-in plugin factories in the host binary directly. DO NOT use this for independently
 // compiled module or plugins.
 var httpFilterConfigFactoryRegistry = make(map[string]shared.HttpFilterConfigFactory)
+var listenerFilterConfigFactoryRegistry = make(map[string]shared.ListenerFilterConfigFactory)
 var networkFilterConfigFactoryRegistry = make(map[string]shared.NetworkFilterConfigFactory)
 
 // NewHttpFilterFactory creates a new plugin factory for the given plugin name and unparsed config.
@@ -35,6 +36,33 @@ func RegisterHttpFilterConfigFactories(factories map[string]shared.HttpFilterCon
 			panic("plugin config factory already registered: " + name)
 		}
 		httpFilterConfigFactoryRegistry[name] = factory
+	}
+}
+
+// NewListenerFilterFactory creates a new listener filter factory for the given plugin name and
+// unparsed config.
+func NewListenerFilterFactory(handle shared.ListenerFilterConfigHandle, name string,
+	unparsedConfig []byte) (shared.ListenerFilterFactory, error) {
+	configFactory := listenerFilterConfigFactoryRegistry[name]
+	if configFactory == nil {
+		return nil, fmt.Errorf("failed to get listener filter config factory for %s", name)
+	}
+	return configFactory.Create(handle, unparsedConfig)
+}
+
+// GetListenerFilterConfigFactory gets the listener filter config factory for the given plugin name.
+func GetListenerFilterConfigFactory(name string) shared.ListenerFilterConfigFactory {
+	return listenerFilterConfigFactoryRegistry[name]
+}
+
+// RegisterListenerFilterConfigFactories registers listener filter config factories for plugins in
+// the composer binary itself. This function MUST only be called from init() functions.
+func RegisterListenerFilterConfigFactories(factories map[string]shared.ListenerFilterConfigFactory) {
+	for name, factory := range factories {
+		if _, ok := listenerFilterConfigFactoryRegistry[name]; ok {
+			panic("listener filter config factory already registered: " + name)
+		}
+		listenerFilterConfigFactoryRegistry[name] = factory
 	}
 }
 

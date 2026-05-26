@@ -29,7 +29,6 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:admin_mocks",
-        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",

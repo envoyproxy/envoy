@@ -40,7 +40,7 @@ public:
   using StoragePtr = std::unique_ptr<uint8_t[]>;
 
   struct SizedStorage {
-    StoragePtr mem_{};
+    StoragePtr mem_;
     size_t len_{};
   };
 

@@ -9,6 +9,7 @@
 
 use crate::{abi, EnvoyBuffer};
 use std::ffi::c_void;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 
 // -----------------------------------------------------------------------------
@@ -1276,24 +1277,31 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_config_new(
   name: abi::envoy_dynamic_module_type_envoy_buffer,
   config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> *const c_void {
-  // The name and config originate from protobuf string/bytes fields, so they are valid
-  // UTF-8 and within bounds when received here. Mirrors the http filter FFI entry point.
-  let name_str = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-    name.ptr as *const _,
-    name.length,
-  ));
-  let config_bytes = std::slice::from_raw_parts(config.ptr as *const _, config.length);
-  let ctx = ConfigContext::new(config_envoy_ptr);
+  catch_unwind(AssertUnwindSafe(|| {
+    // SAFETY: `name` is a protobuf string (UTF-8 by contract) and `config` is opaque bytes.
+    // The helpers additionally tolerate `(nullptr, 0)` empty inputs, and `str_lossy_from_raw`
+    // substitutes `U+FFFD` for any malformed UTF-8 rather than triggering UB.
+    let name_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(name.ptr as *const u8, name.length) };
+    let config_bytes = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(config.ptr as *const u8, config.length)
+    };
+    let ctx = ConfigContext::new(config_envoy_ptr);
 
-  envoy_dynamic_module_on_access_logger_config_new_impl(
-    &ctx,
-    name_str,
-    config_bytes,
-    crate::NEW_ACCESS_LOGGER_CONFIG_FUNCTION
-      .get()
-      .expect("NEW_ACCESS_LOGGER_CONFIG_FUNCTION must be set"),
-    config_envoy_ptr,
-  )
+    envoy_dynamic_module_on_access_logger_config_new_impl(
+      &ctx,
+      name_str.as_ref(),
+      config_bytes,
+      crate::NEW_ACCESS_LOGGER_CONFIG_FUNCTION
+        .get()
+        .expect("NEW_ACCESS_LOGGER_CONFIG_FUNCTION must be set"),
+      config_envoy_ptr,
+    )
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_access_logger_config_new", panic);
+    ptr::null()
+  })
 }
 
 /// Testable wrapper for [`envoy_dynamic_module_on_access_logger_config_new`].
@@ -1325,7 +1333,15 @@ pub fn envoy_dynamic_module_on_access_logger_config_new_impl(
 pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_config_destroy(
   config_ptr: *const c_void,
 ) {
-  drop(Box::from_raw(config_ptr as *mut AccessLoggerConfigHandle));
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    drop(Box::from_raw(config_ptr as *mut AccessLoggerConfigHandle));
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_access_logger_config_destroy",
+      panic,
+    );
+  });
 }
 
 /// # Safety
@@ -1337,10 +1353,16 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_new(
   config_ptr: *const c_void,
   logger_envoy_ptr: *mut c_void,
 ) -> *const c_void {
-  let handle = &*(config_ptr as *const AccessLoggerConfigHandle);
-  let metrics = MetricsContext::new(handle.config_envoy_ptr);
-  let logger: Box<dyn AccessLogger> = handle.inner.create_logger(metrics, logger_envoy_ptr);
-  crate::wrap_into_c_void_ptr!(logger)
+  catch_unwind(AssertUnwindSafe(|| {
+    let handle = &*(config_ptr as *const AccessLoggerConfigHandle);
+    let metrics = MetricsContext::new(handle.config_envoy_ptr);
+    let logger: Box<dyn AccessLogger> = handle.inner.create_logger(metrics, logger_envoy_ptr);
+    crate::wrap_into_c_void_ptr!(logger)
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_access_logger_new", panic);
+    ptr::null()
+  })
 }
 
 /// # Safety
@@ -1353,10 +1375,15 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_log(
   logger_ptr: *mut c_void,
   log_type: abi::envoy_dynamic_module_type_access_log_type,
 ) {
-  let logger = &mut *(logger_ptr as *mut Box<dyn AccessLogger>);
-  let access_log_type = AccessLogType::from_abi(log_type);
-  let ctx = LogContext::new(envoy_ptr, access_log_type);
-  logger.log(&ctx);
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let logger = &mut *(logger_ptr as *mut Box<dyn AccessLogger>);
+    let access_log_type = AccessLogType::from_abi(log_type);
+    let ctx = LogContext::new(envoy_ptr, access_log_type);
+    logger.log(&ctx);
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_access_logger_log", panic);
+  });
 }
 
 /// # Safety
@@ -1365,7 +1392,12 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_log(
 /// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_destroy(logger_ptr: *mut c_void) {
-  crate::drop_wrapped_c_void_ptr!(logger_ptr, AccessLogger);
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    crate::drop_wrapped_c_void_ptr!(logger_ptr, AccessLogger);
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_access_logger_destroy", panic);
+  });
 }
 
 /// # Safety
@@ -1374,8 +1406,13 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_destroy(logger_pt
 /// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_flush(logger_ptr: *mut c_void) {
-  let logger = &mut *(logger_ptr as *mut Box<dyn AccessLogger>);
-  logger.flush();
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let logger = &mut *(logger_ptr as *mut Box<dyn AccessLogger>);
+    logger.flush();
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_access_logger_flush", panic);
+  });
 }
 
 /// Declare access-logger entry points for a single user-supplied config type.
@@ -1458,12 +1495,20 @@ macro_rules! declare_access_logger {
           Err(_) => ::std::option::Option::None,
         }
       }
-      $crate::set_factory_once!(
-        $crate::NEW_ACCESS_LOGGER_CONFIG_FUNCTION,
-        __single_access_logger_factory as $crate::NewAccessLoggerConfigFunction,
-        "NEW_ACCESS_LOGGER_CONFIG_FUNCTION"
-      );
-      $crate::abi::envoy_dynamic_modules_abi_version.as_ptr() as *const ::std::os::raw::c_char
+      match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
+        $crate::set_factory_once!(
+          $crate::NEW_ACCESS_LOGGER_CONFIG_FUNCTION,
+          __single_access_logger_factory as $crate::NewAccessLoggerConfigFunction,
+          "NEW_ACCESS_LOGGER_CONFIG_FUNCTION"
+        );
+        $crate::abi::envoy_dynamic_modules_abi_version.as_ptr() as *const ::std::os::raw::c_char
+      })) {
+        ::std::result::Result::Ok(v) => v,
+        ::std::result::Result::Err(payload) => {
+          $crate::log_ffi_panic("envoy_dynamic_module_on_program_init", payload);
+          ::std::ptr::null()
+        },
+      }
     }
   };
 }

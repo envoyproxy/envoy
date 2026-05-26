@@ -22,6 +22,8 @@
 
 #include "gtest/gtest.h"
 
+using ::testing::Eq;
+using ::testing::Ge;
 using ::testing::HasSubstr;
 
 namespace Envoy {
@@ -159,7 +161,7 @@ void Http2FloodMitigationTest::floodServer(const Http2Frame& frame, const std::s
   tcp_client_->waitForDisconnect();
 
   EXPECT_EQ(1, test_server_->counter(flood_stat)->value());
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_delayed_close_timeout", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_delayed_close_timeout", Ge(1));
 }
 
 // Send header only request, flood client, and verify that the upstream is disconnected and client
@@ -239,9 +241,9 @@ void Http2FloodMitigationTest::prefillOutboundDownstreamQueue(uint32_t data_fram
 
   // Wait for some data to arrive and then wait for the upstream_rq_active to flip to 0 to indicate
   // that the first request has completed.
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 10000);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
-  test_server_->waitForGaugeEq("http2.outbound_frames_active", data_frame_count + 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_rx_bytes_total", Ge(10000));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(0));
+  test_server_->waitForGauge("http2.outbound_frames_active", Eq(data_frame_count + 1));
   // Verify that pre-fill did not trigger flood protection
   EXPECT_EQ(0, test_server_->counter("http2.outbound_flood")->value());
 }
@@ -285,7 +287,7 @@ Http2FloodMitigationTest::prefillOutboundUpstreamQueue(uint32_t frame_count) {
   auto* upstream = fake_upstreams_.front().get();
   EXPECT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
   // Wait for pre-fill data to arrive to Envoy
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 500);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_rx_bytes_total", Ge(500));
   // Verify that pre-fill did not kill upstream connection.
   EXPECT_TRUE(fake_upstream_connection_->connected());
   return response;
@@ -841,7 +843,7 @@ TEST_P(Http2FloodMitigationTest, RstStreamOnUpstreamRemoteCloseBeforeResponseHea
   sendFrame(request2);
 
   // Wait for it to be proxied
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_total", 2);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_total", Ge(2));
 
   // Disconnect upstream connection. Since there no response headers were sent yet the router
   // filter will send 503 with body and then RST_STREAM. With these 3 frames the downstream outbound
@@ -1488,16 +1490,16 @@ TEST_P(Http2FloodMitigationTest, UpstreamRstStreamStormOnDownstreamCloseRegressi
                                            {Http2Frame::Header("no_end_stream", "1")});
     sendFrame(request);
   }
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", num_requests,
-                               TestUtility::DefaultTimeout);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(num_requests),
+                             TestUtility::DefaultTimeout);
 
   // Disconnect downstream connection. Envoy should send RST_STREAM to cancel active upstream
   // requests.
   tcp_client_->close();
 
   // Wait until the disconnect is detected and all upstream connections have been closed.
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0,
-                               TestUtility::DefaultTimeout);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(0),
+                             TestUtility::DefaultTimeout);
 
   // The disconnect shouldn't trigger an outbound control frame flood.
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.http2.outbound_control_flood")->value());

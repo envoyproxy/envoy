@@ -44,6 +44,7 @@
 //! ```
 
 use crate::{abi, bytes_to_module_buffer, EnvoyBuffer};
+use std::panic::{catch_unwind, AssertUnwindSafe};
 
 /// Wrapper around the Envoy cert validator config pointer, providing access to
 /// Envoy-side operations such as filter state during certificate validation.
@@ -253,18 +254,24 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_config_new(
   name: abi::envoy_dynamic_module_type_envoy_buffer,
   config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> abi::envoy_dynamic_module_type_cert_validator_config_module_ptr {
-  let name_str = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-    name.ptr as *const _,
-    name.length,
-  ));
-  let config_slice = std::slice::from_raw_parts(config.ptr as *const _, config.length);
-  init_cert_validator_config(
-    name_str,
-    config_slice,
-    NEW_CERT_VALIDATOR_CONFIG_FUNCTION
-      .get()
-      .expect("NEW_CERT_VALIDATOR_CONFIG_FUNCTION must be set"),
-  )
+  catch_unwind(AssertUnwindSafe(|| {
+    let name_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(name.ptr as *const u8, name.length) };
+    let config_slice = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(config.ptr as *const u8, config.length)
+    };
+    init_cert_validator_config(
+      name_str.as_ref(),
+      config_slice,
+      NEW_CERT_VALIDATOR_CONFIG_FUNCTION
+        .get()
+        .expect("NEW_CERT_VALIDATOR_CONFIG_FUNCTION must be set"),
+    )
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_cert_validator_config_new", panic);
+    std::ptr::null()
+  })
 }
 
 pub(crate) fn init_cert_validator_config(
@@ -286,7 +293,15 @@ pub(crate) fn init_cert_validator_config(
 pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_config_destroy(
   config_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
 ) {
-  drop_wrapped_c_void_ptr!(config_ptr, CertValidatorConfig);
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    drop_wrapped_c_void_ptr!(config_ptr, CertValidatorConfig);
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_cert_validator_config_destroy",
+      panic,
+    );
+  });
 }
 
 /// # Safety
@@ -302,45 +317,59 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_do_verify_cert_c
   host_name: abi::envoy_dynamic_module_type_envoy_buffer,
   is_server: bool,
 ) -> abi::envoy_dynamic_module_type_cert_validator_validation_result {
-  let config = {
-    let raw = config_module_ptr as *const *const dyn CertValidatorConfig;
-    &**raw
-  };
-
-  let envoy_cert_validator = EnvoyCertValidator::new(config_envoy_ptr);
-
-  let cert_buffers = std::slice::from_raw_parts(certs, certs_count);
-  let cert_slices: Vec<&[u8]> = cert_buffers
-    .iter()
-    .map(|buf| std::slice::from_raw_parts(buf.ptr as *const u8, buf.length))
-    .collect();
-
-  let host_name_str = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-    host_name.ptr as *const _,
-    host_name.length,
-  ));
-
-  let result = config.do_verify_cert_chain(
-    &envoy_cert_validator,
-    &cert_slices,
-    host_name_str,
-    is_server,
-  );
-
-  // If the module provided error details, pass them to Envoy via the callback.
-  // Envoy copies the buffer immediately, so the string only needs to live until the call returns.
-  if let Some(ref error) = result.error_details {
-    let error_buf = abi::envoy_dynamic_module_type_module_buffer {
-      ptr: error.as_ptr() as *const _,
-      length: error.len(),
+  catch_unwind(AssertUnwindSafe(|| {
+    let config = {
+      let raw = config_module_ptr as *const *const dyn CertValidatorConfig;
+      &**raw
     };
-    abi::envoy_dynamic_module_callback_cert_validator_set_error_details(
-      config_envoy_ptr,
-      error_buf,
-    );
-  }
 
-  abi::envoy_dynamic_module_type_cert_validator_validation_result::from(&result)
+    let envoy_cert_validator = EnvoyCertValidator::new(config_envoy_ptr);
+
+    // `certs` may be null when `certs_count` is 0 (for example, a TLS handshake with no
+    // client certificate). `slice_from_raw_or_empty` returns an empty slice for null without
+    // dereferencing.
+    let cert_buffers: &[crate::abi::envoy_dynamic_module_type_envoy_buffer] =
+      crate::ffi_helpers::slice_from_raw_or_empty(certs, certs_count);
+    let cert_slices: Vec<&[u8]> = cert_buffers
+      .iter()
+      .map(|buf| crate::ffi_helpers::slice_from_raw_or_empty(buf.ptr as *const u8, buf.length))
+      .collect();
+
+    let host_name_str =
+      crate::ffi_helpers::str_lossy_from_raw(host_name.ptr as *const u8, host_name.length);
+
+    let result = config.do_verify_cert_chain(
+      &envoy_cert_validator,
+      &cert_slices,
+      host_name_str.as_ref(),
+      is_server,
+    );
+
+    // If the module provided error details, pass them to Envoy via the callback.
+    // Envoy copies the buffer immediately, so the string only needs to live until the call returns.
+    if let Some(ref error) = result.error_details {
+      let error_buf = abi::envoy_dynamic_module_type_module_buffer {
+        ptr: error.as_ptr() as *const _,
+        length: error.len(),
+      };
+      abi::envoy_dynamic_module_callback_cert_validator_set_error_details(
+        config_envoy_ptr,
+        error_buf,
+      );
+    }
+
+    abi::envoy_dynamic_module_type_cert_validator_validation_result::from(&result)
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_cert_validator_do_verify_cert_chain",
+      panic,
+    );
+    // Fail-closed: a panic during cert validation must not appear as success.
+    abi::envoy_dynamic_module_type_cert_validator_validation_result::from(
+      &ValidationResult::failed(ClientValidationStatus::Failed, None, None),
+    )
+  })
 }
 
 /// # Safety
@@ -352,11 +381,22 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_get_ssl_verify_m
   config_module_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
   handshaker_provides_certificates: bool,
 ) -> std::os::raw::c_int {
-  let config = {
-    let raw = config_module_ptr as *const *const dyn CertValidatorConfig;
-    &**raw
-  };
-  config.get_ssl_verify_mode(handshaker_provides_certificates)
+  catch_unwind(AssertUnwindSafe(|| {
+    let config = {
+      let raw = config_module_ptr as *const *const dyn CertValidatorConfig;
+      &**raw
+    };
+    config.get_ssl_verify_mode(handshaker_provides_certificates)
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_cert_validator_get_ssl_verify_mode",
+      panic,
+    );
+    // Fail-closed: SSL_VERIFY_PEER (0x01) | SSL_VERIFY_FAIL_IF_NO_PEER_CERT (0x02) = 0x03,
+    // the strictest mode. A panic must not silently degrade to SSL_VERIFY_NONE (0x00).
+    0x03
+  })
 }
 
 /// # Safety
@@ -368,11 +408,25 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_update_digest(
   config_module_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
   out_data: *mut abi::envoy_dynamic_module_type_module_buffer,
 ) {
-  let config = {
-    let raw = config_module_ptr as *const *const dyn CertValidatorConfig;
-    &**raw
-  };
-  let digest = config.update_digest();
-  (*out_data).ptr = digest.as_ptr() as *const _;
-  (*out_data).length = digest.len();
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let config = {
+      let raw = config_module_ptr as *const *const dyn CertValidatorConfig;
+      &**raw
+    };
+    let digest = config.update_digest();
+    (*out_data).ptr = digest.as_ptr() as *const _;
+    (*out_data).length = digest.len();
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_cert_validator_update_digest",
+      panic,
+    );
+    // On panic, leave `out_data` as an empty buffer so Envoy contributes nothing to the
+    // session context hash and avoids reading uninitialized memory.
+    if !out_data.is_null() {
+      (*out_data).ptr = std::ptr::null();
+      (*out_data).length = 0;
+    }
+  });
 }

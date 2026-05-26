@@ -653,11 +653,9 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterClusterMetadataNoClusterIn
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateTest) {
   StreamInfo::MockStreamInfo stream_info;
   stream_info.filter_state_->setData("test_key",
-                                     std::make_unique<Router::StringAccessorImpl>("test_value"),
-                                     StreamInfo::FilterState::StateType::ReadOnly);
+                                     std::make_unique<Router::StringAccessorImpl>("test_value"));
   stream_info.filter_state_->setData("test_obj",
-                                     std::make_unique<TestSerializedStructFilterState>(),
-                                     StreamInfo::FilterState::StateType::ReadOnly);
+                                     std::make_unique<TestSerializedStructFilterState>());
   EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
 
   OpenTelemetryFormatMap expected = {{"test_key", "\"test_value\""},
@@ -686,10 +684,8 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateTest) {
   const StreamInfo::FilterStateSharedPtr upstream_filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request);
   upstream_filter_state->setData("test_key",
-                                 std::make_unique<Router::StringAccessorImpl>("test_value"),
-                                 StreamInfo::FilterState::StateType::ReadOnly);
-  upstream_filter_state->setData("test_obj", std::make_unique<TestSerializedStructFilterState>(),
-                                 StreamInfo::FilterState::StateType::ReadOnly);
+                                 std::make_unique<Router::StringAccessorImpl>("test_value"));
+  upstream_filter_state->setData("test_obj", std::make_unique<TestSerializedStructFilterState>());
 
   EXPECT_CALL(stream_info, upstreamInfo()).Times(testing::AtLeast(1));
   // Get pointer to MockUpstreamInfo.
@@ -724,8 +720,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateTest) {
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateSpeciferTest) {
   StreamInfo::MockStreamInfo stream_info;
   stream_info.filter_state_->setData(
-      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"));
   EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
 
   OpenTelemetryFormatMap expected = {
@@ -759,8 +754,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateSpecife
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request));
 
   stream_info.upstream_info_->upstreamFilterState()->setData(
-      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"));
 
   EXPECT_CALL(Const(stream_info), upstreamInfo()).Times(testing::AtLeast(1));
 
@@ -790,8 +784,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateErrorSpeciferTe
   StreamInfo::MockStreamInfo stream_info;
   std::string body;
   stream_info.filter_state_->setData(
-      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"));
 
   // 'ABCDE' is error specifier.
   KeyValueList key_mapping;
@@ -821,8 +814,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateErrorSp
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request));
 
   stream_info.upstream_info_->upstreamFilterState()->setData(
-      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"));
 
   // 'ABCDE' is error specifier.
   KeyValueList key_mapping;

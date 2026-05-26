@@ -470,11 +470,11 @@ TEST_F(HttpConnectionManagerImplTest, FilterDirectDecodeEncodeDataNoTrailers) {
 
   Buffer::OwnedImpl decoded_data_to_forward;
   decoded_data_to_forward.move(decode_buffer, 2);
-  EXPECT_CALL(*decoder_filters_[1], decodeData(BufferStringEqual("he"), false))
+  EXPECT_CALL(*decoder_filters_[1], decodeData(BufferString("he"), false))
       .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
   decoder_filters_[0]->callbacks_->injectDecodedDataToFilterChain(decoded_data_to_forward, false);
 
-  EXPECT_CALL(*decoder_filters_[1], decodeData(BufferStringEqual("llo"), true))
+  EXPECT_CALL(*decoder_filters_[1], decodeData(BufferString("llo"), true))
       .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
   EXPECT_CALL(*decoder_filters_[1], decodeComplete());
   decoder_filters_[0]->callbacks_->injectDecodedDataToFilterChain(decode_buffer, true);
@@ -502,11 +502,11 @@ TEST_F(HttpConnectionManagerImplTest, FilterDirectDecodeEncodeDataNoTrailers) {
 
   Buffer::OwnedImpl encoded_data_to_forward;
   encoded_data_to_forward.move(encoder_buffer, 3);
-  EXPECT_CALL(*encoder_filters_[0], encodeData(BufferStringEqual("res"), false));
+  EXPECT_CALL(*encoder_filters_[0], encodeData(BufferString("res"), false));
   EXPECT_CALL(response_encoder_, encodeData(_, false));
   encoder_filters_[1]->callbacks_->injectEncodedDataToFilterChain(encoded_data_to_forward, false);
 
-  EXPECT_CALL(*encoder_filters_[0], encodeData(BufferStringEqual("ponse"), true));
+  EXPECT_CALL(*encoder_filters_[0], encodeData(BufferString("ponse"), true));
   EXPECT_CALL(*encoder_filters_[0], encodeComplete());
   EXPECT_CALL(response_encoder_, encodeData(_, true));
   expectOnDestroy();
@@ -556,11 +556,11 @@ TEST_F(HttpConnectionManagerImplTest, FilterDirectDecodeEncodeDataTrailers) {
 
   Buffer::OwnedImpl decoded_data_to_forward;
   decoded_data_to_forward.move(decode_buffer, 2);
-  EXPECT_CALL(*decoder_filters_[1], decodeData(BufferStringEqual("he"), false))
+  EXPECT_CALL(*decoder_filters_[1], decodeData(BufferString("he"), false))
       .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
   decoder_filters_[0]->callbacks_->injectDecodedDataToFilterChain(decoded_data_to_forward, false);
 
-  EXPECT_CALL(*decoder_filters_[1], decodeData(BufferStringEqual("llo"), false))
+  EXPECT_CALL(*decoder_filters_[1], decodeData(BufferString("llo"), false))
       .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
   decoder_filters_[0]->callbacks_->injectDecodedDataToFilterChain(decode_buffer, false);
 
@@ -595,11 +595,11 @@ TEST_F(HttpConnectionManagerImplTest, FilterDirectDecodeEncodeDataTrailers) {
 
   Buffer::OwnedImpl encoded_data_to_forward;
   encoded_data_to_forward.move(encoder_buffer, 3);
-  EXPECT_CALL(*encoder_filters_[0], encodeData(BufferStringEqual("res"), false));
+  EXPECT_CALL(*encoder_filters_[0], encodeData(BufferString("res"), false));
   EXPECT_CALL(response_encoder_, encodeData(_, false));
   encoder_filters_[1]->callbacks_->injectEncodedDataToFilterChain(encoded_data_to_forward, false);
 
-  EXPECT_CALL(*encoder_filters_[0], encodeData(BufferStringEqual("ponse"), false));
+  EXPECT_CALL(*encoder_filters_[0], encodeData(BufferString("ponse"), false));
   EXPECT_CALL(response_encoder_, encodeData(_, false));
   encoder_filters_[1]->callbacks_->injectEncodedDataToFilterChain(encoder_buffer, false);
 
@@ -848,6 +848,12 @@ TEST_F(HttpConnectionManagerImplTest, CodecCreationLoadShedPointCanCloseConnecti
   EXPECT_CALL(overload_manager_,
               getLoadShedPoint(Server::LoadShedPointName::get().HcmDecodeHeaders))
       .WillOnce(Return(nullptr));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().H2ServerGoAwayAndCloseOnDispatch))
+      .WillOnce(Return(nullptr));
 
   setup();
 
@@ -873,6 +879,12 @@ TEST_F(HttpConnectionManagerImplTest, CodecCreationLoadShedPointBypasscheck) {
       .WillOnce(Return(nullptr));
   EXPECT_CALL(overload_manager_,
               getLoadShedPoint(Server::LoadShedPointName::get().HttpDownstreamFilterCheck))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().H2ServerGoAwayAndCloseOnDispatch))
       .WillOnce(Return(nullptr));
 
   setup();
@@ -904,6 +916,12 @@ TEST_F(HttpConnectionManagerImplTest, DecodeHeaderLoadShedPointCanRejectNewStrea
   EXPECT_CALL(overload_manager_,
               getLoadShedPoint(Server::LoadShedPointName::get().HttpDownstreamFilterCheck))
       .WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().H2ServerGoAwayAndCloseOnDispatch))
+      .WillOnce(Return(nullptr));
 
   setup();
   setupFilterChain(1, 0);
@@ -936,6 +954,91 @@ TEST_F(HttpConnectionManagerImplTest, DecodeHeaderLoadShedPointCanRejectNewStrea
   decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
   decoder_filters_[0]->callbacks_->encodeHeaders(
       ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true, "details");
+}
+
+TEST_F(HttpConnectionManagerImplTest, GoAwayLoadShedPoint) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_fix_goaway_loadshed_point")) {
+    GTEST_SKIP();
+  }
+  Server::MockLoadShedPoint goaway_point;
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().HcmDecodeHeaders))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().HcmCodecCreation))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().HttpDownstreamFilterCheck))
+      .WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch))
+      .WillOnce(Return(&goaway_point));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().H2ServerGoAwayAndCloseOnDispatch))
+      .WillOnce(Return(nullptr));
+
+  setup();
+  setupFilterChain(1, 0);
+
+  EXPECT_CALL(goaway_point, shouldShedLoad()).WillOnce(Return(true));
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("200", headers.getStatusValue());
+      }));
+
+  // The client will see a warning GOAWAY, but no final GOAWAY.
+  EXPECT_CALL(*codec_, shutdownNotice());
+  EXPECT_CALL(*codec_, goAway()).Times(0);
+
+  startRequest();
+
+  // Clean up.
+  expectOnDestroy();
+
+  decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[0]->callbacks_->encodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true, "details");
+}
+
+TEST_F(HttpConnectionManagerImplTest, GoAwayAndCloseLoadShedPoint) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_fix_goaway_loadshed_point")) {
+    GTEST_SKIP();
+  }
+  Server::MockLoadShedPoint goaway_and_close_point;
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().HcmDecodeHeaders))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().HcmCodecCreation))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().HttpDownstreamFilterCheck))
+      .WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().H2ServerGoAwayAndCloseOnDispatch))
+      .WillOnce(Return(&goaway_and_close_point));
+
+  setup();
+
+  EXPECT_CALL(goaway_and_close_point, shouldShedLoad()).WillOnce(Return(true));
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, _)).Times(0);
+
+  // The client will see the warning GOAWAY and final GOAWAY immediately afterward.
+  EXPECT_CALL(*codec_, shutdownNotice());
+  EXPECT_CALL(*codec_, goAway());
+
+  // Gives the connection manager an event to handle.
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+
+  // No cleanup because the filter chain is not even created.
 }
 
 TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnDecodingPathFirstFilter) {
@@ -1566,8 +1669,7 @@ private:
 
 TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
   filter_callbacks_.connection_.stream_info_.filter_state_->setData(
-      "connection_provided_data", std::make_shared<SimpleType>(555),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      "connection_provided_data", std::make_shared<SimpleType>(555));
 
   setup(SetupOpts().setTracing(false));
   setupFilterChain(1, 0, /* num_requests = */ 3);
@@ -1587,15 +1689,12 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
         .WillOnce(Invoke([this](HeaderMap&, bool) -> FilterHeadersStatus {
           decoder_filters_[0]->callbacks_->streamInfo().filterState()->setData(
               "per_filter_chain", std::make_unique<SimpleType>(1),
-              StreamInfo::FilterState::StateType::ReadOnly,
               StreamInfo::FilterState::LifeSpan::FilterChain);
           decoder_filters_[0]->callbacks_->streamInfo().filterState()->setData(
               "per_downstream_request", std::make_unique<SimpleType>(2),
-              StreamInfo::FilterState::StateType::ReadOnly,
               StreamInfo::FilterState::LifeSpan::Request);
           decoder_filters_[0]->callbacks_->streamInfo().filterState()->setData(
               "per_downstream_connection", std::make_unique<SimpleType>(3),
-              StreamInfo::FilterState::StateType::ReadOnly,
               StreamInfo::FilterState::LifeSpan::Connection);
           return FilterHeadersStatus::StopIteration;
         }));

@@ -35,8 +35,7 @@ public:
     }
 
     read_callbacks_->streamInfo().filterState()->setData(
-        "envoy.udp_proxy.cluster", std::make_shared<UdpProxy::PerSessionCluster>(cluster_),
-        StreamInfo::FilterState::StateType::Mutable);
+        "envoy.udp_proxy.cluster", std::make_shared<UdpProxy::PerSessionCluster>(cluster_));
     return ReadFilterStatus::Continue;
   }
 
