@@ -39,6 +39,20 @@ constexpr char DefaultConfig[] = R"EOF(
       num_retries: 5
   )EOF";
 
+// A mock GCE Identity Token (JWT) originally from token_cache_test.cc.
+// Payload: {"iss":"https://example.com","sub":"test@example.com", "aud":"example_service",
+// "exp":2001001001} Expiration corresponds to Sun May 29 2033 13:36:41 GMT.
+constexpr absl::string_view GoodTokenStr =
+    "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUu"
+    "Y29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiY"
+    "XVkIjoiZXhhbXBsZV9zZXJ2aWNlIn0.cuui_Syud76B0tqvjESE8IZbX7vzG6xA-M"
+    "Daof1qEFNIoCFT_YQPkseLSUSR2Od3TJcNKk-dKjvUEL1JW3kGnyC1dBx4f3-Xxro"
+    "yL23UbR2eS8TuxO9ZcNCGkjfvH5O4mDb6cVkFHRDEolGhA7XwNiuVgkGJ5Wkrvshi"
+    "h6nqKXcPNaRx9lOaRWg2PkE6ySNoyju7rNfunXYtVxPuUIkl0KMq3WXWRb_cb8a_Z"
+    "EprqSZUzi_ZzzYzqBNVhIJujcNWij7JRra2sXXiSAfKjtxHQoxrX8n4V1ySWJ3_1T"
+    "H_cJcdfS_RKP7YgXRWC0L16PNF5K7iqRqmjKALNe83ZFnFIw";
+const uint64_t ExpTime = 2001001001;
+
 class GcpAuthnClientImplTest : public testing::Test {
 public:
   GcpAuthnClientImplTest() {
@@ -100,9 +114,10 @@ TEST_F(GcpAuthnClientImplTest, Success) {
   }));
   Envoy::Http::ResponseMessagePtr response(
       new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
-  response->body().add("token_string");
+  response->body().add(std::string(GoodTokenStr));
 
-  EXPECT_CALL(request_callbacks_, onComplete(absl::StatusOr<std::string>("token_string")));
+  GcpToken expected_token{std::string(GoodTokenStr), ExpTime, audience};
+  EXPECT_CALL(request_callbacks_, onComplete(absl::StatusOr<GcpToken>(expected_token)));
   client_callback_->onSuccess(client_request_, std::move(response));
 }
 
@@ -211,6 +226,58 @@ TEST_F(GcpAuthnClientImplTest, NoRetryPolicy) {
   client_->fetchToken(audience, request_callbacks_);
 
   EXPECT_FALSE(options_.retry_policy.has_value());
+}
+
+TEST_F(GcpAuthnClientImplTest, TimeoutAtRootConfig) {
+  std::string root_timeout_config = R"EOF(
+    http_uri:
+      uri: http://testhost/path/test
+      cluster: test_cluster
+      timeout:
+        seconds: 5
+    timeout:
+      seconds: 15
+  )EOF";
+
+  GcpAuthnFilterConfig config;
+  TestUtility::loadFromYaml(root_timeout_config, config);
+  config_ = config;
+
+  setupMockObjects();
+  createClient();
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.set_url("http://test_audience");
+  client_->fetchToken(audience, request_callbacks_);
+
+  // Verify that root-level timeout (15s) takes precedence over http_uri level timeout (5s).
+  EXPECT_EQ(options_.timeout->count(), 15000);
+}
+
+TEST_F(GcpAuthnClientImplTest, JwtParsingFailure) {
+  setupMockObjects();
+  createClient();
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.set_url("http://test_audience");
+  client_->fetchToken(audience, request_callbacks_);
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  // Set invalid payload body
+  response->body().add("invalid_jwt_token_payload");
+
+  // Assert that callbacks are notified with an error since JWT parsing failed.
+  EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
+      .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
+        EXPECT_FALSE(token.ok());
+        EXPECT_EQ(token.status().message(), "Failed to parse identity token/JWT.");
+      }));
+
+  client_callback_->onSuccess(client_request_, std::move(response));
 }
 
 } // namespace
