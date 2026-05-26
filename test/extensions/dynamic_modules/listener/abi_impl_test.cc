@@ -1321,7 +1321,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, WriteToSocketSuccess) {
       .WillOnce(testing::Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         uint64_t len = buffer.length();
         buffer.drain(len);
-        return Api::IoCallUint64Result(len, Api::IoError::none());
+        return {len, Api::IoError::none()};
       }));
 
   char data[] = "S";
@@ -1338,7 +1338,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, WriteToSocketMultipleBytes) {
       .WillOnce(testing::Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         uint64_t len = buffer.length();
         buffer.drain(len);
-        return Api::IoCallUint64Result(len, Api::IoError::none());
+        return {len, Api::IoError::none()};
       }));
 
   char data[] = "hello world";
@@ -1380,7 +1380,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, WriteToSocketIoError) {
   EXPECT_CALL(callbacks_.socket_, ioHandle()).WillOnce(testing::ReturnRef(io_handle));
   EXPECT_CALL(io_handle, write(testing::_))
       .WillOnce(testing::Invoke([](Buffer::Instance&) -> Api::IoCallUint64Result {
-        return Api::IoCallUint64Result(0, Network::IoSocketError::create(ECONNRESET));
+        return {0, Network::IoSocketError::create(ECONNRESET)};
       }));
 
   char data[] = "S";

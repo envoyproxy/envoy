@@ -21,6 +21,8 @@ envoy_cc_test(
     deps = [
         "//source/common/config:metadata_lib",
         "//source/common/http:message_lib",
+        "//source/common/router:string_accessor_lib",
+        "//source/common/stream_info:filter_state_lib",
         "//source/extensions/clusters/dynamic_modules:cluster_lib",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
@@ -30,6 +32,7 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:priority_set_mocks",
@@ -46,12 +49,15 @@ envoy_cc_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
+        "//test/extensions/dynamic_modules/test_data/rust:cluster_filter_state_test",
         "//test/extensions/dynamic_modules/test_data/rust:cluster_integration_test",
     ],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/router:string_accessor_lib",
         "//source/extensions/clusters/dynamic_modules:cluster",
         "//source/extensions/dynamic_modules:abi_impl",
+        "//source/extensions/filters/http/dynamic_modules:factory_registration",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
         "//test/extensions/dynamic_modules:util",
         "//test/integration:http_integration_lib",

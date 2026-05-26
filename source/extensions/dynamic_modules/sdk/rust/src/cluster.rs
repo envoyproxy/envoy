@@ -1,8 +1,9 @@
 use crate::buffer::EnvoyBuffer;
 use crate::{
-  abi, drop_wrapped_c_void_ptr, str_to_module_buffer, strs_to_module_buffers, wrap_into_c_void_ptr,
-  CompletionCallback, EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId,
-  EnvoyHistogramId, EnvoyHistogramVecId, NEW_CLUSTER_CONFIG_FUNCTION,
+  abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, str_to_module_buffer,
+  strs_to_module_buffers, wrap_into_c_void_ptr, CompletionCallback, EnvoyCounterId,
+  EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId, EnvoyHistogramId, EnvoyHistogramVecId,
+  NEW_CLUSTER_CONFIG_FUNCTION,
 };
 use mockall::*;
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -226,6 +227,37 @@ pub trait ClusterLbContext {
   ///
   /// Returns `None` if the downstream connection or SNI is not available.
   fn get_downstream_connection_sni(&self) -> Option<String>;
+
+  /// Returns the bytes value of a `Router::StringAccessor` filter state stored on the request.
+  ///
+  /// This lets a cluster consume filter state that an upstream HTTP filter set via
+  /// `EnvoyHttpFilter::set_filter_state_bytes` (or anything else that stores a `StringAccessor`)
+  /// to make a host-selection decision.
+  ///
+  /// Returns `None` if the request has no stream info, the key is not present, or the stored
+  /// value is not a `StringAccessor`. The returned buffer borrows from Envoy and is valid for
+  /// the duration of the current host-selection callback.
+  fn get_filter_state_bytes<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
+
+  /// Returns the serialized bytes of a typed filter state object stored on the request.
+  ///
+  /// Works for any filter state object whose registered `ObjectFactory` produces an object that
+  /// supports `serializeAsString` — e.g. one set by an upstream HTTP filter via
+  /// `EnvoyHttpFilter::set_filter_state_typed`.
+  ///
+  /// Returns `None` if the request has no stream info, the key is not present, or the object
+  /// does not support serialization. The returned buffer borrows from Envoy and is valid until
+  /// the next call to `get_filter_state_typed` on the same worker thread, or until the end of
+  /// the current host-selection callback, whichever comes first.
+  fn get_filter_state_typed<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
+
+  /// Returns the value of a per-host stat for the given host pointer. The module must ensure
+  /// `host` still belongs to the cluster's host set. Returns 0 if the host pointer is null.
+  fn get_host_stat(
+    &self,
+    host: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+    stat: abi::envoy_dynamic_module_type_host_stat,
+  ) -> u64;
 }
 
 /// Envoy-side cluster operations available to the module.
@@ -1829,6 +1861,58 @@ impl ClusterLbContext for ClusterLbContextImpl {
       crate::ffi_helpers::str_lossy_from_raw(result_buffer.ptr as *const u8, result_buffer.length)
     };
     Some(sni.into_owned())
+  }
+
+  fn get_filter_state_bytes(&self, key: &[u8]) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null_mut(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes(
+        self.raw_context,
+        bytes_to_module_buffer(key),
+        &mut result,
+      )
+    };
+    if success {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_filter_state_typed(&self, key: &[u8]) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null_mut(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+        self.raw_context,
+        bytes_to_module_buffer(key),
+        &mut result,
+      )
+    };
+    if success {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_host_stat(
+    &self,
+    host: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+    stat: abi::envoy_dynamic_module_type_host_stat,
+  ) -> u64 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+        self.raw_context,
+        host,
+        stat,
+      )
+    }
   }
 }
 

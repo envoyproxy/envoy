@@ -4,6 +4,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 
+#include "source/common/common/cancel_wrapper.h"
 #include "source/extensions/common/async_files/async_file_manager.h"
 #include "source/extensions/filters/http/file_server/filter_config.h"
 
@@ -61,7 +62,16 @@ private:
   bool paused_ = false;
   bool action_has_been_postponed_by_pause_ = false;
   AsyncFileHandle async_file_;
+  // Cancel handle for the in-flight AsyncFileManager operation. Stops the
+  // file-side work if it has not yet completed when abort() runs.
   CancelFunction cancel_callback_ = []() {};
+  // Cancel handle for the dispatcher-queued completion callback. The
+  // AsyncFileManager posts the callback onto the owner dispatcher before
+  // observing cancellation (see source/extensions/common/async_files/
+  // async_file_manager_thread_pool.cc), so a completion can already be
+  // queued by the time abort() runs. Invoking this on destruction
+  // short-circuits the queued callback before it dereferences this object.
+  Envoy::CancelWrapper::CancelFunction cancel_dispatcher_callbacks_ = []() {};
 };
 
 } // namespace FileServer

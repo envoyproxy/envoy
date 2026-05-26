@@ -473,7 +473,6 @@ int FilterStateWrapper::luaSet(lua_State* state) {
   }
 
   streamInfo().filterState()->setData(object_key, std::move(object),
-                                      StreamInfo::FilterState::StateType::ReadOnly,
                                       StreamInfo::FilterState::LifeSpan::FilterChain,
                                       StreamInfo::StreamSharingMayImpactPooling::None);
   return 0;
