@@ -69,8 +69,8 @@ protoToSharedState(const ProtoConfig& config,
   END_TRY CATCH(const EnvoyException& e, {
     return absl::InvalidArgumentError(absl::StrCat("invalid tenant_name_selector:\n", e.what()));
   });
-  auto bucket_singleton =
-      TokenBucketSingleton::get(context.singletonManager(), context.timeSource(), context.scope());
+  auto bucket_singleton = TokenBucketSingleton::get(
+      context.singletonManager(), context.timeSource(), context.scope(), context.threadLocal());
   std::chrono::milliseconds fill_interval{PROTOBUF_GET_MS_OR_DEFAULT(config, fill_interval, 50)};
   if (config.has_request_limit()) {
     RETURN_IF_NOT_OK(bucket_singleton->setBucket(

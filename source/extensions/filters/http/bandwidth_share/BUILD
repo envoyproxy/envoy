@@ -35,6 +35,7 @@ envoy_cc_library(
         "//envoy/common:time_interface",
         "//envoy/singleton:instance_interface",
         "//envoy/singleton:manager_interface",
+        "//envoy/thread_local:thread_local_interface",
         "//source/common/common:thread_lib",
         "//source/common/runtime:runtime_lib",
     ],
