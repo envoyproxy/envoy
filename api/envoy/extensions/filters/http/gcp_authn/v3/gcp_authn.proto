@@ -63,10 +63,12 @@ message GcpAuthnFilterConfig {
   }];
 
   // Configuration for binding tokens to a client certificate.
+  // We will use the client certificate's fingerprint to generate bound tokens.
   TokenBindingConfig token_binding_config = 7;
 }
 
 // Configuration for binding tokens to a client certificate.
+// The client certificate's fingerprint will be used to generate bound tokens.
 message TokenBindingConfig {
   // The secret config for the client certificate used for mTLS.
   transport_sockets.tls.v3.SdsSecretConfig client_certificate = 1 [(validate.rules).message = {required: true}];
