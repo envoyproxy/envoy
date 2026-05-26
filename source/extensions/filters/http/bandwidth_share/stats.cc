@@ -8,10 +8,9 @@ namespace HttpFilters {
 namespace BandwidthShareFilter {
 
 BandwidthShareStats::BandwidthShareStats(const BandwidthShareStatNames& stat_names,
-                                         Stats::Scope& scope, absl::string_view bucket_id,
-                                         absl::string_view tenant, bool is_response)
-    : dynamic_pool_(scope.symbolTable()), stat_names_(stat_names),
-      bucket_id_(dynamic_pool_.add(bucket_id)), tenant_(dynamic_pool_.add(tenant)),
+                                         Stats::Scope& scope, Stats::StatName bucket_id,
+                                         Stats::StatName tenant, bool is_response)
+    : stat_names_(stat_names), bucket_id_(bucket_id), tenant_(tenant),
       request_or_response_(is_response ? stat_names_.response_ : stat_names_.request_),
       tags_gauge_({{stat_names_.bucket_id_, bucket_id_},
                    {stat_names_.tenant_, tenant_},

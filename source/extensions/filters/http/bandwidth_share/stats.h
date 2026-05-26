@@ -39,10 +39,9 @@ struct BandwidthShareStatNames {
 struct BandwidthShareStats {
 public:
   BandwidthShareStats(const BandwidthShareStatNames& stat_names, Stats::Scope& scope,
-                      absl::string_view bucket_id, absl::string_view tenant, bool is_response);
+                      Stats::StatName bucket_id, Stats::StatName tenant, bool is_response);
 
 private:
-  Stats::StatNameDynamicPool dynamic_pool_;
   const BandwidthShareStatNames& stat_names_;
   const Stats::StatName bucket_id_;
   const Stats::StatName tenant_;

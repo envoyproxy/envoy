@@ -6,12 +6,12 @@
 #include "envoy/http/filter.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/router/router.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "source/extensions/filters/http/bandwidth_share/fair_token_bucket_impl.h"
 #include "source/extensions/filters/http/bandwidth_share/token_bucket_singleton.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "absl/container/node_hash_map.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -36,19 +36,14 @@ public:
   };
   class SharedStats {
   public:
-    SharedStats(const absl::string_view bucket_id, const BandwidthShareStatNames& stat_names,
-                Stats::Scope& scope, bool is_response)
-        : bucket_id_(bucket_id), stat_names_(stat_names), stats_scope_(scope),
-          is_response_(is_response) {}
+    SharedStats(absl::string_view bucket_id, std::shared_ptr<TokenBucketSingleton> bucket_singleton,
+                Stats::Scope& scope, bool is_response, ThreadLocal::SlotAllocator& tls);
     BandwidthShareStats& forTenant(absl::string_view tenant);
 
   private:
-    Thread::MutexBasicLockable mu_;
-    const absl::string_view bucket_id_;
-    const BandwidthShareStatNames& stat_names_;
-    Stats::Scope& stats_scope_;
-    const bool is_response_;
-    absl::node_hash_map<std::string, BandwidthShareStats> stats_by_tenant_ ABSL_GUARDED_BY(mu_);
+    class ThreadLocalStatsStore;
+
+    ThreadLocal::TypedSlot<ThreadLocalStatsStore> tls_;
   };
 
   /**

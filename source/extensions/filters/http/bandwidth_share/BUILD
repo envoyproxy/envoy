@@ -70,6 +70,7 @@ envoy_cc_library(
         "//envoy/http:filter_interface",
         "//envoy/matcher:matcher_interface",
         "//envoy/stats:timespan_interface",
+        "//envoy/thread_local:thread_local_interface",
         "//source/common/http/matching:data_impl_lib",
         "//source/common/matcher/actions:string_returning_action_lib",
         "//source/common/runtime:runtime_protos_lib",

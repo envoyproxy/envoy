@@ -1,10 +1,13 @@
 #include "source/extensions/filters/http/bandwidth_share/filter_config.h"
 
+#include <utility>
+
 #include "envoy/server/factory_context.h"
 
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/matcher/actions/string_returning_action.h"
 
+#include "absl/container/node_hash_map.h"
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -14,11 +17,64 @@ namespace BandwidthShareFilter {
 
 using Matcher::Actions::StringReturningAction;
 
+namespace {
+
+template <class MakeInit> class LazyInit {
+public:
+  using Value = decltype(std::declval<MakeInit>()());
+
+  explicit LazyInit(MakeInit make_init) : make_init_(std::move(make_init)) {}
+  operator Value() const { return make_init_(); }
+
+private:
+  MakeInit make_init_;
+};
+
+template <class MakeInit> LazyInit<MakeInit> lazyInit(MakeInit make_init) {
+  return LazyInit<MakeInit>(std::move(make_init));
+}
+
+} // namespace
+
+class FilterConfig::SharedStats::ThreadLocalStatsStore : public ThreadLocal::ThreadLocalObject {
+public:
+  ThreadLocalStatsStore(absl::string_view bucket_id,
+                        std::shared_ptr<TokenBucketSingleton> bucket_singleton,
+                        Stats::Scope& stats_scope, bool is_response)
+      : dynamic_pool_(stats_scope.symbolTable()), bucket_id_(dynamic_pool_.add(bucket_id)),
+        bucket_singleton_(std::move(bucket_singleton)), stats_scope_(stats_scope),
+        is_response_(is_response) {}
+
+  BandwidthShareStats& forTenant(absl::string_view tenant) {
+    auto [it, _] = stats_by_tenant_.try_emplace(
+        tenant, bucket_singleton_->stat_names_, stats_scope_, bucket_id_,
+        lazyInit([this, tenant] { return dynamic_pool_.add(tenant); }), is_response_);
+    return it->second;
+  }
+
+private:
+  Stats::StatNameDynamicPool dynamic_pool_;
+  const Stats::StatName bucket_id_;
+  const std::shared_ptr<TokenBucketSingleton> bucket_singleton_;
+  Stats::Scope& stats_scope_;
+  const bool is_response_;
+  absl::node_hash_map<std::string, BandwidthShareStats> stats_by_tenant_;
+};
+
+FilterConfig::SharedStats::SharedStats(absl::string_view bucket_id,
+                                       std::shared_ptr<TokenBucketSingleton> bucket_singleton,
+                                       Stats::Scope& scope, bool is_response,
+                                       ThreadLocal::SlotAllocator& tls)
+    : tls_(tls) {
+  tls_.set([bucket_id = std::string(bucket_id), bucket_singleton = std::move(bucket_singleton),
+            stats_scope = &scope, is_response](Event::Dispatcher&) {
+    return std::make_shared<ThreadLocalStatsStore>(bucket_id, bucket_singleton, *stats_scope,
+                                                   is_response);
+  });
+}
+
 BandwidthShareStats& FilterConfig::SharedStats::forTenant(absl::string_view tenant) {
-  Thread::LockGuard lock(mu_);
-  auto [it, _] = stats_by_tenant_.try_emplace(tenant, stat_names_, stats_scope_, bucket_id_, tenant,
-                                              is_response_);
-  return it->second;
+  return tls_->forTenant(tenant);
 }
 
 absl::string_view FilterConfig::tenantForStats(absl::string_view tenant) const {
@@ -71,14 +127,13 @@ FilterConfig::FilterConfig(Server::Configuration::ServerFactoryContext& context,
       tenant_configs_(std::move(tenant_configs)),
       default_tenant_config_(std::move(default_tenant_config)),
       request_stats_(request_bucket_id_ ? std::make_unique<SharedStats>(
-                                              *request_bucket_id_, bucket_singleton_->stat_names_,
-                                              context.scope(), false)
+                                              *request_bucket_id_, bucket_singleton_,
+                                              context.scope(), false, context.threadLocal())
                                         : nullptr),
-      response_stats_(response_bucket_id_
-                          ? std::make_unique<SharedStats>(*response_bucket_id_,
-                                                          bucket_singleton_->stat_names_,
-                                                          context.scope(), true)
-                          : nullptr) {}
+      response_stats_(response_bucket_id_ ? std::make_unique<SharedStats>(
+                                                *response_bucket_id_, bucket_singleton_,
+                                                context.scope(), true, context.threadLocal())
+                                          : nullptr) {}
 
 std::shared_ptr<FairTokenBucket::Client>
 FilterConfig::getBucketById(const absl::optional<std::string>& id, absl::string_view tenant) const {
