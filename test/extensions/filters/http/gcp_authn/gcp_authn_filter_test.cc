@@ -2,9 +2,9 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "source/common/http/header_map_impl.h"
-#include "source/extensions/filters/http/gcp_authn/filter_config.h"
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_client_impl.h"
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_filter.h"
+#include "source/extensions/filters/http/gcp_authn/fingerprint_manager.h"
 
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/gcp_authn/mocks.h"
@@ -47,7 +47,9 @@ public:
   GcpAuthnFilterTest() {
     // Initialize the default configuration.
     TestUtility::loadFromYaml(DefaultConfig, config_);
-    filter_config_ = std::make_shared<FilterConfig>(config_, context_);
+    filter_config_ =
+        std::make_shared<envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig>(
+            config_);
   }
 
   void setupMockObjects() {
@@ -66,11 +68,7 @@ public:
   }
 
   void setupFilterAndCallback() {
-    absl::optional<std::string> fingerprint = absl::nullopt;
-    if (filter_config_->protoConfig().has_token_binding_config()) {
-      fingerprint = filter_config_->clientCertFingerprint();
-    }
-    filter_ = std::make_unique<GcpAuthnFilter>(filter_config_->protoConfig(), fingerprint, context_,
+    filter_ = std::make_unique<GcpAuthnFilter>(*filter_config_, absl::nullopt, context_,
                                                "stats", nullptr);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
@@ -92,7 +90,9 @@ public:
 
   void overrideConfig(const GcpAuthnFilterConfig& config) {
     config_ = config;
-    filter_config_ = std::make_shared<FilterConfig>(config, context_);
+    filter_config_ =
+        std::make_shared<envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig>(
+            config);
   }
 
   void createClient() { client_ = std::make_unique<GcpAuthnClientImpl>(config_, context_); }
@@ -313,15 +313,16 @@ TEST_F(GcpAuthnFilterTest, TokenBindingConfigFingerprint) {
   TestUtility::loadFromYaml(config_yaml, config);
   overrideConfig(config);
 
-  // Verify that clientCertFingerprint() is computed successfully
-  std::string fingerprint = filter_config_->clientCertFingerprint();
-  EXPECT_FALSE(fingerprint.empty());
+  // Compute fingerprint using FingerprintManager
+  FingerprintManager manager(config.token_binding_config(), context_);
+  absl::optional<std::string> fingerprint = manager.fingerprint();
+  EXPECT_NE(fingerprint, absl::nullopt);
 
   // Instantiate the filter.
-  setupFilterAndCallback();
+  filter_ = std::make_unique<GcpAuthnFilter>(config_, fingerprint, context_, "stats", nullptr);
 
   // Verify that the filter populated its fingerprint data member
-  EXPECT_EQ(filter_->clientCertFingerprintForTest(), absl::make_optional(fingerprint));
+  EXPECT_EQ(filter_->clientCertFingerprintForTest(), fingerprint);
 }
 
 } // namespace

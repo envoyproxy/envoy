@@ -71,13 +71,25 @@ envoy_cc_extension(
     srcs = ["filter_config.cc"],
     hdrs = ["filter_config.h"],
     deps = [
-        ":crypto_utils",
         ":gcp_authn",
+        ":fingerprint_manager",
         "//envoy/registry",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "@envoy_api//envoy/extensions/filters/http/gcp_authn/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "fingerprint_manager",
+    srcs = ["fingerprint_manager.cc"],
+    hdrs = ["fingerprint_manager.h"],
+    deps = [
+        ":crypto_utils",
         "//envoy/secret:secret_manager_interface",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/common:matchers_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/extensions/filters/http/gcp_authn/v3:pkg_cc_proto",
     ],
 )

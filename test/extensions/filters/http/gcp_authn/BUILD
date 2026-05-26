@@ -16,20 +16,33 @@ envoy_extension_cc_test(
     name = "filter_config_test",
     size = "small",
     srcs = ["filter_config_test.cc"],
+    extension_names = ["envoy.filters.http.gcp_authn"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/http:message_lib",
+        "//source/extensions/filters/http/gcp_authn:config",
+        "//test/mocks/server:factory_context_mocks",
+        "@envoy_api//envoy/extensions/filters/http/gcp_authn/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "fingerprint_manager_test",
+    size = "small",
+    srcs = ["fingerprint_manager_test.cc"],
     data = [
         "//test/common/tls/test_data:certs",
     ],
     extension_names = ["envoy.filters.http.gcp_authn"],
     rbe_pool = "6gig",
     deps = [
-        "//source/common/http:message_lib",
-        "//source/extensions/filters/http/gcp_authn",
-        "//source/extensions/filters/http/gcp_authn:config",
+        "//source/extensions/filters/http/gcp_authn:fingerprint_manager",
+        "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:environment_lib",
         "@envoy_api//envoy/extensions/filters/http/gcp_authn/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
-        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 
@@ -46,6 +59,7 @@ envoy_extension_cc_test(
         ":gcp_authn_mocks",
         "//source/extensions/filters/http/gcp_authn",
         "//source/extensions/filters/http/gcp_authn:config",
+        "//source/extensions/filters/http/gcp_authn:fingerprint_manager",
         "//test/common/http:common_lib",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:server_mocks",
