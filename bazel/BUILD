@@ -305,6 +305,14 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "disable_http3_on_linux_x86_64",
+    match_all = [
+        ":disable_http3",
+        ":linux_x86_64",
+    ],
+)
+
+selects.config_setting_group(
     name = "disable_http3_on_not_x86_ppc",
     match_all = [
         ":disable_http3",
