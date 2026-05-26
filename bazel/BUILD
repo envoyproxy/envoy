@@ -516,6 +516,11 @@ bool_flag(
     build_setting_default = False,
 )
 
+bool_flag(
+    name = "openssl",
+    build_setting_default = False,
+)
+
 config_setting(
     name = "fips_build",
     flag_values = {":fips": "True"},
@@ -538,7 +543,7 @@ config_setting(
 
 config_setting(
     name = "using_openssl",
-    flag_values = {":ssl": "//compat/openssl:ssl"},
+    flag_values = {":openssl": "True"},
 )
 
 # Convenience grouping for any FIPS SSL library
