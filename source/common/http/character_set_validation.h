@@ -12,17 +12,13 @@ namespace Envoy {
 namespace Http {
 
 struct CharTable {
-  const std::array<uint32_t, 8> table_;
+  const std::array<uint32_t, 8> table;
 
-  static inline constexpr uint32_t row(char c) { return static_cast<uint8_t>(c) >> 5; }
-  static inline constexpr uint32_t mask(char c) {
-    return 0x80000000 >> (static_cast<uint8_t>(c) & 0x1f);
-  }
-  inline constexpr bool hasChar(char c) const { return (table_[row(c)] & mask(c)) != 0; }
-  inline static constexpr void set(std::array<uint32_t, 8>& table, char c) {
-    table[row(c)] |= mask(c);
-  }
-  static inline constexpr CharTable fromChars(absl::string_view chars) {
+  static constexpr uint32_t row(char c) { return static_cast<uint8_t>(c) >> 5; }
+  static constexpr uint32_t mask(char c) { return 0x80000000 >> (static_cast<uint8_t>(c) & 0x1f); }
+  constexpr bool hasChar(char c) const { return (table[row(c)] & mask(c)) != 0; }
+  static constexpr void set(std::array<uint32_t, 8>& table, char c) { table[row(c)] |= mask(c); }
+  static constexpr CharTable fromChars(absl::string_view chars) {
     std::array<uint32_t, 8> table{};
     for (char c : chars) {
       set(table, c);
@@ -30,44 +26,41 @@ struct CharTable {
     return {table};
   }
   constexpr CharTable operator|(const CharTable& o) const {
-    std::array<uint32_t, 8> table;
+    std::array<uint32_t, 8> result;
     for (int i = 0; i < 8; i++) {
-      table[i] = table_[i] | o.table_[i];
+      result[i] = table[i] | o.table[i];
     }
-    return {table};
+    return {result};
   }
   constexpr CharTable operator&(const CharTable& o) const {
-    std::array<uint32_t, 8> table;
+    std::array<uint32_t, 8> result;
     for (int i = 0; i < 8; i++) {
-      table[i] = table_[i] & o.table_[i];
+      result[i] = table[i] & o.table[i];
     }
-    return {table};
+    return {result};
   }
   constexpr CharTable operator~() const {
-    std::array<uint32_t, 8> table;
+    std::array<uint32_t, 8> result;
     for (int i = 0; i < 8; i++) {
-      table[i] = ~table_[i];
+      result[i] = ~table[i];
     }
-    return {table};
+    return {result};
   }
 };
 
 namespace CharTables {
 // Bits 65 (A) to 90 (Z)
-static inline constexpr CharTable kUppercase{
-    {0, 0, 0b01111111111111111111111111100000, 0, 0, 0, 0, 0}};
+inline constexpr CharTable kUppercase{{0, 0, 0b01111111111111111111111111100000, 0, 0, 0, 0, 0}};
 // Bits 97 (a) to 122 (z)
-static inline constexpr CharTable kLowercase{
-    {0, 0, 0, 0b01111111111111111111111111100000, 0, 0, 0, 0}};
+inline constexpr CharTable kLowercase{{0, 0, 0, 0b01111111111111111111111111100000, 0, 0, 0, 0}};
 // Bits 33 (!) to 127 (~).
-static inline constexpr CharTable kPrintable{{0, 0x7fffffff, 0xffffffff, 0xfffffffe, 0, 0, 0, 0}};
+inline constexpr CharTable kPrintable{{0, 0x7fffffff, 0xffffffff, 0xfffffffe, 0, 0, 0, 0}};
 // Bits 129 to 255.
-static inline constexpr CharTable kExtendedAscii{
+inline constexpr CharTable kExtendedAscii{
     {0, 0, 0, 0, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff}};
 // Bits 48 ('0') to 57 ('9')
-static inline constexpr CharTable kDigits{
-    {0, 0b00000000000000001111111111000000, 0, 0, 0, 0, 0, 0}};
-static inline constexpr CharTable kAlphanumeric = kUppercase | kLowercase | kDigits;
+inline constexpr CharTable kDigits{{0, 0b00000000000000001111111111000000, 0, 0, 0, 0, 0, 0}};
+inline constexpr CharTable kAlphanumeric = kUppercase | kLowercase | kDigits;
 // Header name character table.
 // From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-5.1:
 //
