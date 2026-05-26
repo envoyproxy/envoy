@@ -100,6 +100,7 @@ public:
   MOCK_METHOD(void, setHealthChecker, (HealthCheckHostMonitorPtr && health_checker));
   MOCK_METHOD(const std::string&, hostnameForHealthChecks, (), (const));
   MOCK_METHOD(const std::string&, hostname, (), (const));
+  MOCK_METHOD(absl::string_view, observabilityName, (), (const));
   MOCK_METHOD(Network::UpstreamTransportSocketFactory&, transportSocketFactory, (), (const));
   MOCK_METHOD(HostStats&, stats, (), (const));
   MOCK_METHOD(LoadMetricStats&, loadMetricStats, (), (const));
@@ -123,6 +124,7 @@ public:
   MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyDataAt, (size_t index), (const));
 
   std::string hostname_;
+  std::string observability_name_;
   Network::Address::InstanceConstSharedPtr address_;
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
   testing::NiceMock<MockHealthCheckHostMonitor> health_checker_;
@@ -145,7 +147,7 @@ public:
 
   struct MockCreateConnectionData {
     Network::ClientConnection* connection_{};
-    HostDescriptionConstSharedPtr host_description_{};
+    HostDescriptionConstSharedPtr host_description_;
   };
 
   CreateConnectionData
@@ -210,6 +212,7 @@ public:
 
   MOCK_METHOD(const std::string&, hostnameForHealthChecks, (), (const));
   MOCK_METHOD(const std::string&, hostname, (), (const));
+  MOCK_METHOD(absl::string_view, observabilityName, (), (const));
   MOCK_METHOD(Network::UpstreamTransportSocketFactory&, transportSocketFactory, (), (const));
   MOCK_METHOD(Outlier::DetectorHostMonitor&, outlierDetector, (), (const));
   MOCK_METHOD(void, setHealthChecker, (HealthCheckHostMonitorPtr && health_checker));
@@ -235,6 +238,7 @@ public:
   MOCK_METHOD(absl::optional<uint64_t>, lastHealthCheckHttpStatus, (), (const));
 
   bool disable_active_health_check_ = false;
+  std::string observability_name_;
 };
 
 class MockHost : public MockHostLight {

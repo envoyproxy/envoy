@@ -62,7 +62,7 @@ public:
   void onComplete() override { stream_ = nullptr; }
   void onReset() override {}
 
-  ~AsyncUpstreamFilter() {
+  ~AsyncUpstreamFilter() override {
     if (stream_) {
       stream_->reset();
     }

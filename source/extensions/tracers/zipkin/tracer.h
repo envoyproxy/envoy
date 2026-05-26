@@ -80,7 +80,7 @@ private:
    *
    * @return uint64_t value with optional timestamp prefix
    */
-  uint64_t generateTraceId();
+  uint64_t generateTraceId(SystemTime timestamp);
 
   const std::string service_name_;
   Network::Address::InstanceConstSharedPtr address_;
