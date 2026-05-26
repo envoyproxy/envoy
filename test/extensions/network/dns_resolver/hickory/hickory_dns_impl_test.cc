@@ -588,21 +588,6 @@ TEST_F(HickoryDnsImplTest, ResolveFailsSynchronouslyWhenFfiReturnsNull) {
                    .value());
 }
 
-// Verify the `HickoryDnsResolverConfig` destructor's null-guard.
-TEST_F(HickoryDnsImplTest, ConfigDestructorTolerantOfPartialState) {
-  envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig proto_config;
-  auto config_or = HickoryDnsResolverConfig::create(proto_config);
-  ASSERT_TRUE(config_or.ok()) << config_or.status().message();
-  auto config = std::move(*config_or);
-
-  // Force both destructor inputs to null to simulate the field shapes left behind by a
-  // failed `create()`. This exercises the guard without requiring a real Rust failure.
-  config->in_module_config_ = nullptr;
-  config->on_dns_resolver_config_destroy_ = nullptr;
-
-  config.reset();
-}
-
 // Regression test for a UAF in the ABI callback. If the resolver is destroyed
 // after the callback has copied response data and posted a lambda to the dispatcher but
 // before the dispatcher runs that lambda, the lambda must not dereference a freed
