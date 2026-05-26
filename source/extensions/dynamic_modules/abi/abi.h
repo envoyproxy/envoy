@@ -9481,6 +9481,21 @@ bool envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
 
 /**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_host_stat returns the value of a per-host
+ * stat identified by the stat enum for the given host pointer. The module must ensure
+ * host_envoy_ptr still belongs to the cluster's host set.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param host_envoy_ptr is the host whose stat to read.
+ * @param stat is the host stat to query.
+ * @return the stat value, or 0 if the context or host is nullptr.
+ */
+uint64_t envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr host_envoy_ptr,
+    envoy_dynamic_module_type_host_stat stat);
+
+/**
  * envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete is called by the module
  * to deliver the result of an asynchronous host selection. This must be called exactly once for
  * each async handle returned from envoy_dynamic_module_on_cluster_lb_choose_host, unless

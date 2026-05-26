@@ -34,6 +34,30 @@ getContext(envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_
   return static_cast<Envoy::Upstream::LoadBalancerContext*>(context_envoy_ptr);
 }
 
+// Helper that maps a host_stat enum to its counter/gauge accessor on HostStats.
+uint64_t readHostStat(const Envoy::Upstream::HostStats& host_stats,
+                      envoy_dynamic_module_type_host_stat stat) {
+  switch (stat) {
+  case envoy_dynamic_module_type_host_stat_CxConnectFail:
+    return host_stats.cx_connect_fail_.value();
+  case envoy_dynamic_module_type_host_stat_CxTotal:
+    return host_stats.cx_total_.value();
+  case envoy_dynamic_module_type_host_stat_RqError:
+    return host_stats.rq_error_.value();
+  case envoy_dynamic_module_type_host_stat_RqSuccess:
+    return host_stats.rq_success_.value();
+  case envoy_dynamic_module_type_host_stat_RqTimeout:
+    return host_stats.rq_timeout_.value();
+  case envoy_dynamic_module_type_host_stat_RqTotal:
+    return host_stats.rq_total_.value();
+  case envoy_dynamic_module_type_host_stat_CxActive:
+    return host_stats.cx_active_.value();
+  case envoy_dynamic_module_type_host_stat_RqActive:
+    return host_stats.rq_active_.value();
+  }
+  return 0;
+}
+
 // Helper to look up a metadata value by filter name and key for a host in the cluster priority set.
 const Envoy::Protobuf::Value*
 getClusterHostMetadataValue(envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr,
@@ -477,26 +501,7 @@ uint64_t envoy_dynamic_module_callback_cluster_lb_get_host_stat(
   if (index >= hosts.size()) {
     return 0;
   }
-  const auto& host_stats = hosts[index]->stats();
-  switch (stat) {
-  case envoy_dynamic_module_type_host_stat_CxConnectFail:
-    return host_stats.cx_connect_fail_.value();
-  case envoy_dynamic_module_type_host_stat_CxTotal:
-    return host_stats.cx_total_.value();
-  case envoy_dynamic_module_type_host_stat_RqError:
-    return host_stats.rq_error_.value();
-  case envoy_dynamic_module_type_host_stat_RqSuccess:
-    return host_stats.rq_success_.value();
-  case envoy_dynamic_module_type_host_stat_RqTimeout:
-    return host_stats.rq_timeout_.value();
-  case envoy_dynamic_module_type_host_stat_RqTotal:
-    return host_stats.rq_total_.value();
-  case envoy_dynamic_module_type_host_stat_CxActive:
-    return host_stats.cx_active_.value();
-  case envoy_dynamic_module_type_host_stat_RqActive:
-    return host_stats.rq_active_.value();
-  }
-  return 0;
+  return readHostStat(hosts[index]->stats(), stat);
 }
 
 bool envoy_dynamic_module_callback_cluster_lb_get_host_locality(
@@ -894,6 +899,17 @@ bool envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
   result->ptr = const_cast<char*>(last_serialized_filter_state.data());
   result->length = last_serialized_filter_state.size();
   return true;
+}
+
+uint64_t envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr host_envoy_ptr,
+    envoy_dynamic_module_type_host_stat stat) {
+  if (context_envoy_ptr == nullptr || host_envoy_ptr == nullptr) {
+    return 0;
+  }
+  const auto* host = static_cast<const Envoy::Upstream::Host*>(host_envoy_ptr);
+  return readHostStat(host->stats(), stat);
 }
 
 envoy_dynamic_module_type_cluster_scheduler_module_ptr

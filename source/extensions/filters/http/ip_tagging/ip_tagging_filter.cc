@@ -14,157 +14,23 @@ namespace Extensions {
 namespace HttpFilters {
 namespace IpTagging {
 
-namespace {
-static const Network::LcTrie::LcTrie<std::string> EMPTY_TRIE_{{}};
-}
-
-IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tags_datasource,
-                               Event::Dispatcher& main_dispatcher, Api::Api& api,
-                               ProtobufMessage::ValidationVisitor& validation_visitor,
-                               ThreadLocal::SlotAllocator& tls, const std::string& stat_prefix,
-                               Stats::ScopeSharedPtr scope, Singleton::InstanceSharedPtr owner,
-                               absl::Status& creation_status)
-    : api_(api), owner_(owner) {
-  const auto datasource_filename = ip_tags_datasource.filename();
-  if (!datasource_filename.empty()) {
-    if (!absl::EndsWith(datasource_filename, MessageUtil::FileExtensions::get().Yaml) &&
-        !absl::EndsWith(datasource_filename, MessageUtil::FileExtensions::get().Json)) {
-      creation_status = absl::InvalidArgumentError(
-          "Unsupported file format, unable to parse ip tags from file " + datasource_filename);
-      return;
-    }
-    auto provider_or_error =
-        Config::DataSource::DataSourceProvider<Network::LcTrie::LcTrie<std::string>>::create(
-            ip_tags_datasource, main_dispatcher, tls, api_, false,
-            // data_transform_cb
-            [this, datasource_filename, &validation_visitor, scope,
-             stat_prefix](absl::string_view new_data) -> absl::StatusOr<LcTrieSharedPtr> {
-              IPTagsProto ip_tags_proto;
-              if (absl::EndsWith(datasource_filename, MessageUtil::FileExtensions::get().Yaml)) {
-                auto data = std::string(new_data);
-                auto load_status =
-                    // TODO(nezdolik) remove string casting once yaml utility has been migrated to
-                    // string_view.
-                    MessageUtil::loadFromYamlNoThrow(data, ip_tags_proto, validation_visitor);
-                if (!load_status.ok()) {
-                  return load_status;
-                }
-              } else if (absl::EndsWith(datasource_filename,
-                                        MessageUtil::FileExtensions::get().Json)) {
-                bool has_unknown_field;
-                auto load_status =
-                    MessageUtil::loadFromJsonNoThrow(new_data, ip_tags_proto, has_unknown_field);
-                if (!load_status.ok()) {
-                  return load_status;
-                }
-              }
-              auto new_loader = std::make_shared<IpTagsLoader>(stat_prefix, scope);
-              auto result = new_loader->parseIpTagsAsProto(ip_tags_proto.ip_tags());
-              if (result.ok()) {
-                absl::MutexLock lock(&tags_loader_mu_);
-                tags_loader_ = std::move(new_loader);
-              }
-              return result;
-            },
-            0,
-            // data_update_cb
-            absl::make_optional([this]() { getTagsLoader()->incIpTagsReloadSuccess(); }));
-    if (!provider_or_error.status().ok()) {
-      creation_status = absl::InvalidArgumentError(
-          fmt::format("unable to create data source '{}'", provider_or_error.status().message()));
-      return;
-    }
-    data_source_provider_ = std::move(provider_or_error.value());
-  } else {
-    creation_status =
-        absl::InvalidArgumentError("Cannot load tags from empty filename in datasource.");
-  }
-}
-
-IpTagsProvider::~IpTagsProvider() { ENVOY_LOG(debug, "Shutting down ip tags provider"); };
-
-LcTrieSharedPtr IpTagsProvider::ipTags() {
-  return data_source_provider_->data() == nullptr
-             ? std::make_shared<Network::LcTrie::LcTrie<std::string>>()
-             : data_source_provider_->data();
-}
-
-std::shared_ptr<IpTagsLoader> IpTagsProvider::getTagsLoader() {
-  absl::MutexLock lock(&tags_loader_mu_);
-  return tags_loader_;
-}
-
-void IpTagsProvider::incHit(absl::string_view tag) {
-  if (auto loader = getTagsLoader()) {
-    loader->incHit(tag);
-  }
-}
-
-void IpTagsProvider::incTotal() {
-  if (auto loader = getTagsLoader()) {
-    loader->incTotal();
-  }
-}
-
-void IpTagsProvider::incNoHit() {
-  if (auto loader = getTagsLoader()) {
-    loader->incNoHit();
-  }
-}
-
-absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCreateProvider(
-    const envoy::config::core::v3::DataSource& ip_tags_datasource, Api::Api& api,
-    ProtobufMessage::ValidationVisitor& validation_visitor, ThreadLocal::SlotAllocator& tls,
-    Event::Dispatcher& main_dispatcher, const std::string& stat_prefix, Stats::Scope& scope,
-    std::shared_ptr<IpTagsRegistrySingleton> singleton) {
-  if (scope_ == nullptr) {
-    scope_ = scope.createScope("");
-  }
-  std::shared_ptr<IpTagsProvider> ip_tags_provider;
-  absl::Status creation_status = absl::OkStatus();
-  const uint64_t key = std::hash<std::string>()(ip_tags_datasource.filename());
-  auto it = ip_tags_registry_.find(key);
-  if (it != ip_tags_registry_.end()) {
-    if (std::shared_ptr<IpTagsProvider> provider = it->second.lock()) {
-      ip_tags_provider = provider;
-    } else {
-      ip_tags_provider = std::make_shared<IpTagsProvider>(ip_tags_datasource, main_dispatcher, api,
-                                                          validation_visitor, tls, stat_prefix,
-                                                          scope_, singleton, creation_status);
-      if (!creation_status.ok()) {
-        return creation_status;
-      }
-      ip_tags_registry_[key] = ip_tags_provider;
-    }
-  } else {
-    ip_tags_provider = std::make_shared<IpTagsProvider>(ip_tags_datasource, main_dispatcher, api,
-                                                        validation_visitor, tls, stat_prefix,
-                                                        scope_, singleton, creation_status);
-    if (!creation_status.ok()) {
-      return creation_status;
-    }
-    ip_tags_registry_[key] = ip_tags_provider;
-  }
-  return ip_tags_provider;
-}
-
-IpTagsLoader::IpTagsLoader(const std::string& stat_prefix, Stats::ScopeSharedPtr scope)
-    : scope_(scope), stat_name_set_(scope->symbolTable().makeSet("IpTaggingReload")),
+IpTagsStats::IpTagsStats(const std::string& stat_prefix, Stats::ScopeSharedPtr scope)
+    : scope_(std::move(scope)), stat_name_set_(scope_->symbolTable().makeSet("IpTagging")),
       stats_prefix_(stat_name_set_->add(stat_prefix + "ip_tagging")),
       unknown_tag_(stat_name_set_->add("unknown_tag.hit")), total_(stat_name_set_->add("total")),
       no_hit_(stat_name_set_->add("no_hit")),
       reload_success_(stat_name_set_->add("reload_success")) {}
 
-void IpTagsLoader::incHit(absl::string_view tag) {
+void IpTagsStats::incHit(absl::string_view tag) {
   incCounter(stat_name_set_->getBuiltin(absl::StrCat(tag, ".hit"), unknown_tag_));
 }
 
-void IpTagsLoader::incCounter(Stats::StatName name) {
+void IpTagsStats::incCounter(Stats::StatName name) {
   Stats::SymbolTable::StoragePtr storage = scope_->symbolTable().join({stats_prefix_, name});
   scope_->counterFromStatName(Stats::StatName(storage.get())).inc();
 }
 
-absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::parseIpTagsAsProto(
+absl::StatusOr<LcTrieSharedPtr> IpTagsStats::parseIpTagsAsProto(
     const Protobuf::RepeatedPtrField<
         envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTag>& ip_tags) {
   std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
@@ -189,6 +55,107 @@ absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::parseIpTagsAsProto(
   return std::make_shared<Network::LcTrie::LcTrie<std::string>>(tag_data);
 }
 
+IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tags_datasource,
+                               Event::Dispatcher& main_dispatcher, Api::Api& api,
+                               ProtobufMessage::ValidationVisitor& validation_visitor,
+                               ThreadLocal::SlotAllocator& tls, const std::string& stat_prefix,
+                               Stats::ScopeSharedPtr scope, Singleton::InstanceSharedPtr owner,
+                               absl::Status& creation_status)
+    : owner_(owner) {
+  const auto& datasource_filename = ip_tags_datasource.filename();
+  if (datasource_filename.empty()) {
+    creation_status =
+        absl::InvalidArgumentError("Cannot load tags from empty filename in datasource.");
+    return;
+  }
+  if (!absl::EndsWith(datasource_filename, MessageUtil::FileExtensions::get().Yaml) &&
+      !absl::EndsWith(datasource_filename, MessageUtil::FileExtensions::get().Json)) {
+    creation_status = absl::InvalidArgumentError(
+        "Unsupported file format, unable to parse ip tags from file " + datasource_filename);
+    return;
+  }
+
+  // Each successful load (initial + every file-watcher reload) atomically produces a
+  // new LoadedIpTags containing a fresh trie and matching IpTagsStats, which the
+  // DataSourceProvider publishes via data(). `first_load` skips the reload_success
+  // increment on the initial load so the counter only reflects subsequent reloads. The
+  // `scope` shared_ptr is captured by value so the stats scope outlives any individual
+  // listener that bootstrapped this provider (providers are shared across listeners
+  // via IpTagsRegistrySingleton).
+  auto provider_or_error = Config::DataSource::DataSourceProvider<LoadedIpTags>::create(
+      ip_tags_datasource, main_dispatcher, tls, api, /*allow_empty=*/false,
+      [stat_prefix, scope, &validation_visitor, datasource_filename, first_load = true](
+          absl::string_view new_data) mutable -> absl::StatusOr<std::shared_ptr<LoadedIpTags>> {
+        IPTagsProto ip_tags_proto;
+        if (absl::EndsWith(datasource_filename, MessageUtil::FileExtensions::get().Yaml)) {
+          // TODO(nezdolik) remove string casting once yaml utility has been migrated to
+          // string_view.
+          auto data = std::string(new_data);
+          auto load_status =
+              MessageUtil::loadFromYamlNoThrow(data, ip_tags_proto, validation_visitor);
+          if (!load_status.ok()) {
+            return load_status;
+          }
+        } else if (absl::EndsWith(datasource_filename, MessageUtil::FileExtensions::get().Json)) {
+          bool has_unknown_field;
+          auto load_status =
+              MessageUtil::loadFromJsonNoThrow(new_data, ip_tags_proto, has_unknown_field);
+          if (!load_status.ok()) {
+            return load_status;
+          }
+        }
+        auto stats = std::make_shared<IpTagsStats>(stat_prefix, scope);
+        auto trie_or = stats->parseIpTagsAsProto(ip_tags_proto.ip_tags());
+        if (!trie_or.ok()) {
+          return trie_or.status();
+        }
+        if (first_load) {
+          first_load = false;
+        } else {
+          stats->incIpTagsReloadSuccess();
+        }
+        return std::make_shared<LoadedIpTags>(LoadedIpTags{*std::move(trie_or), std::move(stats)});
+      },
+      0);
+  if (!provider_or_error.status().ok()) {
+    creation_status = absl::InvalidArgumentError(
+        fmt::format("unable to create data source '{}'", provider_or_error.status().message()));
+    return;
+  }
+  data_source_provider_ = std::move(provider_or_error.value());
+}
+
+IpTagsProvider::~IpTagsProvider() { ENVOY_LOG(debug, "Shutting down ip tags provider"); }
+
+absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCreateProvider(
+    const envoy::config::core::v3::DataSource& ip_tags_datasource, Api::Api& api,
+    ProtobufMessage::ValidationVisitor& validation_visitor, ThreadLocal::SlotAllocator& tls,
+    Event::Dispatcher& main_dispatcher, const std::string& stat_prefix, Stats::Scope& scope,
+    std::shared_ptr<IpTagsRegistrySingleton> singleton) {
+  // Lazily create a singleton-owned scope on first use. Reusing it across providers
+  // keeps the stats scope alive even after the listener that first created the
+  // provider goes away, since other listeners may still share this provider.
+  if (scope_ == nullptr) {
+    scope_ = scope.createScope("");
+  }
+  const size_t key = std::hash<std::string>()(ip_tags_datasource.filename());
+  auto it = ip_tags_registry_.find(key);
+  if (it != ip_tags_registry_.end()) {
+    if (std::shared_ptr<IpTagsProvider> provider = it->second.lock()) {
+      return provider;
+    }
+  }
+  absl::Status creation_status = absl::OkStatus();
+  auto ip_tags_provider =
+      std::make_shared<IpTagsProvider>(ip_tags_datasource, main_dispatcher, api, validation_visitor,
+                                       tls, stat_prefix, scope_, singleton, creation_status);
+  if (!creation_status.ok()) {
+    return creation_status;
+  }
+  ip_tags_registry_[key] = ip_tags_provider;
+  return ip_tags_provider;
+}
+
 SINGLETON_MANAGER_REGISTRATION(ip_tags_registry);
 
 absl::StatusOr<IpTaggingFilterConfigSharedPtr> IpTaggingFilterConfig::create(
@@ -210,11 +177,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     Runtime::Loader& runtime, Api::Api& api, ThreadLocal::SlotAllocator& tls,
     Event::Dispatcher& dispatcher, ProtobufMessage::ValidationVisitor& validation_visitor,
     absl::Status& creation_status)
-    : request_type_(requestTypeEnum(config.request_type())), scope_(scope), runtime_(runtime),
-      stats_prefix_str_(stat_prefix), stat_name_set_(scope_.symbolTable().makeSet("IpTagging")),
-      stats_prefix_(stat_name_set_->add(stats_prefix_str_ + "ip_tagging")),
-      no_hit_(stat_name_set_->add("no_hit")), total_(stat_name_set_->add("total")),
-      unknown_tag_(stat_name_set_->add("unknown_tag.hit")),
+    : request_type_(requestTypeEnum(config.request_type())), runtime_(runtime),
       ip_tag_header_(config.has_ip_tag_header() ? config.ip_tag_header().header() : ""),
       ip_tag_header_action_(config.has_ip_tag_header()
                                 ? config.ip_tag_header().action()
@@ -225,86 +188,35 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   if (config.ip_tags().empty() && !config.has_ip_tags_datasource()) {
     creation_status = absl::InvalidArgumentError(
         "HTTP IP Tagging Filter requires either ip_tags or ip_tags_datasource to be specified.");
+    return;
   }
 
   if (!config.ip_tags().empty() && config.has_ip_tags_datasource()) {
     creation_status =
         absl::InvalidArgumentError("Only one of ip_tags or ip_tags_datasource can be configured.");
+    return;
   }
 
-  RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   if (!config.ip_tags().empty()) {
-    std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
-    for (const auto& ip_tag : config.ip_tags()) {
-      std::vector<Network::Address::CidrRange> cidr_set;
-      cidr_set.reserve(ip_tag.ip_list().size());
-      for (const envoy::config::core::v3::CidrRange& entry : ip_tag.ip_list()) {
-        absl::StatusOr<Network::Address::CidrRange> cidr_or_error =
-            Network::Address::CidrRange::create(entry);
-        if (cidr_or_error.status().ok()) {
-          cidr_set.emplace_back(std::move(cidr_or_error.value()));
-        } else {
-          creation_status = absl::InvalidArgumentError(
-              fmt::format("invalid ip/mask combo '{}/{}' (format is <ip>/<# mask bits>)",
-                          entry.address_prefix(), entry.prefix_len().value()));
-          return;
-        }
-      }
-      tag_data.emplace_back(ip_tag.ip_tag_name(), cidr_set);
-      stat_name_set_->rememberBuiltin(absl::StrCat(ip_tag.ip_tag_name(), ".hit"));
-      trie_ = std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
-    }
-  } else {
-    auto provider_or_error = ip_tags_registry_->getOrCreateProvider(
-        config.ip_tags_datasource(), api, validation_visitor, tls, dispatcher, stat_prefix, scope,
-        ip_tags_registry_);
-    if (provider_or_error.status().ok()) {
-      provider_ = provider_or_error.value();
-    } else {
-      creation_status = provider_or_error.status();
+    auto stats = std::make_shared<IpTagsStats>(stat_prefix, scope.createScope(""));
+    auto trie_or = stats->parseIpTagsAsProto(config.ip_tags());
+    if (!trie_or.ok()) {
+      creation_status = trie_or.status();
       return;
     }
-    trie_ = provider_->ipTags();
+    static_ip_tags_ =
+        std::make_shared<LoadedIpTags>(LoadedIpTags{*std::move(trie_or), std::move(stats)});
+    return;
   }
-}
 
-void IpTaggingFilterConfig::incCounter(Stats::StatName name) {
-  Stats::SymbolTable::StoragePtr storage = scope_.symbolTable().join({stats_prefix_, name});
-  scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
-}
-
-void IpTaggingFilterConfig::incHit(absl::string_view tag) {
-  if (provider_) {
-    provider_->incHit(tag);
-  } else {
-    incCounter(stat_name_set_->getBuiltin(absl::StrCat(tag, ".hit"), unknown_tag_));
+  auto provider_or_error = ip_tags_registry_->getOrCreateProvider(
+      config.ip_tags_datasource(), api, validation_visitor, tls, dispatcher, stat_prefix, scope,
+      ip_tags_registry_);
+  if (!provider_or_error.status().ok()) {
+    creation_status = provider_or_error.status();
+    return;
   }
-}
-
-void IpTaggingFilterConfig::incNoHit() {
-  if (provider_) {
-    provider_->incNoHit();
-  } else {
-    incCounter(no_hit_);
-  }
-}
-
-void IpTaggingFilterConfig::incTotal() {
-  if (provider_) {
-    provider_->incTotal();
-  } else {
-    incCounter(total_);
-  }
-}
-
-const Network::LcTrie::LcTrie<std::string>& IpTaggingFilterConfig::trie() const {
-  if (provider_) {
-    return *provider_->ipTags();
-  }
-  if (trie_ != nullptr) {
-    return *trie_;
-  }
-  return EMPTY_TRIE_;
+  provider_ = std::move(provider_or_error.value());
 }
 
 OptRef<const Http::LowerCaseString> IpTaggingFilterConfig::ipTagHeader() const {
@@ -332,8 +244,18 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap&
     return Http::FilterHeadersStatus::Continue;
   }
 
-  std::vector<std::string> tags =
-      config_->trie().getData(callbacks_->streamInfo().downstreamAddressProvider().remoteAddress());
+  // Pull the current snapshot once so the trie lookup and stats updates that follow
+  // come from the same reload, even if a file watcher publishes a new snapshot mid-call.
+  LoadedIpTagsConstSharedPtr loaded = config_->loadedIpTags();
+  if (loaded == nullptr) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  std::vector<std::string> tags;
+  if (loaded->trie != nullptr) {
+    tags =
+        loaded->trie->getData(callbacks_->streamInfo().downstreamAddressProvider().remoteAddress());
+  }
 
   // Used for testing.
   synchronizer_.syncPoint("_trie_lookup_complete");
@@ -343,12 +265,12 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap&
     // If there are use cases with a large set of tags, a way to opt into these stats
     // should be exposed and other observability options like logging tags need to be implemented.
     for (const std::string& tag : tags) {
-      config_->incHit(tag);
+      loaded->stats->incHit(tag);
     }
   } else {
-    config_->incNoHit();
+    loaded->stats->incNoHit();
   }
-  config_->incTotal();
+  loaded->stats->incTotal();
   return Http::FilterHeadersStatus::Continue;
 }
 
