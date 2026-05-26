@@ -31,7 +31,8 @@ Http::FilterFactoryCb GcpAuthnFilterFactory::createFilterFactoryFromProtoTyped(
 
   FingerprintManagerSharedPtr fingerprint_manager;
   if (config.has_token_binding_config()) {
-    fingerprint_manager = std::make_shared<FingerprintManager>(config.token_binding_config(), context);
+    fingerprint_manager =
+        std::make_shared<FingerprintManager>(config.token_binding_config(), context);
   }
 
   return [config, stats_prefix, &context, token_cache = std::move(token_cache),

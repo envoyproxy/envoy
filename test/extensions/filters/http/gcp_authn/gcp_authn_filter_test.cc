@@ -2,9 +2,9 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "source/common/http/header_map_impl.h"
+#include "source/extensions/filters/http/gcp_authn/fingerprint_manager.h"
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_client_impl.h"
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_filter.h"
-#include "source/extensions/filters/http/gcp_authn/fingerprint_manager.h"
 
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/gcp_authn/mocks.h"
@@ -68,8 +68,8 @@ public:
   }
 
   void setupFilterAndCallback() {
-    filter_ = std::make_unique<GcpAuthnFilter>(*filter_config_, absl::nullopt, context_,
-                                               "stats", nullptr);
+    filter_ = std::make_unique<GcpAuthnFilter>(*filter_config_, absl::nullopt, context_, "stats",
+                                               nullptr);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 

@@ -1,13 +1,13 @@
+#include "envoy/common/callback.h"
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.h"
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.validate.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "source/extensions/filters/http/gcp_authn/fingerprint_manager.h"
 
+#include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
-#include "envoy/common/callback.h"
-#include "test/mocks/secret/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -20,7 +20,8 @@ public:
   MockTlsCertificateConfigProvider() = default;
   ~MockTlsCertificateConfigProvider() override = default;
 
-  MOCK_METHOD(const envoy::extensions::transport_sockets::tls::v3::TlsCertificate*, secret, (), (const));
+  MOCK_METHOD(const envoy::extensions::transport_sockets::tls::v3::TlsCertificate*, secret, (),
+              (const));
   MOCK_METHOD(Common::CallbackHandlePtr, addValidationCallback,
               (std::function<absl::Status(
                    const envoy::extensions::transport_sockets::tls::v3::TlsCertificate&)>));
@@ -38,10 +39,10 @@ namespace GcpAuthn {
 namespace {
 
 using ::envoy::extensions::filters::http::gcp_authn::v3::TokenBindingConfig;
+using ::testing::_;
+using ::testing::Invoke;
 using ::testing::NiceMock;
 using ::testing::Return;
-using ::testing::Invoke;
-using ::testing::_;
 
 class DummyCallbackHandle : public ::Envoy::Common::CallbackHandle {
 public:
@@ -123,7 +124,8 @@ TEST_F(FingerprintManagerTest, DynamicSdsSecretUpdates) {
   context_.server_factory_context_.secret_manager_.reset(mock_secret_manager);
 
   auto mock_provider = std::make_shared<NiceMock<Secret::MockTlsCertificateConfigProvider>>();
-  EXPECT_CALL(*mock_secret_manager, findOrCreateTlsCertificateProvider(_, "client_cert_secret", _, _, _))
+  EXPECT_CALL(*mock_secret_manager,
+              findOrCreateTlsCertificateProvider(_, "client_cert_secret", _, _, _))
       .WillOnce(Return(mock_provider));
 
   std::function<absl::Status()> update_callback;

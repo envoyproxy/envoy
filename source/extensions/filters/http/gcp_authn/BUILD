@@ -71,8 +71,8 @@ envoy_cc_extension(
     srcs = ["filter_config.cc"],
     hdrs = ["filter_config.h"],
     deps = [
-        ":gcp_authn",
         ":fingerprint_manager",
+        ":gcp_authn",
         "//envoy/registry",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/gcp_authn/v3:pkg_cc_proto",

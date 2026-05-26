@@ -3,8 +3,9 @@
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.h"
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.validate.h"
 #include "envoy/secret/secret_provider.h"
-#include "envoy/thread_local/thread_local.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/thread_local/thread_local.h"
+
 #include "source/common/common/matchers.h"
 
 #include "absl/types/optional.h"
@@ -16,8 +17,9 @@ namespace GcpAuthn {
 
 class FingerprintManager : public Logger::Loggable<Logger::Id::filter> {
 public:
-  FingerprintManager(const envoy::extensions::filters::http::gcp_authn::v3::TokenBindingConfig& config,
-                     Server::Configuration::FactoryContext& context);
+  FingerprintManager(
+      const envoy::extensions::filters::http::gcp_authn::v3::TokenBindingConfig& config,
+      Server::Configuration::FactoryContext& context);
 
   absl::optional<std::string> fingerprint() const;
 

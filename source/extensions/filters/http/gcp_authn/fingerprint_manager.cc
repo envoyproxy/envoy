@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/gcp_authn/fingerprint_manager.h"
 
 #include "envoy/secret/secret_manager.h"
+
 #include "source/extensions/filters/http/gcp_authn/crypto_utils.h"
 
 namespace Envoy {
@@ -11,8 +12,7 @@ namespace GcpAuthn {
 FingerprintManager::FingerprintManager(
     const envoy::extensions::filters::http::gcp_authn::v3::TokenBindingConfig& config,
     Server::Configuration::FactoryContext& context)
-    : config_(config), context_(context),
-      tls_slot_(context.serverFactoryContext().threadLocal()) {
+    : config_(config), context_(context), tls_slot_(context.serverFactoryContext().threadLocal()) {
 
   tls_slot_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalFingerprint>(""); });
 
