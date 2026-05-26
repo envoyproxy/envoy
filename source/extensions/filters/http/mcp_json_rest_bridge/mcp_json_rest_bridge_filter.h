@@ -37,16 +37,13 @@ public:
 
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
   getHttpRule(absl::string_view tool_name) const;
+  absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+  getToolsListHttpRule() const;
 
   const std::string& fallbackProtocolVersion() const { return fallback_protocol_version_; }
 
   uint32_t maxRequestBodySize() const { return max_request_body_size_; }
   uint32_t maxResponseBodySize() const { return max_response_body_size_; }
-
-  const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ServerToolConfig&
-  toolConfig() const {
-    return proto_config_.tool_config();
-  }
 
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge::RequestStorageMode
   requestStorageMode() const {
@@ -61,27 +58,6 @@ private:
   std::string fallback_protocol_version_;
   uint32_t max_request_body_size_;
   uint32_t max_response_body_size_;
-};
-
-class McpJsonRestBridgePerRouteConfig : public Router::RouteSpecificFilterConfig {
-public:
-  explicit McpJsonRestBridgePerRouteConfig(
-      const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
-          proto_config);
-
-  absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
-  getHttpRule(absl::string_view tool_name) const;
-
-  const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ServerToolConfig&
-  toolConfig() const {
-    return tool_config_;
-  }
-
-private:
-  absl::flat_hash_map<std::string,
-                      envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
-      tool_to_http_rule_;
-  const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ServerToolConfig tool_config_;
 };
 
 using McpJsonRestBridgeFilterConfigSharedPtr = std::shared_ptr<McpJsonRestBridgeFilterConfig>;
@@ -103,15 +79,11 @@ public:
                                           bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
-  void onDestroy() override;
 
 private:
   // Handles "method" field in the MCP request.
   void handleMcpMethod(const nlohmann::json& json_rpc,
                        Http::RequestHeaderMapOptRef request_headers);
-
-  // Serves a local tools/list response using tools' ToolsListSpecificConfig.
-  void serveToolsListLocal(const nlohmann::json& json_rpc);
 
   // Modifies the response from upstream into JSON-RPC response.
   void encodeJsonRpcData(Http::ResponseHeaderMapOptRef response_headers);
@@ -141,12 +113,10 @@ private:
     InitializationAck = 3,
     // Clients send a tools/list request to discover available tools.
     ToolsList = 4,
-    // Clients send a tools/list request that is handled locally.
-    ToolsListLocal = 5,
     // Clients send a tools/call request to invoke a tool.
-    ToolsCall = 6,
+    ToolsCall = 5,
     // MCP operation failed.
-    OperationFailed = 7,
+    OperationFailed = 6,
   };
   McpOperation mcp_operation_ = McpOperation::Unspecified;
   absl::optional<nlohmann::json> session_id_;
@@ -156,10 +126,7 @@ private:
   Buffer::OwnedImpl response_body_;
   std::string response_body_str_;
 
-  // Route and per-route config, latched on decodeData.
   McpJsonRestBridgeFilterConfigSharedPtr config_;
-  Router::RouteConstSharedPtr route_;
-  const McpJsonRestBridgePerRouteConfig* per_route_config_{nullptr};
 };
 
 } // namespace McpJsonRestBridge

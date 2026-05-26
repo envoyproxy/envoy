@@ -23,7 +23,6 @@ envoy_cc_test(
     name = "mcp_json_rest_bridge_filter_test",
     srcs = ["mcp_json_rest_bridge_filter_test.cc"],
     deps = [
-        "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/http/mcp_json_rest_bridge:mcp_json_rest_bridge_filter_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
@@ -51,7 +50,6 @@ envoy_cc_test(
         "//source/extensions/filters/http/mcp_json_rest_bridge:config",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/extensions/filters/http/mcp_json_rest_bridge/v3:pkg_cc_proto",
         "@nlohmann_json//:json",
     ],
 )
