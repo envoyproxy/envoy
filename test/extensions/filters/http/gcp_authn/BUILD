@@ -35,7 +35,6 @@ envoy_extension_cc_test(
         "//test/common/tls/test_data:certs",
     ],
     extension_names = ["envoy.filters.http.gcp_authn"],
-    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/gcp_authn:fingerprint_manager",
         "//test/mocks/secret:secret_mocks",
