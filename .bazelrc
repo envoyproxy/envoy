@@ -239,6 +239,7 @@ common:aws-lc-fips --@envoy//bazel:crypto=@aws_lc//:crypto
 common:aws-lc-fips --@envoy//bazel:http3=False
 
 # OpenSSL
+common:openssl --@envoy//bazel:openssl=True
 common:openssl --@envoy//bazel:ssl=@envoy//compat/openssl:ssl
 common:openssl --@envoy//bazel:crypto=@envoy//compat/openssl:crypto
 common:openssl --copt=-DENVOY_SSL_OPENSSL
