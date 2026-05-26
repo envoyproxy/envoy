@@ -68,8 +68,8 @@ public:
   }
 
   void setupFilterAndCallback() {
-    filter_ = std::make_unique<GcpAuthnFilter>(filter_config_, absl::nullopt, context_, "stats",
-                                               nullptr);
+    filter_ =
+        std::make_unique<GcpAuthnFilter>(filter_config_, absl::nullopt, context_, "stats", nullptr);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
@@ -319,7 +319,8 @@ TEST_F(GcpAuthnFilterTest, TokenBindingConfigFingerprint) {
   EXPECT_NE(fingerprint, absl::nullopt);
 
   // Instantiate the filter.
-  filter_ = std::make_unique<GcpAuthnFilter>(filter_config_, fingerprint, context_, "stats", nullptr);
+  filter_ =
+      std::make_unique<GcpAuthnFilter>(filter_config_, fingerprint, context_, "stats", nullptr);
 
   // Verify that the filter populated its fingerprint data member
   EXPECT_EQ(filter_->fingerprint(), fingerprint);

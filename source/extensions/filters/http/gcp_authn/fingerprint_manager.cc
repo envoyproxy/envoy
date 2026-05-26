@@ -40,7 +40,8 @@ FingerprintManager::FingerprintManager(
     });
     updateFingerprint();
   } else {
-    throw EnvoyException(absl::StrCat("TlsCertificateConfigProvider not found for ", client_cert.name()));
+    throw EnvoyException(
+        absl::StrCat("TlsCertificateConfigProvider not found for ", client_cert.name()));
   }
 }
 

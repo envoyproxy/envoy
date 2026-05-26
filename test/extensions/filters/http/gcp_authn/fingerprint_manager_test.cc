@@ -65,9 +65,8 @@ TEST_F(FingerprintManagerTest, CertNotFound) {
   TokenBindingConfig config;
   TestUtility::loadFromYaml(config_yaml, config);
 
-  EXPECT_THROW_WITH_MESSAGE(
-      FingerprintManager manager(config, context_), EnvoyException,
-      "TlsCertificateConfigProvider not found for missing_cert_secret");
+  EXPECT_THROW_WITH_MESSAGE(FingerprintManager manager(config, context_), EnvoyException,
+                            "TlsCertificateConfigProvider not found for missing_cert_secret");
 }
 
 TEST_F(FingerprintManagerTest, ValidCertAndSanMatch) {

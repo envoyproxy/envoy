@@ -37,18 +37,18 @@ Http::FilterFactoryCb GcpAuthnFilterFactory::createFilterFactoryFromProtoTyped(
         std::make_shared<FingerprintManager>(config.token_binding_config(), context);
   }
 
-  return [filter_config = std::move(filter_config), stats_prefix, &context,
-          token_cache = std::move(token_cache),
-          fingerprint_manager = std::move(fingerprint_manager)](
-             Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    absl::optional<std::string> fingerprint = absl::nullopt;
-    if (fingerprint_manager != nullptr) {
-      fingerprint = fingerprint_manager->fingerprint();
-    }
-    callbacks.addStreamFilter(std::make_shared<GcpAuthnFilter>(
-        filter_config, fingerprint, context, stats_prefix,
-        (token_cache != nullptr) ? &token_cache->tls.get()->cache() : nullptr));
-  };
+  return
+      [filter_config = std::move(filter_config), stats_prefix, &context,
+       token_cache = std::move(token_cache), fingerprint_manager = std::move(fingerprint_manager)](
+          Http::FilterChainFactoryCallbacks& callbacks) -> void {
+        absl::optional<std::string> fingerprint = absl::nullopt;
+        if (fingerprint_manager != nullptr) {
+          fingerprint = fingerprint_manager->fingerprint();
+        }
+        callbacks.addStreamFilter(std::make_shared<GcpAuthnFilter>(
+            filter_config, fingerprint, context, stats_prefix,
+            (token_cache != nullptr) ? &token_cache->tls.get()->cache() : nullptr));
+      };
 }
 
 /**
