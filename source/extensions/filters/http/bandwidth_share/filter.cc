@@ -7,8 +7,7 @@
 
 #include "source/common/http/utility.h"
 #include "source/common/stats/timespan_impl.h"
-
-#include "stats.h"
+#include "source/extensions/filters/http/bandwidth_share/stats.h"
 
 using Envoy::Extensions::HttpFilters::Common::StreamRateLimiter;
 
