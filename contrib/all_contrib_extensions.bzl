@@ -49,6 +49,13 @@ AWS_LC_SKIP_CONTRIB_TARGETS = [
     "envoy.compression.qatzstd.compressor",
 ]
 
+# OpenSSL is incompatible with Intel-specific private key providers
+# QUIC extensions are already disabled by http3=False in openssl build config
+OPENSSL_SKIP_CONTRIB_TARGETS = [
+    "envoy.tls.key_providers.cryptomb",
+    "envoy.tls.key_providers.qat",
+]
+
 def envoy_all_contrib_extensions(denylist = []):
     return [v + "_envoy_extension" for k, v in CONTRIB_EXTENSIONS.items() if not k in denylist]
 
@@ -57,5 +64,6 @@ SELECTED_CONTRIB_EXTENSIONS = select({
     "//bazel:linux_ppc": envoy_all_contrib_extensions(PPC_SKIP_CONTRIB_TARGETS),
     "//bazel:using_aws_lc": envoy_all_contrib_extensions(AWS_LC_SKIP_CONTRIB_TARGETS),
     "//bazel:using_boringssl_fips": envoy_all_contrib_extensions(BORINGSSL_FIPS_SKIP_CONTRIB_TARGETS),
+    "//bazel:using_openssl": envoy_all_contrib_extensions(OPENSSL_SKIP_CONTRIB_TARGETS),
     "//conditions:default": envoy_all_contrib_extensions(X86_SKIP_CONTRIB_TARGETS),
 })
