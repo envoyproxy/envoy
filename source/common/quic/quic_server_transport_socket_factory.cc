@@ -31,6 +31,8 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
 
   auto factory_or_error = QuicServerTransportSocketFactory::create(
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_early_data, true),
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_reset_ssl, false),
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_resumption, true),
       context.statsScope(), std::move(server_config),
       context.serverFactoryContext().sslContextManager());
   RETURN_IF_NOT_OK(factory_or_error.status());
@@ -99,21 +101,25 @@ absl::Status initializeQuicCertAndKey(Ssl::TlsContext& context,
 } // namespace
 
 absl::StatusOr<std::unique_ptr<QuicServerTransportSocketFactory>>
-QuicServerTransportSocketFactory::create(bool enable_early_data, Stats::Scope& store,
+QuicServerTransportSocketFactory::create(bool enable_early_data, bool enable_reset_ssl,
+                                         bool enable_resumption, Stats::Scope& store,
                                          Ssl::ServerContextConfigPtr config,
                                          Envoy::Ssl::ContextManager& manager) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<QuicServerTransportSocketFactory>(new QuicServerTransportSocketFactory(
-      enable_early_data, store, std::move(config), manager, creation_status));
+  auto ret = std::unique_ptr<QuicServerTransportSocketFactory>(
+      new QuicServerTransportSocketFactory(enable_early_data, enable_reset_ssl, enable_resumption,
+                                           store, std::move(config), manager, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 
 QuicServerTransportSocketFactory::QuicServerTransportSocketFactory(
-    bool enable_early_data, Stats::Scope& scope, Ssl::ServerContextConfigPtr config,
-    Envoy::Ssl::ContextManager& manager, absl::Status& creation_status)
+    bool enable_early_data, bool enable_reset_ssl, bool enable_resumption, Stats::Scope& scope,
+    Ssl::ServerContextConfigPtr config, Envoy::Ssl::ContextManager& manager,
+    absl::Status& creation_status)
     : QuicTransportSocketFactoryBase(scope, "server"), manager_(manager), stats_scope_(scope),
-      config_(std::move(config)), enable_early_data_(enable_early_data) {
+      config_(std::move(config)), enable_early_data_(enable_early_data),
+      enable_reset_ssl_(enable_reset_ssl), enable_resumption_(enable_resumption) {
   auto ctx_or_error = createSslServerContext();
   SET_AND_RETURN_IF_NOT_OK(ctx_or_error.status(), creation_status);
   ssl_ctx_ = *ctx_or_error;
