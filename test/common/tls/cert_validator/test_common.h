@@ -122,7 +122,7 @@ private:
   Api::ApiPtr api_;
   const absl::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_;
   const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
-      san_matchers_{};
+      san_matchers_;
   const std::string ca_cert_;
   const std::string ca_cert_path_{"TEST_CA_CERT_PATH"};
   const std::string ca_cert_name_{"TEST_CA_CERT_NAME"};

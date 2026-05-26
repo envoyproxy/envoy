@@ -648,8 +648,7 @@ on_no_match:
     // Simulate a filter setting network namespace in downstream filter state.
     auto ns_object = std::make_shared<Router::StringAccessorImpl>("/run/netns/namespace-a");
     downstream_filter_state->setData(
-        "envoy.network.namespace", ns_object, StreamInfo::FilterState::StateType::ReadOnly,
-        StreamInfo::FilterState::LifeSpan::Connection,
+        "envoy.network.namespace", ns_object, StreamInfo::FilterState::LifeSpan::Connection,
         StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
 
     // Create TransportSocketOptions with the shared filter state objects.
@@ -672,8 +671,7 @@ on_no_match:
 
     auto ns_object = std::make_shared<Router::StringAccessorImpl>("/run/netns/namespace-b");
     downstream_filter_state->setData(
-        "envoy.network.namespace", ns_object, StreamInfo::FilterState::StateType::ReadOnly,
-        StreamInfo::FilterState::LifeSpan::Connection,
+        "envoy.network.namespace", ns_object, StreamInfo::FilterState::LifeSpan::Connection,
         StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
 
     auto shared_objects = downstream_filter_state->objectsSharedWithUpstreamConnection();

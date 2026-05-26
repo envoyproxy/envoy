@@ -200,7 +200,7 @@ public:
 
     DataSourceOptRef cert_chain_opt;
 
-    if (chain != "") {
+    if (!chain.empty()) {
       auto chain_env = std::string("CHAIN");
       TestEnvironment::setEnvVar(chain_env, chain, 1);
       yaml = fmt::format(R"EOF(

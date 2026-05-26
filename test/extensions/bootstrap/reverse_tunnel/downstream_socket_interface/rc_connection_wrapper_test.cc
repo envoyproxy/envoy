@@ -60,7 +60,7 @@ protected:
   void TearDown() override {
     io_handle_.reset();
     extension_.reset();
-    while (dispatcher_.to_delete_.size()) {
+    while (!dispatcher_.to_delete_.empty()) {
       dispatcher_.to_delete_.pop_front();
     }
   }

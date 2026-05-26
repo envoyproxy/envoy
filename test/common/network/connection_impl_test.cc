@@ -4163,9 +4163,7 @@ TEST_F(MockTransportConnectionImplTest, UpdatingBufferHighWatermarkTimeoutToZero
 // Fixture for validating behavior after a connection is closed.
 class PostCloseConnectionImplTest : public MockTransportConnectionImplTest {
 public:
-  PostCloseConnectionImplTest() : MockTransportConnectionImplTest() {
-    MockTransportConnectionImplTest::initializeConnection();
-  }
+  PostCloseConnectionImplTest() { MockTransportConnectionImplTest::initializeConnection(); }
 
 protected:
   // Setup connection, single read event.
@@ -4716,7 +4714,6 @@ TEST_P(ClientConnectionWithCustomRawBufferSocketTest, TransportSocketCallbacks) 
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   auto filter_state_object = std::make_shared<TestObject>();
   filter_state.setData("test-filter-state", filter_state_object,
-                       StreamInfo::FilterState::StateType::ReadOnly,
                        StreamInfo::FilterState::LifeSpan::Connection,
                        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   transport_socket_options_ = TransportSocketOptionsUtility::fromFilterState(filter_state);

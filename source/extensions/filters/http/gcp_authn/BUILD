@@ -14,8 +14,8 @@ envoy_cc_library(
     srcs = ["gcp_authn_filter.cc"],
     hdrs = ["gcp_authn_filter.h"],
     deps = [
-        "gcp_authn_lib",
         "token_cache",
+        ":gcp_authn_client_impl",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
@@ -27,17 +27,26 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "gcp_authn_lib",
-    srcs = ["gcp_authn_impl.cc"],
-    hdrs = ["gcp_authn_impl.h"],
+    name = "gcp_authn_client_interface",
+    hdrs = ["gcp_authn_client.h"],
     deps = [
-        "token_cache",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/types:optional",
+        "@envoy_api//envoy/extensions/filters/http/gcp_authn/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "gcp_authn_client_impl",
+    srcs = ["gcp_authn_client_impl.cc"],
+    hdrs = ["gcp_authn_client_impl.h"],
+    deps = [
+        ":gcp_authn_client_interface",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "@abseil-cpp//absl/types:optional",
+        "@abseil-cpp//absl/status:statusor",
         "@envoy_api//envoy/extensions/filters/http/gcp_authn/v3:pkg_cc_proto",
     ],
 )
@@ -66,5 +75,23 @@ envoy_cc_extension(
         "//envoy/registry",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/gcp_authn/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "crypto_utils",
+    srcs = ["crypto_utils.cc"],
+    hdrs = ["crypto_utils.h"],
+    deps = [
+        "//envoy/api:api_interface",
+        "//envoy/secret:secret_provider_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:base64_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/common:matchers_lib",
+        "//source/common/config:datasource_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/tls:utility_lib",
+        "@abseil-cpp//absl/strings:string_view",
     ],
 )
