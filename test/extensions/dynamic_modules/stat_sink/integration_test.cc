@@ -54,7 +54,7 @@ sink_config:
   "@type": type.googleapis.com/google.protobuf.StringValue
   value: test_config
 )EOF",
-                                                 moduleName());
+                                                moduleName());
       envoy::extensions::stat_sinks::dynamic_modules::v3::DynamicModuleStatsSink sink_config;
       TestUtility::loadFromYaml(sink_yaml, sink_config);
       sink->mutable_typed_config()->PackFrom(sink_config);
