@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/gcp_authn/fingerprint_manager.h"
 
+#include "envoy/common/exception.h"
 #include "envoy/secret/secret_manager.h"
 
 #include "source/extensions/filters/http/gcp_authn/crypto_utils.h"
@@ -39,7 +40,7 @@ FingerprintManager::FingerprintManager(
     });
     updateFingerprint();
   } else {
-    ENVOY_LOG_MISC(warn, "TlsCertificateConfigProvider not found for {}", client_cert.name());
+    throw EnvoyException(absl::StrCat("TlsCertificateConfigProvider not found for ", client_cert.name()));
   }
 }
 

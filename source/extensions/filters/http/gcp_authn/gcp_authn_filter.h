@@ -44,12 +44,12 @@ public:
   enum class State { NotStarted, Calling, Complete };
 
   GcpAuthnFilter(
-      const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config,
+      FilterConfigSharedPtr config,
       absl::optional<std::string> client_cert_fingerprint,
       Server::Configuration::FactoryContext& context, const std::string& stats_prefix,
       TokenCacheImpl<JwtToken>* token_cache)
-      : config_(config), context_(context),
-        client_(std::make_unique<GcpAuthnClientImpl>(config_, context_)),
+      : config_(std::move(config)), context_(context),
+        client_(std::make_unique<GcpAuthnClientImpl>(*config_, context_)),
         stats_(generateStats(stats_prefix, context_.scope())),
         client_cert_fingerprint_(std::move(client_cert_fingerprint)),
         jwt_token_cache_(token_cache) {}
@@ -71,7 +71,7 @@ private:
     return {ALL_GCP_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, stats_prefix))};
   }
 
-  const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config_;
+  FilterConfigSharedPtr config_;
   Server::Configuration::FactoryContext& context_;
   std::unique_ptr<GcpAuthnClient> client_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};

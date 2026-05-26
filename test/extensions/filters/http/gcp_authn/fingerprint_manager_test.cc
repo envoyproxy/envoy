@@ -8,6 +8,7 @@
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -64,8 +65,9 @@ TEST_F(FingerprintManagerTest, CertNotFound) {
   TokenBindingConfig config;
   TestUtility::loadFromYaml(config_yaml, config);
 
-  FingerprintManager manager(config, context_);
-  EXPECT_EQ(manager.fingerprint(), absl::nullopt);
+  EXPECT_THROW_WITH_MESSAGE(
+      FingerprintManager manager(config, context_), EnvoyException,
+      "TlsCertificateConfigProvider not found for missing_cert_secret");
 }
 
 TEST_F(FingerprintManagerTest, ValidCertAndSanMatch) {
