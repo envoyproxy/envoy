@@ -26,7 +26,6 @@ public:
 private:
   void updateFingerprint();
 
-  const envoy::extensions::filters::http::gcp_authn::v3::TokenBindingConfig config_;
   Server::Configuration::FactoryContext& context_;
 
   Secret::TlsCertificateConfigProviderSharedPtr tls_cert_provider_;
@@ -34,8 +33,8 @@ private:
   std::vector<Matchers::StringMatcherImpl> san_matchers_;
 
   struct ThreadLocalFingerprint : public ThreadLocal::ThreadLocalObject {
-    explicit ThreadLocalFingerprint(const std::string& fingerprint) : fingerprint_(fingerprint) {}
-    const std::string fingerprint_;
+    explicit ThreadLocalFingerprint(const std::string& fingerprint) : fingerprint(fingerprint) {}
+    const std::string fingerprint;
   };
   Envoy::ThreadLocal::TypedSlot<ThreadLocalFingerprint> tls_slot_;
 };

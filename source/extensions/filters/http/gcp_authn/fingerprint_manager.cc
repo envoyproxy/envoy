@@ -12,14 +12,15 @@ namespace GcpAuthn {
 FingerprintManager::FingerprintManager(
     const envoy::extensions::filters::http::gcp_authn::v3::TokenBindingConfig& config,
     Server::Configuration::FactoryContext& context)
-    : config_(config), context_(context), tls_slot_(context.serverFactoryContext().threadLocal()) {
+    : context_(context), tls_slot_(context.serverFactoryContext().threadLocal()) {
   tls_slot_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalFingerprint>(""); });
 
-  for (const auto& matcher : config_.client_certificate_san_matchers()) {
+  san_matchers_.reserve(config.client_certificate_san_matchers().size());
+  for (const auto& matcher : config.client_certificate_san_matchers()) {
     san_matchers_.emplace_back(matcher, context_.serverFactoryContext());
   }
 
-  const auto& client_cert = config_.client_certificate();
+  const auto& client_cert = config.client_certificate();
   if (client_cert.has_sds_config()) {
     tls_cert_provider_ =
         context.serverFactoryContext().secretManager().findOrCreateTlsCertificateProvider(
@@ -44,8 +45,8 @@ FingerprintManager::FingerprintManager(
 
 absl::optional<std::string> FingerprintManager::fingerprint() const {
   auto slot = tls_slot_.get();
-  if (slot.has_value() && !slot->fingerprint_.empty()) {
-    return slot->fingerprint_;
+  if (slot.has_value() && !slot->fingerprint.empty()) {
+    return slot->fingerprint;
   }
   return absl::nullopt;
 }
