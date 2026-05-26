@@ -34,19 +34,28 @@ absl::StatusOr<std::string> serializeConfigToJson(
 absl::StatusOr<std::shared_ptr<HickoryDnsResolverConfig>> HickoryDnsResolverConfig::create(
     const envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig&
         proto_config) {
+  return createForModule(proto_config, HickoryModuleName);
+}
+
+absl::StatusOr<std::shared_ptr<HickoryDnsResolverConfig>>
+HickoryDnsResolverConfig::createForModule(
+    const envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig&
+        proto_config,
+    absl::string_view module_name) {
   auto config = std::shared_ptr<HickoryDnsResolverConfig>(new HickoryDnsResolverConfig());
 
-  // The Hickory DNS module is statically linked and always available.
+  // The Hickory DNS module is statically linked and always available in production. Tests may
+  // override ``module_name`` to exercise load- and symbol-resolution-failure paths.
   auto module_or =
-      Extensions::DynamicModules::newDynamicModuleByName(HickoryModuleName, /*do_not_close=*/true);
+      Extensions::DynamicModules::newDynamicModuleByName(module_name, /*do_not_close=*/true);
   if (!module_or.ok()) {
     return absl::InternalError(
         absl::StrCat("Failed to load Hickory DNS dynamic module: ", module_or.status().message()));
   }
   config->dynamic_module_ = std::move(*module_or);
 
-  // All symbols are guaranteed to be present in the statically linked module; any failure
-  // here indicates a build configuration error rather than a user-recoverable issue.
+  // All symbols are guaranteed to be present in the statically linked production module; any
+  // failure here indicates a build configuration error rather than a user-recoverable issue.
 #define RESOLVE_SYMBOL(field, symbol)                                                              \
   {                                                                                                \
     auto fn = config->dynamic_module_->getFunctionPointer<decltype(config->field)>(symbol);        \
@@ -74,8 +83,8 @@ absl::StatusOr<std::shared_ptr<HickoryDnsResolverConfig>> HickoryDnsResolverConf
   const std::string config_json = std::move(*config_json_or);
 
   envoy_dynamic_module_type_envoy_buffer name_buf;
-  name_buf.ptr = HickoryModuleName.data();
-  name_buf.length = HickoryModuleName.size();
+  name_buf.ptr = module_name.data();
+  name_buf.length = module_name.size();
 
   envoy_dynamic_module_type_envoy_buffer config_buf;
   config_buf.ptr = config_json.c_str();
