@@ -62,9 +62,7 @@ public:
 
   State state() { return state_; }
   GcpAuthnFilterStats& stats() { return stats_; }
-  const absl::optional<std::string>& clientCertFingerprintForTest() const {
-    return client_cert_fingerprint_;
-  }
+  const absl::optional<std::string>& fingerprint() const { return client_cert_fingerprint_; }
 
   ~GcpAuthnFilter() override = default;
 

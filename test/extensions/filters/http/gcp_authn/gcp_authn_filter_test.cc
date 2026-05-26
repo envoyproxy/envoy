@@ -322,7 +322,7 @@ TEST_F(GcpAuthnFilterTest, TokenBindingConfigFingerprint) {
   filter_ = std::make_unique<GcpAuthnFilter>(config_, fingerprint, context_, "stats", nullptr);
 
   // Verify that the filter populated its fingerprint data member
-  EXPECT_EQ(filter_->clientCertFingerprintForTest(), fingerprint);
+  EXPECT_EQ(filter_->fingerprint(), fingerprint);
 }
 
 } // namespace
