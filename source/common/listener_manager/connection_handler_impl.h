@@ -53,6 +53,9 @@ public:
   void stopListeners(uint64_t listener_tag,
                      const Network::ExtraShutdownListenerOptions& options) override;
   void stopListeners() override;
+  void drainFilterChains(uint64_t listener_tag,
+                         const std::list<const Network::FilterChain*>& filter_chains) override;
+  void drainListeners(uint64_t listener_tag) override;
   void disableListeners() override;
   void enableListeners() override;
   void setListenerRejectFraction(UnitFloat reject_fraction) override;
