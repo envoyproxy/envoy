@@ -337,8 +337,7 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
     for (auto& hs : priority_set.hostSetsPerPriority()) {
       const absl::flat_hash_set<const Host*> excluded = buildExcludedSet(hs->excludedHosts());
       for (const auto& host : hs->hosts()) {
-        if (!excluded.contains(host.get()) &&
-            host->coarseHealth() == Host::Health::Healthy) {
+        if (!excluded.contains(host.get()) && host->coarseHealth() == Host::Health::Healthy) {
           ++total_healthy_hosts;
         }
       }

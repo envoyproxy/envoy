@@ -64,6 +64,9 @@ using FailoverTest = RoundRobinLoadBalancerTest;
 // Ensure if all the hosts with priority 0 unhealthy, the next priority hosts are used.
 TEST_P(FailoverTest, BasicFailover) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  // Mark the P=0 host unhealthy so coarseHealth() is consistent with the
+  // empty healthy_hosts_ snapshot.
+  host_set_.hosts_[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   failover_host_set_.healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
   failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
   init(false);
@@ -74,6 +77,9 @@ TEST_P(FailoverTest, BasicFailover) {
 // Ensure if all the hosts with priority 0 degraded, the first priority degraded hosts are used.
 TEST_P(FailoverTest, BasicDegradedHosts) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  // Set DEGRADED_ACTIVE_HC so coarseHealth() returns Degraded, consistent
+  // with the host being in degraded_hosts_ but not healthy_hosts_.
+  host_set_.hosts_[0]->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
   host_set_.degraded_hosts_ = host_set_.hosts_;
   failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
   init(false);
@@ -86,6 +92,9 @@ TEST_P(FailoverTest, BasicDegradedHosts) {
 // hosts in the second priority are used.
 TEST_P(FailoverTest, BasicFailoverDegradedHosts) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  // Set DEGRADED_ACTIVE_HC so coarseHealth() returns Degraded, consistent with
+  // the host being in degraded_hosts_ but not healthy_hosts_.
+  host_set_.hosts_[0]->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
   host_set_.degraded_hosts_ = host_set_.hosts_;
   failover_host_set_.healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
   failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
@@ -96,7 +105,11 @@ TEST_P(FailoverTest, BasicFailoverDegradedHosts) {
 // Test that extending the priority set with an existing LB causes the correct updates.
 TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSet) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  // Mark both initial hosts unhealthy so coarseHealth() is consistent with
+  // the empty healthy_hosts_ snapshot.
+  host_set_.hosts_[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81")};
+  failover_host_set_.hosts_[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   init(false);
   // With both the primary and failover hosts unhealthy, we should select an
   // unhealthy primary host.
@@ -114,11 +127,17 @@ TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSet) {
   EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
 
   // Now add a healthy host in P=0 and make sure it is immediately selected.
+  // Clear FAILED_ACTIVE_HC first so coarseHealth() returns Healthy, consistent
+  // with adding the host to healthy_hosts_.
+  host_set_.hosts_[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.runCallbacks(add_hosts, {});
   EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
 
-  // Remove the healthy host and ensure we fail back over to tertiary_host_set_
+  // Remove the healthy host and ensure we fail back over to tertiary_host_set_.
+  // Set FAILED_ACTIVE_HC so coarseHealth() returns Unhealthy, consistent with
+  // the empty healthy_hosts_ snapshot.
+  host_set_.hosts_[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   host_set_.healthy_hosts_ = {};
   host_set_.runCallbacks({}, {});
   EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
@@ -128,7 +147,11 @@ TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSet) {
 // cluster is configured to disable on panic.
 TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSetDisableOnPanic) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  // Mark both initial hosts unhealthy so coarseHealth() is consistent with
+  // the empty healthy_hosts_.
+  host_set_.hosts_[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81")};
+  failover_host_set_.hosts_[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   round_robin_lb_config_.mutable_locality_lb_config()
       ->mutable_zone_aware_lb_config()
       ->set_fail_traffic_on_panic(true);
@@ -149,20 +172,28 @@ TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSetDisableOnPanic) {
   EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
 
   // Now add a healthy host in P=0 and make sure it is immediately selected.
+  // Clear FAILED_ACTIVE_HC first so coarseHealth() returns Healthy, consistent
+  // with adding the host to healthy_hosts_.
+  host_set_.hosts_[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.runCallbacks(add_hosts, {});
   EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
 
-  // Remove the healthy host and ensure we fail back over to tertiary_host_set_
+  // Remove the healthy host and ensure we fail back over to tertiary_host_set_.
+  // Set FAILED_ACTIVE_HC so coarseHealth() returns Unhealthy, consistent with
+  // the empty healthy_hosts_ snapshot.
+  host_set_.hosts_[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   host_set_.healthy_hosts_ = {};
   host_set_.runCallbacks({}, {});
   EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
-}
-
-// Test extending the priority set.
+}// Test extending the priority set.
 TEST_P(FailoverTest, ExtendPrioritiesUpdatingPrioritySet) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  // Mark both initial hosts unhealthy so coarseHealth() is consistent with
+  // the empty healthy_hosts_ snapshot.
+  host_set_.hosts_[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81")};
+  failover_host_set_.hosts_[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   init(true);
   // With both the primary and failover hosts unhealthy, we should select an
   // unhealthy primary host.
@@ -180,6 +211,9 @@ TEST_P(FailoverTest, ExtendPrioritiesUpdatingPrioritySet) {
   EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
 
   // Now add a healthy host in P=0 and make sure it is immediately selected.
+  // Clear FAILED_ACTIVE_HC first so coarseHealth() returns Healthy, consistent
+  // with adding the host to healthy_hosts_.
+  host_set_.hosts_[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.runCallbacks(add_hosts, {});
   EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
@@ -187,7 +221,11 @@ TEST_P(FailoverTest, ExtendPrioritiesUpdatingPrioritySet) {
 
 TEST_P(FailoverTest, ExtendPrioritiesWithLocalPrioritySet) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  // Mark both initial hosts unhealthy so coarseHealth() is consistent with
+  // the empty healthy_hosts_ snapshot.
+  host_set_.hosts_[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81")};
+  failover_host_set_.hosts_[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   init(true);
   // With both the primary and failover hosts unhealthy, we should select an
   // unhealthy primary host.
@@ -237,6 +275,10 @@ TEST_P(FailoverTest, PrioritiesWithZeroWarmedHosts) {
   // We then expect all the traffic to spill over to P1 since P0 has an effective load of zero.
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
                       makeTestHost(info_, "tcp://127.0.0.1:81")};
+  // Mark P=0 hosts unhealthy so coarseHealth() is consistent with the empty healthy_hosts_.
+  for (auto& host : host_set_.hosts_) {
+    host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  }
   failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
   failover_host_set_.healthy_hosts_ = failover_host_set_.hosts_;
 
@@ -354,6 +396,10 @@ TEST_P(RoundRobinLoadBalancerTest, DegradedLocality) {
   HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", zone_a),
                                             makeTestHost(info_, "tcp://127.0.0.1:81", zone_b),
                                             makeTestHost(info_, "tcp://127.0.0.1:84", zone_b)}));
+  // Set DEGRADED_ACTIVE_HC on the degraded hosts so coarseHealth() returns Degraded,
+  // consistent with them being in degraded_hosts_ but not healthy_hosts_.
+  (*hosts)[1]->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+  (*hosts)[2]->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
   HostVectorSharedPtr healthy_hosts(new HostVector({(*hosts)[0]}));
   HostVectorSharedPtr degraded_hosts(new HostVector({(*hosts)[1], (*hosts)[2]}));
   HostsPerLocalitySharedPtr hosts_per_locality =
@@ -493,9 +539,14 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
                               makeTestHost(info_, "tcp://127.0.0.1:81")};
   hostSet().hosts_ = {
-      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
+      hostSet().healthy_hosts_[0], hostSet().healthy_hosts_[1],
       makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83"),
       makeTestHost(info_, "tcp://127.0.0.1:84"), makeTestHost(info_, "tcp://127.0.0.1:85")};
+  // Mark the 4 unhealthy hosts so coarseHealth() is consistent with healthy_hosts_ containing
+  // only the first 2 hosts (2/6 = 33% < 50% panic threshold).
+  for (size_t i = 2; i < hostSet().hosts_.size(); ++i) {
+    hostSet().hosts_[i]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  }
 
   init(false);
   EXPECT_EQ(hostSet().hosts_[0], lb_->chooseHost(nullptr).host);
@@ -504,8 +555,11 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {
 
   // Take the threshold back above the panic threshold.
   hostSet().healthy_hosts_ = {
-      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
-      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83")};
+      hostSet().hosts_[0], hostSet().hosts_[1],
+      hostSet().hosts_[2], hostSet().hosts_[3]};
+  // Clear FAILED_ACTIVE_HC on the hosts that are now healthy.
+  hostSet().hosts_[2]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  hostSet().hosts_[3]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
   hostSet().runCallbacks({}, {});
 
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
@@ -519,9 +573,14 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanicDisableOnPanic) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
                               makeTestHost(info_, "tcp://127.0.0.1:81")};
   hostSet().hosts_ = {
-      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
+      hostSet().healthy_hosts_[0], hostSet().healthy_hosts_[1],
       makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83"),
       makeTestHost(info_, "tcp://127.0.0.1:84"), makeTestHost(info_, "tcp://127.0.0.1:85")};
+  // Mark the 4 unhealthy hosts so coarseHealth() is consistent with healthy_hosts_ containing
+  // only the first 2 hosts (2/6 = 33% < 50% panic threshold).
+  for (size_t i = 2; i < hostSet().hosts_.size(); ++i) {
+    hostSet().hosts_[i]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  }
 
   round_robin_lb_config_.mutable_locality_lb_config()
       ->mutable_zone_aware_lb_config()
@@ -531,8 +590,11 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanicDisableOnPanic) {
 
   // Take the threshold back above the panic threshold.
   hostSet().healthy_hosts_ = {
-      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
-      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83")};
+      hostSet().hosts_[0], hostSet().hosts_[1],
+      hostSet().hosts_[2], hostSet().hosts_[3]};
+  // Clear FAILED_ACTIVE_HC on the hosts that are now healthy.
+  hostSet().hosts_[2]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  hostSet().hosts_[3]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
   hostSet().runCallbacks({}, {});
 
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
@@ -543,8 +605,11 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanicDisableOnPanic) {
 
 // Ensure if the panic threshold is 0%, panic mode is disabled.
 TEST_P(RoundRobinLoadBalancerTest, DisablePanicMode) {
-  hostSet().healthy_hosts_ = {};
   hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  // Set FAILED_ACTIVE_HC so coarseHealth() returns Unhealthy, consistent with
+  // the empty healthy_hosts_ snapshot.
+  hostSet().hosts_[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  hostSet().healthy_hosts_ = {};
 
   common_config_.mutable_healthy_panic_threshold()->set_value(0);
 
@@ -1787,6 +1852,11 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
   round_robin_lb_config_.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(60);
   simTime().advanceTimeWait(std::chrono::seconds(1));
   auto host1 = makeTestHost(info_, "tcp://127.0.0.1:80");
+  // Explicitly record the slow-start entry time (current sim time = 1s)
+  host1->setLastHcPassTime(simTime().monotonicTime());
+  // Mark host1 as unhealthy so coarseHealth() is consistent with the empty
+  // healthy_hosts_ snapshot.
+  host1->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   host_set_.hosts_ = {host1};
 
   init(true);
@@ -1809,6 +1879,9 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
 
   hosts_added.push_back(host2);
 
+  // Clear FAILED_ACTIVE_HC before adding host1 to healthy_hosts_ so coarseHealth()
+  // returns Healthy, consistent with the healthy_hosts_ snapshot.
+  host1->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
   hostSet().healthy_hosts_ = {host1, host2};
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks(hosts_added, empty);
@@ -2077,6 +2150,11 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWaitMinWeightPercent35) {
   round_robin_lb_config_.mutable_slow_start_config()->mutable_min_weight_percent()->set_value(35);
   simTime().advanceTimeWait(std::chrono::seconds(1));
   auto host1 = makeTestHost(info_, "tcp://127.0.0.1:80");
+  // Explicitly record the slow-start entry time (current sim time = 1s)
+  host1->setLastHcPassTime(simTime().monotonicTime());  
+  // Mark host1 as unhealthy so coarseHealth() is consistent with the empty
+  // healthy_hosts_ snapshot.
+  host1->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   host_set_.hosts_ = {host1};
 
   init(true);
@@ -2099,6 +2177,9 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWaitMinWeightPercent35) {
 
   hosts_added.push_back(host2);
 
+  // Clear FAILED_ACTIVE_HC before adding host1 to healthy_hosts_ so coarseHealth()
+  // returns Healthy, consistent with the healthy_hosts_ snapshot.
+  host1->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
   hostSet().healthy_hosts_ = {host1, host2};
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks(hosts_added, empty);

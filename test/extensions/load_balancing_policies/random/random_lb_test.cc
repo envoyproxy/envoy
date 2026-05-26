@@ -53,9 +53,14 @@ TEST_P(RandomLoadBalancerTest, FailClusterOnPanic) {
       true);
   init();
 
-  hostSet().healthy_hosts_ = {};
   hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
                       makeTestHost(info_, "tcp://127.0.0.1:81")};
+  // Set FAILED_ACTIVE_HC so coarseHealth() returns Unhealthy, consistent with
+  // the empty healthy_hosts_ snapshot.
+  for (auto& host : hostSet().hosts_) {
+    host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  }
+  hostSet().healthy_hosts_ = {};
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
   EXPECT_EQ(nullptr, lb_->chooseHost(nullptr).host);
 }
