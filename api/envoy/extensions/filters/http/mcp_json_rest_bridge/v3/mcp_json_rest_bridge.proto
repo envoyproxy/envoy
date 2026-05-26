@@ -256,8 +256,21 @@ message ToolConfig {
 //    - If specify a field: Only that specific argument becomes the HTTP JSON body.
 //    - If empty: No body is sent.
 // 3. Query: Any leaf arguments not mapped to Path or Body are added as URL query parameters.
-// [#next-free-field: 7]
+// [#next-free-field: 9]
 message HttpRule {
+  // Represents a mapping from a request message field to an HTTP element.
+  message ParameterBinding {
+    // The name of the HTTP header (e.g., "X-API-Key", "Authorization") or the
+    // name of the cookie (e.g.,"SESSION_ID"). Note: Envoy normalizes the header names to lowercase.
+    string name = 1;
+
+    // Path to the field within the JSON arguments object from a tools/call
+    // request. Uses dot-notation for nested fields.
+    // E.g. if arguments object is `{"user":{"auth_token":"foo"}}`, then
+    // `argument_path` should be "user.auth_token".
+    string argument_path = 2;
+  }
+
   // Determines the HTTP method and the URL path template.
   //
   // Path templating uses curly braces ``{}`` to mark a section of the URL path as replaceable.
@@ -291,6 +304,14 @@ message HttpRule {
   //   fields (e.g., "user.data" maps the value of the "data" field inside "user").
   // - If omitted: There is no HTTP request body; fields not in the path become query parameters.
   string body = 6;
+
+  // Bindings to extract values from the 'arguments' object of a tools/call
+  // request and inject them as HTTP headers.
+  repeated ParameterBinding header_parameter_bindings = 7;
+
+  // Bindings to extract values from the 'arguments' object of a tools/call
+  // request and inject them as HTTP cookies.
+  repeated ParameterBinding cookie_parameter_bindings = 8;
 }
 
 // Per-route override configuration for the MCP JSON REST Bridge filter.

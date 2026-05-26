@@ -149,7 +149,7 @@ McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
   ENVOY_LOG(debug, "Received MCP JSON REST Bridge config: {}", proto_config_.DebugString());
 }
 
-absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+absl::StatusOr<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule&>
 McpJsonRestBridgeFilterConfig::getHttpRule(absl::string_view tool_name) const {
   auto it = tool_entries_.find(tool_name);
   if (it == tool_entries_.end()) {
@@ -167,7 +167,7 @@ bool McpJsonRestBridgeFilterConfig::textContentStreamingEnabled(absl::string_vie
   return it->second.text_content_streaming_enabled;
 }
 
-absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+absl::StatusOr<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule&>
 McpJsonRestBridgeFilterConfig::getToolsListHttpRule() const {
   if (!proto_config_.tool_config().has_tool_list_http_rule()) {
     return absl::NotFoundError("tools_list_http_rule is not configured.");
@@ -429,8 +429,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc,
 
   // TODO(guoyilin42): Consider supporting local response for tools/list in addition to the GET.
   if (method == McpConstants::Methods::TOOLS_LIST) {
-    absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule> http_rule =
-        config_->getToolsListHttpRule();
+    auto http_rule = config_->getToolsListHttpRule();
     if (http_rule.ok() && !http_rule->get().empty()) {
       mcp_operation_ = McpOperation::ToolsList;
       // We don't support pagination for the tools/list request for now.
@@ -602,8 +601,7 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_
   }
   const auto& tool_name = name_it->get<std::string>();
 
-  absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule> http_rule =
-      config_->getHttpRule(tool_name);
+  auto http_rule = config_->getHttpRule(tool_name);
   if (!http_rule.ok()) {
     ENVOY_STREAM_LOG(error, "Failed to get http rule for method: {}", *decoder_callbacks_,
                      tool_name);
@@ -627,7 +625,9 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_
   const nlohmann::json empty_arguments = nlohmann::json::object();
   const nlohmann::json& arguments = arguments_it != params.end() ? *arguments_it : empty_arguments;
 
-  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(*http_rule, arguments);
+  absl::StatusOr<HttpRequest> http_request =
+      buildHttpRequest(*http_rule, arguments, http_rule->header_parameter_bindings(),
+                       http_rule->cookie_parameter_bindings());
   if (!http_request.ok()) {
     ENVOY_STREAM_LOG(error, "Failed to build HTTP request for method: {} with status: {}",
                      *decoder_callbacks_, tool_name, http_request.status());
@@ -658,6 +658,21 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_
     // Set AcceptEncoding to "identity" to prevent server encoding the response.
     request_headers->setCopy(Http::CustomHeaders::get().AcceptEncoding,
                              Http::CustomHeaders::get().AcceptEncodingValues.Identity);
+
+    // Add header parameters.
+    for (const auto& [key, value] : http_request->headers_params) {
+      ENVOY_STREAM_LOG(debug, "Adding header: {} with value: {}", *decoder_callbacks_, key, value);
+      request_headers->setCopy(Http::LowerCaseString(key), value);
+    }
+
+    // Add cookie parameters.
+    if (!http_request->cookies_params.empty()) {
+      ENVOY_STREAM_LOG(debug, "Adding cookie: {}", *decoder_callbacks_,
+                       absl::StrJoin(http_request->cookies_params, "; ", absl::PairFormatter("=")));
+      request_headers->setCopy(
+          Envoy::Http::Headers::get().Cookie,
+          absl::StrJoin(http_request->cookies_params, "; ", absl::PairFormatter("=")));
+    }
   }
 
   if (decoder_callbacks_->downstreamCallbacks().has_value()) {

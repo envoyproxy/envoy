@@ -35,9 +35,9 @@ public:
       const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
           proto_config);
 
-  absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+  absl::StatusOr<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule&>
   getHttpRule(absl::string_view tool_name) const;
-  absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+  absl::StatusOr<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule&>
   getToolsListHttpRule() const;
 
   const std::string& fallbackProtocolVersion() const { return fallback_protocol_version_; }

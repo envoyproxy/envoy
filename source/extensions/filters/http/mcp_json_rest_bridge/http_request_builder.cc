@@ -14,6 +14,7 @@ namespace HttpFilters {
 namespace McpJsonRestBridge {
 namespace {
 
+using ::envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule;
 using ::nlohmann::json;
 
 absl::StatusOr<json> getJsonValue(const json& data, absl::string_view path) {
@@ -41,10 +42,11 @@ struct QueryParam {
   std::string value;
 };
 
-absl::Status constructQueryParams(std::vector<QueryParam>& query_params,
-                                  absl::string_view body_rule, const json& arguments,
-                                  const absl::flat_hash_set<std::string>& templates,
-                                  const std::string& path) {
+absl::Status constructQueryParams(
+    std::vector<QueryParam>& query_params, absl::string_view body_rule, const json& arguments,
+    const absl::flat_hash_set<std::string>& templates, absl::string_view path,
+    absl::Span<const HttpRule::ParameterBinding* const> header_parameter_bindings,
+    absl::Span<const HttpRule::ParameterBinding* const> cookie_parameter_bindings) {
   // Skip if it's a URL path template
   if (templates.contains(path)) {
     return absl::OkStatus();
@@ -52,15 +54,32 @@ absl::Status constructQueryParams(std::vector<QueryParam>& query_params,
 
   // Skip if it's part of the body
   if (!body_rule.empty()) {
-    if (path == body_rule || absl::StartsWith(path, std::string(body_rule) + ".")) {
+    if (path == body_rule || (absl::StartsWith(path, body_rule) && path[body_rule.size()] == '.')) {
+      return absl::OkStatus();
+    }
+  }
+
+  // Skip if it's part of header parameter bindings.
+  for (const auto& binding : header_parameter_bindings) {
+    const absl::string_view arg_path = binding->argument_path();
+    if (path == arg_path || (absl::StartsWith(path, arg_path) && path[arg_path.size()] == '.')) {
+      return absl::OkStatus();
+    }
+  }
+  // Skip if it's part of cookie parameter bindings.
+  for (const auto& binding : cookie_parameter_bindings) {
+    const absl::string_view arg_path = binding->argument_path();
+    if (path == arg_path || (absl::StartsWith(path, arg_path) && path[arg_path.size()] == '.')) {
       return absl::OkStatus();
     }
   }
 
   if (arguments.is_object()) {
     for (auto it = arguments.begin(); it != arguments.end(); ++it) {
-      absl::Status status = constructQueryParams(query_params, body_rule, it.value(), templates,
-                                                 path.empty() ? it.key() : path + "." + it.key());
+      absl::Status status =
+          constructQueryParams(query_params, body_rule, it.value(), templates,
+                               path.empty() ? it.key() : absl::StrCat(path, ".", it.key()),
+                               header_parameter_bindings, cookie_parameter_bindings);
       if (!status.ok()) {
         return status;
       }
@@ -70,7 +89,8 @@ absl::Status constructQueryParams(std::vector<QueryParam>& query_params,
   if (arguments.is_array()) {
     for (auto& array_item : arguments) {
       absl::Status status =
-          constructQueryParams(query_params, body_rule, array_item, templates, path);
+          constructQueryParams(query_params, body_rule, array_item, templates, path,
+                               header_parameter_bindings, cookie_parameter_bindings);
       if (!status.ok()) {
         return status;
       }
@@ -80,7 +100,7 @@ absl::Status constructQueryParams(std::vector<QueryParam>& query_params,
 
   const std::string value = jsonValueToString(arguments);
   // Uses Http::Utility::PercentEncoding::urlEncode to escape the value.
-  query_params.push_back({path, Http::Utility::PercentEncoding::urlEncode(value)});
+  query_params.push_back({std::string(path), Http::Utility::PercentEncoding::urlEncode(value)});
   return absl::OkStatus();
 }
 
@@ -88,11 +108,12 @@ void appendQueryParamsToBaseUrl(std::string& url, absl::Span<const QueryParam> q
   if (query_params.empty()) {
     return;
   }
-  url += "?";
-  url += absl::StrJoin(query_params, "&", [](std::string* out, const QueryParam& query_param) {
-    absl::StrAppend(out, Http::Utility::PercentEncoding::urlEncode(query_param.key), "=",
-                    query_param.value);
-  });
+  absl::StrAppend(
+      &url, "?",
+      absl::StrJoin(query_params, "&", [](std::string* out, const QueryParam& query_param) {
+        absl::StrAppend(out, Http::Utility::PercentEncoding::urlEncode(query_param.key), "=",
+                        query_param.value);
+      }));
 }
 
 // Recursively removes a path from a JSON object.
@@ -124,9 +145,11 @@ void removeJsonPath(json& data, absl::string_view path) {
   recursiveRemoveJsonPath(data, parts);
 }
 
-absl::StatusOr<json> constructRequestBody(absl::string_view body_rule,
-                                          const absl::flat_hash_set<std::string>& templates,
-                                          const json& arguments) {
+absl::StatusOr<json> constructRequestBody(
+    absl::string_view body_rule, const absl::flat_hash_set<std::string>& templates,
+    const json& arguments,
+    absl::Span<const HttpRule::ParameterBinding* const> header_parameter_bindings,
+    absl::Span<const HttpRule::ParameterBinding* const> cookie_parameter_bindings) {
   if (body_rule.empty()) {
     return nullptr;
   }
@@ -135,9 +158,29 @@ absl::StatusOr<json> constructRequestBody(absl::string_view body_rule,
     for (const auto& path : templates) {
       removeJsonPath(body, path);
     }
+    for (const auto& binding : header_parameter_bindings) {
+      removeJsonPath(body, binding->argument_path());
+    }
+    for (const auto& binding : cookie_parameter_bindings) {
+      removeJsonPath(body, binding->argument_path());
+    }
     return body;
   }
   return getJsonValue(arguments, body_rule);
+}
+
+void populateParamsMap(absl::Span<const HttpRule::ParameterBinding* const> bindings,
+                       const json& arguments,
+                       absl::flat_hash_map<std::string, std::string>& params_map) {
+  for (const auto& binding : bindings) {
+    absl::StatusOr<json> value = getJsonValue(arguments, binding->argument_path());
+    if (!value.ok()) {
+      // This is expected when the parameter is optional.
+      continue;
+    }
+    params_map[binding->name()] =
+        Http::Utility::PercentEncoding::urlEncode(jsonValueToString(*std::move(value)));
+  }
 }
 
 } // namespace
@@ -155,7 +198,7 @@ absl::StatusOr<std::string> constructBaseUrl(absl::string_view pattern,
     // in addition to the specified reserved characters.
     std::string value_str = Http::Utility::PercentEncoding::encode(
         jsonValueToString(*template_value_json), ReservedChars);
-    std::string var_pattern = "\\{" + RE2::QuoteMeta(element) + "(?:=[^}]+)?\\}";
+    std::string var_pattern = absl::StrCat("\\{", RE2::QuoteMeta(element), "(?:=[^}]+)?\\}");
     RE2::GlobalReplace(&base_url, var_pattern, value_str);
   }
   return base_url;
@@ -163,7 +206,13 @@ absl::StatusOr<std::string> constructBaseUrl(absl::string_view pattern,
 
 absl::StatusOr<HttpRequest> buildHttpRequest(
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule& http_rule,
-    const nlohmann::json& arguments) {
+    const nlohmann::json& arguments,
+    absl::Span<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule::
+                   ParameterBinding* const>
+        header_parameter_bindings,
+    absl::Span<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule::
+                   ParameterBinding* const>
+        cookie_parameter_bindings) {
   std::string pattern;
   std::string method;
   // TODO(guoyilin42): Add validation to ensure exactly one HTTP method is specified.
@@ -201,22 +250,31 @@ absl::StatusOr<HttpRequest> buildHttpRequest(
   if (http_rule.body() != "*") {
     std::string base_path;
     if (auto status =
-            constructQueryParams(query_params, http_rule.body(), arguments, templates, base_path);
+            constructQueryParams(query_params, http_rule.body(), arguments, templates, base_path,
+                                 header_parameter_bindings, cookie_parameter_bindings);
         !status.ok()) {
       return status;
     }
   }
   appendQueryParamsToBaseUrl(*url, query_params);
 
-  absl::StatusOr<json> http_body = constructRequestBody(http_rule.body(), templates, arguments);
+  absl::StatusOr<json> http_body = constructRequestBody(
+      http_rule.body(), templates, arguments, header_parameter_bindings, cookie_parameter_bindings);
   if (!http_body.ok()) {
     return http_body.status();
   }
+
+  absl::flat_hash_map<std::string, std::string> headers_params;
+  populateParamsMap(header_parameter_bindings, arguments, headers_params);
+  absl::flat_hash_map<std::string, std::string> cookies_params;
+  populateParamsMap(cookie_parameter_bindings, arguments, cookies_params);
 
   return HttpRequest{
       .url = *std::move(url),
       .method = std::move(method),
       .body = *std::move(http_body),
+      .headers_params = std::move(headers_params),
+      .cookies_params = std::move(cookies_params),
   };
 }
 
