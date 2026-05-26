@@ -58,6 +58,8 @@ go_library(
         "sdk/go/shared/http_api.go",
         "sdk/go/shared/network_api.go",
         "sdk/go/shared/network_base.go",
+        "sdk/go/shared/stats_sink.go",
+        "sdk/go/shared/stats_sink_api.go",
         "sdk/go/shared/types.go",
     ],
     cgo = True,

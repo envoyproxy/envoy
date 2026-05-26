@@ -63,6 +63,7 @@ envoy_cc_test(
     srcs = ["integration_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:stat_sink_integration_test",
+        "//test/extensions/dynamic_modules/test_data/go:stat_sink",
     ],
     deps = [
         "//source/extensions/stat_sinks/dynamic_modules:config",
