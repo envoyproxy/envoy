@@ -301,7 +301,7 @@ void OpenTelemetryGrpcMetricsExporterImpl::send(MetricsExportRequestPtr&& export
 void OpenTelemetryGrpcMetricsExporterImpl::onSuccess(
     Grpc::ResponsePtr<MetricsExportResponse>&& export_response, Tracing::Span&) {
   if (export_response->has_partial_success()) {
-    ENVOY_LOG(debug,
+    ENVOY_LOG(warn,
               "export response with partial success; {} rejected, collector "
               "message: {}",
               export_response->partial_success().rejected_data_points(),
@@ -312,7 +312,7 @@ void OpenTelemetryGrpcMetricsExporterImpl::onSuccess(
 void OpenTelemetryGrpcMetricsExporterImpl::onFailure(Grpc::Status::GrpcStatus response_status,
                                                      const std::string& response_message,
                                                      Tracing::Span&) {
-  ENVOY_LOG(debug, "export failure; status: {}, message: {}", response_status, response_message);
+  ENVOY_LOG(warn, "export failure; status: {}, message: {}", response_status, response_message);
 }
 
 template <class StatType>
