@@ -64,6 +64,8 @@ BPF
 Bdecoded
 Bencoded
 CIO
+CBC
+cbc
 cbegin
 cend
 constness
@@ -713,6 +715,7 @@ ci
 ciphersuite
 ciphersuites
 ciphertext
+ciphertexts
 circllhist
 clientcert
 cloneable
@@ -759,6 +762,7 @@ ctad
 ctor
 ctrl
 customizations
+cutover
 darwin
 datacenter
 datadog
