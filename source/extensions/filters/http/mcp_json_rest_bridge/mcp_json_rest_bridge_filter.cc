@@ -315,6 +315,11 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& dat
     std::string escaped_chunk = JsonEscaper::escapeString(chunk, JsonEscaper::extraSpace(chunk));
 
     data.drain(len);
+    // Note: UTF-8 structural validation (i.e., utf8_range::IsStructurallyValid) is omitted
+    // in the streaming fast-path due to the stateless nature of chunk processing (which lacks
+    // a stateful UTF-8 validator to track multi-byte character boundaries across chunk limits).
+    // If the upstream backend returns invalid UTF-8, it will be streamed to the client as-is,
+    // which may cause the client to fail parsing the final JSON.
     if (is_first_streaming_chunk_) {
       ENVOY_STREAM_LOG(debug,
                        "Streaming: emitting prefix + first chunk ({} raw bytes, {} escaped bytes).",
