@@ -17,7 +17,8 @@ class EnvoyTlsServerHandshaker : public quic::TlsServerHandshaker {
 public:
   EnvoyTlsServerHandshaker(quic::QuicSession* session,
                            const quic::QuicCryptoServerConfig* crypto_config,
-                           Ssl::ServerContextSharedPtr pinned_ssl_ctx, bool disable_resumption);
+                           Ssl::ServerContextSharedPtr pinned_ssl_ctx, bool disable_resumption,
+                           bool ticket_support_active);
 
   // Session ticket key callback installed on the QUICHE ssl context.
   // Retrieves the handshaker from ssl ex_data and delegates to the pinned

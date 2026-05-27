@@ -17,15 +17,11 @@ EnvoyQuicCryptoServerStreamFactoryImpl::createEnvoyQuicCryptoServerStream(
     // downstreams. Do not remove it.
     Envoy::Event::Dispatcher& /*dispatcher*/) {
 
-  if (!transport_socket_factory.has_value()) {
-    return quic::CreateCryptoServerStream(crypto_config, compressed_certs_cache, session, helper);
-  }
-
   const bool ticket_support =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_session_ticket_support");
   const bool keylog_support =
       Runtime::runtimeFeatureEnabled("envoy.restart_features.quic_keylog_support");
-  if (!ticket_support && !keylog_support) {
+  if (!transport_socket_factory.has_value() || (!ticket_support && !keylog_support)) {
     return quic::CreateCryptoServerStream(crypto_config, compressed_certs_cache, session, helper);
   }
 
@@ -38,7 +34,7 @@ EnvoyQuicCryptoServerStreamFactoryImpl::createEnvoyQuicCryptoServerStream(
   }
 
   return std::make_unique<EnvoyTlsServerHandshaker>(session, crypto_config, factory.sslCtx(),
-                                                    disable_resumption);
+                                                    disable_resumption, ticket_support);
 }
 
 REGISTER_FACTORY(EnvoyQuicCryptoServerStreamFactoryImpl,
