@@ -331,6 +331,9 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& dat
                        *encoder_callbacks_, len, escaped_chunk.size());
     }
     data.add(escaped_chunk);
+    // TODO(guoyilin42): There will be a case that end_stream is not set in the encodeData call.
+    // This is body + trailer case where encodeTrailer call represents the end of response body.
+    // In that case, we should add the streaming_json_suffix at encodeTrailer call.
     if (end_stream) {
       ENVOY_STREAM_LOG(debug, "Streaming: appending suffix, stream complete.", *encoder_callbacks_);
       data.add(streaming_json_suffix_);
@@ -397,6 +400,10 @@ void McpJsonRestBridgeFilter::buildStreamingPrefixAndSuffix(bool is_error) {
   // Locate the empty-string placeholder for the text value: `"text":""`.
   std::string marker = absl::StrCat("\"", McpConstants::TEXT_FIELD, "\":\"\"");
   size_t pos = ref_json.find(marker);
+  if (pos == std::string::npos) {
+    IS_ENVOY_BUG("JSON-RPC streaming marker not found in serialized envelope");
+    return;
+  }
   streaming_json_prefix_ = ref_json.substr(0, pos + marker.size() - 1);
   streaming_json_suffix_ = ref_json.substr(pos + marker.size() - 1);
 }
