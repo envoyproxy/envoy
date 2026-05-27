@@ -316,7 +316,7 @@ TEST_F(ExtAuthzGrpcClientTest, GrpcCallFailureDoesNotSetStatusCode) {
   // Expected: status_code should be unset (0), not Forbidden.
   auto expected_response = Response{};
   expected_response.status = CheckStatus::Error;
-  expected_response.status_code = static_cast<Http::Code>(0); // Unset
+  expected_response.status_code = {}; // Unset
   expected_response.grpc_status = grpc_status;
 
   envoy::service::auth::v3::CheckRequest request;
@@ -631,6 +631,84 @@ ok_response:
   EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
   EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
                                       AuthzOkResponse(expected_authz_response))));
+  client_->onSuccess(std::make_unique<envoy::service::auth::v3::CheckResponse>(check_response),
+                     span_);
+}
+
+// This test ensures keep_empty_value is respected in ext_authz responses.
+TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithKeepEmptyValueRespected) {
+  initialize();
+
+  envoy::service::auth::v3::CheckResponse check_response;
+  TestUtility::loadFromYaml(R"EOF(
+status:
+  code: 0
+ok_response:
+  headers:
+  - header:
+      key: x-keep-empty
+      value: ""
+    keep_empty_value: false
+)EOF",
+                            check_response);
+
+  // keep_empty_value is false and value is empty, so the header should be dropped.
+  auto expected_authz_response = Response{
+      .status = CheckStatus::OK,
+      .headers_to_set = UnsafeHeaderVector{},
+      .status_code = Http::Code::OK,
+      .grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok,
+  };
+
+  envoy::service::auth::v3::CheckRequest request;
+  expectCallSend(request);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+  Http::TestRequestHeaderMapImpl headers;
+  client_->onCreateInitialMetadata(headers);
+
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  EXPECT_CALL(request_callbacks_, onComplete_(testing::_))
+      .WillOnce(testing::Invoke([&expected_authz_response](ResponsePtr& response) {
+        EXPECT_TRUE(TestCommon::compareHeaderVector(response->headers_to_set,
+                                                    expected_authz_response.headers_to_set));
+      }));
+  client_->onSuccess(std::make_unique<envoy::service::auth::v3::CheckResponse>(check_response),
+                     span_);
+}
+
+TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithKeepEmptyValueTrue) {
+  initialize();
+  envoy::service::auth::v3::CheckResponse check_response;
+  TestUtility::loadFromYaml(R"EOF(
+status:
+  code: 0
+ok_response:
+  headers:
+  - header:
+      key: x-keep-empty
+      value: ""
+    keep_empty_value: true
+)EOF",
+                            check_response);
+  // keep_empty_value is true and value is empty, so the header should be kept.
+  auto expected_authz_response = Response{
+      .status = CheckStatus::OK,
+      .headers_to_set = UnsafeHeaderVector{{"x-keep-empty", ""}},
+      .status_code = Http::Code::OK,
+      .grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok,
+  };
+  envoy::service::auth::v3::CheckRequest request;
+  expectCallSend(request);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  Http::TestRequestHeaderMapImpl headers;
+  client_->onCreateInitialMetadata(headers);
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  EXPECT_CALL(request_callbacks_, onComplete_(testing::_))
+      .WillOnce(testing::Invoke([&expected_authz_response](ResponsePtr& response) {
+        EXPECT_TRUE(TestCommon::compareHeaderVector(response->headers_to_set,
+                                                    expected_authz_response.headers_to_set));
+      }));
   client_->onSuccess(std::make_unique<envoy::service::auth::v3::CheckResponse>(check_response),
                      span_);
 }

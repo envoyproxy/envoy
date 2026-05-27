@@ -406,8 +406,9 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_factory_config
   is_upstream: bool,
 ) -> abi::envoy_dynamic_module_type_transport_socket_factory_config_module_ptr {
   catch_unwind(AssertUnwindSafe(|| {
-    let name_bytes =
-      unsafe { std::slice::from_raw_parts(socket_name.ptr as *const u8, socket_name.length) };
+    let name_bytes = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(socket_name.ptr as *const u8, socket_name.length)
+    };
     let name_str = match std::str::from_utf8(name_bytes) {
       Ok(s) => s,
       Err(_) => {
@@ -415,8 +416,12 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_factory_config
         return std::ptr::null();
       },
     };
-    let config_slice =
-      unsafe { std::slice::from_raw_parts(socket_config.ptr as *const u8, socket_config.length) };
+    let config_slice = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(
+        socket_config.ptr as *const u8,
+        socket_config.length,
+      )
+    };
     let Some(new_config_fn) = crate::NEW_TRANSPORT_SOCKET_FACTORY_CONFIG_FUNCTION.get() else {
       crate::envoy_log_error!(
         "transport socket factory config function not registered; ensure \

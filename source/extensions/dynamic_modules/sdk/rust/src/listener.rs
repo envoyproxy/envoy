@@ -568,13 +568,9 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
     if !result || address.length == 0 || address.ptr.is_null() {
       return None;
     }
-    let address_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        address.ptr as *const _,
-        address.length,
-      ))
-    };
-    Some((address_str.to_string(), port))
+    let address_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(address.ptr as *const u8, address.length) };
+    Some((address_str.into_owned(), port))
   }
 
   fn get_local_address(&self) -> Option<(String, u32)> {
@@ -593,13 +589,9 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
     if !result || address.length == 0 || address.ptr.is_null() {
       return None;
     }
-    let address_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        address.ptr as *const _,
-        address.length,
-      ))
-    };
-    Some((address_str.to_string(), port))
+    let address_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(address.ptr as *const u8, address.length) };
+    Some((address_str.into_owned(), port))
   }
 
   fn get_direct_remote_address(&self) -> Option<(String, u32)> {
@@ -618,13 +610,9 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
     if !result || address.length == 0 || address.ptr.is_null() {
       return None;
     }
-    let address_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        address.ptr as *const _,
-        address.length,
-      ))
-    };
-    Some((address_str.to_string(), port))
+    let address_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(address.ptr as *const u8, address.length) };
+    Some((address_str.into_owned(), port))
   }
 
   fn get_direct_local_address(&self) -> Option<(String, u32)> {
@@ -643,13 +631,9 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
     if !result || address.length == 0 || address.ptr.is_null() {
       return None;
     }
-    let address_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        address.ptr as *const _,
-        address.length,
-      ))
-    };
-    Some((address_str.to_string(), port))
+    let address_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(address.ptr as *const u8, address.length) };
+    Some((address_str.into_owned(), port))
   }
 
   fn get_original_dst(&self) -> Option<(String, u32)> {
@@ -668,13 +652,9 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
     if !result || address.length == 0 || address.ptr.is_null() {
       return None;
     }
-    let address_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        address.ptr as *const _,
-        address.length,
-      ))
-    };
-    Some((address_str.to_string(), port))
+    let address_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(address.ptr as *const u8, address.length) };
+    Some((address_str.into_owned(), port))
   }
 
   fn get_address_type(&self) -> abi::envoy_dynamic_module_type_address_type {
@@ -722,13 +702,9 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
       )
     };
     if success && !result.ptr.is_null() && result.length > 0 {
-      let value_str = unsafe {
-        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-          result.ptr as *const _,
-          result.length,
-        ))
-      };
-      Some(value_str.to_string())
+      let value_str =
+        unsafe { crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length) };
+      Some(value_str.into_owned())
     } else {
       None
     }
@@ -1220,16 +1196,14 @@ pub extern "C" fn envoy_dynamic_module_on_listener_filter_config_new(
 ) -> abi::envoy_dynamic_module_type_listener_filter_config_module_ptr {
   catch_unwind(AssertUnwindSafe(|| {
     let mut envoy_filter_config = EnvoyListenerFilterConfigImpl::new(envoy_filter_config_ptr);
-    let name_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        name.ptr as *const _,
-        name.length,
-      ))
+    let name_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(name.ptr as *const u8, name.length) };
+    let config_slice = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(config.ptr as *const u8, config.length)
     };
-    let config_slice = unsafe { std::slice::from_raw_parts(config.ptr as *const _, config.length) };
     init_listener_filter_config(
       &mut envoy_filter_config,
-      name_str,
+      name_str.as_ref(),
       config_slice,
       NEW_LISTENER_FILTER_CONFIG_FUNCTION
         .get()
@@ -1428,31 +1402,25 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_listener_filter_http_callout_do
     let filter = unsafe { &mut *filter };
 
     // Convert headers to Vec<(EnvoyBuffer, EnvoyBuffer)>.
-    let header_vec = if headers.is_null() || headers_size == 0 {
-      Vec::new()
-    } else {
-      let headers_slice = unsafe { std::slice::from_raw_parts(headers, headers_size) };
-      headers_slice
-        .iter()
-        .map(|h| {
-          (
-            unsafe { EnvoyBuffer::new_from_raw(h.key_ptr as *const _, h.key_length) },
-            unsafe { EnvoyBuffer::new_from_raw(h.value_ptr as *const _, h.value_length) },
-          )
-        })
-        .collect()
-    };
+    let headers_slice =
+      unsafe { crate::ffi_helpers::slice_from_raw_or_empty(headers, headers_size) };
+    let header_vec: Vec<(EnvoyBuffer, EnvoyBuffer)> = headers_slice
+      .iter()
+      .map(|h| {
+        (
+          unsafe { EnvoyBuffer::new_from_raw(h.key_ptr as *const _, h.key_length) },
+          unsafe { EnvoyBuffer::new_from_raw(h.value_ptr as *const _, h.value_length) },
+        )
+      })
+      .collect();
 
     // Convert body chunks to Vec<EnvoyBuffer>.
-    let body_vec = if body_chunks.is_null() || body_chunks_size == 0 {
-      Vec::new()
-    } else {
-      let chunks_slice = unsafe { std::slice::from_raw_parts(body_chunks, body_chunks_size) };
-      chunks_slice
-        .iter()
-        .map(|c| unsafe { EnvoyBuffer::new_from_raw(c.ptr as *const _, c.length) })
-        .collect()
-    };
+    let chunks_slice =
+      unsafe { crate::ffi_helpers::slice_from_raw_or_empty(body_chunks, body_chunks_size) };
+    let body_vec: Vec<EnvoyBuffer> = chunks_slice
+      .iter()
+      .map(|c| unsafe { EnvoyBuffer::new_from_raw(c.ptr as *const _, c.length) })
+      .collect();
 
     filter.on_http_callout_done(
       &mut EnvoyListenerFilterImpl::new(envoy_ptr),

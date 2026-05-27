@@ -5,7 +5,7 @@
 
 use crate::abi;
 use std::ffi::c_void;
-use std::{ptr, slice};
+use std::ptr;
 
 /// Read-only context for accessing HTTP matching data during match evaluation.
 ///
@@ -92,8 +92,8 @@ impl MatchContext {
         .iter()
         .map(|h| unsafe {
           (
-            slice::from_raw_parts(h.key_ptr as *const u8, h.key_length),
-            slice::from_raw_parts(h.value_ptr as *const u8, h.value_length),
+            crate::ffi_helpers::slice_from_raw_or_empty(h.key_ptr as *const u8, h.key_length),
+            crate::ffi_helpers::slice_from_raw_or_empty(h.value_ptr as *const u8, h.value_length),
           )
         })
         .collect(),
@@ -125,7 +125,7 @@ impl MatchContext {
       )
     } {
       unsafe {
-        Some(slice::from_raw_parts(
+        Some(crate::ffi_helpers::slice_from_raw_or_empty(
           result.ptr as *const u8,
           result.length,
         ))
@@ -206,12 +206,17 @@ macro_rules! declare_matcher {
       config: $crate::abi::envoy_dynamic_module_type_envoy_buffer,
     ) -> *const ::std::ffi::c_void {
       ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
-        let name_str = unsafe {
-          let slice = ::std::slice::from_raw_parts(name.ptr as *const u8, name.length);
-          ::std::str::from_utf8(slice).unwrap_or("")
+        // Safe under `(nullptr, 0)` via `ffi_helpers`. The matcher name is used as a registry
+        // lookup key by user `MatcherConfig::new` implementations, so invalid UTF-8 must map to
+        // the empty string rather than being rewritten with `U+FFFD` substitutions; the latter
+        // would silently route invalid bytes to a different registry entry.
+        let name_slice = unsafe {
+          $crate::ffi_helpers::slice_from_raw_or_empty(name.ptr as *const u8, name.length)
         };
-        let config_bytes =
-          unsafe { ::std::slice::from_raw_parts(config.ptr as *const u8, config.length) };
+        let name_str: &str = ::std::str::from_utf8(name_slice).unwrap_or("");
+        let config_bytes = unsafe {
+          $crate::ffi_helpers::slice_from_raw_or_empty(config.ptr as *const u8, config.length)
+        };
 
         match <$config_type as $crate::matcher::MatcherConfig>::new(name_str, config_bytes) {
           Ok(c) => Box::into_raw(Box::new(c)) as *const ::std::ffi::c_void,

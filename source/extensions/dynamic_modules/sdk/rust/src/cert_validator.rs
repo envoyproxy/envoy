@@ -255,13 +255,13 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_config_new(
   config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> abi::envoy_dynamic_module_type_cert_validator_config_module_ptr {
   catch_unwind(AssertUnwindSafe(|| {
-    let name_str = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-      name.ptr as *const _,
-      name.length,
-    ));
-    let config_slice = std::slice::from_raw_parts(config.ptr as *const _, config.length);
+    let name_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(name.ptr as *const u8, name.length) };
+    let config_slice = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(config.ptr as *const u8, config.length)
+    };
     init_cert_validator_config(
-      name_str,
+      name_str.as_ref(),
       config_slice,
       NEW_CERT_VALIDATOR_CONFIG_FUNCTION
         .get()
@@ -325,21 +325,23 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_do_verify_cert_c
 
     let envoy_cert_validator = EnvoyCertValidator::new(config_envoy_ptr);
 
-    let cert_buffers = std::slice::from_raw_parts(certs, certs_count);
+    // `certs` may be null when `certs_count` is 0 (for example, a TLS handshake with no
+    // client certificate). `slice_from_raw_or_empty` returns an empty slice for null without
+    // dereferencing.
+    let cert_buffers: &[crate::abi::envoy_dynamic_module_type_envoy_buffer] =
+      crate::ffi_helpers::slice_from_raw_or_empty(certs, certs_count);
     let cert_slices: Vec<&[u8]> = cert_buffers
       .iter()
-      .map(|buf| std::slice::from_raw_parts(buf.ptr as *const u8, buf.length))
+      .map(|buf| crate::ffi_helpers::slice_from_raw_or_empty(buf.ptr as *const u8, buf.length))
       .collect();
 
-    let host_name_str = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-      host_name.ptr as *const _,
-      host_name.length,
-    ));
+    let host_name_str =
+      crate::ffi_helpers::str_lossy_from_raw(host_name.ptr as *const u8, host_name.length);
 
     let result = config.do_verify_cert_chain(
       &envoy_cert_validator,
       &cert_slices,
-      host_name_str,
+      host_name_str.as_ref(),
       is_server,
     );
 

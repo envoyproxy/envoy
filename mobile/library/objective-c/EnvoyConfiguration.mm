@@ -1,8 +1,10 @@
 #import "library/objective-c/EnvoyEngine.h"
 
-#import "library/cc/engine_builder.h"
+#import "library/cc/mobile_engine_builder.h"
 #import "library/cc/direct_response_testing.h"
 #include "source/common/protobuf/utility.h"
+
+using Envoy::Platform::MobileEngineBuilder;
 
 @implementation NSString (CXX)
 - (std::string)toCXXString {
@@ -154,8 +156,8 @@
   return self;
 }
 
-- (Envoy::Platform::EngineBuilder)applyToCXXBuilder {
-  Envoy::Platform::EngineBuilder builder;
+- (MobileEngineBuilder)applyToCXXBuilder {
+  MobileEngineBuilder builder;
 
   for (EnvoyNativeFilterConfig *nativeFilterConfig in
        [self.nativeFilterChain reverseObjectEnumerator]) {
@@ -228,8 +230,8 @@
 
 - (std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>)generateBootstrap {
   try {
-    Envoy::Platform::EngineBuilder builder = [self applyToCXXBuilder];
-    return builder.generateBootstrap();
+    MobileEngineBuilder builder = [self applyToCXXBuilder];
+    return std::move(builder.generateBootstrap().value());
   } catch (const std::exception &e) {
     NSLog(@"[Envoy] error generating bootstrap: %@", @(e.what()));
     return nullptr;

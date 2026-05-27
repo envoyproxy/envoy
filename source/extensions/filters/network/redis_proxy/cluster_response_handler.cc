@@ -239,7 +239,7 @@ bool AllshardSameResponseHandler::areAllResponsesSame() const {
 
   const Common::Redis::RespValue* first_response = pending_responses_.front().get();
   for (const auto& response : pending_responses_) {
-    if (!response || !first_response || *(response.get()) != *first_response) {
+    if (!response || !first_response || *response != *first_response) {
       return false;
     }
   }

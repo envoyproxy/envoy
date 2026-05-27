@@ -32,7 +32,6 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/health_checker_factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
@@ -870,9 +869,9 @@ public:
 
   std::vector<TestSessionPtr> test_sessions_;
   std::shared_ptr<TestHttpHealthCheckerImpl> health_checker_;
-  std::list<uint32_t> connection_index_{};
-  std::list<uint32_t> codec_index_{};
-  const HostWithHealthCheckMap health_checker_map_{};
+  std::list<uint32_t> connection_index_;
+  std::list<uint32_t> codec_index_;
+  const HostWithHealthCheckMap health_checker_map_;
 };
 
 TEST_F(HttpHealthCheckerImplTest, Success) {
@@ -5273,8 +5272,8 @@ public:
 
   std::vector<TestSessionPtr> test_sessions_;
   std::shared_ptr<TestGrpcHealthCheckerImpl> health_checker_;
-  std::list<uint32_t> connection_index_{};
-  std::list<uint32_t> codec_index_{};
+  std::list<uint32_t> connection_index_;
+  std::list<uint32_t> codec_index_;
 };
 
 // NOLINTNEXTLINE(readability-identifier-naming)

@@ -96,8 +96,8 @@ class HttpFilterTest : public testing::Test {
 protected:
   enum DoStartOption {
     DEFAULT = 1,
-    ON_GRPC_ERROR = 2,
-    ON_GRPC_CLOSE = 3,
+    OnGrpcError = 2,
+    OnGrpcClose = 3,
   };
   void initialize(std::string&& yaml, bool is_upstream_filter = false) {
     scoped_runtime_.mergeValues(
@@ -212,12 +212,12 @@ protected:
                                      const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                                      const Envoy::Http::AsyncClient::StreamOptions&,
                                      Envoy::Http::StreamFilterSidestreamWatermarkCallbacks&) {
-    if (do_start_option_ == ON_GRPC_ERROR) {
+    if (do_start_option_ == OnGrpcError) {
       callbacks.onGrpcError(Grpc::Status::Internal, "foo");
       return nullptr;
     }
 
-    if (do_start_option_ == ON_GRPC_CLOSE) {
+    if (do_start_option_ == OnGrpcClose) {
       callbacks.onGrpcClose();
       return nullptr;
     }
@@ -3534,6 +3534,45 @@ TEST_F(HttpFilterTest, OutOfOrderFailClose) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
+// Test the "!chunk.has_value()" behavior when chunk_queue_ is empty during a streamed body
+// callback.
+TEST_F(HttpFilterTest, StreamedBodyCallbackWithEmptyQueue) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SKIP"
+    request_body_mode: "STREAMED"
+  )EOF");
+
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  // Handle headers response to establish the gRPC stream and initialize stream_callbacks_.
+  processRequestHeaders(false, absl::nullopt);
+
+  // Manually transition decoding_state_ to StreamedBodyCallback while the chunk_queue_ is empty.
+  auto& decoding_state = const_cast<ProcessorState&>(filter_->decodingState());
+  decoding_state.onFinishProcessorCall(Grpc::Status::Ok,
+                                       ProcessorState::CallbackState::StreamedBodyCallback);
+
+  // Receive a body response from the server.
+  std::unique_ptr<ProcessingResponse> resp = std::make_unique<ProcessingResponse>();
+  resp->mutable_request_body();
+
+  // This triggers handleBodyResponse, which delegates to handleStreamedBodyResponse.
+  // Since the chunk_queue_ is empty, it will hit the "!chunk.has_value()" branch, trigger
+  // IS_ENVOY_BUG, and return false.
+  EXPECT_ENVOY_BUG(
+      { stream_callbacks_->onReceiveMessage(std::move(resp)); },
+      "Bad streamed body callback state");
+
+  filter_->onDestroy();
+}
+
 class OverrideTest : public testing::Test {
 protected:
   void SetUp() override {
@@ -5951,7 +5990,7 @@ TEST_F(HttpFilterTest, GrpcErrorOnOpenStream) {
       cluster_name: "ext_proc_server"
   )EOF");
 
-  do_start_option_ = ON_GRPC_ERROR;
+  do_start_option_ = OnGrpcError;
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
   filter_->onDestroy();
   EXPECT_EQ(Grpc::Status::Internal, getExtProcLoggingInfo()->getGrpcStatusBeforeFirstCall());
@@ -5964,7 +6003,7 @@ TEST_F(HttpFilterTest, GrpcCloseOnOpenStream) {
       cluster_name: "ext_proc_server"
   )EOF");
 
-  do_start_option_ = ON_GRPC_CLOSE;
+  do_start_option_ = OnGrpcClose;
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   filter_->onDestroy();
   EXPECT_EQ(Grpc::Status::Aborted, getExtProcLoggingInfo()->getGrpcStatusBeforeFirstCall());

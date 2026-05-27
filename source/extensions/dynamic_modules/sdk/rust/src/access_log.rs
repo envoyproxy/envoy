@@ -1278,18 +1278,19 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_config_new(
   config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> *const c_void {
   catch_unwind(AssertUnwindSafe(|| {
-    // The name and config originate from protobuf string/bytes fields, so they are valid
-    // UTF-8 and within bounds when received here. Mirrors the http filter FFI entry point.
-    let name_str = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-      name.ptr as *const _,
-      name.length,
-    ));
-    let config_bytes = std::slice::from_raw_parts(config.ptr as *const _, config.length);
+    // SAFETY: `name` is a protobuf string (UTF-8 by contract) and `config` is opaque bytes.
+    // The helpers additionally tolerate `(nullptr, 0)` empty inputs, and `str_lossy_from_raw`
+    // substitutes `U+FFFD` for any malformed UTF-8 rather than triggering UB.
+    let name_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(name.ptr as *const u8, name.length) };
+    let config_bytes = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(config.ptr as *const u8, config.length)
+    };
     let ctx = ConfigContext::new(config_envoy_ptr);
 
     envoy_dynamic_module_on_access_logger_config_new_impl(
       &ctx,
-      name_str,
+      name_str.as_ref(),
       config_bytes,
       crate::NEW_ACCESS_LOGGER_CONFIG_FUNCTION
         .get()

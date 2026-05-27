@@ -259,13 +259,9 @@ impl EnvoyUdpListenerFilter for EnvoyUdpListenerFilterImpl {
     if !result || address.length == 0 || address.ptr.is_null() {
       return None;
     }
-    let address_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        address.ptr as *const _,
-        address.length,
-      ))
-    };
-    Some((address_str.to_string(), port))
+    let address_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(address.ptr as *const u8, address.length) };
+    Some((address_str.into_owned(), port))
   }
 
   fn get_local_address(&self) -> Option<(String, u32)> {
@@ -284,13 +280,9 @@ impl EnvoyUdpListenerFilter for EnvoyUdpListenerFilterImpl {
     if !result || address.length == 0 || address.ptr.is_null() {
       return None;
     }
-    let address_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        address.ptr as *const _,
-        address.length,
-      ))
-    };
-    Some((address_str.to_string(), port))
+    let address_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(address.ptr as *const u8, address.length) };
+    Some((address_str.into_owned(), port))
   }
 
   fn send_datagram(&mut self, data: &[u8], peer_address: &str, peer_port: u32) -> bool {
@@ -401,16 +393,14 @@ pub extern "C" fn envoy_dynamic_module_on_udp_listener_filter_config_new(
 ) -> abi::envoy_dynamic_module_type_udp_listener_filter_config_module_ptr {
   catch_unwind(AssertUnwindSafe(|| {
     let mut envoy_filter_config = EnvoyUdpListenerFilterConfigImpl::new(envoy_filter_config_ptr);
-    let name_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        name.ptr as *const _,
-        name.length,
-      ))
+    let name_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(name.ptr as *const u8, name.length) };
+    let config_slice = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(config.ptr as *const u8, config.length)
     };
-    let config_slice = unsafe { std::slice::from_raw_parts(config.ptr as *const _, config.length) };
     init_udp_listener_filter_config(
       &mut envoy_filter_config,
-      name_str,
+      name_str.as_ref(),
       config_slice,
       NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION
         .get()

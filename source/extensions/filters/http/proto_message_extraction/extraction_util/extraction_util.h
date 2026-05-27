@@ -44,22 +44,28 @@ constexpr int kProtoTranslationMaxRecursionDepth = 64;
 
 ABSL_CONST_INIT const char* const kStructTypeUrl = "type.googleapis.com/google.protobuf.Struct";
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 bool IsEmptyStruct(const Protobuf::Struct& message_struct);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 bool IsLabelName(absl::string_view value);
 
 // Monitored resource label names are captured within curly brackets ("{", "}").
 // The format is verified by the service config validator, so to extract label
 // name, we just remove the brackets.
+// NOLINTNEXTLINE(readability-identifier-naming)
 std::string GetLabelName(absl::string_view value);
 
 // Singleton mapping of string to ExtractedMessageDirective.
+// NOLINTNEXTLINE(readability-identifier-naming)
 const absl::flat_hash_map<std::string, ExtractedMessageDirective>& StringToDirectiveMap();
 
 absl::optional<ExtractedMessageDirective>
+// NOLINTNEXTLINE(readability-identifier-naming)
 ExtractedMessageDirectiveFromString(absl::string_view directive);
 
 // Returns a mapping of monitored resource label keys to their values.
+// NOLINTNEXTLINE(readability-identifier-naming)
 void GetMonitoredResourceLabels(absl::string_view label_extractor,
                                 absl::string_view resource_string,
                                 Protobuf::Map<std::string, std::string>* labels);
@@ -70,6 +76,7 @@ void GetMonitoredResourceLabels(absl::string_view label_extractor,
 // In case of error or nullptr/empty field_mask, it returns a negative value and
 // logs the error.
 int64_t
+// NOLINTNEXTLINE(readability-identifier-naming)
 ExtractRepeatedFieldSize(const Protobuf::Type& type,
                          std::function<const Protobuf::Type*(const std::string&)> type_finder,
                          const Protobuf::FieldMask* field_mask,
@@ -78,22 +85,27 @@ ExtractRepeatedFieldSize(const Protobuf::Type& type,
 // Extract the size of the repeated field represented by given field mask
 // path from given proto message. `path` must represent a repeated field.
 absl::StatusOr<int64_t>
+// NOLINTNEXTLINE(readability-identifier-naming)
 ExtractRepeatedFieldSizeHelper(const Protobuf::field_extraction::FieldExtractor& field_extractor,
                                const std::string& path,
                                const Protobuf::field_extraction::MessageData& message);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 absl::string_view ExtractLocationIdFromResourceName(absl::string_view resource_name);
 
 // Recursively redacts the path_pieces in the enclosing proto_struct.
+// NOLINTNEXTLINE(readability-identifier-naming)
 void RedactPath(std::vector<std::string>::const_iterator path_begin,
                 std::vector<std::string>::const_iterator path_end, Protobuf::Struct* proto_struct);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 void RedactPaths(absl::Span<const std::string> paths_to_redact, Protobuf::Struct* proto_struct);
 
 // Finds the last value of the non-repeated string field after the first
 // value. Returns an empty string if there is only one string field. Returns
 // an error if the resource is malformed in case that the search goes forever.
 absl::StatusOr<std::string>
+// NOLINTNEXTLINE(readability-identifier-naming)
 FindSingularLastValue(const Protobuf::Field* field,
                       Envoy::Protobuf::io::CodedInputStream* input_stream);
 
@@ -104,15 +116,18 @@ FindSingularLastValue(const Protobuf::Field* field,
 // non-repeated field. However, parsers are expected to handle the case in
 // which they do."
 absl::StatusOr<std::string>
+// NOLINTNEXTLINE(readability-identifier-naming)
 SingularFieldUseLastValue(const std::string first_value, const Protobuf::Field* field,
                           Envoy::Protobuf::io::CodedInputStream* input_stream);
 
 absl::StatusOr<std::string>
+// NOLINTNEXTLINE(readability-identifier-naming)
 ExtractStringFieldValue(const Protobuf::Type& type,
                         std::function<const Protobuf::Type*(const std::string&)> type_finder,
                         const std::string& path,
                         const Protobuf::field_extraction::MessageData& message);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 absl::Status RedactStructRecursively(std::vector<std::string>::const_iterator path_pieces_begin,
                                      std::vector<std::string>::const_iterator path_pieces_end,
                                      Protobuf::Struct* message_struct);
@@ -120,6 +135,7 @@ absl::Status RedactStructRecursively(std::vector<std::string>::const_iterator pa
 // Converts given proto message to Struct. It also adds
 // a "@type" property with proto type url to the generated Struct. Expects the
 // TypeResolver to handle types prefixed with "type.googleapis.com/".
+// NOLINTNEXTLINE(readability-identifier-naming)
 absl::Status ConvertToStruct(const Protobuf::field_extraction::MessageData& message,
                              const Envoy::Protobuf::Type& type,
                              ::Envoy::Protobuf::util::TypeResolver* type_resolver,
@@ -131,6 +147,7 @@ absl::Status ConvertToStruct(const Protobuf::field_extraction::MessageData& mess
 //  (1) `scrubber` is nullptr;
 //  (2) error during scrubbing/converting;
 //  (3) the message is empty after scrubbing;
+// NOLINTNEXTLINE(readability-identifier-naming)
 bool ScrubToStruct(const proto_processing_lib::proto_scrubber::ProtoScrubber* scrubber,
                    const Envoy::Protobuf::Type& type,
                    const ::google::grpc::transcoding::TypeHelper& type_helper,

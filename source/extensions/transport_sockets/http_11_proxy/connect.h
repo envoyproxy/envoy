@@ -52,7 +52,7 @@ private:
 
   Network::TransportSocketOptionsConstSharedPtr options_;
   Network::TransportSocketCallbacks* callbacks_{};
-  Buffer::OwnedImpl header_buffer_{};
+  Buffer::OwnedImpl header_buffer_;
   bool need_to_strip_connect_response_{};
 };
 

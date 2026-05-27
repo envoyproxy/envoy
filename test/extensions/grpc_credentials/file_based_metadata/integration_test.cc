@@ -70,12 +70,12 @@ secret_data:
     return config;
   }
 
-  std::string header_key_1_{};
-  std::string header_value_1_{};
-  std::string header_value_2_{};
-  std::string header_prefix_1_{};
-  std::string access_token_value_{};
-  std::string credentials_factory_name_{};
+  std::string header_key_1_;
+  std::string header_value_1_;
+  std::string header_value_2_;
+  std::string header_prefix_1_;
+  std::string access_token_value_;
+  std::string credentials_factory_name_;
 };
 
 // Parameterize the loopback test server socket address and gRPC client type.

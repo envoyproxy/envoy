@@ -1,8 +1,9 @@
 use crate::buffer::EnvoyBuffer;
 use crate::{
-  abi, drop_wrapped_c_void_ptr, str_to_module_buffer, strs_to_module_buffers, wrap_into_c_void_ptr,
-  CompletionCallback, EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId,
-  EnvoyHistogramId, EnvoyHistogramVecId, NEW_CLUSTER_CONFIG_FUNCTION,
+  abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, str_to_module_buffer,
+  strs_to_module_buffers, wrap_into_c_void_ptr, CompletionCallback, EnvoyCounterId,
+  EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId, EnvoyHistogramId, EnvoyHistogramVecId,
+  NEW_CLUSTER_CONFIG_FUNCTION,
 };
 use mockall::*;
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -226,6 +227,37 @@ pub trait ClusterLbContext {
   ///
   /// Returns `None` if the downstream connection or SNI is not available.
   fn get_downstream_connection_sni(&self) -> Option<String>;
+
+  /// Returns the bytes value of a `Router::StringAccessor` filter state stored on the request.
+  ///
+  /// This lets a cluster consume filter state that an upstream HTTP filter set via
+  /// `EnvoyHttpFilter::set_filter_state_bytes` (or anything else that stores a `StringAccessor`)
+  /// to make a host-selection decision.
+  ///
+  /// Returns `None` if the request has no stream info, the key is not present, or the stored
+  /// value is not a `StringAccessor`. The returned buffer borrows from Envoy and is valid for
+  /// the duration of the current host-selection callback.
+  fn get_filter_state_bytes<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
+
+  /// Returns the serialized bytes of a typed filter state object stored on the request.
+  ///
+  /// Works for any filter state object whose registered `ObjectFactory` produces an object that
+  /// supports `serializeAsString` — e.g. one set by an upstream HTTP filter via
+  /// `EnvoyHttpFilter::set_filter_state_typed`.
+  ///
+  /// Returns `None` if the request has no stream info, the key is not present, or the object
+  /// does not support serialization. The returned buffer borrows from Envoy and is valid until
+  /// the next call to `get_filter_state_typed` on the same worker thread, or until the end of
+  /// the current host-selection callback, whichever comes first.
+  fn get_filter_state_typed<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
+
+  /// Returns the value of a per-host stat for the given host pointer. The module must ensure
+  /// `host` still belongs to the cluster's host set. Returns 0 if the host pointer is null.
+  fn get_host_stat(
+    &self,
+    host: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+    stat: abi::envoy_dynamic_module_type_host_stat,
+  ) -> u64;
 }
 
 /// Envoy-side cluster operations available to the module.
@@ -986,11 +1018,7 @@ impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
       String::new()
     } else {
       unsafe {
-        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-          result.ptr as *const u8,
-          result.length,
-        ))
-        .to_string()
+        crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length).into_owned()
       }
     }
   }
@@ -1024,11 +1052,7 @@ impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
     };
     if found && !result.ptr.is_null() && result.length > 0 {
       Some(unsafe {
-        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-          result.ptr as *const u8,
-          result.length,
-        ))
-        .to_string()
+        crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length).into_owned()
       })
     } else {
       None
@@ -1088,11 +1112,7 @@ impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
     };
     if found && !result.ptr.is_null() && result.length > 0 {
       Some(unsafe {
-        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-          result.ptr as *const u8,
-          result.length,
-        ))
-        .to_string()
+        crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length).into_owned()
       })
     } else {
       None
@@ -1144,29 +1164,19 @@ impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
         let region_str = if region.ptr.is_null() || region.length == 0 {
           String::new()
         } else {
-          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-            region.ptr as *const u8,
-            region.length,
-          ))
-          .to_string()
+          crate::ffi_helpers::str_lossy_from_raw(region.ptr as *const u8, region.length)
+            .into_owned()
         };
         let zone_str = if zone.ptr.is_null() || zone.length == 0 {
           String::new()
         } else {
-          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-            zone.ptr as *const u8,
-            zone.length,
-          ))
-          .to_string()
+          crate::ffi_helpers::str_lossy_from_raw(zone.ptr as *const u8, zone.length).into_owned()
         };
         let sub_zone_str = if sub_zone.ptr.is_null() || sub_zone.length == 0 {
           String::new()
         } else {
-          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-            sub_zone.ptr as *const u8,
-            sub_zone.length,
-          ))
-          .to_string()
+          crate::ffi_helpers::str_lossy_from_raw(sub_zone.ptr as *const u8, sub_zone.length)
+            .into_owned()
         };
         Some((region_str, zone_str, sub_zone_str))
       }
@@ -1220,11 +1230,7 @@ impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
     };
     if found && !result.ptr.is_null() && result.length > 0 {
       Some(unsafe {
-        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-          result.ptr as *const u8,
-          result.length,
-        ))
-        .to_string()
+        crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length).into_owned()
       })
     } else {
       None
@@ -1320,11 +1326,7 @@ impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
     };
     if found && !result.ptr.is_null() && result.length > 0 {
       Some(unsafe {
-        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-          result.ptr as *const u8,
-          result.length,
-        ))
-        .to_string()
+        crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length).into_owned()
       })
     } else {
       None
@@ -1356,11 +1358,7 @@ impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
     };
     if found && !result.ptr.is_null() && result.length > 0 {
       Some(unsafe {
-        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-          result.ptr as *const u8,
-          result.length,
-        ))
-        .to_string()
+        crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length).into_owned()
       })
     } else {
       None
@@ -1771,15 +1769,10 @@ impl ClusterLbContext for ClusterLbContextImpl {
       raw_headers
         .iter()
         .map(|h| unsafe {
-          let key = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-            h.key_ptr as *const u8,
-            h.key_length,
-          ));
-          let value = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-            h.value_ptr as *const u8,
-            h.value_length,
-          ));
-          (key.to_string(), value.to_string())
+          let key = crate::ffi_helpers::str_lossy_from_raw(h.key_ptr as *const u8, h.key_length);
+          let value =
+            crate::ffi_helpers::str_lossy_from_raw(h.value_ptr as *const u8, h.value_length);
+          (key.into_owned(), value.into_owned())
         })
         .collect(),
     )
@@ -1805,12 +1798,9 @@ impl ClusterLbContext for ClusterLbContextImpl {
       return None;
     }
     let value = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        result_buffer.ptr as *const u8,
-        result_buffer.length,
-      ))
+      crate::ffi_helpers::str_lossy_from_raw(result_buffer.ptr as *const u8, result_buffer.length)
     };
-    Some((value.to_string(), total_size))
+    Some((value.into_owned(), total_size))
   }
 
   fn get_host_selection_retry_count(&self) -> u32 {
@@ -1848,13 +1838,9 @@ impl ClusterLbContext for ClusterLbContextImpl {
     if !ok {
       return None;
     }
-    let addr_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        address.ptr as *const u8,
-        address.length,
-      ))
-    };
-    Some((addr_str.to_string(), strict))
+    let addr_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(address.ptr as *const u8, address.length) };
+    Some((addr_str.into_owned(), strict))
   }
 
   fn get_downstream_connection_sni(&self) -> Option<String> {
@@ -1872,12 +1858,61 @@ impl ClusterLbContext for ClusterLbContextImpl {
       return None;
     }
     let sni = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        result_buffer.ptr as *const u8,
-        result_buffer.length,
-      ))
+      crate::ffi_helpers::str_lossy_from_raw(result_buffer.ptr as *const u8, result_buffer.length)
     };
-    Some(sni.to_string())
+    Some(sni.into_owned())
+  }
+
+  fn get_filter_state_bytes(&self, key: &[u8]) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null_mut(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes(
+        self.raw_context,
+        bytes_to_module_buffer(key),
+        &mut result,
+      )
+    };
+    if success {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_filter_state_typed(&self, key: &[u8]) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null_mut(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+        self.raw_context,
+        bytes_to_module_buffer(key),
+        &mut result,
+      )
+    };
+    if success {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_host_stat(
+    &self,
+    host: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+    stat: abi::envoy_dynamic_module_type_host_stat,
+  ) -> u64 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+        self.raw_context,
+        host,
+        stat,
+      )
+    }
   }
 }
 
@@ -1894,19 +1929,21 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_config_new(
   config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> abi::envoy_dynamic_module_type_cluster_config_module_ptr {
   catch_unwind(AssertUnwindSafe(|| {
-    // SAFETY: Envoy guarantees name and config are valid UTF-8 per the ABI contract.
-    let name_str = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-      name.ptr as *const _,
-      name.length,
-    ));
-    let config_slice = std::slice::from_raw_parts(config.ptr as *const _, config.length);
+    // SAFETY: `name` is a protobuf string (UTF-8 by contract) and `config` is opaque bytes.
+    // The helpers additionally tolerate `(nullptr, 0)` empty inputs, and `str_lossy_from_raw`
+    // substitutes `U+FFFD` for any malformed UTF-8 rather than triggering UB.
+    let name_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(name.ptr as *const u8, name.length) };
+    let config_slice = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(config.ptr as *const u8, config.length)
+    };
     let new_config_fn = NEW_CLUSTER_CONFIG_FUNCTION
       .get()
       .expect("NEW_CLUSTER_CONFIG_FUNCTION must be set");
     let envoy_cluster_metrics: Arc<dyn EnvoyClusterMetrics> = Arc::new(EnvoyClusterMetricsImpl {
       raw: config_envoy_ptr,
     });
-    match new_config_fn(name_str, config_slice, envoy_cluster_metrics) {
+    match new_config_fn(name_str.as_ref(), config_slice, envoy_cluster_metrics) {
       Some(config) => wrap_into_c_void_ptr!(config),
       None => std::ptr::null(),
     }
@@ -2248,7 +2285,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_http_callout_done(
     let cluster = &mut *cluster;
 
     let headers = if headers_size > 0 {
-      Some(std::slice::from_raw_parts(
+      Some(crate::ffi_helpers::slice_from_raw_or_empty(
         headers as *const (EnvoyBuffer, EnvoyBuffer),
         headers_size,
       ))
@@ -2256,7 +2293,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_http_callout_done(
       None
     };
     let body = if body_chunks_size > 0 {
-      Some(std::slice::from_raw_parts(
+      Some(crate::ffi_helpers::slice_from_raw_or_empty(
         body_chunks as *const EnvoyBuffer,
         body_chunks_size,
       ))

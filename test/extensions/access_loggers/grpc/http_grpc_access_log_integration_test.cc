@@ -15,6 +15,8 @@
 #include "gtest/gtest.h"
 
 using testing::AssertionResult;
+using testing::Eq;
+using testing::Ge;
 using testing::HasSubstr;
 
 namespace Envoy {
@@ -197,10 +199,10 @@ http_logs:
   access_log_request_->finishGrpcStream(Grpc::Status::Ok);
   switch (clientType()) {
   case Grpc::ClientType::EnvoyGrpc:
-    test_server_->waitForGaugeEq("cluster.accesslog.upstream_rq_active", 0);
+    test_server_->waitForGauge("cluster.accesslog.upstream_rq_active", Eq(0));
     break;
   case Grpc::ClientType::GoogleGrpc:
-    test_server_->waitForCounterGe("grpc.accesslog.streams_closed_0", 1);
+    test_server_->waitForCounter("grpc.accesslog.streams_closed_0", Ge(1));
     break;
   default:
     PANIC("reached unexpected code");
@@ -326,7 +328,7 @@ TEST_P(AccessLogIntegrationTest, GrpcLoggerSurvivesAfterReloadConfig) {
                                 &response, true);
   EXPECT_TRUE(response.find("HTTP/1.1 200") == 0);
 
-  test_server_->waitForCounterEq("access_logs.grpc_access_log.logs_written", 2);
+  test_server_->waitForCounter("access_logs.grpc_access_log.logs_written", Eq(2));
 
   // Create a new config with HTTP/1.0 proxying. The goal is to trigger a listener update.
   ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
@@ -339,15 +341,15 @@ TEST_P(AccessLogIntegrationTest, GrpcLoggerSurvivesAfterReloadConfig) {
 
   // Create an LDS response with the new config, and reload config.
   new_config_helper.setLds("1");
-  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
-  test_server_->waitForCounterEq("listener_manager.lds.update_success", 2);
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Ge(1));
+  test_server_->waitForCounter("listener_manager.lds.update_success", Eq(2));
 
   // Wait until the http 1.1 connection is destroyed due to the listener update. It indicates the
   // listener starts draining.
-  test_server_->waitForGaugeEq("listener.listener_0.downstream_cx_active", 0);
+  test_server_->waitForGauge("listener.listener_0.downstream_cx_active", Eq(0));
   // Wait until all the draining filter chain is gone. It indicates the old listener and filter
   // chains are destroyed.
-  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
 
   // Verify that the new listener config is applied.
   std::string response2;
@@ -355,7 +357,7 @@ TEST_P(AccessLogIntegrationTest, GrpcLoggerSurvivesAfterReloadConfig) {
   EXPECT_THAT(response2, HasSubstr("HTTP/1.0 200 OK\r\n"));
 
   // Verify that the grpc access logger is available after the listener update.
-  test_server_->waitForCounterEq("access_logs.grpc_access_log.logs_written", 4);
+  test_server_->waitForCounter("access_logs.grpc_access_log.logs_written", Eq(4));
 }
 
 } // namespace

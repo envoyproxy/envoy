@@ -614,15 +614,14 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_dns_resolver_config_new(
   config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> abi::envoy_dynamic_module_type_dns_resolver_config_module_ptr {
   catch_unwind(AssertUnwindSafe(|| {
-    // SAFETY: Envoy guarantees name and config are valid UTF-8 per the ABI contract.
-    let name_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        name.ptr as *const u8,
-        name.length,
-      ))
+    // SAFETY: `name` is a protobuf string (UTF-8 by contract) and `config` is opaque bytes.
+    // The helpers additionally tolerate `(nullptr, 0)` empty inputs, and `str_lossy_from_raw`
+    // substitutes `U+FFFD` for any malformed UTF-8 rather than triggering UB.
+    let name_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(name.ptr as *const u8, name.length) };
+    let config_slice = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(config.ptr as *const u8, config.length)
     };
-    let config_slice =
-      unsafe { std::slice::from_raw_parts(config.ptr as *const u8, config.length) };
     let new_config_fn = crate::NEW_DNS_RESOLVER_CONFIG_FUNCTION
       .get()
       .expect("NEW_DNS_RESOLVER_CONFIG_FUNCTION must be set");
@@ -630,7 +629,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_dns_resolver_config_new(
       Arc::new(EnvoyDnsResolverConfigImpl {
         raw: config_envoy_ptr,
       });
-    match new_config_fn(name_str, config_slice, envoy_dns_resolver_config) {
+    match new_config_fn(name_str.as_ref(), config_slice, envoy_dns_resolver_config) {
       Some(config) => wrap_into_c_void_ptr!(config),
       None => std::ptr::null(),
     }
@@ -711,12 +710,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_dns_resolve(
 ) -> abi::envoy_dynamic_module_type_dns_query_module_ptr {
   catch_unwind(AssertUnwindSafe(|| {
     let wrapper = unsafe { &*(resolver_module_ptr as *const DnsResolverWrapper) };
-    let name_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        dns_name.ptr as *const u8,
-        dns_name.length,
-      ))
-    };
+    let name_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(dns_name.ptr as *const u8, dns_name.length) };
 
     let family = match lookup_family {
       abi::envoy_dynamic_module_type_dns_lookup_family::V4Only => DnsLookupFamily::V4Only,
@@ -726,7 +721,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_dns_resolve(
       abi::envoy_dynamic_module_type_dns_lookup_family::All => DnsLookupFamily::All,
     };
 
-    match wrapper.resolver.resolve(name_str, family, query_id) {
+    match wrapper
+      .resolver
+      .resolve(name_str.as_ref(), family, query_id)
+    {
       Some(query) => {
         let boxed = Box::new(query);
         Box::into_raw(boxed) as abi::envoy_dynamic_module_type_dns_query_module_ptr

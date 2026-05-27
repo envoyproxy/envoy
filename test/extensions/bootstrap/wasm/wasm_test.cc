@@ -3,7 +3,7 @@
 #include "source/extensions/common/wasm/wasm.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -79,7 +79,7 @@ public:
   std::string vm_configuration_;
   std::string vm_key_;
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities_;
-  Extensions::Common::Wasm::EnvironmentVariableMap envs_{};
+  Extensions::Common::Wasm::EnvironmentVariableMap envs_;
   std::string plugin_configuration_;
   std::shared_ptr<Extensions::Common::Wasm::Plugin> plugin_;
   std::shared_ptr<Extensions::Common::Wasm::Wasm> wasm_;

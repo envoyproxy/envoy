@@ -30,8 +30,7 @@ protected:
   Router::ConfigUtility::QueryParameterMatcher createQueryParamMatcher(const std::string& yaml) {
     envoy::config::route::v3::QueryParameterMatcher query_param_matcher;
     TestUtility::loadFromYaml(yaml, query_param_matcher);
-    return Router::ConfigUtility::QueryParameterMatcher(query_param_matcher,
-                                                        context_.serverFactoryContext());
+    return {query_param_matcher, context_.serverFactoryContext()};
   }
 
   Api::ApiPtr api_;

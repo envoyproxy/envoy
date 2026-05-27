@@ -187,18 +187,22 @@ uint64_t BaseClientIntegrationTest::getCounterValue(const std::string& name) {
   return counter_value;
 }
 
-testing::AssertionResult BaseClientIntegrationTest::waitForCounterGe(const std::string& name,
-                                                                     uint64_t value) {
+testing::AssertionResult
+BaseClientIntegrationTest::waitForCounter(const std::string& name,
+                                          testing::Matcher<uint64_t> value_matcher) {
   constexpr std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
   Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (getCounterValue(name) < value) {
+  while (true) {
+    const uint64_t current_value = getCounterValue(name);
+    if (value_matcher.Matches(current_value)) {
+      return testing::AssertionSuccess();
+    }
     timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
     if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
-      return testing::AssertionFailure()
-             << fmt::format("timed out waiting for {} to be {}", name, value);
+      return testing::AssertionFailure() << "timed out waiting for " << name << " to "
+                                         << value_matcher << ": current value " << current_value;
     }
   }
-  return testing::AssertionSuccess();
 }
 
 uint64_t BaseClientIntegrationTest::getGaugeValue(const std::string& name) {
@@ -216,18 +220,22 @@ uint64_t BaseClientIntegrationTest::getGaugeValue(const std::string& name) {
   return gauge_value;
 }
 
-testing::AssertionResult BaseClientIntegrationTest::waitForGaugeGe(const std::string& name,
-                                                                   uint64_t value) {
+testing::AssertionResult
+BaseClientIntegrationTest::waitForGauge(const std::string& name,
+                                        testing::Matcher<uint64_t> value_matcher) {
   constexpr std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
   Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (getGaugeValue(name) < value) {
+  while (true) {
+    const uint64_t current_value = getGaugeValue(name);
+    if (value_matcher.Matches(current_value)) {
+      return testing::AssertionSuccess();
+    }
     timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
     if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
-      return testing::AssertionFailure()
-             << fmt::format("timed out waiting for {} to be {}", name, value);
+      return testing::AssertionFailure() << "timed out waiting for " << name << " to "
+                                         << value_matcher << ": current value " << current_value;
     }
   }
-  return testing::AssertionSuccess();
 }
 
 } // namespace Envoy

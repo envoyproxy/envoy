@@ -21,7 +21,6 @@ using ::envoy::extensions::http::header_validators::envoy_default::v3::
 using ::Envoy::Http::HeaderUtility;
 using ::Envoy::Http::PathNormalizerResponseCodeDetail;
 using ::Envoy::Http::RequestHeaderMap;
-using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
 PathNormalizer::PathNormalizer(const HeaderValidatorConfig& config,
@@ -83,7 +82,7 @@ PathNormalizer::normalizeAndDecodeOctet(std::string::iterator iter,
     ch += factor * (nibble >= 'A' ? (nibble - 'A' + 10) : (nibble - '0'));
   }
 
-  if (testCharInTable(kUnreservedCharTable, ch)) {
+  if (kUnreservedCharTable.hasChar(ch)) {
     // Based on RFC, only decode characters in the UNRESERVED set.
     return {PercentDecodeResult::Decoded, ch};
   }

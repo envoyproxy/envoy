@@ -14,7 +14,7 @@ namespace Network {
 // A test resolver which blocks resolution until unblockResolve is called.
 class TestResolver : public GetAddrInfoDnsResolver {
 public:
-  ~TestResolver() {
+  ~TestResolver() override {
     absl::MutexLock guard(mutex_);
     blocked_resolutions_.clear();
   }

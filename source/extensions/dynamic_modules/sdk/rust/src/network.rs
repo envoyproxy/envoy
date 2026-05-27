@@ -886,13 +886,9 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     if !result || address.length == 0 || address.ptr.is_null() {
       return (String::new(), 0);
     }
-    let address = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        address.ptr as *const _,
-        address.length,
-      ))
-    };
-    (address.to_string(), port)
+    let address =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(address.ptr as *const u8, address.length) };
+    (address.into_owned(), port)
   }
 
   fn get_local_address(&self) -> (String, u32) {
@@ -911,13 +907,9 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     if !result || address.length == 0 || address.ptr.is_null() {
       return (String::new(), 0);
     }
-    let address = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        address.ptr as *const _,
-        address.length,
-      ))
-    };
-    (address.to_string(), port)
+    let address =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(address.ptr as *const u8, address.length) };
+    (address.into_owned(), port)
   }
 
   fn is_ssl(&self) -> bool {
@@ -1162,13 +1154,9 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       )
     };
     if success && !result.ptr.is_null() && result.length > 0 {
-      let value_str = unsafe {
-        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-          result.ptr as *const _,
-          result.length,
-        ))
-      };
-      Some(value_str.to_string())
+      let value_str =
+        unsafe { crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length) };
+      Some(value_str.into_owned())
     } else {
       None
     }
@@ -1304,7 +1292,9 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       )
     };
     if success && !result.ptr.is_null() && result.length > 0 {
-      let slice = unsafe { std::slice::from_raw_parts(result.ptr as *const u8, result.length) };
+      let slice = unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(result.ptr as *const u8, result.length)
+      };
       Some(slice.to_vec())
     } else {
       None
@@ -1345,8 +1335,11 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
           abi::envoy_dynamic_module_type_socket_option_value_type::Bytes => {
             if !opt.byte_value.ptr.is_null() && opt.byte_value.length > 0 {
               let bytes = unsafe {
-                std::slice::from_raw_parts(opt.byte_value.ptr as *const u8, opt.byte_value.length)
-                  .to_vec()
+                crate::ffi_helpers::slice_from_raw_or_empty(
+                  opt.byte_value.ptr as *const u8,
+                  opt.byte_value.length,
+                )
+                .to_vec()
               };
               SocketOptionValue::Bytes(bytes)
             } else {
@@ -1530,13 +1523,9 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     if !result || address.length == 0 || address.ptr.is_null() {
       return None;
     }
-    let address_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        address.ptr as *const _,
-        address.length,
-      ))
-    };
-    Some((address_str.to_string(), port))
+    let address_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(address.ptr as *const u8, address.length) };
+    Some((address_str.into_owned(), port))
   }
 
   fn get_upstream_host_hostname(&self) -> Option<String> {
@@ -1553,13 +1542,9 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     if !result || hostname.length == 0 || hostname.ptr.is_null() {
       return None;
     }
-    let hostname_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        hostname.ptr as *const _,
-        hostname.length,
-      ))
-    };
-    Some(hostname_str.to_string())
+    let hostname_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(hostname.ptr as *const u8, hostname.length) };
+    Some(hostname_str.into_owned())
   }
 
   fn get_upstream_host_cluster(&self) -> Option<String> {
@@ -1577,12 +1562,9 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       return None;
     }
     let cluster_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        cluster_name.ptr as *const _,
-        cluster_name.length,
-      ))
+      crate::ffi_helpers::str_lossy_from_raw(cluster_name.ptr as *const u8, cluster_name.length)
     };
-    Some(cluster_str.to_string())
+    Some(cluster_str.into_owned())
   }
 
   fn has_upstream_host(&self) -> bool {
@@ -1656,16 +1638,14 @@ pub extern "C" fn envoy_dynamic_module_on_network_filter_config_new(
 ) -> abi::envoy_dynamic_module_type_network_filter_config_module_ptr {
   catch_unwind(AssertUnwindSafe(|| {
     let mut envoy_filter_config = EnvoyNetworkFilterConfigImpl::new(envoy_filter_config_ptr);
-    let name_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        name.ptr as *const _,
-        name.length,
-      ))
+    let name_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(name.ptr as *const u8, name.length) };
+    let config_slice = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(config.ptr as *const u8, config.length)
     };
-    let config_slice = unsafe { std::slice::from_raw_parts(config.ptr as *const _, config.length) };
     init_network_filter_config(
       &mut envoy_filter_config,
-      name_str,
+      name_str.as_ref(),
       config_slice,
       NEW_NETWORK_FILTER_CONFIG_FUNCTION
         .get()
@@ -1855,31 +1835,25 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_network_filter_http_callout_don
     let filter = unsafe { &mut *filter };
 
     // Convert headers to Vec<(EnvoyBuffer, EnvoyBuffer)>.
-    let header_vec = if headers.is_null() || headers_size == 0 {
-      Vec::new()
-    } else {
-      let headers_slice = unsafe { std::slice::from_raw_parts(headers, headers_size) };
-      headers_slice
-        .iter()
-        .map(|h| {
-          (
-            unsafe { EnvoyBuffer::new_from_raw(h.key_ptr as *const _, h.key_length) },
-            unsafe { EnvoyBuffer::new_from_raw(h.value_ptr as *const _, h.value_length) },
-          )
-        })
-        .collect()
-    };
+    let headers_slice =
+      unsafe { crate::ffi_helpers::slice_from_raw_or_empty(headers, headers_size) };
+    let header_vec: Vec<(EnvoyBuffer, EnvoyBuffer)> = headers_slice
+      .iter()
+      .map(|h| {
+        (
+          unsafe { EnvoyBuffer::new_from_raw(h.key_ptr as *const _, h.key_length) },
+          unsafe { EnvoyBuffer::new_from_raw(h.value_ptr as *const _, h.value_length) },
+        )
+      })
+      .collect();
 
     // Convert body chunks to Vec<EnvoyBuffer>.
-    let body_vec = if body_chunks.is_null() || body_chunks_size == 0 {
-      Vec::new()
-    } else {
-      let chunks_slice = unsafe { std::slice::from_raw_parts(body_chunks, body_chunks_size) };
-      chunks_slice
-        .iter()
-        .map(|c| unsafe { EnvoyBuffer::new_from_raw(c.ptr as *const _, c.length) })
-        .collect()
-    };
+    let chunks_slice =
+      unsafe { crate::ffi_helpers::slice_from_raw_or_empty(body_chunks, body_chunks_size) };
+    let body_vec: Vec<EnvoyBuffer> = chunks_slice
+      .iter()
+      .map(|c| unsafe { EnvoyBuffer::new_from_raw(c.ptr as *const _, c.length) })
+      .collect();
 
     filter.on_http_callout_done(
       &mut EnvoyNetworkFilterImpl::new(envoy_ptr),
