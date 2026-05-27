@@ -626,10 +626,65 @@ TEST(LoadBalancerBaseCoalesceDisabledTest, FallbackPathExercised) {
   EXPECT_EQ(100, lb.percentageLoad(0));
 }
 
+// Exercises the coalescing change in `LoadBalancerBase` where `PriorityUpdateCb` stages dirty
+// priorities and `MemberUpdateCb` flushes them via `processDirtyPriorities()` and recalculates
+// panic state.
+TEST(LoadBalancerBaseCoalesceEnabledTest, CoalescedPathExercised) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update", "true"}});
+
+  Stats::IsolatedStoreImpl stats_store;
+  ClusterLbStatNames stat_names(stats_store.symbolTable());
+  ClusterLbStats stats(stat_names, *stats_store.rootScope());
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<MockPrioritySet> priority_set;
+  auto info = std::make_shared<NiceMock<MockClusterInfo>>();
+
+  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config;
+  TestLb lb(priority_set, stats, runtime, random, common_config);
+
+  MockHostSet& host_set = *priority_set.getMockHostSet(0);
+  host_set.hosts_ = {makeTestHost(info, "tcp://127.0.0.1:80")};
+  host_set.healthy_hosts_ = host_set.hosts_;
+  host_set.runCallbacks({}, {});
+
+  EXPECT_EQ(100, lb.percentageLoad(0));
+}
+
 TEST(ZoneAwareLbCoalesceDisabledTest, FallbackPathExercised) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update", "false"}});
+
+  Stats::IsolatedStoreImpl stats_store;
+  ClusterLbStatNames stat_names(stats_store.symbolTable());
+  ClusterLbStats stats(stat_names, *stats_store.rootScope());
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<MockPrioritySet> priority_set;
+  auto info = std::make_shared<NiceMock<MockClusterInfo>>();
+
+  ZoneAwareLoadBalancerBase::LocalityLbConfig locality_config;
+  locality_config.mutable_locality_weighted_lb_config();
+  TestZoneAwareLb lb(priority_set, stats, runtime, random, 50, locality_config);
+
+  MockHostSet& host_set = *priority_set.getMockHostSet(0);
+  host_set.hosts_ = {makeTestHost(info, "tcp://127.0.0.1:80")};
+  host_set.healthy_hosts_ = host_set.hosts_;
+  host_set.runCallbacks({}, {});
+
+  EXPECT_FALSE(lb.lifetimeCallbacks().has_value());
+}
+
+// Exercises the coalescing branch of ZoneAwareLoadBalancerBase: PriorityUpdateCb stages dirty
+// priorities, MemberUpdateCb resizes per-priority state and rebuilds locality WRR for each dirty
+// priority. Locality-weighted balancing is enabled to cover the inner per-priority rebuild loop.
+TEST(ZoneAwareLbCoalesceEnabledTest, CoalescedPathExercised) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update", "true"}});
 
   Stats::IsolatedStoreImpl stats_store;
   ClusterLbStatNames stat_names(stats_store.symbolTable());

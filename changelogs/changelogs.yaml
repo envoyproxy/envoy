@@ -92,5 +92,7 @@ areas:
     title: tcp_proxy
   tls:
     title: tls
+  upstream:
+    title: upstream
   wasm:
     title: wasm
