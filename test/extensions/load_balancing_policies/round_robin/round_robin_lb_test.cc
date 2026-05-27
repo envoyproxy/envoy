@@ -186,7 +186,7 @@ TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSetDisableOnPanic) {
   host_set_.healthy_hosts_ = {};
   host_set_.runCallbacks({}, {});
   EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
-}// Test extending the priority set.
+} // Test extending the priority set.
 TEST_P(FailoverTest, ExtendPrioritiesUpdatingPrioritySet) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
   // Mark both initial hosts unhealthy so coarseHealth() is consistent with

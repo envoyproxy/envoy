@@ -2319,19 +2319,22 @@ TEST_F(SubsetLoadBalancerTest, DisabledLocalityWeightAwareness) {
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(&context).host);
 }
 
-// Verifies that we do *not* invoke coarseHealth() on hosts when constructing the load balancer.
-// Since health is modified concurrently from multiple threads, it is not safe to call on the worker
-// threads.
+// Verifies that the load balancer can be constructed correctly when a host starts in a failed
+// state (FAILED_ACTIVE_HC) and then recovers.
 TEST_F(SubsetLoadBalancerTest, DoesNotCheckHostHealth) {
   EXPECT_CALL(subset_info_, isEnabled()).WillRepeatedly(Return(true));
 
-  auto mock_host = std::make_shared<MockHost>();
-  HostVector hosts{mock_host};
-  host_set_.hosts_ = hosts;
-
-  EXPECT_CALL(*mock_host, weight()).WillRepeatedly(Return(1));
+  // Use a real host starting in a failed state.
+  HostSharedPtr real_host = makeHost("tcp://127.0.0.1:80", HostMetadata{});
+  real_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  host_set_.hosts_ = {real_host};
 
   initLbConfigAndLB();
+
+  // Simulate recovery.
+  real_host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  host_set_.healthy_hosts_ = {real_host};
+  host_set_.runCallbacks({real_host}, {});
 }
 
 TEST_F(SubsetLoadBalancerTest, EnabledLocalityWeightAwareness) {
