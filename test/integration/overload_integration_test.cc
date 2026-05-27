@@ -624,21 +624,21 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseIdleHttpConnectionsDuringHa
   }
   TestScopedRuntime scoped_runtime;
 
+#ifdef ENVOY_ENABLE_QUIC
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* proof_source_config = bootstrap.mutable_static_resources()
                                     ->mutable_listeners(0)
                                     ->mutable_udp_listener_config()
                                     ->mutable_quic_options()
                                     ->mutable_proof_source_config();
-#ifdef ENVOY_ENABLE_QUIC
     proof_source_config->set_name("envoy.quic.proof_source.pending_signing");
     test::extensions::quic::proof_source::PendingProofSourceConfig config;
     proof_source_config->mutable_typed_config()->PackFrom(config);
-#else
-    proof_source_config->set_name("envoy.quic.proof_source.pending_signing");
-    proof_source_config->mutable_typed_config();
-#endif
   });
+#else
+  FAIL() << "This test is not expected to run with quic disabled.";
+#endif
+
   initializeOverloadManager(
       TestUtility::parseYaml<envoy::config::overload::v3::ScaleTimersOverloadActionConfig>(R"EOF(
       timer_scale_factors:
@@ -695,8 +695,8 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseMaxDurationHttpConnectionsD
             ProtobufUtil::TimeUtil::SecondsToDuration(20));
       });
 
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
 #ifdef ENVOY_ENABLE_QUIC
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* proof_source_config = bootstrap.mutable_static_resources()
                                     ->mutable_listeners(0)
                                     ->mutable_udp_listener_config()
@@ -705,10 +705,11 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseMaxDurationHttpConnectionsD
     proof_source_config->set_name("envoy.quic.proof_source.pending_signing");
     test::extensions::quic::proof_source::PendingProofSourceConfig config;
     proof_source_config->mutable_typed_config()->PackFrom(config);
-#else
-    FAIL() << "This test is not expected to run with quic disabled.";
-#endif
   });
+#else
+  FAIL() << "This test is not expected to run with quic disabled.";
+#endif
+
   initializeOverloadManager(
       TestUtility::parseYaml<envoy::config::overload::v3::ScaleTimersOverloadActionConfig>(R"EOF(
       timer_scale_factors:
