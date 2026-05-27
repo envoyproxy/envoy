@@ -305,10 +305,9 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& dat
   // buffering the full response body.
   if (!streaming_json_prefix_.empty()) {
     uint64_t len = data.length();
-    if (len == 0 && !end_stream) {
-      ENVOY_STREAM_LOG(debug, "Streaming: skipping empty intermediate chunk.", *encoder_callbacks_);
-      return Http::FilterDataStatus::Continue;
-    }
+    // Note: An empty chunk can arrive when the upstream uses the body + trailer pattern (end_stream
+    // is false on the last data frame). It is a no-op here; the suffix will be appended in
+    // encodeTrailers.
     absl::string_view chunk(static_cast<const char*>(data.linearize(len)), len);
     // TODO(guoyilin42): Consider adding text/event-stream backend response support and explore if
     // it needs buffering.

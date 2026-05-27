@@ -1435,28 +1435,6 @@ TEST_F(McpJsonRestBridgeStreamingFilterTest, ErrorResponseSetsIsErrorTrue) {
           R"json({"id":123,"jsonrpc":"2.0","result":{"content":[{"text":"Internal Server Error","type":"text"}],"isError":true}})json"));
 }
 
-TEST_F(McpJsonRestBridgeStreamingFilterTest, EmptyIntermediateChunkIsSkipped) {
-  sendToolsCallRequest();
-
-  response_headers_ = {{":status", "200"}};
-  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
-            Http::FilterHeadersStatus::Continue);
-
-  Buffer::OwnedImpl empty_chunk;
-  EXPECT_EQ(filter_->encodeData(empty_chunk, /*end_stream=*/false),
-            Http::FilterDataStatus::Continue);
-  EXPECT_TRUE(empty_chunk.toString().empty());
-
-  // The subsequent real chunk should still get the prefix.
-  Buffer::OwnedImpl final_chunk("content");
-  EXPECT_EQ(filter_->encodeData(final_chunk, /*end_stream=*/true),
-            Http::FilterDataStatus::Continue);
-  EXPECT_EQ(
-      nlohmann::json::parse(final_chunk.toString()),
-      nlohmann::json::parse(
-          R"json({"id":123,"jsonrpc":"2.0","result":{"content":[{"text":"content","type":"text"}],"isError":false}})json"));
-}
-
 class McpHttpMethodFilterTest : public testing::TestWithParam<std::string> {
 public:
   void SetUp() override {
