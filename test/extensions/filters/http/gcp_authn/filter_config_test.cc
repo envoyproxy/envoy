@@ -1,5 +1,6 @@
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.h"
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.validate.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/extensions/filters/http/gcp_authn/filter_config.h"
@@ -56,6 +57,46 @@ TEST(GcpAuthnFilterConfigTest, GcpAuthnFilterWithNewProto) {
   GcpAuthnFilterConfig filter_config;
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  GcpAuthnFilterFactory factory;
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(filter_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  cb(filter_callback);
+}
+
+TEST(GcpAuthnFilterConfigTest, GcpAuthnFilterWithTokenBindingConfig) {
+  std::string filter_config_yaml = R"EOF(
+    retry_policy:
+      retry_back_off:
+        base_interval: 0.1s
+        max_interval: 32s
+      num_retries: 5
+    cluster: test_cluster
+    timeout:
+      seconds: 5
+    token_binding_config:
+      client_certificate:
+        name: client_cert_secret
+      client_certificate_san_matchers:
+        - exact: "test.com"
+  )EOF";
+
+  GcpAuthnFilterConfig filter_config;
+  TestUtility::loadFromYaml(filter_config_yaml, filter_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  // Set up static secret in secret manager to prevent FingerprintManager from throwing exception
+  envoy::extensions::transport_sockets::tls::v3::Secret secret;
+  secret.set_name("client_cert_secret");
+  auto* tls_cert = secret.mutable_tls_certificate();
+  tls_cert->mutable_certificate_chain()->set_inline_string("dummy cert content");
+
+  auto status = context.server_factory_context_.secretManager().addStaticSecret(secret);
+  EXPECT_TRUE(status.ok());
+
   EXPECT_CALL(context, messageValidationVisitor());
   GcpAuthnFilterFactory factory;
   Http::FilterFactoryCb cb =
