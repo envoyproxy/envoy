@@ -136,6 +136,12 @@ bool ConnectivityGrid::WrapperCallbacks::shouldAttemptSecondHttp3Connection() {
 void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptFailed(
     ConnectionAttemptCallbacks* attempt, ConnectionPool::PoolFailureReason reason,
     absl::string_view transport_failure_reason, Upstream::HostDescriptionConstSharedPtr host) {
+  if (delete_started_ && Runtime::runtimeFeatureEnabled(
+                             "envoy.reloadable_features.conn_pool_grid_early_return_on_teardown")) {
+    ENVOY_LOG(trace, "Uninteresting connection attempt to host {} failed.",
+              host != nullptr ? host->hostname() : "unknown");
+    return;
+  }
   ENVOY_LOG(trace, "{} pool failed to create connection to host '{}'.",
             describePool(attempt->pool()), host->hostname());
   grid_.dispatcher_.deferredDelete(attempt->removeFromList(connection_attempts_));
