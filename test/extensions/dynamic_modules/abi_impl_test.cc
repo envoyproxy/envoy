@@ -1300,7 +1300,6 @@ WEAK_STUB(TransportSocketSetIsReadable,
 WEAK_STUB(TransportSocketFlushWriteBuffer,
           envoy_dynamic_module_callback_transport_socket_flush_write_buffer(nullptr))
 
-
 WEAK_STUB(StatSinkSnapshotGetCounterCount,
           envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_count(nullptr))
 WEAK_STUB(StatSinkSnapshotGetCounter,
