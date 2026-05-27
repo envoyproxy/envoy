@@ -1314,8 +1314,9 @@ std::string EncoderImpl::sanitizeErrorForResp2(absl::string_view input) {
   // and terminals treat specially. A hostile BlobError supplied by the
   // upstream otherwise becomes a log-injection / terminal-escape vector
   // once a downstream client logs the message.
-  // Fast path: if no character needs replacement, hand back the original
-  // bytes without allocating.
+  // Fast path: if no character needs replacement, copy the input once
+  // and skip the per-byte rewrite loop plus the output-buffer
+  // second allocation.
   bool needs_sanitize = false;
   for (unsigned char c : input) {
     if (c < 0x20 || c == 0x7f) {
