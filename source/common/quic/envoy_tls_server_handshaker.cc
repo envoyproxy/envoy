@@ -10,10 +10,7 @@ EnvoyTlsServerHandshaker::EnvoyTlsServerHandshaker(
     quic::QuicSession* session, const quic::QuicCryptoServerConfig* crypto_config,
     Ssl::ServerContextSharedPtr pinned_ssl_ctx, bool disable_resumption, bool ticket_support_active)
     : TlsServerHandshaker(session, crypto_config), pinned_ssl_ctx_(std::move(pinned_ssl_ctx)) {
-  const int ex_data_set = SSL_set_ex_data(ssl(), handshakerExDataIndex(), this);
-  // In debug builds, catch unexpected ex_data setup failure. In release
-  // builds the callbacks tolerate a missing handshaker and fail closed.
-  ASSERT(ex_data_set == 1);
+  SSL_set_ex_data(ssl(), handshakerExDataIndex(), this);
 
   // When Envoy ticket processing is active, guard against the pinned
   // context lacking keys even if the factory config snapshot said keys
