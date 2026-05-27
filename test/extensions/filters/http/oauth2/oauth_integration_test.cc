@@ -16,6 +16,7 @@ namespace HttpFilters {
 namespace Oauth2 {
 namespace {
 
+static const std::string TEST_FLOW_ID = "8c18b8fcf575b593";
 static const std::string TEST_STATE_CSRF_TOKEN =
     "8c18b8fcf575b593.qE67JkhE3H/0rpNYWCkQXX65Yzk5gEe7uETE3m8tylY=";
 // {"url":"http://traffic.example.com/not/_oauth","csrf_token":"${extracted}"}
@@ -37,71 +38,41 @@ static const std::string TEST_ENCRYPTED_ACCESS_TOKEN =
 static const std::string TEST_ENCRYPTED_REFRESH_TOKEN =
     "Fc1bBwAAAAAVzVsHAAAAAM9NnfacsjScJzcyWlSKX6E"; // "foo"
 
-/**
- * Decrypt an AES-256-CBC encrypted string.
- */
-std::string decrypt(absl::string_view encrypted, absl::string_view secret) {
-  // Decode the Base64Url-encoded input
-  std::string decoded = Base64Url::decode(encrypted);
-  std::vector<unsigned char> combined(decoded.begin(), decoded.end());
+// AES-256-GCM ciphertext of "code_verifier_value" under SHA256("hmac_secret") with a 12-byte
+// zero IV. Decodes to IV(12) + ciphertext(19) + tag(16) = 47 bytes, with the "gcm." marker
+// prepended. The IV is fixed to keep this fixture stable; the production encrypt() uses a
+// random IV. Used by the post-migration ACCEPT test below, which needs a known-GCM code_verifier
+// that survives oauth2_legacy_cbc_decrypt_compat=false.
+static const std::string TEST_GCM_ENCRYPTED_CODE_VERIFIER =
+    "gcm.AAAAAAAAAAAAAAAAGDzCoJmol66Bvqi8bjC73EVj0ka7fIueOPwd-A7FVcr1h_k";
 
-  if (combined.size() <= 16) {
-    return "";
-  }
-
-  // Extract the IV (first 16 bytes)
-  std::vector<unsigned char> iv(combined.begin(), combined.begin() + 16);
-
-  // Extract the ciphertext (remaining bytes)
-  std::vector<unsigned char> ciphertext(combined.begin() + 16, combined.end());
-
-  // Generate the key from the secret using SHA-256
-  std::vector<unsigned char> key(SHA256_DIGEST_LENGTH);
-  SHA256(reinterpret_cast<const unsigned char*>((std::string(secret)).c_str()), secret.size(),
-         key.data());
-
-  EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
-  RELEASE_ASSERT(ctx, "Failed to create context");
-
-  std::vector<unsigned char> plaintext(ciphertext.size() + EVP_MAX_BLOCK_LENGTH);
-  int len = 0, plaintext_len = 0;
-
-  // Initialize decryption operation
-  if (EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, key.data(), iv.data()) != 1) {
-    EVP_CIPHER_CTX_free(ctx);
-    return "";
-  }
-
-  // Decrypt the ciphertext
-  if (EVP_DecryptUpdate(ctx, plaintext.data(), &len, ciphertext.data(), ciphertext.size()) != 1) {
-    EVP_CIPHER_CTX_free(ctx);
-    return "";
-  }
-  plaintext_len += len;
-
-  // Finalize decryption
-  if (EVP_DecryptFinal_ex(ctx, plaintext.data() + len, &len) != 1) {
-    EVP_CIPHER_CTX_free(ctx);
-    return "";
-  }
-
-  plaintext_len += len;
-
-  EVP_CIPHER_CTX_free(ctx);
-
-  // Resize to actual plaintext length
-  plaintext.resize(plaintext_len);
-
-  return std::string(plaintext.begin(), plaintext.end());
-}
-
+// OauthIntegrationTest is parameterized on the existing (IpVersion, gRPC client type) pair plus
+// a third dimension: whether envoy.reloadable_features.oauth2_use_gcm_encryption is enabled.
+// The flag is applied as a runtime override in initialize() so that every TEST_P defined on
+// this fixture is exercised once with the filter emitting legacy AES-256-CBC cookies (the
+// default) and once with it emitting AES-256-GCM cookies (the post-CVE-2026-47775 cipher).
 class OauthIntegrationTest : public HttpIntegrationTest,
-                             public Grpc::GrpcClientIntegrationParamTest {
+                             public Grpc::BaseGrpcClientIntegrationParamTest,
+                             public testing::TestWithParam<
+                                 std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>> {
 public:
   OauthIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP2, Network::Address::IpVersion::v4) {
     skip_tag_extraction_rule_check_ = true;
     enableHalfClose(true);
+  }
+
+  Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
+  Grpc::ClientType clientType() const override { return std::get<1>(GetParam()); }
+  bool useGcm() const { return std::get<2>(GetParam()); }
+
+  static std::string oauthIntegrationParamsToString(
+      const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>>&
+          info) {
+    return fmt::format("{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(info.param)),
+                       std::get<1>(info.param) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc"
+                                                                               : "EnvoyGrpc",
+                       std::get<2>(info.param) ? "GcmEncryption" : "CbcEncryption");
   }
 
   envoy::service::discovery::v3::DiscoveryResponse genericSecretResponse(absl::string_view name,
@@ -182,6 +153,10 @@ public:
   void initialize() override {
     use_lds_ = false; // required for grpc lds
     setUpstreamProtocol(Http::CodecType::HTTP2);
+    if (useGcm()) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.oauth2_use_gcm_encryption",
+                                        "true");
+    }
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Add the static cluster to serve LDS.
       auto* lds_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -343,13 +318,13 @@ typed_config:
     validate_headers.addReferenceKey(
         Http::Headers::get().Cookie,
         absl::StrCat(default_cookie_names_.oauth_expires_, "=", expires));
-    validate_headers.addReferenceKey(
-        Http::Headers::get().Cookie,
-        absl::StrCat(default_cookie_names_.bearer_token_, "=", decrypt(token, hmac_secret)));
+    validate_headers.addReferenceKey(Http::Headers::get().Cookie,
+                                     absl::StrCat(default_cookie_names_.bearer_token_, "=",
+                                                  decrypt(token, hmac_secret).plaintext));
 
     validate_headers.addReferenceKey(Http::Headers::get().Cookie,
                                      absl::StrCat(default_cookie_names_.refresh_token_, "=",
-                                                  decrypt(refreshToken, hmac_secret)));
+                                                  decrypt(refreshToken, hmac_secret).plaintext));
 
     OAuth2CookieValidator validator{api_->timeSource(), default_cookie_names_, ""};
     validator.setParams(validate_headers, std::string(hmac_secret));
@@ -525,8 +500,16 @@ typed_config:
   FakeStreamPtr oauth2_request_;
 };
 
+// Cross-product of the regular gRPC integration params with both values of
+// envoy.reloadable_features.oauth2_use_gcm_encryption so every TEST_P below runs once under each
+// cipher mode.
+#define GRPC_CLIENT_INTEGRATION_PARAMS_WITH_GCM_FLAG                                               \
+  testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
+                   testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()), testing::Bool())
+
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, OauthIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+                         GRPC_CLIENT_INTEGRATION_PARAMS_WITH_GCM_FLAG,
+                         OauthIntegrationTest::oauthIntegrationParamsToString);
 
 // Regular request gets redirected to the login page.
 TEST_P(OauthIntegrationTest, UnauthenticatedFlow) {
@@ -742,7 +725,8 @@ typed_config:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, OauthIntegrationTestWithBasicAuth,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+                         GRPC_CLIENT_INTEGRATION_PARAMS_WITH_GCM_FLAG,
+                         OauthIntegrationTest::oauthIntegrationParamsToString);
 
 // Do OAuth flow with Basic auth header in access token request.
 TEST_P(OauthIntegrationTestWithBasicAuth, AuthenticationFlow) {
@@ -805,7 +789,8 @@ typed_config:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, OauthUseRefreshTokenDisabled,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+                         GRPC_CLIENT_INTEGRATION_PARAMS_WITH_GCM_FLAG,
+                         OauthIntegrationTest::oauthIntegrationParamsToString);
 
 TEST_P(OauthUseRefreshTokenDisabled, FailRefreshTokenFlow) {
   on_server_init_function_ = [&]() {
@@ -916,6 +901,91 @@ TEST_P(OauthIntegrationTest, HmacChangeCausesReauth) {
 
   RELEASE_ASSERT(response2->waitForEndStream(), "unexpected timeout");
   cleanup();
+}
+
+// Post-migration config (oauth2_use_gcm_encryption=true and
+// oauth2_legacy_cbc_decrypt_compat=false): a legacy AES-256-CBC code_verifier cookie must NOT
+// be accepted — the filter should fail to decrypt and respond 401. This is the integration-level
+// proof that CVE-2026-47775 is fully closed once operators have flipped both flags.
+class OauthPostMigrationIntegrationTest : public OauthIntegrationTest {
+public:
+  void initialize() override {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.oauth2_use_gcm_encryption",
+                                      "true");
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.oauth2_legacy_cbc_decrypt_compat",
+                                      "false");
+    OauthIntegrationTest::initialize();
+  }
+};
+
+// The post-migration subclass forces both flags via addRuntimeOverride, so the gcm tuple
+// dimension is fixed at true here — running it with both bool values would just duplicate the
+// test with identical effective behaviour.
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsAndGrpcTypes, OauthPostMigrationIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),
+                     testing::Values(true)),
+    OauthIntegrationTest::oauthIntegrationParamsToString);
+
+TEST_P(OauthPostMigrationIntegrationTest, LegacyCbcCodeVerifierRejected) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "initial");
+  };
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", absl::StrCat("/callback?code=foo&state=", TEST_ENCODED_STATE)},
+      {":scheme", "http"},
+      {"x-forwarded-proto", "http"},
+      {":authority", "authority"},
+      {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, ".", TEST_FLOW_ID, "=",
+                              TEST_STATE_CSRF_TOKEN)},
+      {"cookie", absl::StrCat(default_cookie_names_.code_verifier_, ".", TEST_FLOW_ID, "=",
+                              TEST_ENCRYPTED_CODE_VERIFIER)}};
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  response->waitForHeaders();
+  EXPECT_EQ("401", response->headers().getStatusValue());
+  RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
+  cleanup();
+}
+
+// Symmetric positive test for the post-migration config (use_gcm=true, compat=false): a
+// "gcm."-prefixed code_verifier cookie must be accepted via the unconditional GCM decrypt
+// path and drive the full callback flow to a 302. This is what should happen after the
+// migration window has elapsed and all in-flight cookies are GCM.
+TEST_P(OauthPostMigrationIntegrationTest, GcmCodeVerifierAccepted) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "initial");
+  };
+  initialize();
+
+  doAuthenticationFlow("token_secret", "hmac_secret", TEST_STATE_CSRF_TOKEN, TEST_ENCODED_STATE,
+                       TEST_GCM_ENCRYPTED_CODE_VERIFIER);
+}
+
+// Default config (oauth2_use_gcm_encryption=false, oauth2_legacy_cbc_decrypt_compat=true): a
+// legacy AES-256-CBC code_verifier cookie must be accepted via the CBC fallback so that
+// rolling-upgrade sessions established on older instances continue to work.
+TEST_P(OauthIntegrationTest, LegacyCbcCodeVerifierAcceptedByDefault) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "initial");
+  };
+  initialize();
+
+  // doAuthenticationFlow drives the full callback flow: the filter must decrypt this cookie,
+  // exchange it at the OAuth2 token endpoint, and produce the 302 with the session cookies.
+  // Passing a CBC ciphertext here proves the default-on compat fallback succeeds end-to-end.
+  doAuthenticationFlow("token_secret", "hmac_secret", TEST_STATE_CSRF_TOKEN, TEST_ENCODED_STATE,
+                       TEST_ENCRYPTED_CODE_VERIFIER);
 }
 
 } // namespace
