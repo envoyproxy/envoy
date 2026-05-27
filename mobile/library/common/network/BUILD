@@ -37,6 +37,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":network_types_lib",
+        "@abseil-cpp//absl/synchronization",
         "@envoy//source/common/quic:envoy_quic_network_observer_registry_factory_lib",
     ],
 )

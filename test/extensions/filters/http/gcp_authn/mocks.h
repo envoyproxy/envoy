@@ -16,7 +16,7 @@ public:
   MockGcpAuthnClientCallbacks() = default;
   ~MockGcpAuthnClientCallbacks() override = default;
 
-  MOCK_METHOD(void, onComplete, (absl::StatusOr<std::string> token));
+  MOCK_METHOD(void, onComplete, (absl::StatusOr<GcpToken> token));
 };
 
 } // namespace GcpAuthn

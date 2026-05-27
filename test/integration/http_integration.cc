@@ -342,9 +342,6 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
   // lookupPort calls.
   config_helper_.renameListener("http");
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
-  // Allow extension lookup by name in the integration tests.
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.no_extension_lookup_by_name",
-                                    "false");
 
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1250,7 +1247,11 @@ void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_com
                                                absl::string_view initial_code) {
   if (with_encoder_filter) {
     // Add a filter to make sure 100s play well with them.
-    config_helper_.prependFilter("name: passthrough-filter");
+    config_helper_.prependFilter(R"EOF(
+      name: passthrough-filter
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.PassthroughFilterConfig
+    )EOF");
   }
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1317,11 +1318,19 @@ void HttpIntegrationTest::testTwoRequests(bool network_backup) {
   // created while the socket appears to be in the high watermark state, and regression tests that
   // flow control will be corrected as the socket "becomes unblocked"
   if (network_backup) {
-    config_helper_.prependFilter(
-        fmt::format(R"EOF(
-  name: pause-filter{}
-  )EOF",
-                    downstreamProtocol() == Http::CodecType::HTTP3 ? "-for-quic" : ""));
+    if (downstreamProtocol() == Http::CodecType::HTTP3) {
+      config_helper_.prependFilter(R"EOF(
+        name: pause-filter-for-quic
+        typed_config:
+          "@type": type.googleapis.com/test.integration.filters.PauseFilterForQuicConfig
+      )EOF");
+    } else {
+      config_helper_.prependFilter(R"EOF(
+        name: pause-filter
+        typed_config:
+          "@type": type.googleapis.com/test.integration.filters.PauseFilterConfig
+      )EOF");
+    }
   }
   initialize();
 
@@ -1731,9 +1740,11 @@ void HttpIntegrationTest::testAdminDrain(Http::CodecType admin_request_type) {
 
 void HttpIntegrationTest::simultaneousRequest(uint32_t request1_bytes, uint32_t request2_bytes,
                                               uint32_t response1_bytes, uint32_t response2_bytes) {
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   FakeStreamPtr upstream_request1;
   FakeStreamPtr upstream_request2;

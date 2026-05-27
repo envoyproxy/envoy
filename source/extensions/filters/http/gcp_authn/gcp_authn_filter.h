@@ -45,7 +45,7 @@ public:
 
   GcpAuthnFilter(FilterConfigSharedPtr filter_config,
                  Server::Configuration::FactoryContext& context, const std::string& stats_prefix,
-                 TokenCacheImpl<JwtToken>* token_cache)
+                 TokenCacheImpl* token_cache)
       : filter_config_(std::move(filter_config)), context_(context),
         client_(std::make_unique<GcpAuthnClientImpl>(*filter_config_, context_)),
         stats_(generateStats(stats_prefix, context_.scope())), jwt_token_cache_(token_cache) {}
@@ -53,7 +53,7 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
   void onDestroy() override;
-  void onComplete(absl::StatusOr<std::string> token) override;
+  void onComplete(absl::StatusOr<GcpToken> token) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   State state() { return state_; }
@@ -77,10 +77,10 @@ private:
 
   bool initiating_call_{};
   State state_{State::NotStarted};
-  std::string audience_str_;
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience_;
   // This cache is optional (it will be nullptr if no cache configuration) and not owned by the
   // filter (thread local storage).
-  TokenCacheImpl<JwtToken>* jwt_token_cache_;
+  TokenCacheImpl* jwt_token_cache_;
 };
 
 } // namespace GcpAuthn
