@@ -146,7 +146,7 @@ protected:
   }
 
   TestProcessor test_processor_;
-  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_;
 };
 
 // Skip sending to the external processor completely.

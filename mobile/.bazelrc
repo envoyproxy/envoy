@@ -36,9 +36,6 @@ build --define=envoy_full_protos=disabled
 build --define envoy_exceptions=disabled
 build: --copt=-fno-exceptions
 
-# We don't have a ton of Swift in Envoy Mobile, so always build with WMO
-# This also helps work around a bug in rules_swift: https://github.com/bazelbuild/rules_swift/issues/949
-build --swiftcopt=-wmo
 # https://github.com/bazelbuild/rules_jvm_external/issues/445
 build --repo_env=JAVA_HOME=../bazel_tools/jdk
 build --define disable_known_issue_asserts=true
@@ -77,7 +74,6 @@ build:android --java_language_version=8
 build:android --tool_java_language_version=8
 
 # Default flags for Android
-build:mobile-android --incompatible_enable_android_toolchain_resolution
 build:mobile-android --config=mobile-clang
 build:mobile-android --java_language_version=8
 build:mobile-android --tool_java_language_version=8
@@ -91,12 +87,10 @@ build:mobile-android-release --config=mobile-release-common
 build:mobile-android-release --compilation_mode=opt
 build:mobile-android-release --linkopt=-fuse-ld=lld
 build:mobile-android-release --android_platforms=@envoy//bazel/platforms/android:x86_64
-build:mobile-android-release --fat_apk_cpu=x86_64
 
 build:mobile-android-publish --config=mobile-android-release
 build:mobile-android-publish --config=mobile-release
 build:mobile-android-publish --android_platforms=@envoy//bazel/platforms/android:x86,@envoy//bazel/platforms/android:x86_64,@envoy//bazel/platforms/android:armeabi-v7a,@envoy//bazel/platforms/android::arm64-v8a
-build:mobile-android-publish --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a
 
 
 #############################################################################

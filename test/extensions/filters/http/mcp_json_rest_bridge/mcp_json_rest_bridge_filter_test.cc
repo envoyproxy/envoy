@@ -1229,6 +1229,88 @@ TEST_F(McpJsonRestBridgeFilterTest, ResponseBodyExceedsLimitReturnsError) {
             Http::FilterDataStatus::StopIterationNoBuffer);
 }
 
+TEST_F(McpJsonRestBridgeFilterTest, DynamicMetadataStoredWhenConfigured) {
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config =
+      ParseTextProtoOrDie(R"pb(
+    request_storage_mode: DYNAMIC_METADATA
+    tool_config {
+      tools {
+        name: "create_api_key"
+        http_rule: {
+          post: "/v1/{parent=projects/*}/apiKeys"
+          body: "key"
+        }
+      }
+    }
+  )pb");
+  config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
+  filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","arguments":{"parent":"projects/test","key":{"displayName":"display-key"}}}})json");
+  request_headers_.setContentLength(request_body.toString().size());
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  Protobuf::Struct expected_metadata = ParseTextProtoOrDie(R"pb(
+    fields {
+      key: "method"
+      value { string_value: "tools/call" }
+    }
+    fields {
+      key: "params"
+      value {
+        struct_value {
+          fields {
+            key: "name"
+            value { string_value: "create_api_key" }
+          }
+          fields {
+            key: "arguments"
+            value {
+              struct_value {
+                fields {
+                  key: "parent"
+                  value { string_value: "projects/test" }
+                }
+                fields {
+                  key: "key"
+                  value {
+                    struct_value {
+                      fields {
+                        key: "displayName"
+                        value { string_value: "display-key" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  )pb");
+
+  ON_CALL(decoder_callbacks_, filterConfigName())
+      .WillByDefault(Return("envoy.filters.http.mcp_json_rest_bridge"));
+
+  EXPECT_CALL(decoder_callbacks_.stream_info_,
+              setDynamicMetadata("envoy.filters.http.mcp_json_rest_bridge", _))
+      .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_THAT(metadata, ProtoEq(expected_metadata));
+      });
+
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+}
+
 class McpHttpMethodFilterTest : public testing::TestWithParam<std::string> {
 public:
   void SetUp() override {

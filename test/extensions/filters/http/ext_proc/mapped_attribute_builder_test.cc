@@ -92,8 +92,7 @@ TEST_F(MappedAttributeBuilderTest, CelFilterState) {
 
   Http::TestRequestHeaderMapImpl request_headers;
   stream_info_.filter_state_->setData("fs_key",
-                                      std::make_unique<Router::StringAccessorImpl>("fs_value"),
-                                      StreamInfo::FilterState::StateType::ReadOnly);
+                                      std::make_unique<Router::StringAccessorImpl>("fs_value"));
 
   ProcessingRequestModifier::Params params{
       envoy::config::core::v3::TrafficDirection::INBOUND,

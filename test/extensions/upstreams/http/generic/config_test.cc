@@ -2,6 +2,7 @@
 
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
+#include "test/test_common/enum_test_utils.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -50,7 +51,7 @@ TEST_F(GenericGenericConnPoolFactoryTest, InvalidConnPool) {
   // Passes an invalid UpstreamProtocol and check a nullptr is returned.
   EXPECT_FALSE(factory_.createGenericConnPool(
       nullptr, thread_local_cluster_,
-      static_cast<Router::GenericConnPoolFactory::UpstreamProtocol>(0xff), priority_,
+      uncheckedEnumCastForTest<Router::GenericConnPoolFactory::UpstreamProtocol>(0xff), priority_,
       Envoy::Http::Protocol::Http2, nullptr, *message_));
 }
 

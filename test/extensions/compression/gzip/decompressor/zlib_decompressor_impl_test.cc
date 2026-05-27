@@ -61,7 +61,7 @@ protected:
   static constexpr int64_t memory_level{8};
   static constexpr uint64_t default_input_size{796};
 
-  Stats::IsolatedStoreImpl stats_store_{};
+  Stats::IsolatedStoreImpl stats_store_;
   Stats::Scope& stats_scope_{*stats_store_.rootScope()};
 };
 
@@ -338,7 +338,7 @@ class ZlibDecompressorStatsTest : public testing::Test {
 protected:
   void chargeErrorStats(const int result) { decompressor_.chargeErrorStats(result); }
 
-  Stats::IsolatedStoreImpl stats_store_{};
+  Stats::IsolatedStoreImpl stats_store_;
   Stats::Scope& stats_scope_{*stats_store_.rootScope()};
   ZlibDecompressorImpl decompressor_{stats_scope_, "test.", 4096, 100};
 };
