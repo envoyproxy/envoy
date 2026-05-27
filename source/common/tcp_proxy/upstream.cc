@@ -244,7 +244,7 @@ HttpUpstream::onDownstreamEvent(Network::ConnectionEvent event, absl::string_vie
 }
 
 void HttpUpstream::onResetStream(Http::StreamResetReason reason, absl::string_view) {
-  const bool already_complete = read_half_closed_ && write_half_closed_;
+  const bool already_complete = read_half_closed_;
   read_half_closed_ = true;
   write_half_closed_ = true;
   Network::ConnectionEvent event;

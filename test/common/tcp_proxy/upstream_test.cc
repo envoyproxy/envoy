@@ -224,7 +224,6 @@ TEST_P(HttpUpstreamTest, UpstreamRemoteResetAfterStreamCompleteProducesLocalClos
   // Simulate stream already completed normally via half-close path.
   EXPECT_CALL(this->callbacks_, onEvent(_)).Times(AnyNumber());
   this->upstream_->doneReading();
-  this->upstream_->doneWriting();
 
   // Remote reset after completion should NOT produce RST.
   EXPECT_CALL(this->encoder_.stream_, resetStream(_)).Times(0);
@@ -294,7 +293,6 @@ TEST_P(HttpUpstreamTest, DumpsResponseDecoderWithoutAllocatingMemory) {
 TEST_P(HttpUpstreamTest, UpstreamTrailersMarksDoneReading) {
   this->setupUpstream();
   EXPECT_CALL(this->encoder_.stream_, resetStream(_)).Times(0);
-  this->upstream_->doneWriting();
   Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
   this->upstream_->responseDecoder().decodeTrailers(std::move(trailers));
 }
@@ -855,7 +853,6 @@ TEST_F(CombinedUpstreamTest, DumpsResponseDecoderWithoutAllocatingMemory) {
 }
 TEST_F(CombinedUpstreamTest, UpstreamTrailersMarksDoneReading) {
   this->setup();
-  this->upstream_->doneWriting();
   Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
   this->upstream_->responseDecoder().decodeTrailers(std::move(trailers));
 }
