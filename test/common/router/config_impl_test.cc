@@ -10338,7 +10338,7 @@ virtual_hosts:
             retry_priority:
               name: envoy.test_retry_priority
               typed_config:
-                "@type": type.googleapis.com/google.protobuf.Struct
+                "@type": type.googleapis.com/test.mocks.upstream.TestRetryPriorityConfig
   )EOF";
 
   Upstream::MockRetryPriority priority{{}, {}};

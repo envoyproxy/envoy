@@ -174,9 +174,11 @@ TEST_P(SslIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
 
 TEST_P(SslIntegrationTest, Http1StreamInfoDownstreamHandshakeTiming) {
   ASSERT_TRUE(downstreamProtocol() == Http::CodecType::HTTP1);
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   initialize();
   codec_client_ = makeHttpConnection(makeSslClientConnection({}));
@@ -190,9 +192,11 @@ TEST_P(SslIntegrationTest, Http1StreamInfoDownstreamHandshakeTiming) {
 TEST_P(SslIntegrationTest, Http2StreamInfoDownstreamHandshakeTiming) {
   // See MultiplexedIntegrationTest for equivalent test for HTTP/3.
   setDownstreamProtocol(Http::CodecType::HTTP2);
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   initialize();
   codec_client_ = makeHttpConnection(makeSslClientConnection({}));
@@ -327,7 +331,11 @@ TEST_P(SslIntegrationTest, AdminCertEndpoint) {
 }
 
 TEST_P(SslIntegrationTest, RouterHeaderOnlyRequestAndResponseWithSni) {
-  config_helper_.addFilter("name: sni-to-header-filter");
+  config_helper_.addFilter(R"EOF(
+    name: sni-to-header-filter
+    typed_config:
+      "@type": type.googleapis.com/test.common.tls.integration.SniToHeaderFilterConfig
+  )EOF");
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection(ClientSslTransportOptions().setSni("host.com"));
   };
@@ -353,7 +361,11 @@ TEST_P(SslIntegrationTest, RouterHeaderOnlyRequestAndResponseWithSni) {
 
 TEST_P(SslIntegrationTest, LogPeerIpSanUnsupportedIpVersion) {
   useListenerAccessLog("%DOWNSTREAM_PEER_IP_SAN%");
-  config_helper_.addFilter("name: sni-to-header-filter");
+  config_helper_.addFilter(R"EOF(
+    name: sni-to-header-filter
+    typed_config:
+      "@type": type.googleapis.com/test.common.tls.integration.SniToHeaderFilterConfig
+  )EOF");
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection(ClientSslTransportOptions().setSni("host.com"));
   };
