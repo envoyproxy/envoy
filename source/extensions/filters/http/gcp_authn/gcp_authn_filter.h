@@ -43,11 +43,12 @@ public:
   // it or has completed.
   enum class State { NotStarted, Calling, Complete };
 
-  GcpAuthnFilter(FilterConfigSharedPtr config, absl::optional<std::string> client_cert_fingerprint,
+  GcpAuthnFilter(FilterConfigSharedPtr filter_config,
+                 absl::optional<std::string> client_cert_fingerprint,
                  Server::Configuration::FactoryContext& context, const std::string& stats_prefix,
                  TokenCacheImpl* token_cache)
-      : config_(std::move(config)), context_(context),
-        client_(std::make_unique<GcpAuthnClientImpl>(*config_, context_)),
+      : filter_config_(std::move(filter_config)), context_(context),
+        client_(std::make_unique<GcpAuthnClientImpl>(*filter_config_, context_)),
         stats_(generateStats(stats_prefix, context_.scope())),
         client_cert_fingerprint_(std::move(client_cert_fingerprint)),
         jwt_token_cache_(token_cache) {}
@@ -69,7 +70,7 @@ private:
     return {ALL_GCP_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, stats_prefix))};
   }
 
-  FilterConfigSharedPtr config_;
+  FilterConfigSharedPtr filter_config_;
   Server::Configuration::FactoryContext& context_;
   std::unique_ptr<GcpAuthnClient> client_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
