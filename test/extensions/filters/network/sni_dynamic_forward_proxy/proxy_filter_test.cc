@@ -55,13 +55,13 @@ public:
   void setFilterStateHost(const std::string& host) {
     connection_.streamInfo().filterState()->setData(
         "envoy.upstream.dynamic_host", std::make_shared<Router::StringAccessorImpl>(host),
-        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+        StreamInfo::FilterState::LifeSpan::Connection);
   }
 
   void setFilterStatePort(uint32_t port) {
     connection_.streamInfo().filterState()->setData(
         "envoy.upstream.dynamic_port", std::make_shared<StreamInfo::UInt32AccessorImpl>(port),
-        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+        StreamInfo::FilterState::LifeSpan::Connection);
   }
 
   ~SniDynamicProxyFilterTest() override {
@@ -349,7 +349,7 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
       StreamInfo::UpstreamAddress::key(),
       std::make_unique<StreamInfo::UpstreamAddress>(
           Network::Utility::parseInternetAddressNoThrow("1.2.3.3", 443)),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   InSequence s;
 

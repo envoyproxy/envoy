@@ -144,7 +144,7 @@ bool HeaderUtility::headerNameIsValid(absl::string_view header_key) {
   // TODO(yanavlasov): make validation in HTTP/2 case stricter.
   bool is_valid = true;
   for (auto iter = header_key.begin(); iter != header_key.end() && is_valid; ++iter) {
-    is_valid &= testCharInTable(kGenericHeaderNameCharTable, *iter);
+    is_valid &= CharTables::kGenericHeaderName.hasChar(*iter);
   }
   return is_valid;
 }

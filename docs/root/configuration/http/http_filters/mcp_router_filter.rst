@@ -23,11 +23,24 @@ Example configuration:
   - name: envoy.filters.http.mcp_router
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_router.v3.McpRouter
+      lazy_initialization: true
       servers:
       - name: backend1
         mcp_cluster:
           cluster: backend1_cluster
           path: /mcp
+
+.. _config_http_filters_mcp_router_lazy_initialization:
+
+Lazy initialization
+~~~~~~~~~~~~~~~~~~~
+
+By default, the MCP router eagerly initializes all backend servers during the client's ``initialize``
+request, blocking until every backend responds (or times out). When ``lazy_initialization`` is set to
+``true``, the ``initialize`` response is returned immediately with gateway capabilities and an empty
+backend session map. Each backend is then initialized on-demand when a request first routes to it.
+
+This is useful when some backends are slow or unreliable and should not block client initialization.
 
 .. _config_http_filters_mcp_router_statistics:
 

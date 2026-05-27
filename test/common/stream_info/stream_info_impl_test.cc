@@ -342,7 +342,6 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     EXPECT_EQ(route.get(), stream_info.route().ptr());
 
     stream_info.filterState()->setData("test", std::make_unique<TestIntAccessor>(1),
-                                       FilterState::StateType::ReadOnly,
                                        FilterState::LifeSpan::FilterChain);
     EXPECT_EQ(1, stream_info.filterState()->getDataReadOnly<TestIntAccessor>("test")->access());
 
@@ -445,7 +444,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   s1.route_ = std::make_shared<NiceMock<Router::MockRoute>>();
   s1.setDynamicMetadata("com.test", MessageUtil::keyValueStruct("test_key", "test_value"));
   s1.filterState()->setData("test", std::make_unique<TestIntAccessor>(1),
-                            FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
+                            FilterState::LifeSpan::FilterChain);
   Http::TestRequestHeaderMapImpl headers1;
   s1.setRequestHeaders(headers1);
   Upstream::ClusterInfoConstSharedPtr cluster_info(new NiceMock<Upstream::MockClusterInfo>());

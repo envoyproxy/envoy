@@ -5,6 +5,7 @@
 #include "source/common/network/utility.h"
 
 #include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Network {
@@ -14,12 +15,15 @@ namespace {
 // The static module name for the Hickory DNS Rust module.
 constexpr absl::string_view HickoryModuleName = "hickory_dns_static";
 
-std::string serializeConfigToJson(
+absl::StatusOr<std::string> serializeConfigToJson(
     const envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig&
         proto_config) {
   std::string json;
   auto status = Protobuf::util::MessageToJsonString(proto_config, &json);
-  ASSERT(status.ok());
+  if (!status.ok()) {
+    return absl::InternalError(
+        absl::StrCat("Failed to serialize HickoryDnsResolverConfig to JSON: ", status.message()));
+  }
   return json;
 }
 
@@ -27,22 +31,37 @@ std::string serializeConfigToJson(
 
 // -- HickoryDnsResolverConfig -------------------------------------------------
 
-std::shared_ptr<HickoryDnsResolverConfig> HickoryDnsResolverConfig::create(
+absl::StatusOr<std::shared_ptr<HickoryDnsResolverConfig>> HickoryDnsResolverConfig::create(
     const envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig&
         proto_config) {
+  return createForModule(proto_config, HickoryModuleName);
+}
+
+absl::StatusOr<std::shared_ptr<HickoryDnsResolverConfig>> HickoryDnsResolverConfig::createForModule(
+    const envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig&
+        proto_config,
+    absl::string_view module_name) {
   auto config = std::shared_ptr<HickoryDnsResolverConfig>(new HickoryDnsResolverConfig());
 
-  // The Hickory DNS module is statically linked and always available.
+  // The Hickory DNS module is statically linked and always available in production. Tests may
+  // override ``module_name`` to exercise load- and symbol-resolution-failure paths.
   auto module_or =
-      Extensions::DynamicModules::newDynamicModuleByName(HickoryModuleName, /*do_not_close=*/true);
-  RELEASE_ASSERT(module_or.ok(), std::string(module_or.status().message()));
+      Extensions::DynamicModules::newDynamicModuleByName(module_name, /*do_not_close=*/true);
+  if (!module_or.ok()) {
+    return absl::InternalError(
+        absl::StrCat("Failed to load Hickory DNS dynamic module: ", module_or.status().message()));
+  }
   config->dynamic_module_ = std::move(*module_or);
 
-  // All symbols are guaranteed to be present in the statically linked module.
+  // All symbols are guaranteed to be present in the statically linked production module; any
+  // failure here indicates a build configuration error rather than a user-recoverable issue.
 #define RESOLVE_SYMBOL(field, symbol)                                                              \
   {                                                                                                \
     auto fn = config->dynamic_module_->getFunctionPointer<decltype(config->field)>(symbol);        \
-    RELEASE_ASSERT(fn.ok(), std::string(fn.status().message()));                                   \
+    if (!fn.ok()) {                                                                                \
+      return absl::InternalError(absl::StrCat("Failed to resolve Hickory DNS ABI symbol '",        \
+                                              (symbol), "': ", fn.status().message()));            \
+    }                                                                                              \
     config->field = *fn;                                                                           \
   }
 
@@ -58,11 +77,13 @@ std::shared_ptr<HickoryDnsResolverConfig> HickoryDnsResolverConfig::create(
 
 #undef RESOLVE_SYMBOL
 
-  const std::string config_json = serializeConfigToJson(proto_config);
+  auto config_json_or = serializeConfigToJson(proto_config);
+  RETURN_IF_NOT_OK_REF(config_json_or.status());
+  const std::string config_json = std::move(*config_json_or);
 
   envoy_dynamic_module_type_envoy_buffer name_buf;
-  name_buf.ptr = HickoryModuleName.data();
-  name_buf.length = HickoryModuleName.size();
+  name_buf.ptr = module_name.data();
+  name_buf.length = module_name.size();
 
   envoy_dynamic_module_type_envoy_buffer config_buf;
   config_buf.ptr = config_json.c_str();
@@ -71,14 +92,22 @@ std::shared_ptr<HickoryDnsResolverConfig> HickoryDnsResolverConfig::create(
   config->in_module_config_ = config->on_dns_resolver_config_new_(
       static_cast<envoy_dynamic_module_type_dns_resolver_config_envoy_ptr>(config.get()), name_buf,
       config_buf);
-  RELEASE_ASSERT(config->in_module_config_ != nullptr,
-                 "Hickory DNS module rejected the configuration.");
+  if (config->in_module_config_ == nullptr) {
+    return absl::InvalidArgumentError(
+        "Hickory DNS module rejected the configuration: invalid JSON or unsupported options.");
+  }
 
   return config;
 }
 
 HickoryDnsResolverConfig::~HickoryDnsResolverConfig() {
-  on_dns_resolver_config_destroy_(in_module_config_);
+  // Guard against partially-constructed instances unwound from a failed `create()`.
+  // The dynamic module may not have loaded (`on_dns_resolver_config_destroy_` would be
+  // null) or the Rust module may have rejected the configuration before `in_module_config_`
+  // was assigned. Either case must not call through the destroy FFI.
+  if (in_module_config_ != nullptr && on_dns_resolver_config_destroy_ != nullptr) {
+    on_dns_resolver_config_destroy_(in_module_config_);
+  }
 }
 
 // -- HickoryPendingResolution -------------------------------------------------
@@ -120,7 +149,12 @@ HickoryDnsResolver::HickoryDnsResolver(HickoryDnsResolverConfigSharedPtr config,
       stats_(generateHickoryDnsResolverStats(*scope_)) {
   resolver_module_ptr_ =
       config_->on_dns_resolver_new_(config_->in_module_config_, static_cast<const void*>(this));
-  ASSERT(resolver_module_ptr_ != nullptr);
+  // The Rust SDK only returns null if a panic propagates across the FFI boundary. Use
+  // `RELEASE_ASSERT` so production builds fail loudly instead of silently dereferencing
+  // a null pointer in subsequent FFI calls.
+  RELEASE_ASSERT(resolver_module_ptr_ != nullptr,
+                 "Hickory DNS module returned null from on_dns_resolver_new "
+                 "(likely a Rust panic during resolver creation).");
 }
 
 HickoryDnsResolver::~HickoryDnsResolver() {
@@ -171,19 +205,32 @@ ActiveDnsQuery* HickoryDnsResolver::resolve(const std::string& dns_name,
                                             DnsLookupFamily dns_lookup_family, ResolveCb callback) {
   ENVOY_LOG(debug, "resolving [{}] via Hickory DNS", dns_name);
 
-  stats_.pending_resolutions_.inc();
-
   const uint64_t query_id = next_query_id_++;
-  auto* pending = new HickoryPendingResolution(*this, std::move(callback), query_id, dns_name);
-  pending_queries_[query_id] = pending;
 
   envoy_dynamic_module_type_envoy_buffer name_buf;
   name_buf.ptr = dns_name.c_str();
   name_buf.length = dns_name.size();
 
-  pending->query_module_ptr_ = config_->on_dns_resolve_(
-      resolver_module_ptr_, name_buf, toLookupFamily(dns_lookup_family), query_id);
-  ASSERT(pending->query_module_ptr_ != nullptr);
+  auto* query_module_ptr = config_->on_dns_resolve_(resolver_module_ptr_, name_buf,
+                                                    toLookupFamily(dns_lookup_family), query_id);
+  if (query_module_ptr == nullptr) {
+    // The Rust SDK returns null when `DnsResolverInstance::resolve` returns `None` or when
+    // a panic propagates across the FFI boundary. Surface the failure synchronously rather
+    // than leaving the caller with no active query handle. The `pending_resolutions` gauge
+    // is not incremented because no query was actually spawned; `resolve_total` and
+    // `get_addr_failure` are bumped to match the asynchronous failure accounting in
+    // `onResolveComplete()`.
+    ENVOY_LOG(error, "Hickory DNS module failed to schedule resolution for [{}]", dns_name);
+    stats_.resolve_total_.inc();
+    stats_.get_addr_failure_.inc();
+    callback(ResolutionStatus::Failure, "hickory_dns_dispatch_failure", {});
+    return nullptr;
+  }
+
+  stats_.pending_resolutions_.inc();
+  auto* pending = new HickoryPendingResolution(*this, std::move(callback), query_id, dns_name);
+  pending->query_module_ptr_ = query_module_ptr;
+  pending_queries_[query_id] = pending;
   return pending;
 }
 
@@ -248,8 +295,10 @@ absl::StatusOr<DnsResolverSharedPtr> HickoryDnsResolverFactory::createDnsResolve
   envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig proto_config;
   RETURN_IF_NOT_OK(Envoy::MessageUtil::unpackTo(typed_config.typed_config(), proto_config));
 
-  auto config = HickoryDnsResolverConfig::create(proto_config);
-  return std::make_shared<HickoryDnsResolver>(std::move(config), dispatcher, api.rootScope());
+  auto config_or = HickoryDnsResolverConfig::create(proto_config);
+  RETURN_IF_NOT_OK_REF(config_or.status());
+
+  return std::make_shared<HickoryDnsResolver>(std::move(*config_or), dispatcher, api.rootScope());
 }
 
 REGISTER_FACTORY(HickoryDnsResolverFactory, DnsResolverFactory);

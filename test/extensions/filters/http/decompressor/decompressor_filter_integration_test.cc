@@ -46,8 +46,8 @@ public:
             "@type": type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip
     )EOF"};
 
-  Envoy::Compression::Compressor::CompressorPtr request_compressor_{};
-  Envoy::Compression::Compressor::CompressorPtr response_compressor_{};
+  Envoy::Compression::Compressor::CompressorPtr request_compressor_;
+  Envoy::Compression::Compressor::CompressorPtr response_compressor_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, DecompressorIntegrationTest,

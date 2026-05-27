@@ -14,7 +14,6 @@ namespace Common {
 namespace SetFilterState {
 
 using LifeSpan = StreamInfo::FilterState::LifeSpan;
-using StateType = StreamInfo::FilterState::StateType;
 using StreamSharing = StreamInfo::StreamSharingMayImpactPooling;
 using FilterStateValueProto =
     envoy::extensions::filters::common::set_filter_state::v3::FilterStateValue;
@@ -22,7 +21,6 @@ using FilterStateValueProto =
 struct Value {
   std::string key_;
   const StreamInfo::FilterState::ObjectFactory* factory_;
-  StateType state_type_{StateType::ReadOnly};
   StreamSharing stream_sharing_{StreamSharing::None};
   bool skip_if_empty_;
   Formatter::FormatterConstSharedPtr value_;

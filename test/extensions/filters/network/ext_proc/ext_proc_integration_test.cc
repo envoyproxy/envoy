@@ -158,15 +158,15 @@ public:
             auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners(0);
             auto* filter_chain = listeners->mutable_filter_chains(0);
             auto* filters = filter_chain->mutable_filters();
-            for (int i = 0; i < filters->size(); i++) {
-              if ((*filters)[i].name() == "envoy.network_ext_proc.ext_proc_filter") {
+            for (auto& filter : *filters) {
+              if (filter.name() == "envoy.network_ext_proc.ext_proc_filter") {
                 envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
-                (*filters)[i].mutable_typed_config()->UnpackTo(&config);
+                filter.mutable_typed_config()->UnpackTo(&config);
 
                 // Apply the provided modifier function
                 config_modifier(config);
 
-                (*filters)[i].mutable_typed_config()->PackFrom(config);
+                filter.mutable_typed_config()->PackFrom(config);
                 break;
               }
             }
@@ -221,11 +221,11 @@ public:
       auto* filter_chain = listener->mutable_filter_chains(0);
       auto* filters = filter_chain->mutable_filters();
 
-      for (int i = 0; i < filters->size(); i++) {
-        if ((*filters)[i].name() == "test.metadata_setter") {
+      for (auto& filter : *filters) {
+        if (filter.name() == "test.metadata_setter") {
           Protobuf::Struct existing_config;
-          if ((*filters)[i].has_typed_config()) {
-            (*filters)[i].typed_config().UnpackTo(&existing_config);
+          if (filter.has_typed_config()) {
+            filter.typed_config().UnpackTo(&existing_config);
           }
 
           // Set untyped metadata
@@ -265,7 +265,7 @@ public:
                 .set_string_value(typed_value.value());
           }
 
-          (*filters)[i].mutable_typed_config()->PackFrom(existing_config);
+          filter.mutable_typed_config()->PackFrom(existing_config);
           break;
         }
       }

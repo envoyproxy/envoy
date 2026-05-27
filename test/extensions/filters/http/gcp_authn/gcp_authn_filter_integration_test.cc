@@ -204,8 +204,8 @@ public:
 
   IntegrationStreamDecoderPtr response_;
   IntegrationStreamDecoderPtr gcp_response_;
-  FakeHttpConnectionPtr fake_gcp_authn_connection_{};
-  FakeStreamPtr request_{};
+  FakeHttpConnectionPtr fake_gcp_authn_connection_;
+  FakeStreamPtr request_;
   const std::string default_config_ = R"EOF(
     http_uri:
       uri: "gcp_authn:9000"
@@ -223,7 +223,7 @@ public:
     cache_config:
       cache_size: 100
   )EOF";
-  envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig proto_config_{};
+  envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig proto_config_;
   bool use_new_config_ = true;
 };
 

@@ -35,7 +35,7 @@ protected:
   }
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::string filename_;
-  std::unique_ptr<FileBasedKeyValueStore> store_{};
+  std::unique_ptr<FileBasedKeyValueStore> store_;
   std::chrono::seconds flush_interval_{5};
   Event::MockTimer* ttl_timer_ = nullptr;
   Event::MockTimer* flush_timer_ = nullptr;
