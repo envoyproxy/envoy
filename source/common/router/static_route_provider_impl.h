@@ -82,7 +82,12 @@ private:
       std::weak_ptr<Http::RouteConfigUpdatedCallback> cb_;
     };
 
-    RouteConfigUpdatePtr config_update_info_;
+    RouteConfigUpdatePtr config_update_info_mutable_;
+    // config_update_info_ wraps config_update_info_mutable_ by a const pointer to a const object.
+    // This is done to ensure that the code doesn't mutate the state from the worker thread.
+    // TODO(adisuissa): consider refactoring the VHDS and RDS config providers
+    // to separate worker-thread/main-thread const/mutable use cases.
+    const RouteConfigUpdateReceiver* const config_update_info_;
     VhdsSubscriptionPtr vhds_subscription_;
     Server::Configuration::ServerFactoryContext& factory_context_;
     ThreadLocal::TypedSlot<ThreadLocalConfig> tls_;

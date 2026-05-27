@@ -13,12 +13,11 @@ StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
     Server::Configuration::ServerFactoryContext& factory_context,
     Rds::RouteConfigProviderManager& route_config_provider_manager)
     : base_(config, config_traits, factory_context, route_config_provider_manager),
-      route_config_provider_manager_(route_config_provider_manager) {
-  if (config.has_vhds()) {
-    vhds_context_ = std::make_unique<VhdsContext>(config, factory_context, *this,
-                                                  route_config_provider_manager);
-  }
-}
+      route_config_provider_manager_(route_config_provider_manager),
+      vhds_context_(config.has_vhds()
+                        ? std::make_unique<VhdsContext>(config, factory_context, *this,
+                                                        route_config_provider_manager)
+                        : nullptr) {}
 
 StaticRouteConfigProviderImpl::~StaticRouteConfigProviderImpl() {
   route_config_provider_manager_.eraseStaticProvider(this);
@@ -64,8 +63,8 @@ void StaticRouteConfigProviderImpl::requestVirtualHostsUpdate(
                                              route_config_updated_cb);
     return;
   }
-  // If no VHDS is configured, immediately notify the callback that the
-  // virtual-host doesn't exist.
+  // If no VHDS is configured, immediately notify the callback asynchronously that the
+  // virtual host doesn't exist, shielding the filter chain stack from recursive reentrant calls.
   thread_local_dispatcher.post([current_cb = route_config_updated_cb] {
     if (auto cb = current_cb.lock()) {
       (*cb)(false);
@@ -78,17 +77,19 @@ StaticRouteConfigProviderImpl::VhdsContext::VhdsContext(
     Server::Configuration::ServerFactoryContext& factory_context,
     StaticRouteConfigProviderImpl& parent,
     Rds::RouteConfigProviderManager& route_config_provider_manager)
-    : factory_context_(factory_context), tls_(factory_context.threadLocal()) {
+    : config_update_info_mutable_(std::make_unique<RouteConfigUpdateReceiverImpl>(
+          route_config_provider_manager.protoTraits(), factory_context)),
+      config_update_info_(config_update_info_mutable_.get()), factory_context_(factory_context),
+      tls_(factory_context.threadLocal()) {
   // Emulate a config-update information gathering using a dynamic RouteConfigurationReceiver.
-  config_update_info_ = std::make_unique<RouteConfigUpdateReceiverImpl>(
-      route_config_provider_manager.protoTraits(), factory_context);
-  config_update_info_->onRdsUpdate(config, "");
+  config_update_info_mutable_->onRdsUpdate(config, "");
   // TODO(adisuissa): Convert the THROW_OR_RETURN_VALUE to return an
   // absl::StatusOr<> and propagate the result through a StaticRouteConfigProviderImpl
   // create function.
-  vhds_subscription_ = THROW_OR_RETURN_VALUE(
-      VhdsSubscription::createVhdsSubscription(config_update_info_, factory_context, "", &parent),
-      VhdsSubscriptionPtr);
+  vhds_subscription_ =
+      THROW_OR_RETURN_VALUE(VhdsSubscription::createVhdsSubscription(config_update_info_mutable_,
+                                                                     factory_context, "", &parent),
+                            VhdsSubscriptionPtr);
   vhds_subscription_->registerInitTargetWithInitManager(factory_context.initManager());
   tls_.set([initial_config = parent.base_.config()](Event::Dispatcher&) {
     return std::make_unique<ThreadLocalConfig>(initial_config);
