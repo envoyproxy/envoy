@@ -120,6 +120,23 @@ void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode) {
   }
 }
 
+void MultiplexedActiveClientBase::initiateGoAwayAndDrain() {
+  // Skip Connecting (no PREFACE exchanged yet) and Draining (already drained or peer already
+  // signaled). The pool's subsequent DrainAndDelete path will close Connecting clients via
+  // closeIdleConnectionsForDrainingPool.
+  if (state() == Envoy::ConnectionPool::ActiveClient::State::Connecting ||
+      state() == Envoy::ConnectionPool::ActiveClient::State::Draining) {
+    return;
+  }
+  ENVOY_CONN_LOG(debug, "initiate goaway and drain", *codec_client_);
+  codec_client_->goAway();
+  if (codec_client_->numActiveRequests() == 0) {
+    codec_client_->close();
+  } else {
+    parent_.transitionActiveClientState(*this, ActiveClient::State::Draining);
+  }
+}
+
 // Adjust the concurrent stream limit if the negotiated concurrent stream limit
 // is lower than the local max configured streams.
 //

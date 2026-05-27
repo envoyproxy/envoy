@@ -1093,6 +1093,20 @@ void ClusterManagerImpl::drainConnections(const std::string& cluster,
   });
 }
 
+void ClusterManagerImpl::drainConnections(const std::string& cluster,
+                                          DrainConnectionsHostPredicate predicate,
+                                          ConnectionPool::DrainBehavior drain_behavior) {
+  ENVOY_LOG_EVENT(debug, "drain_connections_call_with_behavior",
+                  "drainConnections called for cluster {} with custom drain behavior", cluster);
+  tls_.runOnAllThreads(
+      [cluster, predicate, drain_behavior](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+        auto cluster_entry = cluster_manager->thread_local_clusters_.find(cluster);
+        if (cluster_entry != cluster_manager->thread_local_clusters_.end()) {
+          cluster_entry->second->drainConnPools(predicate, drain_behavior);
+        }
+      });
+}
+
 void ClusterManagerImpl::drainConnections(DrainConnectionsHostPredicate predicate,
                                           ConnectionPool::DrainBehavior drain_behavior) {
   ENVOY_LOG_EVENT(debug, "drain_connections_call_for_all_clusters",

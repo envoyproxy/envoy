@@ -233,6 +233,10 @@ public:
   bool closingWithIncompleteStream() const override;
   RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override;
   RequestEncoder& newStreamEncoder(ResponseDecoderHandlePtr response_decoder_handle) override;
+  // Sends a GOAWAY and moves to Draining so the pool stops assigning new streams.
+  // Connecting clients (no PREFACE yet) and already-Draining clients are skipped.
+  // If no active streams remain, the client closes immediately.
+  void initiateGoAwayAndDrain() override;
 
   // CodecClientCallbacks
   void onStreamDestroy() override;

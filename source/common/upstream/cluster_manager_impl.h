@@ -382,6 +382,9 @@ public:
   void drainConnections(const std::string& cluster,
                         DrainConnectionsHostPredicate predicate) override;
 
+  void drainConnections(const std::string& cluster, DrainConnectionsHostPredicate predicate,
+                        ConnectionPool::DrainBehavior drain_behavior) override;
+
   void drainConnections(DrainConnectionsHostPredicate predicate,
                         ConnectionPool::DrainBehavior drain_behavior) override;
 

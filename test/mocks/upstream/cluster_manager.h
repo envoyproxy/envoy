@@ -88,6 +88,9 @@ public:
   MOCK_METHOD(void, drainConnections,
               (const std::string& cluster, DrainConnectionsHostPredicate predicate));
   MOCK_METHOD(void, drainConnections,
+              (const std::string& cluster, DrainConnectionsHostPredicate predicate,
+               ConnectionPool::DrainBehavior drain_behavior));
+  MOCK_METHOD(void, drainConnections,
               (DrainConnectionsHostPredicate predicate,
                ConnectionPool::DrainBehavior drain_behavior));
   MOCK_METHOD(absl::Status, checkActiveStaticCluster, (const std::string& cluster));

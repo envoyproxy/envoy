@@ -1,5 +1,7 @@
 #include "source/common/conn_pool/conn_pool_base.h"
 
+#include <vector>
+
 #include "envoy/server/overload/load_shed_point.h"
 
 #include "source/common/common/assert.h"
@@ -490,6 +492,32 @@ void ConnPoolImplBase::drainClients(std::list<ActiveClientPtr>& clients) {
 }
 
 void ConnPoolImplBase::drainConnectionsImpl(DrainBehavior drain_behavior) {
+  if (drain_behavior == Envoy::ConnectionPool::DrainBehavior::GoAwayAndDrainAndDelete) {
+    // Mark the pool as draining first so no new connections are created mid-iteration.
+    is_draining_for_deletion_ = true;
+
+    // Snapshot pointers because initiateGoAwayAndDrain() may call transitionActiveClientState
+    // which mutates the per-state lists. Skip connecting_clients_ - those have not exchanged
+    // the protocol preface yet, so sending GOAWAY is unusual; closeIdleConnectionsForDrainingPool
+    // (called via checkForIdleAndCloseIdleConnsIfDraining below) will close them.
+    std::vector<ActiveClient*> snapshot;
+    snapshot.reserve(early_data_clients_.size() + ready_clients_.size() + busy_clients_.size());
+    for (const auto& c : early_data_clients_) {
+      snapshot.push_back(c.get());
+    }
+    for (const auto& c : ready_clients_) {
+      snapshot.push_back(c.get());
+    }
+    for (const auto& c : busy_clients_) {
+      snapshot.push_back(c.get());
+    }
+    for (auto* client : snapshot) {
+      client->initiateGoAwayAndDrain();
+    }
+
+    checkForIdleAndCloseIdleConnsIfDraining();
+    return;
+  }
   if (drain_behavior == Envoy::ConnectionPool::DrainBehavior::DrainAndDelete) {
     is_draining_for_deletion_ = true;
     checkForIdleAndCloseIdleConnsIfDraining();

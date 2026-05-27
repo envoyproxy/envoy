@@ -517,6 +517,15 @@ public:
                                 DrainConnectionsHostPredicate predicate) PURE;
 
   /**
+   * Drain all connection pool connections owned by this cluster with a specific drain behavior.
+   * @param cluster the cluster to drain.
+   * @param predicate optional host predicate; if null, all hosts are drained.
+   * @param drain_behavior controls the drain semantics (see ConnectionPool::DrainBehavior).
+   */
+  virtual void drainConnections(const std::string& cluster, DrainConnectionsHostPredicate predicate,
+                                ConnectionPool::DrainBehavior drain_behavior) PURE;
+
+  /**
    * Drain all connection pool connections owned by all clusters in the cluster manager.
    * @param predicate supplies the optional drain connections host predicate. If not supplied, all
    *                  hosts are drained.

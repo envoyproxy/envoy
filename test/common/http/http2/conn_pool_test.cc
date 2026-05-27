@@ -2111,6 +2111,154 @@ TEST_F(Http2ConnPoolImplTest, RequestTrackingConnectionFailureNoMetric) {
   EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_remote_.value());
 }
 
+/**
+ * Verify that GoAwayAndDrainAndDelete sends a GOAWAY frame on a ready client with an active
+ * stream, transitions it to Draining, and closes the client once the stream completes.
+ */
+TEST_F(Http2ConnPoolImplTest, GoAwayAndDrainAndDeleteSendsGoAwayThenDrains) {
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  expectClientConnect(0, r1);
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_TRUE(
+      r1.callbacks_.outer_encoder_
+          ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
+          .ok());
+
+  EXPECT_CALL(*test_clients_[0].codec_, goAway());
+
+  ReadyWatcher drained;
+  pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::GoAwayAndDrainAndDelete);
+
+  // Complete the in-flight stream; the pool should become idle and the client should close.
+  EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(testing::AnyNumber());
+  EXPECT_CALL(drained, ready());
+  r1.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
+  EXPECT_CALL(*this, onClientDestroy()).Times(testing::AnyNumber());
+  dispatcher_.clearDeferredDeleteList();
+}
+
+/**
+ * Verify that GoAwayAndDrainAndDelete on a ready idle client sends GOAWAY and immediately
+ * closes the client (no active streams to wait for).
+ */
+TEST_F(Http2ConnPoolImplTest, GoAwayAndDrainAndDeleteIdleClientClosesImmediately) {
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  expectClientConnect(0, r1);
+  completeRequest(r1);
+
+  EXPECT_CALL(*test_clients_[0].codec_, goAway());
+
+  ReadyWatcher drained;
+  EXPECT_CALL(drained, ready());
+  pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(testing::AnyNumber());
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::GoAwayAndDrainAndDelete);
+
+  EXPECT_CALL(*this, onClientDestroy()).Times(testing::AnyNumber());
+  dispatcher_.clearDeferredDeleteList();
+}
+
+/**
+ * Verify that GoAwayAndDrainAndDelete does NOT send GOAWAY on a connecting client (no
+ * HTTP/2 PREFACE exchanged yet). The connecting client is still closed once its pending
+ * stream is resolved (via connection failure).
+ */
+TEST_F(Http2ConnPoolImplTest, GoAwayAndDrainAndDeleteSkipsConnectingClient) {
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  // Do NOT call expectClientConnect — client stays in Connecting state.
+
+  EXPECT_CALL(*test_clients_[0].codec_, goAway()).Times(0);
+
+  ReadyWatcher drained;
+  pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::GoAwayAndDrainAndDelete);
+
+  // The connecting client is not closed yet because it has a pending stream.
+  // Simulate the connection failing, which fires pool_failure_ and cleans up.
+  EXPECT_CALL(r1.callbacks_.pool_failure_, ready());
+  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+  EXPECT_CALL(drained, ready());
+  test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_CALL(*this, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
+/**
+ * Verify that a second GoAwayAndDrainAndDelete call is a no-op — GOAWAY is only sent once.
+ */
+TEST_F(Http2ConnPoolImplTest, GoAwayAndDrainAndDeleteIdempotent) {
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  expectClientConnect(0, r1);
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_TRUE(
+      r1.callbacks_.outer_encoder_
+          ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
+          .ok());
+
+  EXPECT_CALL(*test_clients_[0].codec_, goAway());
+
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::GoAwayAndDrainAndDelete);
+  // Second call: should be a no-op (client is already Draining).
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::GoAwayAndDrainAndDelete);
+
+  // Complete the in-flight stream to clean up.
+  EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(testing::AnyNumber());
+  r1.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
+  EXPECT_CALL(*this, onClientDestroy()).Times(testing::AnyNumber());
+  dispatcher_.clearDeferredDeleteList();
+}
+
+/**
+ * Verify that GoAwayAndDrainAndDelete with multiple clients sends GOAWAY on both Ready
+ * clients. Client 0 has an active stream (busy); client 1 is idle. The idle client closes
+ * immediately; the busy client drains then closes.
+ */
+TEST_F(Http2ConnPoolImplTest, GoAwayAndDrainAndDeleteMultipleClients) {
+  cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(1);
+
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  expectClientConnect(0, r1);
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_TRUE(
+      r1.callbacks_.outer_encoder_
+          ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
+          .ok());
+
+  expectClientCreate();
+  ActiveTestRequest r2(*this, 1, false);
+  expectClientConnect(1, r2);
+  completeRequest(r2);
+
+  EXPECT_CALL(*test_clients_[0].codec_, goAway());
+  EXPECT_CALL(*test_clients_[1].codec_, goAway());
+
+  ReadyWatcher drained;
+  pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::GoAwayAndDrainAndDelete);
+
+  // Complete the in-flight stream on client 0 — pool becomes idle, both clients close.
+  EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(testing::AnyNumber());
+  EXPECT_CALL(drained, ready());
+  r1.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
+
+  EXPECT_CALL(*this, onClientDestroy()).Times(testing::AnyNumber());
+  dispatcher_.clearDeferredDeleteList();
+}
+
 } // namespace Http2
 } // namespace Http
 } // namespace Envoy

@@ -52,6 +52,13 @@ enum class DrainBehavior {
   // Same as DrainExistingConnections, but only drains connections unable to migrate to a different
   // network on mobile.
   DrainExistingNonMigratableConnections,
+  // Same as DrainAndDelete, but multiplexed pools (HTTP/2, HTTP/3) first send a
+  // protocol-level GOAWAY so the peer can move new streams to a different connection
+  // while existing streams complete. HTTP/1 and TCP pools fall back to plain
+  // DrainAndDelete (no GOAWAY concept). Useful when the connection pool sits on the
+  // sending side of a long-lived multiplexed link (e.g. reverse-connection clusters,
+  // where the cluster owns outbound H2 sessions whose lifecycle the peer must follow).
+  GoAwayAndDrainAndDelete,
 };
 
 /**
