@@ -82,7 +82,8 @@ public:
             std::make_unique<Http::SessionIdleList>(*dispatcher_)),
         connection_id_(quic::test::TestConnectionId(1)),
         transport_socket_factory_(*QuicServerTransportSocketFactory::create(
-            true, listener_config_.listenerScope(),
+            /*enable_early_data=*/true, /*enable_reset_ssl=*/false, /*enable_resumption=*/true,
+            listener_config_.listenerScope(),
             std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(), ssl_context_manager_)) {
     auto writer = new testing::NiceMock<quic::test::MockPacketWriter>();
     envoy_quic_dispatcher_.InitializeWithWriter(writer);
