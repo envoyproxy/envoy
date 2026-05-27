@@ -7,6 +7,8 @@
 #include <initializer_list>
 #include <memory>
 
+#include "envoy/common/platform.h"
+
 #include "quiche/quic/test_tools/quic_connection_peer.h"
 
 namespace Envoy {
@@ -2012,8 +2014,13 @@ TEST_P(QuicHttpIntegrationTest, QuicListenerFilterReceivesFirstPacketWithCmsg) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     envoy::config::core::v3::SocketCmsgHeaders* cmsg =
         listener->mutable_udp_listener_config()->mutable_quic_options()->add_save_cmsg_config();
-    cmsg->mutable_level()->set_value(GetParam() == Network::Address::IpVersion::v4 ? 0 : 41);
-    cmsg->mutable_type()->set_value(GetParam() == Network::Address::IpVersion::v4 ? 1 : 50);
+    const bool is_ipv4 = GetParam() == Network::Address::IpVersion::v4;
+    cmsg->mutable_level()->set_value(is_ipv4 ? IPPROTO_IP : IPPROTO_IPV6);
+#ifdef __APPLE__
+    cmsg->mutable_type()->set_value(is_ipv4 ? IP_RECVTOS : IPV6_PKTINFO);
+#else
+    cmsg->mutable_type()->set_value(is_ipv4 ? IP_TOS : IPV6_PKTINFO);
+#endif
     cmsg->set_expected_size(128);
     auto* listener_filter = listener->add_listener_filters();
     listener_filter->set_name("envoy.filters.quic_listener.test");
