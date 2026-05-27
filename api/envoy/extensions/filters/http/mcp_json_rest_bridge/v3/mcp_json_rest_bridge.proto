@@ -216,6 +216,12 @@ message ToolsListSpecificConfig {
   string input_schema = 3;
 }
 
+message McpServerInfo {
+  string path = 1;
+
+  string host = 2;
+}
+
 message ToolConfig {
   // Unique identifier of the tool. Used both for tools/list and tools/call transcoding.
   string name = 1 [(validate.rules).string = {min_len: 1}];
@@ -227,6 +233,10 @@ message ToolConfig {
   // Config for this tool's entry in a local tools/list response. Used when tool_list_local is set
   // in the ServerToolConfig.
   ToolsListSpecificConfig tool_list_config = 3;
+
+  // [#not-implemented-hide:]
+  // Path and host of the MCP server that hosts this tool.
+  McpServerInfo server_info = 4;
 }
 
 // Defines the schema of the JSON-RPC to REST mapping. It specifies how the "arguments"
