@@ -706,8 +706,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseMaxDurationHttpConnectionsD
     test::extensions::quic::proof_source::PendingProofSourceConfig config;
     proof_source_config->mutable_typed_config()->PackFrom(config);
 #else
-    proof_source_config->set_name("envoy.quic.proof_source.pending_signing");
-    proof_source_config->mutable_typed_config();
+    FAIL() << "This test is not expected to run with quic disabled.";
 #endif
   });
   initializeOverloadManager(
