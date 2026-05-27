@@ -696,12 +696,12 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseMaxDurationHttpConnectionsD
       });
 
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+#ifdef ENVOY_ENABLE_QUIC
     auto* proof_source_config = bootstrap.mutable_static_resources()
                                     ->mutable_listeners(0)
                                     ->mutable_udp_listener_config()
                                     ->mutable_quic_options()
                                     ->mutable_proof_source_config();
-#ifdef ENVOY_ENABLE_QUIC
     proof_source_config->set_name("envoy.quic.proof_source.pending_signing");
     test::extensions::quic::proof_source::PendingProofSourceConfig config;
     proof_source_config->mutable_typed_config()->PackFrom(config);
