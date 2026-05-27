@@ -135,21 +135,20 @@ public:
   // to keep the maps up-to-date.
   //
   // Stats::Scope
-  Counter& counterFromString(const std::string& name) override;
-  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override;
-  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override;
-  Counter& counterFromStatNameWithTags(const StatName& stat_name,
-                                       StatNameTagVectorOptConstRef tags) override;
-  Gauge& gaugeFromStatNameWithTags(const StatName& stat_name, StatNameTagVectorOptConstRef tags,
+  Counter& counterFromString(absl::string_view name) override;
+  Gauge& gaugeFromString(absl::string_view name, Gauge::ImportMode import_mode) override;
+  Histogram& histogramFromString(absl::string_view name, Histogram::Unit unit) override;
+  Counter& counterFromStatNameWithTags(StatName stat_name,
+                                       absl::optional<StatNameTagSpan> tags) override;
+  Gauge& gaugeFromStatNameWithTags(StatName stat_name, absl::optional<StatNameTagSpan> tags,
                                    Gauge::ImportMode import_mode) override;
-  Histogram& histogramFromStatNameWithTags(const StatName& stat_name,
-                                           StatNameTagVectorOptConstRef tags,
+  Histogram& histogramFromStatNameWithTags(StatName stat_name, absl::optional<StatNameTagSpan> tags,
                                            Histogram::Unit unit) override;
   TestStore& store() override { return store_; }
   const TestStore& constStore() const override { return store_; }
 
 private:
-  std::string statNameWithTags(const StatName& stat_name, StatNameTagVectorOptConstRef tags);
+  std::string statNameWithTags(StatName stat_name, absl::optional<StatNameTagSpan> tags);
   static std::string addDot(const std::string& prefix) {
     if (prefix.empty() || prefix[prefix.size() - 1] == '.') {
       return prefix;
@@ -158,7 +157,7 @@ private:
   }
 
   void verifyConsistency(StatName ref_stat_name, StatName stat_name,
-                         StatNameTagVectorOptConstRef tags);
+                         absl::optional<StatNameTagSpan> tags);
 
   TestStore& store_;
   const std::string prefix_str_;

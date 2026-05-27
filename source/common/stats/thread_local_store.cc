@@ -158,7 +158,7 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   return ret;
 }
 
-ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::createScope(const std::string& name, bool evictable,
+ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::createScope(absl::string_view name, bool evictable,
                                                             const ScopeStatsLimitSettings& limits,
                                                             StatsMatcherSharedPtr matcher) {
   StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), symbolTable());
@@ -578,7 +578,7 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
 }
 
 Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
-    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags) {
+    StatName name, absl::optional<StatNameTagSpan> stat_name_tags) {
   if (scopeRejectsAll()) {
     return parent_.null_counter_;
   }
@@ -633,8 +633,7 @@ void ThreadLocalStoreImpl::deliverHistogramToSinks(const Histogram& histogram, u
 }
 
 Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
-    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags,
-    Gauge::ImportMode import_mode) {
+    StatName name, absl::optional<StatNameTagSpan> stat_name_tags, Gauge::ImportMode import_mode) {
   // If a gauge is "hidden" it should not be rejected as these are used for deferred stats.
   if (scopeRejectsAll() && import_mode != Gauge::ImportMode::HiddenAccumulate) {
     return parent_.null_gauge_;
@@ -685,7 +684,7 @@ ThreadLocalStoreImpl::ScopeImpl::getOrCreateGaugeBase(const TagUtility::TagStatN
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
-    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags, Histogram::Unit unit) {
+    StatName name, absl::optional<StatNameTagSpan> stat_name_tags, Histogram::Unit unit) {
   // See safety analysis comment in counterFromStatNameWithTags above.
 
   if (scopeRejectsAll()) {
@@ -778,7 +777,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::getOrCreateHistogramBase(
 }
 
 TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatNameWithTags(
-    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags) {
+    StatName name, absl::optional<StatNameTagSpan> stat_name_tags) {
   if (scopeRejectsAll()) {
     return parent_.null_text_readout_;
   }

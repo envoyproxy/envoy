@@ -129,8 +129,8 @@ TestScope::TestScope(StatName prefix, TestStore& store, StatsMatcherSharedPtr ma
 // to keep the maps up-to-date.
 //
 // Stats::Scope
-Counter& TestScope::counterFromString(const std::string& leaf_name) {
-  std::string name = prefix_str_ + leaf_name;
+Counter& TestScope::counterFromString(absl::string_view leaf_name) {
+  std::string name = prefix_str_ + std::string(leaf_name);
   Counter*& counter_ref = store_.counter_map_[name];
   if (counter_ref == nullptr) {
     counter_ref = &IsolatedScopeImpl::counterFromString(leaf_name);
@@ -138,8 +138,8 @@ Counter& TestScope::counterFromString(const std::string& leaf_name) {
   return *counter_ref;
 }
 
-Gauge& TestScope::gaugeFromString(const std::string& leaf_name, Gauge::ImportMode import_mode) {
-  std::string name = prefix_str_ + leaf_name;
+Gauge& TestScope::gaugeFromString(absl::string_view leaf_name, Gauge::ImportMode import_mode) {
+  std::string name = prefix_str_ + std::string(leaf_name);
   Gauge*& gauge_ref = store_.gauge_map_[name];
   if (gauge_ref == nullptr) {
     gauge_ref = &IsolatedScopeImpl::gaugeFromString(leaf_name, import_mode);
@@ -147,8 +147,8 @@ Gauge& TestScope::gaugeFromString(const std::string& leaf_name, Gauge::ImportMod
   return *gauge_ref;
 }
 
-Histogram& TestScope::histogramFromString(const std::string& leaf_name, Histogram::Unit unit) {
-  std::string name = prefix_str_ + leaf_name;
+Histogram& TestScope::histogramFromString(absl::string_view leaf_name, Histogram::Unit unit) {
+  std::string name = prefix_str_ + std::string(leaf_name);
   Histogram*& histogram_ref = store_.histogram_map_[name];
   if (histogram_ref == nullptr) {
     histogram_ref = &IsolatedScopeImpl::histogramFromString(leaf_name, unit);
@@ -156,14 +156,13 @@ Histogram& TestScope::histogramFromString(const std::string& leaf_name, Histogra
   return *histogram_ref;
 }
 
-std::string TestScope::statNameWithTags(const StatName& stat_name,
-                                        StatNameTagVectorOptConstRef tags) {
+std::string TestScope::statNameWithTags(StatName stat_name, absl::optional<StatNameTagSpan> tags) {
   TagUtility::TagStatNameJoiner joiner(prefix(), stat_name, tags, symbolTable());
   return symbolTable().toString(joiner.nameWithTags());
 }
 
 void TestScope::verifyConsistency(StatName ref_stat_name, StatName stat_name,
-                                  StatNameTagVectorOptConstRef tags) {
+                                  absl::optional<StatNameTagSpan> tags) {
   // Ensures StatNames with the same string representation are specified
   // consistently using symbolic/dynamic components on every access.
   TagUtility::TagStatNameJoiner joiner(prefix(), stat_name, tags, symbolTable());
@@ -174,8 +173,8 @@ void TestScope::verifyConsistency(StatName ref_stat_name, StatName stat_name,
                       " stat_name=", symbolTable().toString(joined_stat_name)));
 }
 
-Counter& TestScope::counterFromStatNameWithTags(const StatName& stat_name,
-                                                StatNameTagVectorOptConstRef tags) {
+Counter& TestScope::counterFromStatNameWithTags(StatName stat_name,
+                                                absl::optional<StatNameTagSpan> tags) {
   std::string name = statNameWithTags(stat_name, tags);
   Counter*& counter_ref = store_.counter_map_[name];
   if (counter_ref == nullptr) {
@@ -186,8 +185,8 @@ Counter& TestScope::counterFromStatNameWithTags(const StatName& stat_name,
   return *counter_ref;
 }
 
-Gauge& TestScope::gaugeFromStatNameWithTags(const StatName& stat_name,
-                                            StatNameTagVectorOptConstRef tags,
+Gauge& TestScope::gaugeFromStatNameWithTags(StatName stat_name,
+                                            absl::optional<StatNameTagSpan> tags,
                                             Gauge::ImportMode import_mode) {
   std::string name = statNameWithTags(stat_name, tags);
   Gauge*& gauge_ref = store_.gauge_map_[name];
@@ -199,8 +198,8 @@ Gauge& TestScope::gaugeFromStatNameWithTags(const StatName& stat_name,
   return *gauge_ref;
 }
 
-Histogram& TestScope::histogramFromStatNameWithTags(const StatName& stat_name,
-                                                    StatNameTagVectorOptConstRef tags,
+Histogram& TestScope::histogramFromStatNameWithTags(StatName stat_name,
+                                                    absl::optional<StatNameTagSpan> tags,
                                                     Histogram::Unit unit) {
   std::string name = statNameWithTags(stat_name, tags);
   Histogram*& histogram_ref = store_.histogram_map_[name];

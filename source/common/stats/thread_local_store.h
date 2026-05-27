@@ -300,16 +300,15 @@ private:
     }
 
     // Stats::Scope
-    Counter& counterFromStatNameWithTags(const StatName& name,
-                                         StatNameTagVectorOptConstRef tags) override;
-    Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+    Counter& counterFromStatNameWithTags(StatName name,
+                                         absl::optional<StatNameTagSpan> tags) override;
+    Gauge& gaugeFromStatNameWithTags(StatName name, absl::optional<StatNameTagSpan> tags,
                                      Gauge::ImportMode import_mode) override;
-    Histogram& histogramFromStatNameWithTags(const StatName& name,
-                                             StatNameTagVectorOptConstRef tags,
+    Histogram& histogramFromStatNameWithTags(StatName name, absl::optional<StatNameTagSpan> tags,
                                              Histogram::Unit unit) override;
-    TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
-                                                 StatNameTagVectorOptConstRef tags) override;
-    ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
+    TextReadout& textReadoutFromStatNameWithTags(StatName name,
+                                                 absl::optional<StatNameTagSpan> tags) override;
+    ScopeSharedPtr createScope(absl::string_view name, bool evictable = false,
                                const ScopeStatsLimitSettings& limits = {},
                                StatsMatcherSharedPtr matcher = nullptr) override;
     ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false,
@@ -318,20 +317,20 @@ private:
     const SymbolTable& constSymbolTable() const final { return parent_.constSymbolTable(); }
     SymbolTable& symbolTable() final { return parent_.symbolTable(); }
 
-    Counter& counterFromString(const std::string& name) override {
+    Counter& counterFromString(absl::string_view name) override {
       StatNameManagedStorage storage(name, symbolTable());
       return counterFromStatName(storage.statName());
     }
 
-    Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
+    Gauge& gaugeFromString(absl::string_view name, Gauge::ImportMode import_mode) override {
       StatNameManagedStorage storage(name, symbolTable());
       return gaugeFromStatName(storage.statName(), import_mode);
     }
-    Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
+    Histogram& histogramFromString(absl::string_view name, Histogram::Unit unit) override {
       StatNameManagedStorage storage(name, symbolTable());
       return histogramFromStatName(storage.statName(), unit);
     }
-    TextReadout& textReadoutFromString(const std::string& name) override {
+    TextReadout& textReadoutFromString(absl::string_view name) override {
       StatNameManagedStorage storage(name, symbolTable());
       return textReadoutFromStatName(storage.statName());
     }

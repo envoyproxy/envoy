@@ -9,6 +9,9 @@
 #include "envoy/stats/stats_matcher.h"
 #include "envoy/stats/tag.h"
 
+#include "source/common/stats/symbol_table.h"
+
+#include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -96,7 +99,7 @@ public:
    * NOTE: If the scope specific matcher is set, then the sub scope will inherit the same matcher
    * unless another matcher is explicitly set.
    */
-  virtual ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
+  virtual ScopeSharedPtr createScope(absl::string_view name, bool evictable = false,
                                      const ScopeStatsLimitSettings& limits = {},
                                      StatsMatcherSharedPtr matcher = nullptr) PURE;
 
@@ -122,9 +125,7 @@ public:
    * @param name The name of the stat, obtained from the SymbolTable.
    * @return a counter within the scope's namespace.
    */
-  Counter& counterFromStatName(const StatName& name) {
-    return counterFromStatNameWithTags(name, absl::nullopt);
-  }
+  Counter& counterFromStatName(StatName name) { return counterFromStatNameWithTags(name); }
   /**
    * Creates a Counter from the stat name and tags. If tags are not provided, tag extraction
    * will be performed on the name.
@@ -132,15 +133,16 @@ public:
    * @param tags optionally specified tags.
    * @return a counter within the scope's namespace.
    */
-  virtual Counter& counterFromStatNameWithTags(const StatName& name,
-                                               StatNameTagVectorOptConstRef tags) PURE;
+  virtual Counter&
+  counterFromStatNameWithTags(StatName name,
+                              absl::optional<StatNameTagSpan> tags = absl::nullopt) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use counterFromStatName.
    * @param name The name, expressed as a string.
    * @return a counter within the scope's namespace.
    */
-  virtual Counter& counterFromString(const std::string& name) PURE;
+  virtual Counter& counterFromString(absl::string_view name) PURE;
 
   /**
    * Creates a Gauge from the stat name. Tag extraction will be performed on the name.
@@ -148,7 +150,7 @@ public:
    * @param import_mode Whether hot-restart should accumulate this value.
    * @return a gauge within the scope's namespace.
    */
-  Gauge& gaugeFromStatName(const StatName& name, Gauge::ImportMode import_mode) {
+  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) {
     return gaugeFromStatNameWithTags(name, absl::nullopt, import_mode);
   }
 
@@ -160,7 +162,7 @@ public:
    * @param import_mode Whether hot-restart should accumulate this value.
    * @return a gauge within the scope's namespace.
    */
-  virtual Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+  virtual Gauge& gaugeFromStatNameWithTags(StatName name, absl::optional<StatNameTagSpan> tags,
                                            Gauge::ImportMode import_mode) PURE;
 
   /**
@@ -169,7 +171,7 @@ public:
    * @param import_mode Whether hot-restart should accumulate this value.
    * @return a gauge within the scope's namespace.
    */
-  virtual Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) PURE;
+  virtual Gauge& gaugeFromString(absl::string_view name, Gauge::ImportMode import_mode) PURE;
 
   /**
    * Creates a Histogram from the stat name. Tag extraction will be performed on the name.
@@ -177,7 +179,7 @@ public:
    * @param unit The unit of measurement.
    * @return a histogram within the scope's namespace with a particular value type.
    */
-  Histogram& histogramFromStatName(const StatName& name, Histogram::Unit unit) {
+  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) {
     return histogramFromStatNameWithTags(name, absl::nullopt, unit);
   }
 
@@ -189,8 +191,8 @@ public:
    * @param unit The unit of measurement.
    * @return a histogram within the scope's namespace with a particular value type.
    */
-  virtual Histogram& histogramFromStatNameWithTags(const StatName& name,
-                                                   StatNameTagVectorOptConstRef tags,
+  virtual Histogram& histogramFromStatNameWithTags(StatName name,
+                                                   absl::optional<StatNameTagSpan> tags,
                                                    Histogram::Unit unit) PURE;
 
   /**
@@ -199,15 +201,15 @@ public:
    * @param unit The unit of measurement.
    * @return a histogram within the scope's namespace with a particular value type.
    */
-  virtual Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) PURE;
+  virtual Histogram& histogramFromString(absl::string_view name, Histogram::Unit unit) PURE;
 
   /**
    * Creates a TextReadout from the stat name. Tag extraction will be performed on the name.
    * @param name The name of the stat, obtained from the SymbolTable.
    * @return a text readout within the scope's namespace.
    */
-  TextReadout& textReadoutFromStatName(const StatName& name) {
-    return textReadoutFromStatNameWithTags(name, absl::nullopt);
+  TextReadout& textReadoutFromStatName(StatName name) {
+    return textReadoutFromStatNameWithTags(name);
   }
 
   /**
@@ -217,15 +219,16 @@ public:
    * @param tags optionally specified tags.
    * @return a text readout within the scope's namespace.
    */
-  virtual TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
-                                                       StatNameTagVectorOptConstRef tags) PURE;
+  virtual TextReadout&
+  textReadoutFromStatNameWithTags(StatName name,
+                                  absl::optional<StatNameTagSpan> tags = absl::nullopt) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use textReadoutFromStatName.
    * @param name The name, expressed as a string.
    * @return a text readout within the scope's namespace.
    */
-  virtual TextReadout& textReadoutFromString(const std::string& name) PURE;
+  virtual TextReadout& textReadoutFromString(absl::string_view name) PURE;
 
   /**
    * @param The name of the stat, obtained from the SymbolTable.

@@ -297,11 +297,11 @@ class MockScope : public TestUtil::TestScope {
 public:
   MockScope(StatName prefix, MockStore& store);
 
-  ScopeSharedPtr createScope(const std::string& name, bool evictable,
+  ScopeSharedPtr createScope(absl::string_view name, bool evictable,
                              const ScopeStatsLimitSettings& limits,
                              StatsMatcherSharedPtr = nullptr) override {
     checkCreateScopeArgs(evictable, limits);
-    return ScopeSharedPtr(createScope_(name));
+    return ScopeSharedPtr(createScope_(std::string(name)));
   }
   ScopeSharedPtr scopeFromStatName(StatName name, bool evictable,
                                    const ScopeStatsLimitSettings& limits,
@@ -320,17 +320,17 @@ public:
   // Override the lowest level of stat creation based on StatName to redirect
   // back to the old string-based mechanisms still on the MockStore object
   // to allow tests to inject EXPECT_CALL hooks for those.
-  MOCK_METHOD(Counter&, counterFromStatNameWithTags,
-              (const StatName&, StatNameTagVectorOptConstRef));
+  MOCK_METHOD(Counter&, counterFromStatNameWithTags, (StatName, absl::optional<StatNameTagSpan>),
+              (override));
   // NOLINTNEXTLINE(readability-identifier-naming)
-  Counter& counterFromStatNameWithTags_(const StatName& name, StatNameTagVectorOptConstRef);
+  Counter& counterFromStatNameWithTags_(StatName name, absl::optional<StatNameTagSpan>);
 
-  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef,
+  Gauge& gaugeFromStatNameWithTags(StatName name, absl::optional<StatNameTagSpan>,
                                    Gauge::ImportMode import_mode) override;
-  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef,
+  Histogram& histogramFromStatNameWithTags(StatName name, absl::optional<StatNameTagSpan>,
                                            Histogram::Unit unit) override;
-  TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
-                                               StatNameTagVectorOptConstRef) override;
+  TextReadout& textReadoutFromStatNameWithTags(StatName name,
+                                               absl::optional<StatNameTagSpan>) override;
 
   MockStore& mock_store_;
 };

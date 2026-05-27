@@ -77,7 +77,7 @@ public:
   TestScopeWrapper(Thread::MutexBasicLockable& lock, ScopeSharedPtr wrapped_scope, Store& store)
       : lock_(lock), wrapped_scope_(wrapped_scope), store_(store) {}
 
-  ScopeSharedPtr createScope(const std::string& name, bool evictable,
+  ScopeSharedPtr createScope(absl::string_view name, bool evictable,
                              const ScopeStatsLimitSettings& limits,
                              StatsMatcherSharedPtr matcher = nullptr) override {
     Thread::LockGuard lock(lock_);
@@ -94,43 +94,43 @@ public:
         store_);
   }
 
-  Counter& counterFromStatNameWithTags(const StatName& name,
-                                       StatNameTagVectorOptConstRef tags) override {
+  Counter& counterFromStatNameWithTags(StatName name,
+                                       absl::optional<StatNameTagSpan> tags) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->counterFromStatNameWithTags(name, tags);
   }
 
-  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+  Gauge& gaugeFromStatNameWithTags(StatName name, absl::optional<StatNameTagSpan> tags,
                                    Gauge::ImportMode import_mode) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->gaugeFromStatNameWithTags(name, tags, import_mode);
   }
 
-  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+  Histogram& histogramFromStatNameWithTags(StatName name, absl::optional<StatNameTagSpan> tags,
                                            Histogram::Unit unit) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->histogramFromStatNameWithTags(name, tags, unit);
   }
 
-  TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
-                                               StatNameTagVectorOptConstRef tags) override {
+  TextReadout& textReadoutFromStatNameWithTags(StatName name,
+                                               absl::optional<StatNameTagSpan> tags) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->textReadoutFromStatNameWithTags(name, tags);
   }
 
-  Counter& counterFromString(const std::string& name) override {
+  Counter& counterFromString(absl::string_view name) override {
     StatNameManagedStorage storage(name, symbolTable());
     return counterFromStatName(storage.statName());
   }
-  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
+  Gauge& gaugeFromString(absl::string_view name, Gauge::ImportMode import_mode) override {
     StatNameManagedStorage storage(name, symbolTable());
     return gaugeFromStatName(storage.statName(), import_mode);
   }
-  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
+  Histogram& histogramFromString(absl::string_view name, Histogram::Unit unit) override {
     StatNameManagedStorage storage(name, symbolTable());
     return histogramFromStatName(storage.statName(), unit);
   }
-  TextReadout& textReadoutFromString(const std::string& name) override {
+  TextReadout& textReadoutFromString(absl::string_view name) override {
     StatNameManagedStorage storage(name, symbolTable());
     return textReadoutFromStatName(storage.statName());
   }

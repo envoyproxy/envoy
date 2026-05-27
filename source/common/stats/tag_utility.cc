@@ -10,23 +10,22 @@ namespace Stats {
 namespace TagUtility {
 
 TagStatNameJoiner::TagStatNameJoiner(StatName prefix, StatName stat_name,
-                                     StatNameTagVectorOptConstRef stat_name_tags,
+                                     absl::optional<StatNameTagSpan> stat_name_tags,
                                      SymbolTable& symbol_table)
     : stat_name_tags_(stat_name_tags) {
   prefix_storage_ = symbol_table.join({prefix, stat_name});
   tag_extracted_name_ = StatName(prefix_storage_.get());
 
-  if (stat_name_tags) {
+  if (!stat_name_tags.has_value() || stat_name_tags->empty()) {
+    name_with_tags_ = StatName(prefix_storage_.get());
+  } else {
     full_name_storage_ =
         joinNameAndTags(StatName(prefix_storage_.get()), *stat_name_tags, symbol_table);
     name_with_tags_ = StatName(full_name_storage_.get());
-  } else {
-    name_with_tags_ = StatName(prefix_storage_.get());
   }
 }
 
-SymbolTable::StoragePtr TagStatNameJoiner::joinNameAndTags(StatName name,
-                                                           const StatNameTagVector& tags,
+SymbolTable::StoragePtr TagStatNameJoiner::joinNameAndTags(StatName name, StatNameTagSpan tags,
                                                            SymbolTable& symbol_table) {
   StatNameVec stat_names;
   stat_names.reserve(1 + 2 * tags.size());

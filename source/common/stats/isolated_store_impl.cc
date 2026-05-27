@@ -60,7 +60,7 @@ ConstScopeSharedPtr IsolatedStoreImpl::constRootScope() const {
 
 IsolatedStoreImpl::~IsolatedStoreImpl() = default;
 
-ScopeSharedPtr IsolatedScopeImpl::createScope(const std::string& name, bool,
+ScopeSharedPtr IsolatedScopeImpl::createScope(absl::string_view name, bool,
                                               const ScopeStatsLimitSettings& limits,
                                               StatsMatcherSharedPtr matcher) {
   StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), symbolTable());

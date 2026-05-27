@@ -56,6 +56,16 @@ struct StatTagMetric : public Stats::StatTagMatchingData {
   absl::string_view value_;
 };
 
+// Converts the optional-reference tag representation used by this logger's caches to the
+// absl::optional<StatNameTagSpan> expected by the Scope APIs, preserving the nullopt-vs-present
+// distinction so that absl::nullopt continues to trigger tag extraction downstream.
+absl::optional<Stats::StatNameTagSpan> toSpan(Stats::StatNameTagVectorOptConstRef tags) {
+  if (tags.has_value()) {
+    return Stats::StatNameTagSpan(tags->get());
+  }
+  return absl::nullopt;
+}
+
 class ActionValidationVisitor
     : public Matcher::MatchTreeValidationVisitor<Stats::StatMatchingData> {
 public:
@@ -80,7 +90,7 @@ public:
 AccessLogState::~AccessLogState() {
   for (const auto& p : inflight_gauges_) {
     Stats::Gauge& gauge_stat = parent_->scope().gaugeFromStatNameWithTags(
-        p.first.statName(), p.first.tags(), p.second.import_mode_);
+        p.first.statName(), toSpan(p.first.tags()), p.second.import_mode_);
     gauge_stat.sub(p.second.value_);
   }
 }
@@ -103,7 +113,7 @@ void AccessLogState::addInflightGauge(Stats::StatName stat_name,
     it = new_it;
   }
   it->second.value_ += value;
-  parent_->scope().gaugeFromStatNameWithTags(stat_name, tags, import_mode).add(value);
+  parent_->scope().gaugeFromStatNameWithTags(stat_name, toSpan(tags), import_mode).add(value);
 }
 
 void AccessLogState::removeInflightGauge(Stats::StatName stat_name,
@@ -116,7 +126,7 @@ void AccessLogState::removeInflightGauge(Stats::StatName stat_name,
   GaugeKey key{stat_name, tags};
 
   Stats::Gauge& gauge_stat =
-      parent_->scope().gaugeFromStatNameWithTags(stat_name, tags, import_mode);
+      parent_->scope().gaugeFromStatNameWithTags(stat_name, toSpan(tags), import_mode);
 
   auto it = inflight_gauges_.find(key);
   const bool was_found = (it != inflight_gauges_.end());

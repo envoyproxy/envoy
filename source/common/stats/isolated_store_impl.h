@@ -330,19 +330,19 @@ public:
   // Stats::Scope
   SymbolTable& symbolTable() override { return store_.symbolTable(); }
   const SymbolTable& constSymbolTable() const override { return store_.symbolTable(); }
-  Counter& counterFromStatNameWithTags(const StatName& name,
-                                       StatNameTagVectorOptConstRef tags) override {
+  Counter& counterFromStatNameWithTags(StatName name,
+                                       absl::optional<StatNameTagSpan> tags) override {
     const OptRef<const StatsMatcher> matcher = makeOptRefFromPtr(scope_matcher_.get());
     const TagUtility::TagStatNameJoiner joiner(prefix(), name, tags, symbolTable());
     return store_.counters_.get(joiner, matcher).value_or(store_.null_counter_);
   }
-  ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
+  ScopeSharedPtr createScope(absl::string_view name, bool evictable = false,
                              const ScopeStatsLimitSettings& limits = {},
                              StatsMatcherSharedPtr matcher = nullptr) override;
   ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false,
                                    const ScopeStatsLimitSettings& limits = {},
                                    StatsMatcherSharedPtr matcher = nullptr) override;
-  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+  Gauge& gaugeFromStatNameWithTags(StatName name, absl::optional<StatNameTagSpan> tags,
                                    Gauge::ImportMode import_mode) override {
     const OptRef<const StatsMatcher> matcher = makeOptRefFromPtr(scope_matcher_.get());
     const TagUtility::TagStatNameJoiner joiner(prefix(), name, tags, symbolTable());
@@ -353,14 +353,14 @@ public:
     gauge->mergeImportMode(import_mode);
     return *gauge;
   }
-  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+  Histogram& histogramFromStatNameWithTags(StatName name, absl::optional<StatNameTagSpan> tags,
                                            Histogram::Unit unit) override {
     const OptRef<const StatsMatcher> matcher = makeOptRefFromPtr(scope_matcher_.get());
     const TagUtility::TagStatNameJoiner joiner(prefix(), name, tags, symbolTable());
     return store_.histograms_.get(joiner, unit, matcher).value_or(store_.null_histogram_);
   }
-  TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
-                                               StatNameTagVectorOptConstRef tags) override {
+  TextReadout& textReadoutFromStatNameWithTags(StatName name,
+                                               absl::optional<StatNameTagSpan> tags) override {
     const OptRef<const StatsMatcher> matcher = makeOptRefFromPtr(scope_matcher_.get());
     const TagUtility::TagStatNameJoiner joiner(prefix(), name, tags, symbolTable());
     return store_.text_readouts_.get(joiner, TextReadout::Type::Default, matcher)
@@ -390,19 +390,19 @@ public:
     return store_.text_readouts_.iterate(iterFilter(fn));
   }
 
-  Counter& counterFromString(const std::string& name) override {
+  Counter& counterFromString(absl::string_view name) override {
     StatNameManagedStorage storage(name, symbolTable());
     return counterFromStatName(storage.statName());
   }
-  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
+  Gauge& gaugeFromString(absl::string_view name, Gauge::ImportMode import_mode) override {
     StatNameManagedStorage storage(name, symbolTable());
     return gaugeFromStatName(storage.statName(), import_mode);
   }
-  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
+  Histogram& histogramFromString(absl::string_view name, Histogram::Unit unit) override {
     StatNameManagedStorage storage(name, symbolTable());
     return histogramFromStatName(storage.statName(), unit);
   }
-  TextReadout& textReadoutFromString(const std::string& name) override {
+  TextReadout& textReadoutFromString(absl::string_view name) override {
     StatNameManagedStorage storage(name, symbolTable());
     return textReadoutFromStatName(storage.statName());
   }

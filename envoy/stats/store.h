@@ -12,6 +12,8 @@
 #include "envoy/stats/stats_matcher.h"
 #include "envoy/stats/tag_producer.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Event {
 
@@ -161,23 +163,23 @@ public:
   // Delegate some methods to the root scope; these are exposed to make it more
   // convenient to use stats_macros.h. We may consider dropping them if desired,
   // when we resolve #24007 or in the next follow-up.
-  Counter& counterFromString(const std::string& name) {
+  Counter& counterFromString(absl::string_view name) {
     return rootScope()->counterFromString(name);
   }
-  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) {
+  Gauge& gaugeFromString(absl::string_view name, Gauge::ImportMode import_mode) {
     return rootScope()->gaugeFromString(name, import_mode);
   }
-  TextReadout& textReadoutFromString(const std::string& name) {
+  TextReadout& textReadoutFromString(absl::string_view name) {
     return rootScope()->textReadoutFromString(name);
   }
-  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) {
+  Histogram& histogramFromString(absl::string_view name, Histogram::Unit unit) {
     return rootScope()->histogramFromString(name, unit);
   }
 
   /**
    * @return a scope of the given name.
    */
-  ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
+  ScopeSharedPtr createScope(absl::string_view name, bool evictable = false,
                              const ScopeStatsLimitSettings& limits = {},
                              StatsMatcherSharedPtr matcher = nullptr) {
     return rootScope()->createScope(name, evictable, limits, std::move(matcher));
