@@ -66,6 +66,12 @@ parseAccessTokenResponse(const std::string& response_body,
   }
   std::string access_token = access_token_or_error.value();
   int64_t expires_in = expires_in_or_error.value();
+  if (access_token.empty()) {
+    return absl::InternalError("Extracted access_token is empty.");
+  }
+  if (expires_in <= 0) {
+    return absl::InternalError("Extracted expires_in is non-positive.");
+  }
   uint64_t expires_at = DateUtil::nowToSeconds(time_source) + expires_in;
   return GcpToken{access_token, expires_at, audience};
 }
@@ -113,9 +119,12 @@ void GcpAuthnClientImpl::fetchToken(
   if (audience.has_access_token()) {
     token_type_ = TokenType::AccessToken;
     final_url = AccessTokenEndpoint;
-  } else {
+  } else if (!audience.url().empty()) {
     token_type_ = TokenType::Jwt;
     final_url = absl::StrReplaceAll(JwtTokenEndpoint, {{"[AUDIENCE]", audience.url()}});
+  } else {
+    onError("Failed to fetch the token: both url and access_token are empty.");
+    return;
   }
   active_request_ =
       thread_local_cluster->httpAsyncClient().send(buildRequest(final_url), *this, options);
