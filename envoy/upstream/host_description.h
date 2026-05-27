@@ -208,6 +208,15 @@ public:
   virtual const std::string& hostname() const PURE;
 
   /**
+   * @return the observability name associated with the host. Used in per-endpoint stats and other
+   * observability surfaces. This is configured with
+   * :ref:`stat_name <envoy_v3_api_field_config.endpoint.v3.Endpoint.stat_name>`. If this method
+   * returns an empty string view, then the host's address should be used as fallback for the
+   * observability name.
+   */
+  virtual absl::string_view observabilityName() const PURE;
+
+  /**
    * @return the transport socket factory responsible for this host.
    */
   virtual Network::UpstreamTransportSocketFactory& transportSocketFactory() const PURE;

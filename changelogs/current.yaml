@@ -1,1 +1,13 @@
 date: Pending
+
+new_features:
+- area: network_ext_proc
+  change: |
+    Added support for receiving untyped dynamic metadata from the external processing server.
+    Configured via :ref:`receiving_namespaces
+    <envoy_v3_api_field_extensions.filters.network.ext_proc.v3.MetadataOptions.receiving_namespaces>`.
+- area: network_ext_proc
+  change: |
+    Added ``close_stream_to_ext_proc_server`` to :ref:`ProcessingResponse
+    <envoy_v3_api_msg_service.network_ext_proc.v3.ProcessingResponse>` to allow the external processor to request
+    closing the gRPC stream early, causing subsequent data to bypass the network ``ext_proc`` filter.
