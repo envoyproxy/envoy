@@ -525,6 +525,8 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
     member_update_cb_ =
         priority_set_.addMemberUpdateCb([this](const HostVector&, const HostVector&) {
           resizePerPriorityState();
+          // Resize per_priority_panic_ to match the current number of priority levels.
+          recalculatePerPriorityPanic();
           bool p0_changed = dirty_priorities_.contains(0);
           if (local_priority_set_ && p0_changed) {
             regenerateLocalityRoutingStructures();
