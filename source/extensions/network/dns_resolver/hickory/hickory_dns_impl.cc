@@ -37,8 +37,7 @@ absl::StatusOr<std::shared_ptr<HickoryDnsResolverConfig>> HickoryDnsResolverConf
   return createForModule(proto_config, HickoryModuleName);
 }
 
-absl::StatusOr<std::shared_ptr<HickoryDnsResolverConfig>>
-HickoryDnsResolverConfig::createForModule(
+absl::StatusOr<std::shared_ptr<HickoryDnsResolverConfig>> HickoryDnsResolverConfig::createForModule(
     const envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig&
         proto_config,
     absl::string_view module_name) {

@@ -16,10 +16,10 @@ namespace Network {
 // paths through the dynamic-module loader can be exercised with stub modules.
 class HickoryDnsResolverConfigTestPeer {
 public:
-  static absl::StatusOr<std::shared_ptr<HickoryDnsResolverConfig>>
-  createForModule(const envoy::extensions::network::dns_resolver::hickory::v3::
-                      HickoryDnsResolverConfig& proto_config,
-                  absl::string_view module_name) {
+  static absl::StatusOr<std::shared_ptr<HickoryDnsResolverConfig>> createForModule(
+      const envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig&
+          proto_config,
+      absl::string_view module_name) {
     return HickoryDnsResolverConfig::createForModule(proto_config, module_name);
   }
 };
@@ -851,8 +851,8 @@ TEST_F(HickoryDnsConfigFailureTest, ConfigCreateFailsOnJsonSerializationError) {
 // object on the search path fails, and the shell wraps the loader error as ``InternalError``.
 TEST_F(HickoryDnsConfigFailureTest, ConfigCreateFailsWhenModuleMissing) {
   envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig proto_config;
-  auto result = HickoryDnsResolverConfigTestPeer::createForModule(proto_config,
-                                                                  "envoy_hickory_test_absent");
+  auto result =
+      HickoryDnsResolverConfigTestPeer::createForModule(proto_config, "envoy_hickory_test_absent");
   ASSERT_FALSE(result.ok());
   EXPECT_EQ(result.status().code(), absl::StatusCode::kInternal);
   EXPECT_THAT(std::string(result.status().message()),
