@@ -34,8 +34,6 @@ parseHttpConnectionManagerFromYaml(const std::string& yaml) {
 class HttpConnectionManagerConfigTest : public testing::Test {
 public:
   HttpConnectionManagerConfigTest() {
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
     ON_CALL(context_, listenerInfo()).WillByDefault(testing::ReturnRef(listener_info_));
   }
   NiceMock<Network::MockListenerInfo> listener_info_;
