@@ -53,7 +53,7 @@ public:
       std::make_shared<NiceMock<Upstream::MockHostDescription>>();
   NiceMock<Network::MockClientConnection> mock_upstream_connection_;
   absl::flat_hash_map<uint32_t, UpstreamRequestCallbacks*> requests_;
-  NiceMock<MockClientCodec> mock_client_codec_{};
+  NiceMock<MockClientCodec> mock_client_codec_;
 };
 
 class MockGenericUpstreamFactory : public GenericUpstreamFactory {

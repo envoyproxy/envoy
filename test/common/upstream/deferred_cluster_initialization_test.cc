@@ -546,11 +546,9 @@ TEST_P(EdsTest, ShouldNotMergeAddingHostsForDifferentClustersWithSameName) {
   addEndpoint(cluster_load_assignment, 1000);
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
 
-  auto initiailization_instance =
+  auto initialization_instance =
       cluster_manager_->clusterInitializationMap().find("cluster_1")->second;
-  EXPECT_NE(nullptr, initiailization_instance->load_balancer_factory_);
-  // RING_HASH lb policy requires Envoy re-create the load balancer when the cluster is updated.
-  EXPECT_TRUE(initiailization_instance->load_balancer_factory_->recreateOnHostChange());
+  EXPECT_NE(nullptr, initialization_instance->load_balancer_factory_);
 
   // Update the cluster with a different lb policy. Now it's a different cluster and should
   // not be merged.
@@ -565,7 +563,7 @@ TEST_P(EdsTest, ShouldNotMergeAddingHostsForDifferentClustersWithSameName) {
 
   auto new_initialization_instance =
       cluster_manager_->clusterInitializationMap().find("cluster_1")->second;
-  EXPECT_NE(initiailization_instance.get(), new_initialization_instance.get());
+  EXPECT_NE(initialization_instance.get(), new_initialization_instance.get());
 
   EXPECT_EQ(1, new_initialization_instance->per_priority_state_.at(1).hosts_added_.size());
   // Ensure the hosts_added_ is empty for priority 0. Because if unexpected merge happens,

@@ -125,4 +125,11 @@ message McpRouter {
   // If set, extracts a request "subject" and binds it into the MCP session.
   // If not set, sessions are created without identity binding.
   SessionIdentity session_identity = 2;
+
+  // If true, backend initialization is deferred until the first request that targets each backend.
+  // The ``initialize`` response is returned immediately with gateway capabilities and an empty
+  // backend session map. Each backend is initialized on-demand when a request first routes to it.
+  // This avoids blocking the client ``initialize`` on slow or misbehaving backends.
+  // Default is false (eager initialization of all backends during ``initialize``).
+  bool lazy_initialization = 3;
 }

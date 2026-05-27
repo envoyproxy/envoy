@@ -479,7 +479,6 @@ CAPIStatus
 Filter::sendLocalReply(ProcessorState& state, Http::Code response_code, std::string body_text,
                        std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
                        Grpc::Status::GrpcStatus grpc_status, std::string details) {
-  bool on_worker_thread = state.isThreadSafe();
   if (hasDestroyed()) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
@@ -490,11 +489,9 @@ Filter::sendLocalReply(ProcessorState& state, Http::Code response_code, std::str
   }
   ENVOY_LOG(debug, "sendLocalReply, response code: {}", int(response_code));
 
-  if (on_worker_thread) {
-    sendLocalReplyInternal(state, response_code, body_text, modify_headers, grpc_status, details);
-    return CAPIStatus::CAPIOK;
-  }
-
+  // Always post to the dispatcher: inline execution from inside a Go cgo callback
+  // would re-enter the C++ state machine before handle*GolangStatus consumes the
+  // returned status, tripping its ASSERT (see #44704).
   auto weak_ptr = weak_from_this();
   state.getDispatcher().post([this, &state, weak_ptr, response_code, body_text, modify_headers,
                               grpc_status, details] {
@@ -520,7 +517,6 @@ CAPIStatus Filter::sendPanicReply(ProcessorState& state, absl::string_view detai
 }
 
 CAPIStatus Filter::continueStatus(ProcessorState& state, GolangStatus status) {
-  bool on_worker_thread = state.isThreadSafe();
   if (hasDestroyed()) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
@@ -532,15 +528,9 @@ CAPIStatus Filter::continueStatus(ProcessorState& state, GolangStatus status) {
   ENVOY_LOG(debug, "golang filter continue from Go, status: {}, state: {}", int(status),
             state.stateStr());
 
-  // When on the worker thread, continueStatusInternal re-enters the filter chain
-  // (continueProcessing / continueDoData / sendLocalReply) while the cgo call is still on the
-  // stack. This synchronous reentrancy is intentional and is the same model used by the addData
-  // inline path below; callers must not hold any state-mutating locks across this call.
-  if (on_worker_thread) {
-    continueStatusInternal(state, status);
-    return CAPIStatus::CAPIOK;
-  }
-
+  // Always post to the dispatcher: inline execution from inside a Go cgo callback
+  // would re-enter the C++ state machine before handle*GolangStatus consumes the
+  // returned status, tripping its ASSERT (see #44704).
   auto weak_ptr = weak_from_this();
   state.getDispatcher().post([this, &state, weak_ptr, status] {
     if (!weak_ptr.expired() && !hasDestroyed()) {
@@ -1457,7 +1447,7 @@ void Filter::setDynamicMetadataInternal(std::string filter_name, std::string key
 }
 
 CAPIStatus Filter::setStringFilterState(absl::string_view key, absl::string_view value,
-                                        int state_type, int life_span, int stream_sharing) {
+                                        int /*state_type*/, int life_span, int stream_sharing) {
   if (hasDestroyed()) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
@@ -1466,24 +1456,21 @@ CAPIStatus Filter::setStringFilterState(absl::string_view key, absl::string_view
   if (isThreadSafe()) {
     streamInfo().filterState()->setData(
         key, std::make_shared<Router::StringAccessorImpl>(value),
-        static_cast<StreamInfo::FilterState::StateType>(state_type),
         static_cast<StreamInfo::FilterState::LifeSpan>(life_span),
         static_cast<StreamInfo::StreamSharingMayImpactPooling>(stream_sharing));
   } else {
     auto key_str = std::string(key);
     auto filter_state = std::make_shared<Router::StringAccessorImpl>(value);
     auto weak_ptr = weak_from_this();
-    getDispatcher().post(
-        [this, weak_ptr, key_str, filter_state, state_type, life_span, stream_sharing] {
-          if (!weak_ptr.expired() && !hasDestroyed()) {
-            streamInfo().filterState()->setData(
-                key_str, filter_state, static_cast<StreamInfo::FilterState::StateType>(state_type),
-                static_cast<StreamInfo::FilterState::LifeSpan>(life_span),
-                static_cast<StreamInfo::StreamSharingMayImpactPooling>(stream_sharing));
-          } else {
-            ENVOY_LOG(info, "golang filter has gone or destroyed in setStringFilterState");
-          }
-        });
+    getDispatcher().post([this, weak_ptr, key_str, filter_state, life_span, stream_sharing] {
+      if (!weak_ptr.expired() && !hasDestroyed()) {
+        streamInfo().filterState()->setData(
+            key_str, filter_state, static_cast<StreamInfo::FilterState::LifeSpan>(life_span),
+            static_cast<StreamInfo::StreamSharingMayImpactPooling>(stream_sharing));
+      } else {
+        ENVOY_LOG(info, "golang filter has gone or destroyed in setStringFilterState");
+      }
+    });
   }
   return CAPIStatus::CAPIOK;
 }

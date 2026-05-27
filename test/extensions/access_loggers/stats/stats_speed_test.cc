@@ -26,8 +26,9 @@ public:
   void addInflightGauge(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef tags,
                         Stats::Gauge::ImportMode import_mode, uint64_t value,
                         std::vector<Stats::StatNameDynamicStorage> tags_storage) {
-    if (value == 0)
+    if (value == 0) {
       return;
+    }
 
     Stats::TagUtility::TagStatNameJoiner joiner(Stats::StatName(), stat_name, tags,
                                                 logger_->scope().symbolTable());
@@ -44,8 +45,9 @@ public:
 
   void removeInflightGauge(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef tags,
                            Stats::Gauge::ImportMode import_mode, uint64_t value) {
-    if (value == 0)
+    if (value == 0) {
       return;
+    }
 
     Stats::TagUtility::TagStatNameJoiner joiner(Stats::StatName(), stat_name, tags,
                                                 logger_->scope().symbolTable());
@@ -152,24 +154,24 @@ static void runBenchmark(benchmark::State& state, SharedBencherSetup& setup, T& 
 }
 
 // --- Reality Benchmark ---
-static void BM_AccessLogState(benchmark::State& state) {
+static void bmAccessLogState(benchmark::State& state) {
   SharedBencherSetup setup;
   auto access_log_state = std::make_shared<AccessLogState>(setup.logger_);
   runBenchmark(state, setup, *access_log_state);
 }
-BENCHMARK(BM_AccessLogState)
+BENCHMARK(bmAccessLogState)
     ->Args({/*tag_count=*/3, /*length_selector=*/0})
     ->Args({/*tag_count=*/10, /*length_selector=*/0})
     ->Args({/*tag_count=*/3, /*length_selector=*/1})
     ->Args({/*tag_count=*/10, /*length_selector=*/1});
 
 // --- Joiner Benchmark ---
-static void BM_AccessLogStateUsingJoiner(benchmark::State& state) {
+static void bmAccessLogStateUsingJoiner(benchmark::State& state) {
   SharedBencherSetup setup;
   AccessLogStateUsingJoiner access_log_state(setup.logger_);
   runBenchmark(state, setup, access_log_state);
 }
-BENCHMARK(BM_AccessLogStateUsingJoiner)
+BENCHMARK(bmAccessLogStateUsingJoiner)
     ->Args({/*tag_count=*/3, /*length_selector=*/0})
     ->Args({/*tag_count=*/10, /*length_selector=*/0})
     ->Args({/*tag_count=*/3, /*length_selector=*/1})

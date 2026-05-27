@@ -261,7 +261,6 @@ public:
       filter_object_ = state.get();
       decoder_callbacks_->streamInfo().filterState()->setData(
           "envoy.filters.http.grpc_stats", std::move(state),
-          StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::FilterChain);
     }
     if (connect_unary_) {
