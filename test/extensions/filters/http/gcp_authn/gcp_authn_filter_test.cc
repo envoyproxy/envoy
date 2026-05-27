@@ -2,8 +2,8 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "source/common/http/header_map_impl.h"
-#include "source/extensions/filters/http/gcp_authn/fingerprint_manager.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/http/gcp_authn/fingerprint_manager.h"
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_client_impl.h"
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_filter.h"
 
@@ -82,7 +82,8 @@ public:
   }
 
   void setupFilterAndCallback(TokenCacheImpl* cache = nullptr) {
-    filter_ = std::make_unique<GcpAuthnFilter>(filter_config_, absl::nullopt, context_, "stats", cache);
+    filter_ =
+        std::make_unique<GcpAuthnFilter>(filter_config_, absl::nullopt, context_, "stats", cache);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
