@@ -2,7 +2,7 @@
 
 #include "test/integration/integration.h"
 
-#include "library/cc/engine_builder.h"
+#include "test/cc/engine_builder_test_shim.h"
 #include "library/cc/stream.h"
 #include "library/cc/stream_prototype.h"
 #include "library/common/http/client.h"
@@ -58,12 +58,12 @@ protected:
 
   // Get the value of a Counter in the Envoy instance.
   uint64_t getCounterValue(const std::string& name);
-  // Wait until the Counter specified by `name` is >= `value`.
-  ABSL_MUST_USE_RESULT testing::AssertionResult waitForCounterGe(const std::string& name,
-                                                                 uint64_t value);
+  // Wait until the Counter specified by `name` matches `value_matcher`.
+  ABSL_MUST_USE_RESULT testing::AssertionResult
+  waitForCounter(const std::string& name, testing::Matcher<uint64_t> value_matcher);
   uint64_t getGaugeValue(const std::string& name);
-  ABSL_MUST_USE_RESULT testing::AssertionResult waitForGaugeGe(const std::string& name,
-                                                               uint64_t value);
+  ABSL_MUST_USE_RESULT testing::AssertionResult
+  waitForGauge(const std::string& name, testing::Matcher<uint64_t> value_matcher);
 
   EnvoyStreamCallbacks createDefaultStreamCallbacks();
 

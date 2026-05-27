@@ -1,5 +1,7 @@
 #include "test/integration/integration.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -85,11 +87,11 @@ typed_config:
   const std::string large_data(2048, 'a');
   ASSERT_TRUE(tcp_client->write(large_data));
 
-  test_server_->waitForCounterGe("tcp_bw.tcp_bandwidth_limit.read_throttled", 1);
-  test_server_->waitForGaugeEq("tcp_bw.tcp_bandwidth_limit.read_bytes_buffered", 1024);
+  test_server_->waitForCounter("tcp_bw.tcp_bandwidth_limit.read_throttled", Ge(1));
+  test_server_->waitForGauge("tcp_bw.tcp_bandwidth_limit.read_bytes_buffered", Eq(1024));
 
   timeSystem().advanceTimeWait(std::chrono::milliseconds(100));
-  test_server_->waitForGaugeEq("tcp_bw.tcp_bandwidth_limit.read_bytes_buffered", 0);
+  test_server_->waitForGauge("tcp_bw.tcp_bandwidth_limit.read_bytes_buffered", Eq(0));
 
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
@@ -111,8 +113,8 @@ typed_config:
   const std::string large_data(2048, 'b');
   ASSERT_TRUE(fake_upstream_connection->write(large_data));
 
-  test_server_->waitForCounterGe("tcp_bw.tcp_bandwidth_limit.write_throttled", 1);
-  test_server_->waitForGaugeEq("tcp_bw.tcp_bandwidth_limit.write_bytes_buffered", 1024);
+  test_server_->waitForCounter("tcp_bw.tcp_bandwidth_limit.write_throttled", Ge(1));
+  test_server_->waitForGauge("tcp_bw.tcp_bandwidth_limit.write_bytes_buffered", Eq(1024));
 
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());

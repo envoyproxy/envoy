@@ -184,9 +184,9 @@ TEST(MatchingData, FilterStateInput) {
     EXPECT_EQ(result.stringData(), absl::nullopt);
   }
 
-  stream_info.filterState()->setData(
-      "unknown_key", std::make_shared<Router::StringAccessorImpl>("some_value"),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+  stream_info.filterState()->setData("unknown_key",
+                                     std::make_shared<Router::StringAccessorImpl>("some_value"),
+                                     StreamInfo::FilterState::LifeSpan::Connection);
 
   {
     Network::Matching::FilterStateInput<HttpMatchingData> input("filter_state_key");
@@ -197,7 +197,7 @@ TEST(MatchingData, FilterStateInput) {
 
   stream_info.filterState()->setData(
       "filter_state_key", std::make_shared<Router::StringAccessorImpl>("filter_state_value"),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   {
     Network::Matching::FilterStateInput<HttpMatchingData> input("filter_state_key");

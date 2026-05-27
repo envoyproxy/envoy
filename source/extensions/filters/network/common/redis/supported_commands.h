@@ -81,6 +81,7 @@ struct SupportedCommands {
    * @return commands without keys which are sent to all redis shards and the responses are handled
    * using special response handler according  to its response type
    */
+  // NOLINTNEXTLINE(readability-identifier-naming)
   static const absl::flat_hash_set<std::string>& ClusterScopeCommands() {
     CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "script", "flushall", "flushdb",
                            "slowlog", "config", "info", "keys", "select", "role", "hello");

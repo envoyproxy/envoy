@@ -56,8 +56,8 @@ private:
 
 inline std::unique_ptr<RateLimitClient>
 createLocalRateLimitClient(GlobalRateLimitClientImpl* global_client,
-                           ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_cache_tls_) {
-  return std::make_unique<LocalRateLimitClientImpl>(global_client, buckets_cache_tls_);
+                           ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_cache_tls) {
+  return std::make_unique<LocalRateLimitClientImpl>(global_client, buckets_cache_tls);
 }
 
 } // namespace RateLimitQuota

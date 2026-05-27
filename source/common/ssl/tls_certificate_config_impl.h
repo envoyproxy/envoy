@@ -51,7 +51,7 @@ private:
   const std::string password_path_;
   const std::vector<uint8_t> ocsp_staple_;
   const std::string ocsp_staple_path_;
-  Envoy::Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_{};
+  Envoy::Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_;
 };
 
 } // namespace Ssl

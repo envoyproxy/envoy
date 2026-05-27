@@ -78,8 +78,7 @@ Http::FilterHeadersStatus AlpnFilter::decodeHeaders(Http::RequestHeaderMap&, boo
     ENVOY_LOG(debug, "override with {} ALPNs", alpn_override.size());
     decoder_callbacks_->streamInfo().filterState()->setData(
         Network::ApplicationProtocols::key(),
-        std::make_unique<Network::ApplicationProtocols>(alpn_override),
-        Envoy::StreamInfo::FilterState::StateType::ReadOnly);
+        std::make_unique<Network::ApplicationProtocols>(alpn_override));
   } else {
     ENVOY_LOG(debug, "ALPN override is empty");
   }

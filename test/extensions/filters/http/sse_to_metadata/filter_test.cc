@@ -6,7 +6,7 @@
 
 #include "test/common/stream_info/test_util.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 

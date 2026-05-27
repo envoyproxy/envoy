@@ -14,6 +14,7 @@
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
 
+#include "test/common/formatter/command_extension.h"
 #include "test/common/stream_info/test_int_accessor.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
@@ -198,7 +199,6 @@ TEST(HeaderParserTest, TestParse) {
       std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
           Envoy::StreamInfo::FilterState::LifeSpan::FilterChain));
   filter_state->setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
-                        StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
   ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
@@ -615,7 +615,6 @@ request_headers_to_remove: ["x-nope"]
       std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
           Envoy::StreamInfo::FilterState::LifeSpan::FilterChain));
   filter_state->setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
-                        StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
   ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
@@ -1083,7 +1082,6 @@ response_headers_to_remove: ["x-baz-header"]
       std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
           Envoy::StreamInfo::FilterState::LifeSpan::FilterChain));
   filter_state->setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
-                        StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
   ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
@@ -1128,7 +1126,6 @@ response_headers_to_remove: ["x-baz-header"]
       std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
           Envoy::StreamInfo::FilterState::LifeSpan::FilterChain));
   filter_state->setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
-                        StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
   ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
@@ -1200,6 +1197,25 @@ response_headers_to_remove: ["x-baz-header"]
 
     EXPECT_THAT(transforms.headers_to_remove, ElementsAre(Http::LowerCaseString("x-baz-header")));
   }
+}
+
+TEST(HeaderParserTest, ConfigureWithCommandParsers) {
+  Formatter::CommandParserPtrVector command_parsers;
+  command_parsers.push_back(std::make_unique<Envoy::Formatter::TestCommandParser>());
+
+  Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> to_add;
+  auto* header = to_add.Add();
+  header->mutable_header()->set_key("x-secret");
+  header->mutable_header()->set_value("Bearer %COMMAND_EXTENSION()%");
+
+  HeaderParserPtr parser = HeaderParser::configure(to_add, command_parsers).value();
+
+  Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  parser->evaluateHeaders(header_map, stream_info);
+
+  EXPECT_TRUE(header_map.has("x-secret"));
+  EXPECT_EQ("Bearer TestFormatter", header_map.get_("x-secret"));
 }
 
 } // namespace

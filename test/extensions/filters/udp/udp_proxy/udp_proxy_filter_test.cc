@@ -2271,15 +2271,13 @@ public:
     if (proxy_port) {
       stream_info_.filterState()->setData(
           "udp.connect.proxy_port",
-          std::make_shared<StreamInfo::UInt32AccessorImpl>(proxy_port.value()),
-          Envoy::StreamInfo::FilterState::StateType::Mutable);
+          std::make_shared<StreamInfo::UInt32AccessorImpl>(proxy_port.value()));
     }
 
     if (target_port) {
       stream_info_.filterState()->setData(
           "udp.connect.target_port",
-          std::make_shared<StreamInfo::UInt32AccessorImpl>(target_port.value()),
-          Envoy::StreamInfo::FilterState::StateType::Mutable);
+          std::make_shared<StreamInfo::UInt32AccessorImpl>(target_port.value()));
     }
   }
 
@@ -2740,8 +2738,7 @@ TEST(TunnelingConfigImplTest, HeadersToAdd) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
   stream_info.filterState()->setData(
-      "test_key", std::make_shared<Envoy::Router::StringAccessorImpl>("test_val"),
-      Envoy::StreamInfo::FilterState::StateType::Mutable);
+      "test_key", std::make_shared<Envoy::Router::StringAccessorImpl>("test_val"));
 
   TunnelingConfig proto_config;
   auto* header_to_add = proto_config.add_headers_to_add();
@@ -2760,8 +2757,7 @@ TEST(TunnelingConfigImplTest, ProxyHostFromFilterState) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
   stream_info.filterState()->setData(
-      "test-proxy-host", std::make_shared<Envoy::Router::StringAccessorImpl>("test.host.com"),
-      Envoy::StreamInfo::FilterState::StateType::Mutable);
+      "test-proxy-host", std::make_shared<Envoy::Router::StringAccessorImpl>("test.host.com"));
 
   TunnelingConfig proto_config;
   proto_config.set_proxy_host("%FILTER_STATE(test-proxy-host:PLAIN)%");
@@ -2775,8 +2771,7 @@ TEST(TunnelingConfigImplTest, TargetHostFromFilterState) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
   stream_info.filterState()->setData(
-      "test-proxy-host", std::make_shared<Envoy::Router::StringAccessorImpl>("test.host.com"),
-      Envoy::StreamInfo::FilterState::StateType::Mutable);
+      "test-proxy-host", std::make_shared<Envoy::Router::StringAccessorImpl>("test.host.com"));
 
   TunnelingConfig proto_config;
   proto_config.set_target_host("%FILTER_STATE(test-proxy-host:PLAIN)%");

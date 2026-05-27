@@ -87,6 +87,7 @@ void HttpBodyUtils::appendHttpBodyEnvelope(
                              CodedOutputStream::VarintSize64(content_length);
     std::vector<uint32_t> message_sizes;
     message_sizes.reserve(request_body_field_path.size());
+    // NOLINTNEXTLINE(modernize-loop-convert)
     for (auto it = request_body_field_path.rbegin(); it != request_body_field_path.rend(); ++it) {
       const Protobuf::Field* field = *it;
       const uint64_t message_size = envelope_size + content_length;

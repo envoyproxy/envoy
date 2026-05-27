@@ -949,7 +949,7 @@ TEST_F(EnvoyQuicServerStreamTest, EncodeCapsule) {
 
 TEST_F(EnvoyQuicServerStreamTest, DecodeHttp3Datagram) {
   setUpCapsuleProtocol(true, false);
-  EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(capsule_fragment_), _));
+  EXPECT_CALL(stream_decoder_, decodeData(BufferString(capsule_fragment_), _));
   quic_session_.OnDatagramReceived(datagram_fragment_);
 }
 #endif

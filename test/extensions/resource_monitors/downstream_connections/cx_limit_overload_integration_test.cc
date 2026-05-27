@@ -4,6 +4,7 @@
 #include "test/integration/integration.h"
 #include "test/test_common/test_runtime.h"
 
+using testing::Eq;
 namespace Envoy {
 
 namespace {
@@ -71,14 +72,14 @@ TEST_F(GlobalDownstreamCxLimitIntegrationTest, GlobalLimitInOverloadManager) {
     raw_conns.push_back(std::move(conn));
     ASSERT_TRUE(tcp_clients.back()->connected());
   }
-  test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_global_cx_overflow", 0);
+  test_server_->waitForCounter("listener.127.0.0.1_0.downstream_global_cx_overflow", Eq(0));
   // 7th connection should fail because we have hit the configured limit for
   // `max_active_downstream_connections`.
   tcp_clients.emplace_back(makeTcpConnection(lookupPort("listener_0")));
   FakeRawConnectionPtr conn;
   ASSERT_FALSE(fake_upstreams_[0]->waitForRawConnection(conn, std::chrono::milliseconds(500)));
   tcp_clients.back()->waitForDisconnect();
-  test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_global_cx_overflow", 1);
+  test_server_->waitForCounter("listener.127.0.0.1_0.downstream_global_cx_overflow", Eq(1));
   // Get rid of the client that failed to connect.
   tcp_clients.back()->close();
   tcp_clients.pop_back();
@@ -125,7 +126,7 @@ TEST_F(GlobalDownstreamCxLimitIntegrationTest, GlobalLimitSetViaRuntimeKeyAndOve
   FakeRawConnectionPtr conn1;
   ASSERT_FALSE(fake_upstreams_[0]->waitForRawConnection(conn1, std::chrono::milliseconds(500)));
   tcp_clients.back()->waitForDisconnect();
-  test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_global_cx_overflow", 1);
+  test_server_->waitForCounter("listener.127.0.0.1_0.downstream_global_cx_overflow", Eq(1));
   for (auto& tcp_client : tcp_clients) {
     tcp_client->close();
   }
@@ -147,7 +148,7 @@ TEST_F(GlobalDownstreamCxLimitIntegrationTest, GlobalLimitOptOutRespected) {
     raw_conns.push_back(std::move(conn));
     ASSERT_TRUE(tcp_clients.back()->connected());
   }
-  test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_global_cx_overflow", 0);
+  test_server_->waitForCounter("listener.127.0.0.1_0.downstream_global_cx_overflow", Eq(0));
   for (auto& tcp_client : tcp_clients) {
     tcp_client->close();
   }
@@ -171,8 +172,8 @@ TEST_F(GlobalDownstreamCxLimitIntegrationTest, PerListenerLimitAndGlobalLimitInO
   FakeRawConnectionPtr conn1;
   ASSERT_FALSE(fake_upstreams_[0]->waitForRawConnection(conn1, std::chrono::milliseconds(500)));
   tcp_clients.back()->waitForDisconnect();
-  test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_cx_overflow", 1);
-  test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_global_cx_overflow", 0);
+  test_server_->waitForCounter("listener.127.0.0.1_0.downstream_cx_overflow", Eq(1));
+  test_server_->waitForCounter("listener.127.0.0.1_0.downstream_global_cx_overflow", Eq(0));
   for (auto& tcp_client : tcp_clients) {
     tcp_client->close();
   }

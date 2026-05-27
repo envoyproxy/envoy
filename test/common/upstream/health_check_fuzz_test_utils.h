@@ -71,9 +71,9 @@ public:
 
   std::vector<TestSessionPtr> test_sessions_;
   std::shared_ptr<TestHttpHealthCheckerImpl> health_checker_;
-  std::list<uint32_t> connection_index_{};
-  std::list<uint32_t> codec_index_{};
-  const HostWithHealthCheckMap health_checker_map_{};
+  std::list<uint32_t> connection_index_;
+  std::list<uint32_t> codec_index_;
+  const HostWithHealthCheckMap health_checker_map_;
 };
 
 // TODO(zasweq): This class here isn't currently being used in the unit test class.
@@ -131,8 +131,8 @@ public:
 
   std::vector<TestSessionPtr> test_sessions_;
   std::shared_ptr<TestGrpcHealthCheckerImpl> health_checker_;
-  std::list<uint32_t> connection_index_{};
-  std::list<uint32_t> codec_index_{};
+  std::list<uint32_t> connection_index_;
+  std::list<uint32_t> codec_index_;
 };
 
 } // namespace Upstream

@@ -77,6 +77,7 @@ class FastMockHost : public testing::StrictMock<Upstream::MockHostLight> {
 public:
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
   const std::string& hostname() const override { return hostname_; }
+  absl::string_view observabilityName() const override { return address_->asStringView(); }
 
   std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>>
   counters() const override {
@@ -94,9 +95,7 @@ public:
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr&,
                                 const envoy::config::core::v3::Metadata*,
                                 Network::TransportSocketOptionsConstSharedPtr) const override {
-    IS_ENVOY_BUG("unexpected call to resolveTransportSocketFactory");
-    Network::UpstreamTransportSocketFactory* ptr = nullptr;
-    return *ptr;
+    PANIC("unexpected call to resolveTransportSocketFactory");
   }
 
   Network::Address::InstanceConstSharedPtr address_;
@@ -500,7 +499,7 @@ static void BM_TraditionalHistogramsPrometheusProtobuf(benchmark::State& state) 
 }
 BENCHMARK(BM_TraditionalHistogramsPrometheusProtobuf)->Unit(benchmark::kMillisecond);
 
-static void BM_TraditionalHistogramsPrometheusText(benchmark::State& state) {
+static void bmTraditionalHistogramsPrometheusText(benchmark::State& state) {
   Envoy::Server::StatsHandlerTest& test_context = testContext(false);
   Envoy::Server::StatsParams params;
   Envoy::Buffer::OwnedImpl response;
@@ -515,7 +514,7 @@ static void BM_TraditionalHistogramsPrometheusText(benchmark::State& state) {
   auto label = absl::StrCat("output per iteration: ", count, " (19 buckets/histogram)");
   state.SetLabel(label);
 }
-BENCHMARK(BM_TraditionalHistogramsPrometheusText)->Unit(benchmark::kMillisecond);
+BENCHMARK(bmTraditionalHistogramsPrometheusText)->Unit(benchmark::kMillisecond);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_NativeHistogramsPrometheusProtobuf(benchmark::State& state) {

@@ -37,8 +37,6 @@
 
 #pragma once
 
-#include <stddef.h>
-
 #include <cassert>
 #include <chrono>
 #include <cmath>
@@ -106,14 +104,16 @@ template <class Key, class Value, class MapType>
 class SimpleLRUCacheConstIterator
     : public std::iterator<std::input_iterator_tag, const std::pair<Key, Value*>> {
 public:
-  typedef typename MapType::const_iterator HashMapConstIterator;
+  using HashMapConstIterator = typename MapType::const_iterator;
   // Allow parent template's types to be referenced without qualification.
-  typedef typename SimpleLRUCacheConstIterator::reference reference;
-  typedef typename SimpleLRUCacheConstIterator::pointer pointer;
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  using reference = typename SimpleLRUCacheConstIterator::reference;
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  using pointer = typename SimpleLRUCacheConstIterator::pointer;
 
   // This default constructed Iterator can only be assigned to or destroyed.
   // All other operations give undefined behaviour.
-  SimpleLRUCacheConstIterator() {}
+  SimpleLRUCacheConstIterator() = default;
   SimpleLRUCacheConstIterator(HashMapConstIterator it, HashMapConstIterator end);
   SimpleLRUCacheConstIterator& operator++();
 
@@ -122,10 +122,12 @@ public:
 
   // For LRU mode, last_use_time() returns elements last use time.
   // See getLastUseTime() description for more information.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   int64_t last_use_time() const { return last_use_; }
 
   // For age-based mode, insertion_time() returns elements insertion time.
   // See getInsertionTime() description for more information.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   int64_t insertion_time() const { return last_use_; }
 
   friend bool operator==(const SimpleLRUCacheConstIterator& a,
@@ -167,8 +169,9 @@ template <typename Key, typename Value> struct SimpleLRUCacheElem {
   }
 
   void unlink() {
-    if (!isLinked())
+    if (!isLinked()) {
       return;
+    }
     prev->next = next;
     next->prev = prev;
     prev = nullptr;
@@ -190,17 +193,19 @@ template <typename Key, typename Value> const int64_t SimpleLRUCacheElem<Key, Va
 // behavior for that single call.
 class SimpleLRUCacheOptions {
 public:
-  SimpleLRUCacheOptions() : update_eviction_order_(true) {}
+  SimpleLRUCacheOptions() = default;
 
   // If false neither the last modified time (for based age eviction) nor
   // the element ordering (for LRU eviction) will be updated.
   // This value must be the same for both lookup and release.
   // The default is true.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   bool update_eviction_order() const { return update_eviction_order_; }
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void set_update_eviction_order(bool v) { update_eviction_order_ = v; }
 
 private:
-  bool update_eviction_order_;
+  bool update_eviction_order_ = true;
 };
 
 // The MapType's value_type must be pair<const Key, Elem*>
@@ -228,7 +233,7 @@ public:
   // NOTE:  Be extremely careful when using ScopedLookup with Mutexes. This
   // code is safe since the lock will be released after the ScopedLookup is
   // destroyed.
-  //   MutexLock l(&mu_);
+  //   MutexLock l(mu_);
   //   ScopedLookup lookup(....);
   //
   // This is NOT safe since the lock is released before the ScopedLookup is
@@ -248,8 +253,9 @@ public:
           value_(cache_->lookupWithOptions(key_, options_)) {}
 
     ~ScopedLookup() {
-      if (value_ != nullptr)
+      if (value_ != nullptr) {
         cache_->releaseWithOptions(key_, value_, options_);
+      }
     }
     const Key& key() const { return key_; }
     Value* value() const { return value_; }
@@ -391,8 +397,9 @@ public:
   // Remove all entries which have exceeded their max idle time or age
   // set using setMaxIdleSeconds() or setAgeBasedEviction() respectively.
   void removeExpiredEntries() {
-    if (max_idle_ >= 0)
+    if (max_idle_ >= 0) {
       discardIdle(max_idle_);
+    }
   }
 
   // Return current size of cache
@@ -449,7 +456,8 @@ public:
   }
 
   // STL style const_iterator support
-  typedef SimpleLRUCacheConstIterator<Key, Value, MapType> const_iterator;
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  using const_iterator = SimpleLRUCacheConstIterator<Key, Value, MapType>;
   friend class SimpleLRUCacheConstIterator<Key, Value, MapType>;
   const_iterator begin() const { return const_iterator(table_.begin(), table_.end()); }
   const_iterator end() const { return const_iterator(table_.end(), table_.end()); }
@@ -490,13 +498,13 @@ protected:
   virtual bool isOverfull() const { return units_ > max_units_; }
 
 private:
-  typedef SimpleLRUCacheElem<Key, Value> Elem;
-  typedef MapType Table;
-  typedef typename Table::iterator TableIterator;
-  typedef typename Table::const_iterator TableConstIterator;
-  typedef MapType DeferredTable;
-  typedef typename DeferredTable::iterator DeferredTableIterator;
-  typedef typename DeferredTable::const_iterator DeferredTableConstIterator;
+  using Elem = SimpleLRUCacheElem<Key, Value>;
+  using Table = MapType;
+  using TableIterator = typename Table::iterator;
+  using TableConstIterator = typename Table::const_iterator;
+  using DeferredTable = MapType;
+  using DeferredTableIterator = typename DeferredTable::iterator;
+  using DeferredTableConstIterator = typename DeferredTable::const_iterator;
 
   Table table_; // Main table
   // Pinned entries awaiting to be released before they can be discarded.
@@ -608,8 +616,9 @@ template <class Key, class Value, class MapType, class EQ>
 void SimpleLRUCacheBase<Key, Value, MapType, EQ>::removeUnpinned() {
   for (Elem* e = head_.next; e != &head_;) {
     Elem* next = e->next;
-    if (e->pin == 0)
+    if (e->pin == 0) {
       remove(e->key);
+    }
     e = next;
   }
 }
@@ -650,8 +659,9 @@ Value* SimpleLRUCacheBase<Key, Value, MapType, EQ>::lookupWithOptions(
       pinned_units_ += e->units;
       // We are pinning this entry, take it off the LRU list if we are in LRU
       // mode. In strict age-based mode entries stay on the list while pinned.
-      if (lru_ && options.update_eviction_order())
+      if (lru_ && options.update_eviction_order()) {
         e->unlink();
+      }
     }
     e->pin++;
     return e->value;
@@ -707,8 +717,9 @@ void SimpleLRUCacheBase<Key, Value, MapType, EQ>::releaseWithOptions(
     e->pin--;
 
     if (e->pin == 0) {
-      if (lru_ && options.update_eviction_order())
+      if (lru_ && options.update_eviction_order()) {
         e->link(&head_);
+      }
       pinned_units_ -= e->units;
       if (isOverfullInternal()) {
         // This element is no longer needed, and we are full. So kick it out.
@@ -735,8 +746,9 @@ void SimpleLRUCacheBase<Key, Value, MapType, EQ>::insertPinned(const Key& k, Val
   // If we are in the strict age-based eviction mode, the entry goes on the LRU
   // list now and is never removed. In the LRU mode, the list will only contain
   // unpinned entries.
-  if (!lru_)
+  if (!lru_) {
     e->link(&head_);
+  }
   garbageCollect();
 }
 
@@ -793,8 +805,9 @@ bool SimpleLRUCacheBase<Key, Value, MapType, EQ>::inDeferredTable(const Key& k,
     const Elem* const head = iter->second;
     const Elem* e = head;
     do {
-      if (e->value == value || value == nullptr)
+      if (e->value == value || value == nullptr) {
         return true;
+      }
       e = e->prev;
     } while (e != head);
   }
@@ -858,8 +871,9 @@ static const int kAcceptableClockSynchronizationDriftCycles = 1;
 
 template <class Key, class Value, class MapType, class EQ>
 void SimpleLRUCacheBase<Key, Value, MapType, EQ>::discardIdle(int64_t max_idle) {
-  if (max_idle < 0)
+  if (max_idle < 0) {
     return;
+  }
 
   Elem* e = head_.prev;
   const int64_t threshold = SimpleCycleTimer::now() - max_idle;
@@ -928,8 +942,9 @@ int64_t SimpleLRUCacheBase<Key, Value, MapType, EQ>::deferredEntries() const {
 
 template <class Key, class Value, class MapType, class EQ>
 int64_t SimpleLRUCacheBase<Key, Value, MapType, EQ>::ageOfLRUItemInMicroseconds() const {
-  if (head_.prev == &head_)
+  if (head_.prev == &head_) {
     return 0;
+  }
   return kSecToUsec * (SimpleCycleTimer::now() - head_.prev->last_use_) /
          SimpleCycleTimer::frequency();
 }
@@ -939,8 +954,9 @@ int64_t SimpleLRUCacheBase<Key, Value, MapType, EQ>::getLastUseTime(const Key& k
   // getLastUseTime works only in LRU mode
   assert(lru_);
   TableConstIterator iter = table_.find(k);
-  if (iter == table_.end())
+  if (iter == table_.end()) {
     return -1;
+  }
   const Elem* e = iter->second;
   return e->last_use_;
 }
@@ -950,8 +966,9 @@ int64_t SimpleLRUCacheBase<Key, Value, MapType, EQ>::getInsertionTime(const Key&
   // getInsertionTime works only in age-based mode
   assert(!lru_);
   TableConstIterator iter = table_.find(k);
-  if (iter == table_.end())
+  if (iter == table_.end()) {
     return -1;
+  }
   const Elem* e = iter->second;
   return e->last_use_;
 }
@@ -1018,7 +1035,7 @@ public:
             total_units) {}
 
 protected:
-  virtual void removeElement(Value* value) { delete value; }
+  void removeElement(Value* value) override { delete value; }
 
 private:
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(SimpleLRUCache);
@@ -1028,8 +1045,8 @@ template <class Key, class Value, class Deleter, class H, class EQ>
 class SimpleLRUCacheWithDeleter
     : public SimpleLRUCacheBase<
           Key, Value, absl::flat_hash_map<Key, SimpleLRUCacheElem<Key, Value>*, H, EQ>, EQ> {
-  typedef absl::flat_hash_map<Key, SimpleLRUCacheElem<Key, Value>*, H, EQ> HashMap;
-  typedef SimpleLRUCacheBase<Key, Value, HashMap, EQ> Base;
+  using HashMap = absl::flat_hash_map<Key, SimpleLRUCacheElem<Key, Value>*, H, EQ>;
+  using Base = SimpleLRUCacheBase<Key, Value, HashMap, EQ>;
 
 public:
   explicit SimpleLRUCacheWithDeleter(int64_t total_units) : Base(total_units), deleter_() {}
@@ -1038,7 +1055,7 @@ public:
       : Base(total_units), deleter_(deleter) {}
 
 protected:
-  virtual void removeElement(Value* value) { deleter_(value); }
+  void removeElement(Value* value) override { deleter_(value); }
 
 private:
   Deleter deleter_;

@@ -109,6 +109,11 @@ public:
   bool useLocalDecision() const override { return use_local_decision_; }
 
   /**
+   * @return whether the span will be exported to the OTLP backend.
+   */
+  bool exportedSpan() const override { return sampled_; }
+
+  /**
    * @return whether or not the sampled attribute is set
    */
   bool sampled() const { return sampled_; }

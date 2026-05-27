@@ -72,3 +72,24 @@ envoy_cc_test(
         "//test/mocks/upstream:cluster_manager_mocks",
     ],
 )
+
+envoy_cc_test(
+    name = "integration_test",
+    srcs = ["integration_test.cc"],
+    data = [
+        "//test/extensions/dynamic_modules/test_data/cpp:listener_integration_test",
+        "//test/extensions/dynamic_modules/test_data/go:listener_integration_test",
+    ],
+    env = {"GODEBUG": "cgocheck=0"},
+    rbe_pool = "6gig",
+    deps = [
+        "//source/extensions/dynamic_modules:abi_impl",
+        "//source/extensions/filters/http/dynamic_modules:abi_impl",
+        "//source/extensions/filters/listener/dynamic_modules:config",
+        "//source/extensions/filters/network/echo:config",
+        "//test/integration:integration_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/listener/dynamic_modules/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/echo/v3:pkg_cc_proto",
+    ],
+)

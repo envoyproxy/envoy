@@ -9,17 +9,16 @@
 #include "source/common/jwt/simple_lru_cache_inl.h"
 #include "source/common/jwt/verify.h"
 #include "source/extensions/filters/http/common/factory_base.h"
+#include "source/extensions/filters/http/gcp_authn/gcp_authn_client.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace GcpAuthn {
 
-template <typename TokenType>
-using LRUCache = ::Envoy::SimpleLruCache::SimpleLRUCache<std::string, TokenType>;
-using JwtToken = JwtVerify::Jwt;
+using LRUCache = ::Envoy::SimpleLruCache::SimpleLRUCache<uint64_t, GcpToken>;
 
-template <typename TokenType> class TokenCacheImpl : public Logger::Loggable<Logger::Id::init> {
+class TokenCacheImpl : public Logger::Loggable<Logger::Id::init> {
 public:
   TokenCacheImpl(const envoy::extensions::filters::http::gcp_authn::v3::TokenCacheConfig& config,
                  TimeSource& time_source)
@@ -27,9 +26,10 @@ public:
         time_source_(time_source) {}
 
   TokenCacheImpl() = delete;
-  TokenType* lookUp(const std::string& key);
-  void insert(const std::string& key, std::unique_ptr<TokenType>&& token);
-  TokenType* validateTokenAndReturn(const std::string& key, TokenType* const found_token);
+
+  absl::optional<std::string>
+  lookUp(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience);
+  void insert(std::unique_ptr<GcpToken> token);
 
   uint64_t capacity() { return lru_cache_.maxSize(); }
 
@@ -39,7 +39,7 @@ public:
   }
 
 private:
-  LRUCache<TokenType> lru_cache_;
+  LRUCache lru_cache_;
   TimeSource& time_source_;
 };
 
@@ -48,11 +48,11 @@ public:
   ThreadLocalCache(const envoy::extensions::filters::http::gcp_authn::v3::TokenCacheConfig& config,
                    TimeSource& time_source)
       : cache_(config, time_source) {}
-  TokenCacheImpl<JwtToken>& cache() { return cache_; }
+  TokenCacheImpl& cache() { return cache_; }
 
 private:
   // The lifetime and ownership of cache object is tied to ThreadLocalCache object.
-  TokenCacheImpl<JwtToken> cache_;
+  TokenCacheImpl cache_;
 };
 
 struct TokenCache {
@@ -65,46 +65,6 @@ struct TokenCache {
   }
   Envoy::ThreadLocal::TypedSlot<ThreadLocalCache> tls;
 };
-
-template <typename TokenType> TokenType* TokenCacheImpl<TokenType>::lookUp(const std::string& key) {
-  typename LRUCache<TokenType>::ScopedLookup lookup(&lru_cache_, key);
-  if (lookup.found()) {
-    TokenType* const found_token = lookup.value();
-    return validateTokenAndReturn(key, found_token);
-  }
-  // Return `nullptr` if no entry is found.
-  return nullptr;
-}
-
-template <typename TokenType>
-void TokenCacheImpl<TokenType>::insert(const std::string& key, std::unique_ptr<TokenType>&& token) {
-  // Release the token to transfer the ownership of token.
-  lru_cache_.insert(key, token.release(), 1);
-}
-
-template <typename TokenType>
-TokenType* TokenCacheImpl<TokenType>::validateTokenAndReturn(const std::string& key,
-                                                             TokenType* const found_token) {
-  if constexpr (std::is_same<TokenType, JwtToken>::value) {
-    ASSERT(found_token != nullptr);
-    // Verify the validness of the token by checking its expiration time field. Default clock skew
-    // is one minute and it could be configurable via config if it is needed in the future.
-    // Note: verifyTimeConstraint() interface is correct for the token consumer. However, as the
-    // token producer here, we should instead include the clock skew as the part of the `now` time
-    // up front to account for the clock skew on the consumer side where the token will be consumed.
-    if (found_token->verifyTimeConstraint(DateUtil::nowToSeconds(time_source_) +
-                                              JwtVerify::kClockSkewInSecond,
-                                          /*clock_skew=*/0) == JwtVerify::Status::JwtExpired) {
-      // Remove the expired entry.
-      lru_cache_.remove(key);
-    } else {
-      // Return the valid token.
-      return found_token;
-    }
-  }
-  // Return `nullptr` if no valid token has been found.
-  return nullptr;
-}
 
 } // namespace GcpAuthn
 } // namespace HttpFilters

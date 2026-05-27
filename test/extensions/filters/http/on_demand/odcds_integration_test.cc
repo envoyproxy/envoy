@@ -297,6 +297,7 @@ public:
 };
 
 using OdCdsIntegrationTest = OdCdsIntegrationTestBase;
+using testing::Ge;
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OdCdsIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
@@ -636,11 +637,11 @@ public:
   Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
   Grpc::ClientType clientType() const override { return std::get<1>(GetParam()); }
   Grpc::SotwOrDelta sotwOrDelta() const { return std::get<2>(GetParam()); }
-  bool odcds_over_ads_fix_enabled() const { return std::get<3>(GetParam()); }
+  bool odcdsOverAdsFixEnabled() const { return std::get<3>(GetParam()); }
 
   void initialize() override {
     config_helper_.addRuntimeOverride("envoy.reloadable_features.odcds_over_ads_fix",
-                                      odcds_over_ads_fix_enabled() ? "true" : "false");
+                                      odcdsOverAdsFixEnabled() ? "true" : "false");
     AdsIntegrationTestBase::initialize();
 
     test_server_->waitUntilListenersReady();
@@ -1060,7 +1061,7 @@ TEST_P(OdCdsAdsIntegrationTest, NoCdsConfigOnDemandClusterMultipleClustersSequen
   // but works with the new one (XdstpOdCdsApiImpl).
   // Once envoy.reloadable_features.odcds_over_ads_fix is removed, this test
   // will only execute the fixed component.
-  if (!odcds_over_ads_fix_enabled()) {
+  if (!odcdsOverAdsFixEnabled()) {
     GTEST_SKIP() << "This test only passes with the new XdstpOdCdsApiImpl implementation";
   }
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -1270,7 +1271,7 @@ TEST_P(OdCdsAdsIntegrationTest,
   // but works with the new one (XdstpOdCdsApiImpl).
   // Once envoy.reloadable_features.odcds_over_ads_fix is removed, this test
   // will only execute the fixed component.
-  if (!odcds_over_ads_fix_enabled()) {
+  if (!odcdsOverAdsFixEnabled()) {
     GTEST_SKIP() << "This test only passes with the new XdstpOdCdsApiImpl implementation";
   }
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -1923,7 +1924,7 @@ TEST_P(OdCdsXdstpIntegrationTest, OnDemandCdsWithEds) {
  */
 class OdCdsXdstpAdsIntegrationTest : public AdsXdsTpConfigsIntegrationTest {
 public:
-  OdCdsXdstpAdsIntegrationTest() : AdsXdsTpConfigsIntegrationTest() {
+  OdCdsXdstpAdsIntegrationTest() {
     // Override the sotw_or_delta_ settings to only use SotW-ADS.
     // Note that in the future this can be modified to support other types as
     // well, but currently not needed.
@@ -2042,7 +2043,7 @@ TEST_P(OdCdsXdstpAdsIntegrationTest, OnDemandClusterDiscoveryWithSotwAds) {
   EXPECT_EQ(5, test_server_->gauge("cluster_manager.active_clusters")->value());
 
   // Envoy should now complete initialization.
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   registerTestServerPorts({"http"});
 
   // Send the first request.
@@ -2157,7 +2158,7 @@ key:
                                        {"Addr", "x-foo-key=foo"}});
     createRdsStream("foo_route1");
     sendRdsResponse(route_config_formatter("foo_route1"), "1");
-    test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+    test_server_->waitForCounter("http.config_test.rds.foo_route1.update_success", Ge(1));
     return response;
   }
 

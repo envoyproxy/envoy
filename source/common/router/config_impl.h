@@ -25,9 +25,12 @@
 #include "source/common/common/packed_struct.h"
 #include "source/common/config/datasource.h"
 #include "source/common/config/metadata.h"
+#include "source/common/grpc/common.h"
 #include "source/common/http/hash_policy.h"
 #include "source/common/http/header_mutation.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/http/path_utility.h"
+#include "source/common/http/utility.h"
 #include "source/common/matcher/matcher.h"
 #include "source/common/router/config_utility.h"
 #include "source/common/router/header_parser.h"
@@ -64,6 +67,92 @@ private:
 };
 
 /**
+ * Lazily derives and caches per-request values used during route matching
+ * (path, query params, cookies, gRPC flag, etc.) so each is computed at most
+ * once across all route entries evaluated for a single request.
+ */
+class RouteMatchContext {
+public:
+  RouteMatchContext(const Http::RequestHeaderMap& headers, bool ignore_path_params)
+      : headers_(headers), ignore_path_params_(ignore_path_params) {}
+
+  const Http::RequestHeaderMap& headers() const { return headers_; }
+
+  absl::string_view path() const { return headers_.getPathValue(); }
+
+  absl::string_view pathWithoutQuery() const {
+    if (!path_without_query_computed_) {
+      path_without_query_ = Http::PathUtil::removeQueryAndFragment(path());
+      path_without_query_computed_ = true;
+    }
+    return path_without_query_;
+  }
+
+  absl::string_view sanitizedPath() const {
+    if (!sanitized_path_computed_) {
+      sanitized_path_ = ignore_path_params_ ? stripPathParams(path()) : path();
+      sanitized_path_computed_ = true;
+    }
+    return sanitized_path_;
+  }
+
+  absl::string_view sanitizedPathWithoutQuery() const {
+    if (!sanitized_path_without_query_computed_) {
+      sanitized_path_without_query_ =
+          ignore_path_params_ ? stripPathParams(pathWithoutQuery()) : pathWithoutQuery();
+      sanitized_path_without_query_computed_ = true;
+    }
+    return sanitized_path_without_query_;
+  }
+
+  const Http::Utility::QueryParamsMulti& queryParams() const {
+    if (!query_params_computed_) {
+      query_params_ = Http::Utility::QueryParamsMulti::parseQueryString(path());
+      query_params_computed_ = true;
+    }
+    return query_params_;
+  }
+
+  bool isGrpc() const {
+    if (!is_grpc_computed_) {
+      is_grpc_ = Grpc::Common::isGrpcRequestHeaders(headers_);
+      is_grpc_computed_ = true;
+    }
+    return is_grpc_;
+  }
+
+  const absl::flat_hash_map<std::string, std::string>& cookies() const {
+    if (!cookies_computed_) {
+      cookies_ = Http::Utility::parseCookies(headers_);
+      cookies_computed_ = true;
+    }
+    return cookies_;
+  }
+
+private:
+  static absl::string_view stripPathParams(absl::string_view path) {
+    const auto pos = path.find(';');
+    return pos != absl::string_view::npos ? path.substr(0, pos) : path;
+  }
+
+  const Http::RequestHeaderMap& headers_;
+  mutable absl::string_view path_without_query_;
+  mutable absl::string_view sanitized_path_;
+  mutable absl::string_view sanitized_path_without_query_;
+  mutable Http::Utility::QueryParamsMulti query_params_;
+  mutable absl::flat_hash_map<std::string, std::string> cookies_;
+  // Keep bools at the end to reduce alignment overhead
+  const bool ignore_path_params_{};
+  mutable bool path_without_query_computed_ : 1 {};
+  mutable bool sanitized_path_computed_ : 1 {};
+  mutable bool sanitized_path_without_query_computed_ : 1 {};
+  mutable bool query_params_computed_ : 1 {};
+  mutable bool is_grpc_ : 1 {};
+  mutable bool is_grpc_computed_ : 1 {};
+  mutable bool cookies_computed_ : 1 {};
+};
+
+/**
  * Base interface for something that matches a header.
  */
 class Matchable {
@@ -71,13 +160,15 @@ public:
   virtual ~Matchable() = default;
 
   /**
-   * See if this object matches the incoming headers.
-   * @param headers supplies the headers to match.
+   * See if this object matches the incoming request.
+   * @param route_match_context supplies pre-computed context for the request like path/query
+   * values.
+   * @param stream_info supplies the stream info for the request.
    * @param random_value supplies the random seed to use if a runtime choice is required. This
    *        allows stable choices between calls if desired.
-   * @return true if input headers match this object.
+   * @return RouteConstSharedPtr if input matches this object, nullptr otherwise.
    */
-  virtual RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
+  virtual RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
                                       const StreamInfo::StreamInfo& stream_info,
                                       uint64_t random_value) const PURE;
 
@@ -379,7 +470,7 @@ public:
                                           uint64_t random_value) const;
 
   RouteConstSharedPtr
-  getRouteFromRoutes(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+  getRouteFromRoutes(const RouteCallback& cb, const RouteMatchContext& route_match_context,
                      const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
                      absl::Span<const RouteEntryImplBaseConstSharedPtr> routes) const;
 
@@ -584,8 +675,8 @@ public:
 
   bool isRedirect() const;
 
-  bool matchRoute(const Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo& stream_info,
-                  uint64_t random_value) const;
+  bool matchRoute(const RouteMatchContext& route_match_context,
+                  const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
   absl::Status validateClusters(const Upstream::ClusterManager& cluster_manager) const;
 
   // Router::RouteEntry
@@ -890,7 +981,6 @@ private:
   std::vector<Http::HeaderUtility::HeaderDataPtr> config_headers_;
   std::vector<ConfigUtility::QueryParameterMatcherPtr> config_query_parameters_;
   std::vector<ConfigUtility::CookieMatcherPtr> config_cookies_;
-  absl::flat_hash_set<absl::string_view> config_cookie_names_;
 
   UpgradeMap upgrade_map_;
   std::unique_ptr<const Http::HashPolicyImpl> hash_policy_;
@@ -938,7 +1028,7 @@ public:
   PathMatchType matchType() const override { return PathMatchType::Template; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
+  RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
                               const StreamInfo::StreamInfo& stream_info,
                               uint64_t random_value) const override;
 
@@ -973,7 +1063,7 @@ public:
   PathMatchType matchType() const override { return PathMatchType::Prefix; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
+  RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
                               const StreamInfo::StreamInfo& stream_info,
                               uint64_t random_value) const override;
 
@@ -1008,7 +1098,7 @@ public:
   PathMatchType matchType() const override { return PathMatchType::Exact; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
+  RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
                               const StreamInfo::StreamInfo& stream_info,
                               uint64_t random_value) const override;
 
@@ -1042,7 +1132,7 @@ public:
   PathMatchType matchType() const override { return PathMatchType::Regex; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
+  RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
                               const StreamInfo::StreamInfo& stream_info,
                               uint64_t random_value) const override;
 
@@ -1076,7 +1166,7 @@ public:
   PathMatchType matchType() const override { return PathMatchType::None; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
+  RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
                               const StreamInfo::StreamInfo& stream_info,
                               uint64_t random_value) const override;
 
@@ -1109,7 +1199,7 @@ public:
   PathMatchType matchType() const override { return PathMatchType::PathSeparatedPrefix; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
+  RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
                               const StreamInfo::StreamInfo& stream_info,
                               uint64_t random_value) const override;
 

@@ -74,6 +74,7 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
         "//envoy/upstream:cluster_manager_interface",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
         "//source/common/event:real_time_system_lib",
