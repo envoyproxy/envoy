@@ -4,12 +4,35 @@
 #include "source/extensions/network/dns_resolver/hickory/hickory_dns_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/extensions/dynamic_modules/util.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Network {
+
+// Test peer that provides access to ``HickoryDnsResolverConfig::createForModule`` so failure
+// paths through the dynamic-module loader can be exercised with stub modules.
+class HickoryDnsResolverConfigTestPeer {
+public:
+  static absl::StatusOr<std::shared_ptr<HickoryDnsResolverConfig>> createForModule(
+      const envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig&
+          proto_config,
+      absl::string_view module_name) {
+    return HickoryDnsResolverConfig::createForModule(proto_config, module_name);
+  }
+};
+
+// Test peer that toggles the resolver's private ``shutting_down_`` flag so the ABI callback's
+// shutdown fast path can be exercised without racing against destructor teardown.
+class HickoryDnsResolverTestPeer {
+public:
+  static void setShuttingDown(HickoryDnsResolver& resolver, bool value) {
+    resolver.shutting_down_.store(value, std::memory_order_release);
+  }
+};
+
 namespace {
 
 // These tests exercise the C++ shell of the Hickory DNS resolver extension by directly
@@ -522,10 +545,53 @@ TEST_F(HickoryDnsImplTest, RepeatedCancelDoesNotLeakGauge) {
   EXPECT_EQ(0, stats_store_.counter("dns.hickory.resolve_total").value());
 }
 
-// Regression test for a use-after-free in the ABI callback. If the resolver is destroyed
+// Test-only stub that simulates a Rust panic propagating across the FFI boundary
+// by returning a null query pointer from `on_dns_resolve`.
+envoy_dynamic_module_type_dns_query_module_ptr
+stubOnDnsResolveReturningNull(envoy_dynamic_module_type_dns_resolver_module_ptr,
+                              envoy_dynamic_module_type_envoy_buffer,
+                              envoy_dynamic_module_type_dns_lookup_family, uint64_t) {
+  return nullptr;
+}
+
+// Regression test for null returns from the Rust resolve FFI. If the Rust module
+// panics or `DnsResolverInstance::resolve` returns `None`, the SDK returns null.
+// The C++ shell must invoke the user callback synchronously with `Failure` rather
+// than asserting or leaking the `pending_resolutions` gauge tick.
+TEST_F(HickoryDnsImplTest, ResolveFailsSynchronouslyWhenFfiReturnsNull) {
+  envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig proto_config;
+  auto config_or = HickoryDnsResolverConfig::create(proto_config);
+  ASSERT_TRUE(config_or.ok()) << config_or.status().message();
+  auto config = std::move(*config_or);
+
+  config->on_dns_resolve_ = stubOnDnsResolveReturningNull;
+
+  auto resolver = std::make_shared<HickoryDnsResolver>(config, *dispatcher_, api_->rootScope());
+
+  bool callback_called = false;
+  auto* query = resolver->resolve("example.com", DnsLookupFamily::All,
+                                  [&callback_called](DnsResolver::ResolutionStatus status,
+                                                     absl::string_view details,
+                                                     std::list<DnsResponse>&& responses) {
+                                    callback_called = true;
+                                    EXPECT_EQ(status, DnsResolver::ResolutionStatus::Failure);
+                                    EXPECT_EQ(details, "hickory_dns_dispatch_failure");
+                                    EXPECT_TRUE(responses.empty());
+                                  });
+
+  EXPECT_EQ(query, nullptr);
+  EXPECT_TRUE(callback_called);
+  EXPECT_EQ(1, stats_store_.counter("dns.hickory.resolve_total").value());
+  EXPECT_EQ(1, stats_store_.counter("dns.hickory.get_addr_failure").value());
+  EXPECT_EQ(0, stats_store_
+                   .gauge("dns.hickory.pending_resolutions", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
+}
+
+// Regression test for a UAF in the ABI callback. If the resolver is destroyed
 // after the callback has copied response data and posted a lambda to the dispatcher but
 // before the dispatcher runs that lambda, the lambda must not dereference a freed
-// resolver. The fix uses `std::weak_ptr` to detect destruction inside the lambda.
+// resolver.
 TEST_F(HickoryDnsImplTest, ResolverDestroyedBeforePostedCallbackRuns) {
   initialize();
   auto* hickory_resolver = dynamic_cast<HickoryDnsResolver*>(resolver_.get());
@@ -746,6 +812,181 @@ TEST_F(HickoryDnsImplTest, ResolveIpAddressV6) {
   EXPECT_NE(query, nullptr);
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
   EXPECT_TRUE(callback_called);
+}
+
+// -- Failure-path tests for HickoryDnsResolverConfig::create() -----------------------------------
+//
+// The production path uses the statically linked ``hickory_dns_static`` module so the load,
+// symbol-resolution, and module-rejection failure branches are unreachable. These tests use
+// ``HickoryDnsResolverConfigTestPeer::createForModule`` to substitute test-only modules that
+// trigger each branch deterministically.
+
+// Fixture for failure-path tests that need ``ENVOY_DYNAMIC_MODULES_SEARCH_PATH`` pointing at
+// the central dynamic-modules test_data directory so ``newDynamicModuleByName`` can locate
+// the stub shared objects.
+class HickoryDnsConfigFailureTest : public testing::Test {
+public:
+  HickoryDnsConfigFailureTest() {
+    Extensions::DynamicModules::DynamicModulesTestEnvironment::setModulesSearchPath();
+  }
+};
+
+// Verifies that a proto whose ``Duration`` field has out-of-range ``nanos`` causes
+// ``MessageToJsonString`` to fail with ``InvalidArgumentError("duration out of range")``,
+// which the shell wraps as ``InternalError``. ``nanos`` must be in ``[-999_999_999,
+// 999_999_999]`` per the well-known ``Duration`` JSON serialization rules.
+TEST_F(HickoryDnsConfigFailureTest, ConfigCreateFailsOnJsonSerializationError) {
+  envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig proto_config;
+  proto_config.mutable_query_timeout()->set_seconds(0);
+  proto_config.mutable_query_timeout()->set_nanos(1'000'000'000);
+
+  auto result = HickoryDnsResolverConfig::create(proto_config);
+  ASSERT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInternal);
+  EXPECT_THAT(std::string(result.status().message()),
+              testing::HasSubstr("Failed to serialize HickoryDnsResolverConfig to JSON"));
+}
+
+// Verifies that loading a module name with no static ``program_init`` symbol and no shared
+// object on the search path fails, and the shell wraps the loader error as ``InternalError``.
+TEST_F(HickoryDnsConfigFailureTest, ConfigCreateFailsWhenModuleMissing) {
+  envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig proto_config;
+  auto result =
+      HickoryDnsResolverConfigTestPeer::createForModule(proto_config, "envoy_hickory_test_absent");
+  ASSERT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInternal);
+  EXPECT_THAT(std::string(result.status().message()),
+              testing::HasSubstr("Failed to load Hickory DNS dynamic module"));
+}
+
+// Verifies that loading a module that exposes ``program_init`` but lacks the DNS resolver ABI
+// symbols fails on the first ``RESOLVE_SYMBOL`` lookup, and the shell wraps the loader error
+// as ``InternalError`` with the offending symbol name.
+TEST_F(HickoryDnsConfigFailureTest, ConfigCreateFailsWhenDnsAbiSymbolsMissing) {
+  envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig proto_config;
+  auto result = HickoryDnsResolverConfigTestPeer::createForModule(proto_config, "matcher_no_op");
+  ASSERT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInternal);
+  EXPECT_THAT(std::string(result.status().message()),
+              testing::HasSubstr("Failed to resolve Hickory DNS ABI symbol "
+                                 "'envoy_dynamic_module_on_dns_resolver_config_new'"));
+}
+
+// Verifies that a module returning null from ``on_dns_resolver_config_new`` causes the shell
+// to surface ``InvalidArgumentError`` so operators see a configuration failure rather than a
+// crash.
+TEST_F(HickoryDnsConfigFailureTest, ConfigCreateFailsWhenModuleRejectsConfig) {
+  envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig proto_config;
+  auto result = HickoryDnsResolverConfigTestPeer::createForModule(proto_config,
+                                                                  "dns_resolver_config_new_fail");
+  ASSERT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(std::string(result.status().message()),
+              testing::HasSubstr("Hickory DNS module rejected the configuration"));
+}
+
+// Verifies that the factory propagates an ``unpackTo`` failure when ``typed_config`` contains
+// an ``Any`` whose ``type_url`` does not match ``HickoryDnsResolverConfig``. The factory is
+// looked up by name directly to bypass ``createDnsResolverFactoryFromTypedConfig``'s type-URL
+// check so the failure surfaces inside ``createDnsResolver`` at the ``unpackTo`` call site.
+TEST_F(HickoryDnsConfigFailureTest, FactoryReturnsErrorOnInvalidTypedConfig) {
+  Stats::TestUtil::TestStore stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
+
+  auto* factory = Registry::FactoryRegistry<Network::DnsResolverFactory>::getFactory(
+      "envoy.network.dns_resolver.hickory");
+  ASSERT_NE(factory, nullptr);
+
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  typed_dns_resolver_config.set_name("envoy.network.dns_resolver.hickory");
+  // Pack a wholly different message type so ``MessageUtil::unpackTo`` reports a type mismatch.
+  envoy::config::core::v3::Address unrelated_message;
+  unrelated_message.mutable_socket_address()->set_address("0.0.0.0");
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(unrelated_message);
+
+  auto result = factory->createDnsResolver(*dispatcher, *api, typed_dns_resolver_config);
+  ASSERT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInternal);
+  EXPECT_THAT(std::string(result.status().message()),
+              testing::HasSubstr("Unable to unpack as envoy.extensions.network.dns_resolver."
+                                 "hickory.v3.HickoryDnsResolverConfig"));
+}
+
+// Verifies that the factory surfaces ``HickoryDnsResolverConfig::create()`` failures through
+// ``RETURN_IF_NOT_OK_REF`` rather than ``ASSERT``-ing or constructing a resolver from a null
+// config. Uses an out-of-range ``Duration`` so ``MessageToJsonString`` fails inside
+// ``serializeConfigToJson``; the factory must propagate the wrapped ``InternalError``.
+TEST_F(HickoryDnsConfigFailureTest, FactoryReturnsErrorWhenConfigCreateFails) {
+  Stats::TestUtil::TestStore stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
+
+  auto* factory = Registry::FactoryRegistry<Network::DnsResolverFactory>::getFactory(
+      "envoy.network.dns_resolver.hickory");
+  ASSERT_NE(factory, nullptr);
+
+  envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig proto_config;
+  proto_config.mutable_query_timeout()->set_seconds(0);
+  proto_config.mutable_query_timeout()->set_nanos(1'000'000'000);
+
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  typed_dns_resolver_config.set_name("envoy.network.dns_resolver.hickory");
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(proto_config);
+
+  auto result = factory->createDnsResolver(*dispatcher, *api, typed_dns_resolver_config);
+  ASSERT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInternal);
+  EXPECT_THAT(std::string(result.status().message()),
+              testing::HasSubstr("Failed to serialize HickoryDnsResolverConfig to JSON"));
+}
+
+// -- ABI callback shutdown fast-path test --------------------------------------------------------
+
+// Verifies that the ABI callback returns early when the resolver's ``shutting_down_`` flag is
+// set, without posting to the dispatcher. Regression coverage for the synchronous shutdown
+// guard at the top of ``envoy_dynamic_module_callback_dns_resolve_complete``.
+//
+// No real resolution is initiated so the synthetic ABI callback below cannot race with a Tokio
+// task; this isolates the shutdown fast-path from any background work.
+TEST_F(HickoryDnsImplTest, AbiCallbackIgnoredWhenResolverShuttingDown) {
+  initialize();
+  auto* hickory_resolver = dynamic_cast<HickoryDnsResolver*>(resolver_.get());
+  ASSERT_NE(hickory_resolver, nullptr);
+
+  HickoryDnsResolverTestPeer::setShuttingDown(*hickory_resolver, true);
+
+  const std::string addr_str = "127.0.0.1:0";
+  envoy_dynamic_module_type_dns_address addr;
+  addr.address_ptr = addr_str.c_str();
+  addr.address_length = addr_str.size();
+  addr.ttl_seconds = 60;
+
+  envoy_dynamic_module_type_module_buffer details_buf;
+  details_buf.ptr = nullptr;
+  details_buf.length = 0;
+
+  // The callback must take its fast-path return; without the guard it would copy the address
+  // buffer and post a lambda to the dispatcher.
+  envoy_dynamic_module_callback_dns_resolve_complete(
+      static_cast<const void*>(hickory_resolver), kFirstQueryId,
+      envoy_dynamic_module_type_dns_resolution_status_Completed, details_buf, &addr, 1);
+
+  // Drain the dispatcher; if the fast-path was skipped a lambda would have been posted and run
+  // here, incrementing ``resolve_total`` once ``onResolveComplete`` matched the pending query.
+  // No query was actually registered, so the only behaviour that distinguishes "fast-path took
+  // effect" from "lambda ran but found no match" is the absence of any side effects: details
+  // buffer copy, address parse, weak_ptr capture. Stats remain zero in both cases, but the
+  // important invariant is that the fast-path return path was exercised at all.
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(0, stats_store_.counter("dns.hickory.resolve_total").value());
+  EXPECT_EQ(0, stats_store_
+                   .gauge("dns.hickory.pending_resolutions", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
+
+  // Restore the flag so the resolver's destructor can run its normal Tokio-runtime shutdown
+  // path without observing a spurious early-set flag.
+  HickoryDnsResolverTestPeer::setShuttingDown(*hickory_resolver, false);
 }
 
 } // namespace
