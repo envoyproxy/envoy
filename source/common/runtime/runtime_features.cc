@@ -36,7 +36,6 @@
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
 RUNTIME_GUARD(envoy_reloadable_features_cel_message_serialize_text_format);
-RUNTIME_GUARD(envoy_reloadable_features_coalesce_lb_rebuilds_on_batch_update);
 RUNTIME_GUARD(envoy_reloadable_features_codec_client_enable_idle_timer_only_when_connected);
 RUNTIME_GUARD(envoy_reloadable_features_decouple_explicit_drain_pools_and_dns_refresh);
 RUNTIME_GUARD(envoy_reloadable_features_dfp_cluster_resolves_hosts);
@@ -44,11 +43,13 @@ RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
 RUNTIME_GUARD(envoy_reloadable_features_enable_cel_regex_precompilation);
 RUNTIME_GUARD(envoy_reloadable_features_enable_cel_response_path_matching);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
+RUNTIME_GUARD(envoy_reloadable_features_enable_new_dns_implementation);
 // TODO(adisuissa): enable once the LRS server-self-ads support is fully
 // implemented, and tested.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_lrs_server_self_ads);
 RUNTIME_GUARD(envoy_reloadable_features_enable_new_query_param_present_match_behavior);
 RUNTIME_GUARD(envoy_reloadable_features_ext_authz_http_client_retries_respect_user_retry_on);
+RUNTIME_GUARD(envoy_reloadable_features_ext_authz_respect_keep_empty_value);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
 // @yanjunxiang-google before removing.
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
@@ -203,16 +204,13 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_ext_proc_graceful_grpc_close);
 
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_getaddrinfo_no_ai_flags);
 
+// See: `https://github.com/envoyproxy/envoy/issues/45212` for more details.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_coalesce_lb_rebuilds_on_batch_update);
+
 // Flag to remove legacy route formatter support in header parser
 // Flip to true after two release periods.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_remove_legacy_route_formatter);
 
-// TODO(grnmeira):
-// Enables the new DNS implementation, a merged implementation of
-// strict and logical DNS clusters. This new implementation will
-// take over the split ones, and will be used as a base for the
-// implementation of on-demand DNS.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_new_dns_implementation);
 // Force a local reply from upstream envoy for reverse connections.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_reverse_conn_force_local_reply);
 // RELEASE_ASSERT when upstream stream detects UAF of downstream response decoder instance.

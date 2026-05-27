@@ -107,7 +107,7 @@ public:
 
   IntegrationStreamDecoderPtr response_;
   bool enable_timeout_{};
-  std::string host_to_match_{};
+  std::string host_to_match_;
 };
 
 TEST_P(ConnectUdpTerminationIntegrationTest, ExchangeCapsules) {

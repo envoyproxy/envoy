@@ -362,8 +362,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithAdditionalHitsAddend) {
   InSequence s;
 
   filter_callbacks_.stream_info_.filter_state_->setData(
-      "envoy.ratelimit.hits_addend", std::make_unique<StreamInfo::UInt32AccessorImpl>(5),
-      StreamInfo::FilterState::StateType::Mutable);
+      "envoy.ratelimit.hits_addend", std::make_unique<StreamInfo::UInt32AccessorImpl>(5));
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
@@ -410,8 +409,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithAdditionalHitsAddend) {
   testing::Mock::VerifyAndClearExpectations(&vh_rate_limit_);
   filter_callbacks_.stream_info_.filter_state_->setData(
       // Ensures that addend can be set differently than the request path.
-      "envoy.ratelimit.hits_addend", std::make_unique<StreamInfo::UInt32AccessorImpl>(100),
-      StreamInfo::FilterState::StateType::Mutable);
+      "envoy.ratelimit.hits_addend", std::make_unique<StreamInfo::UInt32AccessorImpl>(100));
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
   EXPECT_CALL(vh_rate_limit_, applyOnStreamDone()).WillRepeatedly(Return(true));
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _))
@@ -432,8 +430,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithHitsAddendFilterState) {
   InSequence s;
 
   filter_callbacks_.stream_info_.filter_state_->setData(
-      "envoy.ratelimit.hits_addend", std::make_unique<StreamInfo::UInt32AccessorImpl>(10),
-      StreamInfo::FilterState::StateType::Mutable);
+      "envoy.ratelimit.hits_addend", std::make_unique<StreamInfo::UInt32AccessorImpl>(10));
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))

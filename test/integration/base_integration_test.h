@@ -672,7 +672,7 @@ protected:
 
   // If this member is not empty, the test will use a fixed RNG value specified
   // by it.
-  absl::optional<uint64_t> deterministic_value_{};
+  absl::optional<uint64_t> deterministic_value_;
 
   // Set true when your test will itself take care of ensuring listeners are up, and registering
   // them in the port_map_.

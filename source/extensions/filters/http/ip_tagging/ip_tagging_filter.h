@@ -30,28 +30,35 @@ namespace IpTagging {
 using IPTagsProto = envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTags;
 using LcTrieSharedPtr = std::shared_ptr<Network::LcTrie::LcTrie<std::string>>;
 
-class IpTagsLoader : public Logger::Loggable<Logger::Id::ip_tagging>,
-                     public std::enable_shared_from_this<IpTagsLoader> {
+/**
+ * Stats container for a single loaded set of ip tags. Owns the StatNameSet used to
+ * intern per-tag `<tag>.hit` builtins, plus the shared `total`, `no_hit`, `unknown_tag.hit`
+ * and `reload_success` stat names. Also exposes the proto-to-trie parser, which is the
+ * one place tag names are interned as builtins.
+ */
+class IpTagsStats : public Logger::Loggable<Logger::Id::ip_tagging> {
 public:
-  IpTagsLoader(const std::string& stat_prefix, Stats::ScopeSharedPtr scope);
-
-  void incIpTagsReloadSuccess() { incCounter(reload_success_); }
+  IpTagsStats(const std::string& stat_prefix, Stats::ScopeSharedPtr scope);
 
   void incHit(absl::string_view tag);
-
   void incNoHit() { incCounter(no_hit_); }
   void incTotal() { incCounter(total_); }
+  void incIpTagsReloadSuccess() { incCounter(reload_success_); }
 
   /**
-   * Parses ip tags in a proto format into a trie structure.
-   * @param ip_tags Collection of ip tags in proto format.
-   * @return Valid LcTrieSharedPtr if parsing succeeded or error status otherwise.
+   * Parses ip tags in proto format into a trie. Interns each `<tag>.hit` as a builtin
+   * on this instance's StatNameSet so subsequent `incHit` calls go through the fast path.
+   * @return Valid LcTrieSharedPtr on success or an error status otherwise.
    */
   absl::StatusOr<LcTrieSharedPtr>
   parseIpTagsAsProto(const Protobuf::RepeatedPtrField<
                      envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTag>& ip_tags);
 
 private:
+  void incCounter(Stats::StatName name);
+
+  // Owned by this instance so the stats remain valid even if the caller that bootstrapped
+  // them goes away (relevant for providers shared across listeners).
   Stats::ScopeSharedPtr scope_;
   Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName stats_prefix_;
@@ -59,12 +66,26 @@ private:
   const Stats::StatName total_;
   const Stats::StatName no_hit_;
   const Stats::StatName reload_success_;
-  void incCounter(Stats::StatName name);
 };
 
+using IpTagsStatsSharedPtr = std::shared_ptr<IpTagsStats>;
+
 /**
- * This class owns ip tags trie structure for a configured absolute file path and provides access to
- * the ip tags data. It also performs periodic refresh of ip tags data.
+ * A single immutable snapshot of the parsed ip tags: the trie used for lookup and the
+ * stats container whose StatNameSet has the matching tag-name builtins interned. A
+ * snapshot is produced atomically on every load and handed to the filter as a unit, so
+ * a request never sees a trie from one reload paired with stats from another.
+ */
+struct LoadedIpTags {
+  LcTrieSharedPtr trie;
+  IpTagsStatsSharedPtr stats;
+};
+
+using LoadedIpTagsConstSharedPtr = std::shared_ptr<const LoadedIpTags>;
+
+/**
+ * Owns the file-watched DataSourceProvider that produces a new LoadedIpTags on every
+ * successful reload.
  */
 class IpTagsProvider : public Logger::Loggable<Logger::Id::ip_tagging> {
 public:
@@ -77,34 +98,23 @@ public:
 
   ~IpTagsProvider();
 
-  LcTrieSharedPtr ipTags();
-
-  void incHit(absl::string_view tag);
-  void incNoHit();
-  void incTotal();
+  LoadedIpTagsConstSharedPtr loadedIpTags() const { return data_source_provider_->data(); }
 
 private:
-  std::shared_ptr<IpTagsLoader> getTagsLoader();
-
-  Api::Api& api_;
-  Envoy::Config::DataSource::DataSourceProviderPtr<Network::LcTrie::LcTrie<std::string>>
-      data_source_provider_;
-  // A shared_ptr to keep the provider singleton alive as long as any of its providers are in use.
+  Envoy::Config::DataSource::DataSourceProviderPtr<LoadedIpTags> data_source_provider_;
+  // Keeps the registry singleton alive as long as any provider is in use.
   const Singleton::InstanceSharedPtr owner_;
-  mutable absl::Mutex tags_loader_mu_;
-  std::shared_ptr<IpTagsLoader> tags_loader_ ABSL_GUARDED_BY(tags_loader_mu_);
 };
 
 using IpTagsProviderSharedPtr = std::shared_ptr<IpTagsProvider>;
 
 /**
- * A singleton for file based loading of ip tags and looking up parsed trie data structures with Ip
- * tags. When given equivalent file paths to the Ip tags, the singleton returns pointers to the same
- * trie structure.
+ * A singleton that de-duplicates IpTagsProvider instances by data source filename so two
+ * filter configs pointing at the same file share one provider (and thus one parsed trie).
  */
 class IpTagsRegistrySingleton : public Envoy::Singleton::Instance {
 public:
-  IpTagsRegistrySingleton() {}
+  IpTagsRegistrySingleton() = default;
 
   absl::StatusOr<std::shared_ptr<IpTagsProvider>>
   getOrCreateProvider(const envoy::config::core::v3::DataSource& ip_tags_datasource, Api::Api& api,
@@ -114,11 +124,12 @@ public:
                       std::shared_ptr<IpTagsRegistrySingleton> singleton);
 
 private:
-  // Each provider stores shared_ptrs to this singleton, which keeps the singleton
-  // from being destroyed unless it's no longer keeping track of any providers.
-  // Each entry in this map consists of a key (hash of an absolute file path to ip tags file)
-  // and and value (instance of `IpTagsProvider` that owns ip tags data).
+  // Each provider stores a shared_ptr to this singleton, keeping the singleton alive
+  // until no provider remains. Key is a hash of the data source filename.
   absl::flat_hash_map<size_t, std::weak_ptr<IpTagsProvider>> ip_tags_registry_;
+  // Shared stats scope used by every provider this singleton creates. Lazily
+  // initialized as a child of the first caller's scope and kept alive by the
+  // singleton so a provider can outlive any individual listener that asked for it.
   Stats::ScopeSharedPtr scope_;
 };
 
@@ -144,15 +155,17 @@ public:
 
   Runtime::Loader& runtime() { return runtime_; }
   FilterRequestType requestType() const { return request_type_; }
-  const Network::LcTrie::LcTrie<std::string>& trie() const;
+
+  // Returns the current snapshot. For the inline (static) path this is the snapshot
+  // built at construction; for the data source path it is the snapshot currently
+  // published by the file watcher. The filter pulls this once per request so the trie
+  // and stats it uses come from the same reload.
+  LoadedIpTagsConstSharedPtr loadedIpTags() const {
+    return provider_ ? provider_->loadedIpTags() : static_ip_tags_;
+  }
 
   OptRef<const Http::LowerCaseString> ipTagHeader() const;
   HeaderAction ipTagHeaderAction() const { return ip_tag_header_action_; }
-
-  void incHit(absl::string_view tag);
-
-  void incNoHit();
-  void incTotal();
 
 private:
   IpTaggingFilterConfig(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
@@ -176,25 +189,18 @@ private:
     PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
-  void incCounter(Stats::StatName name);
-  // Allow the unit test to have access to private members.
   friend class IpTaggingFilterConfigPeer;
+
   const FilterRequestType request_type_;
-  Stats::Scope& scope_;
   Runtime::Loader& runtime_;
-  const std::string stats_prefix_str_;
-  Stats::StatNameSetPtr stat_name_set_;
-  const Stats::StatName stats_prefix_;
-  const Stats::StatName no_hit_;
-  const Stats::StatName total_;
-  const Stats::StatName unknown_tag_;
   const Http::LowerCaseString
       ip_tag_header_; // An empty string indicates that no ip_tag_header is set.
   const HeaderAction ip_tag_header_action_;
-  // A shared_ptr to keep the ip tags registry singleton alive as long as any of its trie structures
-  // are in use.
+  // Keeps the registry singleton alive as long as any of its providers are in use.
   const std::shared_ptr<IpTagsRegistrySingleton> ip_tags_registry_;
-  LcTrieSharedPtr trie_;
+  // Set only on the inline path.
+  LoadedIpTagsConstSharedPtr static_ip_tags_;
+  // Set only on the data source path.
   std::shared_ptr<IpTagsProvider> provider_;
 };
 
