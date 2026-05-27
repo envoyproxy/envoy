@@ -19,33 +19,7 @@ namespace {
 using Server::Configuration::MockFactoryContext;
 using ::testing::NiceMock;
 
-// Good token
-// {"iss":"https://example.com","sub":"test@example.com", "aud":"example_service",
-// "exp":2001001001 - Sun May 29 2033 13:36:41 GMT-0400}
-constexpr absl::string_view GoodTokenStr =
-    "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUu"
-    "Y29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiY"
-    "XVkIjoiZXhhbXBsZV9zZXJ2aWNlIn0.cuui_Syud76B0tqvjESE8IZbX7vzG6xA-M"
-    "Daof1qEFNIoCFT_YQPkseLSUSR2Od3TJcNKk-dKjvUEL1JW3kGnyC1dBx4f3-Xxro"
-    "yL23UbR2eS8TuxO9ZcNCGkjfvH5O4mDb6cVkFHRDEolGhA7XwNiuVgkGJ5Wkrvshi"
-    "h6nqKXcPNaRx9lOaRWg2PkE6ySNoyju7rNfunXYtVxPuUIkl0KMq3WXWRb_cb8a_Z"
-    "EprqSZUzi_ZzzYzqBNVhIJujcNWij7JRra2sXXiSAfKjtxHQoxrX8n4V1ySWJ3_1T"
-    "H_cJcdfS_RKP7YgXRWC0L16PNF5K7iqRqmjKALNe83ZFnFIw";
-// The value of exp time field in the token above.
 const time_t ExpTime = 2001001001;
-
-// Expired token
-// {"iss":"https://example.com","sub":"test@example.com","aud":"example_service",
-// "exp":1205005587 - Sat Mar 08 2008 14:46:27 GMT-0500}
-constexpr absl::string_view ExpiredToken =
-    "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUu"
-    "Y29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImV4cCI6MTIwNTAwNTU4NywiY"
-    "XVkIjoiZXhhbXBsZV9zZXJ2aWNlIn0.izDa6aHNgbsbeRzucE0baXIP7SXOrgopYQ"
-    "ALLFAsKq_N0GvOyqpAZA9nwCAhqCkeKWcL-9gbQe3XJa0KN3FPa2NbW4ChenIjmf2"
-    "QYXOuOQaDu9QRTdHEY2Y4mRy6DiTZAsBHWGA71_cLX-rzTSO_8aC8eIqdHo898oJw"
-    "3E8ISKdryYjayb9X3wtF6KLgNomoD9_nqtOkliuLElD8grO0qHKI1xQurGZNaoeyi"
-    "V1AdwgX_5n3SmQTacVN0WcSgk6YJRZG6VE8PjxZP9bEameBmbSB0810giKRpdTU1-"
-    "RJtjq6aCSTD4CYXtW38T5uko4V-S4zifK3BXeituUTebkgoA";
 
 const char DefaultConfig[] = R"EOF(
     http_uri:
@@ -63,60 +37,138 @@ public:
     envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig config;
     // Initialize the token cache with filter configuration.
     TestUtility::loadFromYaml(DefaultConfig, config);
-    token_cache_ = std::make_unique<TokenCacheImpl<JwtToken>>(config.cache_config(), time_system_);
-
-    jwt_ = std::make_unique<JwtVerify::Jwt>();
+    token_cache_ = std::make_unique<TokenCacheImpl>(config.cache_config(), time_system_);
   }
 
   NiceMock<MockFactoryContext> context_;
-  std::unique_ptr<TokenCacheImpl<JwtToken>> token_cache_;
+  std::unique_ptr<TokenCacheImpl> token_cache_;
   Event::SimulatedTimeSystem time_system_;
-  std::unique_ptr<JwtVerify::Jwt> jwt_ = nullptr;
 };
 
 TEST_F(TokenCacheTest, ValidToken) {
   EXPECT_EQ(token_cache_->capacity(), 100);
-  std::string good_token = std::string(GoodTokenStr);
-  JwtVerify::Status status = jwt_->parseFromString(good_token);
-  EXPECT_TRUE(status == JwtVerify::Status::Ok);
-  auto* old_jwt = jwt_.get();
-  token_cache_->insert(good_token, std::move(jwt_));
-  auto* found_jwt = token_cache_->lookUp(good_token);
-  EXPECT_TRUE(found_jwt != nullptr);
-  EXPECT_EQ(found_jwt, old_jwt);
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.set_url("http://example_service");
+
+  auto token = std::make_unique<GcpToken>();
+  token->token = "foo";
+  token->expires_at = ExpTime;
+  token->audience = audience;
+
+  token_cache_->insert(std::move(token));
+  auto found_token = token_cache_->lookUp(audience);
+  EXPECT_TRUE(found_token.has_value());
+  EXPECT_EQ(found_token.value(), "foo");
 }
 
 TEST_F(TokenCacheTest, ExpiredToken) {
-  std::string expired_token = std::string(ExpiredToken);
-  JwtVerify::Status status = jwt_->parseFromString(expired_token);
-  EXPECT_TRUE(status == JwtVerify::Status::Ok);
-  token_cache_->insert(expired_token, std::move(jwt_));
-  auto* found_jwt = token_cache_->lookUp(expired_token);
-  EXPECT_TRUE(found_jwt == nullptr);
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.set_url("http://example_service");
+
+  auto token = std::make_unique<GcpToken>();
+  token->token = "foo";
+  token->expires_at = 1205005587; // Sat Mar 08 2008 14:46:27 GMT-0500
+  token->audience = audience;
+
+  token_cache_->insert(std::move(token));
+  auto found_token = token_cache_->lookUp(audience);
+  EXPECT_FALSE(found_token.has_value());
 }
 
 // Test the token with the clock skew.
 TEST_F(TokenCacheTest, TokenWithClockSkew) {
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.set_url("http://example_service");
+
   // Set the time to exp_time + 1s.
-  // i.e., The expiration time in the token is `Sun May 29 2033 13:36:41 GMT-0400` and the time we
-  // set to is `Sun May 29 2033 13:35:42 GMT-0400`.
+  // i.e., The expiration time in the token is Sun May 29 2033 13:36:41 GMT and the time we
+  // set to is Sun May 29 2033 13:35:42 GMT.
   const time_t exp_time_with_skew = ExpTime - JwtVerify::kClockSkewInSecond;
   time_system_.setSystemTime(std::chrono::system_clock::from_time_t(exp_time_with_skew + 1));
-  std::string token = std::string(GoodTokenStr);
-  JwtVerify::Status status = jwt_->parseFromString(token);
-  EXPECT_TRUE(status == JwtVerify::Status::Ok);
-  token_cache_->insert(token, std::move(jwt_));
-  auto* found_jwt = token_cache_->lookUp(token);
-  EXPECT_TRUE(found_jwt == nullptr);
 
-  std::unique_ptr<JwtVerify::Jwt> jwt = std::make_unique<JwtVerify::Jwt>();
+  auto token = std::make_unique<GcpToken>();
+  token->token = "foo";
+  token->expires_at = ExpTime;
+  token->audience = audience;
+
+  token_cache_->insert(std::move(token));
+  auto found_token = token_cache_->lookUp(audience);
+  EXPECT_FALSE(found_token.has_value());
+
   // Set the time to exp_time - 1s.
   time_system_.setSystemTime(std::chrono::system_clock::from_time_t(exp_time_with_skew));
-  auto* old_jwt = jwt.get();
-  token_cache_->insert(token, std::move(jwt));
-  found_jwt = token_cache_->lookUp(token);
-  EXPECT_TRUE(found_jwt != nullptr);
-  EXPECT_EQ(found_jwt, old_jwt);
+  auto token2 = std::make_unique<GcpToken>();
+  token2->token = "foo";
+  token2->expires_at = ExpTime;
+  token2->audience = audience;
+
+  token_cache_->insert(std::move(token2));
+  found_token = token_cache_->lookUp(audience);
+  EXPECT_TRUE(found_token.has_value());
+  EXPECT_EQ(found_token.value(), "foo");
+}
+
+TEST_F(TokenCacheTest, TokenWithoutExpiration) {
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.set_url("http://example_service");
+
+  auto token = std::make_unique<GcpToken>();
+  token->token = "foo";
+  token->expires_at = 0; // 0 indicates no expiration
+  token->audience = audience;
+
+  token_cache_->insert(std::move(token));
+
+  // Advance the simulated clock by a huge amount (e.g. 10 years)
+  time_system_.setSystemTime(std::chrono::system_clock::from_time_t(ExpTime + 315360000));
+
+  // The lookup should still find the token since it has no expiration!
+  auto found_token = token_cache_->lookUp(audience);
+  EXPECT_TRUE(found_token.has_value());
+  EXPECT_EQ(found_token.value(), "foo");
+}
+
+TEST_F(TokenCacheTest, LruEviction) {
+  // Initialize a cache with capacity 2.
+  envoy::extensions::filters::http::gcp_authn::v3::TokenCacheConfig config;
+  config.mutable_cache_size()->set_value(2);
+  auto small_cache = std::make_unique<TokenCacheImpl>(config, time_system_);
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience req1;
+  req1.set_url("http://service1");
+  envoy::extensions::filters::http::gcp_authn::v3::Audience req2;
+  req2.set_url("http://service2");
+  envoy::extensions::filters::http::gcp_authn::v3::Audience req3;
+  req3.set_url("http://service3");
+
+  // Insert first two entries.
+  auto t1 = std::make_unique<GcpToken>();
+  t1->token = "token1";
+  t1->expires_at = ExpTime;
+  t1->audience = req1;
+  small_cache->insert(std::move(t1));
+
+  auto t2 = std::make_unique<GcpToken>();
+  t2->token = "token2";
+  t2->expires_at = ExpTime;
+  t2->audience = req2;
+  small_cache->insert(std::move(t2));
+
+  // Verify both are present.
+  EXPECT_TRUE(small_cache->lookUp(req1).has_value());
+  EXPECT_TRUE(small_cache->lookUp(req2).has_value());
+
+  // Insert third entry, which should trigger eviction of the least recently used entry (req1).
+  auto t3 = std::make_unique<GcpToken>();
+  t3->token = "token3";
+  t3->expires_at = ExpTime;
+  t3->audience = req3;
+  small_cache->insert(std::move(t3));
+
+  // Verify req1 is evicted, while req2 and req3 are still present.
+  EXPECT_FALSE(small_cache->lookUp(req1).has_value());
+  EXPECT_TRUE(small_cache->lookUp(req2).has_value());
+  EXPECT_TRUE(small_cache->lookUp(req3).has_value());
 }
 
 } // namespace

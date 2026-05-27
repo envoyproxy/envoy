@@ -23,7 +23,7 @@ EnvoyQuicConnectionIdGeneratorFactoryPtr ConfigFactory::createQuicConnectionIdGe
           const envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config&>(
           config, validation_visitor),
       context);
-  THROW_IF_NOT_OK(factory_or_status.status());
+  THROW_IF_NOT_OK_REF(factory_or_status.status());
   return std::move(factory_or_status.value());
 }
 

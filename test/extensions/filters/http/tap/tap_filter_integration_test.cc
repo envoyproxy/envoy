@@ -11,6 +11,11 @@
 namespace Envoy {
 namespace {
 
+using ::testing::AnyOf;
+using ::testing::Eq;
+using ::testing::Ge;
+using ::testing::StrEq;
+
 class TapIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public HttpIntegrationTest {
 public:
@@ -140,7 +145,7 @@ public:
     codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
     makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
     codec_client_->close();
-    test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+    test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
 
     // Find the written .pb file and verify it.
     auto files = TestUtility::listFiles(getTempPathPrefix(), false);
@@ -312,7 +317,7 @@ tap_config:
   // Setup a tap and disconnect it without any request/response.
   startAdminRequest(admin_request_yaml);
   admin_client_->close();
-  test_server_->waitForGaugeEq("http.admin.downstream_rq_active", 0);
+  test_server_->waitForGauge("http.admin.downstream_rq_active", Eq(0));
 
   // Second request/response with no tap.
   makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
@@ -352,7 +357,7 @@ tap_config:
   EXPECT_EQ("baz", findHeader("bar", trace.http_buffered_trace().response().headers())->value());
 
   admin_client_->close();
-  test_server_->waitForGaugeEq("http.admin.downstream_rq_active", 0);
+  test_server_->waitForGauge("http.admin.downstream_rq_active", Eq(0));
 
   // Now setup a tap that matches on logical AND.
   const std::string admin_request_yaml2 =
@@ -394,7 +399,7 @@ tap_config:
 
   admin_client_->close();
   EXPECT_EQ(current_tapped + 3UL, test_server_->counter("http.config_test.tap.rq_tapped")->value());
-  test_server_->waitForGaugeEq("http.admin.downstream_rq_active", 0);
+  test_server_->waitForGauge("http.admin.downstream_rq_active", Eq(0));
 }
 
 // Make sure that an admin tap works correctly across an LDS reload.
@@ -429,7 +434,7 @@ tap_config:
   new_config_helper.prependFilter(admin_filter_config_);
   new_config_helper.renameListener("foo");
   new_config_helper.setLds("1");
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(2));
   registerTestServerPorts({"http"});
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -1060,7 +1065,7 @@ typed_config:
   makeRequest(request_headers_tap_, {"hello"}, &request_trailers_, response_headers_no_tap_,
               {"world"}, &response_trailers_);
   codec_client_->close();
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
 
   std::vector<envoy::data::tap::v3::TraceWrapper> traces =
       Extensions::Common::Tap::readTracesFromPath(path_prefix);
@@ -1107,7 +1112,7 @@ typed_config:
   makeRequest(request_headers_no_tap_, {"hello"}, &request_trailers_, response_headers_tap_,
               {"world"}, &response_trailers_);
   codec_client_->close();
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
 
   std::vector<envoy::data::tap::v3::TraceWrapper> traces =
       Extensions::Common::Tap::readTracesFromPath(path_prefix);
@@ -1154,7 +1159,7 @@ typed_config:
   makeRequest(request_headers_tap_, {"hello"}, &request_trailers_, response_headers_no_tap_,
               {"world"}, &response_trailers_);
   codec_client_->close();
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
 
   std::vector<envoy::data::tap::v3::TraceWrapper> traces =
       Extensions::Common::Tap::readTracesFromPath(path_prefix);
@@ -1196,7 +1201,7 @@ typed_config:
   makeRequest(request_headers_tap_, {"hello"}, &request_trailers_, response_headers_no_tap_,
               {"world"}, &response_trailers_);
   codec_client_->close();
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
 
   std::vector<envoy::data::tap::v3::TraceWrapper> traces =
       Extensions::Common::Tap::readTracesFromPath(path_prefix);
@@ -1238,15 +1243,13 @@ typed_config:
   makeRequest(request_headers_tap_, {"hello"}, &request_trailers_, response_headers_no_tap_,
               {"world"}, &response_trailers_);
   codec_client_->close();
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
 
   std::vector<envoy::data::tap::v3::TraceWrapper> traces =
       Extensions::Common::Tap::readTracesFromPath(path_prefix);
   ASSERT_EQ(1, traces.size());
   EXPECT_TRUE(traces[0].has_http_buffered_trace());
   EXPECT_TRUE(traces[0].http_buffered_trace().has_upstream_connection());
-  using ::testing::AnyOf;
-  using ::testing::StrEq;
   std::string upstream_local_address = traces[0]
                                            .http_buffered_trace()
                                            .upstream_connection()

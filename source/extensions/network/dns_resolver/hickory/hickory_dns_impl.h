@@ -102,7 +102,6 @@ public:
   DnsResolver::ResolveCb callback_;
   const uint64_t query_id_;
   const std::string dns_name_;
-  bool cancelled_ = false;
   HickoryDnsResolver& parent_;
 };
 
@@ -111,8 +110,15 @@ public:
  * This is a thread-safe resolver: resolve() is called on the dispatcher thread, and the
  * module may deliver results from any thread. The shell posts results back to the correct
  * dispatcher thread.
+ *
+ * Inherits from `std::enable_shared_from_this` so the ABI completion callback can capture
+ * a `std::weak_ptr` into the lambda it posts to the dispatcher. Locking the weak pointer
+ * inside the lambda detects whether the resolver has been destroyed in the window between
+ * posting and execution, avoiding a use-after-free on the dispatcher drain path.
  */
-class HickoryDnsResolver : public DnsResolver, protected Logger::Loggable<Logger::Id::dns> {
+class HickoryDnsResolver : public DnsResolver,
+                           public std::enable_shared_from_this<HickoryDnsResolver>,
+                           protected Logger::Loggable<Logger::Id::dns> {
 public:
   HickoryDnsResolver(HickoryDnsResolverConfigSharedPtr config, Event::Dispatcher& dispatcher,
                      Stats::Scope& root_scope);

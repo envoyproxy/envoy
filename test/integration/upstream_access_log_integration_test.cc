@@ -45,13 +45,12 @@ public:
   void onConnected() override {
     const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
         callbacks_->connection().streamInfo().filterState();
-    filter_state->setData("test_key", std::make_unique<Router::StringAccessorImpl>("test_value"),
-                          StreamInfo::FilterState::StateType::ReadOnly);
+    filter_state->setData("test_key", std::make_unique<Router::StringAccessorImpl>("test_value"));
     transport_socket_->onConnected();
   }
 
-  void closeSocket(Network::ConnectionEvent event) override {
-    transport_socket_->closeSocket(event);
+  void closeSocket(Network::ConnectionEvent event, bool abort_reset) override {
+    transport_socket_->closeSocket(event, abort_reset);
   }
 
   Network::TransportSocketCallbacks* callbacks_{};

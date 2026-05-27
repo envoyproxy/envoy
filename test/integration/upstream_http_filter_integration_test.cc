@@ -31,6 +31,8 @@ constexpr absl::string_view expected_types[] = {
 
 using HttpFilterProto =
     envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
+using testing::Eq;
+using testing::Ge;
 using testing::Not;
 
 class UpstreamHttpFilterIntegrationTestBase : public HttpIntegrationTest {
@@ -464,7 +466,7 @@ public:
     });
 
     HttpIntegrationTest::initialize();
-    test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+    test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
     EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
     registerTestServerPorts({"http"});
   }
@@ -626,15 +628,15 @@ TEST_P(DynamicRouterOrClusterFiltersIntegrationTest, BasicSuccess) {
 
   // Send 1st config update.
   sendXdsResponse(filter_name_, "1", default_header_key_, "test-val1");
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", Eq(1));
   auto headers2 = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers2, "test-val1");
 
   // Send 2nd config update.
   sendXdsResponse(filter_name_, "1", default_header_key_, "test-val2");
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 2);
+  test_server_->waitForCounter(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", Eq(2));
   auto headers3 = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers3, "test-val2");
 };
@@ -647,14 +649,14 @@ TEST_P(DynamicRouterOrClusterFiltersIntegrationTest, BasicSuccessWithTtl) {
 
   // Send 1st config update.
   sendXdsResponse(filter_name_, "1", default_header_key_, "test-val1", true);
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", Eq(1));
   auto headers1 = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers1, "test-val1");
 
   // Wait for configuration expiry, the default configuration should be applied.
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 2);
+  test_server_->waitForCounter(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", Eq(2));
   auto headers2 = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers2, default_header_value_);
 };
@@ -667,8 +669,8 @@ TEST_P(DynamicRouterOrClusterFiltersIntegrationTest, BasicWithConfigFail) {
 
   // Send config update with invalid config (header value length has to >=2).
   sendXdsResponse(filter_name_, "1", default_header_key_, "x");
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_fail", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_fail", Eq(1));
   auto headers = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers, default_header_value_);
 };
@@ -681,8 +683,8 @@ TEST_P(DynamicRouterOrClusterFiltersIntegrationTest, TwoSubscriptionsSameName) {
   initialize();
 
   sendXdsResponse(filter_name_, "1", default_header_key_, "test-val");
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", Eq(1));
   auto headers = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers, "test-val,test-val");
 }
@@ -701,10 +703,10 @@ TEST_P(DynamicRouterOrClusterFiltersIntegrationTest, TwoSubscriptionsDifferentNa
   // Send 1st config update.
   sendXdsResponse("foo", "1", "header-key1", "test-val1");
   sendXdsResponse("bar", "1", "header-key2", "test-val1", false, true);
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter.foo.config_reload", 1);
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter.bar.config_reload", 1);
+  test_server_->waitForCounter("extension_config_discovery.upstream_http_filter.foo.config_reload",
+                               Eq(1));
+  test_server_->waitForCounter("extension_config_discovery.upstream_http_filter.bar.config_reload",
+                               Eq(1));
   auto headers2 = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers2, "header-key1", "test-val1");
   expectHeaderKeyAndValue(headers2, "header-key2", "test-val1");
@@ -712,10 +714,10 @@ TEST_P(DynamicRouterOrClusterFiltersIntegrationTest, TwoSubscriptionsDifferentNa
   // Send 2nd config update.
   sendXdsResponse("foo", "2", "header-key1", "test-val2");
   sendXdsResponse("bar", "2", "header-key2", "test-val2", false, true);
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter.foo.config_reload", 2);
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter.bar.config_reload", 2);
+  test_server_->waitForCounter("extension_config_discovery.upstream_http_filter.foo.config_reload",
+                               Eq(2));
+  test_server_->waitForCounter("extension_config_discovery.upstream_http_filter.bar.config_reload",
+                               Eq(2));
   auto headers3 = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers3, "header-key1", "test-val2");
   expectHeaderKeyAndValue(headers3, "header-key2", "test-val2");
@@ -731,8 +733,8 @@ TEST_P(DynamicRouterOrClusterFiltersIntegrationTest, TwoDynamicTwoStaticFilterMi
   initialize();
 
   sendXdsResponse(filter_name_, "1", default_header_key_, "xds-val");
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", Eq(1));
   auto headers = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers, default_header_key_, "xds-val,static-val1,xds-val");
   expectHeaderKeyAndValue(headers, "header2", "static-val2");
@@ -748,8 +750,8 @@ TEST_P(DynamicRouterOrClusterFiltersIntegrationTest, DynamicStaticFilterMixedDif
   initialize();
 
   sendXdsResponse(filter_name_, "1", default_header_key_, "xds-val");
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", Eq(1));
   auto headers = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers, default_header_key_, "static-val1,xds-val,xds-val");
   expectHeaderKeyAndValue(headers, "header2", "static-val2");
@@ -775,8 +777,8 @@ TEST_P(DynamicRouterOrClusterFiltersIntegrationTest, UpdateDuringConnection) {
 
   // Send config update.
   sendXdsResponse(filter_name_, "1", default_header_key_, "xds-val");
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", Eq(1));
 
   IntegrationStreamDecoderPtr response2 =
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -802,8 +804,8 @@ TEST_P(DynamicRouterOrClusterFiltersIntegrationTest, BasicSuccessWithConfigDump)
 
   // Send 1st config update.
   sendXdsResponse(filter_name_, "1", default_header_key_, "xds-val");
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", Eq(1));
 
   // Verify ECDS config dump are working correctly.
   BufferingStreamDecoderPtr response;
@@ -878,8 +880,8 @@ TEST_P(DynamicRouterAndClusterFiltersIntegrationTest, DynamicRouterAndClusterSam
 
   // Send 1st config update.
   sendXdsResponse(filter_name_, "1", default_header_key_, "test-val1");
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitForCounter(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", Eq(1));
   auto headers2 = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers2, "test-val1");
 };
@@ -900,10 +902,10 @@ TEST_P(DynamicRouterAndClusterFiltersIntegrationTest, DynamicRouterAndClusterDif
   // Send 1st config update.
   sendXdsResponse("foo", "1", default_header_key_, "value-from-cluster");
   sendXdsResponse("bar", "1", default_header_key_, "value-from-router", false, true);
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter.foo.config_reload", 1);
-  test_server_->waitForCounterEq(
-      "extension_config_discovery.upstream_http_filter.bar.config_reload", 1);
+  test_server_->waitForCounter("extension_config_discovery.upstream_http_filter.foo.config_reload",
+                               Eq(1));
+  test_server_->waitForCounter("extension_config_discovery.upstream_http_filter.bar.config_reload",
+                               Eq(1));
   auto headers2 = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers2, "value-from-cluster");
 };

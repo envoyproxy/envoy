@@ -443,12 +443,17 @@ void DnsCacheImpl::finishResolve(const std::string& host,
 
   // Functions like this one that modify primary_hosts_ are only called in the main thread so we
   // know it is safe to use the PrimaryHostInfo pointers outside of the lock.
-  auto* primary_host_info = [&]() {
+  auto* primary_host_info = [this, &host]() {
     absl::ReaderMutexLock reader_lock{primary_hosts_lock_};
     const auto primary_host_it = primary_hosts_.find(host);
     ASSERT(primary_host_it != primary_hosts_.end());
     return primary_host_it->second.get();
   }();
+
+  if (primary_host_info == nullptr) {
+    ENVOY_LOG(warn, "host '{}' was removed during resolution, skipping update", host);
+    return;
+  }
 
   std::string details_with_maybe_trace = std::string(details);
   if (primary_host_info != nullptr && primary_host_info->active_query_ != nullptr) {

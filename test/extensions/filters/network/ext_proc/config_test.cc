@@ -15,7 +15,7 @@ namespace {
 
 class ConfigTest : public testing::Test {
 public:
-  ConfigTest() {}
+  ConfigTest() = default;
 
 protected:
   NiceMock<Stats::MockIsolatedStatsStore> store_;

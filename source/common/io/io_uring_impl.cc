@@ -79,14 +79,9 @@ void IoUringImpl::forEveryCompletion(const CompletionCb& completion_cb) {
   // long.
   // Iterate the injected completion.
   while (!injected_completions_.empty()) {
-    auto& completion = injected_completions_.front();
-    completion_cb(completion.user_data_, completion.result_, true);
-    // The socket may closed in the completion_cb and all the related completions are
-    // removed.
-    if (injected_completions_.empty()) {
-      break;
-    }
+    auto completion = injected_completions_.front();
     injected_completions_.pop_front();
+    completion_cb(completion.user_data_, completion.result_, true);
   }
 }
 

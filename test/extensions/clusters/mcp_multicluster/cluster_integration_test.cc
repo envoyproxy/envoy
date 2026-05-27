@@ -83,7 +83,7 @@ public:
     HttpIntegrationTest::initialize();
 
     // Verify clusters are created.
-    test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
+    test_server_->waitForGauge("cluster_manager.active_clusters", testing::Ge(4));
   }
 
   void setNumRetries(uint32_t retries) { num_retries_ = retries; }

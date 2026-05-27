@@ -8,7 +8,7 @@
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 #include "library/cc/engine.h"
-#include "library/cc/engine_builder.h"
+#include "test/cc/engine_builder_test_shim.h"
 #include "library/cc/stream.h"
 #include "library/cc/stream_client.h"
 #include "library/cc/stream_prototype.h"

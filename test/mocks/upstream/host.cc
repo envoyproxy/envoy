@@ -33,7 +33,11 @@ MockHealthCheckHostMonitor::~MockHealthCheckHostMonitor() = default;
 MockHostDescription::MockHostDescription()
     : address_(*Network::Utility::resolveUrl("tcp://10.0.0.1:443")),
       socket_factory_(new testing::NiceMock<Network::MockTransportSocketFactory>) {
+  observability_name_ = address_->asString();
   ON_CALL(*this, hostname()).WillByDefault(ReturnRef(hostname_));
+  ON_CALL(*this, observabilityName()).WillByDefault(Invoke([this]() {
+    return absl::string_view(observability_name_);
+  }));
   ON_CALL(*this, address()).WillByDefault(Return(address_));
   ON_CALL(*this, outlierDetector()).WillByDefault(ReturnRef(outlier_detector_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
@@ -59,16 +63,23 @@ MockHostDescription::MockHostDescription()
         if (index >= lb_policy_datas_.size()) {
           return {};
         }
-        return OptRef<HostLbPolicyData>(*lb_policy_datas_[index]);
+        return {*lb_policy_datas_[index]};
       }));
 }
 
 MockHostDescription::~MockHostDescription() = default;
 
-MockHostLight::MockHostLight() = default;
+MockHostLight::MockHostLight() {
+  ON_CALL(*this, observabilityName()).WillByDefault(Invoke([this]() {
+    return absl::string_view(observability_name_);
+  }));
+}
 MockHostLight::~MockHostLight() = default;
 
 MockHost::MockHost() : socket_factory_(new testing::NiceMock<Network::MockTransportSocketFactory>) {
+  ON_CALL(*this, observabilityName()).WillByDefault(Invoke([this]() {
+    return absl::string_view(observability_name_);
+  }));
   ON_CALL(*this, cluster()).WillByDefault(ReturnRef(cluster_));
   ON_CALL(*this, outlierDetector()).WillByDefault(ReturnRef(outlier_detector_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
@@ -88,7 +99,7 @@ MockHost::MockHost() : socket_factory_(new testing::NiceMock<Network::MockTransp
         if (index >= lb_policy_datas_.size()) {
           return {};
         }
-        return OptRef<HostLbPolicyData>(*lb_policy_datas_[index]);
+        return {*lb_policy_datas_[index]};
       }));
 }
 

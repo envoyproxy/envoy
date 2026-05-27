@@ -1256,7 +1256,7 @@ TEST_P(RedisProxyIntegrationTest, KEYSRequestAndResponse) {
   initialize();
   std::string request = makeBulkStringArray({"keys", "*"});
   std::string upstream_response = "*2\r\n$4\r\nbar1\r\n$4\r\nbar2\r\n";
-  std::string downstream_response = upstream_response;
+  const std::string& downstream_response = upstream_response;
 
   // Make KEYS request from downstream
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));

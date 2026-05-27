@@ -189,6 +189,37 @@ TEST(HeaderTransportTest, InvalidHeaderSize) {
   }
 }
 
+TEST(HeaderTransportTest, NegativeStringLength) {
+  HeaderTransportImpl transport;
+  MessageMetadata metadata;
+
+  Buffer::OwnedImpl buffer;
+  buffer.writeBEInt<int32_t>(100);    // frame size
+  buffer.writeBEInt<int16_t>(0x0FFF); // magic
+  buffer.writeBEInt<int16_t>(0);      // flags
+  buffer.writeBEInt<int32_t>(1);      // sequence number
+  buffer.writeBEInt<int16_t>(10);     // header size / 4 (header_size = 40)
+
+  // Header data
+  buffer.writeByte(0); // Protocol ID (Binary) - varint 0
+  buffer.writeByte(0); // Num transforms - varint 0
+  buffer.writeByte(1); // Info ID (1) - varint 1
+  buffer.writeByte(1); // Header Count (1) - varint 1
+
+  // Key length: -1 (encoded as varint 0xFF 0xFF 0xFF 0xFF 0x0F)
+  buffer.writeByte(0xFF);
+  buffer.writeByte(0xFF);
+  buffer.writeByte(0xFF);
+  buffer.writeByte(0xFF);
+  buffer.writeByte(0x0F);
+
+  addRepeated(buffer, 80, 0); // padding
+
+  EXPECT_THROW_WITH_MESSAGE(
+      transport.decodeFrameStart(buffer, metadata), EnvoyException,
+      "unable to read header transport header key: invalid negative length -1");
+}
+
 TEST(HeaderTransportTest, InvalidProto) {
   HeaderTransportImpl transport;
   MessageMetadata metadata;

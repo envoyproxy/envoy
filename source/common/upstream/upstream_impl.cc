@@ -474,11 +474,11 @@ absl::StatusOr<std::unique_ptr<HostDescriptionImpl>> HostDescriptionImpl::create
     MetadataConstSharedPtr locality_metadata,
     std::shared_ptr<const envoy::config::core::v3::Locality> locality,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-    uint32_t priority, const AddressVector& address_list) {
+    uint32_t priority, const AddressVector& address_list, absl::string_view stat_name) {
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::unique_ptr<HostDescriptionImpl>(new HostDescriptionImpl(
       creation_status, cluster, hostname, dest_address, endpoint_metadata, locality_metadata,
-      locality, health_check_config, priority, address_list));
+      locality, health_check_config, priority, address_list, stat_name));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -489,12 +489,13 @@ HostDescriptionImpl::HostDescriptionImpl(
     MetadataConstSharedPtr locality_metadata,
     std::shared_ptr<const envoy::config::core::v3::Locality> locality,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-    uint32_t priority, const AddressVector& address_list)
+    uint32_t priority, const AddressVector& address_list, absl::string_view stat_name)
     : HostDescriptionImplBase(cluster, hostname, dest_address, endpoint_metadata, locality_metadata,
                               locality, health_check_config, priority, creation_status),
       address_(dest_address),
       address_list_or_null_(makeAddressListOrNull(dest_address, address_list)),
-      health_check_address_(resolveHealthCheckAddress(health_check_config, dest_address)) {}
+      health_check_address_(resolveHealthCheckAddress(health_check_config, dest_address)),
+      observability_name_(stat_name) {}
 
 HostDescriptionImplBase::HostDescriptionImplBase(
     ClusterInfoConstSharedPtr cluster, const std::string& hostname,
@@ -514,6 +515,8 @@ HostDescriptionImplBase::HostDescriptionImplBase(
       locality_metadata_(locality_metadata), locality_(std::move(locality)),
       locality_zone_stat_name_(locality_->zone(), cluster->statsScope().symbolTable()),
       priority_(priority),
+      // TODO(wbpcode): This should be resolved.
+      // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
       socket_factory_(resolveTransportSocketFactory(dest_address, endpoint_metadata_.get())) {
   if (health_check_config.port_value() != 0 && dest_address->type() != Network::Address::Type::Ip) {
     // Setting the health check port to non-0 only works for IP-type addresses. Setting the port
@@ -599,6 +602,19 @@ Host::CreateConnectionData HostImplBase::createHealthCheckConnection(
           : transportSocketFactory();
   return createConnection(dispatcher, cluster(), healthCheckAddress(), {}, factory, nullptr,
                           transport_socket_options, shared_from_this());
+}
+
+Host::CreateConnectionData HostImplBase::createOrcaReportingConnection(
+    Event::Dispatcher& dispatcher,
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+    const envoy::config::core::v3::Metadata* metadata) const {
+  const auto orca_address = orcaReportingAddress();
+  Network::UpstreamTransportSocketFactory& factory =
+      (metadata != nullptr)
+          ? resolveTransportSocketFactory(orca_address, metadata, transport_socket_options)
+          : transportSocketFactory();
+  return createConnection(dispatcher, cluster(), orca_address, addressListOrNull(), factory,
+                          /*options=*/nullptr, transport_socket_options, shared_from_this());
 }
 
 absl::optional<Network::Address::InstanceConstSharedPtr> HostImplBase::maybeGetProxyRedirectAddress(
@@ -722,11 +738,12 @@ absl::StatusOr<std::unique_ptr<HostImpl>> HostImpl::create(
     std::shared_ptr<const envoy::config::core::v3::Locality> locality,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
     uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
-    const AddressVector& address_list) {
+    const AddressVector& address_list, absl::string_view stat_name) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<HostImpl>(new HostImpl(
-      creation_status, cluster, hostname, address, endpoint_metadata, locality_metadata,
-      initial_weight, locality, health_check_config, priority, health_status, address_list));
+  auto ret = std::unique_ptr<HostImpl>(
+      new HostImpl(creation_status, cluster, hostname, address, endpoint_metadata,
+                   locality_metadata, initial_weight, locality, health_check_config, priority,
+                   health_status, address_list, stat_name));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -1553,9 +1570,9 @@ ClusterInfoImpl::processHttpForOutlierDetection(Http::ResponseHeaderMap& headers
   // Run matchers.
   http_protocol_options_->outlier_detection_http_error_matcher_[0]->onHttpResponseHeaders(headers,
                                                                                           statuses);
-  return absl::optional<bool>(http_protocol_options_->outlier_detection_http_error_matcher_[0]
-                                  ->matchStatus(statuses)
-                                  .matches_);
+  return http_protocol_options_->outlier_detection_http_error_matcher_[0]
+      ->matchStatus(statuses)
+      .matches_;
 }
 
 absl::StatusOr<bool> validateTransportSocketSupportsQuic(
@@ -2205,7 +2222,7 @@ void PriorityStateManager::registerHostForPriority(
           lb_endpoint.load_balancing_weight().value(),
           parent_.constLocalitySharedPool()->getObject(locality_lb_endpoint.locality()),
           lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority(),
-          lb_endpoint.health_status(), address_list),
+          lb_endpoint.health_status(), address_list, lb_endpoint.endpoint().observability_name()),
       std::unique_ptr<HostImpl>));
   registerHostForPriority(host, locality_lb_endpoint);
 }

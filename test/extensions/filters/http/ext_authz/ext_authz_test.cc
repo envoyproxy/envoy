@@ -20,6 +20,7 @@
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
+#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
@@ -50,11 +51,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 namespace {
-
-// Matcher to convert a Buffer::Instance to its string representation for composition.
-MATCHER_P(BufferString, m, "") {
-  return testing::ExplainMatchResult(m, arg->toString(), result_listener);
-}
 
 // Matcher to parse a buffer string into a CheckRequest proto.
 MATCHER_P(AsCheckRequest, m, "") {
@@ -108,7 +104,7 @@ constexpr char FilterConfigName[] = "ext_authz_filter";
 
 template <class T> class HttpFilterTestBase : public T {
 public:
-  HttpFilterTestBase() {}
+  HttpFilterTestBase() = default;
 
   void initialize(std::string&& yaml) {
     envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config{};
@@ -249,7 +245,7 @@ public:
     initialize(getFilterConfig(std::get<0>(GetParam()), std::get<1>(GetParam())));
   }
 
-  static std::string ParamsToString(const testing::TestParamInfo<std::tuple<bool, bool>>& info) {
+  static std::string paramsToString(const testing::TestParamInfo<std::tuple<bool, bool>>& info) {
     return absl::StrCat(std::get<0>(info.param) ? "FailOpen" : "FailClosed", "_",
                         std::get<1>(info.param) ? "HttpClient" : "GrpcClient");
   }
@@ -257,7 +253,7 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(ParameterizedFilterConfig, HttpFilterTestParam,
                          testing::Combine(testing::Bool(), testing::Bool()),
-                         HttpFilterTestParam::ParamsToString);
+                         HttpFilterTestParam::paramsToString);
 
 class ExtAuthzLoggingInfoTest
     : public testing::TestWithParam<
@@ -293,7 +289,7 @@ public:
     }
   }
 
-  static std::string ParamsToString(
+  static std::string paramsToString(
       const testing::TestParamInfo<std::tuple<std::string, absl::optional<uint64_t>>>& info) {
     return absl::StrCat(std::get<1>(info.param).has_value() ? "" : "no_", std::get<0>(info.param),
                         std::get<1>(info.param).has_value()
@@ -309,12 +305,12 @@ INSTANTIATE_TEST_SUITE_P(
     testing::Combine(testing::Values("latency_us", "bytesSent", "bytesReceived"),
                      testing::Values(absl::optional<uint64_t>{}, absl::optional<uint64_t>{0},
                                      absl::optional<uint64_t>{1})),
-    ExtAuthzLoggingInfoTest::ParamsToString);
+    ExtAuthzLoggingInfoTest::paramsToString);
 
 INSTANTIATE_TEST_SUITE_P(ExtAuthzLoggingInfoTestInvalid, ExtAuthzLoggingInfoTest,
                          testing::Values(std::make_tuple("wrong_property_name",
                                                          absl::optional<uint64_t>{})),
-                         ExtAuthzLoggingInfoTest::ParamsToString);
+                         ExtAuthzLoggingInfoTest::paramsToString);
 
 class EmitFilterStateTest
     : public HttpFilterTestBase<testing::TestWithParam<
@@ -361,7 +357,7 @@ public:
   }
 
   static std::string
-  ParamsToString(const testing::TestParamInfo<std::tuple<bool, bool, bool>>& info) {
+  paramsToString(const testing::TestParamInfo<std::tuple<bool, bool, bool>>& info) {
     return absl::StrCat(std::get<0>(info.param) ? "HttpClient" : "GrpcClient", "_",
                         std::get<1>(info.param) ? "EmitStats" : "DoNotEmitStats", "_",
                         std::get<2>(info.param) ? "EmitFilterMetadata" : "DoNotEmitFilterMetadata");
@@ -441,7 +437,7 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(EmitFilterStateTestParams, EmitFilterStateTest,
                          testing::Combine(testing::Bool(), testing::Bool(), testing::Bool()),
-                         EmitFilterStateTest::ParamsToString);
+                         EmitFilterStateTest::paramsToString);
 
 class InvalidMutationTest : public HttpFilterTestBase<testing::Test> {
 public:
@@ -497,6 +493,7 @@ public:
   const std::string invalid_value_;
 
   static std::string getInvalidValue() {
+    // NOLINTNEXTLINE(modernize-return-braced-init-list)
     return std::string(reinterpret_cast<const char*>(invalid_value_bytes_));
   }
 };
@@ -5306,8 +5303,7 @@ TEST_P(EmitFilterStateTest, PreexistingFilterStateDifferentTypeMutable) {
       FilterConfigName,
       // This will not cast to ExtAuthzLoggingInfo, so when the filter tries to
       // getMutableData<ExtAuthzLoggingInfo>(...), it will return nullptr.
-      std::make_shared<TestObject>(), Envoy::StreamInfo::FilterState::StateType::Mutable,
-      Envoy::StreamInfo::FilterState::LifeSpan::Request);
+      std::make_shared<TestObject>(), Envoy::StreamInfo::FilterState::LifeSpan::Request);
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
@@ -5327,7 +5323,6 @@ TEST_P(EmitFilterStateTest, PreexistingFilterStateSameTypeMutable) {
       // This will not cast to ExtAuthzLoggingInfo, so when the filter tries to
       // getMutableData<ExtAuthzLoggingInfo>(...), it will return nullptr.
       std::make_shared<ExtAuthzLoggingInfo>(absl::nullopt),
-      Envoy::StreamInfo::FilterState::StateType::Mutable,
       Envoy::StreamInfo::FilterState::LifeSpan::Request);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -5754,10 +5749,10 @@ TEST_P(HttpFilterTestParam, PerRouteConfigurationIntegrationTest) {
       .WillOnce(Return(absl::StatusOr<Grpc::RawAsyncClientSharedPtr>(mock_raw_grpc_client)));
 
   // Mock the sendRaw call with matcher-based validation for the gRPC authorization check.
-  EXPECT_CALL(*mock_raw_grpc_client,
-              sendRaw(_, _,
-                      BufferString(AsCheckRequest(HasContextExtension("test_key", "test_value"))),
-                      _, _, _))
+  EXPECT_CALL(
+      *mock_raw_grpc_client,
+      sendRaw(_, _, BufferPtrString(AsCheckRequest(HasContextExtension("test_key", "test_value"))),
+              _, _, _))
       .WillOnce([&](absl::string_view /*service_full_name*/, absl::string_view /*method_name*/,
                     Buffer::InstancePtr&& /*request*/, Grpc::RawAsyncRequestCallbacks& callbacks,
                     Tracing::Span& parent_span,
@@ -7189,14 +7184,15 @@ TEST_F(HttpFilterTest, ValidErrorResponseWithMutations) {
 
   // Should succeed and NOT clear attributes because mutations are valid.
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, _))
-      .WillOnce(Invoke([&](Http::Code, absl::string_view,
-                           std::function<void(Http::ResponseHeaderMap&)> modify_headers,
-                           const absl::optional<uint64_t>, absl::string_view) {
-        Http::TestResponseHeaderMapImpl response_headers;
-        modify_headers(response_headers);
-        EXPECT_EQ("value", response_headers.get_("x-error-header"));
-        EXPECT_EQ("value", response_headers.get_("x-error-append"));
-      }));
+      .WillOnce(
+          Invoke([&](Http::Code, absl::string_view,
+                     std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                     const absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
+            Http::TestResponseHeaderMapImpl response_headers;
+            modify_headers(response_headers);
+            EXPECT_EQ("value", response_headers.get_("x-error-header"));
+            EXPECT_EQ("value", response_headers.get_("x-error-append"));
+          }));
 
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 }

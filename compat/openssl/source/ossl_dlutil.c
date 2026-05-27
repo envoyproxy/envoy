@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include "log.h"
 #include "ossl_dlutil.h"
 
@@ -41,10 +42,15 @@ void ossl_dlopen(int expected_major, int expected_minor) {
     char ossl_path[PATH_MAX];
     char temp_path[PATH_MAX];
 
-    // Prefix libcrypto_path and libssl_path with the absolute path to the
-    // OpenSSL shared library directory under bazel's runfiles directory.
+    // Bazel 8 places external repo runfiles directly under the runfiles root
+    // (e.g. {RUNFILES_DIR}/openssl/...), while Bazel 7 nests them under the
+    // workspace (e.g. {RUNFILES_DIR}/{TEST_WORKSPACE}/external/openssl/...).
     snprintf(ossl_path, sizeof(ossl_path), "%s/%s/external/openssl/openssl/lib",
                                             runfiles_dir, test_workspace);
+    if (access(ossl_path, F_OK) != 0) {
+      snprintf(ossl_path, sizeof(ossl_path), "%s/openssl/openssl/lib", runfiles_dir);
+    }
+
     strcpy(temp_path, libcrypto_path);
     snprintf(libcrypto_path, sizeof(libcrypto_path), "%s/%s", ossl_path, temp_path);
 

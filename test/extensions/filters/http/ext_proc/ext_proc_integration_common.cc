@@ -24,7 +24,6 @@ namespace ExternalProcessing {
 using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
 using Envoy::Protobuf::Any;
 using Envoy::Protobuf::MapPair;
-
 using namespace std::chrono_literals;
 
 // ExtProcIntegrationTest::
@@ -489,8 +488,8 @@ void ExtProcIntegrationTest::processRequestBodyMessage(
   if (check_downstream_flow_control) {
     // Check the flow control counter in downstream, which is triggered on the request
     // path to ext_proc server (i.e., from side stream).
-    test_server_->waitForCounterGe("http.config_test.downstream_flow_control_paused_reading_total",
-                                   1);
+    test_server_->waitForCounter("http.config_test.downstream_flow_control_paused_reading_total",
+                                 testing::Ge(1));
   }
 
   // Send back the response from ext_proc server.
@@ -853,7 +852,7 @@ uint32_t ExtProcIntegrationTest::serverReceiveBodyDuplexStreamed(absl::string_vi
           ADD_FAILURE() << "Expected response body message but got unexpected message type";
           return total_req_body_msg;
         }
-        body_received = absl::StrCat(body_received, body_request.response_body().body());
+        absl::StrAppend(&body_received, body_request.response_body().body());
         end_stream = body_request.response_body().end_of_stream();
         total_req_body_msg++;
       }
@@ -865,7 +864,7 @@ uint32_t ExtProcIntegrationTest::serverReceiveBodyDuplexStreamed(absl::string_vi
           ADD_FAILURE() << "Expected request body message but got unexpected message type";
           return total_req_body_msg;
         }
-        body_received = absl::StrCat(body_received, body_request.request_body().body());
+        absl::StrAppend(&body_received, body_request.request_body().body());
         end_stream = body_request.request_body().end_of_stream();
         total_req_body_msg++;
       }

@@ -448,7 +448,9 @@ impl EnvoyTracerSpanImpl {
     };
     let found = unsafe { getter(self.raw, &mut result) };
     if found && !result.ptr.is_null() {
-      let slice = unsafe { std::slice::from_raw_parts(result.ptr as *const u8, result.length) };
+      let slice = unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(result.ptr as *const u8, result.length)
+      };
       Some(slice.to_vec())
     } else {
       None
@@ -471,7 +473,9 @@ impl EnvoyTracerSpan for EnvoyTracerSpanImpl {
       )
     };
     if found && !result.ptr.is_null() {
-      let slice = unsafe { std::slice::from_raw_parts(result.ptr as *const u8, result.length) };
+      let slice = unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(result.ptr as *const u8, result.length)
+      };
       Some(slice.to_vec())
     } else {
       None
@@ -551,15 +555,18 @@ impl SpanWrapper {
 // Panic-safe FFI helper
 // -----------------------------------------------------------------------------
 
-/// Decode an envoy_buffer into a `&str` without UTF-8 validation.
+/// Decode an envoy_buffer into a `Cow<'static, str>` with lossy UTF-8 fallback.
+///
+/// Routes through [`crate::ffi_helpers::str_lossy_from_raw`] so a malformed input on the FFI
+/// seam produces a lossy decode rather than undefined behaviour.
 ///
 /// # Safety
 ///
-/// The buffer must contain valid UTF-8 data and the pointer must be valid for the given length.
-unsafe fn envoy_buffer_to_str(buf: abi::envoy_dynamic_module_type_envoy_buffer) -> &'static str {
-  unsafe {
-    std::str::from_utf8_unchecked(std::slice::from_raw_parts(buf.ptr as *const _, buf.length))
-  }
+/// Same constraints as [`crate::ffi_helpers::str_lossy_from_raw`].
+unsafe fn envoy_buffer_to_str(
+  buf: abi::envoy_dynamic_module_type_envoy_buffer,
+) -> std::borrow::Cow<'static, str> {
+  unsafe { crate::ffi_helpers::str_lossy_from_raw(buf.ptr as *const u8, buf.length) }
 }
 
 // -----------------------------------------------------------------------------
@@ -578,14 +585,16 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_config_new(
 ) -> abi::envoy_dynamic_module_type_tracer_config_module_ptr {
   let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
     let name_str = unsafe { envoy_buffer_to_str(name) };
-    let config_slice = unsafe { std::slice::from_raw_parts(config.ptr as *const _, config.length) };
+    let config_slice = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(config.ptr as *const u8, config.length)
+    };
     let ctx = TracerConfigContext {
       envoy_ptr: config_envoy_ptr,
     };
     let new_config_fn = NEW_TRACER_CONFIG_FUNCTION
       .get()
       .expect("NEW_TRACER_CONFIG_FUNCTION must be set");
-    match new_config_fn(ctx, name_str, config_slice) {
+    match new_config_fn(ctx, name_str.as_ref(), config_slice) {
       Some(config) => wrap_into_c_void_ptr!(config),
       None => std::ptr::null(),
     }
@@ -593,10 +602,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_config_new(
   match result {
     Ok(ptr) => ptr,
     Err(panic) => {
-      crate::envoy_log_error!(
-        "on_tracer_config_new: caught panic: {}",
-        crate::panic_payload_to_string(panic)
-      );
+      crate::log_ffi_panic("envoy_dynamic_module_on_tracer_config_new", panic);
       std::ptr::null()
     },
   }
@@ -610,11 +616,16 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_config_new(
 pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_config_destroy(
   config_module_ptr: abi::envoy_dynamic_module_type_tracer_config_module_ptr,
 ) {
-  let config = config_module_ptr as *mut *mut dyn TracerConfig;
-  unsafe {
-    let _outer = Box::from_raw(config);
-    let _inner = Box::from_raw(*config);
-  }
+  let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+    let config = config_module_ptr as *mut *mut dyn TracerConfig;
+    unsafe {
+      let _outer = Box::from_raw(config);
+      let _inner = Box::from_raw(*config);
+    }
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_tracer_config_destroy", panic);
+  });
 }
 
 /// # Safety
@@ -634,7 +645,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_start_span(
     let config = unsafe { &**config };
     let envoy_span = EnvoyTracerSpanImpl::new(span_envoy_ptr);
     let op_name = unsafe { envoy_buffer_to_str(operation_name) };
-    match config.start_span(&envoy_span, op_name, traced, reason.into()) {
+    match config.start_span(&envoy_span, op_name.as_ref(), traced, reason.into()) {
       Some(span) => {
         let wrapper = SpanWrapper::new(span);
         wrap_into_c_void_ptr!(wrapper)
@@ -645,10 +656,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_start_span(
   match result {
     Ok(ptr) => ptr,
     Err(panic) => {
-      crate::envoy_log_error!(
-        "on_tracer_start_span: caught panic: {}",
-        crate::panic_payload_to_string(panic)
-      );
+      crate::log_ffi_panic("envoy_dynamic_module_on_tracer_start_span", panic);
       std::ptr::null()
     },
   }
@@ -666,7 +674,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_set_operation(
   let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
     let wrapper = unsafe { &mut *(span_module_ptr as *mut SpanWrapper) };
     let op = unsafe { envoy_buffer_to_str(operation) };
-    wrapper.inner.set_operation(op);
+    wrapper.inner.set_operation(op.as_ref());
   }));
 }
 
@@ -684,7 +692,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_set_tag(
     let wrapper = unsafe { &mut *(span_module_ptr as *mut SpanWrapper) };
     let k = unsafe { envoy_buffer_to_str(key) };
     let v = unsafe { envoy_buffer_to_str(value) };
-    wrapper.inner.set_tag(k, v);
+    wrapper.inner.set_tag(k.as_ref(), v.as_ref());
   }));
 }
 
@@ -701,7 +709,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_log(
   let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
     let wrapper = unsafe { &mut *(span_module_ptr as *mut SpanWrapper) };
     let e = unsafe { envoy_buffer_to_str(event) };
-    wrapper.inner.log(timestamp_ns, e);
+    wrapper.inner.log(timestamp_ns, e.as_ref());
   }));
 }
 
@@ -748,7 +756,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_spawn_child(
   let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
     let wrapper = unsafe { &mut *(span_module_ptr as *mut SpanWrapper) };
     let n = unsafe { envoy_buffer_to_str(name) };
-    match wrapper.inner.spawn_child(n, start_time_ns) {
+    match wrapper.inner.spawn_child(n.as_ref(), start_time_ns) {
       Some(child) => {
         let child_wrapper = SpanWrapper::new(child);
         wrap_into_c_void_ptr!(child_wrapper)
@@ -759,10 +767,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_spawn_child(
   match result {
     Ok(ptr) => ptr,
     Err(panic) => {
-      crate::envoy_log_error!(
-        "on_tracer_span_spawn_child: caught panic: {}",
-        crate::panic_payload_to_string(panic)
-      );
+      crate::log_ffi_panic("envoy_dynamic_module_on_tracer_span_spawn_child", panic);
       std::ptr::null()
     },
   }
@@ -811,7 +816,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_get_baggage(
   let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
     let wrapper = unsafe { &mut *(span_module_ptr as *mut SpanWrapper) };
     let k = unsafe { envoy_buffer_to_str(key) };
-    match wrapper.inner.get_baggage(k) {
+    match wrapper.inner.get_baggage(k.as_ref()) {
       Some(val) => {
         wrapper.write_scratch_to_out(val, value_out);
         true
@@ -851,7 +856,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_set_baggage(
     let wrapper = unsafe { &mut *(span_module_ptr as *mut SpanWrapper) };
     let k = unsafe { envoy_buffer_to_str(key) };
     let v = unsafe { envoy_buffer_to_str(value) };
-    wrapper.inner.set_baggage(k, v);
+    wrapper.inner.set_baggage(k.as_ref(), v.as_ref());
   }));
 }
 
@@ -937,10 +942,15 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_get_span_id(
 pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_destroy(
   span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
 ) {
-  let wrapper = span_module_ptr as *mut SpanWrapper;
-  unsafe {
-    let _ = Box::from_raw(wrapper);
-  }
+  let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+    let wrapper = span_module_ptr as *mut SpanWrapper;
+    unsafe {
+      let _ = Box::from_raw(wrapper);
+    }
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_tracer_span_destroy", panic);
+  });
 }
 
 /// Declare the init functions for the tracer dynamic module.
@@ -952,16 +962,24 @@ macro_rules! declare_tracer_init_functions {
   ($f:ident, $new_tracer_config_fn:expr) => {
     #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
-      envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
-        envoy_proxy_dynamic_modules_rust_sdk::NEW_TRACER_CONFIG_FUNCTION,
-        $new_tracer_config_fn,
-        "NEW_TRACER_CONFIG_FUNCTION"
-      );
-      if ($f()) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
-          as *const ::std::os::raw::c_char
-      } else {
-        ::std::ptr::null()
+      match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_TRACER_CONFIG_FUNCTION,
+          $new_tracer_config_fn,
+          "NEW_TRACER_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
+      })) {
+        ::std::result::Result::Ok(v) => v,
+        ::std::result::Result::Err(payload) => {
+          $crate::log_ffi_panic("envoy_dynamic_module_on_program_init", payload);
+          ::std::ptr::null()
+        },
       }
     }
   };
