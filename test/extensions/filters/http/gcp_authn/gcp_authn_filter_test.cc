@@ -177,9 +177,10 @@ TEST_F(GcpAuthnFilterTest, ResumeFilterChainIterationWithAccessToken) {
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.mutable_access_token();
 
-  (*metadata_.mutable_typed_filter_metadata())
-      [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-          .PackFrom(audience);
+  (*metadata_
+        .mutable_typed_filter_metadata())[std::string(
+                                              Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+      .PackFrom(audience);
   ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
 
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),

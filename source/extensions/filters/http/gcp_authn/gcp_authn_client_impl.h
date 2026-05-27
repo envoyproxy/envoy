@@ -38,10 +38,7 @@ public:
                  Http::AsyncClient::FailureReason reason) override;
 
 private:
-  enum class TokenType {
-    Jwt,
-    AccessToken
-  };
+  enum class TokenType { Jwt, AccessToken };
 
   void onError(absl::string_view error_msg);
   const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config_;

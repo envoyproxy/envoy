@@ -50,10 +50,10 @@ parseJwtResponse(const std::string& response_body,
   return absl::InternalError("Failed to parse identity token/JWT.");
 }
 
-absl::StatusOr<GcpToken> parseAccessTokenResponse(
-    const std::string& response_body,
-    const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-    TimeSource& time_source) {
+absl::StatusOr<GcpToken>
+parseAccessTokenResponse(const std::string& response_body,
+                         const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+                         TimeSource& time_source) {
   auto json_or_error = Json::Factory::loadFromString(response_body);
   if (!json_or_error.ok()) {
     return absl::InternalError("Failed to parse access token response as JSON.");
@@ -143,8 +143,8 @@ void GcpAuthnClientImpl::onSuccess(const Http::AsyncClient::Request&,
   if (token_type_ == TokenType::Jwt) {
     token_or_error = parseJwtResponse(response_body, audience_);
   } else {
-    token_or_error = parseAccessTokenResponse(
-        response_body, audience_, context_.serverFactoryContext().timeSource());
+    token_or_error = parseAccessTokenResponse(response_body, audience_,
+                                              context_.serverFactoryContext().timeSource());
   }
 
   if (token_or_error.ok()) {
