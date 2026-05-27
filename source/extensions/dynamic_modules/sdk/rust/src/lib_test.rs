@@ -4502,6 +4502,15 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_filter_st
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _host_envoy_ptr: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+  _stat: abi::envoy_dynamic_module_type_host_stat,
+) -> u64 {
+  0
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_http_callout(
   _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
   _callout_id_out: *mut u64,
@@ -4950,6 +4959,37 @@ fn test_cluster_lb_context_get_downstream_connection_sni_none() {
     .expect_get_downstream_connection_sni()
     .returning(|| None);
   assert!(mock_ctx.get_downstream_connection_sni().is_none());
+}
+
+#[test]
+fn test_cluster_lb_context_get_host_stat() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  let host_ptr = 0xDEADBEEF as abi::envoy_dynamic_module_type_cluster_host_envoy_ptr;
+  // Captured as usize because `*mut c_void` is !Send and `withf` requires a Send closure.
+  let host_ptr_addr = host_ptr as usize;
+  mock_ctx
+    .expect_get_host_stat()
+    .withf(move |h, s| {
+      *h as usize == host_ptr_addr && *s == abi::envoy_dynamic_module_type_host_stat::RqActive
+    })
+    .returning(|_, _| 42);
+  assert_eq!(
+    mock_ctx.get_host_stat(host_ptr, abi::envoy_dynamic_module_type_host_stat::RqActive),
+    42
+  );
+}
+
+#[test]
+fn test_cluster_lb_context_get_host_stat_null_host() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx.expect_get_host_stat().returning(|_, _| 0);
+  assert_eq!(
+    mock_ctx.get_host_stat(
+      std::ptr::null_mut(),
+      abi::envoy_dynamic_module_type_host_stat::RqActive,
+    ),
+    0
+  );
 }
 
 #[test]

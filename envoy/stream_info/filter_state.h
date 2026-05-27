@@ -52,8 +52,6 @@ enum class StreamSharingMayImpactPooling {
  */
 class FilterState {
 public:
-  enum class StateType { ReadOnly, Mutable };
-
   // Objects stored in the FilterState may have different life span. Life span is what controls
   // how long an object stored in FilterState lives. Implementation of this interface actually
   // stores objects in a (reverse) tree manner - multiple FilterStateImpl with shorter life span may
@@ -158,15 +156,6 @@ public:
   setData(absl::string_view data_name, std::shared_ptr<Object> data,
           LifeSpan life_span = LifeSpan::FilterChain,
           StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) PURE;
-
-  /**
-   * Deprecated version of setData that takes the no longer used `StateType`.
-   */
-  void setData(absl::string_view data_name, std::shared_ptr<Object> data, StateType /*state_type*/,
-               LifeSpan life_span = LifeSpan::FilterChain,
-               StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) {
-    return setData(data_name, std::move(data), life_span, stream_sharing);
-  }
 
   /**
    * @param data_name the name of the data being looked up.

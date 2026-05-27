@@ -96,7 +96,8 @@ ip_tags:
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml"),
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"));
 
-  test_server_->waitForCounter("http.config_test.ip_tagging.reload_success", testing::Ge(2));
+  // There is only one useful reload in this test.
+  test_server_->waitForCounter("http.config_test.ip_tagging.reload_success", testing::Ge(1));
 
   response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
@@ -165,7 +166,7 @@ ip_tags:
         });
     new_config_helper.setLds("1");
     test_server_->waitForGauge("listener_manager.total_listeners_active", testing::Eq(1));
-    test_server_->waitForCounter("listener_manager.lds.update_success", testing::Eq(1));
+    test_server_->waitForCounter("listener_manager.lds.update_success", testing::Ge(1));
     test_server_->waitForGauge("listener_manager.total_listeners_draining", testing::Eq(0));
   }
 

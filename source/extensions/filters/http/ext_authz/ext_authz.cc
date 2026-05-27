@@ -292,7 +292,6 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     if (!filter_state->hasData<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName())) {
       filter_state->setData(decoder_callbacks_->filterConfigName(),
                             std::make_shared<ExtAuthzLoggingInfo>(config_->filterMetadata()),
-                            Envoy::StreamInfo::FilterState::StateType::Mutable,
                             Envoy::StreamInfo::FilterState::LifeSpan::Request);
 
       // This may return nullptr (if there's a value at this name whose type doesn't match or isn't
@@ -1355,7 +1354,7 @@ void Filter::setShadowFilterState(Filters::Common::ExtAuthz::Response& response)
   // already uses the filter's configured name as its FilterState key (with a different lifespan).
   decoder_callbacks_->streamInfo().filterState()->setData(
       absl::StrCat(decoder_callbacks_->filterConfigName(), ".shadow"), std::move(object),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+      StreamInfo::FilterState::LifeSpan::FilterChain);
 }
 
 } // namespace ExtAuthz

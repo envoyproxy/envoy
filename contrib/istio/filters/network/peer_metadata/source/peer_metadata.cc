@@ -106,7 +106,7 @@ void Filter::populateBaggage() {
   ASSERT(read_callbacks_);
   read_callbacks_->connection().streamInfo().filterState()->setData(
       config_.baggage_key(), std::make_shared<Router::StringAccessorImpl>(baggage_),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+      StreamInfo::FilterState::LifeSpan::FilterChain);
 }
 
 bool Filter::disableDiscovery() const {
@@ -340,8 +340,7 @@ void UpstreamFilter::populatePeerMetadata(const Istio::Common::WorkloadMetadataO
   auto cel = std::make_shared<CelState>(peerInfoPrototype());
   cel->setValue(absl::string_view(proto.SerializeAsString()));
   callbacks_->connection().streamInfo().filterState()->setData(
-      Istio::Common::UpstreamPeer, std::move(cel), StreamInfo::FilterState::StateType::ReadOnly,
-      StreamInfo::FilterState::LifeSpan::Connection);
+      Istio::Common::UpstreamPeer, std::move(cel), StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 void UpstreamFilter::populateNoPeerMetadata() {
@@ -350,7 +349,7 @@ void UpstreamFilter::populateNoPeerMetadata() {
 
   callbacks_->connection().streamInfo().filterState()->setData(
       Istio::Common::NoPeer, std::make_shared<StreamInfo::BoolAccessorImpl>(true),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 ConfigFactory::ConfigFactory()

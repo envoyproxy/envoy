@@ -196,7 +196,7 @@ struct Harness {
   Http::Http3::CodecStats http3_stats_;
 
   quic::QuicConfig quic_config_;
-  envoy::config::core::v3::Http3ProtocolOptions http3_options_{};
+  envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   quic::DeterministicConnectionIdGenerator generator_{quic::kQuicDefaultConnectionIdLength};
   quic::QuicCompressedCertsCache compressed_certs_cache_{100};
   EnvoyQuicTestCryptoServerStreamFactory crypto_stream_factory_;

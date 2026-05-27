@@ -16,7 +16,6 @@ namespace OpenTelemetry {
 namespace {
 
 using testing::NiceMock;
-using testing::Return;
 using testing::ReturnRef;
 
 const std::string kTestZone = "test_zone";

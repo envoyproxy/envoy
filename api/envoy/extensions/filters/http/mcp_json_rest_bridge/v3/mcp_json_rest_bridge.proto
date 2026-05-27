@@ -167,6 +167,11 @@ message ServerInfo {
   google.protobuf.StringValue fallback_protocol_version = 3;
 }
 
+// [#not-implemented-hide:]
+// Configuration for sending locally-generated responses to tools/list requests.
+message ToolsListLocal {
+}
+
 // Configuration for the MCP tool capability of the server.
 message ServerToolConfig {
   // List of MCP tools configurations.
@@ -177,26 +182,51 @@ message ServerToolConfig {
   // Whether this server supports notifications for changes to the tool list.
   bool list_changed = 2;
 
-  // Optional configuration to transcode the tools/list requests to a standard HTTP request.
-  //
-  // Note: tools/list should be mapped to a GET request with an empty body.
-  //
-  // - If provided: The extension transcodes the request and forwards it down the filter chain.
-  //   The response (whether from an upstream backend, a configured ``direct_response``, or another
-  //   extension) MUST be a JSON body strictly matching the MCP ``ListToolsResult`` schema.
-  //   Ref: https://modelcontextprotocol.io/specification/2025-11-25/schema#listtoolsresult
-  // - If not provided: The ``tools/list`` request is passed through. This allows subsequent
-  //   extension or the backend itself to handle the tools/list request if they support it.
-  HttpRule tool_list_http_rule = 3;
+  // Optional configuration for tools/list requests. If not set: The ``tools/list`` request is
+  // passed through. This allows subsequent extension or the backend itself to handle the tools/list
+  // request if they support it.
+  oneof tool_list_config {
+    // Configuration to transcode the tools/list requests to a standard HTTP request. If provided:
+    // The extension transcodes the request and forwards it down the filter chain. The response
+    // (whether from an upstream backend, a configured ``direct_response``, or another extension)
+    // MUST be a JSON body strictly matching the MCP ``ListToolsResult`` schema. Ref:
+    // https://modelcontextprotocol.io/specification/2025-11-25/schema#listtoolsresult
+    HttpRule tool_list_http_rule = 3;
+
+    // [#not-implemented-hide:]
+    // If provided: The extension sends a local response, according to each tool's
+    // ToolsListSpecificConfig.
+    ToolsListLocal tool_list_local = 4;
+  }
 }
 
-// Configuration for a specific MCP tool.
+// [#not-implemented-hide:]
+// Configuration for a tool's entry in tools/list responses.
+message ToolsListSpecificConfig {
+  // Optional, human-readable name of the tool for display purposes.
+  string title = 1;
+
+  // Human-readable description of functionality.
+  string description = 2 [(validate.rules).string = {min_len: 1}];
+
+  // A JSON Schema describing expected parameters, as a serialized JSON string, in the JSON Schema
+  // 2020-12 dialect. This should be raw JSON, including the "properties" and "required" keys, but
+  // not "type". Tools with no parameters may omit this to signify a tool with no constraints on the
+  // parameters object, or set to '"additionalProperties": false' to require empty parameters.
+  string input_schema = 3;
+}
+
 message ToolConfig {
-  // Name of the tool.
+  // Unique identifier of the tool. Used both for tools/list and tools/call transcoding.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // The HTTP configuration rules that apply to the normal backend.
   HttpRule http_rule = 2;
+
+  // [#not-implemented-hide:]
+  // Config for this tool's entry in a local tools/list response. Used when tool_list_local is set
+  // in the ServerToolConfig.
+  ToolsListSpecificConfig tool_list_config = 3;
 }
 
 // Defines the schema of the JSON-RPC to REST mapping. It specifies how the "arguments"
@@ -246,4 +276,9 @@ message HttpRule {
   //   fields (e.g., "user.data" maps the value of the "data" field inside "user").
   // - If omitted: There is no HTTP request body; fields not in the path become query parameters.
   string body = 6;
+}
+
+// Per-route override configuration for the MCP JSON REST Bridge filter.
+message McpJsonRestBridgePerRoute {
+  ServerToolConfig tool_config = 1;
 }

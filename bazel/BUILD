@@ -305,6 +305,14 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "disable_http3_on_linux_x86_64",
+    match_all = [
+        ":disable_http3",
+        ":linux_x86_64",
+    ],
+)
+
+selects.config_setting_group(
     name = "disable_http3_on_not_x86_ppc",
     match_all = [
         ":disable_http3",
@@ -516,6 +524,11 @@ bool_flag(
     build_setting_default = False,
 )
 
+bool_flag(
+    name = "openssl",
+    build_setting_default = False,
+)
+
 config_setting(
     name = "fips_build",
     flag_values = {":fips": "True"},
@@ -538,7 +551,7 @@ config_setting(
 
 config_setting(
     name = "using_openssl",
-    flag_values = {":ssl": "//compat/openssl:ssl"},
+    flag_values = {":openssl": "True"},
 )
 
 # Convenience grouping for any FIPS SSL library
