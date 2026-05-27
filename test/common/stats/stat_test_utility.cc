@@ -130,7 +130,7 @@ TestScope::TestScope(StatName prefix, TestStore& store, StatsMatcherSharedPtr ma
 //
 // Stats::Scope
 Counter& TestScope::counterFromString(absl::string_view leaf_name) {
-  std::string name = prefix_str_ + std::string(leaf_name);
+  std::string name = absl::StrCat(prefix_str_, leaf_name);
   Counter*& counter_ref = store_.counter_map_[name];
   if (counter_ref == nullptr) {
     counter_ref = &IsolatedScopeImpl::counterFromString(leaf_name);
@@ -139,7 +139,7 @@ Counter& TestScope::counterFromString(absl::string_view leaf_name) {
 }
 
 Gauge& TestScope::gaugeFromString(absl::string_view leaf_name, Gauge::ImportMode import_mode) {
-  std::string name = prefix_str_ + std::string(leaf_name);
+  std::string name = absl::StrCat(prefix_str_, leaf_name);
   Gauge*& gauge_ref = store_.gauge_map_[name];
   if (gauge_ref == nullptr) {
     gauge_ref = &IsolatedScopeImpl::gaugeFromString(leaf_name, import_mode);
@@ -148,7 +148,7 @@ Gauge& TestScope::gaugeFromString(absl::string_view leaf_name, Gauge::ImportMode
 }
 
 Histogram& TestScope::histogramFromString(absl::string_view leaf_name, Histogram::Unit unit) {
-  std::string name = prefix_str_ + std::string(leaf_name);
+  std::string name = absl::StrCat(prefix_str_, leaf_name);
   Histogram*& histogram_ref = store_.histogram_map_[name];
   if (histogram_ref == nullptr) {
     histogram_ref = &IsolatedScopeImpl::histogramFromString(leaf_name, unit);

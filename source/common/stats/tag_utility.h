@@ -17,8 +17,8 @@ class TagStatNameJoiner {
 public:
   /**
    * Combines a prefix, stat name and tags into a single stat name.
-   * @param prefix StaName the stat prefix to use.
-   * @param name StaName the stat name to use.
+   * @param prefix StatName the stat prefix to use.
+   * @param name StatName the stat name to use.
    * @param stat_name_tags optional explicit tags to add to the stat name. absl::nullopt means no
    *        explicit tags were provided, in which case tag extraction will later be performed on
    *        the name. A present-but-empty span means "explicitly no tags" and suppresses extraction.

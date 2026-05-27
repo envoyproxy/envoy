@@ -1,7 +1,6 @@
 #include "envoy/stats/sink.h"
 #include "envoy/type/v3/scope.pb.h"
 
-#include "source/common/common/assert.h"
 #include "source/common/config/decoded_resource_impl.h"
 #include "source/common/stats/allocator_impl.h"
 #include "source/common/stats/thread_local_store.h"
@@ -436,7 +435,6 @@ TEST_F(StatsAccessLoggerTest, EmptyTagFormatter) {
           testing::Invoke([this](Stats::StatName name,
                                  absl::optional<Stats::StatNameTagSpan> tags) -> Stats::Counter& {
             EXPECT_EQ("counter", scope_->symbolTable().toString(name));
-            ASSERT(tags.has_value());
             EXPECT_EQ(1, tags->size());
             EXPECT_EQ(":200", scope_->symbolTable().toString(tags->front().second));
 
@@ -1133,7 +1131,6 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterUpdateTag) {
           testing::Invoke([this](Stats::StatName name,
                                  absl::optional<Stats::StatNameTagSpan> tags) -> Stats::Counter& {
             EXPECT_EQ("counter", scope_->symbolTable().toString(name));
-            ASSERT(tags.has_value());
             EXPECT_EQ(1, tags->size());
             EXPECT_EQ("foo", scope_->symbolTable().toString((*tags)[0].first));
             EXPECT_EQ("baz", scope_->symbolTable().toString((*tags)[0].second));
@@ -1177,7 +1174,6 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterDropTag) {
           testing::Invoke([this](Stats::StatName name,
                                  absl::optional<Stats::StatNameTagSpan> tags) -> Stats::Counter& {
             EXPECT_EQ("counter", scope_->symbolTable().toString(name));
-            ASSERT(tags.has_value());
             EXPECT_EQ(0, tags->size());
             return scope_->counterFromStatNameWithTags_(name, tags);
           }));
@@ -1297,7 +1293,6 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterUpdateTagOnGauge) {
       .WillOnce(Invoke([&](Stats::StatName name, absl::optional<Stats::StatNameTagSpan> tags,
                            Stats::Gauge::ImportMode) -> Stats::Gauge& {
         EXPECT_EQ("gauge", scope_->symbolTable().toString(name));
-        ASSERT(tags.has_value());
         EXPECT_EQ(1, tags->size());
         EXPECT_EQ("foo", scope_->symbolTable().toString((*tags)[0].first));
         EXPECT_EQ("baz", scope_->symbolTable().toString((*tags)[0].second));
@@ -1345,7 +1340,6 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterUpdateTagOnHistogram) {
       .WillOnce(Invoke([&](Stats::StatName name, absl::optional<Stats::StatNameTagSpan> tags,
                            Stats::Histogram::Unit) -> Stats::Histogram& {
         EXPECT_EQ("histogram", scope_->symbolTable().toString(name));
-        ASSERT(tags.has_value());
         EXPECT_EQ(1, tags->size());
         EXPECT_EQ("foo", scope_->symbolTable().toString((*tags)[0].first));
         EXPECT_EQ("baz", scope_->symbolTable().toString((*tags)[0].second));
