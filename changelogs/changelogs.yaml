@@ -46,6 +46,8 @@ areas:
     title: attributes
   build:
     title: build
+  circuit_breaker:
+    title: circuit_breaker
   composite:
     title: composite
   dns_resolver:
@@ -68,6 +70,8 @@ areas:
     title: logging
   mysql_proxy:
     title: mysql_proxy
+  network_ext_proc:
+    title: network_ext_proc
   oauth2:
     title: oauth2
   quic:
@@ -92,5 +96,9 @@ areas:
     title: tcp_proxy
   tls:
     title: tls
+  tracing:
+    title: tracing
   wasm:
     title: wasm
+  dns:
+    title: dns

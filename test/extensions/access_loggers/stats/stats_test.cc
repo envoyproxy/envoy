@@ -56,8 +56,9 @@ public:
 
   void iterateTagStatNames(const TagStatNameIterFn& fn) const override {
     for (const auto& tag : tags_storage_) {
-      if (!fn(tag.first->statName(), tag.second->statName()))
+      if (!fn(tag.first->statName(), tag.second->statName())) {
         return;
+      }
     }
   }
 

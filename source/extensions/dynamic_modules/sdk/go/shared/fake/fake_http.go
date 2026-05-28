@@ -7,6 +7,11 @@ import (
 	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared"
 )
 
+var (
+	_ shared.HeaderMap  = (*FakeHeaderMap)(nil)
+	_ shared.BodyBuffer = (*FakeBodyBuffer)(nil)
+)
+
 type FakeHeaderMap struct {
 	Headers map[string][]string
 }

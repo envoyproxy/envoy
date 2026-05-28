@@ -8,6 +8,7 @@
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
+#include "test/test_common/enum_test_utils.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -68,7 +69,7 @@ public:
         // If the bad resource is requested, set an invalid enum value (1000) for the Policy's
         // drop percentage denominator.
         cla.mutable_policy()->add_drop_overloads()->mutable_drop_percentage()->set_denominator(
-            static_cast<envoy::type::v3::FractionalPercent_DenominatorType>(1000));
+            uncheckedEnumCastForTest<envoy::type::v3::FractionalPercent_DenominatorType>(1000));
       }
 
       envoy::service::discovery::v3::Resource resource;

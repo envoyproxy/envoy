@@ -721,7 +721,7 @@ public:
 
 class ProxySettingsProxyFilterTest : public ProxyFilterTest {
 public:
-  virtual void setupFilter() override {
+  void setupFilter() override {
     EXPECT_CALL(*dns_cache_manager_, getCache(_));
 
     Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(

@@ -123,9 +123,11 @@ TEST_P(MultiplexedIntegrationTest, Http3StreamInfoDownstreamHandshakeTiming) {
     return;
   }
 
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -331,6 +333,8 @@ TEST_P(MultiplexedIntegrationTest, Http2DownstreamKeepalive) {
 
 static std::string response_metadata_filter = R"EOF(
 name: response-metadata-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.ResponseMetadataFilterConfig
 )EOF";
 
 class MetadataIntegrationTest : public HttpProtocolIntegrationTest {
@@ -844,6 +848,8 @@ TEST_P(MetadataIntegrationTest, RequestMetadataThenTrailers) {
 
 static std::string request_metadata_filter = R"EOF(
 name: request-metadata-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.RequestMetadataFilterConfig
 )EOF";
 
 TEST_P(MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
@@ -1023,6 +1029,8 @@ void MetadataIntegrationTest::testRequestMetadataWithStopAllFilter() {
 
 static std::string metadata_stop_all_filter = R"EOF(
 name: metadata-stop-all-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.MetadataStopAllFilterConfig
 )EOF";
 
 TEST_P(MetadataIntegrationTest, RequestMetadataWithStopAllFilterBeforeMetadataFilter) {
@@ -1038,6 +1046,8 @@ TEST_P(MetadataIntegrationTest, RequestMetadataWithStopAllFilterAfterMetadataFil
 TEST_P(MetadataIntegrationTest, TestAddEncodedMetadata) {
   config_helper_.prependFilter(R"EOF(
 name: encode-headers-return-stop-all-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.EncodeHeadersReturnStopAllFilterConfig
 )EOF");
 
   initialize();
@@ -1143,7 +1153,11 @@ TEST_P(MultiplexedIntegrationTest, BadFrame) {
 
 // Test GoAway from L7 decoder filters with StopIteration.
 TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByFilter) {
-  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  config_helper_.addFilter(R"EOF(
+    name: send-goaway-during-decode-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SendGoawayFilterConfig
+  )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(
@@ -1159,7 +1173,11 @@ TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByFilter) {
 
 // Test GoAway from L7 decoder filters with Continue.
 TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByFilterContinue) {
-  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  config_helper_.addFilter(R"EOF(
+    name: send-goaway-during-decode-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SendGoawayFilterConfig
+  )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(
@@ -1179,7 +1197,11 @@ TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByEncoderFilterStopIterat
   FakeHttpConnectionPtr fake_upstream_connection;
   Http::RequestEncoder* encoder;
   FakeStreamPtr upstream_request;
-  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  config_helper_.addFilter(R"EOF(
+    name: send-goaway-during-decode-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SendGoawayFilterConfig
+  )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =
@@ -1211,7 +1233,11 @@ TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByEncoderFilterContinue) 
   FakeHttpConnectionPtr fake_upstream_connection;
   Http::RequestEncoder* encoder;
   FakeStreamPtr upstream_request;
-  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  config_helper_.addFilter(R"EOF(
+    name: send-goaway-during-decode-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SendGoawayFilterConfig
+  )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =
@@ -1240,7 +1266,11 @@ TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByEncoderFilterContinue) 
 
 // Test sending GoAway during SendLocalReply from L7 encoder filters.
 TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredInLocalReplyEncoderFilter) {
-  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  config_helper_.addFilter(R"EOF(
+    name: send-goaway-during-decode-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SendGoawayFilterConfig
+  )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -1901,6 +1931,8 @@ TEST_P(MultiplexedIntegrationTest, EmptyTrailers) {
 TEST_P(MultiplexedIntegrationTest, TestEncode1xxHeaders) {
   static std::string encode1xx_local_reply_config = R"EOF(
   name: encode1xx-local-reply-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.Encode1xxLocalReplyFilterConfig
   )EOF";
   config_helper_.prependFilter(encode1xx_local_reply_config);
   config_helper_.addConfigModifier(
@@ -1930,9 +1962,13 @@ TEST_P(MultiplexedIntegrationTest, TestEncode1xxHeaders) {
 TEST_P(MultiplexedIntegrationTest, TestEncode1xxHeadersWithLocalReplyDuringData) {
   std::string local_reply_during_decode_config = R"EOF(
   name: local-reply-during-decode
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.LocalReplyDuringDecodeConfig
   )EOF";
   std::string add_response_metadata_config = R"EOF(
   name: response-metadata-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.ResponseMetadataFilterConfig
   )EOF";
   config_helper_.prependFilter(local_reply_during_decode_config);
   config_helper_.prependFilter(add_response_metadata_config);
@@ -2798,6 +2834,8 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithMetadata) {
 
   config_helper_.prependFilter(R"EOF(
   name: metadata-control-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.MetadataControlFilterConfig
   )EOF");
 
   const int kRequestsSentPerIOCycle = 20;
@@ -2852,7 +2890,11 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequestsDecodeHeadersEndsRequest) {
   // The local-reply-during-decode will call sendLocalReply, completing them
   // when processing headers. This will cause the ConnectionManagerImpl::ActiveRequest
   // object to be removed from the streams_ list during the onDeferredRequestProcessing call.
-  config_helper_.addFilter("{ name: local-reply-during-decode }");
+  config_helper_.addFilter(R"EOF(
+    name: local-reply-during-decode
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.LocalReplyDuringDecodeConfig
+  )EOF");
   // Process more than 1 deferred request at a time to validate the removal of elements from
   // the list does not break reverse iteration.
   config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "3");
@@ -2936,7 +2978,11 @@ void Http2FrameIntegrationTest::sendRequestsAndResponses(uint32_t num_requests) 
 
 // Validate that GOAWAY is triggered by a L7 filter.
 TEST_P(Http2FrameIntegrationTest, SendGoAwayTriggerredByDecodingFilter) {
-  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  config_helper_.addFilter(R"EOF(
+    name: send-goaway-during-decode-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SendGoawayFilterConfig
+  )EOF");
   beginSession();
   uint32_t num_requests = 10;
   std::string buffer;
@@ -2957,7 +3003,11 @@ TEST_P(Http2FrameIntegrationTest, SendGoAwayTriggerredByDecodingFilter) {
 
 // GOAWAY is not triggered by a L7 filter.
 TEST_P(Http2FrameIntegrationTest, SendGoAwayNotTriggerredByDecodingFilter) {
-  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  config_helper_.addFilter(R"EOF(
+    name: send-goaway-during-decode-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SendGoawayFilterConfig
+  )EOF");
   beginSession();
   std::string buffer;
   auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(1), "a", "/",
@@ -2979,7 +3029,11 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithTrailersWithFilterChainPau
   const int kRequestsSentPerIOCycle = 20;
   // Add filter that stops iteration in the decodeHeaders and resumes in
   // decodeData to verify that downstream end_stream is handled correctly by the filter manager.
-  config_helper_.addFilter("name: stop-in-headers-continue-in-body-filter");
+  config_helper_.addFilter(R"EOF(
+    name: stop-in-headers-continue-in-body-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StopInHeadersContinueInBodyFilterConfig
+  )EOF");
   config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "1");
   sendRequestsAndResponses(kRequestsSentPerIOCycle);
 }
@@ -2995,7 +3049,11 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithTrailersNoPauseInFilterCha
 TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithTrailersDecodeHeadersEndsRequest) {
   const int kRequestsSentPerIOCycle = 20;
   autonomous_upstream_ = true;
-  config_helper_.addFilter("{ name: local-reply-during-decode }");
+  config_helper_.addFilter(R"EOF(
+    name: local-reply-during-decode
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.LocalReplyDuringDecodeConfig
+  )EOF");
   config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "6");
   beginSession();
 

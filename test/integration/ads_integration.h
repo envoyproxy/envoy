@@ -102,9 +102,9 @@ class AdsIntegrationTest
       public testing::TestWithParam<
           std::tuple<Network::Address::IpVersion, Grpc::ClientType, Grpc::SotwOrDelta>> {
 public:
-  AdsIntegrationTest() : AdsIntegrationTestBase(ipVersion(), sotwOrDelta()) {}
+  AdsIntegrationTest() : AdsIntegrationTestBase(testIpVersion(), testSotwOrDelta()) {}
   AdsIntegrationTest(const std::string& config)
-      : AdsIntegrationTestBase(ipVersion(), sotwOrDelta(), config) {}
+      : AdsIntegrationTestBase(testIpVersion(), testSotwOrDelta(), config) {}
 
   void TearDown() override { cleanUpXdsConnection(); }
 
@@ -138,6 +138,10 @@ public:
     return sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
            sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw;
   }
+
+private:
+  static Network::Address::IpVersion testIpVersion() { return std::get<0>(GetParam()); }
+  static Grpc::SotwOrDelta testSotwOrDelta() { return std::get<2>(GetParam()); }
 };
 
 // When old delta subscription state goes away, we could replace this macro back with

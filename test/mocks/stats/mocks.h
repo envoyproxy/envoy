@@ -322,6 +322,7 @@ public:
   // to allow tests to inject EXPECT_CALL hooks for those.
   MOCK_METHOD(Counter&, counterFromStatNameWithTags,
               (const StatName&, StatNameTagVectorOptConstRef));
+  // NOLINTNEXTLINE(readability-identifier-naming)
   Counter& counterFromStatNameWithTags_(const StatName& name, StatNameTagVectorOptConstRef);
 
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef,

@@ -204,7 +204,7 @@ public:
     std::unique_ptr<Init::Manager> init_manager_;
     const bool ignore_global_conn_limit_;
     envoy::config::core::v3::TrafficDirection direction_;
-    absl::flat_hash_map<std::string, Network::UdpListenerCallbacks*> udp_listener_callback_map_{};
+    absl::flat_hash_map<std::string, Network::UdpListenerCallbacks*> udp_listener_callback_map_;
     Network::ListenerInfoConstSharedPtr listener_info_;
   };
 

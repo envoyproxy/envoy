@@ -1447,7 +1447,7 @@ void Filter::setDynamicMetadataInternal(std::string filter_name, std::string key
 }
 
 CAPIStatus Filter::setStringFilterState(absl::string_view key, absl::string_view value,
-                                        int state_type, int life_span, int stream_sharing) {
+                                        int /*state_type*/, int life_span, int stream_sharing) {
   if (hasDestroyed()) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
@@ -1456,24 +1456,21 @@ CAPIStatus Filter::setStringFilterState(absl::string_view key, absl::string_view
   if (isThreadSafe()) {
     streamInfo().filterState()->setData(
         key, std::make_shared<Router::StringAccessorImpl>(value),
-        static_cast<StreamInfo::FilterState::StateType>(state_type),
         static_cast<StreamInfo::FilterState::LifeSpan>(life_span),
         static_cast<StreamInfo::StreamSharingMayImpactPooling>(stream_sharing));
   } else {
     auto key_str = std::string(key);
     auto filter_state = std::make_shared<Router::StringAccessorImpl>(value);
     auto weak_ptr = weak_from_this();
-    getDispatcher().post(
-        [this, weak_ptr, key_str, filter_state, state_type, life_span, stream_sharing] {
-          if (!weak_ptr.expired() && !hasDestroyed()) {
-            streamInfo().filterState()->setData(
-                key_str, filter_state, static_cast<StreamInfo::FilterState::StateType>(state_type),
-                static_cast<StreamInfo::FilterState::LifeSpan>(life_span),
-                static_cast<StreamInfo::StreamSharingMayImpactPooling>(stream_sharing));
-          } else {
-            ENVOY_LOG(info, "golang filter has gone or destroyed in setStringFilterState");
-          }
-        });
+    getDispatcher().post([this, weak_ptr, key_str, filter_state, life_span, stream_sharing] {
+      if (!weak_ptr.expired() && !hasDestroyed()) {
+        streamInfo().filterState()->setData(
+            key_str, filter_state, static_cast<StreamInfo::FilterState::LifeSpan>(life_span),
+            static_cast<StreamInfo::StreamSharingMayImpactPooling>(stream_sharing));
+      } else {
+        ENVOY_LOG(info, "golang filter has gone or destroyed in setStringFilterState");
+      }
+    });
   }
   return CAPIStatus::CAPIOK;
 }

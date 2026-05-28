@@ -3,21 +3,15 @@
 #include <cstdint>
 #include <string>
 
-#include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 
-#include "absl/container/fixed_array.h"
+#include "absl/strings/escaping.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace {
 
-// clang-format off
-constexpr char CHAR_TABLE[] =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-// Conversion table is taken from
-// https://opensource.apple.com/source/QuickTimeStreamingServer/QuickTimeStreamingServer-452/CommonUtilitiesLib/base64.c
 constexpr unsigned char REVERSE_LOOKUP_TABLE[256] = {
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 62, 64, 64, 64, 63,
@@ -31,11 +25,6 @@ constexpr unsigned char REVERSE_LOOKUP_TABLE[256] = {
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64};
 
-// The base64url tables are copied from above and modified based on table in
-// https://tools.ietf.org/html/rfc4648#section-5
-constexpr char URL_CHAR_TABLE[] =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-
 constexpr unsigned char URL_REVERSE_LOOKUP_TABLE[256] = {
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 62, 64, 64,
@@ -48,99 +37,53 @@ constexpr unsigned char URL_REVERSE_LOOKUP_TABLE[256] = {
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64};
-// clang-format on
 
-inline bool decodeBase(const uint8_t cur_char, uint64_t pos, std::string& ret,
-                       const unsigned char* const reverse_lookup_table) {
-  const unsigned char c = reverse_lookup_table[static_cast<uint32_t>(cur_char)];
-  if (c == 64) {
-    // Invalid character
-    return false;
+std::string decodeHelper(absl::string_view input, const unsigned char* lookup_table,
+                         bool (*unescape_fn)(absl::string_view, std::string*)) {
+  if (input.empty()) {
+    return EMPTY_STRING;
   }
 
-  switch (pos % 4) {
-  case 0:
-    ret.push_back(c << 2);
-    break;
-  case 1:
-    ret.back() |= c >> 4;
-    ret.push_back(c << 4);
-    break;
-  case 2:
-    ret.back() |= c >> 2;
-    ret.push_back(c << 6);
-    break;
-  case 3:
-    ret.back() |= c;
-    break;
-  }
-  return true;
-}
+  // Strip up to two trailing '=' characters.
+  const size_t n = input.length();
+  const size_t count = (input[n - 1] == '=') + (n >= 2 && input[n - 2] == '=');
+  const size_t real_chars = n - count;
 
-inline bool decodeLast(const uint8_t cur_char, uint64_t pos, std::string& ret,
-                       const unsigned char* const reverse_lookup_table) {
-  const unsigned char c = reverse_lookup_table[static_cast<uint32_t>(cur_char)];
-  if (c == 64) {
-    // Invalid character
-    return false;
+  // A base64 string with length % 4 == 1 is structurally invalid
+  if (real_chars % 4 == 1) {
+    return EMPTY_STRING;
   }
 
-  switch (pos % 4) {
-  case 0:
-    return false;
-  case 1:
-    ret.back() |= c >> 4;
-    return (c & 0b1111) == 0;
-  case 2:
-    ret.back() |= c >> 2;
-    return (c & 0b11) == 0;
-  case 3:
-    ret.back() |= c;
-    break;
-  }
-  return true;
-}
-
-inline void encodeBase(const uint8_t cur_char, uint64_t pos, uint8_t& next_c, std::string& ret,
-                       const char* const char_table) {
-  switch (pos % 3) {
-  case 0:
-    ret.push_back(char_table[cur_char >> 2]);
-    next_c = (cur_char & 0x03) << 4;
-    break;
-  case 1:
-    ret.push_back(char_table[next_c | (cur_char >> 4)]);
-    next_c = (cur_char & 0x0f) << 2;
-    break;
-  case 2:
-    ret.push_back(char_table[next_c | (cur_char >> 6)]);
-    ret.push_back(char_table[cur_char & 0x3f]);
-    next_c = 0;
-    break;
-  }
-}
-
-inline void encodeLast(uint64_t pos, uint8_t last_char, std::string& ret,
-                       const char* const char_table, bool add_padding) {
-  switch (pos % 3) {
-  case 1:
-    ret.push_back(char_table[last_char]);
-    if (add_padding) {
-      ret.push_back('=');
-      ret.push_back('=');
+  // Validate the trailing bits of the last real character.
+  if (real_chars > 0) {
+    const uint8_t last_value = lookup_table[static_cast<uint8_t>(input[real_chars - 1])];
+    if (last_value == 64) {
+      return EMPTY_STRING;
     }
-    break;
-  case 2:
-    ret.push_back(char_table[last_char]);
-    if (add_padding) {
-      ret.push_back('=');
+    // Base64 groups input into 4 character blocks. Each character represents 6 bits.
+    // A valid encoded string can have trailing characters where the unused lower bits must be 0.
+    // This code checks whether the unused bits are 0. If they are not, the input is invalid.
+    if (real_chars % 4 == 2 && (last_value & 0x0F) != 0) {
+      return EMPTY_STRING;
     }
-    break;
-  default:
-    break;
+    if (real_chars % 4 == 3 && (last_value & 0x03) != 0) {
+      return EMPTY_STRING;
+    }
   }
-}
 
+  std::string ret;
+  if (!unescape_fn(input.substr(0, real_chars), &ret)) {
+    return EMPTY_STRING;
+  }
+
+  // If abseil decodes the wrong number of bytes, we must reject the entire input.
+  size_t expected_length = real_chars * 3 / 4;
+  if (ret.length() != expected_length) {
+    return EMPTY_STRING;
+  }
+
+  return ret;
+}
 } // namespace
 
 std::string Base64::decode(absl::string_view input) {
@@ -151,66 +94,25 @@ std::string Base64::decode(absl::string_view input) {
 }
 
 std::string Base64::decodeWithoutPadding(absl::string_view input) {
-  if (input.empty()) {
-    return EMPTY_STRING;
-  }
-
-  // At most last two chars can be '='.
-  size_t n = input.length();
-  if (input[n - 1] == '=') {
-    n--;
-    if (n > 0 && input[n - 1] == '=') {
-      n--;
-    }
-  }
-  // Last position before "valid" padding character.
-  uint64_t last = n - 1;
-  // Determine output length.
-  size_t max_length = (n + 3) / 4 * 3;
-  if (n % 4 == 3) {
-    max_length -= 1;
-  }
-  if (n % 4 == 2) {
-    max_length -= 2;
-  }
-
-  std::string ret;
-  ret.reserve(max_length);
-  for (uint64_t i = 0; i < last; ++i) {
-    if (!decodeBase(input[i], i, ret, REVERSE_LOOKUP_TABLE)) {
-      return EMPTY_STRING;
-    }
-  }
-
-  if (!decodeLast(input[last], last, ret, REVERSE_LOOKUP_TABLE)) {
-    return EMPTY_STRING;
-  }
-
-  ASSERT(ret.size() == max_length);
-  return ret;
+  return decodeHelper(input, REVERSE_LOOKUP_TABLE, absl::Base64Unescape);
 }
 
 std::string Base64::encode(const Buffer::Instance& buffer, uint64_t length) {
-  uint64_t output_length = (std::min(length, buffer.length()) + 2) / 3 * 4;
-  std::string ret;
-  ret.reserve(output_length);
-
-  uint64_t j = 0;
-  uint8_t next_c = 0;
-  for (const Buffer::RawSlice& slice : buffer.getRawSlices()) {
-    const uint8_t* slice_mem = static_cast<const uint8_t*>(slice.mem_);
-
-    for (uint64_t i = 0; i < slice.len_ && j < length; ++i, ++j) {
-      encodeBase(slice_mem[i], j, next_c, ret, CHAR_TABLE);
-    }
-
-    if (j == length) {
-      break;
-    }
+  const uint64_t encode_length = std::min(length, buffer.length());
+  if (encode_length == 0) {
+    return EMPTY_STRING;
   }
-
-  encodeLast(j, next_c, ret, CHAR_TABLE, true);
-
+  std::string ret;
+  const auto slices = buffer.getRawSlices();
+  if (slices.size() == 1 && slices[0].len_ >= encode_length) {
+    absl::Base64Escape(absl::string_view(static_cast<const char*>(slices[0].mem_), encode_length),
+                       &ret);
+  } else {
+    std::string tmp;
+    tmp.resize(encode_length);
+    buffer.copyOut(0, encode_length, tmp.data());
+    absl::Base64Escape(tmp, &ret);
+  }
   return ret;
 }
 
@@ -221,19 +123,15 @@ std::string Base64::encode(const char* input, uint64_t length) {
 }
 
 std::string Base64::encode(const char* input, uint64_t length, bool add_padding) {
-  uint64_t output_length = (length + 2) / 3 * 4;
   std::string ret;
-  ret.reserve(output_length);
+  absl::Base64Escape(absl::string_view(input, length), &ret);
 
-  uint64_t pos = 0;
-  uint8_t next_c = 0;
-
-  for (uint64_t i = 0; i < length; ++i) {
-    encodeBase(input[i], pos++, next_c, ret, CHAR_TABLE);
+  if (!add_padding) {
+    // Remove trailing '='
+    const size_t n = ret.size();
+    const size_t count = (n >= 1 && ret[n - 1] == '=') + (n >= 2 && ret[n - 2] == '=');
+    ret.resize(n - count);
   }
-
-  encodeLast(pos, next_c, ret, CHAR_TABLE, add_padding);
-
   return ret;
 }
 
@@ -245,41 +143,20 @@ void Base64::completePadding(std::string& encoded) {
 }
 
 std::string Base64Url::decode(absl::string_view input) {
-  if (input.empty()) {
-    return EMPTY_STRING;
-  }
-
-  std::string ret;
-  ret.reserve(input.length() / 4 * 3 + 3);
-
-  uint64_t last = input.length() - 1;
-  for (uint64_t i = 0; i < last; ++i) {
-    if (!decodeBase(input[i], i, ret, URL_REVERSE_LOOKUP_TABLE)) {
+  // URL decoding does not accept any padding
+  if (!input.empty()) {
+    const uint8_t last_value =
+        URL_REVERSE_LOOKUP_TABLE[static_cast<uint8_t>(input[input.size() - 1])];
+    if (last_value == 64) {
       return EMPTY_STRING;
     }
   }
-
-  if (!decodeLast(input[last], last, ret, URL_REVERSE_LOOKUP_TABLE)) {
-    return EMPTY_STRING;
-  }
-
-  return ret;
+  return decodeHelper(input, URL_REVERSE_LOOKUP_TABLE, absl::WebSafeBase64Unescape);
 }
 
 std::string Base64Url::encode(const char* input, uint64_t length) {
-  uint64_t output_length = (length + 2) / 3 * 4;
   std::string ret;
-  ret.reserve(output_length);
-
-  uint64_t pos = 0;
-  uint8_t next_c = 0;
-
-  for (uint64_t i = 0; i < length; ++i) {
-    encodeBase(input[i], pos++, next_c, ret, URL_CHAR_TABLE);
-  }
-
-  encodeLast(pos, next_c, ret, URL_CHAR_TABLE, false);
-
+  absl::WebSafeBase64Escape(absl::string_view(input, length), &ret);
   return ret;
 }
 

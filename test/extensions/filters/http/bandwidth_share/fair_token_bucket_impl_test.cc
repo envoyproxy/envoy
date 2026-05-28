@@ -17,7 +17,7 @@ auto IsBetween = [](uint64_t min, uint64_t max) {
 };
 
 class ClientTest : public testing::Test {
-  void SetUp() {
+  void SetUp() override {
     // Avoid starting at time zero.
     time_system_.setMonotonicTime(start_time_);
   }
@@ -162,27 +162,27 @@ TEST_F(ClientTest, RunWithAggressiveThreadsToEnsureNoDeadlocks) {
     bool acting = true;
     absl::optional<Client> client;
   } threads[10];
-  for (size_t i = 0; i < 10; i++) {
-    threads[i].client.emplace(bucket_, "foo", 1);
-    threads[i].thread = std::thread([&mu, &total_consumed, thread = &threads[i]] {
+  for (auto& thread : threads) {
+    thread.client.emplace(bucket_, "foo", 1);
+    thread.thread = std::thread([&mu, &total_consumed, &thread] {
       while (true) {
-        uint64_t got = thread->client->consume(1000);
+        uint64_t got = thread.client->consume(1000);
         {
           absl::MutexLock lock(mu);
-          thread->acting = false;
-          thread->consumed += got;
+          thread.acting = false;
+          thread.consumed += got;
           total_consumed += got;
           if (total_consumed >= 100000) {
             break;
           }
-          mu.Await(absl::Condition(&thread->acting));
+          mu.Await(absl::Condition(&thread.acting));
         }
       }
     });
   }
   const auto all_threads_blocked = [&]() {
-    for (int i = 0; i < 10; i++) {
-      if (threads[i].acting) {
+    for (auto& thread : threads) {
+      if (thread.acting) {
         return false;
       }
     }
@@ -192,23 +192,23 @@ TEST_F(ClientTest, RunWithAggressiveThreadsToEnsureNoDeadlocks) {
     absl::MutexLock lock(mu);
     // Wait for all threads to have consumed, then advance time.
     mu.Await(absl::Condition(&all_threads_blocked));
-    for (int i = 0; i < 10; i++) {
-      threads[i].acting = true;
+    for (auto& thread : threads) {
+      thread.acting = true;
     }
     if (total_consumed >= 100000) {
       break;
     }
     time_system_.advanceTimeWaitImpl(std::chrono::milliseconds(50));
   }
-  for (size_t i = 0; i < 10; i++) {
-    threads[i].thread.join();
+  for (auto& thread : threads) {
+    thread.thread.join();
   }
   // Since it's battling threads, and one of them got the initial bucket fill,
   // an exact fair share cannot be expected, so just verify that
   // everyone got a reasonable share.
   absl::MutexLock lock(mu);
-  for (size_t i = 0; i < 10; i++) {
-    EXPECT_THAT(threads[i].consumed, IsBetween(9000, 11000));
+  for (auto& thread : threads) {
+    EXPECT_THAT(thread.consumed, IsBetween(9000, 11000));
   }
   // We definitely shouldn't have granted more than 100000 tokens in less
   // than 99 fake-seconds.

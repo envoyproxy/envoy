@@ -51,6 +51,11 @@ envoy_proto_library(
     srcs = ["test_resolver.proto"],
 )
 
+envoy_proto_library(
+    name = "modify_host_filter_proto",
+    srcs = ["modify_host_filter.proto"],
+)
+
 envoy_cc_test_library(
     name = "test_resolver_lib",
     srcs = ["test_resolver.cc"],
@@ -69,6 +74,7 @@ envoy_cc_test_library(
     name = "modify_host_filter_lib",
     srcs = ["modify_host_filter.cc"],
     deps = [
+        ":modify_host_filter_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
