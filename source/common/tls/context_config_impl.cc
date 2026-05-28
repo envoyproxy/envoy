@@ -430,6 +430,8 @@ ClientContextConfigImpl::ClientContextConfigImpl(
       server_name_indication_(config.sni()), auto_host_sni_(config.auto_host_sni()),
       allow_renegotiation_(config.allow_renegotiation()),
       max_session_keys_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_session_keys, 1)) {
+
+  // BoringSSL treats this as a C string, so embedded NULL characters will not
   // be handled correctly.
   if (server_name_indication_.find('\0') != std::string::npos) {
     creation_status = absl::InvalidArgumentError("SNI names containing NULL-byte are not allowed");
