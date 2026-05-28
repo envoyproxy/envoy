@@ -46,6 +46,8 @@ areas:
     title: attributes
   build:
     title: build
+  circuit_breaker:
+    title: circuit_breaker
   composite:
     title: composite
   dns_resolver:
