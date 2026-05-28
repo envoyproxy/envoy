@@ -213,6 +213,7 @@ TEST_P(HttpUpstreamTest, UpstreamResetWithGuardDisabled) {
   this->upstream_->onResetStream(Http::StreamResetReason::RemoteReset, "");
   EXPECT_EQ(this->upstream_->detectedCloseType(), StreamInfo::DetectedCloseType::Normal);
 }
+
 TEST_P(HttpUpstreamTest, UpstreamRemoteResetAfterStreamCompleteProducesLocalClose) {
   this->setupUpstream();
   testing::Mock::VerifyAndClearExpectations(&this->encoder_);
@@ -230,6 +231,22 @@ TEST_P(HttpUpstreamTest, UpstreamRemoteResetAfterStreamCompleteProducesLocalClos
   EXPECT_CALL(this->callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
   this->upstream_->onResetStream(Http::StreamResetReason::RemoteReset, "");
   EXPECT_EQ(this->upstream_->detectedCloseType(), StreamInfo::DetectedCloseType::Normal);
+}
+
+TEST_P(HttpUpstreamTest, UpstreamRemoteResetBeforeStreamCompleteProducesRemoteClose) {
+  this->setupUpstream();
+  testing::Mock::VerifyAndClearExpectations(&this->encoder_);
+  EXPECT_CALL(this->encoder_, getStream()).Times(AnyNumber());
+  EXPECT_CALL(this->encoder_, encodeHeaders(_, false)).Times(AnyNumber());
+  EXPECT_CALL(this->encoder_, http1StreamEncoderOptions()).Times(AnyNumber());
+  EXPECT_CALL(this->encoder_, enableTcpTunneling()).Times(AnyNumber());
+
+  // Stream has NOT completed - doneReading() is intentionally not called.
+  // Remote reset before completion SHOULD propagate as RemoteReset downstream.
+  EXPECT_CALL(this->encoder_.stream_, resetStream(_)).Times(0);
+  EXPECT_CALL(this->callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
+  this->upstream_->onResetStream(Http::StreamResetReason::RemoteReset, "");
+  EXPECT_EQ(this->upstream_->detectedCloseType(), StreamInfo::DetectedCloseType::RemoteReset);
 }
 
 TEST_P(HttpUpstreamTest, UpstreamWatermarks) {
