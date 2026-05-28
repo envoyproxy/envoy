@@ -252,7 +252,7 @@ message ToolConfig {
 
   // [#not-implemented-hide:]
   // Path and host of the MCP server that hosts this tool.
-  McpServerInfo server_info = 5;
+  repeated McpServerInfo server_info = 5;
 }
 
 // Defines the schema of the JSON-RPC to REST mapping. It specifies how the "arguments"
