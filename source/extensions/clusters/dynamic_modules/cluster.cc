@@ -306,7 +306,8 @@ void DynamicModuleCluster::runOnAllWorkers(uint64_t event_id) {
          "envoy_dynamic_module_callback_cluster_run_on_all_workers must be called from the main "
          "thread");
   if (config_->on_cluster_worker_event_ == nullptr) {
-    // Module did not implement the worker event hook; nothing to deliver.
+    // If the module did not export envoy_dynamic_module_on_cluster_worker_event, this call is a
+    // no-op: no slot allocation and no fan-out.
     return;
   }
 
@@ -340,15 +341,17 @@ void DynamicModuleCluster::workerSlotSet(
   // Capture the wrapper by value so every thread observes the same shared_ptr (single-pointer
   // semantics); the prior wrapper is released when its last reference drops, firing the module's
   // destroy hook.
-  auto wrapper =
-      std::make_shared<WorkerSlotData>(data_ptr, config_->on_cluster_worker_slot_data_destroy_);
+  auto wrapper = std::make_shared<WorkerSlotData>(
+      data_ptr, config_->on_cluster_worker_slot_data_destroy_, config_);
   worker_slot_->set(
       [wrapper](Event::Dispatcher&) -> std::shared_ptr<WorkerSlotData> { return wrapper; });
 }
 
 envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr
 DynamicModuleCluster::workerSlotGet() {
-  if (worker_slot_ == nullptr) {
+  // Guard against access from threads with no TLS registration: TypedSlot::get on such a thread
+  // would index past the slot vector.
+  if (worker_slot_ == nullptr || !worker_slot_->currentThreadRegistered()) {
     return nullptr;
   }
   OptRef<WorkerSlotData> ref = worker_slot_->get();

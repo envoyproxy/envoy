@@ -453,6 +453,10 @@ impl<C: EnvoyCluster + ?Sized> EnvoyClusterWorkerSlotExt for C {
     // the wrapping shared_ptr alive for at least the duration of this dispatcher tick on the
     // calling thread, so a shared borrow is valid here.
     let outer: &WorkerSlotPayload = unsafe { &*(raw as *const WorkerSlotPayload) };
+    debug_assert!(
+      outer.is::<Arc<T>>(),
+      "worker_slot_get<T> called with type mismatch"
+    );
     outer.downcast_ref::<Arc<T>>().cloned()
   }
 }

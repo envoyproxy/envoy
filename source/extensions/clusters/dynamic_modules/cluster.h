@@ -429,15 +429,17 @@ private:
   };
 
   /**
-   * Wrapper for the module-owned opaque pointer stored in worker_slot_. Holds the pointer and
-   * the module's destroy hook; the destructor invokes the destroy hook when the last shared_ptr
+   * Wrapper for the module-owned opaque pointer stored in worker_slot_. Pins the config (and
+   * therefore the underlying DynamicModule .so that owns destroy_fn_) for as long as any wrapper
+   * has a live reference; the destructor invokes the destroy hook when the last shared_ptr
    * reference drops.
    */
   class WorkerSlotData : public ThreadLocal::ThreadLocalObject {
   public:
     WorkerSlotData(envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr data_ptr,
-                   OnClusterWorkerSlotDataDestroyType destroy_fn)
-        : data_ptr_(data_ptr), destroy_fn_(destroy_fn) {}
+                   OnClusterWorkerSlotDataDestroyType destroy_fn,
+                   DynamicModuleClusterConfigSharedPtr config)
+        : data_ptr_(data_ptr), destroy_fn_(destroy_fn), config_(std::move(config)) {}
     ~WorkerSlotData() override {
       if (destroy_fn_ != nullptr) {
         destroy_fn_(data_ptr_);
@@ -448,6 +450,7 @@ private:
   private:
     envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr data_ptr_;
     OnClusterWorkerSlotDataDestroyType destroy_fn_;
+    DynamicModuleClusterConfigSharedPtr config_;
   };
 
   // Allocates worker_slot_ lazily on first use.
