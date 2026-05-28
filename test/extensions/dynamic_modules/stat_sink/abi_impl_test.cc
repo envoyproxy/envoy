@@ -77,8 +77,8 @@ TEST_F(DynamicModuleStatsSinkAbiTest, GetCounterValid) {
   envoy_dynamic_module_type_envoy_buffer name_out{};
   uint64_t value_out = 0;
   uint64_t delta_out = 0;
-  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_counter(
-      &snapshot_, 0, &name_out, &value_out, &delta_out));
+  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_counter(&snapshot_, 0, &name_out,
+                                                                           &value_out, &delta_out));
   EXPECT_EQ("requests_total", toString(name_out));
   EXPECT_EQ(100u, value_out);
   EXPECT_EQ(7u, delta_out);

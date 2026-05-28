@@ -9,8 +9,7 @@ DynamicModuleStatsSink::DynamicModuleStatsSink(DynamicModuleStatsSinkConfigShare
     : config_(std::move(config)) {}
 
 void DynamicModuleStatsSink::flush(Stats::MetricSnapshot& snapshot) {
-  config_->on_flush_(config_->in_module_config_, thisAsVoidPtr(),
-                     static_cast<void*>(&snapshot));
+  config_->on_flush_(config_->in_module_config_, thisAsVoidPtr(), static_cast<void*>(&snapshot));
 }
 
 void DynamicModuleStatsSink::onHistogramComplete(const Stats::Histogram& histogram,
