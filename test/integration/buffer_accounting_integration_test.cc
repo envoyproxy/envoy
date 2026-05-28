@@ -886,7 +886,9 @@ public:
   Http2DeferredProcessingIntegrationTest() : registered_tee_factory_(tee_filter_factory_) {
     config_helper_.prependFilter(R"EOF(
       name: stream-tee-filter
-    )EOF");
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.StreamTeeFilterConfig
+      )EOF");
   }
 
 protected:

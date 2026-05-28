@@ -313,6 +313,7 @@ public:
 
   /**
    * Convert a string to an unsigned long, checking for error.
+   * Rejects leading '+' or '-' after optional ASCII whitespace.
    * @return pointer to the remainder of 'str' if successful, nullptr otherwise.
    */
   static const char* strtoull(const char* str, uint64_t& out, int base = 10);

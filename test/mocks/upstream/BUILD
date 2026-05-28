@@ -2,11 +2,17 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_mock",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_proto_library(
+    name = "upstream_mocks_proto",
+    srcs = ["upstream_mocks.proto"],
+)
 
 envoy_cc_mock(
     name = "cluster_info_mocks",
@@ -171,6 +177,7 @@ envoy_cc_mock(
     name = "retry_priority_factory_mocks",
     hdrs = ["retry_priority_factory.h"],
     deps = [
+        ":upstream_mocks_proto_cc_proto",
         "//envoy/upstream:retry_interface",
         "//test/mocks/upstream:retry_priority_mocks",
     ],

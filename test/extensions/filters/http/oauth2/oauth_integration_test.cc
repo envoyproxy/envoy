@@ -669,6 +669,8 @@ TEST_P(OauthIntegrationTest, LoadListenerAfterServerIsInitialized) {
                           cluster: cluster_0
               http_filters:
                 - name: envoy.filters.http.router
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
         )EOF");
 
     // dummy listener is being sent so that lds api gets marked as ready, which
