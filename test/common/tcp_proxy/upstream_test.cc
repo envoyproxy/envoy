@@ -310,6 +310,7 @@ TEST_P(HttpUpstreamTest, DumpsResponseDecoderWithoutAllocatingMemory) {
 TEST_P(HttpUpstreamTest, UpstreamTrailersMarksDoneReading) {
   this->setupUpstream();
   EXPECT_CALL(this->encoder_.stream_, resetStream(_)).Times(0);
+  this->upstream_->doneWriting();
   Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
   this->upstream_->responseDecoder().decodeTrailers(std::move(trailers));
 }
