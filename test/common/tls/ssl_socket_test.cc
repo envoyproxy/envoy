@@ -8147,8 +8147,6 @@ BORINGSSL_TEST_P(SslSocketTest, AsyncCustomCertValidatorFails) {
                .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 }
 
-
-
 // Test that TLS handshakes succeed when certificate compression is enabled via runtime flag.
 // This verifies the certificate compression feature (RFC 8879) integration with brotli, zstd,
 // and zlib algorithms when the runtime flag is enabled.

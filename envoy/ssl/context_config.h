@@ -158,8 +158,6 @@ public:
    */
   virtual size_t maxSessionKeys() const PURE;
 
-
-
   /**
    * @return an optional factory which can be used to create TLS context provider instances.
    */
