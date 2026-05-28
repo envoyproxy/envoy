@@ -538,13 +538,12 @@ TEST_P(RoundRobinLoadBalancerTest, WeightedInitializationPicksAllHosts) {
 TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
                               makeTestHost(info_, "tcp://127.0.0.1:81")};
-  hostSet().hosts_ = {
-      hostSet().healthy_hosts_[0],
-      hostSet().healthy_hosts_[1],
-      makeTestHost(info_, "tcp://127.0.0.1:82"),
-      makeTestHost(info_, "tcp://127.0.0.1:83"),
-      makeTestHost(info_, "tcp://127.0.0.1:84"),
-      makeTestHost(info_, "tcp://127.0.0.1:85")};
+  hostSet().hosts_ = {hostSet().healthy_hosts_[0],
+                      hostSet().healthy_hosts_[1],
+                      makeTestHost(info_, "tcp://127.0.0.1:82"),
+                      makeTestHost(info_, "tcp://127.0.0.1:83"),
+                      makeTestHost(info_, "tcp://127.0.0.1:84"),
+                      makeTestHost(info_, "tcp://127.0.0.1:85")};
   // Mark the 4 unhealthy hosts so coarseHealth() is consistent with healthy_hosts_ containing
   // only the first 2 hosts (2/6 = 33% < 50% panic threshold).
   for (size_t i = 2; i < hostSet().hosts_.size(); ++i) {
@@ -557,7 +556,7 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {
   EXPECT_EQ(hostSet().hosts_[2], lb_->chooseHost(nullptr).host);
 
   // Take the threshold back above the panic threshold.
-  hostSet().healthy_hosts_ = {hostSet().hosts_[0], hostSet().hosts_[1],hostSet().hosts_[2], 
+  hostSet().healthy_hosts_ = {hostSet().hosts_[0], hostSet().hosts_[1], hostSet().hosts_[2],
                               hostSet().hosts_[3]};
   // Clear FAILED_ACTIVE_HC on the hosts that are now healthy.
   hostSet().hosts_[2]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -574,13 +573,12 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {
 TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanicDisableOnPanic) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
                               makeTestHost(info_, "tcp://127.0.0.1:81")};
-  hostSet().hosts_ = {
-      hostSet().healthy_hosts_[0],
-      hostSet().healthy_hosts_[1],
-      makeTestHost(info_, "tcp://127.0.0.1:82"),
-      makeTestHost(info_, "tcp://127.0.0.1:83"),
-      makeTestHost(info_, "tcp://127.0.0.1:84"),
-      makeTestHost(info_, "tcp://127.0.0.1:85")};
+  hostSet().hosts_ = {hostSet().healthy_hosts_[0],
+                      hostSet().healthy_hosts_[1],
+                      makeTestHost(info_, "tcp://127.0.0.1:82"),
+                      makeTestHost(info_, "tcp://127.0.0.1:83"),
+                      makeTestHost(info_, "tcp://127.0.0.1:84"),
+                      makeTestHost(info_, "tcp://127.0.0.1:85")};
   // Mark the 4 unhealthy hosts so coarseHealth() is consistent with healthy_hosts_ containing
   // only the first 2 hosts (2/6 = 33% < 50% panic threshold).
   for (size_t i = 2; i < hostSet().hosts_.size(); ++i) {
@@ -594,7 +592,7 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanicDisableOnPanic) {
   EXPECT_EQ(nullptr, lb_->chooseHost(nullptr).host);
 
   // Take the threshold back above the panic threshold.
-  hostSet().healthy_hosts_ = {hostSet().hosts_[0], hostSet().hosts_[1],hostSet().hosts_[2],
+  hostSet().healthy_hosts_ = {hostSet().hosts_[0], hostSet().hosts_[1], hostSet().hosts_[2],
                               hostSet().hosts_[3]};
   // Clear FAILED_ACTIVE_HC on the hosts that are now healthy.
   hostSet().hosts_[2]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
