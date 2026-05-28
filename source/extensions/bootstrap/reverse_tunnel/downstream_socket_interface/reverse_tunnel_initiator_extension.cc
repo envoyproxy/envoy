@@ -41,6 +41,7 @@ ReverseTunnelInitiatorExtension::ReverseTunnelInitiatorExtension(
     additional_headers_ = {config.http_handshake().additional_headers().begin(),
                            config.http_handshake().additional_headers().end()};
     use_http_upgrade_ = config.http_handshake().use_http_upgrade();
+    upgrade_type_ = config.http_handshake().upgrade_type();
 
     if (!config.http_handshake().formatters().empty()) {
       Server::GenericFactoryContextImpl formatter_context(context,
@@ -59,6 +60,9 @@ ReverseTunnelInitiatorExtension::ReverseTunnelInitiatorExtension(
       }
       handshake_headers_ = std::move(handshake_headers);
     }
+  }
+  if (upgrade_type_.empty()) {
+    upgrade_type_ = std::string(ReverseConnectionUtility::REVERSE_TUNNEL_UPGRADE_PROTOCOL);
   }
   // Instantiate access loggers from config.
   Server::GenericFactoryContextImpl generic_context(context, context.scope(),

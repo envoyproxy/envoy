@@ -7,6 +7,7 @@ import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3";
 option java_outer_classname = "DownstreamReverseConnectionSocketInterfaceProto";
@@ -30,7 +31,7 @@ message DownstreamReverseConnectionSocketInterface {
     // Additional headers to include in the HTTP handshake request.
     repeated config.core.v3.HeaderValueOption additional_headers = 2;
 
-    // Perform the handshake as an HTTP/1.1 ``Upgrade`` exchange (``Upgrade: reverse-tunnel``,
+    // Perform the handshake as an HTTP/1.1 ``Upgrade`` exchange (``Upgrade: <upgrade_type>``,
     // success on ``101``) so HTTP proxies can route the handshake and splice the tunnel
     // afterward. The responder must set this flag to the same value.
     // Defaults to ``false``.
@@ -41,6 +42,11 @@ message DownstreamReverseConnectionSocketInterface {
     // as substitution format strings; when empty, the values are sent literally.
     // [#extension-category: envoy.formatter]
     repeated config.core.v3.TypedExtensionConfig formatters = 4;
+
+    // Upgrade token sent in the ``Upgrade`` header when ``use_http_upgrade`` is ``true``.
+    // The responder must be configured with the same value.
+    // If empty, defaults to ``reverse-tunnel``.
+    string upgrade_type = 5 [(validate.rules).string = {max_len: 255 ignore_empty: true}];
   }
 
   // Stat prefix to be used for downstream reverse connection socket interface stats.

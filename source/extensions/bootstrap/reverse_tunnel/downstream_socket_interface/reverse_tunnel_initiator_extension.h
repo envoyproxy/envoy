@@ -123,6 +123,11 @@ public:
   const HandshakeHeadersConstSharedPtr& handshakeHeaders() const { return handshake_headers_; }
 
   /**
+   * @return the upgrade token sent during the HTTP/1.1 Upgrade handshake.
+   */
+  const std::string& handshakeUpgradeType() const { return upgrade_type_; }
+
+  /**
    * @return reference to the configured access loggers for reverse tunnel lifecycle events.
    */
   const AccessLog::InstanceSharedPtrVector& accessLogs() const { return access_logs_; }
@@ -178,6 +183,7 @@ private:
   std::vector<envoy::config::core::v3::HeaderValueOption> additional_headers_;
   bool use_http_upgrade_{false};
   HandshakeHeadersConstSharedPtr handshake_headers_;
+  std::string upgrade_type_;
   AccessLog::InstanceSharedPtrVector access_logs_;
 
   /**

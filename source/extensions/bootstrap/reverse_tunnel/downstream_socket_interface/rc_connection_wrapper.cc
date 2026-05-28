@@ -141,9 +141,7 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
     // the connection raw after `101 Switching Protocols`. Both ends must agree.
     headers->setReferenceKey(Http::Headers::get().Connection,
                              Http::Headers::get().ConnectionValues.Upgrade);
-    headers->setReferenceKey(Http::Headers::get().Upgrade,
-                             ::Envoy::Extensions::Bootstrap::ReverseConnection::
-                                 ReverseConnectionUtility::REVERSE_TUNNEL_UPGRADE_PROTOCOL);
+    headers->setCopy(Http::Headers::get().Upgrade, parent_.upgradeType());
   }
   headers->addCopy(node_hdr, std::string(node_id));
   headers->addCopy(cluster_hdr, std::string(cluster_id));

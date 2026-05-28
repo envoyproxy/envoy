@@ -167,7 +167,11 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
               : "envoy.filters.network.reverse_tunnel"),
       required_cluster_name_(proto_config.required_cluster_name()),
       use_http_upgrade_(proto_config.use_http_upgrade()),
-      skip_rebalancing_(proto_config.skip_rebalancing()) {}
+      skip_rebalancing_(proto_config.skip_rebalancing()),
+      upgrade_type_(proto_config.upgrade_type().empty()
+                        ? std::string(::Envoy::Extensions::Bootstrap::ReverseConnection::
+                                          ReverseConnectionUtility::REVERSE_TUNNEL_UPGRADE_PROTOCOL)
+                        : proto_config.upgrade_type()) {}
 
 bool ReverseTunnelFilterConfig::validateIdentifiers(
     absl::string_view node_id, absl::string_view cluster_id, absl::string_view tenant_id,
@@ -370,19 +374,17 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
   // `Connection: Upgrade` paired token, so we only re-check the `Upgrade` value here.
   if (parent_.config_->useHttpUpgrade()) {
     const auto upgrade = headers_->getUpgradeValue();
-    if (!absl::EqualsIgnoreCase(upgrade, Bootstrap::ReverseConnection::ReverseConnectionUtility::
-                                             REVERSE_TUNNEL_UPGRADE_PROTOCOL)) {
+    const std::string& expected_upgrade = parent_.config_->upgradeType();
+    if (!absl::EqualsIgnoreCase(upgrade, expected_upgrade)) {
       parent_.stats_.parse_error_.inc();
       ENVOY_CONN_LOG(debug,
                      "reverse_tunnel: upgrade negotiation enabled but Upgrade header missing or "
-                     "unexpected (got '{}')",
-                     parent_.read_callbacks_->connection(), upgrade);
+                     "unexpected (got '{}', expected '{}')",
+                     parent_.read_callbacks_->connection(), upgrade, expected_upgrade);
       sendLocalReply(
-          Http::Code::UpgradeRequired, "Upgrade: reverse-tunnel required",
-          [](Http::ResponseHeaderMap& h) {
-            h.setReferenceKey(Http::Headers::get().Upgrade,
-                              Bootstrap::ReverseConnection::ReverseConnectionUtility::
-                                  REVERSE_TUNNEL_UPGRADE_PROTOCOL);
+          Http::Code::UpgradeRequired, fmt::format("Upgrade: {} required", expected_upgrade),
+          [&expected_upgrade](Http::ResponseHeaderMap& h) {
+            h.setCopy(Http::Headers::get().Upgrade, expected_upgrade);
           },
           absl::nullopt, "reverse_tunnel_upgrade_required");
       parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
@@ -501,9 +503,7 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
     resp_headers->setStatus(101);
     resp_headers->setReferenceKey(Http::Headers::get().Connection,
                                   Http::Headers::get().ConnectionValues.Upgrade);
-    resp_headers->setReferenceKey(
-        Http::Headers::get().Upgrade,
-        Bootstrap::ReverseConnection::ReverseConnectionUtility::REVERSE_TUNNEL_UPGRADE_PROTOCOL);
+    resp_headers->setCopy(Http::Headers::get().Upgrade, parent_.config_->upgradeType());
   } else {
     resp_headers->setStatus(200);
   }
