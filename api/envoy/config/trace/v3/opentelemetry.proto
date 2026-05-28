@@ -23,9 +23,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //  [#extension: envoy.tracers.opentelemetry]
 // [#next-free-field: 10]
 message OpenTelemetryConfig {
-  // Configures usage of Semantic Conventions standard tag names. Specifying both options will
-  // emit both legacy and semantic convention tags. If neither are specified, only legacy Envoy
-  // tags are emitted.
+  // Configures usage of Semantic Conventions standard tag names.
+  //
+  // Based on the `OTEL_SEMCONV_STABILITY_OPT_IN` environment variable concept
+  // from https://opentelemetry.io/docs/specs/semconv/http/http-metrics/.
   message OtelSemconvStabilityOptIn {
     // Emit legacy Envoy attributes. Default false.
     google.protobuf.BoolValue emit_legacy_tags = 1;
@@ -89,6 +90,6 @@ message OpenTelemetryConfig {
   google.protobuf.BoolValue set_service_name_resource_attribute = 8;
 
   // Configures which OpenTelemetry semantic convention stability levels to opt-in to. If not
-  // specified, only legacy Envoy tags are emitted.
+  // specified, the default is to emit only legacy Envoy tags.
   OtelSemconvStabilityOptIn otel_semconv_stability_opt_in = 9;
 }
