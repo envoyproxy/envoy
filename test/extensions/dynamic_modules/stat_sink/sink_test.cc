@@ -149,36 +149,26 @@ TEST_F(DynamicModuleStatsSinkTest, FlushWithEmptySnapshot) {
   g_recorder = nullptr;
 }
 
-// Flush pre-caches counter names, gauge names, and text-readout
-// names+values so the pointers handed to the module remain valid for the
-// duration of the call. This is the regression test for the dangling-pointer
-// bug where name() returns std::string by value.
-TEST_F(DynamicModuleStatsSinkTest, FlushPreCachesNames) {
+// Flush passes the MetricSnapshot pointer directly to the module. Verify
+// the module can read counters, gauges, and text readouts via that pointer.
+TEST_F(DynamicModuleStatsSinkTest, FlushPassesSnapshotDirectly) {
   CallRecorder recorder;
   g_recorder = &recorder;
 
-  // Our hook peeks at the context to verify cached names are populated.
   config_->on_flush_ = [](envoy_dynamic_module_type_stat_sink_config_module_ptr,
                           envoy_dynamic_module_type_stat_sink_envoy_ptr,
                           envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_ptr) {
     g_recorder->flush_calls++;
-    auto* ctx = static_cast<const StatSinkFlushContext*>(snapshot_ptr);
-    ASSERT_NE(nullptr, ctx);
-    EXPECT_EQ(2u, ctx->counter_names.size());
-    EXPECT_EQ(1u, ctx->gauge_names.size());
-    EXPECT_EQ(1u, ctx->text_readout_names.size());
-    EXPECT_EQ(1u, ctx->text_readout_values.size());
-    EXPECT_EQ("c0", ctx->counter_names[0]);
-    EXPECT_EQ("c1", ctx->counter_names[1]);
-    EXPECT_EQ("g0", ctx->gauge_names[0]);
-    EXPECT_EQ("t0", ctx->text_readout_names[0]);
-    EXPECT_EQ("v0", ctx->text_readout_values[0]);
+    auto* snapshot = static_cast<Stats::MetricSnapshot*>(snapshot_ptr);
+    ASSERT_NE(nullptr, snapshot);
+    EXPECT_EQ(2u, snapshot->counters().size());
+    EXPECT_EQ(1u, snapshot->gauges().size());
+    EXPECT_EQ(1u, snapshot->textReadouts().size());
   };
 
   DynamicModuleStatsSink sink(config_);
   NiceMock<Stats::MockMetricSnapshot> snapshot;
 
-  // Populate two counters, one gauge, one text readout.
   NiceMock<Stats::MockCounter> c0, c1;
   c0.name_ = "c0";
   c0.value_ = 10;

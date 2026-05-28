@@ -15,7 +15,6 @@ envoy_extension_package()
 envoy_cc_library(
     name = "abi_impl",
     srcs = ["abi_impl.cc"],
-    hdrs = ["stat_sink_flush_context.h"],
     deps = [
         "//envoy/stats:sink_interface",
         "//source/extensions/dynamic_modules:abi_impl",

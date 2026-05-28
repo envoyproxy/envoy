@@ -52,7 +52,7 @@ envoy_cc_test(
     srcs = ["abi_impl_test.cc"],
     deps = [
         "//source/extensions/dynamic_modules/abi",
-        "//source/extensions/stat_sinks/dynamic_modules:sink_lib",
+        "//source/extensions/stat_sinks/dynamic_modules:abi_impl",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:utility_lib",
     ],
@@ -63,7 +63,7 @@ envoy_cc_test(
     srcs = ["integration_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:stat_sink_integration_test",
-        "//test/extensions/dynamic_modules/test_data/go:stat_sink",
+        "//test/extensions/dynamic_modules/test_data/go:stat_sink_integration_test",
     ],
     deps = [
         "//source/extensions/stat_sinks/dynamic_modules:config",

@@ -24,12 +24,7 @@ public:
 
   std::string language() const { return std::get<1>(GetParam()); }
 
-  std::string moduleName() const {
-    if (language() == "go") {
-      return "stat_sink";
-    }
-    return "stat_sink_integration_test";
-  }
+  std::string moduleName() const { return "stat_sink_integration_test"; }
 
   void setUpTestModulePath() {
     const std::string shared_object_path =
