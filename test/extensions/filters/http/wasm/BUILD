@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
+    "envoy_proto_library",
 )
 load(
     "//bazel:envoy_select.bzl",
@@ -15,6 +16,11 @@ load(
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_proto_library(
+    name = "wasm_test_filters_proto",
+    srcs = ["wasm_test_filters.proto"],
+)
 
 envoy_extension_cc_test(
     name = "wasm_filter_test",
@@ -94,6 +100,7 @@ envoy_extension_cc_test(
     shard_count = 16,
     tags = ["skip_on_windows"],
     deps = [
+        ":wasm_test_filters_proto_cc_proto",
         "//source/common/common:base64_lib",
         "//source/common/common:hex_lib",
         "//source/common/crypto:utility_lib",

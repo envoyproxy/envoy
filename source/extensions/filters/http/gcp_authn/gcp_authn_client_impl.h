@@ -27,7 +27,6 @@ public:
 
   void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 
-  // GcpAuthnClient implemented by this class.
   void fetchToken(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
                   GcpAuthnClient::Callbacks& callbacks) override;
   void cancel() override;
@@ -44,6 +43,7 @@ private:
   Server::Configuration::FactoryContext& context_;
   Http::AsyncClient::Request* active_request_{};
   GcpAuthnClient::Callbacks* callbacks_{};
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience_;
 };
 
 } // namespace GcpAuthn

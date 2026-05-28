@@ -584,7 +584,7 @@ TEST_P(CustomResponseIntegrationTest, DecodeLocalReplyBeforeCER) {
   filters_before_cer_.emplace_back(R"EOF(
 name: local-reply-during-decode
 typed_config:
-  "@type": type.googleapis.com/google.protobuf.Struct
+  "@type": type.googleapis.com/test.integration.filters.LocalReplyDuringDecodeConfig
 )EOF");
   initialize();
 
@@ -604,7 +604,7 @@ TEST_P(CustomResponseIntegrationTest, DecodeLocalReplyBeforeCERLocalReplyPolicy)
   filters_before_cer_.emplace_back(R"EOF(
 name: local-reply-during-decode
 typed_config:
-  "@type": type.googleapis.com/google.protobuf.Struct
+  "@type": type.googleapis.com/test.integration.filters.LocalReplyDuringDecodeConfig
 )EOF");
 
   setLocalResponseFor5xx();
@@ -627,7 +627,7 @@ TEST_P(CustomResponseIntegrationTest, DecodeLocalReplyAfterCERLocalReplyPolicy) 
   filters_after_cer_.emplace_back(R"EOF(
 name: local-reply-during-decode
 typed_config:
-  "@type": type.googleapis.com/google.protobuf.Struct
+  "@type": type.googleapis.com/test.integration.filters.LocalReplyDuringDecodeConfig
 )EOF");
 
   setLocalResponseFor5xx();
@@ -649,7 +649,7 @@ TEST_P(CustomResponseIntegrationTest, EncodeLocalReplyBeforeCERLocalReplyPolicy)
   filters_before_cer_.emplace_back(R"EOF(
 name: local-reply-during-encode
 typed_config:
-  "@type": type.googleapis.com/google.protobuf.Struct
+  "@type": type.googleapis.com/test.integration.filters.LocalReplyDuringEncodeConfig
 )EOF");
 
   setLocalResponseFor5xx();
@@ -668,7 +668,7 @@ TEST_P(CustomResponseIntegrationTest, EncodeLocalReplyBeforeCER) {
   filters_before_cer_.emplace_back(R"EOF(
 name: local-reply-during-encode
 typed_config:
-  "@type": type.googleapis.com/google.protobuf.Struct
+  "@type": type.googleapis.com/test.integration.filters.LocalReplyDuringEncodeConfig
 )EOF");
   initialize();
 
@@ -685,7 +685,7 @@ TEST_P(CustomResponseIntegrationTest, EncodeLocalReplyAfterCER) {
   filters_after_cer_.emplace_back(R"EOF(
 name: local-reply-during-encode
 typed_config:
-  "@type": type.googleapis.com/google.protobuf.Struct
+  "@type": type.googleapis.com/test.integration.filters.LocalReplyDuringEncodeConfig
 )EOF");
   initialize();
 
@@ -705,9 +705,12 @@ TEST_P(CustomResponseIntegrationTest, RouteSpecificDecodeLocalReplyBeforeRedirec
   filters_before_cer_.emplace_back(R"EOF(
 name: local-reply-during-decode-if-not-cer
 typed_config:
-  "@type": type.googleapis.com/google.protobuf.Struct
+  "@type": type.googleapis.com/test.extensions.filters.http.custom_response.LocalReplyDuringDecodeIfNotCerConfig
 )EOF");
-  SimpleFilterConfig<LocalReplyDuringDecodeIfNotCER> factory;
+  UniqueSimpleFilterConfig<
+      LocalReplyDuringDecodeIfNotCER,
+      test::extensions::filters::http::custom_response::LocalReplyDuringDecodeIfNotCerConfig>
+      factory;
   Envoy::Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration(
       factory);
   initialize();
@@ -728,9 +731,12 @@ TEST_P(CustomResponseIntegrationTest, RouteSpecificDecodeLocalReplyAfterRedirect
   filters_after_cer_.emplace_back(R"EOF(
 name: local-reply-during-decode-if-not-cer
 typed_config:
-  "@type": type.googleapis.com/google.protobuf.Struct
+  "@type": type.googleapis.com/test.extensions.filters.http.custom_response.LocalReplyDuringDecodeIfNotCerConfig
 )EOF");
-  SimpleFilterConfig<LocalReplyDuringDecodeIfNotCER> factory;
+  UniqueSimpleFilterConfig<
+      LocalReplyDuringDecodeIfNotCER,
+      test::extensions::filters::http::custom_response::LocalReplyDuringDecodeIfNotCerConfig>
+      factory;
   Envoy::Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration(
       factory);
   // Add route with header matcher
@@ -859,7 +865,7 @@ TEST_P(CustomResponseIntegrationTest, LocalReplyMatcherInterceptsLocalReply) {
   filters_before_cer_.emplace_back(R"EOF(
 name: local-reply-during-decode
 typed_config:
-  "@type": type.googleapis.com/google.protobuf.Struct
+  "@type": type.googleapis.com/test.integration.filters.LocalReplyDuringDecodeConfig
 )EOF");
 
   setLocalResponseFor5xxLocalRepliesOnly();

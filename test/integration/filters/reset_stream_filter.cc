@@ -7,6 +7,7 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 namespace Envoy {
 
@@ -19,9 +20,12 @@ public:
   }
 };
 
-class ResetFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpDualFilterConfig {
+class ResetFilterConfig : public Extensions::HttpFilters::Common::UniqueEmptyHttpDualFilterConfig<
+                              test::integration::filters::ResetStreamFilterConfig> {
 public:
-  ResetFilterConfig() : EmptyHttpDualFilterConfig("reset-stream-filter") {}
+  ResetFilterConfig()
+      : UniqueEmptyHttpDualFilterConfig<test::integration::filters::ResetStreamFilterConfig>(
+            "reset-stream-filter") {}
   absl::StatusOr<Http::FilterFactoryCb>
   createDualFilter(const std::string&, Server::Configuration::ServerFactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
@@ -59,9 +63,13 @@ private:
   bool continue_after_reset_{false};
 };
 
-class EncoderResetFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpDualFilterConfig {
+class EncoderResetFilterConfig
+    : public Extensions::HttpFilters::Common::UniqueEmptyHttpDualFilterConfig<
+          test::integration::filters::EncoderResetStreamFilterConfig> {
 public:
-  EncoderResetFilterConfig() : EmptyHttpDualFilterConfig("encoder-reset-stream-filter") {}
+  EncoderResetFilterConfig()
+      : UniqueEmptyHttpDualFilterConfig<test::integration::filters::EncoderResetStreamFilterConfig>(
+            "encoder-reset-stream-filter") {}
   absl::StatusOr<Http::FilterFactoryCb>
   createDualFilter(const std::string&, Server::Configuration::ServerFactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
