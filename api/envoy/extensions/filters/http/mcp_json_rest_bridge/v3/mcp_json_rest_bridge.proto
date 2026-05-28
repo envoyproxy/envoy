@@ -222,6 +222,7 @@ message McpServerInfo {
   string host = 2;
 }
 
+// [#next-free-field: 6]
 message ToolConfig {
   // Unique identifier of the tool. Used both for tools/list and tools/call transcoding.
   string name = 1 [(validate.rules).string = {min_len: 1}];
@@ -234,9 +235,24 @@ message ToolConfig {
   // in the ServerToolConfig.
   ToolsListSpecificConfig tool_list_config = 3;
 
+  // Enables streaming transcoding for unstructured text responses (``content`` field of a result).
+  //
+  // When enabled, the response body is streamed directly to the client without buffering. Each
+  // chunk is JSON escaped as it arrives and wrapped with a pre-built JSON-RPC prefix and suffix.
+  //
+  // Streaming flow:
+  //
+  // .. code-block:: text
+  //
+  //   input:  [chunk1] → [chunk2] → [chunk3]
+  //   output: [prefix+escaped_chunk1] → [escaped_chunk2] → [escaped_chunk3+suffix]
+  //
+  // Disabled by default.
+  bool text_content_streaming_enabled = 4;
+
   // [#not-implemented-hide:]
   // Path and host of the MCP server that hosts this tool.
-  McpServerInfo server_info = 4;
+  McpServerInfo server_info = 5;
 }
 
 // Defines the schema of the JSON-RPC to REST mapping. It specifies how the "arguments"
