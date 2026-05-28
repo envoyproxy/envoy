@@ -331,6 +331,8 @@ public:
 
     config_helper_.prependFilter(R"EOF(
     name: decode-dynamic-metadata-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.DecodeDynamicMetadataFilterConfig
     )EOF");
 
     HttpIntegrationTest::initialize();

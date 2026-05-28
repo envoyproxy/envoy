@@ -14,6 +14,7 @@ package(default_visibility = [
     "//test/extensions/dynamic_modules/udp:__pkg__",
     "//test/extensions/load_balancing_policies/dynamic_modules:__pkg__",
     "//test/extensions/matching/input_matchers/dynamic_modules:__pkg__",
+    "//test/extensions/network/dns_resolver/hickory:__pkg__",
     "//test/extensions/tracers/dynamic_modules:__pkg__",
     "//test/extensions/transport_sockets/tls/cert_validator/dynamic_modules:__pkg__",
     "//test/extensions/upstreams/http/dynamic_modules:__pkg__",
@@ -226,3 +227,5 @@ test_program(name = "stat_sink_missing_flush")
 test_program(name = "stat_sink_missing_histogram_complete")
 
 test_program(name = "stat_sink_integration_test")
+
+test_program(name = "dns_resolver_config_new_fail")
