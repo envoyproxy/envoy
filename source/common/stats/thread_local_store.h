@@ -167,7 +167,7 @@ public:
   static const char IterateScopeSync[];
   static const char MainDispatcherCleanupSync[];
 
-  ThreadLocalStoreImpl(Allocator& alloc);
+  ThreadLocalStoreImpl(Allocator& alloc, bool use_tag_scope = false);
   ~ThreadLocalStoreImpl() override;
   // Stats::Store
   NullCounterImpl& nullCounter() override { return null_counter_; }
@@ -300,21 +300,31 @@ private:
     }
 
     // Stats::Scope
-    Counter& counterFromStatNameWithTags(const StatName& name,
-                                         StatNameTagVectorOptConstRef tags) override;
-    Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                     Gauge::ImportMode import_mode) override;
-    Histogram& histogramFromStatNameWithTags(const StatName& name,
-                                             StatNameTagVectorOptConstRef tags,
-                                             Histogram::Unit unit) override;
-    TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
-                                                 StatNameTagVectorOptConstRef tags) override;
-    ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
-                               const ScopeStatsLimitSettings& limits = {},
-                               StatsMatcherSharedPtr matcher = nullptr) override;
-    ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false,
-                                     const ScopeStatsLimitSettings& limits = {},
-                                     StatsMatcherSharedPtr matcher = nullptr) override;
+    // Keep the base's non-virtual convenience overloads (the legacy createScope/scopeFromStatName
+    // and *FromStatNameWithTags methods, and the single-argument *FromStatName helpers) visible
+    // alongside the tag-aware overrides below; otherwise the overrides would hide them.
+    using Scope::counterFromStatName;
+    using Scope::createScope;
+    using Scope::gaugeFromStatName;
+    using Scope::histogramFromStatName;
+    using Scope::scopeFromStatName;
+    using Scope::textReadoutFromStatName;
+    // The legacy scope ignores name_tags/tagged_name: it joins parent's prefix + name as before.
+    Counter& counterFromStatName(StatName name, absl::optional<StatNameTagSpan> name_tags,
+                                 StatName tagged_name) override;
+    Gauge& gaugeFromStatName(StatName name, absl::optional<StatNameTagSpan> name_tags,
+                             StatName tagged_name, Gauge::ImportMode import_mode) override;
+    Histogram& histogramFromStatName(StatName name, absl::optional<StatNameTagSpan> name_tags,
+                                     StatName tagged_name, Histogram::Unit unit) override;
+    TextReadout& textReadoutFromStatName(StatName name, absl::optional<StatNameTagSpan> name_tags,
+                                         StatName tagged_name) override;
+    ScopeSharedPtr createScope(absl::string_view name, StringViewTagSpan name_tags,
+                               absl::string_view tagged_name, bool evictable,
+                               const ScopeStatsLimitSettings& limits,
+                               StatsMatcherSharedPtr matcher) override;
+    ScopeSharedPtr scopeFromStatName(StatName name, StatNameTagSpan name_tags, StatName tagged_name,
+                                     bool evictable, const ScopeStatsLimitSettings& limits,
+                                     StatsMatcherSharedPtr matcher) override;
     const SymbolTable& constSymbolTable() const final { return parent_.constSymbolTable(); }
     SymbolTable& symbolTable() final { return parent_.symbolTable(); }
 
@@ -490,10 +500,55 @@ private:
     const ScopeStatsLimitSettings limits_;
     StatsMatcherSharedPtr scope_matcher_;
 
-  private:
+  protected:
     StatNameStorage prefix_;
     mutable CentralCacheEntrySharedPtr central_cache_ ABSL_GUARDED_BY(parent_.lock_);
     std::function<void()> cleanup_callback_;
+  };
+
+  // Tag-aware scope for the thread-local store. It tracks a tag-extracted prefix separately from
+  // the prefix (the base ScopeImpl's prefix_, which may carry interspersed tag values) and a set
+  // of scope-level prefix tags propagated onto every stat it creates. The tag-aware Scope APIs are
+  // implemented here; see TagStatNameJoiner.
+  class TagScopeImpl : public ScopeImpl {
+  public:
+    // `name` is the scope's tag-extracted prefix; `tagged_name` is its flat prefix with tag
+    // values interleaved (stored in the base ScopeImpl's prefix_).
+    TagScopeImpl(std::unique_ptr<StatNamePool> pool, StatName name, StatNameTagSpan name_tags,
+                 StatName tagged_name, ThreadLocalStoreImpl& store, bool evictable,
+                 const ScopeStatsLimitSettings& limits = {},
+                 StatsMatcherSharedPtr matcher = nullptr);
+
+    // Keep the base's non-virtual convenience overloads visible alongside the tag-aware overrides.
+    using Scope::counterFromStatName;
+    using Scope::createScope;
+    using Scope::gaugeFromStatName;
+    using Scope::histogramFromStatName;
+    using Scope::scopeFromStatName;
+    using Scope::textReadoutFromStatName;
+
+    ScopeSharedPtr createScope(absl::string_view name, StringViewTagSpan name_tags,
+                               absl::string_view tagged_name, bool evictable,
+                               const ScopeStatsLimitSettings& limits,
+                               StatsMatcherSharedPtr matcher) override;
+    ScopeSharedPtr scopeFromStatName(StatName name, StatNameTagSpan name_tags, StatName tagged_name,
+                                     bool evictable, const ScopeStatsLimitSettings& limits,
+                                     StatsMatcherSharedPtr matcher) override;
+    Counter& counterFromStatName(StatName name, absl::optional<StatNameTagSpan> name_tags,
+                                 StatName tagged_name) override;
+    Gauge& gaugeFromStatName(StatName name, absl::optional<StatNameTagSpan> name_tags,
+                             StatName tagged_name, Gauge::ImportMode import_mode) override;
+    Histogram& histogramFromStatName(StatName name, absl::optional<StatNameTagSpan> name_tags,
+                                     StatName tagged_name, Histogram::Unit unit) override;
+    TextReadout& textReadoutFromStatName(StatName name, absl::optional<StatNameTagSpan> name_tags,
+                                         StatName tagged_name) override;
+
+  private:
+    std::unique_ptr<StatNamePool> pool_;
+    // The scope's tag-extracted prefix. Paired with the base ScopeImpl's prefix_
+    // (which holds the tagged/flat prefix) and prefix_tags_.
+    StatName tag_extracted_prefix_;
+    StatNameTagVec prefix_tags_;
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
@@ -601,6 +656,8 @@ private:
   uint64_t next_histogram_id_ ABSL_GUARDED_BY(hist_mutex_) = 0;
 
   StatNameSetPtr well_known_tags_;
+  // When true, the default scope is a TagScopeImpl, enabling the tag-aware Scope APIs.
+  const bool use_tag_scope_ = false;
 
   mutable Thread::MutexBasicLockable hist_mutex_;
   StatSet<ParentHistogramImpl> histogram_set_ ABSL_GUARDED_BY(hist_mutex_);

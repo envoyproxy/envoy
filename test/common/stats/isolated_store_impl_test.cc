@@ -150,6 +150,29 @@ TEST_F(StatsIsolatedStoreImplTest, PrefixIsStatName) {
   EXPECT_EQ("scope1.scope2.c1", c1.name());
 }
 
+// When scopeFromStatName / createScope is called with name_tags but no explicit `tagged_name`, the
+// joiner derives the child's flat prefix by appending the tag name/value pairs to the
+// tag-extracted name. IsolatedScopeImpl does not retain the tags afterwards, so subsequent
+// stats see no propagated tag metadata.
+TEST_F(StatsIsolatedStoreImplTest, ScopeFromTagsWithoutExplicitTaggedName) {
+  StatNameTagVector name_tags{{makeStatName("cluster_name"), makeStatName("foo")}};
+  ScopeSharedPtr cluster_scope =
+      scope_->scopeFromStatName(makeStatName("cluster"), StatNameTagSpan(name_tags), StatName());
+  EXPECT_EQ("cluster.cluster_name.foo", symbol_table_.toString(cluster_scope->prefix()));
+
+  Counter& c = cluster_scope->counterFromString("upstream_rq");
+  EXPECT_EQ("cluster.cluster_name.foo.upstream_rq", c.name());
+  EXPECT_EQ("cluster.cluster_name.foo.upstream_rq", c.tagExtractedName());
+  EXPECT_EQ(0, c.tags().size());
+
+  // Same behavior via the string-view createScope path.
+  std::vector<StringViewTag> sv_tags{{"cluster_name", "bar"}};
+  ScopeSharedPtr bar_scope = scope_->createScope("cluster", sv_tags, /*tagged_name=*/"");
+  EXPECT_EQ("cluster.cluster_name.bar", symbol_table_.toString(bar_scope->prefix()));
+  EXPECT_EQ("cluster.cluster_name.bar.upstream_rq",
+            bar_scope->counterFromString("upstream_rq").name());
+}
+
 TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
   ScopeSharedPtr scope1 = scope_->createScope("scope1.");
   Counter& c1 = scope_->counterFromStatName(makeStatName("c1"));
@@ -517,6 +540,111 @@ TEST_F(IsolatedStoreScopeMatcherTest, ChildScopeOverridesMatcher) {
   // "rejected_by_child" prefix IS rejected by the child's own matcher.
   Counter& rejected = child_scope->counterFromString("rejected_by_child.foo");
   EXPECT_EQ("", rejected.name());
+}
+
+// The explicit `tagged_name` controls the flat stat name while name_tags are still recorded;
+// `name` yields the tag-extracted name.
+TEST_F(StatsIsolatedStoreImplTest, CounterNameAndNameTags) {
+  StatNameTagVector name_tags{{makeStatName("cluster_name"), makeStatName("foo")}};
+  Counter& c =
+      scope_->counterFromStatName(makeStatName("cluster.upstream_rq"), StatNameTagSpan(name_tags),
+                                  makeStatName("cluster.foo.up"));
+  EXPECT_EQ("cluster.foo.up", c.name());
+  EXPECT_EQ("cluster.upstream_rq", c.tagExtractedName());
+  ASSERT_EQ(1, c.tags().size());
+  EXPECT_EQ("cluster_name", c.tags()[0].name_);
+  EXPECT_EQ("foo", c.tags()[0].value_);
+}
+
+// Without an explicit tagged_name, the name_tags are appended to prefix+tag_extracted_name (legacy
+// convention).
+TEST_F(StatsIsolatedStoreImplTest, CounterTagsAppendedWithoutTaggedName) {
+  StatNameTagVector name_tags{{makeStatName("cluster_name"), makeStatName("foo")}};
+  Counter& c = scope_->counterFromStatName(makeStatName("upstream_rq"), StatNameTagSpan(name_tags),
+                                           StatName());
+  EXPECT_EQ("upstream_rq.cluster_name.foo", c.name());
+  EXPECT_EQ("upstream_rq", c.tagExtractedName());
+  ASSERT_EQ(1, c.tags().size());
+}
+
+// IsolatedScopeImpl does not retain scope-level tags. scopeFromStatName uses the joiner to derive
+// the child's flat tagged_name (so the tag value still appears in the tagged_name when the caller
+// asks for it), but the child scope itself carries no tag metadata: subsequent stats see no
+// propagated tag.
+TEST_F(StatsIsolatedStoreImplTest, ScopeTagsAreNotPropagated) {
+  StatNameTagVector name_tags{{makeStatName("cluster_name"), makeStatName("foo")}};
+  ScopeSharedPtr cluster_scope = scope_->scopeFromStatName(
+      makeStatName("cluster"), StatNameTagSpan(name_tags), makeStatName("cluster.foo"));
+  EXPECT_EQ("cluster.foo", symbol_table_.toString(cluster_scope->prefix()));
+
+  Counter& c = cluster_scope->counterFromStatName(makeStatName("upstream_rq"));
+  EXPECT_EQ("cluster.foo.upstream_rq", c.name());
+  EXPECT_EQ("cluster.foo.upstream_rq", c.tagExtractedName());
+  EXPECT_EQ(0, c.tags().size());
+
+  // Per-stat name_tags still work: only the metric's own tag is attached.
+  StatNameTagVector own{{makeStatName("method"), makeStatName("get")}};
+  Counter& c2 =
+      cluster_scope->counterFromStatName(makeStatName("rq"), StatNameTagSpan(own), StatName());
+  EXPECT_EQ("cluster.foo.rq.method.get", c2.name());
+  EXPECT_EQ("cluster.foo.rq", c2.tagExtractedName());
+  ASSERT_EQ(1, c2.tags().size());
+  EXPECT_EQ("method", c2.tags()[0].name_);
+  EXPECT_EQ("get", c2.tags()[0].value_);
+}
+
+// The legacy createScope/counter APIs still work.
+TEST_F(StatsIsolatedStoreImplTest, LegacyScopeApiStillWorks) {
+  ScopeSharedPtr child = scope_->createScope("a.b");
+  Counter& c = child->counterFromString("c");
+  EXPECT_EQ("a.b.c", c.name());
+  EXPECT_EQ("a.b.c", c.tagExtractedName());
+  EXPECT_EQ(0, c.tags().size());
+}
+
+// The string_view createScope path uses the joiner to derive the child's flat tagged_name but drops
+// the scope-level tags (none propagate to child stats).
+TEST_F(StatsIsolatedStoreImplTest, CreateScopeWithStringViewTagsDropsScopeTags) {
+  std::vector<StringViewTag> name_tags{{"cluster_name", "foo"}};
+  ScopeSharedPtr cluster_scope = scope_->createScope("cluster", name_tags, "cluster.foo");
+  EXPECT_EQ("cluster.foo", symbol_table_.toString(cluster_scope->prefix()));
+
+  Counter& c = cluster_scope->counterFromString("upstream_rq");
+  EXPECT_EQ("cluster.foo.upstream_rq", c.name());
+  EXPECT_EQ("cluster.foo.upstream_rq", c.tagExtractedName());
+  EXPECT_EQ(0, c.tags().size());
+}
+
+TEST_F(StatsIsolatedStoreImplTest, CreateScopeWithStringViewTagsDropsScopeTags2) {
+  std::vector<StringViewTag> name_tags{{"cluster_name", "foo"}};
+  ScopeSharedPtr cluster_scope = scope_->createScope("cluster", name_tags, /*tagged_name=*/"");
+  EXPECT_EQ("cluster.cluster_name.foo", symbol_table_.toString(cluster_scope->prefix()));
+
+  Counter& c = cluster_scope->counterFromString("upstream_rq");
+  EXPECT_EQ("cluster.cluster_name.foo.upstream_rq", c.name());
+  EXPECT_EQ("cluster.cluster_name.foo.upstream_rq", c.tagExtractedName());
+  EXPECT_EQ(0, c.tags().size());
+}
+
+// The explicit tagged_name + name_tags combination works for histograms and text readouts too, not
+// just counters/gauges.
+TEST_F(StatsIsolatedStoreImplTest, HistogramAndTextReadoutNameAndNameTags) {
+  StatNameTagVector name_tags{{makeStatName("cluster_name"), makeStatName("foo")}};
+  Histogram& h = scope_->histogramFromStatName(
+      makeStatName("cluster.rq_time"), StatNameTagSpan(name_tags),
+      makeStatName("cluster.foo.rq_time"), Histogram::Unit::Unspecified);
+  EXPECT_EQ("cluster.foo.rq_time", h.name());
+  EXPECT_EQ("cluster.rq_time", h.tagExtractedName());
+  ASSERT_EQ(1, h.tags().size());
+  EXPECT_EQ("foo", h.tags()[0].value_);
+
+  TextReadout& t =
+      scope_->textReadoutFromStatName(makeStatName("cluster.version"), StatNameTagSpan(name_tags),
+                                      makeStatName("cluster.foo.version"));
+  EXPECT_EQ("cluster.foo.version", t.name());
+  EXPECT_EQ("cluster.version", t.tagExtractedName());
+  ASSERT_EQ(1, t.tags().size());
+  EXPECT_EQ("foo", t.tags()[0].value_);
 }
 
 } // namespace Stats

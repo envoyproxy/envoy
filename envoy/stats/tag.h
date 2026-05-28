@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <utility>
 
 #include "envoy/common/optref.h"
 
@@ -35,6 +36,11 @@ using StatNameTagVectorOptConstRef =
 
 using StatNameTagSpan = absl::Span<const StatNameTag>;
 using StatNameTagVec = absl::InlinedVector<StatNameTag, 6>;
+
+// String-view representation of a tag (name, value), used by the string-based scope APIs so
+// callers can supply tags without first interning them in the symbol table.
+using StringViewTag = std::pair<absl::string_view, absl::string_view>;
+using StringViewTagSpan = absl::Span<const StringViewTag>;
 
 } // namespace Stats
 } // namespace Envoy

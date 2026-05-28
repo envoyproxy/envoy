@@ -182,6 +182,13 @@ public:
                              StatsMatcherSharedPtr matcher = nullptr) {
     return rootScope()->createScope(name, evictable, limits, std::move(matcher));
   }
+  ScopeSharedPtr createScope(absl::string_view name, StringViewTagSpan name_tags,
+                             absl::string_view tagged_name, bool evictable = false,
+                             const ScopeStatsLimitSettings& limits = {},
+                             StatsMatcherSharedPtr matcher = nullptr) {
+    return rootScope()->createScope(name, name_tags, tagged_name, evictable, limits,
+                                    std::move(matcher));
+  }
 
   /**
    * Extracts tags from the name and appends them to the provided StatNameTagVector.

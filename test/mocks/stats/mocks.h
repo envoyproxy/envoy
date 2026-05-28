@@ -297,15 +297,22 @@ class MockScope : public TestUtil::TestScope {
 public:
   MockScope(StatName prefix, MockStore& store);
 
-  ScopeSharedPtr createScope(const std::string& name, bool evictable,
-                             const ScopeStatsLimitSettings& limits,
-                             StatsMatcherSharedPtr = nullptr) override {
+  // Keep the base's non-virtual convenience overloads visible alongside the tag-aware overrides.
+  using TestUtil::TestScope::counterFromStatName;
+  using TestUtil::TestScope::createScope;
+  using TestUtil::TestScope::gaugeFromStatName;
+  using TestUtil::TestScope::histogramFromStatName;
+  using TestUtil::TestScope::scopeFromStatName;
+  using TestUtil::TestScope::textReadoutFromStatName;
+  ScopeSharedPtr createScope(absl::string_view name, StringViewTagSpan, absl::string_view,
+                             bool evictable, const ScopeStatsLimitSettings& limits,
+                             StatsMatcherSharedPtr) override {
     checkCreateScopeArgs(evictable, limits);
-    return ScopeSharedPtr(createScope_(name));
+    return ScopeSharedPtr(createScope_(std::string(name)));
   }
-  ScopeSharedPtr scopeFromStatName(StatName name, bool evictable,
+  ScopeSharedPtr scopeFromStatName(StatName name, StatNameTagSpan, StatName, bool evictable,
                                    const ScopeStatsLimitSettings& limits,
-                                   StatsMatcherSharedPtr = nullptr) override {
+                                   StatsMatcherSharedPtr) override {
     checkCreateScopeArgs(evictable, limits);
     return createScope_(symbolTable().toString(name));
   }
@@ -319,18 +326,19 @@ public:
 
   // Override the lowest level of stat creation based on StatName to redirect
   // back to the old string-based mechanisms still on the MockStore object
-  // to allow tests to inject EXPECT_CALL hooks for those.
-  MOCK_METHOD(Counter&, counterFromStatNameWithTags,
-              (const StatName&, StatNameTagVectorOptConstRef));
+  // to allow tests to inject EXPECT_CALL hooks for those. The optional pre-built tagged_name is
+  // ignored.
+  MOCK_METHOD(Counter&, counterFromStatName, (StatName, absl::optional<StatNameTagSpan>, StatName),
+              (override));
   // NOLINTNEXTLINE(readability-identifier-naming)
-  Counter& counterFromStatNameWithTags_(const StatName& name, StatNameTagVectorOptConstRef);
+  Counter& counterFromStatName_(StatName name, absl::optional<StatNameTagSpan>, StatName);
 
-  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef,
-                                   Gauge::ImportMode import_mode) override;
-  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef,
-                                           Histogram::Unit unit) override;
-  TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
-                                               StatNameTagVectorOptConstRef) override;
+  Gauge& gaugeFromStatName(StatName name, absl::optional<StatNameTagSpan>, StatName,
+                           Gauge::ImportMode import_mode) override;
+  Histogram& histogramFromStatName(StatName name, absl::optional<StatNameTagSpan>, StatName,
+                                   Histogram::Unit unit) override;
+  TextReadout& textReadoutFromStatName(StatName name, absl::optional<StatNameTagSpan>,
+                                       StatName) override;
 
   MockStore& mock_store_;
 };

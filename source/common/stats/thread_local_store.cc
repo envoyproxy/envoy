@@ -19,6 +19,7 @@
 #include "source/common/stats/tag_utility.h"
 
 #include "absl/strings/str_join.h"
+#include "symbol_table.h"
 
 namespace Envoy {
 namespace Stats {
@@ -27,18 +28,24 @@ const char ThreadLocalStoreImpl::DeleteScopeSync[] = "delete-scope";
 const char ThreadLocalStoreImpl::IterateScopeSync[] = "iterate-scope";
 const char ThreadLocalStoreImpl::MainDispatcherCleanupSync[] = "main-dispatcher-cleanup";
 
-ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
+ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc, bool use_tag_scope)
     : alloc_(alloc), tag_producer_(std::make_unique<TagProducerImpl>()),
       stats_matcher_(std::make_unique<StatsMatcherImpl>()),
       histogram_settings_(std::make_unique<HistogramSettingsImpl>()),
       null_counter_(alloc.symbolTable()), null_gauge_(alloc.symbolTable()),
       null_histogram_(alloc.symbolTable()), null_text_readout_(alloc.symbolTable()),
-      well_known_tags_(alloc.symbolTable().makeSet("well_known_tags")) {
+      well_known_tags_(alloc.symbolTable().makeSet("well_known_tags")),
+      use_tag_scope_(use_tag_scope) {
   for (const auto& desc : Config::TagNames::get().descriptorVec()) {
     well_known_tags_->rememberBuiltin(desc.name_);
   }
-  StatNameManagedStorage empty("", alloc.symbolTable());
-  auto new_scope = std::make_shared<ScopeImpl>(*this, StatName(empty.statName()), false);
+  std::shared_ptr<ScopeImpl> new_scope;
+  if (use_tag_scope_) {
+    new_scope = std::make_shared<TagScopeImpl>(nullptr, StatName{}, StatNameTagSpan{}, StatName{},
+                                               *this, false);
+  } else {
+    new_scope = std::make_shared<ScopeImpl>(*this, StatName{}, false);
+  }
   addScope(new_scope);
   default_scope_ = new_scope;
 }
@@ -158,17 +165,29 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   return ret;
 }
 
-ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::createScope(const std::string& name, bool evictable,
-                                                            const ScopeStatsLimitSettings& limits,
-                                                            StatsMatcherSharedPtr matcher) {
+ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::createScope(
+    absl::string_view name, StringViewTagSpan, absl::string_view tagged_name, bool evictable,
+    const ScopeStatsLimitSettings& limits, StatsMatcherSharedPtr matcher) {
+  // The legacy scope implementation does not track scope-level tags. If a non-empty `tagged_name`
+  // is provided, it becomes the scope's flat name (the tag-extracted `name` and tags are dropped);
+  // otherwise `name` itself is used as the scope name.
+  if (!tagged_name.empty()) {
+    name = tagged_name;
+  }
+
   StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), symbolTable());
   return scopeFromStatName(stat_name_storage.statName(), evictable, limits, std::move(matcher));
 }
 
-ScopeSharedPtr
-ThreadLocalStoreImpl::ScopeImpl::scopeFromStatName(StatName name, bool evictable,
-                                                   const ScopeStatsLimitSettings& limits,
-                                                   StatsMatcherSharedPtr matcher) {
+ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::scopeFromStatName(
+    StatName name, StatNameTagSpan, StatName tagged_name, bool evictable,
+    const ScopeStatsLimitSettings& limits, StatsMatcherSharedPtr matcher) {
+  // Same backward-compat behavior as createScope: if no explicit `tagged_name` is provided, fall
+  // back to using `name` as the scope name. The legacy scope does not retain scope-level tags.
+  if (!tagged_name.empty()) {
+    name = tagged_name;
+  }
+
   SymbolTable::StoragePtr joined = symbolTable().join({prefix_.statName(), name});
   // Use explicit matcher if provided; otherwise inherit scope_matcher_ (which may be null,
   // meaning the store-level matcher is used).
@@ -577,8 +596,16 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   return ret;
 }
 
-Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
-    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags) {
+Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatName(
+    StatName name, absl::optional<StatNameTagSpan> stat_name_tags, StatName tagged_name) {
+  if (!tagged_name.empty()) {
+    // If a non-empty tagged_name (with tag values) is provided, it means the latest tag-aware API
+    // is being used. The legacy scope implementation does not retain scope-level tag metadata, so
+    // it uses tagged_name as both the tag-extracted name and the flat name and drops the tags.
+    name = tagged_name;
+    stat_name_tags = absl::nullopt;
+  }
+
   if (scopeRejectsAll()) {
     return parent_.null_counter_;
   }
@@ -632,9 +659,17 @@ void ThreadLocalStoreImpl::deliverHistogramToSinks(const Histogram& histogram, u
   }
 }
 
-Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
-    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags,
+Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(
+    StatName name, absl::optional<StatNameTagSpan> stat_name_tags, StatName tagged_name,
     Gauge::ImportMode import_mode) {
+  if (!tagged_name.empty()) {
+    // If a non-empty tagged_name (with tag values) is provided, it means the latest tag-aware API
+    // is being used. The legacy scope implementation does not retain scope-level tag metadata, so
+    // it uses tagged_name as both the tag-extracted name and the flat name and drops the tags.
+    name = tagged_name;
+    stat_name_tags = absl::nullopt;
+  }
+
   // If a gauge is "hidden" it should not be rejected as these are used for deferred stats.
   if (scopeRejectsAll() && import_mode != Gauge::ImportMode::HiddenAccumulate) {
     return parent_.null_gauge_;
@@ -684,9 +719,16 @@ ThreadLocalStoreImpl::ScopeImpl::getOrCreateGaugeBase(const TagUtility::TagStatN
   return gauge;
 }
 
-Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
-    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags, Histogram::Unit unit) {
-  // See safety analysis comment in counterFromStatNameWithTags above.
+Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(
+    StatName name, absl::optional<StatNameTagSpan> stat_name_tags, StatName tagged_name,
+    Histogram::Unit unit) {
+  if (!tagged_name.empty()) {
+    // If a non-empty tagged_name (with tag values) is provided, it means the latest tag-aware API
+    // is being used. The legacy scope implementation does not retain scope-level tag metadata, so
+    // it uses tagged_name as both the tag-extracted name and the flat name and drops the tags.
+    name = tagged_name;
+    stat_name_tags = absl::nullopt;
+  }
 
   if (scopeRejectsAll()) {
     return parent_.null_histogram_;
@@ -777,8 +819,16 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::getOrCreateHistogramBase(
   return **central_ref;
 }
 
-TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatNameWithTags(
-    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags) {
+TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatName(
+    StatName name, absl::optional<StatNameTagSpan> stat_name_tags, StatName tagged_name) {
+  if (!tagged_name.empty()) {
+    // If a non-empty tagged_name (with tag values) is provided, it means the latest tag-aware API
+    // is being used. The legacy scope implementation does not retain scope-level tag metadata, so
+    // it uses tagged_name as both the tag-extracted name and the flat name and drops the tags.
+    name = tagged_name;
+    stat_name_tags = absl::nullopt;
+  }
+
   if (scopeRejectsAll()) {
     return parent_.null_text_readout_;
   }
@@ -848,6 +898,111 @@ HistogramOptConstRef ThreadLocalStoreImpl::ScopeImpl::findHistogramLockHeld(Stat
 TextReadoutOptConstRef ThreadLocalStoreImpl::ScopeImpl::findTextReadout(StatName name) const {
   Thread::LockGuard lock(parent_.lock_);
   return findStatLockHeld<TextReadout>(name, central_cache_->text_readouts_);
+}
+
+ThreadLocalStoreImpl::TagScopeImpl::TagScopeImpl(std::unique_ptr<StatNamePool> pool, StatName name,
+                                                 StatNameTagSpan name_tags, StatName tagged_name,
+                                                 ThreadLocalStoreImpl& store, bool evictable,
+                                                 const ScopeStatsLimitSettings& limits,
+                                                 StatsMatcherSharedPtr matcher)
+    : ScopeImpl(store, tagged_name, evictable, limits, std::move(matcher)), pool_(std::move(pool)),
+      tag_extracted_prefix_(name), prefix_tags_(name_tags.begin(), name_tags.end()) {}
+
+ScopeSharedPtr ThreadLocalStoreImpl::TagScopeImpl::createScope(
+    absl::string_view name, StringViewTagSpan name_tags, absl::string_view tagged_name,
+    bool evictable, const ScopeStatsLimitSettings& limits, StatsMatcherSharedPtr matcher) {
+  StatNamePool tag_pool(symbolTable());
+  StatName stat_name = tag_pool.add(Utility::sanitizeStatsName(name));
+  StatName stat_tagged_name;
+  if (!name_tags.empty()) {
+    // The tagged name is only meaningful when there are tags to interleave; otherwise it is
+    // ignored.
+    stat_tagged_name =
+        tagged_name.empty() ? StatName() : tag_pool.add(Utility::sanitizeStatsName(tagged_name));
+  }
+
+  StatNameTagVec stat_name_tags;
+  stat_name_tags.reserve(name_tags.size());
+  for (const auto [tag, value] : name_tags) {
+    stat_name_tags.emplace_back(tag_pool.add(tag), tag_pool.add(value));
+  }
+  return scopeFromStatName(stat_name, stat_name_tags, stat_tagged_name, evictable, limits,
+                           std::move(matcher));
+}
+
+ScopeSharedPtr ThreadLocalStoreImpl::TagScopeImpl::scopeFromStatName(
+    StatName name, StatNameTagSpan name_tags, StatName tagged_name, bool evictable,
+    const ScopeStatsLimitSettings& limits, StatsMatcherSharedPtr matcher) {
+  // Combine this scope's prefix and tags with the new scope element to derive the child's
+  // tag-extracted prefix, tagged prefix and accumulated tags.
+  const TagUtility::TagStatNameJoiner joiner(tag_extracted_prefix_, prefix_tags_,
+                                             prefix_.statName(), name, name_tags, tagged_name,
+                                             symbolTable());
+
+  auto child_pool = std::make_unique<StatNamePool>(symbolTable());
+  const StatName child_tag_extracted_prefix = child_pool->add(joiner.tagExtractedName());
+  StatNameTagVec child_prefix_tags;
+  if (const auto effective_tags = joiner.effectiveTags(); effective_tags.has_value()) {
+    child_prefix_tags.reserve(effective_tags->size());
+    for (const auto [tag, value] : *effective_tags) {
+      child_prefix_tags.emplace_back(child_pool->add(tag), child_pool->add(value));
+    }
+  }
+
+  // Use explicit matcher if provided; otherwise inherit scope_matcher_.
+  StatsMatcherSharedPtr child_matcher = matcher ? std::move(matcher) : scope_matcher_;
+  std::shared_ptr<ScopeImpl> new_scope = std::make_shared<TagScopeImpl>(
+      std::move(child_pool), child_tag_extracted_prefix, std::move(child_prefix_tags),
+      joiner.nameWithTags(), parent_, evictable, limits, std::move(child_matcher));
+  parent_.addScope(new_scope);
+  return new_scope;
+}
+
+Counter& ThreadLocalStoreImpl::TagScopeImpl::counterFromStatName(
+    StatName name, absl::optional<StatNameTagSpan> name_tags, StatName tagged_name) {
+  if (scopeRejectsAll()) {
+    return parent_.null_counter_;
+  }
+  const TagUtility::TagStatNameJoiner joiner(tag_extracted_prefix_, prefix_tags_, prefix(), name,
+                                             name_tags.value_or(StatNameTagSpan{}), tagged_name,
+                                             symbolTable());
+  return getOrCreateCounterBase(joiner);
+}
+
+Gauge& ThreadLocalStoreImpl::TagScopeImpl::gaugeFromStatName(
+    StatName name, absl::optional<StatNameTagSpan> name_tags, StatName tagged_name,
+    Gauge::ImportMode import_mode) {
+  // If a gauge is "hidden" it should not be rejected as these are used for deferred stats.
+  if (scopeRejectsAll() && import_mode != Gauge::ImportMode::HiddenAccumulate) {
+    return parent_.null_gauge_;
+  }
+  const TagUtility::TagStatNameJoiner joiner(tag_extracted_prefix_, prefix_tags_, prefix(), name,
+                                             name_tags.value_or(StatNameTagSpan{}), tagged_name,
+                                             symbolTable());
+  return getOrCreateGaugeBase(joiner, import_mode);
+}
+
+Histogram& ThreadLocalStoreImpl::TagScopeImpl::histogramFromStatName(
+    StatName name, absl::optional<StatNameTagSpan> name_tags, StatName tagged_name,
+    Histogram::Unit unit) {
+  if (scopeRejectsAll()) {
+    return parent_.null_histogram_;
+  }
+  const TagUtility::TagStatNameJoiner joiner(tag_extracted_prefix_, prefix_tags_, prefix(), name,
+                                             name_tags.value_or(StatNameTagSpan{}), tagged_name,
+                                             symbolTable());
+  return getOrCreateHistogramBase(joiner, unit);
+}
+
+TextReadout& ThreadLocalStoreImpl::TagScopeImpl::textReadoutFromStatName(
+    StatName name, absl::optional<StatNameTagSpan> name_tags, StatName tagged_name) {
+  if (scopeRejectsAll()) {
+    return parent_.null_text_readout_;
+  }
+  const TagUtility::TagStatNameJoiner joiner(tag_extracted_prefix_, prefix_tags_, prefix(), name,
+                                             name_tags.value_or(StatNameTagSpan{}), tagged_name,
+                                             symbolTable());
+  return getOrCreateTextReadoutBase(joiner);
 }
 
 Histogram& ThreadLocalStoreImpl::tlsHistogram(ParentHistogramImpl& parent, uint64_t id) {
