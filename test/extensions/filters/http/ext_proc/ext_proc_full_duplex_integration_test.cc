@@ -987,7 +987,8 @@ TEST_P(ExtProcIntegrationTest,
   EXPECT_THAT(response->headers(), ContainsHeader("x-new-header_1", "new_1"));
 }
 
-// With trailers, both directions, server buffers one chunks of body before sending back the response.
+// With trailers, both directions, server buffers one chunks of body before sending back the
+// response.
 TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirectionWithTrailerRandom) {
   twoExtProcFiltersFullDuplexConfig();
 
@@ -1017,7 +1018,8 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirectionWithTra
   processor_stream_->sendGrpcMessage(response_body);
 
   // The ext_proc_server_0 receives the body and trailers.
-  uint32_t total_req_body_msg = serverReceiveBodyDuplexStreamed("", processor_stream_, false, false);
+  uint32_t total_req_body_msg =
+      serverReceiveBodyDuplexStreamed("", processor_stream_, false, false);
 
   // The ext_proc_server_0 sends back the body and trailers.
   serverSendBodyRespDuplexStreamed(total_req_body_msg, processor_stream_, /*end_stream*/ false,
@@ -1121,7 +1123,6 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirectionWithTra
   EXPECT_THAT(response->headers(), ContainsHeader("x-new-header", "new"));
   EXPECT_THAT(response->headers(), ContainsHeader("x-new-header_1", "new_1"));
 }
-
 
 } // namespace ExternalProcessing
 } // namespace HttpFilters
