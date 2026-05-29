@@ -122,6 +122,7 @@ envoy_cc_library(
         "//source/common/json:json_utility_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/stream_info:utility_lib",
+        "@abseil-cpp//absl/status:statusor",
     ],
     alwayslink = 1,  # has factory registration
 )
