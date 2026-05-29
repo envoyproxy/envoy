@@ -19,6 +19,14 @@ on:
       dockerhub-username:
         required: true
         type: string
+      ghcr:
+        required: false
+        default: true
+        type: boolean
+      ghcr-repo:
+        required: false
+        default: ''
+        type: string
       sha:
         required: true
         type: string
@@ -53,8 +61,20 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
-      packages: read
+      packages: write
     steps:
+    - name: Configure registries
+      id: registries
+      uses: envoyproxy/toolshed/actions/jq@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+      with:
+        input-format: yaml
+        filter: >-
+          [.[] | select(.enabled) | .registry | ascii_downcase]
+        input: |
+          - registry: docker.io/envoyproxy
+            enabled: true
+          - registry: ghcr.io/${{ inputs.ghcr-repo || github.repository_owner }}
+            enabled: ${{ inputs.ghcr }}
     - name: Generate manifest configuration (dev)
       id: dev-config
       if: ${{ inputs.dev && inputs.target-branch == 'main' }}
@@ -62,11 +82,13 @@ jobs:
       with:
         input-format: yaml
         filter: >-
-          {manifests: .}
+          .registries as $registries
+          | {manifests: [.manifests[] as $manifest | $registries[] | $manifest + {registry: .}]}
         input: |
+          registries: ${{ steps.registries.outputs.value }}
+          manifests:
           - name: ${{ inputs.dockerhub-repo }}
             tag: dev
-            registry: docker.io/envoyproxy
             architectures:
             - amd64
             - arm64
@@ -75,7 +97,6 @@ jobs:
             - dev-${{ github.sha }}
           - name: ${{ inputs.dockerhub-repo }}
             tag: contrib-dev
-            registry: docker.io/envoyproxy
             architectures:
             - amd64
             - arm64
@@ -84,7 +105,6 @@ jobs:
             - contrib-dev-${{ github.sha }}
           - name: ${{ inputs.dockerhub-repo }}
             tag: contrib-debug-dev
-            registry: docker.io/envoyproxy
             architectures:
             - amd64
             - arm64
@@ -93,7 +113,6 @@ jobs:
             - contrib-debug-dev-${{ github.sha }}
           - name: ${{ inputs.dockerhub-repo }}
             tag: contrib-distroless-dev
-            registry: docker.io/envoyproxy
             architectures:
             - amd64
             - arm64
@@ -102,7 +121,6 @@ jobs:
             - contrib-distroless-dev-${{ github.sha }}
           - name: ${{ inputs.dockerhub-repo }}
             tag: debug-dev
-            registry: docker.io/envoyproxy
             architectures:
             - amd64
             - arm64
@@ -111,7 +129,6 @@ jobs:
             - debug-dev-${{ github.sha }}
           - name: ${{ inputs.dockerhub-repo }}
             tag: distroless-dev
-            registry: docker.io/envoyproxy
             architectures:
             - amd64
             - arm64
@@ -120,7 +137,6 @@ jobs:
             - distroless-dev-${{ github.sha }}
           - name: ${{ inputs.dockerhub-repo }}
             tag: google-vrp-dev
-            registry: docker.io/envoyproxy
             architectures:
             - amd64
             artifact-pattern: envoy-google-vrp.{arch}.tar
@@ -128,7 +144,6 @@ jobs:
             - google-vrp-dev-${{ github.sha }}
           - name: ${{ inputs.dockerhub-repo }}
             tag: tools-dev
-            registry: docker.io/envoyproxy
             architectures:
             - amd64
             - arm64
@@ -144,19 +159,23 @@ jobs:
         input-format: yaml
         filter: >-
           .version as $v
+          | .registries as $registries
           | {manifests:
               [.manifests[]
                | select(
                    (.tag | test("contrib-distroless") | not)
-                   or ($v.major > 1 or ($v.major == 1 and $v.minor >= 37)))]}
+                   or ($v.major > 1 or ($v.major == 1 and $v.minor >= 37)))
+               | . as $manifest
+               | $registries[]
+               | $manifest + {registry: .}]}
         input: |
           version:
             major: ${{ inputs.version-major }}
             minor: ${{ inputs.version-minor }}
+          registries: ${{ steps.registries.outputs.value }}
           manifests:
           - name: ${{ inputs.dockerhub-repo }}
             tag: v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
-            registry: docker.io/envoyproxy
             architectures:
             - amd64
             - arm64
@@ -165,7 +184,6 @@ jobs:
             - v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
           - name: ${{ inputs.dockerhub-repo }}
             tag: contrib-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
-            registry: docker.io/envoyproxy
             architectures:
             - amd64
             - arm64
@@ -174,7 +192,6 @@ jobs:
             - contrib-v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
           - name: ${{ inputs.dockerhub-repo }}
             tag: contrib-debug-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
-            registry: docker.io/envoyproxy
             architectures:
             - amd64
             - arm64
@@ -183,7 +200,6 @@ jobs:
             - contrib-debug-v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
           - name: ${{ inputs.dockerhub-repo }}
             tag: contrib-distroless-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
-            registry: docker.io/envoyproxy
             architectures:
             - amd64
             - arm64
@@ -192,7 +208,6 @@ jobs:
             - contrib-distroless-v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
           - name: ${{ inputs.dockerhub-repo }}
             tag: debug-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
-            registry: docker.io/envoyproxy
             architectures:
             - amd64
             - arm64
@@ -201,7 +216,6 @@ jobs:
             - debug-v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
           - name: ${{ inputs.dockerhub-repo }}
             tag: distroless-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
-            registry: docker.io/envoyproxy
             architectures:
             - amd64
             - arm64
@@ -210,7 +224,6 @@ jobs:
             - distroless-v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
           - name: ${{ inputs.dockerhub-repo }}
             tag: google-vrp-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
-            registry: docker.io/envoyproxy
             architectures:
             - amd64
             artifact-pattern: envoy-google-vrp.{arch}.tar
@@ -218,13 +231,26 @@ jobs:
             - google-vrp-v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
           - name: ${{ inputs.dockerhub-repo }}
             tag: tools-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
-            registry: docker.io/envoyproxy
             architectures:
             - amd64
             - arm64
             artifact-pattern: envoy-tools.{arch}.tar
             additional-tags:
             - tools-v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
+
+    - name: Log in to the GitHub Container Registry
+      # The collector's buildah only logs in to docker.io/gcr.io; share its auth
+      # file by logging in to ghcr.io here, gated to match the collector's push.
+      if: >-
+        ${{ inputs.ghcr
+            && inputs.trusted
+            && ! (inputs.target-branch != 'main' && inputs.dev) }}
+      shell: bash
+      env:
+        GHCR_TOKEN: ${{ github.token }}
+      run: |
+        echo "${GHCR_TOKEN}" \
+            | buildah login --username "${{ github.actor }}" --password-stdin ghcr.io
 
     - name: Collect and push OCI artifacts
       uses: envoyproxy/toolshed/actions/oci/collector@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17

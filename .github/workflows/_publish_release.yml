@@ -83,12 +83,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
+      packages: write
     name: Publish container images
     uses: ./.github/workflows/_publish_release_container.yml
     with:
       dockerhub-repo: ${{ vars.DOCKERHUB_REPO || 'envoy' }}
       dockerhub-username: ${{ inputs.dockerhub-username }}
+      ghcr: ${{ vars.ENVOY_PUBLISH_GHCR != 'false' }}
+      ghcr-repo: ${{ vars.GHCR_REPO || github.repository_owner }}
       dev: ${{ fromJSON(inputs.request).request.version.dev }}
       sha: ${{ fromJSON(inputs.request).request.sha }}
       target-branch: ${{ fromJSON(inputs.request).request.target-branch }}

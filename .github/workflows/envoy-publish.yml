@@ -118,7 +118,7 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
+      packages: write
     if: ${{ fromJSON(needs.load.outputs.request).run.release }}
     needs:
     - load

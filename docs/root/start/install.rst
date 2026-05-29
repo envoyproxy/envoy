@@ -126,6 +126,13 @@ The following commands will pull and show the Envoy version of current images.
          $ docker pull envoyproxy/|envoy_distroless_docker_image|
          $ docker run --rm envoyproxy/|envoy_distroless_docker_image| --version
 
+.. note::
+
+   The same images are also published to the `GitHub Container Registry
+   <https://github.com/envoyproxy/envoy/pkgs/container/envoy>`__ under
+   ``ghcr.io/envoyproxy/envoy``, using identical tags. For example,
+   ``ghcr.io/envoyproxy/envoy:v1.73.7`` mirrors ``envoyproxy/envoy:v1.73.7``.
+
 
 Supported tags
 ^^^^^^^^^^^^^^
