@@ -349,6 +349,7 @@ OverrideHostLoadBalancer::LoadBalancerImpl::LoadBalancerImpl(
         [this](const Upstream::HostVector&, const Upstream::HostVector&) {
           fallback_picker_lb_ =
               fallback_picker_lb_factory_->create({priority_set_, local_priority_set_});
+          ASSERT(fallback_picker_lb_ != nullptr); // Factory can not create null LB.
         });
   }
 }
