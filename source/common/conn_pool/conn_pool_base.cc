@@ -492,14 +492,8 @@ void ConnPoolImplBase::drainClients(std::list<ActiveClientPtr>& clients) {
 }
 
 void ConnPoolImplBase::drainConnectionsImpl(DrainBehavior drain_behavior) {
-  if (drain_behavior == Envoy::ConnectionPool::DrainBehavior::GoAwayAndDrainAndDelete) {
-    // Mark the pool as draining first so no new connections are created mid-iteration.
-    is_draining_for_deletion_ = true;
-
-    // Snapshot pointers because initiateGoAwayAndDrain() may call transitionActiveClientState
-    // which mutates the per-state lists. Skip connecting_clients_ - those have not exchanged
-    // the protocol preface yet, so sending GOAWAY is unusual; closeIdleConnectionsForDrainingPool
-    // (called via checkForIdleAndCloseIdleConnsIfDraining below) will close them.
+  if (drain_behavior == Envoy::ConnectionPool::DrainBehavior::NotifyPeerAndDrainExisting) {
+    // Snapshot before iterating: notifyPeerAndDrain() can move clients between per-state lists.
     std::vector<ActiveClient*> snapshot;
     snapshot.reserve(early_data_clients_.size() + ready_clients_.size() + busy_clients_.size());
     for (const auto& c : early_data_clients_) {
@@ -512,11 +506,11 @@ void ConnPoolImplBase::drainConnectionsImpl(DrainBehavior drain_behavior) {
       snapshot.push_back(c.get());
     }
     for (auto* client : snapshot) {
-      client->initiateGoAwayAndDrain();
+      client->notifyPeerAndDrain();
     }
-
-    checkForIdleAndCloseIdleConnsIfDraining();
-    return;
+    // Fall through into the DrainExistingConnections body below to reuse its cleanup
+    // (closeIdleConnectionsForDrainingPool, etc.). is_draining_for_deletion_ is intentionally
+    // not set, so the pool stays usable for new streams via fresh clients.
   }
   if (drain_behavior == Envoy::ConnectionPool::DrainBehavior::DrainAndDelete) {
     is_draining_for_deletion_ = true;

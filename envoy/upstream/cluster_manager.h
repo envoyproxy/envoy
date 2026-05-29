@@ -518,9 +518,11 @@ public:
 
   /**
    * Drain all connection pool connections owned by this cluster with a specific drain behavior.
+   * Use this overload when a drain behavior other than the default DrainExistingConnections is
+   * needed (see ConnectionPool::DrainBehavior).
    * @param cluster the cluster to drain.
    * @param predicate optional host predicate; if null, all hosts are drained.
-   * @param drain_behavior controls the drain semantics (see ConnectionPool::DrainBehavior).
+   * @param drain_behavior controls the drain semantics.
    */
   virtual void drainConnections(const std::string& cluster, DrainConnectionsHostPredicate predicate,
                                 ConnectionPool::DrainBehavior drain_behavior) PURE;

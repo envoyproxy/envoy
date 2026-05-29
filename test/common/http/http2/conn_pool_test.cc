@@ -2112,10 +2112,10 @@ TEST_F(Http2ConnPoolImplTest, RequestTrackingConnectionFailureNoMetric) {
 }
 
 /**
- * Verify that GoAwayAndDrainAndDelete sends a GOAWAY frame on a ready client with an active
+ * Verify that NotifyPeerAndDrainExisting sends a GOAWAY frame on a ready client with an active
  * stream, transitions it to Draining, and closes the client once the stream completes.
  */
-TEST_F(Http2ConnPoolImplTest, GoAwayAndDrainAndDeleteSendsGoAwayThenDrains) {
+TEST_F(Http2ConnPoolImplTest, NotifyPeerAndDrainExistingSendsGoAwayThenDrains) {
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
   expectClientConnect(0, r1);
@@ -2129,7 +2129,7 @@ TEST_F(Http2ConnPoolImplTest, GoAwayAndDrainAndDeleteSendsGoAwayThenDrains) {
 
   ReadyWatcher drained;
   pool_->addIdleCallback([&]() -> void { drained.ready(); });
-  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::GoAwayAndDrainAndDelete);
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::NotifyPeerAndDrainExisting);
 
   // Complete the in-flight stream; the pool should become idle and the client should close.
   EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
@@ -2142,10 +2142,10 @@ TEST_F(Http2ConnPoolImplTest, GoAwayAndDrainAndDeleteSendsGoAwayThenDrains) {
 }
 
 /**
- * Verify that GoAwayAndDrainAndDelete on a ready idle client sends GOAWAY and immediately
+ * Verify that NotifyPeerAndDrainExisting on a ready idle client sends GOAWAY and immediately
  * closes the client (no active streams to wait for).
  */
-TEST_F(Http2ConnPoolImplTest, GoAwayAndDrainAndDeleteIdleClientClosesImmediately) {
+TEST_F(Http2ConnPoolImplTest, NotifyPeerAndDrainExistingIdleClientClosesImmediately) {
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
   expectClientConnect(0, r1);
@@ -2157,18 +2157,18 @@ TEST_F(Http2ConnPoolImplTest, GoAwayAndDrainAndDeleteIdleClientClosesImmediately
   EXPECT_CALL(drained, ready());
   pool_->addIdleCallback([&]() -> void { drained.ready(); });
   EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(testing::AnyNumber());
-  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::GoAwayAndDrainAndDelete);
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::NotifyPeerAndDrainExisting);
 
   EXPECT_CALL(*this, onClientDestroy()).Times(testing::AnyNumber());
   dispatcher_.clearDeferredDeleteList();
 }
 
 /**
- * Verify that GoAwayAndDrainAndDelete does NOT send GOAWAY on a connecting client (no
+ * Verify that NotifyPeerAndDrainExisting does NOT send GOAWAY on a connecting client (no
  * HTTP/2 PREFACE exchanged yet). The connecting client is still closed once its pending
  * stream is resolved (via connection failure).
  */
-TEST_F(Http2ConnPoolImplTest, GoAwayAndDrainAndDeleteSkipsConnectingClient) {
+TEST_F(Http2ConnPoolImplTest, NotifyPeerAndDrainExistingSkipsConnectingClient) {
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
   // Do NOT call expectClientConnect — client stays in Connecting state.
@@ -2177,7 +2177,7 @@ TEST_F(Http2ConnPoolImplTest, GoAwayAndDrainAndDeleteSkipsConnectingClient) {
 
   ReadyWatcher drained;
   pool_->addIdleCallback([&]() -> void { drained.ready(); });
-  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::GoAwayAndDrainAndDelete);
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::NotifyPeerAndDrainExisting);
 
   // The connecting client is not closed yet because it has a pending stream.
   // Simulate the connection failing, which fires pool_failure_ and cleans up.
@@ -2191,9 +2191,9 @@ TEST_F(Http2ConnPoolImplTest, GoAwayAndDrainAndDeleteSkipsConnectingClient) {
 }
 
 /**
- * Verify that a second GoAwayAndDrainAndDelete call is a no-op — GOAWAY is only sent once.
+ * Verify that a second NotifyPeerAndDrainExisting call is a no-op — GOAWAY is only sent once.
  */
-TEST_F(Http2ConnPoolImplTest, GoAwayAndDrainAndDeleteIdempotent) {
+TEST_F(Http2ConnPoolImplTest, NotifyPeerAndDrainExistingIdempotent) {
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
   expectClientConnect(0, r1);
@@ -2205,9 +2205,9 @@ TEST_F(Http2ConnPoolImplTest, GoAwayAndDrainAndDeleteIdempotent) {
 
   EXPECT_CALL(*test_clients_[0].codec_, goAway());
 
-  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::GoAwayAndDrainAndDelete);
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::NotifyPeerAndDrainExisting);
   // Second call: should be a no-op (client is already Draining).
-  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::GoAwayAndDrainAndDelete);
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::NotifyPeerAndDrainExisting);
 
   // Complete the in-flight stream to clean up.
   EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
@@ -2219,11 +2219,11 @@ TEST_F(Http2ConnPoolImplTest, GoAwayAndDrainAndDeleteIdempotent) {
 }
 
 /**
- * Verify that GoAwayAndDrainAndDelete with multiple clients sends GOAWAY on both Ready
+ * Verify that NotifyPeerAndDrainExisting with multiple clients sends GOAWAY on both Ready
  * clients. Client 0 has an active stream (busy); client 1 is idle. The idle client closes
  * immediately; the busy client drains then closes.
  */
-TEST_F(Http2ConnPoolImplTest, GoAwayAndDrainAndDeleteMultipleClients) {
+TEST_F(Http2ConnPoolImplTest, NotifyPeerAndDrainExistingMultipleClients) {
   cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
   cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(1);
 
@@ -2246,7 +2246,7 @@ TEST_F(Http2ConnPoolImplTest, GoAwayAndDrainAndDeleteMultipleClients) {
 
   ReadyWatcher drained;
   pool_->addIdleCallback([&]() -> void { drained.ready(); });
-  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::GoAwayAndDrainAndDelete);
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::NotifyPeerAndDrainExisting);
 
   // Complete the in-flight stream on client 0 — pool becomes idle, both clients close.
   EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
@@ -2254,6 +2254,54 @@ TEST_F(Http2ConnPoolImplTest, GoAwayAndDrainAndDeleteMultipleClients) {
   EXPECT_CALL(drained, ready());
   r1.inner_decoder_->decodeHeaders(
       ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
+
+  EXPECT_CALL(*this, onClientDestroy()).Times(testing::AnyNumber());
+  dispatcher_.clearDeferredDeleteList();
+}
+
+/**
+ * After NotifyPeerAndDrainExisting the pool must stay usable. A new stream issued post-drain
+ * is expected to create a fresh client (all existing clients are in Draining state), not
+ * trip the ASSERT(!is_draining_for_deletion_) in newStreamImpl.
+ */
+TEST_F(Http2ConnPoolImplTest, NotifyPeerAndDrainExistingAllowsNewStreamAfterDrain) {
+  cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(1);
+
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  expectClientConnect(0, r1);
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_TRUE(
+      r1.callbacks_.outer_encoder_
+          ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
+          .ok());
+
+  EXPECT_CALL(*test_clients_[0].codec_, goAway());
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::NotifyPeerAndDrainExisting);
+
+  // The pool must create a fresh client because client 0 is in Draining state.
+  expectClientCreate();
+  ActiveTestRequest r2(*this, 1, false);
+  expectClientConnect(1, r2);
+  EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_TRUE(
+      r2.callbacks_.outer_encoder_
+          ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
+          .ok());
+
+  EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(testing::AnyNumber());
+  r1.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
+  EXPECT_CALL(r2.decoder_, decodeHeaders_(_, true));
+  r2.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
+
+  ReadyWatcher drained;
+  pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  EXPECT_CALL(drained, ready());
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
 
   EXPECT_CALL(*this, onClientDestroy()).Times(testing::AnyNumber());
   dispatcher_.clearDeferredDeleteList();

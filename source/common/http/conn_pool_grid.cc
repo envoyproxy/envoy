@@ -496,8 +496,7 @@ void ConnectivityGrid::addIdleCallback(IdleCb cb) {
 }
 
 void ConnectivityGrid::drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) {
-  if (drain_behavior == Envoy::ConnectionPool::DrainBehavior::DrainAndDelete ||
-      drain_behavior == Envoy::ConnectionPool::DrainBehavior::GoAwayAndDrainAndDelete) {
+  if (drain_behavior == Envoy::ConnectionPool::DrainBehavior::DrainAndDelete) {
     // Note that no new pools should be created from this point on.
     draining_ = true;
   }

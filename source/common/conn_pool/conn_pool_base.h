@@ -88,10 +88,11 @@ public:
     return state_ == State::Ready;
   }
 
-  // Send a protocol-level GOAWAY to the peer and transition this client to Draining.
-  // Invoked by the pool under DrainBehavior::GoAwayAndDrainAndDelete. Default no-op for
-  // protocols without GOAWAY (HTTP/1, TCP); multiplexed HTTP clients override.
-  virtual void initiateGoAwayAndDrain() {}
+  // Notify the peer that this client is draining and transition the client to Draining.
+  // Invoked by the pool under DrainBehavior::NotifyPeerAndDrainExisting. Default no-op for
+  // protocols without a peer-level drain signal (HTTP/1, raw TCP); multiplexed HTTP clients
+  // override to send a GOAWAY.
+  virtual void notifyPeerAndDrain() {}
 
   enum class State {
     Connecting,        // Connection is not yet established.
