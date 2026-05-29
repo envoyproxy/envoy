@@ -234,7 +234,7 @@ TEST_F(ClusterTest, CreateSubClusterConfig) {
   EXPECT_EQ(false, sub_cluster_pair.second.has_value());
 }
 
-// sub cluster is not exist and load balancer would return nullptr.
+// Sub cluster does not exist and load balancer should return nullptr.
 TEST_F(ClusterTest, SubClusterNotExist) {
   initialize(sub_cluster_yaml_config_, false);
 
