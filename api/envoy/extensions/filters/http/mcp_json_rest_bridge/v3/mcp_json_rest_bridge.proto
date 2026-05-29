@@ -262,13 +262,15 @@ message HttpRule {
   message ParameterBinding {
     // The name of the HTTP header (e.g., "X-API-Key", "Authorization") or the
     // name of the cookie (e.g.,"SESSION_ID"). Note: Envoy normalizes the header names to lowercase.
-    string name = 1;
+    string name = 1
+        [(validate.rules).string =
+             {min_len: 1 max_bytes: 16384 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
     // Path to the field within the JSON arguments object from a tools/call
     // request. Uses dot-notation for nested fields.
     // E.g. if arguments object is `{"user":{"auth_token":"foo"}}`, then
     // `argument_path` should be "user.auth_token".
-    string argument_path = 2;
+    string argument_path = 2 [(validate.rules).string = {min_len: 1}];
   }
 
   // Determines the HTTP method and the URL path template.

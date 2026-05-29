@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/mcp_json_rest_bridge/http_request_builder.h"
 
+#include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.h"
+
 #include "source/common/http/utility.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -42,17 +44,17 @@ struct QueryParam {
   std::string value;
 };
 
-absl::Status constructQueryParams(
-    std::vector<QueryParam>& query_params, absl::string_view body_rule, const json& arguments,
-    const absl::flat_hash_set<std::string>& templates, absl::string_view path,
-    absl::Span<const HttpRule::ParameterBinding* const> header_parameter_bindings,
-    absl::Span<const HttpRule::ParameterBinding* const> cookie_parameter_bindings) {
+absl::Status constructQueryParams(std::vector<QueryParam>& query_params, const HttpRule& http_rule,
+                                  const json& arguments,
+                                  const absl::flat_hash_set<std::string>& templates,
+                                  absl::string_view path) {
   // Skip if it's a URL path template
   if (templates.contains(path)) {
     return absl::OkStatus();
   }
 
   // Skip if it's part of the body
+  absl::string_view body_rule = http_rule.body();
   if (!body_rule.empty()) {
     if (path == body_rule || (absl::StartsWith(path, body_rule) && path[body_rule.size()] == '.')) {
       return absl::OkStatus();
@@ -60,15 +62,15 @@ absl::Status constructQueryParams(
   }
 
   // Skip if it's part of header parameter bindings.
-  for (const auto& binding : header_parameter_bindings) {
-    const absl::string_view arg_path = binding->argument_path();
+  for (const auto& binding : http_rule.header_parameter_bindings()) {
+    absl::string_view arg_path = binding.argument_path();
     if (path == arg_path || (absl::StartsWith(path, arg_path) && path[arg_path.size()] == '.')) {
       return absl::OkStatus();
     }
   }
   // Skip if it's part of cookie parameter bindings.
-  for (const auto& binding : cookie_parameter_bindings) {
-    const absl::string_view arg_path = binding->argument_path();
+  for (const auto& binding : http_rule.cookie_parameter_bindings()) {
+    absl::string_view arg_path = binding.argument_path();
     if (path == arg_path || (absl::StartsWith(path, arg_path) && path[arg_path.size()] == '.')) {
       return absl::OkStatus();
     }
@@ -77,9 +79,8 @@ absl::Status constructQueryParams(
   if (arguments.is_object()) {
     for (auto it = arguments.begin(); it != arguments.end(); ++it) {
       absl::Status status =
-          constructQueryParams(query_params, body_rule, it.value(), templates,
-                               path.empty() ? it.key() : absl::StrCat(path, ".", it.key()),
-                               header_parameter_bindings, cookie_parameter_bindings);
+          constructQueryParams(query_params, http_rule, it.value(), templates,
+                               path.empty() ? it.key() : absl::StrCat(path, ".", it.key()));
       if (!status.ok()) {
         return status;
       }
@@ -89,8 +90,7 @@ absl::Status constructQueryParams(
   if (arguments.is_array()) {
     for (auto& array_item : arguments) {
       absl::Status status =
-          constructQueryParams(query_params, body_rule, array_item, templates, path,
-                               header_parameter_bindings, cookie_parameter_bindings);
+          constructQueryParams(query_params, http_rule, array_item, templates, path);
       if (!status.ok()) {
         return status;
       }
@@ -145,11 +145,10 @@ void removeJsonPath(json& data, absl::string_view path) {
   recursiveRemoveJsonPath(data, parts);
 }
 
-absl::StatusOr<json> constructRequestBody(
-    absl::string_view body_rule, const absl::flat_hash_set<std::string>& templates,
-    const json& arguments,
-    absl::Span<const HttpRule::ParameterBinding* const> header_parameter_bindings,
-    absl::Span<const HttpRule::ParameterBinding* const> cookie_parameter_bindings) {
+absl::StatusOr<json> constructRequestBody(const HttpRule& http_rule,
+                                          const absl::flat_hash_set<std::string>& templates,
+                                          const json& arguments) {
+  absl::string_view body_rule = http_rule.body();
   if (body_rule.empty()) {
     return nullptr;
   }
@@ -158,28 +157,41 @@ absl::StatusOr<json> constructRequestBody(
     for (const auto& path : templates) {
       removeJsonPath(body, path);
     }
-    for (const auto& binding : header_parameter_bindings) {
-      removeJsonPath(body, binding->argument_path());
+    for (const auto& binding : http_rule.header_parameter_bindings()) {
+      removeJsonPath(body, binding.argument_path());
     }
-    for (const auto& binding : cookie_parameter_bindings) {
-      removeJsonPath(body, binding->argument_path());
+    for (const auto& binding : http_rule.cookie_parameter_bindings()) {
+      removeJsonPath(body, binding.argument_path());
     }
     return body;
   }
   return getJsonValue(arguments, body_rule);
 }
 
-void populateParamsMap(absl::Span<const HttpRule::ParameterBinding* const> bindings,
+void populateParamsMap(const Protobuf::RepeatedPtrField<HttpRule::ParameterBinding>& bindings,
                        const json& arguments,
                        absl::flat_hash_map<std::string, std::string>& params_map) {
   for (const auto& binding : bindings) {
-    absl::StatusOr<json> value = getJsonValue(arguments, binding->argument_path());
+    absl::StatusOr<json> value = getJsonValue(arguments, binding.argument_path());
     if (!value.ok()) {
       // This is expected when the parameter is optional.
       continue;
     }
-    params_map[binding->name()] =
+    params_map[binding.name()] =
         Http::Utility::PercentEncoding::urlEncode(jsonValueToString(*std::move(value)));
+  }
+}
+
+void populateCookiesParams(const Protobuf::RepeatedPtrField<HttpRule::ParameterBinding>& bindings,
+                           const json& arguments,
+                           std::vector<std::pair<std::string, std::string>>& cookies_params) {
+  for (const auto& binding : bindings) {
+    absl::StatusOr<json> value = getJsonValue(arguments, binding.argument_path());
+    if (!value.ok()) {
+      continue;
+    }
+    cookies_params.push_back({binding.name(), Http::Utility::PercentEncoding::urlEncode(
+                                                  jsonValueToString(*std::move(value)))});
   }
 }
 
@@ -206,13 +218,7 @@ absl::StatusOr<std::string> constructBaseUrl(absl::string_view pattern,
 
 absl::StatusOr<HttpRequest> buildHttpRequest(
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule& http_rule,
-    const nlohmann::json& arguments,
-    absl::Span<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule::
-                   ParameterBinding* const>
-        header_parameter_bindings,
-    absl::Span<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule::
-                   ParameterBinding* const>
-        cookie_parameter_bindings) {
+    const nlohmann::json& arguments) {
   std::string pattern;
   std::string method;
   // TODO(guoyilin42): Add validation to ensure exactly one HTTP method is specified.
@@ -250,24 +256,22 @@ absl::StatusOr<HttpRequest> buildHttpRequest(
   if (http_rule.body() != "*") {
     std::string base_path;
     if (auto status =
-            constructQueryParams(query_params, http_rule.body(), arguments, templates, base_path,
-                                 header_parameter_bindings, cookie_parameter_bindings);
+            constructQueryParams(query_params, http_rule, arguments, templates, base_path);
         !status.ok()) {
       return status;
     }
   }
   appendQueryParamsToBaseUrl(*url, query_params);
 
-  absl::StatusOr<json> http_body = constructRequestBody(
-      http_rule.body(), templates, arguments, header_parameter_bindings, cookie_parameter_bindings);
+  absl::StatusOr<json> http_body = constructRequestBody(http_rule, templates, arguments);
   if (!http_body.ok()) {
     return http_body.status();
   }
 
   absl::flat_hash_map<std::string, std::string> headers_params;
-  populateParamsMap(header_parameter_bindings, arguments, headers_params);
-  absl::flat_hash_map<std::string, std::string> cookies_params;
-  populateParamsMap(cookie_parameter_bindings, arguments, cookies_params);
+  populateParamsMap(http_rule.header_parameter_bindings(), arguments, headers_params);
+  std::vector<std::pair<std::string, std::string>> cookies_params;
+  populateCookiesParams(http_rule.cookie_parameter_bindings(), arguments, cookies_params);
 
   return HttpRequest{
       .url = *std::move(url),

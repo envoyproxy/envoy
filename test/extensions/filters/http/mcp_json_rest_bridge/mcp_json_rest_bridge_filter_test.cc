@@ -21,7 +21,6 @@ namespace {
 
 using ::ocpdiag::testing::ParseTextProtoOrDie;
 using testing::_;
-using testing::AnyOf;
 using testing::Eq;
 using testing::Return;
 using testing::SizeIs;
@@ -524,8 +523,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallWithHeaderCookiesParams) {
               StrEq("header_2_value"));
   ASSERT_THAT(request_headers_.get(Http::Headers::get().Cookie), SizeIs(1));
   EXPECT_THAT(request_headers_.get(Http::Headers::get().Cookie)[0]->value().getStringView(),
-              AnyOf(StrEq("cookie=cookie_value; cookie_2=cookie_2_value"),
-                    StrEq("cookie_2=cookie_2_value; cookie=cookie_value")));
+              StrEq("cookie=cookie_value; cookie_2=cookie_2_value"));
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolCallWithHeaderOnlyParams) {
@@ -574,7 +572,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallWithCookieOnlyParams) {
   // Cookie header should be set.
   ASSERT_THAT(request_headers_.get(Http::Headers::get().Cookie), SizeIs(1));
   EXPECT_THAT(request_headers_.get(Http::Headers::get().Cookie)[0]->value().getStringView(),
-              AnyOf(StrEq("cookie=cval; cookie_2=cval2"), StrEq("cookie_2=cval2; cookie=cval")));
+              StrEq("cookie=cval; cookie_2=cval2"));
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolNameNotFoundReturnsError) {

@@ -20,19 +20,13 @@ struct HttpRequest {
   std::string method;
   nlohmann::json body;
   absl::flat_hash_map<std::string, std::string> headers_params;
-  absl::flat_hash_map<std::string, std::string> cookies_params;
+  std::vector<std::pair<std::string, std::string>> cookies_params;
 };
 
 // Builds an HttpRequest from `http_rule` and `arguments` from the JSON-RPC request body.
 absl::StatusOr<HttpRequest> buildHttpRequest(
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule& http_rule,
-    const nlohmann::json& arguments,
-    absl::Span<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule::
-                   ParameterBinding* const>
-        header_parameter_bindings,
-    absl::Span<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule::
-                   ParameterBinding* const>
-        cookie_parameter_bindings);
+    const nlohmann::json& arguments);
 
 // Constructs a base URL by replacing template variables with values from the arguments.
 // Exposed for testing.

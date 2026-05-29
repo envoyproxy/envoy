@@ -625,9 +625,7 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_
   const nlohmann::json empty_arguments = nlohmann::json::object();
   const nlohmann::json& arguments = arguments_it != params.end() ? *arguments_it : empty_arguments;
 
-  absl::StatusOr<HttpRequest> http_request =
-      buildHttpRequest(*http_rule, arguments, http_rule->header_parameter_bindings(),
-                       http_rule->cookie_parameter_bindings());
+  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(*http_rule, arguments);
   if (!http_request.ok()) {
     ENVOY_STREAM_LOG(error, "Failed to build HTTP request for method: {} with status: {}",
                      *decoder_callbacks_, tool_name, http_request.status());
