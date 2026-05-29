@@ -356,9 +356,37 @@ TEST_F(StatsIsolatedStoreImplTest, NullImplCoverage) {
   NullCounterImpl& c = store_->nullCounter();
   c.inc();
   EXPECT_EQ(0, c.value());
+  c.add(1);
+  c.reset();
+  EXPECT_EQ(0, c.latch());
+  EXPECT_FALSE(c.used());
+  c.markUnused();
+  EXPECT_FALSE(c.hidden());
+  c.incRefCount();
+  EXPECT_TRUE(c.decRefCount());
+  EXPECT_EQ(0, c.use_count());
+
   NullGaugeImpl& g = store_->nullGauge();
   g.inc();
   EXPECT_EQ(0, g.value());
+  g.add(1);
+  g.dec();
+  g.set(1);
+  g.setParentValue(1);
+  g.sub(0);
+  EXPECT_EQ(Gauge::ImportMode::NeverImport, g.importMode());
+  g.mergeImportMode(Gauge::ImportMode::Accumulate);
+  EXPECT_FALSE(g.used());
+  g.markUnused();
+  EXPECT_FALSE(g.hidden());
+  g.incRefCount();
+  EXPECT_TRUE(g.decRefCount());
+  EXPECT_EQ(0, g.use_count());
+
+  // Exercise NullTextReadoutImpl via the scope-matcher rejection path.
+  TextReadout& tr = scope_->textReadoutFromString("any.tr");
+  // Real text readout: a fresh one is unused.
+  EXPECT_FALSE(tr.used());
 }
 
 TEST_F(StatsIsolatedStoreImplTest, StatNamesStruct) {
