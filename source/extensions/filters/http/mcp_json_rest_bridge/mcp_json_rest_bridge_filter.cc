@@ -8,7 +8,6 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/json_escape_string.h"
-#include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/common/mcp/constants.h"
@@ -86,8 +85,7 @@ json translateJsonRestResponseToJsonRpc(absl::string_view tool_call_response,
 }
 
 json generateInitializeResponse(const json& session_id, absl::string_view server_name,
-                                absl::string_view protocol_version, bool list_changed,
-                                absl::string_view description) {
+                                absl::string_view protocol_version) {
   absl::string_view negotiated_protocol_version = McpConstants::LATEST_SUPPORTED_MCP_VERSION;
   if (isMcpProtocolVersionSupported(protocol_version)) {
     negotiated_protocol_version = protocol_version;
@@ -99,14 +97,12 @@ json generateInitializeResponse(const json& session_id, absl::string_view server
 
   json result;
   result[McpConstants::PROTOCOL_VERSION_FIELD] = negotiated_protocol_version;
+  // TODO(guoyilin42): Support list_changed from ServerToolConfig and description from ServerInfo.
   result[McpConstants::CAPABILITIES_FIELD][McpConstants::TOOLS_FIELD]
-        [McpConstants::LIST_CHANGED_FIELD] = list_changed;
+        [McpConstants::LIST_CHANGED_FIELD] = false;
   result[McpConstants::SERVER_INFO_FIELD][McpConstants::NAME_FIELD] = server_name;
   result[McpConstants::SERVER_INFO_FIELD][McpConstants::VERSION_FIELD] =
       McpConstants::DEFAULT_SERVER_VERSION;
-  if (!description.empty()) {
-    result[McpConstants::SERVER_INFO_FIELD][McpConstants::DESCRIPTION_FIELD] = description;
-  }
   ret[McpConstants::RESULT_FIELD] = result;
   return ret;
 }
@@ -223,10 +219,8 @@ McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, 
   }
 
   mcp_operation_ = McpOperation::Undecided;
-  // Strip the port number from the Host header value (e.g., "example.com:8080" -> "example.com",
-  // "[::1]:8080" -> "[::1]") using the shared Envoy utility.
+  // TODO(guoyilin42): Strip port number from server_name_.
   server_name_ = std::string(request_headers.getHostValue());
-  Http::HeaderUtility::stripPortFromHost(server_name_);
 
   if (request_headers.getMethodValue() != Http::Headers::get().MethodValues.Post) {
     ENVOY_STREAM_LOG(warn, "Only POST method is supported for MCP. Received: {}",
@@ -500,8 +494,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc,
           generateInitializeResponse(
               *session_id_, server_name_,
               json_rpc[McpConstants::PARAMS_FIELD][McpConstants::PROTOCOL_VERSION_FIELD]
-                  .get<std::string>(),
-              config_->toolsListChanged(), config_->serverDescription())
+                  .get<std::string>())
               .dump(),
           [](Http::ResponseHeaderMap& headers) {
             headers.setContentType(Http::Headers::get().ContentTypeValues.Json);

@@ -19,7 +19,6 @@ envoy_cc_library(
         "//envoy/http:filter_interface",
         "//envoy/server:filter_config_interface",
         "//source/common/common:logger_lib",
-        "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf",
         "//source/extensions/filters/common/mcp:constants_lib",

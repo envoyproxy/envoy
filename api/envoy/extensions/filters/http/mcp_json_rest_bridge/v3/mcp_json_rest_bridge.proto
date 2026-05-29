@@ -156,6 +156,8 @@ message ServerInfo {
   // Example values: ["2025-11-25", "2025-06-18"]
   repeated string supported_protocol_versions = 1;
 
+  // [#not-implemented-hide:]
+  // [#comment:TODO(guoyilin42): Implement description]
   // Optional description of the server.
   string description = 2;
 
@@ -179,6 +181,8 @@ message ServerToolConfig {
   // List of MCP tools configurations.
   repeated ToolConfig tools = 1;
 
+  // [#not-implemented-hide:]
+  // [#comment:TODO(guoyilin42): Implement list_changed]
   // Whether this server supports notifications for changes to the tool list.
   bool list_changed = 2;
 
