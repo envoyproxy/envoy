@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "envoy/common/random_generator.h"
 #include "envoy/event/timer.h"
@@ -50,6 +51,14 @@ public:
    *         policies specified in @param config are valid.
    */
   static std::pair<uint32_t, bool> parseRetryGrpcOn(absl::string_view retry_grpc_on_header);
+
+  /**
+   * Returns any tokens from @param config that are not recognized by either
+   * the HTTP or gRPC retry policy parsers.
+   * @param config is the comma-separated retry_on field value.
+   * @return vector of unrecognized token strings.
+   */
+  static std::vector<std::string> getUnknownRetryOnTokens(absl::string_view config);
 
   // Router::RetryState
   bool enabled() override { return retry_on_ != 0; }
