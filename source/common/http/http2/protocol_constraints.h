@@ -72,7 +72,19 @@ public:
   }
   void decrementActiveStreamCount() {
     ASSERT(active_streams_ > 0);
-    --active_streams_;
+    if (active_streams_ > 0) {
+      --active_streams_;
+      if (inbound_priority_frames_ > max_inbound_priority_frames_per_stream_) {
+        inbound_priority_frames_ -= max_inbound_priority_frames_per_stream_;
+      } else {
+        inbound_priority_frames_ = 0;
+      }
+      if (inbound_window_update_frames_ > 2) {
+        inbound_window_update_frames_ -= 2;
+      } else {
+        inbound_window_update_frames_ = 0;
+      }
+    }
   }
 
   Status checkOutboundFrameLimits();
