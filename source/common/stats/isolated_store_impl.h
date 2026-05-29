@@ -106,6 +106,7 @@ public:
 
   NullCounterImpl& nullCounter() override { return null_counter_; }
   NullGaugeImpl& nullGauge() override { return null_gauge_; }
+  NullTextReadoutImpl& nullTextReadout() { return null_text_readout_; }
 
   bool iterate(const IterateFn<Counter>& fn) const override {
     return constRootScope()->iterate(fn);

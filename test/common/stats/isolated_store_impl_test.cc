@@ -383,10 +383,15 @@ TEST_F(StatsIsolatedStoreImplTest, NullImplCoverage) {
   EXPECT_TRUE(g.decRefCount());
   EXPECT_EQ(0, g.use_count());
 
-  // Exercise NullTextReadoutImpl via the scope-matcher rejection path.
-  TextReadout& tr = scope_->textReadoutFromString("any.tr");
-  // Real text readout: a fresh one is unused.
-  EXPECT_FALSE(tr.used());
+  NullTextReadoutImpl& t = store_->nullTextReadout();
+  t.set("foo");
+  EXPECT_EQ("", t.value());
+  EXPECT_FALSE(t.used());
+  t.markUnused();
+  EXPECT_FALSE(t.hidden());
+  t.incRefCount();
+  EXPECT_TRUE(t.decRefCount());
+  EXPECT_EQ(0, t.use_count());
 }
 
 TEST_F(StatsIsolatedStoreImplTest, StatNamesStruct) {
