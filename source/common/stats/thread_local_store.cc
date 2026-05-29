@@ -39,12 +39,19 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc, bool use_tag_scope)
   for (const auto& desc : Config::TagNames::get().descriptorVec()) {
     well_known_tags_->rememberBuiltin(desc.name_);
   }
+  // Default scope name is the empty string. Use a managed-storage temporary to materialize a
+  // valid (empty) StatName -- a default-constructed StatName{} has no backing bytes and would
+  // crash when StatNameStorage(StatName, SymbolTable&) calls src.size().
+  StatNameManagedStorage empty_storage("", alloc.symbolTable());
+  const StatName empty = empty_storage.statName();
   std::shared_ptr<ScopeImpl> new_scope;
   if (use_tag_scope_) {
-    new_scope = std::make_shared<TagScopeImpl>(nullptr, StatName{}, StatNameTagSpan{}, StatName{},
-                                               *this, false);
+    auto pool = std::make_unique<StatNamePool>(alloc.symbolTable());
+    const StatName interned_empty = pool->add(empty);
+    new_scope = std::make_shared<TagScopeImpl>(std::move(pool), interned_empty, StatNameTagSpan{},
+                                               interned_empty, *this, false);
   } else {
-    new_scope = std::make_shared<ScopeImpl>(*this, StatName{}, false);
+    new_scope = std::make_shared<ScopeImpl>(*this, empty, false);
   }
   addScope(new_scope);
   default_scope_ = new_scope;
