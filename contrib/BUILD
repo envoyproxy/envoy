@@ -37,6 +37,19 @@ selects.config_setting_group(
     visibility = ["//visibility:public"],
 )
 
+# Disambiguation for SELECTED_CONTRIB_EXTENSIONS' select, where both
+# "//bazel:linux_aarch64" and "//bazel:using_openssl" otherwise match for an
+# arm64 openssl build. Restricting the openssl branch to x86_64 lets the
+# aarch64 branch win on arm64.
+selects.config_setting_group(
+    name = "using_openssl_on_linux_x86_64",
+    match_all = [
+        "//bazel:using_openssl",
+        "//bazel:linux_x86_64",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 exports_files([
     "extensions_metadata.yaml",
     "contrib_build_config.bzl",

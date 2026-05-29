@@ -64,7 +64,15 @@ message GcpAuthnFilterConfig {
 // Audience is the URL of the receiving service that performs token authentication.
 // It will be provided to the filter through cluster's typed_filter_metadata.
 message Audience {
-  string url = 1 [(validate.rules).string = {min_len: 1}];
+  message AccessToken {
+  }
+
+  // The audience URL, used for fetching unbound JWT token.
+  string url = 1;
+
+  // If defined, the filter will fetch unbound Access Token instead of JWT.
+  // It takes precedence over ``url``.
+  AccessToken access_token = 2;
 }
 
 // Token Cache configuration.

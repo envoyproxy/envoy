@@ -3,11 +3,17 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_proto_library(
+    name = "sni_to_header_filter_proto",
+    srcs = ["sni_to_header_filter.proto"],
+)
 
 envoy_cc_test_library(
     name = "ssl_integration_test_lib",
@@ -63,6 +69,7 @@ envoy_cc_test_library(
         "sni_to_header_filter.cc",
     ],
     deps = [
+        ":sni_to_header_filter_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//source/common/network:connection_lib",

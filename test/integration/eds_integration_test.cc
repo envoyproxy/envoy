@@ -694,7 +694,11 @@ TEST_P(EdsIntegrationTest, BatchMemberUpdateCb) {
 }
 
 TEST_P(EdsIntegrationTest, StatsReadyFilter) {
-  config_helper_.prependFilter("name: eds-ready-filter");
+  config_helper_.prependFilter(R"EOF(
+    name: eds-ready-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.EdsReadyFilterConfig
+  )EOF");
   initializeTest(false);
 
   // Initial state: no healthy endpoints
