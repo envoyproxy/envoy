@@ -420,7 +420,6 @@ public:
   virtual Store& store() PURE;
   virtual const Store& constStore() const PURE;
 
-private:
   // Converts the legacy optional-vector-reference tag representation accepted by the deprecated
   // *FromStatNameWithTags convenience methods into the span representation taken by the new
   // *FromStatName virtual methods. The returned span aliases the caller-owned vector and must only
