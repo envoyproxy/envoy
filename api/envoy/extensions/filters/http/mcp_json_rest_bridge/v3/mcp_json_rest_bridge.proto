@@ -268,8 +268,8 @@ message HttpRule {
 
     // Path to the field within the JSON arguments object from a tools/call
     // request. Uses dot-notation for nested fields.
-    // E.g. if arguments object is `{"user":{"auth_token":"foo"}}`, then
-    // `argument_path` should be "user.auth_token".
+    // E.g. if arguments object is ``{"user":{"auth_token":"foo"}}``, then
+    // ``argument_path`` should be "user.auth_token".
     string argument_path = 2 [(validate.rules).string = {min_len: 1}];
   }
 
