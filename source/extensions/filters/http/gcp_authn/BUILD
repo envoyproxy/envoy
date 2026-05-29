@@ -16,6 +16,7 @@ envoy_cc_library(
     deps = [
         "token_cache",
         ":gcp_authn_client_impl",
+        ":crypto_utils",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",

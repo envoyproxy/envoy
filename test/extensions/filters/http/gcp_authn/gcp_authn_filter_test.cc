@@ -1,5 +1,6 @@
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.h"
 
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_client_impl.h"
@@ -8,7 +9,10 @@
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/gcp_authn/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/network/transport_socket.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/environment.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -18,6 +22,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GcpAuthn {
 namespace {
+
+class MockCertFingerprinter : public CertFingerprinter {
+public:
+  MOCK_METHOD(absl::StatusOr<std::string>, getFingerprintFromPem, (const std::string& pem), (const, override));
+};
 
 using ::envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig;
 using Server::Configuration::MockFactoryContext;
@@ -61,6 +70,7 @@ public:
     filter_config_ =
         std::make_shared<envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig>(
             config_);
+    fingerprinter_ = std::make_shared<NiceMock<MockCertFingerprinter>>();
   }
 
   void setupMockObjects() {
@@ -79,7 +89,7 @@ public:
   }
 
   void setupFilterAndCallback(TokenCacheImpl* cache = nullptr) {
-    filter_ = std::make_unique<GcpAuthnFilter>(filter_config_, context_, "stats", cache);
+    filter_ = std::make_unique<GcpAuthnFilter>(filter_config_, context_, "stats", cache, fingerprinter_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
@@ -121,6 +131,7 @@ public:
   std::unique_ptr<GcpAuthnFilter> filter_;
   GcpAuthnFilterConfig config_;
   FilterConfigSharedPtr filter_config_;
+  std::shared_ptr<MockCertFingerprinter> fingerprinter_;
   Http::TestRequestHeaderMapImpl default_headers_{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
   envoy::config::core::v3::Metadata metadata_;
@@ -320,9 +331,89 @@ TEST_F(GcpAuthnFilterTest, CacheMissAndInsert) {
   // Verify by performing a lookup in the cache and asserting it is found!
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.set_url("test");
-  auto cached_val = cache.lookUp(audience);
+  auto cached_val = cache.lookUp(audience, absl::nullopt);
   EXPECT_TRUE(cached_val.has_value());
   EXPECT_EQ(cached_val.value(), std::string(GoodTokenStr));
+}
+
+TEST_F(GcpAuthnFilterTest, mTLSClusterFingerprint) {
+  setupMockObjects();
+  setupFilterAndCallback();
+  
+  cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_));
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.mutable_bound_jwt()->set_url("test");
+
+  (*metadata_.mutable_typed_filter_metadata())
+      [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+          .PackFrom(audience);
+  ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
+
+  const std::string dummy_pem = "dummy cert PEM";
+  const std::string expected_fingerprint = "mock_fingerprint_base64";
+
+  auto socket_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
+  auto client_context_config = std::make_unique<NiceMock<Ssl::MockClientContextConfig>>();
+  auto tls_cert_config = std::make_unique<NiceMock<Ssl::MockTlsCertificateConfig>>();
+
+  ON_CALL(*tls_cert_config, certificateChain()).WillByDefault(testing::ReturnRef(dummy_pem));
+
+  std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>> tls_certs;
+  tls_certs.push_back(*tls_cert_config);
+  ON_CALL(*client_context_config, tlsCertificates()).WillByDefault(testing::Return(tls_certs));
+
+  ON_CALL(*socket_factory, clientContextConfig())
+      .WillByDefault(testing::Return(OptRef<const Ssl::ClientContextConfig>(*client_context_config)));
+
+  auto transport_socket_matcher =
+      std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(std::move(socket_factory));
+  EXPECT_CALL(*cluster_info_, transportSocketMatcher())
+      .WillRepeatedly(testing::ReturnRef(*transport_socket_matcher));
+
+  EXPECT_CALL(*fingerprinter_, getFingerprintFromPem(dummy_pem))
+      .WillOnce(testing::Return(expected_fingerprint));
+
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+  EXPECT_TRUE(filter_->fingerprint().has_value());
+  EXPECT_EQ(filter_->fingerprint().value(), expected_fingerprint);
+
+  filter_.reset();
+}
+
+TEST_F(GcpAuthnFilterTest, BoundJwtWithoutFingerprintFails) {
+  setupMockObjects();
+  setupFilterAndCallback();
+
+  cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_));
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.mutable_bound_jwt()->set_url("http://bound_audience");
+
+  (*metadata_.mutable_typed_filter_metadata())
+      [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+          .PackFrom(audience);
+  ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
+
+  auto socket_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
+  ON_CALL(*socket_factory, clientContextConfig())
+      .WillByDefault(testing::Return(OptRef<const Ssl::ClientContextConfig>{}));
+
+  auto transport_socket_matcher =
+      std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(std::move(socket_factory));
+  EXPECT_CALL(*cluster_info_, transportSocketMatcher())
+      .WillRepeatedly(testing::ReturnRef(*transport_socket_matcher));
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+  EXPECT_FALSE(filter_->fingerprint().has_value());
 }
 
 } // namespace

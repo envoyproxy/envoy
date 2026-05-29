@@ -17,14 +17,14 @@ namespace HttpFilters {
 namespace GcpAuthn {
 
 namespace {
-constexpr absl::string_view JwtTokenEndpoint =
-    "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/"
-    "identity?audience=[AUDIENCE]";
-constexpr absl::string_view AccessTokenEndpoint =
-    "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/"
-    "token";
+constexpr absl::string_view DefaultServiceAccountPrefix =
+    "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/";
+constexpr absl::string_view IdentityUrlPath = "identity";
+constexpr absl::string_view TokenUrlPath = "token";
+constexpr absl::string_view AudienceQueryKey = "audience";
 constexpr char MetadataFlavorKey[] = "Metadata-Flavor";
 constexpr char MetadataFlavor[] = "Google";
+constexpr char ClientCertificateSha256Key[] = "client_certificate_sha256";
 
 Http::RequestMessagePtr buildRequest(absl::string_view url) {
   absl::string_view host;
@@ -77,9 +77,39 @@ parseAccessTokenResponse(const std::string& response_body,
 }
 } // namespace
 
-void GcpAuthnClientImpl::fetchToken(
+void GcpAuthnClientImpl::fetchUnboundJwt(
     const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
     GcpAuthnClient::Callbacks& callbacks) {
+  Http::Utility::QueryParamsMulti query_params;
+  query_params.add(AudienceQueryKey, audience.url());
+  const std::string final_url =
+      absl::StrCat(DefaultServiceAccountPrefix, IdentityUrlPath, query_params.toString());
+  fetchTokenHelper(TokenType::Jwt, audience, final_url, callbacks);
+}
+
+void GcpAuthnClientImpl::fetchUnboundAccessToken(
+    const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+    GcpAuthnClient::Callbacks& callbacks) {
+  const std::string final_url = absl::StrCat(DefaultServiceAccountPrefix, TokenUrlPath);
+  fetchTokenHelper(TokenType::AccessToken, audience, final_url, callbacks);
+}
+
+void GcpAuthnClientImpl::fetchBoundJwt(
+    const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+    const std::string& fingerprint,
+    GcpAuthnClient::Callbacks& callbacks) {
+  Http::Utility::QueryParamsMulti query_params;
+  query_params.add(AudienceQueryKey, audience.bound_jwt().url());
+  query_params.add(ClientCertificateSha256Key, fingerprint);
+  const std::string final_url =
+      absl::StrCat(DefaultServiceAccountPrefix, IdentityUrlPath, query_params.toString());
+  fetchTokenHelper(TokenType::BoundJwt, audience, final_url, callbacks);
+}
+
+void GcpAuthnClientImpl::fetchTokenHelper(
+    TokenType token_type,
+    const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+    const std::string& final_url, GcpAuthnClient::Callbacks& callbacks) {
   // Cancel any active requests.
   cancel();
   ASSERT(callbacks_ == nullptr);
@@ -115,17 +145,7 @@ void GcpAuthnClientImpl::fetchToken(
     options.setBufferBodyForRetry(true);
   }
 
-  std::string final_url;
-  if (audience.has_access_token()) {
-    token_type_ = TokenType::AccessToken;
-    final_url = AccessTokenEndpoint;
-  } else if (!audience.url().empty()) {
-    token_type_ = TokenType::Jwt;
-    final_url = absl::StrReplaceAll(JwtTokenEndpoint, {{"[AUDIENCE]", audience.url()}});
-  } else {
-    onError("Failed to fetch the token: both url and access_token are empty.");
-    return;
-  }
+  token_type_ = token_type;
   active_request_ =
       thread_local_cluster->httpAsyncClient().send(buildRequest(final_url), *this, options);
 }
@@ -149,7 +169,7 @@ void GcpAuthnClientImpl::onSuccess(const Http::AsyncClient::Request&,
   ASSERT(callbacks_ != nullptr);
   std::string response_body = response->bodyAsString();
   absl::StatusOr<GcpToken> token_or_error;
-  if (token_type_ == TokenType::Jwt) {
+  if (token_type_ == TokenType::Jwt || token_type_ == TokenType::BoundJwt) {
     token_or_error = parseJwtResponse(response_body, audience_);
   } else {
     token_or_error = parseAccessTokenResponse(response_body, audience_,
