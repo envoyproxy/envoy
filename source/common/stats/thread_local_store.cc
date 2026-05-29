@@ -930,7 +930,7 @@ ScopeSharedPtr ThreadLocalStoreImpl::TagScopeImpl::createScope(
 
   StatNameTagVec stat_name_tags;
   stat_name_tags.reserve(name_tags.size());
-  for (const auto [tag, value] : name_tags) {
+  for (const auto& [tag, value] : name_tags) {
     stat_name_tags.emplace_back(tag_pool.add(tag), tag_pool.add(value));
   }
   return scopeFromStatName(stat_name, stat_name_tags, stat_tagged_name, evictable, limits,
@@ -951,7 +951,7 @@ ScopeSharedPtr ThreadLocalStoreImpl::TagScopeImpl::scopeFromStatName(
   StatNameTagVec child_prefix_tags;
   if (const auto effective_tags = joiner.effectiveTags(); effective_tags.has_value()) {
     child_prefix_tags.reserve(effective_tags->size());
-    for (const auto [tag, value] : *effective_tags) {
+    for (const auto& [tag, value] : *effective_tags) {
       child_prefix_tags.emplace_back(child_pool->add(tag), child_pool->add(value));
     }
   }

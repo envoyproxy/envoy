@@ -79,7 +79,7 @@ ScopeSharedPtr IsolatedScopeImpl::createScope(absl::string_view name, StringView
 
   StatNameTagVec stat_name_tags;
   stat_name_tags.reserve(name_tags.size());
-  for (const auto [tag, value] : name_tags) {
+  for (const auto& [tag, value] : name_tags) {
     stat_name_tags.emplace_back(tag_pool.add(tag), tag_pool.add(value));
   }
   return scopeFromStatName(stat_name, stat_name_tags, stat_tagged_name, evictable, limits,
