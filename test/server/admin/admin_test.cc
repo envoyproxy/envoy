@@ -175,6 +175,7 @@ TEST_P(AdminInstanceTest, Help) {
       level: desired logging level, this will change all loggers's level; One of (, trace, debug, info, warning, error, critical, off)
   /memory: print current allocation/heap usage
   /memory/tcmalloc: print TCMalloc stats
+  /peak_heap_dump: dump peak Envoy heap (if supported)
   /quitquitquit (POST): exit the server
   /ready: print server state, return 200 if LIVE, otherwise return 503
   /reopen_logs (POST): reopen access logs
