@@ -1,20 +1,15 @@
 #include "source/extensions/load_balancing_policies/least_request/least_request_lb.h"
 
-#include "source/common/runtime/runtime_features.h"
-
 namespace Envoy {
 namespace Upstream {
 
-namespace {
-uint64_t effectiveActiveRequests(const Host& host) {
+uint64_t LeastRequestLoadBalancer::effectiveActiveRequests(const Host& host) const {
   uint64_t active = host.stats().rq_active_.value();
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.least_request_lb_count_pending_requests")) {
+  if (count_pending_requests_) {
     active += host.stats().rq_pending_active_.value();
   }
   return active;
 }
-} // namespace
 
 double LeastRequestLoadBalancer::hostWeight(const Host& host) const {
   // This method is called to calculate the dynamic weight as following when all load balancing
