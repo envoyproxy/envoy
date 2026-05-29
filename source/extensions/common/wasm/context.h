@@ -119,7 +119,8 @@ public:
           PluginHandleSharedPtr plugin_handle); // Stream context.
   ~Context() override;
 
-  Wasm* wasm() const;
+  WasmBase* wasm() const override;
+  Wasm* envoyWasm() const;
   Plugin* plugin() const;
   Context* rootContext() const;
   Upstream::ClusterManager& clusterManager() const;
@@ -148,8 +149,7 @@ public:
                                      const std::shared_ptr<PluginBase>& plugin); // deprecated
 
   // AccessLog::Instance
-  void log(const Formatter::HttpFormatterContext& log_context,
-           const StreamInfo::StreamInfo& info) override;
+  void log(const Formatter::Context& log_context, const StreamInfo::StreamInfo& info) override;
 
   uint32_t getLogLevel() override;
 

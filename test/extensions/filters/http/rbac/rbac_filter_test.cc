@@ -15,7 +15,7 @@
 #include "test/extensions/filters/http/rbac/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 
 #include "xds/type/matcher/v3/matcher.pb.h"
 
@@ -279,6 +279,16 @@ on_no_match:
         .WillByDefault(ReturnPointee(req_info_.downstream_connection_info_provider_));
   }
 
+  void setLocalAddressWithNetworkNamespace(const std::string& network_namespace_path,
+                                           uint16_t port = 123) {
+    address_ = std::make_shared<Network::Address::Ipv4Instance>(
+        "127.0.0.1", port, nullptr, absl::make_optional(std::string(network_namespace_path)));
+
+    req_info_.downstream_connection_info_provider_->setLocalAddress(address_);
+    ON_CALL(connection_.stream_info_, downstreamAddressProvider())
+        .WillByDefault(ReturnPointee(req_info_.downstream_connection_info_provider_));
+  }
+
   void checkAccessLogMetadata(LogResult expected) {
     if (expected != LogResult::Undecided) {
       auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(
@@ -296,23 +306,23 @@ on_no_match:
 
   void setMetadata() {
     ON_CALL(req_info_, setDynamicMetadata("envoy.filters.http.rbac", _))
-        .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
+        .WillByDefault(Invoke([this](const std::string&, const Protobuf::Struct& obj) {
           req_info_.metadata_.mutable_filter_metadata()->insert(
-              Protobuf::MapPair<std::string, ProtobufWkt::Struct>("envoy.filters.http.rbac", obj));
+              Protobuf::MapPair<std::string, Protobuf::Struct>("envoy.filters.http.rbac", obj));
         }));
 
     ON_CALL(req_info_,
             setDynamicMetadata(
                 Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace, _))
-        .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
+        .WillByDefault(Invoke([this](const std::string&, const Protobuf::Struct& obj) {
           req_info_.metadata_.mutable_filter_metadata()->insert(
-              Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
+              Protobuf::MapPair<std::string, Protobuf::Struct>(
                   Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace, obj));
         }));
   }
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
-  NiceMock<Network::MockConnection> connection_{};
+  NiceMock<Network::MockConnection> connection_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info_;
   Stats::TestUtil::TestStore stats_store_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
@@ -968,6 +978,100 @@ TEST_F(RoleBasedAccessControlFilterTest, MatcherDenied) {
   checkAccessLogMetadata(LogResult::Undecided);
 }
 
+TEST_F(RoleBasedAccessControlFilterTest, MatcherNetworkNamespaceAllowed) {
+  envoy::extensions::filters::http::rbac::v3::RBAC config;
+
+  const std::string matcher_yaml = R"EOF(
+matcher_list:
+  matchers:
+  - predicate:
+      single_predicate:
+        input:
+          name: envoy.matching.inputs.network_namespace
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.NetworkNamespaceInput
+        value_match:
+          exact: "/var/run/netns/http_ns1"
+    on_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+          name: allow_ns
+          action: ALLOW
+on_no_match:
+  action:
+    name: action
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+      name: deny_all
+      action: DENY
+)EOF";
+
+  xds::type::matcher::v3::Matcher matcher;
+  TestUtility::loadFromYaml(matcher_yaml, matcher);
+  *config.mutable_matcher() = matcher;
+  config.set_shadow_rules_stat_prefix("shadow_rules_prefix_");
+
+  setupConfig(std::make_shared<RoleBasedAccessControlFilterConfig>(
+      config, "test", *stats_store_.rootScope(), context_,
+      ProtobufMessage::getStrictValidationVisitor()));
+
+  setLocalAddressWithNetworkNamespace("/var/run/netns/http_ns1", 123);
+  setMetadata();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().denied_.value());
+}
+
+TEST_F(RoleBasedAccessControlFilterTest, MatcherNetworkNamespaceDenied) {
+  envoy::extensions::filters::http::rbac::v3::RBAC config;
+
+  const std::string matcher_yaml = R"EOF(
+matcher_list:
+  matchers:
+  - predicate:
+      single_predicate:
+        input:
+          name: envoy.matching.inputs.network_namespace
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.NetworkNamespaceInput
+        value_match:
+          exact: "/var/run/netns/http_ns1"
+    on_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+          name: allow_ns
+          action: ALLOW
+on_no_match:
+  action:
+    name: action
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+      name: deny_all
+      action: DENY
+)EOF";
+
+  xds::type::matcher::v3::Matcher matcher;
+  TestUtility::loadFromYaml(matcher_yaml, matcher);
+  *config.mutable_matcher() = matcher;
+  config.set_shadow_rules_stat_prefix("shadow_rules_prefix_");
+
+  setupConfig(std::make_shared<RoleBasedAccessControlFilterConfig>(
+      config, "test", *stats_store_.rootScope(), context_,
+      ProtobufMessage::getStrictValidationVisitor()));
+
+  setLocalAddressWithNetworkNamespace("/var/run/netns/other", 123);
+  setMetadata();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers_, false));
+  EXPECT_EQ(0U, config_->stats().allowed_.value());
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+}
+
 TEST_F(RoleBasedAccessControlFilterTest, MatcherRouteLocalOverride) {
   setupMatcher("ALLOW", "DENY");
 
@@ -1175,7 +1279,7 @@ public:
         std::make_unique<StreamInfo::UpstreamAddress>(
             Envoy::Network::Utility::parseInternetAddressAndPortNoThrow(upstream_ips.back(),
                                                                         false)),
-        StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
+        StreamInfo::FilterState::LifeSpan::Request);
   }
 };
 

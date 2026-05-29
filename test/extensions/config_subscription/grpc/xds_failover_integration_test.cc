@@ -1,7 +1,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
-#include "source/common/common/logger.h"
 #include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
 #include "source/common/tls/ssl_socket.h"
@@ -14,6 +13,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 
 namespace {
@@ -147,13 +148,12 @@ public:
       tls_cert->mutable_private_key()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
       auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-          tls_context, factory_context_, false);
+          tls_context, factory_context_, {}, false);
       // upstream_stats_store_ should have been initialized be prior call to
       // BaseIntegrationTest::createXdsUpstream().
       ASSERT(upstream_stats_store_ != nullptr);
       auto context = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-          std::move(cfg), context_manager_, *upstream_stats_store_->rootScope(),
-          std::vector<std::string>{});
+          std::move(cfg), context_manager_, *upstream_stats_store_->rootScope());
       addFakeUpstream(std::move(context), Http::CodecType::HTTP2, /*autonomous_upstream=*/false);
     }
     failover_xds_upstream_ = fake_upstreams_.back().get();
@@ -179,6 +179,15 @@ public:
   void primaryConnectionFailure() {
     AssertionResult result = xds_upstream_->waitForHttpConnection(*dispatcher_, xds_connection_);
     RELEASE_ASSERT(result, result.message());
+    // When GoogleGrpc is used, there may be cases where the connection will be
+    // disconnected before the gRPC library observes the TLS handshake, which will
+    // end up in a fast retry without notifying Envoy that the connection was
+    // disconnected. We wait for a stream to ensure that the gRPC library
+    // observed a successful connection.
+    if (clientType() == Grpc::ClientType::GoogleGrpc) {
+      result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+      RELEASE_ASSERT(result, result.message());
+    }
     result = xds_connection_->close();
     RELEASE_ASSERT(result, result.message());
   }
@@ -202,7 +211,7 @@ public:
     // current invocation of gRPC stream closure piece of code that will also
     // enable the retry timer.
     // 3. The test thread will increase the simulated time.
-    test_server_->waitForCounterGe("cluster_manager.cds.update_failure", expected_failures);
+    test_server_->waitForCounter("cluster_manager.cds.update_failure", Ge(expected_failures));
     absl::Notification notification;
     test_server_->server().dispatcher().post([&]() { notification.Notify(); });
     notification.WaitForNotification();
@@ -249,34 +258,34 @@ public:
     sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
         CdsTypeUrl, {ConfigHelper::buildCluster("cluster_0")},
         {ConfigHelper::buildCluster("cluster_0")}, {}, "1", {}, xds_stream);
-    test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
-    test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 1);
+    test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(1));
+    test_server_->waitForGauge("cluster.cluster_0.warming_state", Eq(1));
     EXPECT_TRUE(compareDiscoveryRequest(EdsTypeUrl, "", {"cluster_0"}, {"cluster_0"}, {}, false,
                                         Grpc::Status::WellKnownGrpcStatus::Ok, "", xds_stream));
     sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
         EdsTypeUrl, {buildClusterLoadAssignment("cluster_0")},
         {buildClusterLoadAssignment("cluster_0")}, {}, "1", {}, xds_stream);
 
-    test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-    test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
-    test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 0);
+    test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
+    test_server_->waitForGauge("cluster_manager.active_clusters", Ge(2));
+    test_server_->waitForGauge("cluster.cluster_0.warming_state", Eq(0));
 
     EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "1", {}, {}, {}, false,
                                         Grpc::Status::WellKnownGrpcStatus::Ok, "", xds_stream));
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}, false,
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}, false,
                                         Grpc::Status::WellKnownGrpcStatus::Ok, "", xds_stream));
 
     sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
         LdsTypeUrl, {buildSimpleListener("listener_0", "cluster_0")},
         {buildSimpleListener("listener_0", "cluster_0")}, {}, "1", {}, xds_stream);
 
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
                                         {"cluster_0"}, {}, {}, false,
                                         Grpc::Status::WellKnownGrpcStatus::Ok, "", xds_stream));
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}, {}, {}, false,
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "1", {}, {}, {}, false,
                                         Grpc::Status::WellKnownGrpcStatus::Ok, "", xds_stream));
 
-    test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+    test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
     makeSingleRequest();
   }
 
@@ -347,7 +356,7 @@ TEST_P(XdsFailoverAdsIntegrationTest, StartupPrimaryNotResponding) {
   ASSERT_TRUE(xds_connection_->waitForDisconnect());
 
   // The CDS request fails when the primary disconnects.
-  test_server_->waitForCounterGe("cluster_manager.cds.update_failure", 2);
+  test_server_->waitForCounter("cluster_manager.cds.update_failure", Ge(2));
 
   AssertionResult result =
       failover_xds_upstream_->waitForHttpConnection(*dispatcher_, failover_xds_connection_);
@@ -408,7 +417,7 @@ TEST_P(XdsFailoverAdsIntegrationTest, StartupPrimaryGrpcFailure) {
   }
 
   // The CDS request fails when the primary disconnects.
-  test_server_->waitForCounterGe("cluster_manager.cds.update_failure", 2);
+  test_server_->waitForCounter("cluster_manager.cds.update_failure", Ge(2));
 
   ASSERT(failover_xds_connection_ == nullptr);
   result = failover_xds_upstream_->waitForHttpConnection(*dispatcher_, failover_xds_connection_);
@@ -455,7 +464,7 @@ TEST_P(XdsFailoverAdsIntegrationTest, StartupPrimaryGrpcFailureAfterHeaders) {
   xds_stream_->finishGrpcStream(Grpc::Status::Internal);
 
   // The CDS request fails when the primary disconnects.
-  test_server_->waitForCounterGe("cluster_manager.cds.update_failure", 2);
+  test_server_->waitForCounter("cluster_manager.cds.update_failure", Ge(2));
 
   ASSERT(failover_xds_connection_ == nullptr);
   result = failover_xds_upstream_->waitForHttpConnection(*dispatcher_, failover_xds_connection_);
@@ -497,8 +506,8 @@ TEST_P(XdsFailoverAdsIntegrationTest, NoFailoverUseAfterPrimaryResponse) {
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       CdsTypeUrl, {ConfigHelper::buildCluster("cluster_0")},
       {ConfigHelper::buildCluster("cluster_0")}, {}, "1", {}, xds_stream_.get());
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
-  test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_0.warming_state", Eq(1));
 
   // Envoy has received a CDS response, it means the primary is available.
   // Now disconnect the primary.
@@ -506,7 +515,7 @@ TEST_P(XdsFailoverAdsIntegrationTest, NoFailoverUseAfterPrimaryResponse) {
 
   // CDS was successful, but EDS will fail. After that add a notification to the
   // main thread to ensure that the retry timer kicks in.
-  test_server_->waitForCounterGe("cluster.cluster_0.update_failure", 1);
+  test_server_->waitForCounter("cluster.cluster_0.update_failure", Ge(1));
   absl::Notification notification;
   test_server_->server().dispatcher().post([&]() { notification.Notify(); });
   notification.WaitForNotification();
@@ -594,7 +603,7 @@ TEST_P(XdsFailoverAdsIntegrationTest, PrimaryUseAfterFailoverResponseAndDisconne
   ASSERT_TRUE(xds_connection_->waitForDisconnect());
 
   // The CDS request fails when the primary disconnects.
-  test_server_->waitForCounterGe("cluster_manager.cds.update_failure", 2);
+  test_server_->waitForCounter("cluster_manager.cds.update_failure", Ge(2));
 
   AssertionResult result =
       failover_xds_upstream_->waitForHttpConnection(*dispatcher_, failover_xds_connection_);
@@ -613,8 +622,8 @@ TEST_P(XdsFailoverAdsIntegrationTest, PrimaryUseAfterFailoverResponseAndDisconne
       {ConfigHelper::buildCluster("failover_cluster_0")}, {}, "failover1", {},
       failover_xds_stream_.get());
   // Wait for an EDS request, and send its response.
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
-  test_server_->waitForGaugeEq("cluster.failover_cluster_0.warming_state", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(1));
+  test_server_->waitForGauge("cluster.failover_cluster_0.warming_state", Eq(1));
   EXPECT_TRUE(compareDiscoveryRequest(
       EdsTypeUrl, "", {"failover_cluster_0"}, {"failover_cluster_0"}, {}, false,
       Grpc::Status::WellKnownGrpcStatus::Ok, "", failover_xds_stream_.get()));
@@ -622,14 +631,14 @@ TEST_P(XdsFailoverAdsIntegrationTest, PrimaryUseAfterFailoverResponseAndDisconne
       EdsTypeUrl, {buildClusterLoadAssignment("failover_cluster_0")},
       {buildClusterLoadAssignment("failover_cluster_0")}, {}, "failover1", {},
       failover_xds_stream_.get());
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
-  test_server_->waitForGaugeEq("cluster.failover_cluster_0.warming_state", 0);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(2));
+  test_server_->waitForGauge("cluster.failover_cluster_0.warming_state", Eq(0));
   EXPECT_EQ(2, test_server_->gauge("control_plane.connected_state")->value());
   EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "failover1", {}, {}, {}, false,
                                       Grpc::Status::WellKnownGrpcStatus::Ok, "",
                                       failover_xds_stream_.get()));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}, false,
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}, false,
                                       Grpc::Status::WellKnownGrpcStatus::Ok, "",
                                       failover_xds_stream_.get()));
 
@@ -639,7 +648,7 @@ TEST_P(XdsFailoverAdsIntegrationTest, PrimaryUseAfterFailoverResponseAndDisconne
 
   // CDS and EDS were successful, but LDS will fail. After that add a notification to the
   // main thread to ensure that the retry timer kicks in.
-  test_server_->waitForCounterGe("listener_manager.lds.update_failure", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_failure", Ge(1));
   absl::Notification notification;
   test_server_->server().dispatcher().post([&]() { notification.Notify(); });
   notification.WaitForNotification();
@@ -672,8 +681,8 @@ TEST_P(XdsFailoverAdsIntegrationTest, PrimaryUseAfterFailoverResponseAndDisconne
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       CdsTypeUrl, {ConfigHelper::buildCluster("primary_cluster_0")},
       {ConfigHelper::buildCluster("primary_cluster_0")}, {}, "primary1", {}, xds_stream_.get());
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
-  test_server_->waitForGaugeEq("cluster.primary_cluster_0.warming_state", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(1));
+  test_server_->waitForGauge("cluster.primary_cluster_0.warming_state", Eq(1));
 
   // Expect an updated failover EDS request.
   EXPECT_TRUE(compareDiscoveryRequest(EdsTypeUrl, "", {"primary_cluster_0"}, {"primary_cluster_0"},
@@ -713,7 +722,7 @@ TEST_P(XdsFailoverAdsIntegrationTest, FailoverUseAfterFailoverResponseAndDisconn
   ASSERT_TRUE(xds_connection_->waitForDisconnect());
 
   // The CDS request fails when the primary disconnects.
-  test_server_->waitForCounterGe("cluster_manager.cds.update_failure", 2);
+  test_server_->waitForCounter("cluster_manager.cds.update_failure", Ge(2));
 
   AssertionResult result =
       failover_xds_upstream_->waitForHttpConnection(*dispatcher_, failover_xds_connection_);
@@ -732,8 +741,8 @@ TEST_P(XdsFailoverAdsIntegrationTest, FailoverUseAfterFailoverResponseAndDisconn
       {ConfigHelper::buildCluster("failover_cluster_0")}, {}, "failover1", {},
       failover_xds_stream_.get());
   // Wait for an EDS request, and send its response.
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
-  test_server_->waitForGaugeEq("cluster.failover_cluster_0.warming_state", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(1));
+  test_server_->waitForGauge("cluster.failover_cluster_0.warming_state", Eq(1));
   EXPECT_TRUE(compareDiscoveryRequest(
       EdsTypeUrl, "", {"failover_cluster_0"}, {"failover_cluster_0"}, {}, false,
       Grpc::Status::WellKnownGrpcStatus::Ok, "", failover_xds_stream_.get()));
@@ -741,14 +750,14 @@ TEST_P(XdsFailoverAdsIntegrationTest, FailoverUseAfterFailoverResponseAndDisconn
       EdsTypeUrl, {buildClusterLoadAssignment("failover_cluster_0")},
       {buildClusterLoadAssignment("failover_cluster_0")}, {}, "failover1", {},
       failover_xds_stream_.get());
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
-  test_server_->waitForGaugeEq("cluster.failover_cluster_0.warming_state", 0);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(2));
+  test_server_->waitForGauge("cluster.failover_cluster_0.warming_state", Eq(0));
   EXPECT_EQ(2, test_server_->gauge("control_plane.connected_state")->value());
   EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "failover1", {}, {}, {}, false,
                                       Grpc::Status::WellKnownGrpcStatus::Ok, "",
                                       failover_xds_stream_.get()));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}, false,
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}, false,
                                       Grpc::Status::WellKnownGrpcStatus::Ok, "",
                                       failover_xds_stream_.get()));
 
@@ -795,8 +804,8 @@ TEST_P(XdsFailoverAdsIntegrationTest, FailoverUseAfterFailoverResponseAndDisconn
       CdsTypeUrl, {ConfigHelper::buildCluster("failover_cluster_1")},
       {ConfigHelper::buildCluster("failover_cluster_1")}, {}, "failover2", {},
       failover_xds_stream_.get());
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
-  test_server_->waitForGaugeEq("cluster.failover_cluster_1.warming_state", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(1));
+  test_server_->waitForGauge("cluster.failover_cluster_1.warming_state", Eq(1));
 
   // Expect an updated failover EDS request.
   EXPECT_TRUE(compareDiscoveryRequest(
@@ -837,7 +846,7 @@ TEST_P(XdsFailoverAdsIntegrationTest,
   ASSERT_TRUE(xds_connection_->waitForDisconnect());
 
   // The CDS request fails when the primary disconnects.
-  test_server_->waitForCounterGe("cluster_manager.cds.update_failure", 2);
+  test_server_->waitForCounter("cluster_manager.cds.update_failure", Ge(2));
 
   AssertionResult result =
       failover_xds_upstream_->waitForHttpConnection(*dispatcher_, failover_xds_connection_);
@@ -856,8 +865,8 @@ TEST_P(XdsFailoverAdsIntegrationTest,
       {ConfigHelper::buildCluster("failover_cluster_0")}, {}, "failover1", {},
       failover_xds_stream_.get());
   // Wait for an EDS request, and send its response.
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
-  test_server_->waitForGaugeEq("cluster.failover_cluster_0.warming_state", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(1));
+  test_server_->waitForGauge("cluster.failover_cluster_0.warming_state", Eq(1));
   EXPECT_TRUE(compareDiscoveryRequest(
       EdsTypeUrl, "", {"failover_cluster_0"}, {"failover_cluster_0"}, {}, false,
       Grpc::Status::WellKnownGrpcStatus::Ok, "", failover_xds_stream_.get()));
@@ -865,14 +874,14 @@ TEST_P(XdsFailoverAdsIntegrationTest,
       EdsTypeUrl, {buildClusterLoadAssignment("failover_cluster_0")},
       {buildClusterLoadAssignment("failover_cluster_0")}, {}, "failover1", {},
       failover_xds_stream_.get());
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
-  test_server_->waitForGaugeEq("cluster.failover_cluster_0.warming_state", 0);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(2));
+  test_server_->waitForGauge("cluster.failover_cluster_0.warming_state", Eq(0));
   EXPECT_EQ(2, test_server_->gauge("control_plane.connected_state")->value());
   EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "failover1", {}, {}, {}, false,
                                       Grpc::Status::WellKnownGrpcStatus::Ok, "",
                                       failover_xds_stream_.get()));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}, false,
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}, false,
                                       Grpc::Status::WellKnownGrpcStatus::Ok, "",
                                       failover_xds_stream_.get()));
 
@@ -944,7 +953,7 @@ TEST_P(XdsFailoverAdsIntegrationTest, NoPrimaryUseAfterFailoverResponse) {
   ASSERT_TRUE(xds_connection_->waitForDisconnect());
 
   // The CDS request fails when the primary disconnects.
-  test_server_->waitForCounterGe("cluster_manager.cds.update_failure", 2);
+  test_server_->waitForCounter("cluster_manager.cds.update_failure", Ge(2));
 
   AssertionResult result =
       failover_xds_upstream_->waitForHttpConnection(*dispatcher_, failover_xds_connection_);
@@ -963,8 +972,8 @@ TEST_P(XdsFailoverAdsIntegrationTest, NoPrimaryUseAfterFailoverResponse) {
       {ConfigHelper::buildCluster("failover_cluster_0")}, {}, "failover1", {},
       failover_xds_stream_.get());
   // Wait for an EDS request, and send its response.
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
-  test_server_->waitForGaugeEq("cluster.failover_cluster_0.warming_state", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(1));
+  test_server_->waitForGauge("cluster.failover_cluster_0.warming_state", Eq(1));
   // Ensure basic flow with failover works.
   EXPECT_TRUE(compareDiscoveryRequest(
       EdsTypeUrl, "", {"failover_cluster_0"}, {"failover_cluster_0"}, {}, false,
@@ -973,9 +982,9 @@ TEST_P(XdsFailoverAdsIntegrationTest, NoPrimaryUseAfterFailoverResponse) {
       EdsTypeUrl, {buildClusterLoadAssignment("failover_cluster_0")},
       {buildClusterLoadAssignment("failover_cluster_0")}, {}, "failover1", {},
       failover_xds_stream_.get());
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
-  test_server_->waitForGaugeEq("cluster.failover_cluster_0.warming_state", 0);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(2));
+  test_server_->waitForGauge("cluster.failover_cluster_0.warming_state", Eq(0));
   EXPECT_EQ(2, test_server_->gauge("control_plane.connected_state")->value());
   EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "failover1", {}, {}, {}, false,
                                       Grpc::Status::WellKnownGrpcStatus::Ok, "",
@@ -988,7 +997,7 @@ TEST_P(XdsFailoverAdsIntegrationTest, NoPrimaryUseAfterFailoverResponse) {
   // Now disconnect the failover source, this should result in an LDS failure.
   // After that add a notification to the main thread to ensure that the retry timer kicks in.
   failover_xds_stream_->finishGrpcStream(Grpc::Status::Internal);
-  test_server_->waitForCounterGe("listener_manager.lds.update_failure", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_failure", Ge(1));
   absl::Notification notification;
   test_server_->server().dispatcher().post([&]() { notification.Notify(); });
   notification.WaitForNotification();
@@ -1048,5 +1057,83 @@ TEST_P(XdsFailoverAdsIntegrationTest, NoPrimaryUseAfterFailoverResponse) {
   EXPECT_TRUE(compareDiscoveryRequest(
       LdsTypeUrl, "", {}, {}, {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "",
       failover_xds_stream_.get(), makeOptRef(empty_initial_resource_versions_map)));
+}
+
+// Validates that initial resource versions are sent after ADS replacement where
+// the first attempt to the primary source fails.
+TEST_P(XdsFailoverAdsIntegrationTest, InitialResourceVersionsSentAfterAdsReplacementAndFailure) {
+  // Initial resource versions is only supported by delta-xDS, so skip the SotW
+  // tests.
+  if (sotwOrDelta() != Grpc::SotwOrDelta::Delta &&
+      sotwOrDelta() != Grpc::SotwOrDelta::UnifiedDelta) {
+    GTEST_SKIP()
+        << "Initial resource versions is only supported by delta-xDS, skipping non-delta-xDS tests";
+    return;
+  }
+  initialize();
+
+  // Establish the primary connection, receive a CDS update, and send a CDS
+  // response (simple static cluster).
+  createXdsConnection();
+  ASSERT_TRUE(xds_connection_->waitForNewStream(*dispatcher_, xds_stream_));
+  xds_stream_->startGrpcStream();
+
+  EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "", {}, {}, {}, true));
+  auto cluster = ConfigHelper::buildCluster("cluster_0");
+  cluster.set_type(envoy::config::cluster::v3::Cluster::STATIC);
+  cluster.clear_eds_cluster_config();
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(CdsTypeUrl, {cluster}, {cluster}, {},
+                                                             "1", {}, xds_stream_.get());
+
+  // Receive LDS request
+  EXPECT_TRUE(compareDiscoveryRequest(LdsTypeUrl, "", {}, {}, {}, false));
+  // Receive CDS ACK.
+  EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "1", {}, {}, {}, false));
+
+  // Replace the ADS server config (with a different timeout, just triggering the
+  // mechanism).
+  envoy::config::core::v3::ApiConfigSource new_ads_config;
+  new_ads_config.CopyFrom(test_server_->server().bootstrap().dynamic_resources().ads_config());
+  new_ads_config.mutable_grpc_services(0)->mutable_timeout()->set_seconds(200);
+
+  // Replace the ADS config.
+  test_server_->setAdsConfigSource(new_ads_config);
+
+  // Expect a reset from the ADS source.
+  EXPECT_TRUE(xds_stream_->waitForReset());
+  // GoogleGrpc will disconnect in this case, and a new connection will be
+  // created. EnvoyGrpc will not kill the connection, and a new stream should be
+  // created.
+  if (clientType() == Grpc::ClientType::GoogleGrpc) {
+    ASSERT_TRUE(xds_connection_->waitForDisconnect());
+    xds_connection_.reset();
+    // Reject the initial primary server attempt.
+    primaryConnectionFailure();
+  } else {
+    ASSERT(clientType() == Grpc::ClientType::EnvoyGrpc);
+    xds_stream_.reset();
+    // The connection will be re-used in then EnvoyGrpc case.
+    ASSERT_TRUE(xds_connection_->waitForNewStream(*dispatcher_, xds_stream_));
+    // Disconnect the primary immediately.
+    ASSERT_TRUE(xds_connection_->close());
+  }
+
+  // Wait for the second attempt to the primary source.
+  ASSERT_TRUE(xds_connection_->waitForDisconnect());
+  // The CDS request fails when the primary disconnects. After that fetch the config
+  // dump to ensure that the retry timer kicks in.
+  waitForPrimaryXdsRetryTimer();
+
+  // Allow the second attempt to the primary to succeed.
+  createXdsConnection();
+  ASSERT_TRUE(xds_connection_->waitForNewStream(*dispatcher_, xds_stream_));
+  xds_stream_->startGrpcStream();
+
+  // The first CDS request should include the initial-resource-versions.
+  const absl::flat_hash_map<std::string, std::string> cds_initial_resource_versions_map{
+      {"cluster_0", "1"}};
+  EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "", {}, {}, {}, true,
+                                      Grpc::Status::WellKnownGrpcStatus::Ok, "", xds_stream_.get(),
+                                      makeOptRef(cds_initial_resource_versions_map)));
 }
 } // namespace Envoy

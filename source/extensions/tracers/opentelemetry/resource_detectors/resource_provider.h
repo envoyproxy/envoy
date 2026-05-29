@@ -20,6 +20,24 @@ constexpr absl::string_view kDefaultTelemetrySdkName = "envoy";
 
 constexpr absl::string_view kTelemetrySdkVersionKey = "telemetry.sdk.version";
 
+/**
+ * @brief Configuration options controlling the population of optional attributes in the emitted
+ * OpenTelemetry resource object.
+ */
+struct ResourceProviderOptions {
+  /**
+   * @brief Whether to automatically include telemetry SDK metadata attributes
+   * (`telemetry.sdk.language`, `telemetry.sdk.name`, `telemetry.sdk.version`).
+   */
+  bool set_telemetry_sdk_resource_attributes{true};
+  /**
+   * @brief Whether to automatically include the `service.name` resource attribute.
+   */
+  bool set_service_name_resource_attribute{true};
+
+  bool operator==(const ResourceProviderOptions& other) const = default;
+};
+
 class ResourceProvider : public Logger::Loggable<Logger::Id::tracing> {
 public:
   virtual ~ResourceProvider() = default;
@@ -36,14 +54,20 @@ public:
    * @return Resource const The merged resource.
    */
   virtual Resource
-  getResource(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
-              Server::Configuration::TracerFactoryContext& context) const PURE;
+  getResource(const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
+                  resource_detectors,
+              Server::Configuration::ServerFactoryContext& context, absl::string_view service_name,
+              const ResourceProviderOptions& options) const PURE;
 };
+using ResourceProviderPtr = std::shared_ptr<ResourceProvider>;
 
 class ResourceProviderImpl : public ResourceProvider {
 public:
-  Resource getResource(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
-                       Server::Configuration::TracerFactoryContext& context) const override;
+  Resource
+  getResource(const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
+                  resource_detectors,
+              Server::Configuration::ServerFactoryContext& context, absl::string_view service_name,
+              const ResourceProviderOptions& options) const override;
 };
 
 } // namespace OpenTelemetry

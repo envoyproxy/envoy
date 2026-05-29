@@ -19,7 +19,7 @@ in either [bazel/repository_locations.bzl](bazel/repository_locations.bzl) or
 An example entry for the `nghttp2` dependency is:
 
 ```python
-com_github_nghttp2_nghttp2 = dict(
+nghttp2 = dict(
     project_name = "Nghttp2",
     project_desc = "Implementation of HTTP/2 and its header compression ...",
     project_url = "https://nghttp2.org",

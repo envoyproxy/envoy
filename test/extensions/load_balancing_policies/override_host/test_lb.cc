@@ -19,7 +19,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace DynamicForwarding {
 
 using ::Envoy::Upstream::Host;
@@ -108,6 +108,6 @@ TestLoadBalancerFactory::create(OptRef<const Upstream::LoadBalancerConfig> lb_co
 REGISTER_FACTORY(TestLoadBalancerFactory, Upstream::TypedLoadBalancerFactory);
 
 } // namespace DynamicForwarding
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

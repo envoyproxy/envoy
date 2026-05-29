@@ -6,7 +6,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace LeastRequest {
 
 TypedLeastRequestLbConfig::TypedLeastRequestLbConfig(const CommonLbConfigProto& common_lb_config,
@@ -46,6 +46,6 @@ Upstream::LoadBalancerPtr LeastRequestCreator::operator()(
 REGISTER_FACTORY(Factory, Upstream::TypedLoadBalancerFactory);
 
 } // namespace LeastRequest
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

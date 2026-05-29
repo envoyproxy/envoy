@@ -103,7 +103,7 @@ TEST_P(ApiListenerIntegrationTest, Basic) {
     Http::TestResponseHeaderMapImpl expected_response_headers{{":status", "200"}};
     EXPECT_CALL(stream_encoder_, encodeHeaders(_, false));
     EXPECT_CALL(stream_encoder_, encodeData(_, false));
-    EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(""), true)).WillOnce(Notify(&done));
+    EXPECT_CALL(stream_encoder_, encodeData(BufferString(""), true)).WillOnce(Notify(&done));
 
     // Send a headers-only request
     stream_decoder->get()->decodeHeaders(
@@ -162,7 +162,7 @@ TEST_P(ApiListenerIntegrationTest, FromWorkerThread) {
       ThreadLocal::TypedSlot<>::makeUnique(test_server_->server().threadLocal());
   slot->set([&dispatchers_mutex, &dispatchers, &has_dispatcher](
                 Event::Dispatcher& dispatcher) -> std::shared_ptr<ThreadLocal::ThreadLocalObject> {
-    absl::MutexLock ml(&dispatchers_mutex);
+    absl::MutexLock ml(dispatchers_mutex);
     // A string comparison on thread name seems to be the only way to
     // distinguish worker threads from the main thread with the slots interface.
     if (dispatcher.name() != "main_thread") {
@@ -191,7 +191,7 @@ TEST_P(ApiListenerIntegrationTest, FromWorkerThread) {
     Http::TestResponseHeaderMapImpl expected_response_headers{{":status", "200"}};
     EXPECT_CALL(stream_encoder_, encodeHeaders(_, false));
     EXPECT_CALL(stream_encoder_, encodeData(_, false));
-    EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(""), true)).WillOnce(Notify(&done));
+    EXPECT_CALL(stream_encoder_, encodeData(BufferString(""), true)).WillOnce(Notify(&done));
 
     // Send a headers-only request
     stream_decoder->get()->decodeHeaders(

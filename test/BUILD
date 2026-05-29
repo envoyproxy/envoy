@@ -52,6 +52,7 @@ envoy_cc_test_library(
         "//test/mocks/access_log:access_log_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:global_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:printers_lib",
     ],
 )
@@ -106,13 +107,13 @@ envoy_pch_library(
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/stats:stats_mocks",
-        "@com_github_gabime_spdlog//:spdlog",
-        "@com_google_googletest//:gtest",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+        "@googletest//:gtest",
+        "@spdlog",
     ],
 )

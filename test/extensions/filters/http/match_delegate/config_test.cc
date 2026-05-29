@@ -19,7 +19,7 @@ namespace {
 struct TestFactory : public Envoy::Server::Configuration::NamedHttpFilterConfigFactory {
   std::string name() const override { return "test"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
+    return std::make_unique<Protobuf::StringValue>();
   }
   absl::StatusOr<Envoy::Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
@@ -114,6 +114,74 @@ xds_matcher:
       typed_config:
         "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
         header_name: default-matcher-header
+    exact_match_map:
+        map:
+            match:
+                action:
+                    name: skip
+                    typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
+)EOF");
+
+  MatchDelegateConfig factory;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute config;
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+  Router::RouteSpecificFilterConfigConstSharedPtr route_config =
+      factory
+          .createRouteSpecificFilterConfig(config, server_factory_context,
+                                           ProtobufMessage::getNullValidationVisitor())
+          .value();
+  EXPECT_TRUE(route_config.get());
+}
+
+TEST(MatchWrapper, PerRouteConfigResponseHeaders) {
+  TestFactory test_factory;
+  Envoy::Registry::InjectFactory<Envoy::Server::Configuration::NamedHttpFilterConfigFactory>
+      inject_factory(test_factory);
+
+  const auto yaml = (R"EOF(
+xds_matcher:
+  matcher_tree:
+    input:
+      name: response-headers
+      typed_config:
+        "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput
+        header_name: match-response-header
+    exact_match_map:
+        map:
+            match:
+                action:
+                    name: skip
+                    typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
+)EOF");
+
+  MatchDelegateConfig factory;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute config;
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+  Router::RouteSpecificFilterConfigConstSharedPtr route_config =
+      factory
+          .createRouteSpecificFilterConfig(config, server_factory_context,
+                                           ProtobufMessage::getNullValidationVisitor())
+          .value();
+  EXPECT_TRUE(route_config.get());
+}
+
+TEST(MatchWrapper, PerRouteConfigResponseTrailers) {
+  TestFactory test_factory;
+  Envoy::Registry::InjectFactory<Envoy::Server::Configuration::NamedHttpFilterConfigFactory>
+      inject_factory(test_factory);
+
+  const auto yaml = (R"EOF(
+xds_matcher:
+  matcher_tree:
+    input:
+      name: response-trailers
+      typed_config:
+        "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseTrailerMatchInput
+        header_name: match-response-trailer
     exact_match_map:
         map:
             match:
@@ -293,7 +361,7 @@ xds_matcher:
             "according to allowlist");
 }
 
-struct TestAction : Matcher::ActionBase<ProtobufWkt::StringValue> {};
+struct TestAction : Matcher::ActionBase<Protobuf::StringValue> {};
 
 template <class InputType, class ActionType>
 Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>
@@ -545,6 +613,8 @@ TEST(DelegatingFilterTest, MatchTreeSkipActionRequestAndResponseHeaders) {
         Buffer::OwnedImpl empty_buffer;
         filter->decoder_callbacks_->encodeData(empty_buffer, false);
 
+        filter->decoder_callbacks_->encodeMetadata(std::make_unique<Envoy::Http::MetadataMap>());
+
         Envoy::Http::ResponseTrailerMapPtr trailers{
             new Envoy::Http::TestResponseTrailerMapImpl{{"test", "test"}}};
         filter->decoder_callbacks_->encodeTrailers(std::move(trailers));
@@ -561,6 +631,12 @@ TEST(DelegatingFilterTest, MatchTreeSkipActionRequestAndResponseHeaders) {
       .WillOnce(Invoke([&](Buffer::Instance& data, bool end_stream) {
         EXPECT_CALL(*filter, encodeData(_, _)).Times(0);
         delegating_filter->encodeData(data, end_stream);
+      }));
+  EXPECT_CALL(decoder_callbacks, encodeMetadata_(_))
+      .WillOnce(Invoke([&](Envoy::Http::MetadataMapPtr metadata) {
+        // All the following encoding callbacks will be skipped.
+        EXPECT_CALL(*filter, encodeMetadata(_)).Times(0);
+        delegating_filter->encodeMetadata(*metadata);
       }));
   EXPECT_CALL(decoder_callbacks, encodeTrailers_(_))
       .WillOnce(Invoke([&](Envoy::Http::ResponseTrailerMap& trailers) {
@@ -679,6 +755,8 @@ TEST(DelegatingFilterTest, MatchTreeFilterActionEncodingTrailers) {
         Buffer::OwnedImpl empty_buffer;
         filter->decoder_callbacks_->encodeData(empty_buffer, false);
 
+        filter->decoder_callbacks_->encodeMetadata(std::make_unique<Envoy::Http::MetadataMap>());
+
         Envoy::Http::ResponseTrailerMapPtr trailers{
             new Envoy::Http::TestResponseTrailerMapImpl{{"match-trailer", "match"}}};
         filter->decoder_callbacks_->encodeTrailers(std::move(trailers));
@@ -694,6 +772,12 @@ TEST(DelegatingFilterTest, MatchTreeFilterActionEncodingTrailers) {
       .WillOnce(Invoke([&](Buffer::Instance& data, bool end_stream) {
         EXPECT_CALL(*filter, encodeData(_, _));
         delegating_filter->encodeData(data, end_stream);
+      }));
+  EXPECT_CALL(decoder_callbacks, encodeMetadata_(_))
+      .WillOnce(Invoke([&](Envoy::Http::MetadataMapPtr metadata) {
+        // All the following encoding callbacks will be skipped.
+        EXPECT_CALL(*filter, encodeMetadata(_));
+        delegating_filter->encodeMetadata(*metadata);
       }));
   EXPECT_CALL(decoder_callbacks, encodeTrailers_(_))
       .WillOnce(Invoke([&](Envoy::Http::ResponseTrailerMap& trailers) {
@@ -715,6 +799,32 @@ TEST(DelegatingFilterTest, MatchTreeFilterActionEncodingTrailers) {
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
             delegating_filter->decodeHeaders(*request_headers, true));
   delegating_filter->decodeComplete();
+}
+
+TEST(DelegatingFactoryCallbacks, DelegatingFactoryCallbacksTest) {
+  NiceMock<Envoy::Http::MockFilterChainFactoryCallbacks> factory_callbacks;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  ON_CALL(factory_callbacks, streamInfo()).WillByDefault(ReturnRef(stream_info));
+  ON_CALL(factory_callbacks, dispatcher()).WillByDefault(ReturnRef(dispatcher));
+
+  auto decoder_filter = std::make_shared<Envoy::Http::MockStreamDecoderFilter>();
+  auto encoder_filter = std::make_shared<Envoy::Http::MockStreamEncoderFilter>();
+  auto filter = std::make_shared<Envoy::Http::MockStreamFilter>();
+
+  DelegatingFactoryCallbacks delegating_factory_callbacks(factory_callbacks, nullptr);
+
+  delegating_factory_callbacks.dispatcher();
+  delegating_factory_callbacks.addStreamDecoderFilter(decoder_filter);
+  delegating_factory_callbacks.addStreamEncoderFilter(encoder_filter);
+  delegating_factory_callbacks.addStreamFilter(filter);
+  delegating_factory_callbacks.addAccessLogHandler(nullptr);
+
+  delegating_factory_callbacks.filterConfigName();
+  delegating_factory_callbacks.setFilterConfigName("test");
+  delegating_factory_callbacks.streamInfo();
+  delegating_factory_callbacks.requestHeaders();
+  delegating_factory_callbacks.route();
 }
 
 } // namespace

@@ -64,7 +64,7 @@ private:
 class TestPrivateKeyMethodProvider : public virtual Ssl::PrivateKeyMethodProvider {
 public:
   TestPrivateKeyMethodProvider(
-      const ProtobufWkt::Any& typed_config,
+      const Protobuf::Any& typed_config,
       Server::Configuration::TransportSocketFactoryContext& factory_context);
   // Ssl::PrivateKeyMethodProvider
   void registerPrivateKeyMethod(SSL* ssl, Ssl::PrivateKeyConnectionCallbacks& cb,
@@ -78,7 +78,7 @@ public:
   static int ecdsaConnectionIndex();
 
 private:
-  Ssl::BoringSslPrivateKeyMethodSharedPtr method_{};
+  Ssl::BoringSslPrivateKeyMethodSharedPtr method_;
   bssl::UniquePtr<EVP_PKEY> pkey_;
   TestPrivateKeyConnectionTestOptions test_options_;
   std::string mode_;

@@ -153,12 +153,12 @@ public:
                                Server::Configuration::FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
 
   std::string name() const override { return name_; }
 
-  ProtobufWkt::Struct config_struct_;
+  Protobuf::Struct config_struct_;
   std::string config_stat_prefix_;
 
 private:

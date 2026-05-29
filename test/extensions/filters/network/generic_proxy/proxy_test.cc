@@ -13,7 +13,6 @@
 #include "test/extensions/filters/network/generic_proxy/mocks/filter.h"
 #include "test/extensions/filters/network/generic_proxy/mocks/route.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -56,14 +55,19 @@ public:
       const std::string tracing_config_yaml = R"EOF(
       max_path_tag_length: 256
       spawn_upstream_span: true
+      custom_tags:
+      - tag: "x-key"
+        value: "%REQUEST_PROPERTY(x-key)%"
       )EOF";
 
       Tracing::ConnectionManagerTracingConfigProto tracing_config;
 
       TestUtility::loadFromYaml(tracing_config_yaml, tracing_config);
 
-      tracing_config_ = std::make_unique<Tracing::ConnectionManagerTracingConfigImpl>(
-          envoy::config::core::v3::TrafficDirection::OUTBOUND, tracing_config);
+      std::vector<Formatter::CommandParserPtr> command_parsers;
+      command_parsers.push_back(createGenericProxyCommandParser());
+      tracing_config_ = std::make_unique<Tracing::ConnectionManagerTracingConfig>(
+          envoy::config::core::v3::TrafficDirection::OUTBOUND, tracing_config, command_parsers);
     }
 
     std::vector<NamedFilterFactoryCb> factories;
@@ -73,6 +77,9 @@ public:
       mock_decoder_filters_.push_back(
           {"mock_default_decoder_filter", std::make_shared<NiceMock<MockDecoderFilter>>()});
     }
+
+    factories.reserve(mock_decoder_filters_.size() + mock_encoder_filters_.size() +
+                      mock_stream_filters_.size());
 
     for (const auto& filter : mock_stream_filters_) {
       factories.push_back({filter.first, [f = filter.second](FilterChainFactoryCallbacks& cb) {
@@ -172,15 +179,16 @@ TEST_F(FilterConfigTest, CreateFilterChain) {
 
   initializeFilterConfig();
 
-  NiceMock<MockFilterChainManager> cb;
+  NiceMock<MockFilterChainFactoryCallbacks> callbacks_;
 
-  EXPECT_CALL(cb.callbacks_, addFilter(_))
+  EXPECT_CALL(callbacks_, setFilterConfigName(_)).Times(3);
+  EXPECT_CALL(callbacks_, addFilter(_))
       .Times(3)
       .WillRepeatedly(Invoke([&](StreamFilterSharedPtr filter) {
         EXPECT_EQ(filter.get(), mock_stream_filter.get());
       }));
 
-  filter_config_->createFilterChain(cb);
+  filter_config_->createFilterChain(callbacks_);
 }
 
 /**
@@ -232,6 +240,12 @@ public:
 
 TEST_F(FilterTest, SimpleOnNewConnection) {
   initializeFilter();
+
+  EXPECT_CALL(*server_codec_, onConnected()).WillOnce(Invoke([this] {
+    ASSERT_NE(server_codec_callbacks_, nullptr);
+    ASSERT_EQ(&filter_callbacks_.connection_, server_codec_callbacks_->connection().ptr());
+  }));
+
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
 }
 
@@ -564,7 +578,8 @@ TEST_F(FilterTest, ActiveStreamAddFilters) {
   EXPECT_EQ(1, active_stream->decoderFiltersForTest().size());
   EXPECT_EQ(0, active_stream->encoderFiltersForTest().size());
 
-  ActiveStream::FilterChainFactoryCallbacksHelper helper(*active_stream, {"fake_test"});
+  ActiveStream::FilterChainFactoryCallbacksHelper helper(*active_stream);
+  helper.setFilterConfigName("fake_test");
 
   auto new_filter_0 = std::make_shared<NiceMock<MockStreamFilter>>();
   auto new_filter_1 = std::make_shared<NiceMock<MockStreamFilter>>();
@@ -762,7 +777,7 @@ TEST_F(FilterTest, ActiveStreamSingleFrameFiltersContinueEncoding) {
   // Next filter is `mock_0`.
   EXPECT_EQ("mock_0", (*active_stream->nextEncoderHeaderFilterForTest())->filterConfigName());
 
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
   EXPECT_CALL(*server_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame&, EncodingContext&) {
         Buffer::OwnedImpl buffer;
@@ -991,7 +1006,7 @@ TEST_F(FilterTest, ActiveStreamMultipleFrameFiltersContinueEncoding) {
       .WillOnce(Return(CommonFilterStatus::StopIteration))  // StopIteration will be ignored.
       .WillOnce(Return(CommonFilterStatus::StopIteration)); // StopIteration will be ignored.
 
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
   EXPECT_CALL(*server_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame&, EncodingContext&) {
         Buffer::OwnedImpl buffer;
@@ -1173,7 +1188,7 @@ TEST_F(FilterTest, SendLocalReplyAfterPreviousLocalReply) {
 
         return EncodingResult{4};
       }));
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
 
   // The latest local reply will skip the filter chain processing and be sent to the downstream
   // directly.
@@ -1232,7 +1247,7 @@ TEST_F(FilterTest, SendLocalReplyAfterPreviousUpstreamResponseHeaderIsSent) {
 
         return EncodingResult{4};
       }));
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
   response->message_ = "anything";
@@ -1305,7 +1320,7 @@ TEST_F(FilterTest, ActiveStreamSendLocalReply) {
 
         return EncodingResult{4};
       }));
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
 
   // Clean up the stream and log the access log.
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
@@ -1392,7 +1407,7 @@ TEST_F(FilterTest, ActiveStreamSendLocalReplyWhenProcessingBody) {
 
         return EncodingResult{4};
       }));
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
 
   // Clean up the stream and log the access log.
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
@@ -1490,7 +1505,7 @@ TEST_F(FilterTest, ActiveStreamSendLocalReplyWhenTransferringBody) {
 
         return EncodingResult{4};
       }));
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
 
   // Clean up the stream and log the access log.
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
@@ -1585,7 +1600,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormally) {
 
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
 
   EXPECT_CALL(*server_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame&, EncodingContext&) {
@@ -1678,7 +1693,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithMultipleFrames) {
       .WillOnce(Return(false));
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false)).Times(2);
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false)).Times(2);
   EXPECT_CALL(*server_codec_, encode(_, _))
       .Times(2)
       .WillRepeatedly(Invoke([&](const StreamFrame&, EncodingContext&) {
@@ -1728,7 +1743,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithDrainClose) {
 
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
 
   EXPECT_CALL(*server_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame&, EncodingContext&) {
@@ -1775,7 +1790,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithStreamDrainClose) {
 
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
 
   EXPECT_CALL(*server_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame&, EncodingContext&) {
@@ -1808,6 +1823,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithTracing) {
   initializeFilter(true);
 
   auto request = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
+  request->data_["x-key"] = "x-value"; // The custom tag will extract this key-value pair.
 
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
@@ -1835,10 +1851,15 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithTracing) {
 
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
-  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  absl::flat_hash_map<std::string, std::string> final_tags;
+  EXPECT_CALL(*span, setTag(_, _))
+      .WillRepeatedly(
+          testing::Invoke([&final_tags](absl::string_view key, absl::string_view value) {
+            final_tags[key] = std::string(value);
+          }));
   EXPECT_CALL(*span, finishSpan());
 
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
 
   EXPECT_CALL(*server_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame&, EncodingContext&) {
@@ -1857,6 +1878,9 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithTracing) {
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
   active_stream->onResponseHeaderFrame(std::move(response));
+
+  // Check the tracing tags after the stream is completed.
+  EXPECT_EQ(final_tags["x-key"], "x-value");
 }
 
 TEST_F(FilterTest, NewStreamAndReplyNormallyWithTracingAndSamplingToTrue) {
@@ -1899,7 +1923,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithTracingAndSamplingToTrue) {
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(*span, finishSpan());
 
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
 
   EXPECT_CALL(*server_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame&, EncodingContext&) {

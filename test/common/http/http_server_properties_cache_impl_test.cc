@@ -15,7 +15,7 @@ namespace Http {
 namespace {
 
 static const absl::optional<std::chrono::seconds> kNoTtl = absl::nullopt;
-class HttpServerPropertiesCacheImplTest : public testing::TestWithParam<Envoy::MockKeyValueStore*> {
+class HttpServerPropertiesCacheImplTest : public testing::TestWithParam<bool> {
 public:
   HttpServerPropertiesCacheImplTest()
       : dispatcher_([]() {
@@ -24,7 +24,7 @@ public:
               []() { return std::make_unique<Event::SimulatedTimeSystemHelper>(); });
           return NiceMock<Event::MockDispatcher>();
         }()),
-        store_(GetParam()), expiration1_(dispatcher_.timeSource().monotonicTime() + Seconds(5)),
+        expiration1_(dispatcher_.timeSource().monotonicTime() + Seconds(5)),
         expiration2_(dispatcher_.timeSource().monotonicTime() + Seconds(10)),
         protocol1_(alpn1_, hostname1_, port1_, expiration1_),
         protocol2_(alpn2_, hostname2_, port2_, expiration2_), protocols1_({protocol1_}),
@@ -35,15 +35,23 @@ public:
   }
 
   void initialize() {
+    store_ = nullptr;
+    if (GetParam()) {
+      owned_store_ = std::make_unique<NiceMock<MockKeyValueStore>>();
+      store_ = owned_store_.get();
+    } else {
+      owned_store_.reset();
+    }
     protocols_ = std::make_unique<HttpServerPropertiesCacheImpl>(
-        dispatcher_, std::move(suffixes_), std::unique_ptr<KeyValueStore>(store_), max_entries_);
+        dispatcher_, std::move(suffixes_), std::move(owned_store_), max_entries_);
   }
 
   size_t max_entries_ = 10;
 
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::vector<std::string> suffixes_;
-  MockKeyValueStore* store_;
+  MockKeyValueStore* store_{};
+  std::unique_ptr<MockKeyValueStore> owned_store_;
   std::unique_ptr<HttpServerPropertiesCacheImpl> protocols_;
 
   const std::string hostname1_ = "hostname1";
@@ -85,7 +93,7 @@ TEST_P(HttpServerPropertiesCacheImplTest, Init) {
 TEST_P(HttpServerPropertiesCacheImplTest, SetAlternativesThenSrtt) {
   initialize();
   EXPECT_EQ(0, protocols_->size());
-  EXPECT_EQ(std::chrono::microseconds(0), protocols_->getSrtt(origin1_));
+  EXPECT_EQ(std::chrono::microseconds(0), protocols_->getSrtt(origin1_, false));
   EXPECT_CALL_WHEN_STORE_VALID(
       addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0|0", kNoTtl));
   protocols_->setAlternatives(origin1_, protocols1_);
@@ -93,7 +101,7 @@ TEST_P(HttpServerPropertiesCacheImplTest, SetAlternativesThenSrtt) {
       addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|5|0", kNoTtl));
   protocols_->setSrtt(origin1_, std::chrono::microseconds(5));
   EXPECT_EQ(1, protocols_->size());
-  EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_));
+  EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_, false));
 }
 
 TEST_P(HttpServerPropertiesCacheImplTest, SetSrttThenAlternatives) {
@@ -102,11 +110,11 @@ TEST_P(HttpServerPropertiesCacheImplTest, SetSrttThenAlternatives) {
   EXPECT_CALL_WHEN_STORE_VALID(addOrUpdate("https://hostname1:1", "clear|5|0", kNoTtl));
   protocols_->setSrtt(origin1_, std::chrono::microseconds(5));
   EXPECT_EQ(1, protocols_->size());
-  EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_));
+  EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_, false));
   EXPECT_CALL_WHEN_STORE_VALID(
       addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|5|0", kNoTtl));
   protocols_->setAlternatives(origin1_, protocols1_);
-  EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_));
+  EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_, false));
 }
 
 TEST_P(HttpServerPropertiesCacheImplTest, SetConcurrency) {
@@ -349,7 +357,7 @@ TEST_P(HttpServerPropertiesCacheImplTest, CacheLoad) {
       protocols_->findAlternatives(origin1_);
   ASSERT_TRUE(protocols.has_value());
   EXPECT_EQ(protocols1_, protocols.ref());
-  EXPECT_EQ(2, protocols_->getSrtt(origin1_).count());
+  EXPECT_EQ(2, protocols_->getSrtt(origin1_, false).count());
   EXPECT_EQ(3, protocols_->getConcurrentStreams(origin1_));
 }
 
@@ -365,7 +373,7 @@ TEST_P(HttpServerPropertiesCacheImplTest, CacheLoadSrttOnly) {
 
   EXPECT_CALL(*store_, addOrUpdate(_, _, _)).Times(0);
   ASSERT_FALSE(protocols_->findAlternatives(origin1_).has_value());
-  EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_));
+  EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_, false));
 }
 
 TEST_P(HttpServerPropertiesCacheImplTest, ShouldNotUpdateStoreOnCacheLoad) {
@@ -536,18 +544,18 @@ TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffixSrtt) {
 
   std::chrono::microseconds set_srtt1(42);
   protocols_->setSrtt(origin1, set_srtt1);
-  EXPECT_EQ(protocols_->getSrtt(origin1), set_srtt1);
-  EXPECT_EQ(protocols_->getSrtt(origin2), set_srtt1);
-  EXPECT_EQ(protocols_->getSrtt(origin3), set_srtt1);
-  EXPECT_NE(protocols_->getSrtt(no_match), set_srtt1);
+  EXPECT_EQ(protocols_->getSrtt(origin1, true), set_srtt1);
+  EXPECT_EQ(protocols_->getSrtt(origin2, true), set_srtt1);
+  EXPECT_EQ(protocols_->getSrtt(origin3, true), set_srtt1);
+  EXPECT_NE(protocols_->getSrtt(no_match, true), set_srtt1);
 
   std::chrono::microseconds set_srtt2(422);
   protocols_->setSrtt(origin2, set_srtt2);
-  EXPECT_EQ(protocols_->getSrtt(origin1), set_srtt1);
-  EXPECT_EQ(protocols_->getSrtt(origin2), set_srtt2);
-  EXPECT_EQ(protocols_->getSrtt(origin3), set_srtt2);
-  EXPECT_NE(protocols_->getSrtt(no_match), set_srtt1);
-  EXPECT_NE(protocols_->getSrtt(no_match), set_srtt2);
+  EXPECT_EQ(protocols_->getSrtt(origin1, true), set_srtt1);
+  EXPECT_EQ(protocols_->getSrtt(origin2, true), set_srtt2);
+  EXPECT_EQ(protocols_->getSrtt(origin3, true), set_srtt2);
+  EXPECT_NE(protocols_->getSrtt(no_match, true), set_srtt1);
+  EXPECT_NE(protocols_->getSrtt(no_match, true), set_srtt2);
 }
 
 TEST_P(HttpServerPropertiesCacheImplTest, ExplicitAlternativeTakesPriorityOverCanonicalSuffix) {
@@ -570,7 +578,7 @@ TEST_P(HttpServerPropertiesCacheImplTest, ExplicitAlternativeTakesPriorityOverCa
 
 // Execute all tests when key value store is nullptr and when it is valid.
 INSTANTIATE_TEST_SUITE_P(HttpServerPropertiesCacheImplTestSuite, HttpServerPropertiesCacheImplTest,
-                         testing::Values(nullptr, new NiceMock<MockKeyValueStore>()));
+                         testing::Bool());
 } // namespace
 } // namespace Http
 } // namespace Envoy

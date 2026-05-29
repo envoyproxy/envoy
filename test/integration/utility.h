@@ -13,10 +13,12 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/utility.h"
 #include "source/common/http/codec_client.h"
+#include "source/common/http/response_decoder_impl_base.h"
 #include "source/common/stats/isolated_store_impl.h"
 
 #include "test/test_common/printers.h"
@@ -26,10 +28,26 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
+class OsSysCallsWithMockedDns : public Api::OsSysCallsImpl {
+public:
+  static addrinfo* makeAddrInfo(const Network::Address::InstanceConstSharedPtr& addr);
+
+  Api::SysCallIntResult getaddrinfo(const char* node, const char* service, const addrinfo* hints,
+                                    addrinfo** res) override;
+  void freeaddrinfo(addrinfo* ai) override;
+
+  void setIpVersion(Network::Address::IpVersion version);
+
+  Network::Address::IpVersion ip_version_ = Network::Address::IpVersion::v4;
+  absl::flat_hash_set<absl::string_view> nonexisting_addresses_ = {"doesnotexist.example.com",
+                                                                   "itdoesnotexist"};
+};
+
 /**
  * A buffering response decoder used for testing.
  */
-class BufferingStreamDecoder : public Http::ResponseDecoder, public Http::StreamCallbacks {
+class BufferingStreamDecoder : public Http::ResponseDecoderImplBase, public Http::StreamCallbacks {
 public:
   BufferingStreamDecoder(std::function<void()> on_complete_cb) : on_complete_cb_(on_complete_cb) {}
 

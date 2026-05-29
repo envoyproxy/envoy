@@ -17,6 +17,9 @@ public:
       : local_address_(local_address), direct_local_address_(local_address),
         remote_address_(remote_address), direct_remote_address_(remote_address) {}
 
+  void setDirectLocalAddressForTest(const Address::InstanceConstSharedPtr& direct_local_address) {
+    direct_local_address_ = direct_local_address;
+  }
   void setDirectRemoteAddressForTest(const Address::InstanceConstSharedPtr& direct_remote_address) {
     direct_remote_address_ = direct_remote_address;
   }
@@ -53,6 +56,15 @@ public:
   absl::string_view requestedServerName() const override { return server_name_; }
   void setRequestedServerName(const absl::string_view requested_server_name) override {
     server_name_ = std::string(requested_server_name);
+  }
+  const std::vector<std::string>& requestedApplicationProtocols() const override {
+    return application_protocols_;
+  }
+  void setRequestedApplicationProtocols(const std::vector<absl::string_view>& protocols) override {
+    application_protocols_.clear();
+    for (const auto& protocol : protocols) {
+      application_protocols_.emplace_back(protocol);
+    }
   }
   absl::optional<uint64_t> connectionID() const override { return connection_id_; }
   void setConnectionID(uint64_t id) override { connection_id_ = id; }
@@ -99,6 +111,7 @@ private:
   Address::InstanceConstSharedPtr remote_address_;
   Address::InstanceConstSharedPtr direct_remote_address_;
   std::string server_name_;
+  std::vector<std::string> application_protocols_;
   absl::optional<uint64_t> connection_id_;
   bool allow_syscall_for_interface_name_{false};
   absl::optional<std::string> interface_name_;

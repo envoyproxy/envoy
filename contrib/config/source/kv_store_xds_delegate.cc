@@ -148,7 +148,7 @@ std::string KeyValueStoreXdsDelegateFactory::name() const {
 };
 
 Envoy::Config::XdsResourcesDelegatePtr KeyValueStoreXdsDelegateFactory::createXdsResourcesDelegate(
-    const ProtobufWkt::Any& config, ProtobufMessage::ValidationVisitor& validation_visitor,
+    const Protobuf::Any& config, ProtobufMessage::ValidationVisitor& validation_visitor,
     Api::Api& api, Event::Dispatcher& dispatcher) {
   const auto& validator_config =
       Envoy::MessageUtil::anyConvertAndValidate<KeyValueStoreXdsDelegateConfig>(config,

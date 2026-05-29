@@ -1,8 +1,10 @@
+#include <cstring>
 #include <memory>
 #include <string>
 
 #include "source/common/common/json_escape_string.h"
 #include "source/common/common/logger.h"
+#include "source/common/version/version_string.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
@@ -118,6 +120,36 @@ TEST(JsonEscapeTest, Escape) {
   expect_json_escape("\x1f", "\\u001f");
 }
 
+// Regression test for off-by-one write when control characters appear at the end of input.
+TEST(JsonEscapeTest, NulTerminatorIntegrity) {
+  const auto verify_nul_terminator = [](absl::string_view input) {
+    std::string escaped = JsonEscaper::escapeString(input, JsonEscaper::extraSpace(input));
+
+    // Verify the null terminator is intact.
+    EXPECT_EQ('\0', escaped.c_str()[escaped.size()])
+        << "null terminator corrupted for input ending with control character";
+
+    // Verify strlen matches the size. A corrupted null terminator would cause strlen
+    // to read past the string boundary.
+    EXPECT_EQ(escaped.size(), std::strlen(escaped.c_str()))
+        << "strlen mismatch indicates NUL terminator corruption";
+  };
+
+  // Test control characters at the end of input. These would trigger the buggy code path.
+  verify_nul_terminator("\x01");                           // Single control char.
+  verify_nul_terminator("\x00");                           // Single NUL.
+  verify_nul_terminator("test\x01");                       // Trailing control char.
+  verify_nul_terminator(absl::string_view("test\x00", 5)); // Trailing NUL.
+  verify_nul_terminator("\x01\x02");                       // Multiple control chars.
+  verify_nul_terminator("test\x01\x02");                   // Multiple trailing control chars.
+  verify_nul_terminator(std::string(100, 'A') + "\x1f");   // Large string ending with control char.
+
+  // Test control characters not at the end. These should always work.
+  verify_nul_terminator("\x01test");         // Leading control char.
+  verify_nul_terminator("te\x01st");         // Middle control char.
+  verify_nul_terminator("\x01test\x02more"); // Multiple control chars in middle.
+}
+
 class LoggerCustomFlagsTest : public testing::TestWithParam<spdlog::logger*> {
 public:
   LoggerCustomFlagsTest() : logger_(GetParam()) {}
@@ -141,6 +173,10 @@ public:
     formatter
         ->add_flag<CustomFlagFormatter::ExtractedMessage>(
             CustomFlagFormatter::ExtractedMessage::Placeholder)
+        .set_pattern(pattern);
+    formatter
+        ->add_flag<CustomFlagFormatter::EnvoyVersion>(
+            CustomFlagFormatter::EnvoyVersion::Placeholder)
         .set_pattern(pattern);
     logger_->set_formatter(std::move(formatter));
     logger_->set_level(spdlog::level::info);
@@ -207,6 +243,18 @@ TEST_P(LoggerCustomFlagsTest, LogMessageWithTagsAndExtractTags) {
   expectLogMessage("%*", "[Tags: \"key\":\"val\"] mes\"] sge4", ",\"key\":\"val\"");
 }
 
+TEST_P(LoggerCustomFlagsTest, LogMessageWithEnvoyVersion) {
+  // Sanity-check the version string before using it as expected output: it must be non-empty
+  // and follow the slash-separated format produced by envoyVersionString().
+  const std::string& version = envoyVersionString();
+  EXPECT_FALSE(version.empty());
+  EXPECT_NE(version.find('/'), std::string::npos);
+
+  // %N emits the Envoy version string from envoyVersionString().
+  expectLogMessage("%N %v", "hello", absl::StrCat(version, " hello"));
+  expectLogMessage("%v", "hello", "hello");
+}
+
 class NamedLogTest : public Loggable<Id::assert>, public testing::Test {};
 
 TEST_F(NamedLogTest, NamedLogsAreSentToSink) {
@@ -230,52 +278,6 @@ TEST_F(NamedLogTest, NamedLogsAreSentToSink) {
   ENVOY_LOG_EVENT_TO_LOGGER(Registry::getLog(Id::misc), debug, "misc_event", "log");
 }
 
-struct TlsLogSink : SinkDelegate {
-  TlsLogSink(DelegatingLogSinkSharedPtr log_sink) : SinkDelegate(log_sink) { setTlsDelegate(); }
-  ~TlsLogSink() override { restoreTlsDelegate(); }
-
-  MOCK_METHOD(void, log, (absl::string_view, const spdlog::details::log_msg&));
-  MOCK_METHOD(void, logWithStableName,
-              (absl::string_view, absl::string_view, absl::string_view, absl::string_view));
-  MOCK_METHOD(void, flush, ());
-};
-
-// Verifies that we can register a thread local sink override.
-TEST(TlsLoggingOverrideTest, OverrideSink) {
-  MockLogSink global_sink(Envoy::Logger::Registry::getSink());
-  testing::InSequence s;
-
-  {
-    TlsLogSink tls_sink(Envoy::Logger::Registry::getSink());
-
-    // Calls on the current thread goes to the TLS sink.
-    EXPECT_CALL(tls_sink, log(_, _));
-    ENVOY_LOG_MISC(info, "hello tls");
-
-    // Calls on other threads should use the global sink.
-    std::thread([&]() {
-      EXPECT_CALL(global_sink, log(_, _));
-      ENVOY_LOG_MISC(info, "hello global");
-    }).join();
-
-    // Sanity checking that we're still using the TLS sink.
-    EXPECT_CALL(tls_sink, log(_, _));
-    ENVOY_LOG_MISC(info, "hello tls");
-
-    // All the logging functions should be delegated to the TLS override.
-    EXPECT_CALL(tls_sink, flush());
-    Registry::getSink()->flush();
-
-    EXPECT_CALL(tls_sink, logWithStableName(_, _, _, _));
-    Registry::getSink()->logWithStableName("foo", "level", "bar", "msg");
-  }
-
-  // Now that the TLS sink is out of scope, log calls on this thread should use the global sink
-  // again.
-  EXPECT_CALL(global_sink, log(_, _));
-  ENVOY_LOG_MISC(info, "hello global 2");
-}
-
 TEST(LoggerTest, LogWithLogDetails) {
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
 
@@ -291,7 +293,7 @@ TEST(LoggerTest, LogWithLogDetails) {
 }
 
 TEST(LoggerTest, TestJsonFormatError) {
-  ProtobufWkt::Any log_struct;
+  Protobuf::Any log_struct;
   log_struct.set_type_url("type.googleapis.com/bad.type.url");
   log_struct.set_value("asdf");
 
@@ -307,9 +309,9 @@ TEST(LoggerTest, TestJsonFormatNonEscapedThrows) {
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
 
   {
-    ProtobufWkt::Struct log_struct;
+    Protobuf::Struct log_struct;
     (*log_struct.mutable_fields())["Message"].set_string_value("%v");
-    (*log_struct.mutable_fields())["NullField"].set_null_value(ProtobufWkt::NULL_VALUE);
+    (*log_struct.mutable_fields())["NullField"].set_null_value(Protobuf::NULL_VALUE);
 
     auto status = Envoy::Logger::Registry::setJsonLogFormat(log_struct);
     EXPECT_FALSE(status.ok());
@@ -319,9 +321,9 @@ TEST(LoggerTest, TestJsonFormatNonEscapedThrows) {
   }
 
   {
-    ProtobufWkt::Struct log_struct;
+    Protobuf::Struct log_struct;
     (*log_struct.mutable_fields())["Message"].set_string_value("%_");
-    (*log_struct.mutable_fields())["NullField"].set_null_value(ProtobufWkt::NULL_VALUE);
+    (*log_struct.mutable_fields())["NullField"].set_null_value(Protobuf::NULL_VALUE);
 
     auto status = Envoy::Logger::Registry::setJsonLogFormat(log_struct);
     EXPECT_FALSE(status.ok());
@@ -332,7 +334,7 @@ TEST(LoggerTest, TestJsonFormatNonEscapedThrows) {
 }
 
 TEST(LoggerTest, TestJsonFormatEmptyStruct) {
-  ProtobufWkt::Struct log_struct;
+  Protobuf::Struct log_struct;
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
   EXPECT_TRUE(Envoy::Logger::Registry::setJsonLogFormat(log_struct).ok());
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
@@ -347,10 +349,10 @@ TEST(LoggerTest, TestJsonFormatEmptyStruct) {
 }
 
 TEST(LoggerTest, TestJsonFormatNullAndFixedField) {
-  ProtobufWkt::Struct log_struct;
+  Protobuf::Struct log_struct;
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
   (*log_struct.mutable_fields())["FixedValue"].set_string_value("Fixed");
-  (*log_struct.mutable_fields())["NullField"].set_null_value(ProtobufWkt::NULL_VALUE);
+  (*log_struct.mutable_fields())["NullField"].set_null_value(Protobuf::NULL_VALUE);
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
   EXPECT_TRUE(Envoy::Logger::Registry::setJsonLogFormat(log_struct).ok());
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
@@ -367,7 +369,7 @@ TEST(LoggerTest, TestJsonFormatNullAndFixedField) {
 }
 
 TEST(LoggerTest, TestJsonFormat) {
-  ProtobufWkt::Struct log_struct;
+  Protobuf::Struct log_struct;
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
@@ -401,7 +403,7 @@ TEST(LoggerTest, TestJsonFormat) {
 }
 
 TEST(LoggerTest, TestJsonFormatWithNestedJsonMessage) {
-  ProtobufWkt::Struct log_struct;
+  Protobuf::Struct log_struct;
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
   (*log_struct.mutable_fields())["FixedValue"].set_string_value("Fixed");
@@ -598,7 +600,7 @@ TEST(TaggedLogTest, TestConnEventLog) {
 }
 
 TEST(TaggedLogTest, TestConnEventLogWithJsonFormat) {
-  ProtobufWkt::Struct log_struct;
+  Protobuf::Struct log_struct;
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
@@ -682,7 +684,7 @@ TEST(TaggedLogTest, TestStreamLog) {
 }
 
 TEST(TaggedLogTest, TestTaggedLogWithJsonFormat) {
-  ProtobufWkt::Struct log_struct;
+  Protobuf::Struct log_struct;
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
@@ -715,7 +717,7 @@ TEST(TaggedLogTest, TestTaggedLogWithJsonFormat) {
 }
 
 TEST(TaggedLogTest, TestTaggedConnLogWithJsonFormat) {
-  ProtobufWkt::Struct log_struct;
+  Protobuf::Struct log_struct;
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
@@ -759,7 +761,7 @@ TEST(TaggedLogTest, TestTaggedConnLogWithJsonFormat) {
 }
 
 TEST(TaggedLogTest, TestConnLogWithJsonFormat) {
-  ProtobufWkt::Struct log_struct;
+  Protobuf::Struct log_struct;
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
@@ -784,7 +786,7 @@ TEST(TaggedLogTest, TestConnLogWithJsonFormat) {
 }
 
 TEST(TaggedLogTest, TestTaggedStreamLogWithJsonFormat) {
-  ProtobufWkt::Struct log_struct;
+  Protobuf::Struct log_struct;
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
@@ -831,7 +833,7 @@ TEST(TaggedLogTest, TestTaggedStreamLogWithJsonFormat) {
 }
 
 TEST(TaggedLogTest, TestStreamLogWithJsonFormat) {
-  ProtobufWkt::Struct log_struct;
+  Protobuf::Struct log_struct;
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
@@ -857,7 +859,7 @@ TEST(TaggedLogTest, TestStreamLogWithJsonFormat) {
 }
 
 TEST(TaggedLogTest, TestTaggedLogWithJsonFormatMultipleJFlags) {
-  ProtobufWkt::Struct log_struct;
+  Protobuf::Struct log_struct;
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message1"].set_string_value("%j");
   (*log_struct.mutable_fields())["Message2"].set_string_value("%j");

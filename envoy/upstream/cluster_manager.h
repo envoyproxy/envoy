@@ -46,6 +46,13 @@ class EnvoyQuicNetworkObserverRegistry;
 
 } // namespace Quic
 
+namespace Config {
+// TODO(adisuissa): This forward declaration is needed because OD-CDS code is
+// part of the Envoy::Upstream namespace but should be eventually moved to the
+// Envoy::Config namespace (next to the XdsManager).
+class XdsManager;
+} // namespace Config
+
 namespace Upstream {
 
 /**
@@ -334,6 +341,14 @@ public:
   virtual ClusterInfoMaps clusters() const PURE;
 
   /**
+   * Iterates over all active clusters and invokes the callback for each.
+   * @param cb the callback to invoke for each active cluster.
+   *
+   * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
+   */
+  virtual void forEachActiveCluster(std::function<void(const Cluster&)> cb) const PURE;
+
+  /**
    * Receives a cluster name and returns an active cluster (if found).
    * @param cluster_name the name of the cluster.
    * @return OptRef<const Cluster> A reference to the cluster if found, and nullopt otherwise.
@@ -341,6 +356,16 @@ public:
    * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
    */
   virtual OptRef<const Cluster> getActiveCluster(const std::string& cluster_name) const PURE;
+
+  /**
+   * Receives a cluster name and returns an active or warming cluster (if found).
+   * @param cluster_name the name of the cluster.
+   * @return OptRef<const Cluster> A reference to the cluster if found, and nullopt otherwise.
+   *
+   * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
+   */
+  virtual OptRef<const Cluster>
+  getActiveOrWarmingCluster(const std::string& cluster_name) const PURE;
 
   /**
    * Returns true iff the given cluster name is known in the cluster-manager
@@ -496,7 +521,8 @@ public:
    * @param predicate supplies the optional drain connections host predicate. If not supplied, all
    *                  hosts are drained.
    */
-  virtual void drainConnections(DrainConnectionsHostPredicate predicate) PURE;
+  virtual void drainConnections(DrainConnectionsHostPredicate predicate,
+                                ConnectionPool::DrainBehavior drain_behavior) PURE;
 
   /**
    * Check if the cluster is active and statically configured, and if not, return an error
@@ -512,12 +538,15 @@ public:
    * @param validation_visitor
    * @return OdCdsApiHandlePtr the ODCDS handle.
    */
-
+  // TODO(adisuissa): once the xDS-TP config-sources are fully supported, the
+  // `odcds_config` parameter should become optional, and the comment above
+  // should be updated.
   using OdCdsCreationFunction = std::function<absl::StatusOr<std::shared_ptr<OdCdsApi>>(
       const envoy::config::core::v3::ConfigSource& odcds_config,
-      OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator, ClusterManager& cm,
-      MissingClusterNotifier& notifier, Stats::Scope& scope,
-      ProtobufMessage::ValidationVisitor& validation_visitor)>;
+      OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
+      Config::XdsManager& xds_manager, ClusterManager& cm, MissingClusterNotifier& notifier,
+      Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor,
+      Server::Configuration::ServerFactoryContext& server_factory_context)>;
 
   virtual absl::StatusOr<OdCdsApiHandlePtr>
   allocateOdCdsApi(OdCdsCreationFunction creation_function,
@@ -630,7 +659,8 @@ public:
    */
   virtual absl::StatusOr<CdsApiPtr>
   createCds(const envoy::config::core::v3::ConfigSource& cds_config,
-            const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm) PURE;
+            const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm,
+            bool support_multi_ads_sources) PURE;
 };
 
 /**

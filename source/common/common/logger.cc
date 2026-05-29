@@ -9,6 +9,7 @@
 
 #include "source/common/common/json_escape_string.h"
 #include "source/common/common/lock_guard.h"
+#include "source/common/version/version_string.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/escaping.h"
@@ -28,15 +29,8 @@ void SinkDelegate::logWithStableName(absl::string_view, absl::string_view, absl:
 
 SinkDelegate::~SinkDelegate() {
   // The previous delegate should have never been set or should have been reset by now via
-  // restoreDelegate()/restoreTlsDelegate();
+  // restoreDelegate().
   assert(previous_delegate_ == nullptr);
-  assert(previous_tls_delegate_ == nullptr);
-}
-
-void SinkDelegate::setTlsDelegate() {
-  assert(previous_tls_delegate_ == nullptr);
-  previous_tls_delegate_ = log_sink_->tlsDelegate();
-  log_sink_->setTlsDelegate(this);
 }
 
 void SinkDelegate::setDelegate() {
@@ -44,13 +38,6 @@ void SinkDelegate::setDelegate() {
   assert(previous_delegate_ == nullptr);
   previous_delegate_ = log_sink_->delegate();
   log_sink_->setDelegate(this);
-}
-
-void SinkDelegate::restoreTlsDelegate() {
-  // Ensures stacked allocation of delegates.
-  assert(log_sink_->tlsDelegate() == this);
-  log_sink_->setTlsDelegate(previous_tls_delegate_);
-  previous_tls_delegate_ = nullptr;
 }
 
 void SinkDelegate::restoreDelegate() {
@@ -78,12 +65,17 @@ void StderrSinkDelegate::flush() {
 }
 
 void DelegatingLogSink::set_formatter(std::unique_ptr<spdlog::formatter> formatter) {
-  absl::MutexLock lock(&format_mutex_);
+  absl::MutexLock lock(format_mutex_);
   formatter_ = std::move(formatter);
 }
 
+void DelegatingLogSink::setShouldEscape(bool should_escape) {
+  absl::MutexLock lock(format_mutex_);
+  should_escape_ = should_escape;
+}
+
 void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
-  absl::ReleasableMutexLock lock(&format_mutex_);
+  absl::ReleasableMutexLock lock(format_mutex_);
   absl::string_view msg_view = absl::string_view(msg.payload.data(), msg.payload.size());
 
   // This memory buffer must exist in the scope of the entire function,
@@ -93,29 +85,14 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
     formatter_->format(msg, formatted);
     msg_view = absl::string_view(formatted.data(), formatted.size());
   }
+  const bool escape = should_escape_;
   lock.Release();
 
-  auto log_to_sink = [this, msg_view, msg](SinkDelegate& sink) {
-    if (should_escape_) {
-      sink.log(escapeLogLine(msg_view), msg);
-    } else {
-      sink.log(msg_view, msg);
-    }
-  };
-  auto* tls_sink = tlsDelegate();
-  if (tls_sink != nullptr) {
-    log_to_sink(*tls_sink);
-    return;
+  if (escape) {
+    sink_->log(escapeLogLine(msg_view), msg);
+  } else {
+    sink_->log(msg_view, msg);
   }
-
-  // Hold the sink mutex while performing the actual logging. This prevents the sink from being
-  // swapped during an individual log event.
-  // TODO(mattklein123): In production this lock will never be contended. In practice, thread
-  // protection is really only needed in tests. It would be nice to figure out a test-only
-  // mechanism for this that does not require extra locking that we don't explicitly need in the
-  // prod code.
-  absl::ReaderMutexLock sink_lock(&sink_mutex_);
-  log_to_sink(*sink_);
 }
 
 std::string DelegatingLogSink::escapeLogLine(absl::string_view msg_view) {
@@ -138,34 +115,10 @@ DelegatingLogSinkSharedPtr DelegatingLogSink::init() {
   return delegating_sink;
 }
 
-void DelegatingLogSink::flush() {
-  auto* tls_sink = tlsDelegate();
-  if (tls_sink != nullptr) {
-    tls_sink->flush();
-    return;
-  }
-  absl::ReaderMutexLock lock(&sink_mutex_);
-  sink_->flush();
-}
-
-SinkDelegate** DelegatingLogSink::tlsSink() {
-  static thread_local SinkDelegate* tls_sink = nullptr;
-
-  return &tls_sink;
-}
-
-void DelegatingLogSink::setTlsDelegate(SinkDelegate* sink) { *tlsSink() = sink; }
-
-SinkDelegate* DelegatingLogSink::tlsDelegate() { return *tlsSink(); }
+void DelegatingLogSink::flush() { sink_->flush(); }
 
 void DelegatingLogSink::logWithStableName(absl::string_view stable_name, absl::string_view level,
                                           absl::string_view component, absl::string_view message) {
-  auto tls_sink = tlsDelegate();
-  if (tls_sink != nullptr) {
-    tls_sink->logWithStableName(stable_name, level, component, message);
-    return;
-  }
-  absl::ReaderMutexLock sink_lock(&sink_mutex_);
   sink_->logWithStableName(stable_name, level, component, message);
 }
 
@@ -369,6 +322,10 @@ void setLogFormatForLogger(spdlog::logger& logger, const std::string& log_format
           CustomFlagFormatter::ExtractedMessage::Placeholder)
       .set_pattern(log_format);
 
+  formatter
+      ->add_flag<CustomFlagFormatter::EnvoyVersion>(CustomFlagFormatter::EnvoyVersion::Placeholder)
+      .set_pattern(log_format);
+
   logger.set_formatter(std::move(formatter));
 }
 
@@ -466,6 +423,12 @@ void ExtractedMessage::format(const spdlog::details::log_msg& msg, const std::tm
   auto original_message =
       absl::string_view(payload.data() + tags_end_pos, payload.size() - tags_end_pos);
   Envoy::Logger::Utility::escapeMessageJsonString(original_message, dest);
+}
+
+void EnvoyVersion::format(const spdlog::details::log_msg&, const std::tm&,
+                          spdlog::memory_buf_t& dest) {
+  const std::string& version = envoyVersionString();
+  dest.append(version.data(), version.data() + version.size());
 }
 
 } // namespace CustomFlagFormatter

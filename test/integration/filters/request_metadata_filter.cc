@@ -7,6 +7,7 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 namespace Envoy {
 // A filter tests request metadata consuming and inserting. The filter inserts new
@@ -49,9 +50,12 @@ public:
 };
 
 class AddRequestMetadataStreamFilterConfig
-    : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+    : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<
+          test::integration::filters::RequestMetadataFilterConfig> {
 public:
-  AddRequestMetadataStreamFilterConfig() : EmptyHttpFilterConfig("request-metadata-filter") {}
+  AddRequestMetadataStreamFilterConfig()
+      : UniqueEmptyHttpFilterConfig<test::integration::filters::RequestMetadataFilterConfig>(
+            "request-metadata-filter") {}
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {

@@ -1,12 +1,16 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
+#include "source/common/tls/context_manager_impl.h"
+
 #include "test/config/v2_link_hacks.h"
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/http_integration.h"
+#include "test/integration/ssl_utility.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "contrib/golang/filters/http/source/golang_filter.h"
+#include "contrib/golang/filters/http/test/golang_test_filters.pb.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -62,10 +66,11 @@ public:
 };
 
 class RetrieveDynamicMetadataFilterConfig
-    : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+    : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<
+          contrib::golang::filters::http::test::RetrieveDynamicMetadataFilterConfig> {
 public:
   RetrieveDynamicMetadataFilterConfig()
-      : Extensions::HttpFilters::Common::EmptyHttpFilterConfig("validate-dynamic-metadata") {}
+      : UniqueEmptyHttpFilterConfig("validate-dynamic-metadata") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
@@ -135,7 +140,11 @@ typed_config:
     auto yaml_string = absl::StrFormat(yaml_fmt, so_id, genSoPath(), so_id);
     config_helper_.prependFilter(yaml_string);
     if (with_injected_metadata_validator) {
-      config_helper_.prependFilter("{ name: validate-dynamic-metadata }");
+      config_helper_.prependFilter(R"EOF(
+        name: validate-dynamic-metadata
+        typed_config:
+          "@type": type.googleapis.com/contrib.golang.filters.http.test.RetrieveDynamicMetadataFilterConfig
+      )EOF");
     }
 
     config_helper_.skipPortUsageValidation();
@@ -202,12 +211,12 @@ typed_config:
                       set: bar
               )EOF";
           auto yaml = absl::StrFormat(yaml_fmt, so_id);
-          ProtobufWkt::Any value;
+          Protobuf::Any value;
           TestUtility::loadFromYaml(yaml, value);
           hcm.mutable_route_config()
               ->mutable_virtual_hosts(0)
               ->mutable_typed_per_filter_config()
-              ->insert(Protobuf::MapPair<std::string, ProtobufWkt::Any>(key, value));
+              ->insert(Protobuf::MapPair<std::string, Protobuf::Any>(key, value));
 
           // route level per route config
           const auto yaml_fmt2 =
@@ -223,13 +232,13 @@ typed_config:
                       set: baz
               )EOF";
           auto yaml2 = absl::StrFormat(yaml_fmt2, so_id);
-          ProtobufWkt::Any value2;
+          Protobuf::Any value2;
           TestUtility::loadFromYaml(yaml2, value2);
 
           auto* new_route2 = hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
           new_route2->mutable_match()->set_prefix("/route-config-test");
           new_route2->mutable_typed_per_filter_config()->insert(
-              Protobuf::MapPair<std::string, ProtobufWkt::Any>(key, value2));
+              Protobuf::MapPair<std::string, Protobuf::Any>(key, value2));
           new_route2->mutable_route()->set_cluster("cluster_0");
         });
 
@@ -883,7 +892,7 @@ typed_config:
           });
     }
 
-    if (add_endpoint != "") {
+    if (!add_endpoint.empty()) {
       config_helper_.addConfigModifier(
           [add_endpoint](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
             auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
@@ -921,7 +930,7 @@ typed_config:
     ASSERT_TRUE(response->waitForEndStream(std::chrono::milliseconds(100000)));
 
     EXPECT_EQ(expected_status_code, response->headers().getStatusValue());
-    if (expected_upstream_host != "") {
+    if (!expected_upstream_host.empty()) {
       EXPECT_TRUE(absl::StrContains(getHeader(response->headers(), "rsp-upstream-host"),
                                     expected_upstream_host));
     }
@@ -941,6 +950,34 @@ typed_config:
   const std::string ADDDATA{"add_data"};
   const std::string BUFFERINJECTDATA{"bufferinjectdata"};
   const std::string SECRETS{"secrets"};
+  const std::string SSL{"ssl"};
+
+  // Setup SSL configuration for tests that need client certificates
+  void setupSslWithClientCert() {
+    config_helper_.addSslConfig(
+        ConfigHelper::ServerSslOptions().setRsaCert(true).setExpectClientEcdsaCert(false));
+  }
+
+  // Create SSL client connection with certificates
+  Network::ClientConnectionPtr makeSslClientConnection() {
+    // Create SSL context manager on first use
+    if (!ssl_context_manager_) {
+      ssl_context_manager_ =
+          std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+              server_factory_context_);
+    }
+
+    Network::Address::InstanceConstSharedPtr address =
+        Ssl::getSslAddress(version_, lookupPort("http"));
+    auto client_transport_socket_factory_ptr = Ssl::createClientSslTransportSocketFactory(
+        Ssl::ClientSslTransportOptions(), *ssl_context_manager_, *api_);
+    return dispatcher_->createClientConnection(
+        address, Network::Address::InstanceConstSharedPtr(),
+        client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr, nullptr);
+  }
+
+protected:
+  std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GolangIntegrationTest,
@@ -1006,6 +1043,139 @@ TEST_P(GolangIntegrationTest, Passthrough) {
   // check body for passthrough
   auto body = absl::StrFormat("%s%s", good, bye);
   EXPECT_EQ(body, response->body());
+
+  cleanup();
+}
+
+// Test SSL filter with non-SSL connection
+// Verifies that the filter correctly detects no SSL and sets appropriate headers
+TEST_P(GolangIntegrationTest, SslConnectionNonSsl) {
+  initializeConfig(SSL, genSoPath(), SSL);
+  initialize();
+  registerTestServerPorts({"http"});
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "test.com"}};
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers, true);
+  auto response = std::move(encoder_decoder.second);
+
+  waitForNextUpstreamRequest();
+
+  // Verify the filter detected no SSL and set the appropriate header
+  auto ssl_tested = getHeader(upstream_request_->headers(), "x-ssl-tested");
+  ASSERT_FALSE(ssl_tested.empty());
+  EXPECT_EQ("no-ssl", ssl_tested);
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  cleanup();
+}
+
+// Test SSL filter with actual SSL connection and client certificates
+// Verifies all 20+ SSL API methods work correctly
+TEST_P(GolangIntegrationTest, SslConnectionWithCertificate) {
+  initializeConfig(SSL, genSoPath(), SSL);
+  setupSslWithClientCert();
+  initialize();
+  registerTestServerPorts({"https"});
+
+  codec_client_ = makeHttpConnection(makeSslClientConnection());
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test"}, {":scheme", "https"}, {":authority", "test.com"}};
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers, true);
+  auto response = std::move(encoder_decoder.second);
+
+  waitForNextUpstreamRequest();
+
+  // Verify SSL was detected
+  auto ssl_tested = getHeader(upstream_request_->headers(), "x-ssl-tested");
+  EXPECT_EQ("yes", ssl_tested);
+
+  // Verify certificate presentation and validation
+  auto cert_presented = getHeader(upstream_request_->headers(), "x-cert-presented");
+  EXPECT_EQ("true", cert_presented);
+
+  auto cert_validated = getHeader(upstream_request_->headers(), "x-cert-validated");
+  EXPECT_EQ("true", cert_validated);
+
+  // Verify certificate string fields are present and non-empty
+  auto cert_digest = getHeader(upstream_request_->headers(), "x-cert-digest");
+  EXPECT_FALSE(cert_digest.empty());
+
+  auto cert_subject = getHeader(upstream_request_->headers(), "x-cert-subject");
+  EXPECT_FALSE(cert_subject.empty());
+
+  auto cert_issuer = getHeader(upstream_request_->headers(), "x-cert-issuer");
+  EXPECT_FALSE(cert_issuer.empty());
+
+  auto cert_serial = getHeader(upstream_request_->headers(), "x-cert-serial");
+  EXPECT_FALSE(cert_serial.empty());
+
+  auto cert_subject_local = getHeader(upstream_request_->headers(), "x-cert-subject-local");
+  EXPECT_FALSE(cert_subject_local.empty());
+
+  // Verify PEM encoding fields
+  auto cert_pem_length = getHeader(upstream_request_->headers(), "x-cert-pem-length");
+  if (!cert_pem_length.empty()) {
+    EXPECT_NE("0", cert_pem_length);
+  }
+
+  auto cert_chain_length = getHeader(upstream_request_->headers(), "x-cert-chain-length");
+  if (!cert_chain_length.empty()) {
+    EXPECT_NE("0", cert_chain_length);
+  }
+
+  // Verify SAN counts (may be 0 depending on certificate)
+  auto dns_sans_peer = getHeader(upstream_request_->headers(), "x-cert-dns-sans-peer-count");
+  EXPECT_FALSE(dns_sans_peer.empty());
+
+  auto dns_sans_local = getHeader(upstream_request_->headers(), "x-cert-dns-sans-local-count");
+  EXPECT_FALSE(dns_sans_local.empty());
+
+  auto uri_sans_peer = getHeader(upstream_request_->headers(), "x-cert-uri-sans-peer-count");
+  EXPECT_FALSE(uri_sans_peer.empty());
+
+  auto uri_sans_local = getHeader(upstream_request_->headers(), "x-cert-uri-sans-local-count");
+  EXPECT_FALSE(uri_sans_local.empty());
+
+  // Verify certificate validity timestamps
+  auto cert_valid_from = getHeader(upstream_request_->headers(), "x-cert-valid-from");
+  EXPECT_FALSE(cert_valid_from.empty());
+
+  auto cert_expiration = getHeader(upstream_request_->headers(), "x-cert-expiration");
+  EXPECT_FALSE(cert_expiration.empty());
+
+  // Verify TLS connection details
+  auto tls_version = getHeader(upstream_request_->headers(), "x-tls-version");
+  EXPECT_FALSE(tls_version.empty());
+  EXPECT_THAT(std::string(tls_version), HasSubstr("TLS"));
+
+  auto cipher_suite = getHeader(upstream_request_->headers(), "x-cipher-suite");
+  EXPECT_FALSE(cipher_suite.empty());
+
+  auto cipher_id = getHeader(upstream_request_->headers(), "x-cipher-id");
+  if (!cipher_id.empty()) {
+    EXPECT_NE("0", cipher_id);
+    EXPECT_NE("65535", cipher_id); // 0xffff
+  }
+
+  // Verify session ID (may or may not be present depending on TLS version and configuration)
+  // Note: We don't assert on session ID as it's optional
+  [[maybe_unused]] auto session_id_length =
+      getHeader(upstream_request_->headers(), "x-session-id-length");
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 
   cleanup();
 }
@@ -1758,14 +1928,14 @@ TEST_P(GolangIntegrationTest, RefreshRouteCache) {
                     value:
               )EOF";
         auto yaml = absl::StrFormat(yaml_fmt, so_id);
-        ProtobufWkt::Any value;
+        Protobuf::Any value;
         TestUtility::loadFromYaml(yaml, value);
 
         auto* route_first_matched =
             hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
         route_first_matched->mutable_match()->set_prefix("/disney/api");
         route_first_matched->mutable_typed_per_filter_config()->insert(
-            Protobuf::MapPair<std::string, ProtobufWkt::Any>(key, value));
+            Protobuf::MapPair<std::string, Protobuf::Any>(key, value));
         auto* resp_header = route_first_matched->add_response_headers_to_add();
         auto* header = resp_header->mutable_header();
         header->set_key("add-header-from");
@@ -1847,8 +2017,8 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_BadHost) {
   testUpstreamOverrideHost("403", "", "/test?upstreamOverrideHost=badhost", true);
 }
 
-// Set a unavaiable host, and the host is not in the cluster, will req the valid host in the cluster
-// and rerurn 200.
+// Set an unavailable host, and the host is not in the cluster, will req the valid host in the
+// cluster and return 200.
 TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_NotFound) {
   const std::string expected_host =
       GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]";
@@ -1857,8 +2027,8 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_NotFound) {
   testUpstreamOverrideHost("200", expected_host, "/test?upstreamOverrideHost=" + url_host, false);
 }
 
-// Set a unavaiable host, and the host is in the cluster, but not available(can not connect to the
-// host), will req the unavaiable hoat and rerurn 503.
+// Set an unavailable host, and the host is in the cluster, but not available(can not connect to the
+// host), will req the unavailable hoat and return 503.
 TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Unavaliable) {
   const std::string expected_host =
       GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]";
@@ -1870,8 +2040,8 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Unavaliable) {
                            add_endpoint);
 }
 
-// Set a unavaiable host, and the host is in the cluster, but not available(can not connect to the
-// host), and with retry. when first request with unavaiable host failed 503, the second request
+// Set an unavailable host, and the host is in the cluster, but not available(can not connect to the
+// host), and with retry. when first request with unavailable host failed 503, the second request
 // will retry with the valid host, then the second request will succeed and finally return 200.
 TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Unavaliable_Retry) {
   const std::string expected_host =
@@ -1884,8 +2054,8 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Unavaliable_Re
                            add_endpoint, true);
 }
 
-// Set a unavaiable host with strict mode, and the host is in the cluster, will req the unavaiable
-// host and rerurn 503.
+// Set an unavailable host with strict mode, and the host is in the cluster, will req the
+// unavailable host and return 503.
 TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict) {
   const std::string expected_host =
       GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]";
@@ -1899,8 +2069,8 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict) {
       false, add_endpoint);
 }
 
-// Set a unavaiable host with strict mode, and the host is not in the cluster, will req the
-// unavaiable host and rerurn 503.
+// Set an unavailable host with strict mode, and the host is not in the cluster, will req the
+// unavailable host and return 503.
 TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict_NotFound) {
   const std::string expected_host =
       GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]";
@@ -1912,8 +2082,8 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict_NotFoun
       false);
 }
 
-// Set a unavaiable host with strict mode and retry, and the host is in the cluster.
-// when first request with unavaiable host failed 503, the second request will retry with the valid
+// Set an unavailable host with strict mode and retry, and the host is in the cluster.
+// when first request with unavailable host failed 503, the second request will retry with the valid
 // host, then the second request will succeed and finally return 200.
 TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict_Retry) {
   const std::string expected_host =
@@ -1928,8 +2098,8 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict_Retry) 
                            false, add_endpoint, true);
 }
 
-// Set a unavaiable host with strict mode and retry, and the host is not in the cluster, will req
-// the unavaiable host and rerurn 503.
+// Set an unavailable host with strict mode and retry, and the host is not in the cluster, will req
+// the unavailable host and return 503.
 TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict_NotFound_Retry) {
   const std::string expected_host =
       GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]";
@@ -1938,6 +2108,30 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict_NotFoun
   testUpstreamOverrideHost(
       "503", "", "/test?upstreamOverrideHost=" + url_host + "&upstreamOverrideHostStrict=true",
       false, "", true);
+}
+
+// Test DrainConnectionUponCompletion triggers connection draining for HTTP/1.1.
+TEST_P(GolangIntegrationTest, DrainConnectionUponCompletion) {
+  initializeBasicFilter(BASIC);
+  registerTestServerPorts({"http"});
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Make request with drainConnection query parameter.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test?drainConnection=1"}, {":authority", "test"}};
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // For HTTP/1.1, we should see Connection: close header.
+  EXPECT_EQ("close", response->headers().getConnectionValue());
+
+  // Connection should be closed after request completes.
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  cleanupUpstreamAndDownstream();
 }
 
 } // namespace Envoy

@@ -29,8 +29,18 @@ GrpcClientImpl::~GrpcClientImpl() { ASSERT(!callbacks_); }
 
 void GrpcClientImpl::cancel() {
   ASSERT(callbacks_ != nullptr);
-  request_->cancel();
+  if (request_) {
+    request_->cancel();
+    request_ = nullptr;
+  }
   callbacks_ = nullptr;
+}
+
+void GrpcClientImpl::detach() {
+  if (request_) {
+    request_->detach();
+    request_ = nullptr;
+  }
 }
 
 void GrpcClientImpl::createRequest(envoy::service::ratelimit::v3::RateLimitRequest& request,
@@ -40,6 +50,8 @@ void GrpcClientImpl::createRequest(envoy::service::ratelimit::v3::RateLimitReque
   request.set_domain(domain);
   request.set_hits_addend(hits_addend);
   for (const Envoy::RateLimit::Descriptor& descriptor : descriptors) {
+    ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::filter), trace,
+                        "adding ratelimit descriptor: {}", descriptor.toString());
     envoy::extensions::common::ratelimit::v3::RateLimitDescriptor* new_descriptor =
         request.add_descriptors();
     for (const Envoy::RateLimit::DescriptorEntry& entry : descriptor.entries_) {
@@ -57,24 +69,32 @@ void GrpcClientImpl::createRequest(envoy::service::ratelimit::v3::RateLimitReque
     if (descriptor.hits_addend_.has_value()) {
       new_descriptor->mutable_hits_addend()->set_value(descriptor.hits_addend_.value());
     }
+    if (descriptor.is_negative_hits_) {
+      new_descriptor->set_is_negative_hits(true);
+    }
   }
 }
 
 void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domain,
                            const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-                           Tracing::Span& parent_span,
-                           OptRef<const StreamInfo::StreamInfo> stream_info, uint32_t hits_addend) {
+                           Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info,
+                           uint32_t hits_addend) {
+  // The client should only be used for one outstanding request at a time,
+  // so we assert that there is no existing request or callback.
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
+  request_ = nullptr;
 
   envoy::service::ratelimit::v3::RateLimitRequest request;
   createRequest(request, domain, descriptors, hits_addend);
 
-  auto options = Http::AsyncClient::RequestOptions().setTimeout(timeout_);
-  if (stream_info.has_value()) {
-    options.setParentContext(Http::AsyncClient::ParentContext{stream_info.ptr()});
+  auto options = Http::AsyncClient::RequestOptions().setTimeout(timeout_).setParentContext(
+      Http::AsyncClient::ParentContext{&stream_info});
+  auto inflight_request =
+      async_client_->send(service_method_, request, *this, parent_span, options);
+  if (inflight_request != nullptr) {
+    request_ = inflight_request;
   }
-  request_ = async_client_->send(service_method_, request, *this, parent_span, options);
 }
 
 void GrpcClientImpl::onSuccess(
@@ -109,12 +129,13 @@ void GrpcClientImpl::onSuccess(
       response->statuses().begin(), response->statuses().end());
   DynamicMetadataPtr dynamic_metadata =
       response->has_dynamic_metadata()
-          ? std::make_unique<ProtobufWkt::Struct>(response->dynamic_metadata())
+          ? std::make_unique<Protobuf::Struct>(response->dynamic_metadata())
           : nullptr;
   // The rate limit requests applied on stream-done will destroy the client inside the complete
   // callback, so we release the callback here to make the destructor happy.
   auto call_backs = callbacks_;
   callbacks_ = nullptr;
+  request_ = nullptr;
   call_backs->complete(status, std::move(descriptor_statuses), std::move(response_headers_to_add),
                        std::move(request_headers_to_add), response->raw_body(),
                        std::move(dynamic_metadata));
@@ -129,12 +150,13 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   // callback, so we release the callback here to make the destructor happy.
   auto call_backs = callbacks_;
   callbacks_ = nullptr;
+  request_ = nullptr;
   call_backs->complete(LimitStatus::Error, nullptr, nullptr, nullptr, EMPTY_STRING, nullptr);
 }
 
 ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
                           const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-                          const std::chrono::milliseconds timeout) {
+                          const absl::optional<std::chrono::milliseconds>& timeout) {
   // TODO(ramaraochavali): register client to singleton when GrpcClientImpl supports concurrent
   // requests.
   auto client_or_error =

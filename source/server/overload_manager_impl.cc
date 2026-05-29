@@ -140,6 +140,8 @@ absl::StatusOr<Event::ScaledTimerType> parseTimerType(
     return Event::ScaledTimerType::TransportSocketConnectTimeout;
   case Config::HTTP_DOWNSTREAM_CONNECTION_MAX:
     return Event::ScaledTimerType::HttpDownstreamMaxConnectionTimeout;
+  case Config::HTTP_DOWNSTREAM_STREAM_FLUSH:
+    return Event::ScaledTimerType::HttpDownstreamStreamFlush;
   default:
     return absl::InvalidArgumentError(
         fmt::format("Unknown timer type {}", static_cast<int>(config_timer_type)));
@@ -147,7 +149,7 @@ absl::StatusOr<Event::ScaledTimerType> parseTimerType(
 }
 
 absl::StatusOr<Event::ScaledTimerTypeMap>
-parseTimerMinimums(const ProtobufWkt::Any& typed_config,
+parseTimerMinimums(const Protobuf::Any& typed_config,
                    ProtobufMessage::ValidationVisitor& validation_visitor) {
   using Config = envoy::config::overload::v3::ScaleTimersOverloadActionConfig;
   const Config action_config =
@@ -409,11 +411,11 @@ OverloadManagerImpl::create(Event::Dispatcher& dispatcher, Stats::Scope& stats_s
                             ThreadLocal::SlotAllocator& slot_allocator,
                             const envoy::config::overload::v3::OverloadManager& config,
                             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-                            const Server::Options& options) {
+                            const Server::Options& options, Runtime::Loader& runtime) {
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::unique_ptr<OverloadManagerImpl>(
       new OverloadManagerImpl(dispatcher, stats_scope, slot_allocator, config, validation_visitor,
-                              api, options, creation_status));
+                              api, options, runtime, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -422,7 +424,7 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
                                          const envoy::config::overload::v3::OverloadManager& config,
                                          ProtobufMessage::ValidationVisitor& validation_visitor,
                                          Api::Api& api, const Server::Options& options,
-                                         absl::Status& creation_status)
+                                         Runtime::Loader& runtime, absl::Status& creation_status)
     : dispatcher_(dispatcher), time_source_(api.timeSource()), tls_(slot_allocator),
       refresh_interval_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_interval, 1000))),
@@ -432,7 +434,7 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
           std::make_unique<
               absl::node_hash_map<OverloadProactiveResourceName, ProactiveResource>>()) {
   Configuration::ResourceMonitorFactoryContextImpl context(dispatcher, options, api,
-                                                           validation_visitor);
+                                                           validation_visitor, runtime);
   // We should hide impl details from users, for them there should be no distinction between
   // proactive and regular resource monitors in configuration API. But internally we will maintain
   // two distinct collections of proactive and regular resources. Proactive resources are not
@@ -514,6 +516,12 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
         return;
       }
       makeCounter(api.rootScope(), OverloadActionStatsNames::get().ResetStreamsCount);
+    } else if (name == OverloadActionNames::get().ShrinkHeap) {
+      if (action.has_typed_config()) {
+        shrink_heap_config_ =
+            MessageUtil::anyConvertAndValidate<envoy::config::overload::v3::ShrinkHeapConfig>(
+                action.typed_config(), validation_visitor);
+      }
     } else if (action.has_typed_config()) {
       creation_status = absl::InvalidArgumentError(fmt::format(
           "Overload action \"{}\" has an unexpected value for the typed_config field", name));
@@ -579,10 +587,16 @@ void OverloadManagerImpl::start() {
     // Start a new flush epoch. If all resource updates complete before this callback runs, the last
     // resource update will call flushResourceUpdates to flush the whole batch early.
     ++flush_epoch_;
-    flush_awaiting_updates_ = resources_.size();
+    flush_awaiting_updates_ = resources_.size() + proactive_resources_->size();
 
     for (auto& resource : resources_) {
       resource.second.update(flush_epoch_);
+    }
+
+    for (auto& resource : *proactive_resources_) {
+      const double pressure = resource.second.updateResourcePressure();
+      updateResourcePressure(OverloadProactiveResources::get().resourceToName(resource.first),
+                             pressure, flush_epoch_);
     }
 
     // Record delay.

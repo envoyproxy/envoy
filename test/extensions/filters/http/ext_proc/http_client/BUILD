@@ -19,6 +19,7 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
+        "//source/common/http:http_service_headers_lib",
         "//source/common/http:message_lib",
         "//source/extensions/filters/http/ext_proc/http_client:http_client_lib",
         "//test/mocks/server:factory_context_mocks",

@@ -81,6 +81,7 @@ static_resources:
               - match: {prefix: "/"}
                 route:
                   cluster: service_foo
+                  timeout: 15s  # must be disabled for long-lived and streaming requests
                   idle_timeout: 15s  # must be disabled for long-lived and streaming requests
   clusters:
   - name: service_foo

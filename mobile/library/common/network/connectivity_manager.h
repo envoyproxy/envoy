@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/optref.h"
 #include "envoy/network/socket.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -11,6 +12,8 @@
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 
 #include "library/common/engine_types.h"
+#include "library/common/network/envoy_mobile_quic_network_observer_registry_factory.h"
+#include "library/common/network/network_types.h"
 #include "library/common/network/proxy_settings.h"
 #include "library/common/types/c_types.h"
 
@@ -20,11 +23,11 @@
  * remain valid/relevant at time of execution.
  *
  * Currently, there are two primary circumstances this is used:
- * 1. When network type changes, a refreshDNS call will be scheduled on the event dispatcher, along
- * with a configuration key of this type. If network type changes again before that refresh
- * executes, the refresh is now stale, another refresh task will have been queued, and it should no
- * longer execute. The configuration key allows the connectivity_manager to determine if the
- * refreshDNS call is representative of current configuration.
+ * 1. When network type changes, some clean up will be scheduled on the event dispatcher, along
+ * with a configuration key of this type. If network type changes again before that scheduled clean
+ * up executes, another clean up will be scheduled, and the old one should no longer execute. The
+ * configuration key allows the connectivity_manager to determine if the clean up is representative
+ * of current configuration.
  * 2. When a request is configured with a certain set of socket options and begins, it is given a
  * configuration key. The heuristic in reportNetworkUsage relies on characteristics of the
  * request/response to make future decisions about socket options, but needs to be able to correctly
@@ -40,6 +43,9 @@
 typedef uint16_t envoy_netconf_t;
 
 namespace Envoy {
+
+constexpr NetworkHandle kInvalidNetworkHandle = -1;
+
 namespace Network {
 
 /**
@@ -58,6 +64,14 @@ enum class SocketMode : int {
   // enable_interface_binding_ is set to true.
   AlternateBoundInterfaceMode = 1,
 };
+
+namespace {
+
+// The number of faults allowed on a previously-successful connection (i.e. able to send and receive
+// L7 bytes) before switching socket mode.
+constexpr unsigned int MaxFaultThreshold = 3;
+
+} // namespace
 
 using DnsCacheManagerSharedPtr = Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr;
 using InterfacePair = std::pair<const std::string, Address::InstanceConstSharedPtr>;
@@ -185,6 +199,8 @@ public:
   virtual Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dnsCache() PURE;
 };
 
+using ConnectivityManagerSharedPtr = std::shared_ptr<ConnectivityManager>;
+
 // Used when draining hosts upon DNS refreshing is desired.
 class RefreshDnsWithPostDrainHandler
     : public Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks,
@@ -217,8 +233,11 @@ private:
       dns_callbacks_handle_;
 };
 
+using DefaultNetworkChangeCallback = std::function<void(envoy_netconf_t)>;
+
 class ConnectivityManagerImpl : public ConnectivityManager,
                                 public Singleton::Instance,
+                                public Quic::NetworkConnectivityTracker,
                                 public Logger::Loggable<Logger::Id::upstream> {
 public:
   /**
@@ -227,11 +246,10 @@ public:
    * @param network, the OS-preferred network.
    * @returns configuration key to associate with any related calls.
    */
-  static envoy_netconf_t setPreferredNetwork(int network);
+  envoy_netconf_t setPreferredNetwork(int network);
 
   ConnectivityManagerImpl(Upstream::ClusterManager& cluster_manager,
-                          DnsCacheManagerSharedPtr dns_cache_manager)
-      : cluster_manager_(cluster_manager), dns_cache_manager_(dns_cache_manager) {}
+                          DnsCacheManagerSharedPtr dns_cache_manager);
 
   // ConnectivityManager
   std::vector<InterfacePair> enumerateV4Interfaces() override;
@@ -251,6 +269,23 @@ public:
   envoy_netconf_t addUpstreamSocketOptions(Socket::OptionsSharedPtr options) override;
   Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dnsCache() override;
 
+  // These interfaces are only used to handle Android network change notifications.
+  void onDefaultNetworkChangedAndroid(ConnectionType connection_type, NetworkHandle net_id);
+  void onNetworkDisconnectAndroid(NetworkHandle net_id);
+  void onNetworkConnectAndroid(ConnectionType connection_type, NetworkHandle net_id);
+  void purgeActiveNetworkListAndroid(const std::vector<NetworkHandle>& active_network_ids);
+  void setDefaultNetworkChangeCallback(DefaultNetworkChangeCallback cb) {
+    default_network_change_callback_ = cb;
+  }
+
+  // Refresh DNS regardless of configuration key change.
+  void doRefreshDns(envoy_netconf_t configuration_key, bool drain_connections);
+
+  // Quic::NetworkConnectivityTracker.
+  // Only used on Android.
+  NetworkHandle getDefaultNetwork() override;
+  absl::flat_hash_map<NetworkHandle, ConnectionType> getAllConnectedNetworks() override;
+
 private:
   // The states of the current default network picked by the platform.
   struct DefaultNetworkState {
@@ -264,18 +299,27 @@ private:
   Socket::OptionsSharedPtr getAlternateInterfaceSocketOptions(int network);
   InterfacePair getActiveAlternateInterface(int network, unsigned short family);
   Socket::OptionsSharedPtr getUpstreamSocketOptions(int network, SocketMode socket_mode);
+  void setPreferredNetworkNoLock(int network_type) ABSL_EXCLUSIVE_LOCKS_REQUIRED(network_mutex_);
+  void initializeNetworkStates();
 
   bool enable_interface_binding_{false};
   Upstream::ClusterManager& cluster_manager_;
+  Quic::EnvoyMobileQuicNetworkObserverRegistryFactory quic_observer_registry_factory_;
   // nullptr if draining hosts after refreshing DNS is disabled via setDrainPostDnsRefreshEnabled().
   std::unique_ptr<RefreshDnsWithPostDrainHandler> dns_refresh_handler_;
   DnsCacheManagerSharedPtr dns_cache_manager_;
   ProxySettingsConstSharedPtr proxy_settings_;
-  static DefaultNetworkState network_state_ ABSL_GUARDED_BY(network_mutex_);
-  static Thread::MutexBasicLockable network_mutex_;
+  DefaultNetworkState network_state_ ABSL_GUARDED_BY(network_mutex_){
+      1, 0, MaxFaultThreshold, SocketMode::DefaultPreferredNetworkMode};
+  Thread::MutexBasicLockable network_mutex_{};
+  // Below states are only populated on Android platform.
+  NetworkHandle default_network_handle_ ABSL_GUARDED_BY(network_mutex_){kInvalidNetworkHandle};
+  absl::flat_hash_map<NetworkHandle, ConnectionType>
+      connected_networks_ ABSL_GUARDED_BY(network_mutex_);
+  DefaultNetworkChangeCallback default_network_change_callback_;
 };
 
-using ConnectivityManagerSharedPtr = std::shared_ptr<ConnectivityManager>;
+using ConnectivityManagerImplSharedPtr = std::shared_ptr<ConnectivityManagerImpl>;
 
 /**
  * Provides access to the singleton ConnectivityManager.
@@ -288,7 +332,7 @@ public:
   /**
    * @returns singleton ConnectivityManager instance.
    */
-  ConnectivityManagerSharedPtr get();
+  ConnectivityManagerImplSharedPtr get();
 
 private:
   Server::GenericFactoryContextImpl context_;

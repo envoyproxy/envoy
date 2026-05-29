@@ -30,7 +30,7 @@ envoy_cc_library(
     deps = [
         "//contrib/sip_proxy/filters/network/source:metadata_lib",
         "//envoy/router:router_interface",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 

@@ -5,7 +5,6 @@
 #include "source/extensions/filters/http/aws_lambda/config.h"
 
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/server/instance.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -382,6 +381,33 @@ aws_session_token = profile4_token
   EXPECT_EQ("default_access_key", credentials.accessKeyId().value());
   EXPECT_EQ("default_secret", credentials.secretAccessKey().value());
   EXPECT_EQ("default_token", credentials.sessionToken().value());
+}
+
+TEST(AwsLambdaFilterConfigTest, ValidConfigCreatesFilterWithServerContext) {
+  const std::string yaml = R"EOF(
+arn: "arn:aws:lambda:region:424242:function:fun"
+payload_passthrough: true
+invocation_mode: asynchronous
+  )EOF";
+
+  LambdaConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  AwsLambdaFilterFactory factory;
+
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  auto has_expected_settings = [](std::shared_ptr<Envoy::Http::StreamFilter> stream_filter) {
+    auto filter = std::static_pointer_cast<Filter>(stream_filter);
+    const auto& settings = filter->settingsForTest();
+    return settings.payloadPassthrough() &&
+           settings.invocationMode() == InvocationMode::Asynchronous;
+  };
+
+  EXPECT_CALL(filter_callbacks, addStreamFilter(Truly(has_expected_settings)));
+  cb(filter_callbacks);
 }
 
 } // namespace

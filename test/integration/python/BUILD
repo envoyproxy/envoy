@@ -12,6 +12,7 @@ envoy_py_test(
     size = "large",
     srcs = select({
         "//bazel:disable_hot_restart_or_admin": ["null_test.py"],
+        "//bazel:disable_http3": ["null_test.py"],
         "//conditions:default": ["hotrestart_handoff_test.py"],
     }),
     args = [
@@ -32,6 +33,7 @@ envoy_py_test(
     }),
     main = select({
         "//bazel:disable_hot_restart_or_admin": "null_test.py",
+        "//bazel:disable_http3": "null_test.py",
         "//conditions:default": "hotrestart_handoff_test.py",
     }),
     # Hot restart does not apply on Windows.

@@ -70,6 +70,9 @@ public:
   void setFileFlushIntervalMsec(std::chrono::milliseconds file_flush_interval_msec) {
     file_flush_interval_msec_ = file_flush_interval_msec;
   }
+  void setFileFlushMinSizeKB(uint64_t file_flush_min_size_kb) {
+    file_flush_min_size_kb_ = file_flush_min_size_kb;
+  }
   void setServiceClusterName(const std::string& service_cluster) {
     service_cluster_ = service_cluster;
   }
@@ -140,6 +143,7 @@ public:
   std::chrono::milliseconds fileFlushIntervalMsec() const override {
     return file_flush_interval_msec_;
   }
+  uint64_t fileFlushMinSizeKB() const override { return file_flush_min_size_kb_; }
   const std::string& serviceClusterName() const override { return service_cluster_; }
   const std::string& serviceNodeName() const override { return service_node_; }
   const std::string& serviceZone() const override { return service_zone_; }
@@ -204,6 +208,7 @@ private:
   std::string service_node_;
   std::string service_zone_;
   std::chrono::milliseconds file_flush_interval_msec_{10000};
+  uint64_t file_flush_min_size_kb_{64};
   std::chrono::seconds drain_time_{600};
   std::chrono::seconds parent_shutdown_time_{900};
   Server::DrainStrategy drain_strategy_{Server::DrainStrategy::Gradual};

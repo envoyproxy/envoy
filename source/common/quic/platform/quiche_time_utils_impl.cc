@@ -4,9 +4,10 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
+#include "quiche_platform_impl/quiche_time_utils_impl.h"
+
 #include "absl/time/civil_time.h"
 #include "absl/time/time.h"
-#include "quiche_platform_impl/quiche_time_utils_impl.h"
 
 namespace quiche {
 

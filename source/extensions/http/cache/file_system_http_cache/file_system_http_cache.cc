@@ -322,17 +322,17 @@ void FileSystemHttpCache::updateHeaders(const LookupContext& base_lookup_context
 absl::string_view FileSystemHttpCache::cachePath() const { return shared_->cachePath(); }
 
 bool FileSystemHttpCache::workInProgress(const Key& key) {
-  absl::MutexLock lock(&cache_mu_);
+  absl::MutexLock lock(cache_mu_);
   return entries_being_written_.contains(key);
 }
 
 std::shared_ptr<Cleanup> FileSystemHttpCache::maybeStartWritingEntry(const Key& key) {
-  absl::MutexLock lock(&cache_mu_);
+  absl::MutexLock lock(cache_mu_);
   if (!entries_being_written_.emplace(key).second) {
     return nullptr;
   }
   return std::make_shared<Cleanup>([this, key]() {
-    absl::MutexLock lock(&cache_mu_);
+    absl::MutexLock lock(cache_mu_);
     entries_being_written_.erase(key);
   });
 }

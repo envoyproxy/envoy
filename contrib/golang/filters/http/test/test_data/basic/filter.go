@@ -41,6 +41,7 @@ type filter struct {
 
 	upstreamOverrideHost       string // set upstream override host
 	upstreamOverrideHostStrict bool   // set strict mode for upstream override host
+	drainConnection            bool   // drain connection upon completion
 }
 
 func parseQuery(path string) url.Values {
@@ -90,6 +91,7 @@ func (f *filter) initRequest(header api.RequestHeaderMap) {
 	f.refreshRoute = f.query_params.Get("refreshRoute") != ""
 	f.upstreamOverrideHost = f.query_params.Get("upstreamOverrideHost")
 	f.upstreamOverrideHostStrict = f.query_params.Get("upstreamOverrideHostStrict") != ""
+	f.drainConnection = f.query_params.Get("drainConnection") != ""
 }
 
 func (f *filter) fail(callbacks api.FilterProcessCallbacks, msg string, a ...any) api.StatusType {
@@ -284,6 +286,9 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 		header.SetPath("/user/api/") // path used to match the new route
 		f.callbacks.RefreshRouteCache()
 		header.SetPath("/api/") // path used by the upstream
+	}
+	if f.drainConnection {
+		f.callbacks.StreamInfo().DrainConnectionUponCompletion()
 	}
 	return api.Continue
 }

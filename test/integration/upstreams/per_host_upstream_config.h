@@ -30,11 +30,11 @@ void addHeader(Envoy::Http::RequestHeaderMap& header_map, absl::string_view head
                absl::string_view key2) {
   if (auto filter_metadata = metadata.filter_metadata().find(std::string(key1));
       filter_metadata != metadata.filter_metadata().end()) {
-    const ProtobufWkt::Struct& data_struct = filter_metadata->second;
+    const Protobuf::Struct& data_struct = filter_metadata->second;
     const auto& fields = data_struct.fields();
     if (auto iter = fields.find(toStdStringView(key2)); // NOLINT(std::string_view)
         iter != fields.end()) {
-      if (iter->second.kind_case() == ProtobufWkt::Value::kStringValue) {
+      if (iter->second.kind_case() == Protobuf::Value::kStringValue) {
         header_map.setCopy(Envoy::Http::LowerCaseString(std::string(header_name)),
                            iter->second.string_value());
       }
@@ -111,7 +111,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
 };
 

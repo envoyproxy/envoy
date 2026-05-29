@@ -15,7 +15,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/config/subscription_base.h"
+#include "source/common/config/resource_type_helper.h"
 #include "source/common/config/utility.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/target_impl.h"
@@ -418,10 +418,9 @@ struct ExtensionConfigDiscoveryStats {
  * Subscriptions are shared between the filter config providers. The filter config providers are
  * notified when a new config is accepted.
  */
-class FilterConfigSubscription
-    : Config::SubscriptionBase<envoy::config::core::v3::TypedExtensionConfig>,
-      Logger::Loggable<Logger::Id::filter>,
-      public std::enable_shared_from_this<FilterConfigSubscription> {
+class FilterConfigSubscription : public Config::SubscriptionCallbacks,
+                                 Logger::Loggable<Logger::Id::filter>,
+                                 public std::enable_shared_from_this<FilterConfigSubscription> {
 public:
   static absl::StatusOr<std::unique_ptr<FilterConfigSubscription>>
   create(const envoy::config::core::v3::ConfigSource& config_source,
@@ -483,6 +482,9 @@ private:
   Server::Configuration::ServerFactoryContext& factory_context_;
 
   Init::SharedTargetImpl init_target_;
+  const Config::ResourceTypeHelper<envoy::config::core::v3::TypedExtensionConfig>
+      resource_type_helper_;
+
   bool started_{false};
 
   Stats::ScopeSharedPtr scope_;
@@ -651,7 +653,7 @@ protected:
   }
 
   absl::StatusOr<ProtobufTypes::MessagePtr>
-  getDefaultConfig(const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
+  getDefaultConfig(const Protobuf::Any& proto_config, const std::string& filter_config_name,
                    Server::Configuration::ServerFactoryContext& server_context,
                    bool last_filter_in_filter_chain, const std::string& filter_chain_type,
                    const absl::flat_hash_set<std::string>& require_type_urls) const {

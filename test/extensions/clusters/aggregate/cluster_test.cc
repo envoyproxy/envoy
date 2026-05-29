@@ -6,10 +6,8 @@
 #include "source/extensions/clusters/aggregate/cluster.h"
 
 #include "test/common/upstream/utility.h"
-#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
-#include "test/mocks/server/instance.h"
-#include "test/mocks/ssl/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/load_balancer.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
@@ -73,7 +71,7 @@ public:
         priority,
         Upstream::HostSetImpl::partitionHosts(std::make_shared<Upstream::HostVector>(hosts),
                                               Upstream::HostsPerLocalityImpl::empty()),
-        nullptr, hosts, {}, 123, absl::nullopt, 100);
+        nullptr, hosts, {}, absl::nullopt, 100);
   }
 
   void setupSecondary(int priority, int healthy_hosts, int degraded_hosts, int unhealthy_hosts) {
@@ -83,7 +81,7 @@ public:
         priority,
         Upstream::HostSetImpl::partitionHosts(std::make_shared<Upstream::HostVector>(hosts),
                                               Upstream::HostsPerLocalityImpl::empty()),
-        nullptr, hosts, {}, 123, absl::nullopt, 100);
+        nullptr, hosts, {}, absl::nullopt, 100);
   }
 
   void setupPrioritySet() {

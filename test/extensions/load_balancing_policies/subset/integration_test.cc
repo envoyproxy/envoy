@@ -14,7 +14,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace Subset {
 namespace {
 
@@ -182,6 +182,6 @@ TEST_P(SubsetIntegrationTest, NormalLoadBalancingWithLegacyAPI) {
 
 } // namespace
 } // namespace Subset
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

@@ -79,9 +79,10 @@ public:
     EXPECT_CALL(listener_config_, filterChainFactory());
     ON_CALL(*udp_listener_config_, packetWriterFactory())
         .WillByDefault(ReturnRef(udp_packet_writer_factory_));
-    ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_, _))
-        .WillByDefault(Invoke(
-            [&](Network::IoHandle& io_handle, Stats::Scope& scope) -> Network::UdpPacketWriterPtr {
+    ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_, _, _, _))
+        .WillByDefault(
+            Invoke([&](Network::IoHandle& io_handle, Stats::Scope& scope, Envoy::Event::Dispatcher&,
+                       absl::AnyInvocable<void()&&>) -> Network::UdpPacketWriterPtr {
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
               return std::make_unique<Quic::UdpGsoBatchWriter>(io_handle, scope);
 #else

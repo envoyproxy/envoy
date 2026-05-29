@@ -50,7 +50,7 @@ std::shared_ptr<AsyncFileManager> AsyncFileManagerFactoryImpl::getAsyncFileManag
   Api::OsSysCalls& posix = substitute_posix_file_operations == nullptr
                                ? Api::OsSysCallsSingleton::get()
                                : *substitute_posix_file_operations;
-  absl::MutexLock lock(&mu_);
+  absl::MutexLock lock(mu_);
   auto it = managers_.find(config.id());
   if (it == managers_.end()) {
     switch (config.manager_type_case()) {

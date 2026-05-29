@@ -10,7 +10,6 @@ envoy_cc_test(
     rbe_pool = "6gig",
     # MSVC does not allow strings over a certain length, see error C2026
     tags = [
-        "no-remote-exec",
         "skip_on_windows",
     ],
     deps = ["//tools/type_whisperer:api_type_db_lib"],

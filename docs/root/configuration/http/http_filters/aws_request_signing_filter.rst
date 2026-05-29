@@ -7,10 +7,6 @@ AWS Request Signing
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigning``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning>`
 
-.. attention::
-
-  The AWS request signing filter is experimental and is currently under active development.
-
 The HTTP AWS request signing filter is used to access authenticated AWS services. It uses the
 existing AWS Credential Provider to get the secrets used for generating the required
 headers.

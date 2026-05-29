@@ -9,7 +9,7 @@ Build & run the example iOS apps
 The fastest way to build and run the sample iOS apps is to run the
 following command::
 
-    ./bazelw run //examples/swift/hello_world:app
+    bazel run //examples/swift/hello_world:app
 
 This will build and run the Hello World iOS app in a new iOS Simulator.
 
@@ -23,7 +23,7 @@ Envoy Mobile makes use of the
 project to add support for many of Xcode's development, debugging and
 profiling features to Envoy Mobile.
 
-To start, run ``./bazelw run //:xcodeproj`` to generate an Xcode project
+To start, run ``bazel run //:xcodeproj`` to generate an Xcode project
 and ``xed .`` to open it in Xcode (or double-click ``Envoy.xcodeproj``
 in Finder).
 

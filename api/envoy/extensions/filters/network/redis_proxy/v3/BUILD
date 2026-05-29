@@ -10,6 +10,6 @@ api_proto_package(
         "//envoy/config/core/v3:pkg",
         "//envoy/extensions/common/aws/v3:pkg",
         "//envoy/extensions/common/dynamic_forward_proxy/v3:pkg",
-        "@com_github_cncf_xds//udpa/annotations:pkg",
+        "@xds//udpa/annotations:pkg",
     ],
 )

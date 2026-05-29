@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <sys/socket.h>
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/socket_option.pb.h"
 #include "envoy/config/metrics/v3/metrics_service.pb.h"
 #include "envoy/extensions/compression/brotli/decompressor/v3/brotli.pb.h"
@@ -12,6 +13,7 @@
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 #include "envoy/extensions/filters/http/router/v3/router.pb.h"
 #include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.h"
+#include "envoy/extensions/early_data/v3/default_early_data_policy.pb.h"
 
 #if defined(__APPLE__)
 #include "envoy/extensions/network/dns_resolver/apple/v3/apple_dns_resolver.pb.h"
@@ -24,9 +26,11 @@
 #include "source/common/http/matching/inputs.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
+#include "absl/debugging/leak_check.h"
 #include "fmt/core.h"
 #include "library/common/internal_engine.h"
 #include "library/common/extensions/cert_validator/platform_bridge/platform_bridge.pb.h"
@@ -35,6 +39,7 @@
 #include "library/common/extensions/filters/http/network_configuration/filter.pb.h"
 #include "library/common/extensions/filters/http/socket_tag/filter.pb.h"
 #include "library/common/extensions/key_value/platform/platform.pb.h"
+#include "library/common/extensions/quic_packet_writer/platform/platform_packet_writer.pb.h"
 
 #if defined(__APPLE__)
 #include "library/common/network/apple_proxy_resolution.h"
@@ -50,6 +55,11 @@ EngineBuilder& EngineBuilder::setNetworkThreadPriority(int thread_priority) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setBufferHighWatermark(size_t high_watermark) {
+  high_watermark_ = high_watermark;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::setLogLevel(Logger::Logger::Levels log_level) {
   log_level_ = log_level;
   return *this;
@@ -57,6 +67,11 @@ EngineBuilder& EngineBuilder::setLogLevel(Logger::Logger::Levels log_level) {
 
 EngineBuilder& EngineBuilder::setLogger(std::unique_ptr<EnvoyLogger> logger) {
   logger_ = std::move(logger);
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::enableLogger(bool logger_on) {
+  enable_logger_ = logger_on;
   return *this;
 }
 
@@ -137,6 +152,12 @@ EngineBuilder& EngineBuilder::addDnsPreresolveHostnames(const std::vector<std::s
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setDnsResolver(
+    const envoy::config::core::v3::TypedExtensionConfig& dns_resolver_config) {
+  dns_resolver_config_ = dns_resolver_config;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::setAdditionalSocketOptions(
     const std::vector<envoy::config::core::v3::SocketOption>& socket_options) {
   socket_options_ = socket_options;
@@ -209,6 +230,26 @@ EngineBuilder& EngineBuilder::enableSocketTagging(bool socket_tagging_on) {
 
 EngineBuilder& EngineBuilder::enableHttp3(bool http3_on) {
   enable_http3_ = http3_on;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::enableEarlyData(bool early_data_on) {
+  enable_early_data_ = early_data_on;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::enableScone(bool enable) {
+  scone_enabled_ = enable;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::addQuicConnectionOption(std::string option) {
+  quic_connection_options_.push_back(std::move(option));
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::addQuicClientConnectionOption(std::string option) {
+  quic_client_connection_options_.push_back(std::move(option));
   return *this;
 }
 
@@ -286,6 +327,10 @@ EngineBuilder& EngineBuilder::setMaxConcurrentStreams(int max_concurrent_streams
 
 EngineBuilder&
 EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_validation_on) {
+  if (use_worker_thread_) {
+    // Platform certificate validation is not supported with worker thread.
+    return *this;
+  }
   platform_certificates_validation_on_ = platform_certificates_validation_on;
   return *this;
 }
@@ -308,10 +353,17 @@ EngineBuilder& EngineBuilder::addNativeFilter(std::string name, std::string type
 }
 
 EngineBuilder& EngineBuilder::addNativeFilter(const std::string& name,
-                                              const ProtobufWkt::Any& typed_config) {
+                                              const Protobuf::Any& typed_config) {
   native_filter_chain_.push_back(NativeFilterConfig(name, typed_config));
   return *this;
 }
+
+#if defined(__APPLE__)
+EngineBuilder& EngineBuilder::enableNetworkChangeMonitor(bool network_change_monitor_on) {
+  enable_network_change_monitor_ = network_change_monitor_on;
+  return *this;
+}
+#endif
 
 std::string EngineBuilder::nativeNameToConfig(absl::string_view name) {
 #ifdef ENVOY_ENABLE_FULL_PROTOS
@@ -324,13 +376,26 @@ std::string EngineBuilder::nativeNameToConfig(absl::string_view name) {
   proto_config.set_platform_filter_name(name);
   std::string ret;
   proto_config.SerializeToString(&ret);
-  ProtobufWkt::Any any_config;
+  Protobuf::Any any_config;
   any_config.set_type_url(
       "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge");
   any_config.set_value(ret);
   any_config.SerializeToString(&ret);
   return ret;
 #endif
+}
+
+EngineBuilder& EngineBuilder::enableWorkerThread(bool use_worker_thread) {
+  use_worker_thread_ = use_worker_thread;
+  if (use_worker_thread_) {
+    // Platform certificate validation and system proxy settings are not supported with worker
+    // thread.
+    platform_certificates_validation_on_ = false;
+#ifdef __APPLE__
+    respect_system_proxy_settings_ = false;
+#endif
+  }
+  return *this;
 }
 
 EngineBuilder& EngineBuilder::addPlatformFilter(const std::string& name) {
@@ -348,8 +413,60 @@ EngineBuilder& EngineBuilder::addRestartRuntimeGuard(std::string guard, bool val
   return *this;
 }
 
+EngineBuilder& EngineBuilder::enableStatsCollection(bool stats_collection_on) {
+  enable_stats_collection_ = stats_collection_on;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setNodeId(std::string node_id) {
+  node_id_ = std::move(node_id);
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setNodeLocality(std::string region, std::string zone,
+                                              std::string sub_zone) {
+  node_locality_ = {std::move(region), std::move(zone), std::move(sub_zone)};
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setNodeMetadata(Protobuf::Struct node_metadata) {
+  node_metadata_ = std::move(node_metadata);
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setUseQuicPlatformPacketWriter(bool use_quic_platform_packet_writer) {
+  use_quic_platform_packet_writer_ = use_quic_platform_packet_writer;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::enableQuicConnectionMigration(bool quic_connection_migration_on) {
+  enable_quic_connection_migration_ = quic_connection_migration_on;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setMigrateIdleQuicConnection(bool migrate_idle_quic_connection) {
+  migrate_idle_quic_connection_ = migrate_idle_quic_connection;
+  return *this;
+}
+
+EngineBuilder&
+EngineBuilder::setMaxIdleTimeBeforeQuicMigrationSeconds(int max_idle_time_before_quic_migration) {
+  max_idle_time_before_quic_migration_seconds_ = max_idle_time_before_quic_migration;
+  return *this;
+}
+
+EngineBuilder&
+EngineBuilder::setMaxTimeOnNonDefaultNetworkSeconds(int max_time_on_non_default_network) {
+  max_time_on_non_default_network_seconds_ = max_time_on_non_default_network;
+  return *this;
+}
+
 #if defined(__APPLE__)
 EngineBuilder& EngineBuilder::respectSystemProxySettings(bool value, int refresh_interval_secs) {
+  if (use_worker_thread_) {
+    // System proxy settings are not supported with worker thread.
+    return *this;
+  }
   respect_system_proxy_settings_ = value;
   if (refresh_interval_secs > 0) {
     proxy_settings_refresh_interval_secs_ = refresh_interval_secs;
@@ -362,6 +479,18 @@ EngineBuilder& EngineBuilder::setIosNetworkServiceType(int ios_network_service_t
   return *this;
 }
 #endif
+
+#ifdef ENVOY_MOBILE_XDS
+
+EngineBuilder& EngineBuilder::setXds(XdsBuilder xds_builder) {
+  xds_builder_ = std::move(xds_builder);
+  // Add the XdsBuilder's xDS server hostname and port to the list of DNS addresses to preresolve in
+  // the `base` DFP cluster.
+  dns_preresolve_hostnames_.push_back(
+      {xds_builder_->xds_server_address_ /* host */, xds_builder_->xds_server_port_ /* port */});
+  return *this;
+}
+#endif // ENVOY_MOBILE_XDS
 
 std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generateBootstrap() const {
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap =
@@ -397,6 +526,13 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   auto* backoff = route_to->mutable_retry_policy()->mutable_retry_back_off();
   backoff->mutable_base_interval()->set_nanos(250000000);
   backoff->mutable_max_interval()->set_seconds(60);
+
+  if (!enable_early_data_) {
+    auto* early_data = route_to->mutable_early_data_policy();
+    early_data->set_name("envoy.route.early_data_policy.default");
+    ::envoy::extensions::early_data::v3::DefaultEarlyDataPolicy config;
+    early_data->mutable_typed_config()->PackFrom(config);
+  }
 
   for (auto filter = native_filter_chain_.rbegin(); filter != native_filter_chain_.rend();
        ++filter) {
@@ -508,24 +644,28 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
         ->PackFrom(kv_config);
   }
 
+  if (dns_resolver_config_.has_value()) {
+    *dns_cache_config->mutable_typed_dns_resolver_config() = *dns_resolver_config_;
+  } else {
 #if defined(__APPLE__)
-  envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig resolver_config;
-  dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
-      "envoy.network.dns_resolver.apple");
-  dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
-      resolver_config);
+    envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig resolver_config;
+    dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
+        "envoy.network.dns_resolver.apple");
+    dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
+        resolver_config);
 #else
-  envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
-      resolver_config;
-  if (dns_num_retries_.has_value()) {
-    resolver_config.mutable_num_retries()->set_value(*dns_num_retries_);
-  }
-  resolver_config.mutable_num_resolver_threads()->set_value(getaddrinfo_num_threads_);
-  dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
-      "envoy.network.dns_resolver.getaddrinfo");
-  dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
-      resolver_config);
+    envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
+        resolver_config;
+    if (dns_num_retries_.has_value()) {
+      resolver_config.mutable_num_retries()->set_value(*dns_num_retries_);
+    }
+    resolver_config.mutable_num_resolver_threads()->set_value(getaddrinfo_num_threads_);
+    dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
+        "envoy.network.dns_resolver.getaddrinfo");
+    dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
+        resolver_config);
 #endif
+  }
 
   for (const auto& [host, port] : dns_preresolve_hostnames_) {
     envoy::config::core::v3::SocketAddress* address = dns_cache_config->add_preresolve_hostnames();
@@ -581,7 +721,11 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     validation->mutable_custom_validator_config()->mutable_typed_config()->PackFrom(validator);
   } else {
     std::string certs;
-
+#ifdef ENVOY_MOBILE_XDS
+    if (xds_builder_ && !xds_builder_->ssl_root_certs_.empty()) {
+      certs = xds_builder_->ssl_root_certs_;
+    }
+#endif // ENVOY_MOBILE_XDS
     if (certs.empty()) {
       // The xDS builder doesn't supply root certs, so we'll use the certs packed with Envoy Mobile,
       // if the build config allows it.
@@ -721,8 +865,17 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     auto* quic_protocol_options = alpn_options.mutable_auto_config()
                                       ->mutable_http3_protocol_options()
                                       ->mutable_quic_protocol_options();
-    quic_protocol_options->set_connection_options(http3_connection_options_);
-    quic_protocol_options->set_client_connection_options(http3_client_connection_options_);
+    if (!quic_connection_options_.empty()) {
+      quic_protocol_options->set_connection_options(absl::StrJoin(quic_connection_options_, ","));
+    } else {
+      quic_protocol_options->set_connection_options(http3_connection_options_);
+    }
+    if (!quic_client_connection_options_.empty()) {
+      quic_protocol_options->set_client_connection_options(
+          absl::StrJoin(quic_client_connection_options_, ","));
+    } else {
+      quic_protocol_options->set_client_connection_options(http3_client_connection_options_);
+    }
     quic_protocol_options->mutable_initial_stream_window_size()->set_value(
         initial_stream_window_size_);
     quic_protocol_options->mutable_initial_connection_window_size()->set_value(
@@ -739,6 +892,33 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     }
     if (max_concurrent_streams_ > 0) {
       quic_protocol_options->mutable_max_concurrent_streams()->set_value(max_concurrent_streams_);
+    }
+    if (enable_quic_connection_migration_) {
+      auto* migration_setting = quic_protocol_options->mutable_connection_migration();
+      if (migrate_idle_quic_connection_) {
+        auto* migrate_idle_connections = migration_setting->mutable_migrate_idle_connections();
+        if (max_idle_time_before_quic_migration_seconds_ > 0) {
+          migrate_idle_connections->mutable_max_idle_time_before_migration()->set_seconds(
+              max_idle_time_before_quic_migration_seconds_);
+        }
+      }
+      if (max_time_on_non_default_network_seconds_ > 0) {
+        migration_setting->mutable_max_time_on_non_default_network()->set_seconds(
+            max_time_on_non_default_network_seconds_);
+      }
+    }
+
+    if (scone_enabled_) {
+      quic_protocol_options->mutable_enable_scone()->set_value(true);
+    }
+
+    if (use_quic_platform_packet_writer_ || enable_quic_connection_migration_) {
+      envoy_mobile::extensions::quic_packet_writer::platform::QuicPlatformPacketWriterConfig
+          writer_config;
+      quic_protocol_options->mutable_client_packet_writer()->mutable_typed_config()->PackFrom(
+          writer_config);
+      quic_protocol_options->mutable_client_packet_writer()->set_name(
+          "envoy.quic.packet_writer.platform");
     }
 
     alpn_options.mutable_auto_config()->mutable_alternate_protocols_cache_options()->set_name(
@@ -802,24 +982,29 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   }
 
   // Set up stats.
-  auto* list = bootstrap->mutable_stats_config()->mutable_stats_matcher()->mutable_inclusion_list();
-  list->add_patterns()->set_prefix("cluster.base.upstream_rq_");
-  list->add_patterns()->set_prefix("cluster.stats.upstream_rq_");
-  list->add_patterns()->set_prefix("cluster.base.upstream_cx_");
-  list->add_patterns()->set_prefix("cluster.stats.upstream_cx_");
-  list->add_patterns()->set_exact("cluster.base.http2.keepalive_timeout");
-  list->add_patterns()->set_exact("cluster.base.upstream_http3_broken");
-  list->add_patterns()->set_exact("cluster.stats.http2.keepalive_timeout");
-  list->add_patterns()->set_prefix("http.hcm.downstream_rq_");
-  list->add_patterns()->set_prefix("http.hcm.decompressor.");
-  list->add_patterns()->set_prefix("pulse.");
-  list->add_patterns()->set_prefix("runtime.load_success");
-  list->add_patterns()->set_prefix("dns_cache");
-  list->add_patterns()->mutable_safe_regex()->set_regex(
-      "^vhost\\.[\\w]+\\.vcluster\\.[\\w]+?\\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|"
-      "total)");
-  list->add_patterns()->set_contains("quic_connection_close_error_code");
-  list->add_patterns()->set_contains("quic_reset_stream_error_code");
+  if (enable_stats_collection_) {
+    auto* list =
+        bootstrap->mutable_stats_config()->mutable_stats_matcher()->mutable_inclusion_list();
+    list->add_patterns()->set_prefix("cluster.base.upstream_rq_");
+    list->add_patterns()->set_prefix("cluster.stats.upstream_rq_");
+    list->add_patterns()->set_prefix("cluster.base.upstream_cx_");
+    list->add_patterns()->set_prefix("cluster.stats.upstream_cx_");
+    list->add_patterns()->set_exact("cluster.base.http2.keepalive_timeout");
+    list->add_patterns()->set_exact("cluster.base.upstream_http3_broken");
+    list->add_patterns()->set_exact("cluster.stats.http2.keepalive_timeout");
+    list->add_patterns()->set_prefix("http.hcm.downstream_rq_");
+    list->add_patterns()->set_prefix("http.hcm.decompressor.");
+    list->add_patterns()->set_prefix("pulse.");
+    list->add_patterns()->set_prefix("runtime.load_success");
+    list->add_patterns()->set_prefix("dns_cache");
+    list->add_patterns()->mutable_safe_regex()->set_regex(
+        "^vhost\\.[\\w]+\\.vcluster\\.[\\w]+?\\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|"
+        "total)");
+    list->add_patterns()->set_contains("quic_connection_close_error_code");
+    list->add_patterns()->set_contains("quic_reset_stream_error_code");
+  } else {
+    bootstrap->mutable_stats_config()->mutable_stats_matcher()->set_reject_all(true);
+  }
   bootstrap->mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
 
   // Set up watchdog
@@ -831,9 +1016,17 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   // Set up node
   auto* node = bootstrap->mutable_node();
-  node->set_id("envoy-mobile");
+  node->set_id(node_id_.empty() ? "envoy-mobile" : node_id_);
   node->set_cluster("envoy-mobile");
-  ProtobufWkt::Struct& metadata = *node->mutable_metadata();
+  if (node_locality_ && !node_locality_->region.empty()) {
+    node->mutable_locality()->set_region(node_locality_->region);
+    node->mutable_locality()->set_zone(node_locality_->zone);
+    node->mutable_locality()->set_sub_zone(node_locality_->sub_zone);
+  }
+  if (node_metadata_.has_value()) {
+    *node->mutable_metadata() = *node_metadata_;
+  }
+  Protobuf::Struct& metadata = *node->mutable_metadata();
   (*metadata.mutable_fields())["app_id"].set_string_value(app_id_);
   (*metadata.mutable_fields())["app_version"].set_string_value(app_version_);
   (*metadata.mutable_fields())["device_os"].set_string_value(device_os_);
@@ -841,25 +1034,34 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   // Set up runtime.
   auto* runtime = bootstrap->mutable_layered_runtime()->add_layers();
   runtime->set_name("static_layer_0");
-  ProtobufWkt::Struct envoy_layer;
-  ProtobufWkt::Struct& runtime_values =
+  Protobuf::Struct envoy_layer;
+  Protobuf::Struct& runtime_values =
       *(*envoy_layer.mutable_fields())["envoy"].mutable_struct_value();
-  ProtobufWkt::Struct& reloadable_features =
+  Protobuf::Struct& reloadable_features =
       *(*runtime_values.mutable_fields())["reloadable_features"].mutable_struct_value();
-  (*reloadable_features.mutable_fields())["prefer_quic_client_udp_gro"].set_bool_value(true);
   for (auto& guard_and_value : runtime_guards_) {
+    if (Runtime::RuntimeFeaturesDefaults::get().getFlag(absl::StrJoin(
+            {"envoy", "reloadable_features", guard_and_value.first}, ".")) == nullptr) {
+      // Not a registered runtime guard, skip it.
+      continue;
+    }
     (*reloadable_features.mutable_fields())[guard_and_value.first].set_bool_value(
         guard_and_value.second);
   }
-  ProtobufWkt::Struct& restart_features =
+  Protobuf::Struct& restart_features =
       *(*runtime_values.mutable_fields())["restart_features"].mutable_struct_value();
-  (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
-  (*runtime_values.mutable_fields())["enable_dfp_dns_trace"].set_bool_value(true);
   for (auto& guard_and_value : restart_runtime_guards_) {
+    if (Runtime::RuntimeFeaturesDefaults::get().getFlag(
+            absl::StrJoin({"envoy", "restart_features", guard_and_value.first}, ".")) == nullptr) {
+      // Not a registered runtime guard, skip it.
+      continue;
+    }
     (*restart_features.mutable_fields())[guard_and_value.first].set_bool_value(
         guard_and_value.second);
   }
-  ProtobufWkt::Struct& overload_values =
+  (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
+  (*runtime_values.mutable_fields())["enable_dfp_dns_trace"].set_bool_value(true);
+  Protobuf::Struct& overload_values =
       *(*envoy_layer.mutable_fields())["overload"].mutable_struct_value();
   (*overload_values.mutable_fields())["global_downstream_max_connections"].set_string_value(
       "4294967295");
@@ -870,7 +1072,19 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   bootstrap->mutable_dynamic_resources();
 
-  envoy::config::listener::v3::ApiListenerManager api;
+#ifdef ENVOY_MOBILE_XDS
+  if (xds_builder_) {
+    xds_builder_->build(*bootstrap);
+  }
+#endif // ENVOY_MOBILE_XDS
+
+  envoy::config::bootstrap::v3::ApiListenerManager api;
+  if (!use_worker_thread_) {
+    api.set_threading_model(envoy::config::bootstrap::v3::ApiListenerManager::MAIN_THREAD_ONLY);
+  } else {
+    api.set_threading_model(
+        envoy::config::bootstrap::v3::ApiListenerManager::STANDALONE_WORKER_THREAD);
+  }
   auto* listener_manager = bootstrap->mutable_listener_manager();
   listener_manager->mutable_typed_config()->PackFrom(api);
   listener_manager->set_name("envoy.listener_manager_impl.api");
@@ -879,9 +1093,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 }
 
 EngineSharedPtr EngineBuilder::build() {
-  InternalEngine* envoy_engine =
-      new InternalEngine(std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
-                         network_thread_priority_, disable_dns_refresh_on_network_change_);
+  InternalEngine* envoy_engine = absl::IgnoreLeak(new InternalEngine(
+      std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
+      network_thread_priority_, high_watermark_, enable_logger_, use_worker_thread_));
+  envoy_engine->disableDnsRefreshOnNetworkChange(disable_dns_refresh_on_network_change_);
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.
@@ -917,6 +1132,10 @@ EngineSharedPtr EngineBuilder::build() {
   options->setLogLevel(static_cast<spdlog::level::level_enum>(log_level_));
   options->setConcurrency(1);
   envoy_engine->run(options);
+
+  if (enable_network_change_monitor_) {
+    engine->initializeNetworkChangeMonitor();
+  }
 
   // we can't construct via std::make_shared
   // because Engine is only constructible as a friend

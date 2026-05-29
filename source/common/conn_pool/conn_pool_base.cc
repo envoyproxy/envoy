@@ -59,7 +59,9 @@ ConnPoolImplBase::ConnPoolImplBase(
       transport_socket_options_(transport_socket_options), cluster_connectivity_state_(state),
       upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() { onUpstreamReady(); })),
       create_new_connection_load_shed_(overload_manager.getLoadShedPoint(
-          Server::LoadShedPointName::get().ConnectionPoolNewConnection)) {
+          Server::LoadShedPointName::get().ConnectionPoolNewConnection)),
+      skip_pending_overflow_on_active_rq_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.skip_pending_overflow_count_on_active_rq")) {
   ENVOY_LOG_ONCE_IF(trace, create_new_connection_load_shed_ == nullptr,
                     "LoadShedPoint envoy.load_shed_points.connection_pool_new_connection is not "
                     "found. Is it configured?");
@@ -241,7 +243,10 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
     ENVOY_LOG(debug, "max streams overflow");
     onPoolFailure(client.real_host_description_, absl::string_view(),
                   ConnectionPool::PoolFailureReason::Overflow, context);
-    traffic_stats.upstream_rq_pending_overflow_.inc();
+    traffic_stats.upstream_rq_active_overflow_.inc();
+    if (!skip_pending_overflow_on_active_rq_) {
+      traffic_stats.upstream_rq_pending_overflow_.inc();
+    }
     return;
   }
   ENVOY_CONN_LOG(debug, "creating stream", client);

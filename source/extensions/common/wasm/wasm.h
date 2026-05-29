@@ -51,7 +51,7 @@ public:
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   Event::Dispatcher& dispatcher() { return dispatcher_; }
   Api::Api& api() { return api_; }
-  Context* getRootContext(const std::shared_ptr<PluginBase>& plugin, bool allow_closed) {
+  Context* getRootContext(const std::shared_ptr<PluginBase>& plugin, bool allow_closed) override {
     return static_cast<Context*>(WasmBase::getRootContext(plugin, allow_closed));
   }
   void setTimerPeriod(uint32_t root_context_id, std::chrono::milliseconds period) override;
@@ -69,7 +69,7 @@ public:
   void getFunctions() override;
 
   // AccessLog::Instance
-  void log(const PluginSharedPtr& plugin, const Formatter::HttpFormatterContext& log_context,
+  void log(const PluginSharedPtr& plugin, const Formatter::Context& log_context,
            const StreamInfo::StreamInfo& info);
 
   void onStatsUpdate(const PluginSharedPtr& plugin, Envoy::Stats::MetricSnapshot& snapshot);
@@ -154,8 +154,8 @@ using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;
 
 class PluginHandleSharedPtrThreadLocal : public ThreadLocal::ThreadLocalObject {
 public:
-  PluginHandleSharedPtr handle{};
-  MonotonicTime last_load{};
+  PluginHandleSharedPtr handle;
+  MonotonicTime last_load;
 
   PluginHandleSharedPtrThreadLocal(PluginHandleSharedPtr h, MonotonicTime t = {})
       : handle(std::move(h)), last_load(t) {}
@@ -224,7 +224,7 @@ private:
   PluginSharedPtr plugin_;
   RemoteAsyncDataProviderPtr remote_data_provider_;
   const bool is_singleton_handle_{};
-  WasmHandleSharedPtr base_wasm_{};
+  WasmHandleSharedPtr base_wasm_;
   absl::variant<absl::monostate, SinglePluginHandle, ThreadLocalPluginHandle> plugin_handle_;
 };
 

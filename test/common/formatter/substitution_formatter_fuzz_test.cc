@@ -32,8 +32,10 @@ DEFINE_PROTO_FUZZER(const test::common::substitution::TestCase& input) {
     return;
   }
 
-  const Formatter::HttpFormatterContext formatter_context{
-      request_headers.get(), response_headers.get(), response_trailers.get()};
+  Formatter::Context formatter_context;
+  formatter_context.setRequestHeaders(*request_headers)
+      .setResponseHeaders(*response_headers)
+      .setResponseTrailers(*response_trailers);
 
   // Text formatter.
   {
@@ -52,7 +54,7 @@ DEFINE_PROTO_FUZZER(const test::common::substitution::TestCase& input) {
     }
 
     // This should never throw.
-    formatter->formatWithContext(formatter_context, *stream_info);
+    formatter->format(formatter_context, *stream_info);
     ENVOY_LOG_MISC(trace, "TEXT formatter Success");
   }
 
@@ -64,7 +66,7 @@ DEFINE_PROTO_FUZZER(const test::common::substitution::TestCase& input) {
 
     try {
       // Create struct for JSON formatter.
-      ProtobufWkt::Struct struct_for_json_formatter;
+      Protobuf::Struct struct_for_json_formatter;
       TestUtility::loadFromYaml(fmt::format(R"EOF(
       may_empty_a: '%REQ(may_empty)%'
       raw_bool_value: true
@@ -106,12 +108,12 @@ DEFINE_PROTO_FUZZER(const test::common::substitution::TestCase& input) {
 
     // This should never throw.
     const std::string keep_empty_result =
-        formatter_keep_empty->formatWithContext(formatter_context, *stream_info);
+        formatter_keep_empty->format(formatter_context, *stream_info);
     const std::string omit_empty_result =
-        formatter_omit_empty->formatWithContext(formatter_context, *stream_info);
+        formatter_omit_empty->format(formatter_context, *stream_info);
 
     // Ensure the result is legal JSON.
-    ProtobufWkt::Struct proto_struct;
+    Protobuf::Struct proto_struct;
     TestUtility::loadFromJson(keep_empty_result, proto_struct);
     TestUtility::loadFromJson(omit_empty_result, proto_struct);
 

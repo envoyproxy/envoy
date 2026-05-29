@@ -121,7 +121,7 @@ envoy_cc_library(
         "//source/common/network:socket_option_factory_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/stream_info:stream_info_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -182,6 +182,7 @@ envoy_cc_library(
     srcs = ["filter_manager_impl.cc"],
     hdrs = ["filter_manager_impl.h"],
     deps = [
+        "//envoy/access_log:access_log_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
         "//source/common/common:assert_lib",
@@ -235,8 +236,8 @@ envoy_cc_library(
         ":cidr_range_lib",
         ":utility_lib",
         "//source/common/common:assert_lib",
-        "@com_google_absl//absl/container:node_hash_set",
-        "@com_google_absl//absl/numeric:int128",
+        "@abseil-cpp//absl/container:node_hash_set",
+        "@abseil-cpp//absl/numeric:int128",
     ],
 )
 
@@ -293,8 +294,8 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_includes",
-        "@com_github_google_quiche//:quic_platform_socket_address",
         "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
+        "@quiche//:quic_platform_socket_address",
     ] + select({
         "//bazel:android": [],
         "//bazel:liburing_enabled": [
@@ -431,6 +432,7 @@ envoy_cc_library(
     deps = [
         ":address_lib",
         "//envoy/api:os_sys_calls_interface",
+        "//envoy/network:address_interface",
         "//envoy/network:listen_socket_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
@@ -438,7 +440,7 @@ envoy_cc_library(
         "//source/common/common:scalar_to_byte_vector_lib",
         "//source/common/common:utility_lib",
         "//source/common/memory:aligned_allocator_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -455,7 +457,7 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -486,9 +488,10 @@ envoy_cc_library(
         ":address_lib",
         ":socket_option_lib",
         ":win32_redirect_records_option_lib",
+        "//envoy/network:address_interface",
         "//envoy/network:listen_socket_interface",
         "//source/common/common:logger_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -500,6 +503,7 @@ envoy_cc_library(
     deps = [
         ":address_lib",
         ":default_socket_interface_lib",
+        ":ip_address_parsing_lib",
         ":socket_lib",
         ":socket_option_lib",
         "//envoy/api:os_sys_calls_interface",
@@ -518,11 +522,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "ip_address_parsing_lib",
+    srcs = ["ip_address_parsing.cc"],
+    hdrs = ["ip_address_parsing.h"],
+    deps = [
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:statusor_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "transport_socket_options_lib",
     srcs = ["transport_socket_options_impl.cc"],
     hdrs = ["transport_socket_options_impl.h"],
     deps = [
         ":application_protocol_lib",
+        ":downstream_network_namespace_lib",
         ":filter_state_proxy_info_lib",
         ":proxy_protocol_filter_state_lib",
         ":upstream_server_name_lib",
@@ -542,7 +557,9 @@ envoy_cc_library(
     srcs = ["filter_state_proxy_info.cc"],
     hdrs = ["filter_state_proxy_info.h"],
     deps = [
+        ":utility_lib",
         "//envoy/network:address_interface",
+        "//envoy/registry",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/common:macros",
     ],
@@ -574,6 +591,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "downstream_network_namespace_lib",
+    srcs = ["downstream_network_namespace.cc"],
+    hdrs = ["downstream_network_namespace.h"],
+    deps = [
+        "//envoy/registry",
+        "//envoy/stream_info:filter_state_interface",
+        "//source/common/common:macros",
+    ],
+)
+
+envoy_cc_library(
     name = "upstream_subject_alt_names_lib",
     srcs = ["upstream_subject_alt_names.cc"],
     hdrs = ["upstream_subject_alt_names.h"],
@@ -581,6 +609,7 @@ envoy_cc_library(
         "//envoy/registry",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/common:macros",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -593,7 +622,7 @@ envoy_cc_library(
     deps = [
         "//envoy/network:filter_interface",
         "//envoy/network:listen_socket_interface",
-        "@com_google_absl//absl/strings:str_format",
+        "@abseil-cpp//absl/strings:str_format",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )

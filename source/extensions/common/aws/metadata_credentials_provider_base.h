@@ -1,5 +1,6 @@
 #pragma once
 
+#include "source/common/common/cancel_wrapper.h"
 #include "source/extensions/common/aws/aws_cluster_manager.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
@@ -27,9 +28,11 @@ struct MetadataCredentialsProviderStats {
 using CreateMetadataFetcherCb =
     std::function<MetadataFetcherPtr(Upstream::ClusterManager&, absl::string_view)>;
 
-class MetadataCredentialsProviderBase : public CredentialsProvider,
-                                        public Logger::Loggable<Logger::Id::aws>,
-                                        public AwsManagedClusterUpdateCallbacks {
+class MetadataCredentialsProviderBase
+    : public CredentialsProvider,
+      public Logger::Loggable<Logger::Id::aws>,
+      public AwsManagedClusterUpdateCallbacks,
+      public std::enable_shared_from_this<MetadataCredentialsProviderBase> {
 public:
   friend class MetadataCredentialsProviderBaseFriend;
   using OnAsyncFetchCb = std::function<void(const std::string&&)>;
@@ -40,6 +43,8 @@ public:
                                   CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                   MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
                                   std::chrono::seconds initialization_timer);
+
+  ~MetadataCredentialsProviderBase() override;
 
   Credentials getCredentials() override;
   bool credentialsPending() override;
@@ -53,7 +58,7 @@ public:
   }
 
   CredentialSubscriberCallbacksHandlePtr
-  subscribeToCredentialUpdates(CredentialSubscriberCallbacks& cs);
+  subscribeToCredentialUpdates(CredentialSubscriberCallbacksSharedPtr cs);
 
 protected:
   struct ThreadLocalCredentialsCache : public ThreadLocal::ThreadLocalObject {
@@ -120,7 +125,9 @@ protected:
   // Are credentials pending?
   std::atomic<bool> credentials_pending_ = true;
   Thread::MutexBasicLockable mu_;
-  std::list<CredentialSubscriberCallbacks*> credentials_subscribers_ ABSL_GUARDED_BY(mu_);
+  std::list<std::weak_ptr<CredentialSubscriberCallbacks>>
+      credentials_subscribers_ ABSL_GUARDED_BY(mu_);
+  CancelWrapper::CancelFunction cancel_credentials_update_callback_ = []() {};
 };
 
 } // namespace Aws

@@ -17,6 +17,8 @@
 #include "contrib/config/test/invalid_proto_kv_store_config.pb.h"
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -308,19 +310,19 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
       // SDS.
       initXdsStream(*getSdsUpstream(), sds_connection_, sds_stream_);
       EXPECT_TRUE(compareSotwDiscoveryRequest(
-          /*expected_type_url=*/Config::TypeUrl::get().Secret, /*expected_version=*/"",
+          /*expected_type_url=*/Config::TestTypeUrl::get().Secret, /*expected_version=*/"",
           /*expected_resource_names=*/{std::string(CLIENT_CERT_NAME)}, /*expect_node=*/true,
           /*expected_error_code=*/Grpc::Status::WellKnownGrpcStatus::Ok,
           /*expected_error_message=*/"", sds_stream_.get()));
       auto sds_resource = getClientSecret();
       sendSotwDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
-          Config::TypeUrl::get().Secret, {sds_resource}, "1", sds_stream_.get());
+          Config::TestTypeUrl::get().Secret, {sds_resource}, "1", sds_stream_.get());
     }
     {
       // RTDS.
       initXdsStream(*getRtdsUpstream(), rtds_connection_, rtds_stream_);
       EXPECT_TRUE(compareSotwDiscoveryRequest(
-          /*expected_type_url=*/Config::TypeUrl::get().Runtime,
+          /*expected_type_url=*/Config::TestTypeUrl::get().Runtime,
           /*expected_version=*/"",
           /*expected_resource_names=*/{"some_rtds_layer"}, /*expect_node=*/true,
           /*expected_error_code=*/Grpc::Status::WellKnownGrpcStatus::Ok,
@@ -332,16 +334,18 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
             baz: meh
       )EOF");
       sendSotwDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
-          Config::TypeUrl::get().Runtime, {rtds_resource}, "1", rtds_stream_.get());
+          Config::TestTypeUrl::get().Runtime, {rtds_resource}, "1", rtds_stream_.get());
     }
   };
 
   initialize();
 
   // Wait until the discovery responses have been processed.
-  test_server_->waitForCounterGe(
-      "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
-  test_server_->waitForCounterGe("runtime.load_success", 2);
+  test_server_->waitForCounter(
+      "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", Ge(1));
+  // Initial snapshot load, post-listener-manager TLS refresh (onWorkerThreadsRegistered), and
+  // first RTDS response each increment runtime.load_success; wait until all have completed.
+  test_server_->waitForCounter("runtime.load_success", Ge(3));
 
   // Verify that the xDS resources are used by Envoy.
   checkSecretExists(std::string(CLIENT_CERT_NAME), /*version_info=*/"1");
@@ -351,7 +355,7 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
 
   // Send an update to the RTDS resource, from the RTDS cluster to the Envoy test server.
   EXPECT_TRUE(compareSotwDiscoveryRequest(
-      /*expected_type_url=*/Config::TypeUrl::get().Runtime, /*expected_version=*/"1",
+      /*expected_type_url=*/Config::TestTypeUrl::get().Runtime, /*expected_version=*/"1",
       /*expected_resource_names=*/{"some_rtds_layer"}, /*expect_node=*/false,
       /*expected_error_code=*/Grpc::Status::WellKnownGrpcStatus::Ok,
       /*expected_error_message=*/"", rtds_stream_.get()));
@@ -360,9 +364,11 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
     layer:
       baz: saz
   )EOF");
+  const uint32_t runtime_loads_before_rtds_v2 =
+      test_server_->counter("runtime.load_success")->value();
   sendSotwDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
-      Config::TypeUrl::get().Runtime, {rtds_resource}, "2", rtds_stream_.get());
-  test_server_->waitForCounterGe("runtime.load_success", 3);
+      Config::TestTypeUrl::get().Runtime, {rtds_resource}, "2", rtds_stream_.get());
+  test_server_->waitForCounter("runtime.load_success", Ge(runtime_loads_before_rtds_v2 + 1));
 
   EXPECT_EQ("whatevs", getRuntimeKey("foo"));
   EXPECT_EQ("yar", getRuntimeKey("bar"));
@@ -372,10 +378,10 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
   shutdownAndRestartTestServer();
 
   // Wait until SDS and RTDS have been loaded from the KV store and updated the Envoy instance.
-  test_server_->waitForCounterGe(
-      "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
-  // Two runtime loads are expected, one for the admin layer and one for the RTDS layer.
-  test_server_->waitForCounterGe("runtime.load_success", 2);
+  test_server_->waitForCounter(
+      "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", Ge(1));
+  // Expect initial snapshot load, post-listener-manager TLS refresh, and RTDS restored from KV.
+  test_server_->waitForCounter("runtime.load_success", Ge(3));
 
   // Verify that the latest resource values in the KV store are used by Envoy.
   EXPECT_EQ(2, test_server_->counter("xds.kv_store.load_success")->value());
@@ -398,10 +404,12 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
             foo: zoo
             baz: jazz
   )EOF");
+  const uint32_t runtime_loads_before_rtds_v3 =
+      test_server_->counter("runtime.load_success")->value();
   sendSotwDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
-      Config::TypeUrl::get().Runtime, {rtds_resource_v2}, /*version=*/"3", rtds_stream_.get());
+      Config::TestTypeUrl::get().Runtime, {rtds_resource_v2}, /*version=*/"3", rtds_stream_.get());
 
-  test_server_->waitForCounterGe("runtime.load_success", 3);
+  test_server_->waitForCounter("runtime.load_success", Ge(runtime_loads_before_rtds_v3 + 1));
 
   // Verify that the values from the xDS response are used instead of from the persisted xDS once
   // connectivity is re-established.
@@ -421,7 +429,7 @@ public:
   // We only have a cds_config making wildcard requests, so we only need to implement the iterate
   // function.
   void iterate(ConstIterateCb cb) const override {
-    const Config::XdsConfigSourceId source_id{CDS_CLUSTER_NAME, Config::TypeUrl::get().Cluster};
+    const Config::XdsConfigSourceId source_id{CDS_CLUSTER_NAME, Config::TestTypeUrl::get().Cluster};
     const std::string cluster_name = "cluster_A";
     const std::string key = absl::StrCat(source_id.toKey(), "+", cluster_name);
 
@@ -538,7 +546,7 @@ TEST_P(InvalidProtoKeyValueStoreXdsDelegateIntegrationTest, InvalidProto) {
   initialize();
 
   // Make sure that the proto parsing of a serialized resource with an invalid enum value fails.
-  test_server_->waitForCounterEq("xds.kv_store.xds_load_failed", 1);
+  test_server_->waitForCounter("xds.kv_store.xds_load_failed", Eq(1));
 }
 
 } // namespace

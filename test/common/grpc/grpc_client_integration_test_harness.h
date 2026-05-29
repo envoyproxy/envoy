@@ -25,7 +25,6 @@
 #include "source/common/router/context_impl.h"
 #include "source/common/router/upstream_codec_filter.h"
 #include "source/common/stats/symbol_table.h"
-
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
@@ -33,13 +32,11 @@
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/grpc/utility.h"
 #include "test/integration/fake_upstream.h"
-#include "test/mocks/grpc/mocks.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/tracing/mocks.h"
-#include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/environment.h"
@@ -188,12 +185,15 @@ public:
             // Verify that the number of received byte that is tracked in the stream info equals to
             // the length of reply response buffer.
             auto upstream_meter = this->grpc_stream_->streamInfo().getUpstreamBytesMeter();
-            uint64_t total_bytes_rev = upstream_meter->wireBytesReceived();
-            uint64_t header_bytes_rev = upstream_meter->headerBytesReceived();
+            uint64_t total_bytes_recv = upstream_meter->wireBytesReceived();
+            uint64_t header_bytes_recv = upstream_meter->headerBytesReceived();
+            uint64_t decompressed_header_bytes_recv =
+                upstream_meter->decompressedHeaderBytesReceived();
             // In HTTP2 codec, H2_FRAME_HEADER_SIZE is always included in bytes meter so we need to
             // account for it in the check here as well.
-            EXPECT_EQ(total_bytes_rev - header_bytes_rev,
+            EXPECT_EQ(total_bytes_recv - header_bytes_recv,
                       recv_buf->length() + Http::Http2::H2_FRAME_HEADER_SIZE);
+            EXPECT_GE(decompressed_header_bytes_recv, header_bytes_recv);
           }
           response_received_ = true;
           dispatcher_helper_.exitDispatcherIfNeeded();
@@ -286,7 +286,7 @@ public:
 
   DispatcherHelper& dispatcher_helper_;
   FakeStream* fake_stream_{};
-  AsyncStream<helloworld::HelloRequest> grpc_stream_{};
+  AsyncStream<helloworld::HelloRequest> grpc_stream_;
   const TestMetadata empty_metadata_;
   bool response_received_{};
 };
@@ -414,7 +414,7 @@ public:
     config.mutable_envoy_grpc()->set_skip_envoy_headers(skip_envoy_headers_);
 
     fillServiceWideInitialMetadata(config);
-    return *AsyncClientImpl::create(cm_, config, dispatcher_->timeSource());
+    return *AsyncClientImpl::create(config, server_factory_context_);
   }
 
   virtual envoy::config::core::v3::GrpcService createGoogleGrpcConfig() {
@@ -645,10 +645,10 @@ public:
 class GrpcClientIntegrationTest : public GrpcClientIntegrationParamTest,
                                   public GrpcClientIntegrationTestBase<Event::TestRealTimeSystem> {
 public:
-  virtual Network::Address::IpVersion getIpVersion() const override {
+  Network::Address::IpVersion getIpVersion() const override {
     return GrpcClientIntegrationParamTest::ipVersion();
   }
-  virtual ClientType getClientType() const override {
+  ClientType getClientType() const override {
     return GrpcClientIntegrationParamTest::clientType();
   };
 };
@@ -658,10 +658,10 @@ class EnvoyGrpcFlowControlTest
     : public EnvoyGrpcClientIntegrationParamTest,
       public GrpcClientIntegrationTestBase<Event::SimulatedTimeSystemHelper> {
 public:
-  virtual Network::Address::IpVersion getIpVersion() const override {
+  Network::Address::IpVersion getIpVersion() const override {
     return EnvoyGrpcClientIntegrationParamTest::ipVersion();
   }
-  virtual ClientType getClientType() const override {
+  ClientType getClientType() const override {
     return EnvoyGrpcClientIntegrationParamTest::clientType();
   };
 };
@@ -749,12 +749,11 @@ public:
     }
 
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-        tls_context, factory_context_, false);
+        tls_context, factory_context_, {}, false);
 
     static auto* upstream_stats_store = new Stats::IsolatedStoreImpl();
     return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-        std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),
-        std::vector<std::string>{});
+        std::move(cfg), context_manager_, *upstream_stats_store->rootScope());
   }
 
   bool use_client_cert_{};

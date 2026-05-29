@@ -9,8 +9,7 @@
 #include "source/extensions/filters/http/rbac/rbac_filter.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/factory_context.h"
-#include "test/mocks/ssl/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -94,7 +93,7 @@ void checkMatcherEngine(
 
 void onMetadata(NiceMock<StreamInfo::MockStreamInfo>& info) {
   ON_CALL(info, setDynamicMetadata("envoy.common", _))
-      .WillByDefault(Invoke([&info](const std::string&, const ProtobufWkt::Struct& obj) {
+      .WillByDefault(Invoke([&info](const std::string&, const Protobuf::Struct& obj) {
         (*info.metadata_.mutable_filter_metadata())["envoy.common"] = obj;
       }));
 }
@@ -443,7 +442,7 @@ TEST(RoleBasedAccessControlEngineImpl, MetadataCondition) {
   auto label = MessageUtil::keyValueStruct("label", "prod");
   envoy::config::core::v3::Metadata metadata;
   metadata.mutable_filter_metadata()->insert(
-      Protobuf::MapPair<std::string, ProtobufWkt::Struct>("other", label));
+      Protobuf::MapPair<std::string, Protobuf::Struct>("other", label));
   EXPECT_CALL(Const(info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
 
   checkEngine(engine, true, LogResult::Undecided, info, Envoy::Network::MockConnection(), headers);

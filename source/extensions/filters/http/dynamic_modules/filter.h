@@ -1,5 +1,8 @@
 #pragma once
 
+#include <atomic>
+
+#include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/dynamic_modules/filter_config.h"
@@ -16,9 +19,12 @@ using namespace Envoy::Http;
  */
 class DynamicModuleHttpFilter : public Http::StreamFilter,
                                 public std::enable_shared_from_this<DynamicModuleHttpFilter>,
-                                public Logger::Loggable<Logger::Id::dynamic_modules> {
+                                public Logger::Loggable<Logger::Id::dynamic_modules>,
+                                public Http::DownstreamWatermarkCallbacks {
 public:
-  DynamicModuleHttpFilter(DynamicModuleHttpFilterConfigSharedPtr config) : config_(config) {}
+  DynamicModuleHttpFilter(DynamicModuleHttpFilterConfigSharedPtr config,
+                          Stats::SymbolTable& symbol_table, uint32_t worker_index)
+      : config_(config), stat_name_pool_(symbol_table), worker_index_(worker_index) {}
   ~DynamicModuleHttpFilter() override;
 
   /**
@@ -29,6 +35,7 @@ public:
   // ---------- Http::StreamFilterBase ------------
   void onStreamComplete() override;
   void onDestroy() override;
+  Http::LocalErrorStatus onLocalReply(const Http::StreamFilterBase::LocalReplyData& data) override;
 
   // ----------  Http::StreamDecoderFilter  ----------
   FilterHeadersStatus decodeHeaders(RequestHeaderMap& headers, bool end_stream) override;
@@ -37,6 +44,12 @@ public:
   FilterMetadataStatus decodeMetadata(MetadataMap&) override;
   void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
+    // Publish the worker dispatcher for cross-thread `commit()`; see `dispatcher()`.
+    cached_dispatcher_.store(&callbacks.dispatcher(), std::memory_order_release);
+    // Registration is deferred until the in-module filter exists: the factory wires callbacks
+    // before initializeInModuleFilter(), and addDownstreamWatermarkCallbacks() synchronously
+    // replays any pending onAboveWriteBufferHighWatermark() into the newly registered callback.
+    maybeRegisterDownstreamWatermarkCallbacks();
   }
   void decodeComplete() override;
 
@@ -51,20 +64,38 @@ public:
   }
   void encodeComplete() override;
 
+  bool isDestroyed() const { return destroyed_; }
+
+  /**
+   * Returns the worker dispatcher this filter is running on; safe to call from any thread.
+   * Returns nullptr until callbacks are wired and after `onDestroy()`.
+   */
+  Event::Dispatcher* dispatcher() { return cached_dispatcher_.load(std::memory_order_acquire); }
+
+  // ----------  Http::DownstreamWatermarkCallbacks  ----------
+  void onAboveWriteBufferHighWatermark() override;
+  void onBelowWriteBufferLowWatermark() override;
+
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details);
 
-  // The callbacks for the filter. They are only valid until onDestroy() is called.
+  // The callbacks for the filter. Worker-thread only; foreign threads must use `dispatcher()`.
+  // They are only valid until onDestroy() is called.
   StreamDecoderFilterCallbacks* decoder_callbacks_ = nullptr;
   StreamEncoderFilterCallbacks* encoder_callbacks_ = nullptr;
+  bool destroyed_ = false;
 
   // These are used to hold the current chunk of the request/response body during the decodeData and
   // encodeData callbacks. It is only valid during the call and should not be used outside of the
   // call.
   Buffer::Instance* current_request_body_ = nullptr;
   Buffer::Instance* current_response_body_ = nullptr;
+
+  // Temporary storage for the serialized typed filter state value returned by
+  // get_filter_state_typed. Valid until the end of the current event hook.
+  absl::optional<std::string> last_serialized_filter_state_;
 
   /**
    * Helper to get the correct callbacks.
@@ -141,6 +172,18 @@ public:
   }
 
   /**
+   * Helper to get the active tracing span for this stream.
+   * Returns a reference to a NullSpan if tracing is not enabled.
+   */
+  Tracing::Span& activeSpan() {
+    auto cb = callbacks();
+    if (cb) {
+      return cb->activeSpan();
+    }
+    return Tracing::NullSpan::instance();
+  }
+
+  /**
    * This is called when an event is scheduled via DynamicModuleHttpFilterScheduler::commit.
    */
   void onScheduled(uint64_t event_id);
@@ -161,8 +204,41 @@ public:
    * Sends an HTTP callout to the specified cluster with the given message.
    */
   envoy_dynamic_module_type_http_callout_init_result
-  sendHttpCallout(uint32_t callout_id, absl::string_view cluster_name,
+  sendHttpCallout(uint64_t* callout_id_out, absl::string_view cluster_name,
                   Http::RequestMessagePtr&& message, uint64_t timeout_milliseconds);
+
+  /**
+   * Starts a streamable HTTP callout to the specified cluster with the given message.
+   * Returns a stream handle that can be used to reset the stream.
+   */
+  envoy_dynamic_module_type_http_callout_init_result
+  startHttpStream(uint64_t* stream_id_out, absl::string_view cluster_name,
+                  Http::RequestMessagePtr&& message, bool end_stream,
+                  uint64_t timeout_milliseconds);
+
+  /**
+   * Resets an ongoing streamable HTTP callout stream.
+   */
+  void resetHttpStream(uint64_t stream_id);
+
+  /**
+   * Sends data on an ongoing streamable HTTP callout stream.
+   */
+  bool sendStreamData(uint64_t stream_id, Buffer::Instance& data, bool end_stream);
+
+  /**
+   * Sends trailers on an ongoing streamable HTTP callout stream.
+   */
+  bool sendStreamTrailers(uint64_t stream_id, Http::RequestTrailerMapPtr trailers);
+
+  bool hasConfig() const { return config_ != nullptr; }
+  const DynamicModuleHttpFilterConfig& getFilterConfig() const { return *config_; }
+  Stats::StatNameDynamicPool& getStatNamePool() { return stat_name_pool_; }
+
+  /**
+   * Returns the worker index assigned to this filter.
+   */
+  uint32_t workerIndex() const { return worker_index_; }
 
 private:
   /**
@@ -178,6 +254,13 @@ private:
    */
   void destroy();
 
+  /**
+   * Registers this filter for downstream watermark callbacks once both decoder callbacks have been
+   * set and the in-module filter has been constructed. Idempotent; safe to call from either
+   * entry point regardless of which runs first.
+   */
+  void maybeRegisterDownstreamWatermarkCallbacks();
+
   // True if the filter is in the continue state. This is to avoid prohibited calls to
   // continueDecoding() or continueEncoding() multiple times.
   bool in_continue_ = false;
@@ -191,6 +274,15 @@ private:
 
   const DynamicModuleHttpFilterConfigSharedPtr config_ = nullptr;
   envoy_dynamic_module_type_http_filter_module_ptr in_module_filter_ = nullptr;
+  Stats::StatNameDynamicPool stat_name_pool_;
+  uint32_t worker_index_;
+  // Tracks whether addDownstreamWatermarkCallbacks() has been invoked on decoder_callbacks_.
+  // Also gates the paired remove in onDestroy(), because removeDownstreamWatermarkCallbacks()
+  // asserts that the callback was previously added.
+  bool downstream_watermark_callbacks_registered_ = false;
+
+  // Worker dispatcher published at callback-init, cleared on destroy. Read via `dispatcher()`.
+  std::atomic<Event::Dispatcher*> cached_dispatcher_{nullptr};
 
   /**
    * This implementation of the AsyncClient::Callbacks is used to handle the response from the HTTP
@@ -198,8 +290,8 @@ private:
    */
   class HttpCalloutCallback : public Http::AsyncClient::Callbacks {
   public:
-    HttpCalloutCallback(std::shared_ptr<DynamicModuleHttpFilter> filter, uint32_t id)
-        : filter_(std::move(filter)), callout_id_(id) {}
+    HttpCalloutCallback(DynamicModuleHttpFilter& filter, uint64_t id)
+        : filter_(filter), callout_id_(id) {}
     ~HttpCalloutCallback() override = default;
 
     void onSuccess(const AsyncClient::Request& request, ResponseMessagePtr&& response) override;
@@ -212,12 +304,104 @@ private:
     Http::AsyncClient::Request* request_ = nullptr;
 
   private:
-    std::shared_ptr<DynamicModuleHttpFilter> filter_;
-    uint32_t callout_id_;
+    DynamicModuleHttpFilter& filter_;
+    const uint64_t callout_id_{};
   };
 
-  absl::flat_hash_map<uint32_t, std::unique_ptr<DynamicModuleHttpFilter::HttpCalloutCallback>>
+  /**
+   * This implementation of the AsyncClient::StreamCallbacks is used to handle the streaming
+   * response from the HTTP streamable callout from the parent HTTP filter.
+   */
+  class HttpStreamCalloutCallback : public Http::AsyncClient::StreamCallbacks,
+                                    public Event::DeferredDeletable {
+  public:
+    HttpStreamCalloutCallback(DynamicModuleHttpFilter& filter, uint64_t callout_id)
+        : callout_id_(callout_id), filter_(filter) {}
+    ~HttpStreamCalloutCallback() override = default;
+
+    // AsyncClient::StreamCallbacks
+    void onHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override;
+    void onData(Buffer::Instance& data, bool end_stream) override;
+    void onTrailers(ResponseTrailerMapPtr&& trailers) override;
+    void onComplete() override;
+    void onReset() override;
+
+    // This is the stream object that is used to send the streaming HTTP callout. It is used to
+    // reset the callout if the filter is destroyed before the callout is completed or if the
+    // module requests it.
+    Http::AsyncClient::Stream* stream_ = nullptr;
+
+    // Store the request message to keep headers alive, since AsyncStream stores a pointer to them.
+    Http::RequestMessagePtr request_message_ = nullptr;
+
+    // Store the request trailers to keep them alive, since AsyncStream stores a pointer to them.
+    Http::RequestTrailerMapPtr request_trailers_ = nullptr;
+
+    // Store this as void* so it can be passed directly to the module without casting.
+    const uint64_t callout_id_{};
+
+    // Track if this callback has already been cleaned up to avoid double cleanup.
+    bool cleaned_up_ = false;
+
+  private:
+    DynamicModuleHttpFilter& filter_;
+  };
+
+  uint64_t getNextCalloutId() { return next_callout_id_++; }
+
+  uint64_t next_callout_id_ = 1; // 0 is reserved as an invalid id.
+
+  absl::flat_hash_map<uint64_t, std::unique_ptr<DynamicModuleHttpFilter::HttpCalloutCallback>>
       http_callouts_;
+  // Unlike http_callouts_, we don't use an id-based map because the stream pointer itself is the
+  // unique identifier. We store the callback objects here to manage their lifetime.
+  absl::flat_hash_map<uint64_t, std::unique_ptr<DynamicModuleHttpFilter::HttpStreamCalloutCallback>>
+      http_stream_callouts_;
+
+  // Socket options storage for HTTP filters.
+  struct StoredSocketOption {
+    int64_t level;
+    int64_t name;
+    envoy_dynamic_module_type_socket_option_state state;
+    envoy_dynamic_module_type_socket_direction direction;
+    bool is_int;
+    int64_t int_value;
+    std::string byte_value;
+  };
+
+  std::vector<StoredSocketOption> socket_options_;
+
+public:
+  /**
+   * Store an integer socket option for the current stream and Surface it back to modules.
+   */
+  void storeSocketOptionInt(int64_t level, int64_t name,
+                            envoy_dynamic_module_type_socket_option_state state,
+                            envoy_dynamic_module_type_socket_direction direction, int64_t value);
+
+  /**
+   * Store a bytes socket option for the current stream and Surface it back to modules.
+   */
+  void storeSocketOptionBytes(int64_t level, int64_t name,
+                              envoy_dynamic_module_type_socket_option_state state,
+                              envoy_dynamic_module_type_socket_direction direction,
+                              absl::string_view value);
+
+  /**
+   * Retrieve an integer socket option by level/name/state/direction.
+   */
+  bool tryGetSocketOptionInt(int64_t level, int64_t name,
+                             envoy_dynamic_module_type_socket_option_state state,
+                             envoy_dynamic_module_type_socket_direction direction,
+                             int64_t& value_out) const;
+
+  /**
+   * Retrieve a bytes socket option by level/name/state/direction.
+   */
+  bool tryGetSocketOptionBytes(int64_t level, int64_t name,
+                               envoy_dynamic_module_type_socket_option_state state,
+                               envoy_dynamic_module_type_socket_direction direction,
+                               absl::string_view& value_out) const;
 };
 
 using DynamicModuleHttpFilterSharedPtr = std::shared_ptr<DynamicModuleHttpFilter>;
@@ -231,14 +415,24 @@ using DynamicModuleHttpFilterWeakPtr = std::weak_ptr<DynamicModuleHttpFilter>;
  */
 class DynamicModuleHttpFilterScheduler {
 public:
-  DynamicModuleHttpFilterScheduler(DynamicModuleHttpFilterWeakPtr filter,
-                                   Event::Dispatcher& dispatcher)
-      : filter_(std::move(filter)), dispatcher_(dispatcher) {}
+  explicit DynamicModuleHttpFilterScheduler(DynamicModuleHttpFilterWeakPtr filter)
+      : filter_(std::move(filter)) {}
 
+  // Safe to call from any thread. Reads only the weak_ptr and the atomic dispatcher cache (see
+  // `DynamicModuleHttpFilter::dispatcher()`); it never dereferences `decoder_callbacks_` from a
+  // foreign thread.
   void commit(uint64_t event_id) {
-    dispatcher_.post([filter = filter_, event_id]() {
-      if (DynamicModuleHttpFilterSharedPtr filter_shared = filter.lock()) {
-        filter_shared->onScheduled(event_id);
+    DynamicModuleHttpFilterSharedPtr filter_shared = filter_.lock();
+    if (!filter_shared) {
+      return;
+    }
+    Event::Dispatcher* dispatcher = filter_shared->dispatcher();
+    if (dispatcher == nullptr) {
+      return;
+    }
+    dispatcher->post([filter = filter_, event_id]() {
+      if (DynamicModuleHttpFilterSharedPtr fs = filter.lock()) {
+        fs->onScheduled(event_id);
       }
     });
   }
@@ -247,8 +441,6 @@ private:
   // The filter that this scheduler is associated with. Using a weak pointer to avoid unnecessarily
   // extending the lifetime of the filter.
   DynamicModuleHttpFilterWeakPtr filter_;
-  // The dispatcher is used to post the event to the worker thread that filter_ is assigned to.
-  Event::Dispatcher& dispatcher_;
 };
 
 } // namespace HttpFilters

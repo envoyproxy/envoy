@@ -19,7 +19,7 @@ public:
                 AccessLog::FilterPtr filter)
       : plugin_config_(std::move(plugin_config)), filter_(std::move(filter)) {}
 
-  void log(const Formatter::HttpFormatterContext& log_context,
+  void log(const Formatter::Context& log_context,
            const StreamInfo::StreamInfo& stream_info) override {
     if (filter_) {
       if (!filter_->evaluate(log_context, stream_info)) {

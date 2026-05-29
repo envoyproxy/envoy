@@ -24,11 +24,9 @@
 #include "test/mocks/config/custom_config_validators.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/admin.h"
-#include "test/mocks/server/instance.h"
 #include "test/mocks/server/options.h"
-#include "test/mocks/ssl/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -67,11 +65,12 @@ public:
         /*xds_config_tracker_=*/Config::XdsConfigTrackerOptRef(),
         /*backoff_strategy_=*/std::move(backoff_strategy),
         /*target_xds_authority_=*/"",
-        /*eds_resources_cache_=*/nullptr};
+        /*eds_resources_cache_=*/nullptr,
+        /*skip_subsequent_node_=*/true};
     if (use_unified_mux_) {
-      grpc_mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(grpc_mux_context, true);
+      grpc_mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(grpc_mux_context);
     } else {
-      grpc_mux_ = std::make_shared<Config::GrpcMuxImpl>(grpc_mux_context, true);
+      grpc_mux_ = std::make_shared<Config::GrpcMuxImpl>(grpc_mux_context);
     }
     resetCluster(R"EOF(
       name: name

@@ -15,6 +15,7 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/global.h"
 
+#include "absl/container/inlined_vector.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -84,9 +85,11 @@ public:
   MOCK_METHOD(Network::Address::InstanceConstSharedPtr, address, (), (const));
   MOCK_METHOD(SharedConstAddressVector, addressListOrNull, (), (const));
   MOCK_METHOD(Network::Address::InstanceConstSharedPtr, healthCheckAddress, (), (const));
+  MOCK_METHOD(Network::Address::InstanceConstSharedPtr, orcaReportingAddress, (), (const));
   MOCK_METHOD(bool, canary, (), (const));
   MOCK_METHOD(void, canary, (bool new_canary));
   MOCK_METHOD(MetadataConstSharedPtr, metadata, (), (const));
+  MOCK_METHOD(std::size_t, metadataHash, (), (const));
   MOCK_METHOD(void, metadata, (MetadataConstSharedPtr));
   MOCK_METHOD(const MetadataConstSharedPtr, localityMetadata, (), (const));
   MOCK_METHOD(const ClusterInfo&, cluster, (), (const));
@@ -97,6 +100,7 @@ public:
   MOCK_METHOD(void, setHealthChecker, (HealthCheckHostMonitorPtr && health_checker));
   MOCK_METHOD(const std::string&, hostnameForHealthChecks, (), (const));
   MOCK_METHOD(const std::string&, hostname, (), (const));
+  MOCK_METHOD(absl::string_view, observabilityName, (), (const));
   MOCK_METHOD(Network::UpstreamTransportSocketFactory&, transportSocketFactory, (), (const));
   MOCK_METHOD(HostStats&, stats, (), (const));
   MOCK_METHOD(LoadMetricStats&, loadMetricStats, (), (const));
@@ -112,12 +116,15 @@ public:
   }
   MOCK_METHOD(Network::UpstreamTransportSocketFactory&, resolveTransportSocketFactory,
               (const Network::Address::InstanceConstSharedPtr& dest_address,
-               const envoy::config::core::v3::Metadata* metadata),
+               const envoy::config::core::v3::Metadata* metadata,
+               Network::TransportSocketOptionsConstSharedPtr transport_socket_options),
               (const));
-  MOCK_METHOD(void, setLbPolicyData, (HostLbPolicyDataPtr lb_policy_data));
-  MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyData, (), (const));
+  MOCK_METHOD(void, addLbPolicyData, (HostLbPolicyDataPtr lb_policy_data));
+  MOCK_METHOD(size_t, lbPolicyDataCount, (), (const));
+  MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyDataAt, (size_t index), (const));
 
   std::string hostname_;
+  std::string observability_name_;
   Network::Address::InstanceConstSharedPtr address_;
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
   testing::NiceMock<MockHealthCheckHostMonitor> health_checker_;
@@ -125,10 +132,12 @@ public:
   testing::NiceMock<MockClusterInfo> cluster_;
   HostStats stats_;
   LoadMetricStatsImpl load_metric_stats_;
-  HostLbPolicyDataPtr lb_policy_data_;
   envoy::config::core::v3::Locality locality_;
   mutable Stats::TestUtil::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
+
+private:
+  absl::InlinedVector<HostLbPolicyDataPtr, 2> lb_policy_datas_;
 };
 
 class MockHostLight : public Host {
@@ -138,7 +147,7 @@ public:
 
   struct MockCreateConnectionData {
     Network::ClientConnection* connection_{};
-    HostDescriptionConstSharedPtr host_description_{};
+    HostDescriptionConstSharedPtr host_description_;
   };
 
   CreateConnectionData
@@ -157,6 +166,14 @@ public:
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }
 
+  CreateConnectionData
+  createOrcaReportingConnection(Event::Dispatcher& dispatcher,
+                                Network::TransportSocketOptionsConstSharedPtr,
+                                const envoy::config::core::v3::Metadata*) const override {
+    MockCreateConnectionData data = createConnection_(dispatcher, nullptr);
+    return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
+  }
+
   bool disableActiveHealthCheck() const override { return disable_active_health_check_; }
   void setDisableActiveHealthCheck(bool disable_active_health_check) override {
     disable_active_health_check_ = disable_active_health_check;
@@ -165,9 +182,11 @@ public:
   MOCK_METHOD(Network::Address::InstanceConstSharedPtr, address, (), (const));
   MOCK_METHOD(SharedConstAddressVector, addressListOrNull, (), (const));
   MOCK_METHOD(Network::Address::InstanceConstSharedPtr, healthCheckAddress, (), (const));
+  MOCK_METHOD(Network::Address::InstanceConstSharedPtr, orcaReportingAddress, (), (const));
   MOCK_METHOD(bool, canary, (), (const));
   MOCK_METHOD(void, canary, (bool new_canary));
   MOCK_METHOD(MetadataConstSharedPtr, metadata, (), (const));
+  MOCK_METHOD(std::size_t, metadataHash, (), (const));
   MOCK_METHOD(const MetadataConstSharedPtr, localityMetadata, (), (const));
   MOCK_METHOD(void, metadata, (MetadataConstSharedPtr));
   MOCK_METHOD(const ClusterInfo&, cluster, (), (const));
@@ -193,6 +212,7 @@ public:
 
   MOCK_METHOD(const std::string&, hostnameForHealthChecks, (), (const));
   MOCK_METHOD(const std::string&, hostname, (), (const));
+  MOCK_METHOD(absl::string_view, observabilityName, (), (const));
   MOCK_METHOD(Network::UpstreamTransportSocketFactory&, transportSocketFactory, (), (const));
   MOCK_METHOD(Outlier::DetectorHostMonitor&, outlierDetector, (), (const));
   MOCK_METHOD(void, setHealthChecker, (HealthCheckHostMonitorPtr && health_checker));
@@ -211,10 +231,14 @@ public:
   MOCK_METHOD(void, priority, (uint32_t));
   MOCK_METHOD(bool, warmed, (), (const));
   MOCK_METHOD(absl::optional<MonotonicTime>, lastHcPassTime, (), (const));
-  MOCK_METHOD(void, setLbPolicyData, (HostLbPolicyDataPtr lb_policy_data));
-  MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyData, (), (const));
+  MOCK_METHOD(void, addLbPolicyData, (HostLbPolicyDataPtr lb_policy_data));
+  MOCK_METHOD(size_t, lbPolicyDataCount, (), (const));
+  MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyDataAt, (size_t index), (const));
+  MOCK_METHOD(void, setLastHealthCheckHttpStatus, (uint64_t));
+  MOCK_METHOD(absl::optional<uint64_t>, lastHealthCheckHttpStatus, (), (const));
 
   bool disable_active_health_check_ = false;
+  std::string observability_name_;
 };
 
 class MockHost : public MockHostLight {
@@ -230,7 +254,8 @@ public:
 
   MOCK_METHOD(Network::UpstreamTransportSocketFactory&, resolveTransportSocketFactory,
               (const Network::Address::InstanceConstSharedPtr& dest_address,
-               const envoy::config::core::v3::Metadata* metadata),
+               const envoy::config::core::v3::Metadata* metadata,
+               Network::TransportSocketOptionsConstSharedPtr transport_socket_options),
               (const));
 
   testing::NiceMock<MockClusterInfo> cluster_;
@@ -238,9 +263,11 @@ public:
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
   HostStats stats_;
   LoadMetricStatsImpl load_metric_stats_;
-  HostLbPolicyDataPtr lb_policy_data_;
   mutable Stats::TestUtil::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
+
+private:
+  absl::InlinedVector<HostLbPolicyDataPtr, 2> lb_policy_datas_;
 };
 
 } // namespace Upstream

@@ -22,7 +22,7 @@ namespace OpenTelemetry {
 
 // Test detector when when attributes is empty
 TEST(StaticConfigResourceDetectorTest, EmptyAttributesMap) {
-  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
       StaticConfigResourceDetectorConfig config;
@@ -52,7 +52,8 @@ TEST(StaticConfigResourceDetectorTest, EmptyAttributesAreIgnored) {
       StaticConfigResourceDetectorConfig proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
-  auto detector = std::make_unique<StaticConfigResourceDetector>(proto_config, context);
+  auto detector =
+      std::make_unique<StaticConfigResourceDetector>(proto_config, context.server_factory_context_);
   Resource resource = detector->detect();
 
   EXPECT_EQ(resource.schema_url_, "");
@@ -84,7 +85,8 @@ TEST(StaticConfigResourceDetectorTest, ValidAttributes) {
       StaticConfigResourceDetectorConfig proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
-  auto detector = std::make_unique<StaticConfigResourceDetector>(proto_config, context);
+  auto detector =
+      std::make_unique<StaticConfigResourceDetector>(proto_config, context.server_factory_context_);
   Resource resource = detector->detect();
 
   EXPECT_EQ(resource.schema_url_, "");

@@ -1,6 +1,8 @@
 #pragma once
 #include "envoy/http/codec.h"
 
+#include "source/common/http/response_decoder_impl_base.h"
+
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -43,7 +45,7 @@ public:
   MOCK_METHOD(RequestDecoderHandlePtr, getRequestDecoderHandle, ());
 };
 
-class MockResponseDecoder : public ResponseDecoder {
+class MockResponseDecoder : public ResponseDecoderImplBase {
 public:
   MockResponseDecoder();
   ~MockResponseDecoder() override;

@@ -1,10 +1,10 @@
+#include <cstdint>
 #include <memory>
 
 #include "source/common/access_log/access_log_manager_impl.h"
 #include "source/common/filesystem/file_shared_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
-#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
@@ -16,6 +16,7 @@
 
 using testing::_;
 using testing::ByMove;
+using testing::Eq;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -31,7 +32,7 @@ class AccessLogManagerImplTest : public testing::Test {
 protected:
   AccessLogManagerImplTest()
       : file_(new NiceMock<Filesystem::MockFile>), thread_factory_(Thread::threadFactoryForTest()),
-        access_log_manager_(timeout_40ms_, api_, dispatcher_, lock_, store_) {
+        access_log_manager_(timeout_40ms_, flush_size_kb_, api_, dispatcher_, lock_, store_) {
     EXPECT_CALL(file_system_,
                 createFile(testing::Matcher<const Envoy::Filesystem::FilePathAndType&>(
                     Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"})))
@@ -47,18 +48,20 @@ protected:
     EXPECT_CALL(api_, threadFactory()).WillRepeatedly(ReturnRef(thread_factory_));
   }
 
-  AssertionResult waitForCounterEq(const std::string& name, uint64_t value) {
-    return TestUtility::waitForCounterEq(store_, name, value, time_system_);
+  AssertionResult waitForCounter(const std::string& name,
+                                 testing::Matcher<uint64_t> value_matcher) {
+    return TestUtility::waitForCounter(store_, name, value_matcher, time_system_);
   }
 
-  AssertionResult waitForGaugeEq(const std::string& name, uint64_t value) {
-    return TestUtility::waitForGaugeEq(store_, name, value, time_system_);
+  AssertionResult waitForGauge(const std::string& name, testing::Matcher<uint64_t> value_matcher) {
+    return TestUtility::waitForGauge(store_, name, value_matcher, time_system_);
   }
 
   NiceMock<Api::MockApi> api_;
   NiceMock<Filesystem::MockInstance> file_system_;
   NiceMock<Filesystem::MockFile>* file_;
   const std::chrono::milliseconds timeout_40ms_{40};
+  const uint64_t flush_size_kb_{64};
   Stats::TestUtil::TestStore store_;
   Thread::ThreadFactory& thread_factory_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -123,10 +126,10 @@ TEST_F(AccessLogManagerImplTest, FlushToLogFilePeriodically) {
 
   EXPECT_TRUE(file_->waitForEventCount(file_->num_writes_, 1));
 
-  EXPECT_TRUE(waitForCounterEq("filesystem.write_completed", 1));
+  EXPECT_TRUE(waitForCounter("filesystem.write_completed", Eq(1)));
   EXPECT_EQ(1UL, store_.counter("filesystem.write_buffered").value());
   EXPECT_EQ(0UL, store_.counter("filesystem.flushed_by_timer").value());
-  EXPECT_TRUE(waitForGaugeEq("filesystem.write_total_buffered", 0));
+  EXPECT_TRUE(waitForGauge("filesystem.write_total_buffered", Eq(0)));
 
   EXPECT_CALL(*file_, write_(_))
       .WillOnce(Invoke([&](absl::string_view data) -> Api::IoCallSizeResult {
@@ -147,11 +150,11 @@ TEST_F(AccessLogManagerImplTest, FlushToLogFilePeriodically) {
 
   EXPECT_TRUE(file_->waitForEventCount(file_->num_writes_, 2));
 
-  EXPECT_TRUE(waitForCounterEq("filesystem.write_completed", 2));
+  EXPECT_TRUE(waitForCounter("filesystem.write_completed", Eq(2)));
   EXPECT_EQ(0UL, store_.counter("filesystem.write_failed").value());
   EXPECT_EQ(1UL, store_.counter("filesystem.flushed_by_timer").value());
   EXPECT_EQ(2UL, store_.counter("filesystem.write_buffered").value());
-  EXPECT_TRUE(waitForGaugeEq("filesystem.write_total_buffered", 0));
+  EXPECT_TRUE(waitForGauge("filesystem.write_total_buffered", Eq(0)));
 
   EXPECT_CALL(*file_, close_()).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
 }
@@ -188,7 +191,7 @@ TEST_F(AccessLogManagerImplTest, FlushToLogFileOnDemand) {
   log_file->write("test");
 
   {
-    absl::MutexLock lock(&file_->mutex_);
+    absl::MutexLock lock(file_->mutex_);
     EXPECT_EQ(expected_writes, file_->num_writes_);
   }
 
@@ -196,7 +199,7 @@ TEST_F(AccessLogManagerImplTest, FlushToLogFileOnDemand) {
   expected_writes++;
   EXPECT_TRUE(file_->waitForEventCount(file_->num_writes_, expected_writes));
 
-  EXPECT_TRUE(waitForCounterEq("filesystem.write_completed", 2));
+  EXPECT_TRUE(waitForCounter("filesystem.write_completed", Eq(2)));
   EXPECT_EQ(0UL, store_.counter("filesystem.flushed_by_timer").value());
 
   EXPECT_CALL(*file_, write_(_))
@@ -236,7 +239,7 @@ TEST_F(AccessLogManagerImplTest, FlushCountsIOErrors) {
   log_file->write("test");
 
   EXPECT_TRUE(file_->waitForEventCount(file_->num_writes_, 1));
-  EXPECT_TRUE(waitForCounterEq("filesystem.write_failed", 1));
+  EXPECT_TRUE(waitForCounter("filesystem.write_failed", Eq(1)));
   EXPECT_EQ(0UL, store_.counter("filesystem.write_completed").value());
 
   EXPECT_CALL(*file_, close_()).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
@@ -407,8 +410,8 @@ TEST_F(AccessLogManagerImplTest, ReopenRetry) {
 
   // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
   EXPECT_TRUE(file_->waitForEventCount(file_->num_writes_, 3));
-  EXPECT_TRUE(waitForCounterEq("filesystem.reopen_failed", 2));
-  EXPECT_TRUE(waitForGaugeEq("filesystem.write_total_buffered", 0));
+  EXPECT_TRUE(waitForCounter("filesystem.reopen_failed", Eq(2)));
+  EXPECT_TRUE(waitForGauge("filesystem.write_total_buffered", Eq(0)));
 }
 
 TEST_F(AccessLogManagerImplTest, BigDataChunkShouldBeFlushedWithoutTimer) {

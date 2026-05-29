@@ -52,7 +52,7 @@ Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOpt
 Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config,
                                  Server::Configuration::CommonFactoryContext& context,
                                  ProtobufMessage::ValidationVisitor& validation_visitor,
-                                 const ProtobufWkt::BoolValue& hcm_stream_error,
+                                 const Protobuf::BoolValue& hcm_stream_error,
                                  bool validate_scheme) {
   Http1Settings ret = parseHttp1Settings(config, context, validation_visitor);
   ret.validate_scheme_ = validate_scheme;

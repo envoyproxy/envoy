@@ -125,7 +125,7 @@ public:
     connect_unary_ = Grpc::Common::isConnectRequestHeaders(headers);
     connect_streaming_request_ = Grpc::Common::isConnectStreamingRequestHeaders(headers);
     if (grpc_request_ || connect_streaming_request_ || connect_unary_) {
-      cluster_ = decoder_callbacks_->clusterInfo();
+      cluster_ = decoder_callbacks_->clusterInfoSharedPtr();
       if (cluster_) {
         if (config_->stats_for_all_methods_) {
           // Get dynamically-allocated Context::RequestStatNames from the context.
@@ -261,7 +261,6 @@ public:
       filter_object_ = state.get();
       decoder_callbacks_->streamInfo().filterState()->setData(
           "envoy.filters.http.grpc_stats", std::move(state),
-          StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::FilterChain);
     }
     if (connect_unary_) {

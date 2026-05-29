@@ -9,6 +9,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/container/node_hash_map.h"
+#include "absl/functional/any_invocable.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/synchronization/notification.h"
 
@@ -20,17 +21,19 @@ class TrackedWatermarkBuffer : public Buffer::WatermarkBuffer {
 public:
   TrackedWatermarkBuffer(
       std::function<void(uint64_t current_size)> update_size,
-      std::function<void(uint32_t watermark)> update_high_watermark,
+      std::function<void(uint64_t watermark)> update_high_watermark,
       std::function<void(TrackedWatermarkBuffer*)> on_delete,
       std::function<void(BufferMemoryAccountSharedPtr&, TrackedWatermarkBuffer*)> on_bind,
-      std::function<void()> below_low_watermark, std::function<void()> above_high_watermark,
-      std::function<void()> above_overflow_watermark)
-      : WatermarkBuffer(below_low_watermark, above_high_watermark, above_overflow_watermark),
+      absl::AnyInvocable<void()> below_low_watermark,
+      absl::AnyInvocable<void()> above_high_watermark,
+      absl::AnyInvocable<void()> above_overflow_watermark)
+      : WatermarkBuffer(std::move(below_low_watermark), std::move(above_high_watermark),
+                        std::move(above_overflow_watermark)),
         update_size_(update_size), update_high_watermark_(update_high_watermark),
         on_delete_(on_delete), on_bind_(on_bind) {}
   ~TrackedWatermarkBuffer() override { on_delete_(this); }
 
-  void setWatermarks(uint32_t watermark, uint32_t overload) override {
+  void setWatermarks(uint64_t watermark, uint32_t overload) override {
     update_high_watermark_(watermark);
     WatermarkBuffer::setWatermarks(watermark, overload);
   }
@@ -53,7 +56,7 @@ protected:
 
 private:
   std::function<void(uint64_t current_size)> update_size_;
-  std::function<void(uint32_t)> update_high_watermark_;
+  std::function<void(uint64_t)> update_high_watermark_;
   std::function<void(TrackedWatermarkBuffer*)> on_delete_;
   std::function<void(BufferMemoryAccountSharedPtr&, TrackedWatermarkBuffer*)> on_bind_;
 };
@@ -66,9 +69,9 @@ public:
   TrackedWatermarkBufferFactory(uint32_t min_tracking_bytes);
   ~TrackedWatermarkBufferFactory() override;
   // Buffer::WatermarkFactory
-  Buffer::InstancePtr createBuffer(std::function<void()> below_low_watermark,
-                                   std::function<void()> above_high_watermark,
-                                   std::function<void()> above_overflow_watermark) override;
+  Buffer::InstancePtr createBuffer(absl::AnyInvocable<void()> below_low_watermark,
+                                   absl::AnyInvocable<void()> above_high_watermark,
+                                   absl::AnyInvocable<void()> above_overflow_watermark) override;
   BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler& reset_handler) override;
   void unregisterAccount(const BufferMemoryAccountSharedPtr& account,
                          absl::optional<uint32_t> current_class) override;
@@ -85,7 +88,7 @@ public:
   uint64_t sumMaxBufferSizes() const;
   // Get lower and upper bound on buffer high watermarks. A watermark of 0 indicates that watermark
   // functionality is disabled.
-  std::pair<uint32_t, uint32_t> highWatermarkRange() const;
+  std::pair<uint64_t, uint64_t> highWatermarkRange() const;
 
   // Number of accounts created.
   uint64_t numAccountsCreated() const;
@@ -100,7 +103,7 @@ public:
 
   // Total bytes currently buffered across all known buffers.
   uint64_t totalBytesBuffered() const {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     return total_buffer_size_;
   }
 
@@ -152,7 +155,7 @@ private:
   void checkIfExpectedBalancesMet() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   struct BufferInfo {
-    uint32_t watermark_ = 0;
+    uint64_t watermark_ = 0;
     uint64_t current_size_ = 0;
     uint64_t max_size_ = 0;
   };

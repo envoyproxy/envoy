@@ -28,7 +28,8 @@ envoy_extension_cc_test(
         "//source/extensions/stat_sinks/wasm:config",
         "//test/extensions/common/wasm:wasm_runtime",
         "//test/extensions/stats_sinks/wasm/test_data:test_context_cpp_plugin",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/server:server_lifecycle_notifier_mocks",
         "@envoy_api//envoy/extensions/stat_sinks/wasm/v3:pkg_cc_proto",
     ],
 )
@@ -50,6 +51,6 @@ envoy_extension_cc_test(
         "//test/extensions/stats_sinks/wasm/test_data:test_context_cpp_plugin",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:wasm_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )

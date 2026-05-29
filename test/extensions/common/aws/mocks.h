@@ -21,6 +21,9 @@ namespace Aws {
 
 class MockMetadataFetcher : public MetadataFetcher {
 public:
+  MockMetadataFetcher();
+  ~MockMetadataFetcher() override;
+
   MOCK_METHOD(void, cancel, ());
   MOCK_METHOD(absl::string_view, failureToString, (MetadataFetcher::MetadataReceiver::Failure));
   MOCK_METHOD(void, fetch,
@@ -49,10 +52,12 @@ public:
   MockSigner();
   ~MockSigner() override;
 
-  MOCK_METHOD(absl::Status, sign, (Http::RequestMessage&, bool, absl::string_view));
-  MOCK_METHOD(absl::Status, sign, (Http::RequestHeaderMap&, const std::string&, absl::string_view));
-  MOCK_METHOD(absl::Status, signEmptyPayload, (Http::RequestHeaderMap&, absl::string_view));
-  MOCK_METHOD(absl::Status, signUnsignedPayload, (Http::RequestHeaderMap&, absl::string_view));
+  MOCK_METHOD(absl::Status, sign, (Http::RequestMessage&, bool, const absl::string_view));
+  MOCK_METHOD(absl::Status, sign,
+              (Http::RequestHeaderMap&, const std::string&, const absl::string_view));
+  MOCK_METHOD(absl::Status, signEmptyPayload, (Http::RequestHeaderMap&, const absl::string_view));
+  MOCK_METHOD(absl::Status, signUnsignedPayload,
+              (Http::RequestHeaderMap&, const absl::string_view));
   MOCK_METHOD(bool, addCallbackIfCredentialsPending, (CredentialsPendingCallback&&));
 };
 
@@ -155,6 +160,11 @@ public:
     provider_->metadata_fetcher_ = std::move(fetcher);
   }
   void setCacheDurationTimer(Event::Timer* timer) { provider_->cache_duration_timer_.reset(timer); }
+  void setCredentialsToAllThreads(CredentialsConstUniquePtr&& creds) {
+    provider_->setCredentialsToAllThreads(std::move(creds));
+  }
+  void invalidateStats() { provider_->stats_.reset(); }
+
   std::shared_ptr<MetadataCredentialsProviderBase> provider_;
 };
 
@@ -178,6 +188,9 @@ public:
 
   std::chrono::seconds getCacheDuration() { return provider_->getCacheDuration(); }
   void refresh() { return provider_->refresh(); }
+  bool needsRefresh() { return provider_->needsRefresh(); }
+  void setExpirationTime(SystemTime time) { provider_->expiration_time_ = time; }
+
   X509Credentials getCredentials() { return provider_->getCredentials(); }
 
   std::unique_ptr<IAMRolesAnywhereX509CredentialsProvider> provider_;
@@ -194,6 +207,8 @@ public:
   MOCK_METHOD(absl::Status, sign,
               (Http::RequestMessage & message, bool sign_body,
                const absl::string_view override_region));
+  MOCK_METHOD(absl::Status, sign,
+              (Http::RequestHeaderMap&, const std::string&, const absl::string_view));
 
 private:
   MOCK_METHOD(std::string, createCredentialScope,

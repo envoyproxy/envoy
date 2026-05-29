@@ -9,6 +9,7 @@
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/ssl/ssl.h"
 #include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_config_impl.h"
@@ -24,7 +25,6 @@
 #include "test/integration/ssl_utility.h"
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -33,6 +33,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 using testing::StartsWith;
 
 namespace Envoy {
@@ -55,7 +57,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, SslIntegrationTest,
 // Test that Envoy behaves correctly when receiving an SSLAlert for an unspecified code. The codes
 // are defined in the standard, and assigned codes have a string associated with them in BoringSSL,
 // which is included in logs. For an unknown code, verify that no crash occurs.
-TEST_P(SslIntegrationTest, UnknownSslAlert) {
+BORINGSSL_TEST_P(SslIntegrationTest, UnknownSslAlert) {
   initialize();
   Network::ClientConnectionPtr connection = makeSslClientConnection({});
   ConnectionStatusCallbacks callbacks;
@@ -78,7 +80,7 @@ TEST_P(SslIntegrationTest, UnknownSslAlert) {
 
   const std::string counter_name = listenerStatPrefix("ssl.connection_error");
   Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
-  test_server_->waitForCounterGe(counter_name, 1);
+  test_server_->waitForCounter(counter_name, Ge(1));
   connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
@@ -146,7 +148,7 @@ TEST_P(SslIntegrationTest, StatsTagExtraction) {
 
   for (const Stats::CounterSharedPtr& counter : test_server_->counters()) {
     // Useful for debugging when the test is failing.
-    if (counter->name().find("ssl") != std::string::npos) {
+    if (absl::StrContains(counter->name(), "ssl")) {
       ENVOY_LOG_MISC(critical, "Found ssl metric: {}", counter->name());
     }
     auto it = expected_counters.find(counter->name());
@@ -172,9 +174,11 @@ TEST_P(SslIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
 
 TEST_P(SslIntegrationTest, Http1StreamInfoDownstreamHandshakeTiming) {
   ASSERT_TRUE(downstreamProtocol() == Http::CodecType::HTTP1);
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   initialize();
   codec_client_ = makeHttpConnection(makeSslClientConnection({}));
@@ -188,9 +192,11 @@ TEST_P(SslIntegrationTest, Http1StreamInfoDownstreamHandshakeTiming) {
 TEST_P(SslIntegrationTest, Http2StreamInfoDownstreamHandshakeTiming) {
   // See MultiplexedIntegrationTest for equivalent test for HTTP/3.
   setDownstreamProtocol(Http::CodecType::HTTP2);
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   initialize();
   codec_client_ = makeHttpConnection(makeSslClientConnection({}));
@@ -325,7 +331,11 @@ TEST_P(SslIntegrationTest, AdminCertEndpoint) {
 }
 
 TEST_P(SslIntegrationTest, RouterHeaderOnlyRequestAndResponseWithSni) {
-  config_helper_.addFilter("name: sni-to-header-filter");
+  config_helper_.addFilter(R"EOF(
+    name: sni-to-header-filter
+    typed_config:
+      "@type": type.googleapis.com/test.common.tls.integration.SniToHeaderFilterConfig
+  )EOF");
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection(ClientSslTransportOptions().setSni("host.com"));
   };
@@ -351,7 +361,11 @@ TEST_P(SslIntegrationTest, RouterHeaderOnlyRequestAndResponseWithSni) {
 
 TEST_P(SslIntegrationTest, LogPeerIpSanUnsupportedIpVersion) {
   useListenerAccessLog("%DOWNSTREAM_PEER_IP_SAN%");
-  config_helper_.addFilter("name: sni-to-header-filter");
+  config_helper_.addFilter(R"EOF(
+    name: sni-to-header-filter
+    typed_config:
+      "@type": type.googleapis.com/test.common.tls.integration.SniToHeaderFilterConfig
+  )EOF");
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection(ClientSslTransportOptions().setSni("host.com"));
   };
@@ -386,7 +400,54 @@ TEST_P(SslIntegrationTest, LogPeerIpSanUnsupportedIpVersion) {
   EXPECT_EQ(result, "1.2.3.4,0:1:2:3::4");
 }
 
-TEST_P(SslIntegrationTest, AsyncCertValidationSucceeds) {
+#if ENVOY_PLATFORM_ENABLE_SEND_RST
+TEST_P(SslIntegrationTest, TlsDownstreamReset) {
+  useListenerAccessLog("DS_CLOSE_TYPE=%DOWNSTREAM_DETECTED_CLOSE_TYPE%");
+  initialize();
+
+  Network::ClientConnectionPtr connection = makeSslClientConnection({});
+  ConnectionStatusCallbacks callbacks;
+  connection->addConnectionCallbacks(callbacks);
+  connection->connect();
+
+  while (!callbacks.connected()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  // Abort the connection with AbortReset. SslSocket skips the TLS close_notify
+  // shutdown when the connection is being torn down with a RST so the server
+  // reliably observes the reset and reports RemoteReset in the access log.
+  connection->close(Network::ConnectionCloseType::AbortReset);
+
+  auto result = waitForAccessLog(listener_access_log_name_);
+  EXPECT_THAT(result, testing::HasSubstr("DS_CLOSE_TYPE=RemoteReset"));
+}
+#else
+// On platforms that do not support sending a TCP RST (no SO_LINGER=0 path),
+// AbortReset must still complete cleanly: ConnectionImpl falls back to a
+// regular close and the peer observes a graceful close (not a RemoteReset).
+TEST_P(SslIntegrationTest, TlsDownstreamResetUnsupported) {
+  useListenerAccessLog("DS_CLOSE_TYPE=%DOWNSTREAM_DETECTED_CLOSE_TYPE%");
+  initialize();
+
+  Network::ClientConnectionPtr connection = makeSslClientConnection({});
+  ConnectionStatusCallbacks callbacks;
+  connection->addConnectionCallbacks(callbacks);
+  connection->connect();
+
+  while (!callbacks.connected()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  connection->close(Network::ConnectionCloseType::AbortReset);
+
+  auto result = waitForAccessLog(listener_access_log_name_);
+  EXPECT_THAT(result, testing::Not(testing::HasSubstr("DS_CLOSE_TYPE=RemoteReset")));
+}
+#endif
+
+// This test is disabled because it uses the timed_cert_validator which we don't support.
+BORINGSSL_TEST_P(SslIntegrationTest, AsyncCertValidationSucceeds) {
   // Config client to use an async cert validator which defer the actual validation by 5ms.
   auto custom_validator_config = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
       envoy::config::core::v3::TypedExtensionConfig());
@@ -416,7 +477,8 @@ typed_config:
   connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
-TEST_P(SslIntegrationTest, AsyncCertValidationSucceedsWithLocalAddress) {
+// This test is disabled because it uses the timed_cert_validator which we don't support.
+BORINGSSL_TEST_P(SslIntegrationTest, AsyncCertValidationSucceedsWithLocalAddress) {
   auto custom_validator_config = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
       envoy::config::core::v3::TypedExtensionConfig());
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
@@ -469,7 +531,8 @@ typed_config:
   connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
-TEST_P(SslIntegrationTest, AsyncCertValidationAfterTearDown) {
+// This test is disabled because it uses the timed_cert_validator which we don't support.
+BORINGSSL_TEST_P(SslIntegrationTest, AsyncCertValidationAfterTearDown) {
   auto custom_validator_config = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
       envoy::config::core::v3::TypedExtensionConfig());
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
@@ -518,7 +581,8 @@ typed_config:
   }
 }
 
-TEST_P(SslIntegrationTest, AsyncCertValidationAfterSslShutdown) {
+// This test is disabled because it uses the timed_cert_validator which we don't support.
+BORINGSSL_TEST_P(SslIntegrationTest, AsyncCertValidationAfterSslShutdown) {
   auto custom_validator_config = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
       envoy::config::core::v3::TypedExtensionConfig());
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
@@ -831,7 +895,7 @@ TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnly) {
   EXPECT_FALSE(codec_client->connected());
   const std::string counter_name = listenerStatPrefix("ssl.connection_error");
   Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
-  test_server_->waitForCounterGe(counter_name, 1);
+  test_server_->waitForCounter(counter_name, Ge(1));
   EXPECT_EQ(1U, counter->value());
   counter->reset();
 }
@@ -900,7 +964,7 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaClientEcdsaOnly) {
           ->connected());
   const std::string counter_name = listenerStatPrefix("ssl.connection_error");
   Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
-  test_server_->waitForCounterGe(counter_name, 1);
+  test_server_->waitForCounter(counter_name, Ge(1));
   EXPECT_EQ(1U, counter->value());
   counter->reset();
 }
@@ -984,7 +1048,7 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaServerEcdsaP384EcdsaClientAllCurve
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
   for (const Stats::CounterSharedPtr& counter : test_server_->counters()) {
     // Useful for debugging when the test is failing.
-    if (counter->name().find("ssl") != std::string::npos) {
+    if (absl::StrContains(counter->name(), "ssl")) {
       ENVOY_LOG_MISC(critical, "Found ssl metric: {}", counter->name());
     }
   }
@@ -1317,7 +1381,7 @@ typed_config:
   EXPECT_EQ(test_server_->counter("aysnc_cert_selection.cert_selection_sync")->value(), 1);
 }
 
-TEST_P(SslIntegrationTest, AsyncCertSelectorSucceeds) {
+BORINGSSL_TEST_P(SslIntegrationTest, AsyncCertSelectorSucceeds) {
   tls_cert_selector_yaml_ = R"EOF(
 name: test-tls-context-provider
 typed_config:
@@ -1335,7 +1399,7 @@ typed_config:
             1);
 }
 
-TEST_P(SslIntegrationTest, AsyncSleepCertSelectorSucceeds) {
+BORINGSSL_TEST_P(SslIntegrationTest, AsyncSleepCertSelectorSucceeds) {
   tls_cert_selector_yaml_ = R"EOF(
 name: test-tls-context-provider
 typed_config:
@@ -1353,7 +1417,7 @@ typed_config:
             1);
 }
 
-TEST_P(SslIntegrationTest, AsyncSleepCertSelectionAfterTearDown) {
+BORINGSSL_TEST_P(SslIntegrationTest, AsyncSleepCertSelectionAfterTearDown) {
   tls_cert_selector_yaml_ = R"EOF(
 name: test-tls-context-provider
 typed_config:
@@ -1371,8 +1435,8 @@ typed_config:
   ASSERT(socket);
 
   // wait for the server tls handshake into sleep state.
-  test_server_->waitForCounterEq("aysnc_cert_selection.cert_selection_sleep", 1,
-                                 TestUtility::DefaultTimeout, dispatcher_.get());
+  test_server_->waitForCounter("aysnc_cert_selection.cert_selection_sleep", Eq(1),
+                               TestUtility::DefaultTimeout, dispatcher_.get());
 
   ASSERT_EQ(connection->state(), Network::Connection::State::Open);
   ENVOY_LOG_MISC(debug, "debug: closing connection");
@@ -1380,11 +1444,11 @@ typed_config:
   connection.reset();
 
   // wait the sleep timer in cert selector is triggered.
-  test_server_->waitForCounterEq("aysnc_cert_selection.cert_selection_sleep_finished", 1,
-                                 TestUtility::DefaultTimeout, dispatcher_.get());
+  test_server_->waitForCounter("aysnc_cert_selection.cert_selection_sleep_finished", Eq(1),
+                               TestUtility::DefaultTimeout, dispatcher_.get());
 }
 
-TEST_P(SslIntegrationTest, AsyncCertSelectionAfterSslShutdown) {
+BORINGSSL_TEST_P(SslIntegrationTest, AsyncCertSelectionAfterSslShutdown) {
   tls_cert_selector_yaml_ = R"EOF(
 name: test-tls-context-provider
 typed_config:
@@ -1402,15 +1466,15 @@ typed_config:
   ASSERT(socket);
 
   // wait for the server tls handshake into sleep state.
-  test_server_->waitForCounterEq("aysnc_cert_selection.cert_selection_sleep", 1,
-                                 TestUtility::DefaultTimeout, dispatcher_.get());
+  test_server_->waitForCounter("aysnc_cert_selection.cert_selection_sleep", Eq(1),
+                               TestUtility::DefaultTimeout, dispatcher_.get());
 
   ASSERT_EQ(connection->state(), Network::Connection::State::Open);
   connection->close(Network::ConnectionCloseType::NoFlush);
 
   // wait the sleep timer in cert selector is triggered.
-  test_server_->waitForCounterEq("aysnc_cert_selection.cert_selection_sleep_finished", 1,
-                                 TestUtility::DefaultTimeout, dispatcher_.get());
+  test_server_->waitForCounter("aysnc_cert_selection.cert_selection_sleep_finished", Eq(1),
+                               TestUtility::DefaultTimeout, dispatcher_.get());
 
   connection.reset();
 }

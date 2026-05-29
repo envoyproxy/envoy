@@ -1,4 +1,4 @@
-load("@rules_proto//proto:defs.bzl", "ProtoInfo")
+load("@com_google_protobuf//bazel/common:proto_info.bzl", "ProtoInfo")
 
 def _file_descriptor_set_text(ctx):
     file_descriptor_sets = depset(

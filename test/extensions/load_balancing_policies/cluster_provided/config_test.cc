@@ -2,7 +2,7 @@
 
 #include "source/extensions/load_balancing_policies/cluster_provided/config.h"
 
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/priority_set.h"
 
@@ -10,7 +10,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace ClusterProvided {
 namespace {
 
@@ -36,6 +36,6 @@ TEST(ClusterProvidedConfigTest, ClusterProvidedConfigTest) {
 
 } // namespace
 } // namespace ClusterProvided
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

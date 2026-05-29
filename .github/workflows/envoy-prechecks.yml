@@ -43,7 +43,7 @@ jobs:
 
   format:
     secrets:
-      gcs-cache-key: ${{ secrets.GCS_CACHE_KEY }}
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
       actions: read
       contents: read
@@ -55,13 +55,12 @@ jobs:
     needs:
     - load
     with:
-      gcs-cache-bucket: ${{ vars.ENVOY_CACHE_BUCKET }}
       request: ${{ needs.load.outputs.request }}
       trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 
   deps:
     secrets:
-      gcs-cache-key: ${{ secrets.GCS_CACHE_KEY }}
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
       actions: read
       contents: read
@@ -73,19 +72,18 @@ jobs:
     needs:
     - load
     with:
-      gcs-cache-bucket: ${{ vars.ENVOY_CACHE_BUCKET }}
       dependency-review: ${{ github.event_name == 'pull_request_target' && github.repository == 'envoyproxy/envoy' }}
       request: ${{ needs.load.outputs.request }}
       trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 
   publish:
     secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
       gcp-key: >-
         ${{ needs.load.outputs.trusted
             && fromJSON(needs.load.outputs.trusted)
             && secrets.GCP_SERVICE_ACCOUNT_KEY_TRUSTED
             || secrets.GCP_SERVICE_ACCOUNT_KEY }}
-      gcs-cache-key: ${{ secrets.GCS_CACHE_KEY }}
     permissions:
       actions: read
       contents: read
@@ -97,7 +95,23 @@ jobs:
     needs:
     - load
     with:
-      gcs-cache-bucket: ${{ vars.ENVOY_CACHE_BUCKET }}
+      request: ${{ needs.load.outputs.request }}
+      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
+
+  external:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+      pull-requests: read
+    name: Precheck (${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).summary.title || 'SKIPPED' }})
+    uses: ./.github/workflows/_precheck_external.yml
+    if: ${{ fromJSON(needs.load.outputs.request).run.precheck-external }}
+    needs:
+    - load
+    with:
       request: ${{ needs.load.outputs.request }}
       trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 
@@ -116,12 +130,14 @@ jobs:
       && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
       && (fromJSON(needs.load.outputs.request).run.precheck-format
           || fromJSON(needs.load.outputs.request).run.precheck-deps
-          || fromJSON(needs.load.outputs.request).run.precheck-publish)
+          || fromJSON(needs.load.outputs.request).run.precheck-publish
+          || fromJSON(needs.load.outputs.request).run.precheck-external)
     needs:
     - load
     - format
     - deps
     - publish
+    - external
     uses: ./.github/workflows/_finish.yml
     with:
       needs: ${{ toJSON(needs) }}

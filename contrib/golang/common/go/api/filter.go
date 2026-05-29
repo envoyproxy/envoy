@@ -160,6 +160,13 @@ type StreamInfo interface {
 	VirtualClusterName() (string, bool)
 	// WorkerID returns the ID of the Envoy worker thread
 	WorkerID() uint32
+	// DrainConnectionUponCompletion marks the connection to be drained after the current request completes.
+	// For HTTP/1.x, this will add a "Connection: close" header to the response.
+	// For HTTP/2 and HTTP/3, this will send a GOAWAY frame after the response is sent.
+	DrainConnectionUponCompletion()
+	// DownstreamSslConnection returns SSL connection info for the downstream connection
+	// Returns nil if the connection is not secured with SSL/TLS
+	DownstreamSslConnection() SslConnection
 	// Some fields in stream info can be fetched via GetProperty
 	// For example, startTime() is equal to GetProperty("request.time")
 }
@@ -210,29 +217,22 @@ type FilterProcessCallbacks interface {
 
 type DecoderFilterCallbacks interface {
 	FilterProcessCallbacks
-	// Sets an upstream address override for the request. When the overridden host exists in the host list of the routed cluster
-	// and can be selected directly, the load balancer bypasses its algorithm and routes traffic directly to the specified host.
-	//
-	// Here are some cases:
-	// 1. Set a valid host(no matter in or not in the cluster), will route to the specified host directly and return 200.
-	// 2. Set a non-IP host, C++ side will return error and not route to cluster.
-	// 3. Set a unavaiable host, and the host is not in the cluster, will req the valid host in the cluster and rerurn 200.
-	// 4. Set a unavaiable host, and the host is in the cluster, but not available(can not connect to the host), will req the unavaiable hoat and rerurn 503.
-	// 5. Set a unavaiable host, and the host is in the cluster, but not available(can not connect to the host), and with retry. when first request with unavaiable host failed 503, the second request will retry with the valid host, then the second request will succeed and finally return 200.
-	// 6. Set a unavaiable host with strict mode, and the host is in the cluster, will req the unavaiable host and rerurn 503.
-	// 7. Set a unavaiable host with strict mode, and the host is not in the cluster, will req the unavaiable host and rerurn 503.
-	// 8. Set a unavaiable host with strict mode and retry. when first request with unavaiable host failed 503, the second request will retry with the valid host, then the second request will succeed and finally return 200.
-	// 9. Set a unavaiable host with strict mode and retry, and the host is not in the cluster, will req the unavaiable host and rerurn 503.
+
+	// SetUpstreamOverrideHost sets an upstream address override for the request.
+	// When the overridden host is available and can be selected directly, the load balancer bypasses its algorithm
+	// and routes traffic directly to the specified host. The strict flag determines whether the HTTP request must
+	// strictly use the overridden destination. If the destination is unavailable and strict is set to true, Envoy
+	// responds with a 503 Service Unavailable error.
 	//
 	// The function takes two arguments:
 	//
-	// host (string): The upstream host address to use for the request. This must be a valid IP address(with port); otherwise, the
-	// C++ side will throw an error.
+	// host (string): The upstream host address to use for the request. This must be a valid IP address(with port);
+	// otherwise, it will return an error.
 	//
 	// strict (boolean): Determines whether the HTTP request must be strictly routed to the requested
-	// host. When set to ``true``, if the requested host is invalid, Envoy will return a 503 status code.
+	// host. When set to ``true``, if the requested host is unavailable, Envoy will return a 503 status code.
 	// The default value is ``false``, which allows Envoy to fall back to its load balancing mechanism. In this case, if the
-	// requested host is invalid, the request will be routed according to the load balancing algorithm and choose other hosts.
+	// requested host is not found, the request will be routed according to the load balancing algorithm.
 	SetUpstreamOverrideHost(host string, strict bool) error
 }
 
@@ -341,6 +341,72 @@ const (
 type FilterState interface {
 	SetString(key, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
 	GetString(key string) string
+}
+
+// SslConnection provides SSL/TLS connection information for the downstream connection.
+// This interface mirrors envoy/ssl/connection.h and provides access to peer certificate
+// details, TLS version, cipher suite, and other SSL/TLS connection properties.
+//
+// Note: Most methods that return certificate information will return empty values
+// (empty string, nil slice, or false for the bool return) when the information is not available.
+// Refer to https://github.com/envoyproxy/envoy/blob/main/envoy/ssl/connection.h
+type SslConnection interface {
+	// PeerCertificatePresented returns whether the peer certificate was presented
+	PeerCertificatePresented() bool
+	// PeerCertificateValidated returns whether the peer certificate was validated
+	PeerCertificateValidated() bool
+
+	// Sha256PeerCertificateDigest returns the SHA256 digest of the peer certificate.
+	// Returns empty string if not available.
+	Sha256PeerCertificateDigest() string
+	// SerialNumberPeerCertificate returns the serial number of the peer certificate.
+	// Returns empty string if not available.
+	SerialNumberPeerCertificate() string
+	// SubjectPeerCertificate returns the subject field of the peer certificate.
+	// Returns empty string if not available.
+	SubjectPeerCertificate() string
+	// IssuerPeerCertificate returns the issuer field of the peer certificate.
+	// Returns empty string if not available.
+	IssuerPeerCertificate() string
+	// SubjectLocalCertificate returns the subject field of the local certificate.
+	// Returns empty string if not available.
+	SubjectLocalCertificate() string
+
+	// UriSanPeerCertificate returns the URI SANs of the peer certificate.
+	// Returns nil if not available.
+	UriSanPeerCertificate() []string
+	// UriSanLocalCertificate returns the URI SANs of the local certificate.
+	// Returns nil if not available.
+	UriSanLocalCertificate() []string
+	// DnsSansPeerCertificate returns the DNS SANs of the peer certificate.
+	// Returns nil if not available.
+	DnsSansPeerCertificate() []string
+	// DnsSansLocalCertificate returns the DNS SANs of the local certificate.
+	// Returns nil if not available.
+	DnsSansLocalCertificate() []string
+
+	// ValidFromPeerCertificate returns the validity start time of the peer certificate as Unix timestamp
+	ValidFromPeerCertificate() (uint64, bool)
+	// ExpirationPeerCertificate returns the expiration time of the peer certificate as Unix timestamp
+	ExpirationPeerCertificate() (uint64, bool)
+
+	// TlsVersion returns the TLS version (e.g., "TLSv1.3")
+	TlsVersion() string
+	// CiphersuiteString returns the ciphersuite name (e.g., "AES128-SHA").
+	// Returns empty string if not available.
+	CiphersuiteString() string
+	// CiphersuiteId returns the ciphersuite ID
+	CiphersuiteId() (uint16, bool)
+	// SessionId returns the TLS session ID.
+	// The second return value indicates whether the value is available.
+	SessionId() (string, bool)
+
+	// UrlEncodedPemEncodedPeerCertificate returns the URL-encoded PEM-encoded peer certificate.
+	// Returns empty string if not available.
+	UrlEncodedPemEncodedPeerCertificate() string
+	// UrlEncodedPemEncodedPeerCertificateChain returns the URL-encoded PEM-encoded peer certificate chain.
+	// Returns empty string if not available.
+	UrlEncodedPemEncodedPeerCertificateChain() string
 }
 
 type SecretManager interface {

@@ -15,7 +15,7 @@ namespace OpenTelemetry {
 /**
  * @brief A string key-value map that stores the resource attributes.
  */
-using ResourceAttributes = std::map<std::string, std::string>;
+using ResourceAttributes = absl::flat_hash_map<std::string, std::string>;
 
 /**
  * @brief A Resource represents the entity producing telemetry as Attributes.
@@ -26,7 +26,7 @@ using ResourceAttributes = std::map<std::string, std::string>;
  */
 struct Resource {
   std::string schema_url_{""};
-  ResourceAttributes attributes_{};
+  ResourceAttributes attributes_;
 
   virtual ~Resource() = default;
 };
@@ -67,7 +67,7 @@ public:
    */
   virtual ResourceDetectorPtr
   createResourceDetector(const Protobuf::Message& message,
-                         Server::Configuration::TracerFactoryContext& context) PURE;
+                         Server::Configuration::ServerFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.tracers.opentelemetry.resource_detectors"; }
 };

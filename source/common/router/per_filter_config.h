@@ -10,7 +10,7 @@ namespace Router {
 class PerFilterConfigs : public Logger::Loggable<Logger::Id::http> {
 public:
   static absl::StatusOr<std::unique_ptr<PerFilterConfigs>>
-  create(const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
+  create(const Protobuf::Map<std::string, Protobuf::Any>& typed_configs,
          Server::Configuration::ServerFactoryContext& factory_context,
          ProtobufMessage::ValidationVisitor& validator);
 
@@ -29,12 +29,12 @@ public:
   absl::optional<bool> disabled(absl::string_view name) const;
 
 private:
-  PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
+  PerFilterConfigs(const Protobuf::Map<std::string, Protobuf::Any>& typed_configs,
                    Server::Configuration::ServerFactoryContext& factory_context,
                    ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status);
 
   absl::StatusOr<RouteSpecificFilterConfigConstSharedPtr>
-  createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
+  createRouteSpecificFilterConfig(const std::string& name, const Protobuf::Any& typed_config,
                                   bool is_optional,
                                   Server::Configuration::ServerFactoryContext& factory_context,
                                   ProtobufMessage::ValidationVisitor& validator);

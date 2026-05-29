@@ -52,6 +52,10 @@ bool QuicFilterManagerConnectionImpl::initializeReadFilters() {
   return filter_manager_->initializeReadFilters();
 }
 
+void QuicFilterManagerConnectionImpl::addAccessLogHandler(AccessLog::InstanceSharedPtr handler) {
+  filter_manager_->addAccessLogHandler(handler);
+}
+
 void QuicFilterManagerConnectionImpl::enableHalfClose(bool enabled) {
   RELEASE_ASSERT(!enabled, "Quic connection doesn't support half close.");
 }
@@ -71,6 +75,11 @@ void QuicFilterManagerConnectionImpl::setBufferLimits(uint32_t /*limit*/) {
   // during construction. Changing the buffer limit during the life time of the connection is not
   // supported.
   IS_ENVOY_BUG("unexpected call to setBufferLimits");
+}
+
+void QuicFilterManagerConnectionImpl::setBufferHighWatermarkTimeout(
+    std::chrono::milliseconds /*timeout*/) {
+  IS_ENVOY_BUG("unexpected call to setBufferHighWatermarkTimeout");
 }
 
 bool QuicFilterManagerConnectionImpl::aboveHighWatermark() const {
@@ -226,16 +235,12 @@ void QuicFilterManagerConnectionImpl::closeConnectionImmediately() {
 
 void QuicFilterManagerConnectionImpl::onSendBufferHighWatermark() {
   ENVOY_CONN_LOG(trace, "onSendBufferHighWatermark", *this);
-  for (auto callback : callbacks_) {
-    callback->onAboveWriteBufferHighWatermark();
-  }
+  onFilterAboveHighWatermark();
 }
 
 void QuicFilterManagerConnectionImpl::onSendBufferLowWatermark() {
   ENVOY_CONN_LOG(trace, "onSendBufferLowWatermark", *this);
-  for (auto callback : callbacks_) {
-    callback->onBelowWriteBufferLowWatermark();
-  }
+  onFilterBelowLowWatermark();
 }
 
 absl::optional<std::chrono::milliseconds>

@@ -1,6 +1,7 @@
 #include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
+#include "envoy/upstream/load_stats_reporter.h"
 
 #include "source/common/config/decoded_resource_impl.h"
 #include "source/common/config/utility.h"
@@ -59,19 +60,21 @@ std::string convertToWildcard(const std::string& resource_name) {
 }
 } // namespace
 
-GrpcMuxImpl::GrpcMuxImpl(GrpcMuxContext& grpc_mux_context, bool skip_subsequent_node)
+GrpcMuxImpl::GrpcMuxImpl(GrpcMuxContext& grpc_mux_context)
     : dispatcher_(grpc_mux_context.dispatcher_),
       grpc_stream_(createGrpcStreamObject(std::move(grpc_mux_context.async_client_),
                                           std::move(grpc_mux_context.failover_async_client_),
                                           grpc_mux_context.service_method_, grpc_mux_context.scope_,
                                           std::move(grpc_mux_context.backoff_strategy_),
                                           grpc_mux_context.rate_limit_settings_)),
-      local_info_(grpc_mux_context.local_info_), skip_subsequent_node_(skip_subsequent_node),
+      local_info_(grpc_mux_context.local_info_),
+      skip_subsequent_node_(grpc_mux_context.skip_subsequent_node_),
       config_validators_(std::move(grpc_mux_context.config_validators_)),
       xds_config_tracker_(grpc_mux_context.xds_config_tracker_),
       xds_resources_delegate_(grpc_mux_context.xds_resources_delegate_),
       eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)),
       target_xds_authority_(grpc_mux_context.target_xds_authority_),
+      load_stats_reporter_factory_(grpc_mux_context.load_stats_reporter_factory_),
       dynamic_update_callback_handle_(
           grpc_mux_context.local_info_.contextProvider().addDynamicContextUpdateCallback(
               [this](absl::string_view resource_type_url) {
@@ -84,8 +87,8 @@ GrpcMuxImpl::GrpcMuxImpl(GrpcMuxContext& grpc_mux_context, bool skip_subsequent_
 
 std::unique_ptr<GrpcStreamInterface<envoy::service::discovery::v3::DiscoveryRequest,
                                     envoy::service::discovery::v3::DiscoveryResponse>>
-GrpcMuxImpl::createGrpcStreamObject(Grpc::RawAsyncClientPtr&& async_client,
-                                    Grpc::RawAsyncClientPtr&& failover_async_client,
+GrpcMuxImpl::createGrpcStreamObject(Grpc::RawAsyncClientSharedPtr&& async_client,
+                                    Grpc::RawAsyncClientSharedPtr&& failover_async_client,
                                     const Protobuf::MethodDescriptor& service_method,
                                     Stats::Scope& scope, BackOffStrategyPtr&& backoff_strategy,
                                     const RateLimitSettings& rate_limit_settings) {
@@ -104,7 +107,7 @@ GrpcMuxImpl::createGrpcStreamObject(Grpc::RawAsyncClientPtr&& async_client,
               std::move(backoff_strategy), rate_limit_settings,
               GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
                          envoy::service::discovery::v3::DiscoveryResponse>::ConnectedStateValue::
-                  FIRST_ENTRY);
+                  FirstEntry);
         },
         /*failover_stream_creator=*/
         failover_async_client
@@ -129,7 +132,7 @@ GrpcMuxImpl::createGrpcStreamObject(Grpc::RawAsyncClientPtr&& async_client,
                         rate_limit_settings,
                         GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
                                    envoy::service::discovery::v3::DiscoveryResponse>::
-                            ConnectedStateValue::SECOND_ENTRY);
+                            ConnectedStateValue::SecondEntry);
                   })
             : absl::nullopt,
         /*grpc_mux_callbacks=*/*this,
@@ -141,7 +144,7 @@ GrpcMuxImpl::createGrpcStreamObject(Grpc::RawAsyncClientPtr&& async_client,
       std::move(backoff_strategy), rate_limit_settings,
       GrpcStream<
           envoy::service::discovery::v3::DiscoveryRequest,
-          envoy::service::discovery::v3::DiscoveryResponse>::ConnectedStateValue::FIRST_ENTRY);
+          envoy::service::discovery::v3::DiscoveryResponse>::ConnectedStateValue::FirstEntry);
 }
 
 GrpcMuxImpl::~GrpcMuxImpl() { AllMuxes::get().erase(this); }
@@ -247,20 +250,19 @@ void GrpcMuxImpl::loadConfigFromDelegate(const std::string& type_url,
             std::make_unique<DecodedResourceImpl>(resource_decoder, resource));
       }
       END_TRY
-      catch (const EnvoyException& e) {
-        xds_resources_delegate_->onResourceLoadFailed(source_id, resource.name(), e);
-      }
+      CATCH(const EnvoyException& e,
+            { xds_resources_delegate_->onResourceLoadFailed(source_id, resource.name(), e); });
     }
 
     processDiscoveryResources(decoded_resources, api_state, type_url, version_info,
                               /*call_delegate=*/false);
   }
   END_TRY
-  catch (const EnvoyException& e) {
+  CATCH(const EnvoyException& e, {
     // TODO(abeyad): do something else here?
     ENVOY_LOG_MISC(warn, "Failed to load config from delegate for {}: {}", source_id.toKey(),
                    e.what());
-  }
+  });
 }
 
 GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
@@ -299,9 +301,9 @@ GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
 }
 
 absl::Status
-GrpcMuxImpl::updateMuxSource(Grpc::RawAsyncClientPtr&& primary_async_client,
-                             Grpc::RawAsyncClientPtr&& failover_async_client, Stats::Scope& scope,
-                             BackOffStrategyPtr&& backoff_strategy,
+GrpcMuxImpl::updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_client,
+                             Grpc::RawAsyncClientSharedPtr&& failover_async_client,
+                             Stats::Scope& scope, BackOffStrategyPtr&& backoff_strategy,
                              const envoy::config::core::v3::ApiConfigSource& ads_config_source) {
   // Process the rate limit settings.
   absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
@@ -412,7 +414,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
       // TODO(snowp): Check the underlying type when the resource is a Resource.
       if (!resource.Is<envoy::service::discovery::v3::Resource>() &&
           type_url != resource.type_url()) {
-        throw EnvoyException(
+        throwEnvoyExceptionOrPanic(
             fmt::format("{} does not match the message-wide type URL {} in DiscoveryResponse {}",
                         resource.type_url(), type_url, message->DebugString()));
       }
@@ -435,7 +437,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     }
   }
   END_TRY
-  catch (const EnvoyException& e) {
+  CATCH(const EnvoyException& e, {
     for (auto watch : api_state.watches_) {
       watch->callbacks_.onConfigUpdateFailed(
           Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
@@ -448,7 +450,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     if (xds_config_tracker_.has_value()) {
       xds_config_tracker_->onConfigRejected(*message, error_detail->message());
     }
-  }
+  });
   api_state.previously_fetched_data_ = true;
   api_state.request_.set_response_nonce(message->nonce());
   ASSERT(api_state.paused());
@@ -652,6 +654,27 @@ void GrpcMuxImpl::drainRequests() {
   grpc_stream_->maybeUpdateQueueSizeStat(request_queue_->size());
 }
 
+Upstream::LoadStatsReporter* GrpcMuxImpl::maybeCreateLoadStatsReporter() {
+  if (!lrs_server_ && load_stats_reporter_factory_ &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_lrs_server_self_ads")) {
+    ENVOY_LOG(info, "Creating self-hosted LRS reporter for xDS-gRPC-Mux (target-authority: {})",
+              target_xds_authority_);
+    lrs_server_ = load_stats_reporter_factory_();
+    if (!lrs_server_) {
+      ENVOY_LOG(warn,
+                "Failed to create self-hosted LRS reporter, not using an xDS-based LRS server");
+      return nullptr;
+    }
+    ENVOY_LOG(
+        debug,
+        "Successfully created self-hosted LRS reporter for xDS-gRPC-Mux (target-authority: {})",
+        target_xds_authority_);
+  }
+  return lrs_server_.get();
+}
+
+Upstream::LoadStatsReporter* GrpcMuxImpl::loadStatsReporter() const { return lrs_server_.get(); }
+
 // A factory class for creating GrpcMuxImpl so it does not have to be
 // hard-compiled into cluster_manager_impl.cc
 class GrpcMuxFactory : public MuxFactory {
@@ -659,12 +682,15 @@ public:
   std::string name() const override { return "envoy.config_mux.grpc_mux_factory"; }
   void shutdownAll() override { return GrpcMuxImpl::shutdownAll(); }
   std::shared_ptr<GrpcMux>
-  create(Grpc::RawAsyncClientPtr&& async_client, Grpc::RawAsyncClientPtr&& failover_async_client,
-         Event::Dispatcher& dispatcher, Random::RandomGenerator&, Stats::Scope& scope,
+  create(Grpc::RawAsyncClientSharedPtr&& async_client,
+         Grpc::RawAsyncClientSharedPtr&& failover_async_client, Event::Dispatcher& dispatcher,
+         Random::RandomGenerator&, Stats::Scope& scope,
          const envoy::config::core::v3::ApiConfigSource& ads_config,
          const LocalInfo::LocalInfo& local_info, CustomConfigValidatorsPtr&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
-         XdsResourcesDelegateOptRef xds_resources_delegate, bool use_eds_resources_cache) override {
+         XdsResourcesDelegateOptRef xds_resources_delegate,
+         std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory)
+      override {
     absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
         Utility::parseRateLimitSettings(ads_config);
     THROW_IF_NOT_OK_REF(rate_limit_settings_or_error.status());
@@ -683,13 +709,10 @@ public:
         /*xds_config_tracker_=*/xds_config_tracker,
         /*backoff_strategy_=*/std::move(backoff_strategy),
         /*target_xds_authority_=*/Config::Utility::getGrpcControlPlane(ads_config).value_or(""),
-        /*eds_resources_cache_=*/
-        (use_eds_resources_cache &&
-         Runtime::runtimeFeatureEnabled("envoy.restart_features.use_eds_cache_for_ads"))
-            ? std::make_unique<EdsResourcesCacheImpl>(dispatcher)
-            : nullptr};
-    return std::make_shared<Config::GrpcMuxImpl>(grpc_mux_context,
-                                                 ads_config.set_node_on_first_message_only());
+        /*eds_resources_cache_=*/std::make_unique<EdsResourcesCacheImpl>(dispatcher),
+        /*skip_subsequent_node_=*/ads_config.set_node_on_first_message_only(),
+        /*load_stats_reporter_factory_=*/load_stats_reporter_factory};
+    return std::make_shared<Config::GrpcMuxImpl>(grpc_mux_context);
   }
 };
 

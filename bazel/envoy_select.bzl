@@ -11,13 +11,6 @@ def envoy_cc_platform_dep(name):
         "//conditions:default": [name + "_posix"],
     })
 
-def envoy_select_boringssl(if_fips, default = None, if_disabled = None):
-    return select({
-        "@envoy//bazel:boringssl_fips": if_fips,
-        "@envoy//bazel:boringssl_disabled": if_disabled or [],
-        "//conditions:default": default or [],
-    })
-
 # Selects the given values if Google gRPC is enabled in the current build.
 def envoy_select_google_grpc(xs, repository = ""):
     return select({
@@ -63,6 +56,13 @@ def envoy_select_static_extension_registration(xs, repository = ""):
 def envoy_select_envoy_mobile_listener(xs, repository = ""):
     return select({
         repository + "//bazel:disable_envoy_mobile_listener": [],
+        "//conditions:default": xs,
+    })
+
+# Selects the given values if Envoy Mobile xDS is enabled in the current build.
+def envoy_select_envoy_mobile_xds(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_envoy_mobile_xds": [],
         "//conditions:default": xs,
     })
 

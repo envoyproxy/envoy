@@ -5,8 +5,9 @@ namespace Router {
 
 // Router:DelegatingRouteEntry
 void DelegatingRouteEntry::finalizeResponseHeaders(
-    Http::ResponseHeaderMap& headers, const StreamInfo::StreamInfo& stream_info) const {
-  return base_route_entry_->finalizeResponseHeaders(headers, stream_info);
+    Http::ResponseHeaderMap& headers, const Formatter::Context& context,
+    const StreamInfo::StreamInfo& stream_info) const {
+  return base_route_entry_->finalizeResponseHeaders(headers, context, stream_info);
 }
 
 Http::HeaderTransforms
@@ -27,15 +28,18 @@ const CorsPolicy* DelegatingRouteEntry::corsPolicy() const {
   return base_route_entry_->corsPolicy();
 }
 
-absl::optional<std::string>
-DelegatingRouteEntry::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const {
-  return base_route_entry_->currentUrlPathAfterRewrite(headers);
+std::string
+DelegatingRouteEntry::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers,
+                                                 const Formatter::Context& context,
+                                                 const StreamInfo::StreamInfo& stream_info) const {
+  return base_route_entry_->currentUrlPathAfterRewrite(headers, context, stream_info);
 }
 
 void DelegatingRouteEntry::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
+                                                  const Formatter::Context& context,
                                                   const StreamInfo::StreamInfo& stream_info,
                                                   bool insert_envoy_original_path) const {
-  return base_route_entry_->finalizeRequestHeaders(headers, stream_info,
+  return base_route_entry_->finalizeRequestHeaders(headers, context, stream_info,
                                                    insert_envoy_original_path);
 }
 
@@ -61,7 +65,7 @@ const RateLimitPolicy& DelegatingRouteEntry::rateLimitPolicy() const {
   return base_route_entry_->rateLimitPolicy();
 }
 
-const RetryPolicy& DelegatingRouteEntry::retryPolicy() const {
+const RetryPolicyConstSharedPtr& DelegatingRouteEntry::retryPolicy() const {
   return base_route_entry_->retryPolicy();
 }
 
@@ -77,8 +81,8 @@ const InternalRedirectPolicy& DelegatingRouteEntry::internalRedirectPolicy() con
   return base_route_entry_->internalRedirectPolicy();
 }
 
-uint32_t DelegatingRouteEntry::retryShadowBufferLimit() const {
-  return base_route_entry_->retryShadowBufferLimit();
+uint64_t DelegatingRouteEntry::requestBodyBufferLimit() const {
+  return base_route_entry_->requestBodyBufferLimit();
 }
 
 const std::vector<Router::ShadowPolicyPtr>& DelegatingRouteEntry::shadowPolicies() const {
@@ -91,6 +95,10 @@ std::chrono::milliseconds DelegatingRouteEntry::timeout() const {
 
 absl::optional<std::chrono::milliseconds> DelegatingRouteEntry::idleTimeout() const {
   return base_route_entry_->idleTimeout();
+}
+
+absl::optional<std::chrono::milliseconds> DelegatingRouteEntry::flushTimeout() const {
+  return base_route_entry_->flushTimeout();
 }
 
 bool DelegatingRouteEntry::usingNewTimeouts() const {

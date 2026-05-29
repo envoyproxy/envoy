@@ -61,6 +61,9 @@ public:
   std::chrono::milliseconds streamIdleTimeout() const override {
     return parent_.streamIdleTimeout();
   }
+  absl::optional<std::chrono::milliseconds> streamFlushTimeout() const override {
+    return parent_.streamFlushTimeout();
+  }
   std::chrono::milliseconds requestTimeout() const override { return parent_.requestTimeout(); }
   std::chrono::milliseconds requestHeadersTimeout() const override {
     return parent_.requestHeadersTimeout();
@@ -99,6 +102,10 @@ public:
   ForwardClientCertType forwardClientCert() const override { return parent_.forwardClientCert(); }
   const std::vector<ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return parent_.setCurrentClientCertDetails();
+  }
+  ClientCertFormat clientCertFormat() const override { return parent_.clientCertFormat(); }
+  const Matcher::MatchTreePtr<HttpMatchingData>& forwardClientCertMatcher() const override {
+    return parent_.forwardClientCertMatcher();
   }
   const Network::Address::Instance& localAddress() override { return parent_.localAddress(); }
   const absl::optional<std::string>& userAgent() override { return parent_.userAgent(); }
@@ -141,6 +148,12 @@ public:
   bool appendLocalOverload() const override { return parent_.appendLocalOverload(); }
   bool addProxyProtocolConnectionState() const override {
     return parent_.addProxyProtocolConnectionState();
+  }
+  const absl::flat_hash_set<uint32_t>& httpsDestinationPorts() const override {
+    return parent_.httpsDestinationPorts();
+  }
+  const absl::flat_hash_set<uint32_t>& httpDestinationPorts() const override {
+    return parent_.httpDestinationPorts();
   }
 
 private:
@@ -232,8 +245,10 @@ void HttpConnectionManagerImplMixin::setup(const SetupOpts& opts) {
                                        percent1,
                                        percent2,
                                        percent1,
-                                       false,
-                                       256});
+                                       nullptr,
+                                       nullptr,
+                                       256,
+                                       false});
   }
 }
 
@@ -253,18 +268,20 @@ void HttpConnectionManagerImplMixin::setupFilterChain(int num_decoder_filters,
   for (int req = 0; req < num_requests; req++) {
     EXPECT_CALL(filter_factory_, createFilterChain(_))
         .WillOnce(Invoke([num_decoder_filters, num_encoder_filters, req,
-                          this](FilterChainManager& manager) -> bool {
+                          this](FilterChainFactoryCallbacks& callbacks) -> bool {
           bool applied_filters = false;
           if (log_handler_) {
             auto factory = createLogHandlerFactoryCb(log_handler_);
-            manager.applyFilterFactoryCb({}, factory);
+            callbacks.setFilterConfigName("");
+            factory(callbacks);
             applied_filters = true;
           }
           for (int i = 0; i < num_decoder_filters; i++) {
             auto factory = createDecoderFilterFactoryCb(
                 StreamDecoderFilterSharedPtr{decoder_filters_[req * num_decoder_filters + i]});
             std::string name = absl::StrCat(req * num_decoder_filters + i);
-            manager.applyFilterFactoryCb({name}, factory);
+            callbacks.setFilterConfigName(name);
+            factory(callbacks);
             applied_filters = true;
           }
 
@@ -272,7 +289,8 @@ void HttpConnectionManagerImplMixin::setupFilterChain(int num_decoder_filters,
             auto factory = createEncoderFilterFactoryCb(
                 StreamEncoderFilterSharedPtr{encoder_filters_[req * num_encoder_filters + i]});
             std::string name = absl::StrCat(req * num_decoder_filters + i);
-            manager.applyFilterFactoryCb({name}, factory);
+            callbacks.setFilterConfigName(name);
+            factory(callbacks);
             applied_filters = true;
           }
           return applied_filters;

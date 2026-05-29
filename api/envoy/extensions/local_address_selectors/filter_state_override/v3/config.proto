@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package envoy.extensions.local_address_selectors.filter_state_override.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.local_address_selectors.filter_state_override.v3";
+option java_outer_classname = "ConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/local_address_selectors/filter_state_override/v3;filter_state_overridev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Linux Network Namespace Local Address Selector]
+// [#extension: envoy.upstream.local_address_selector.filter_state_override]
+
+// Overrides the upstream bind address Linux network namespace using a filter
+// state object with the key ``envoy.network.upstream_bind_override.network_namespace``
+// passed from the downstream. The override applies over the :ref:`default
+// address selector
+// <extension_envoy.upstream.local_address_selector.default_local_address_selector>`
+message Config {
+}

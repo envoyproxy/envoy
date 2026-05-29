@@ -26,7 +26,7 @@ public:
    * @return an instance of extension filter implementation from a config proto.
    */
   virtual FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-                                 Server::Configuration::FactoryContext& context) PURE;
+                                 Server::Configuration::GenericFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.access_loggers.extension_filters"; }
 };
@@ -50,7 +50,7 @@ public:
    */
   virtual AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-                          Server::Configuration::FactoryContext& context,
+                          Server::Configuration::GenericFactoryContext& context,
                           std::vector<Formatter::CommandParserPtr>&& command_parsers = {}) PURE;
 
   std::string category() const override { return "envoy.access_loggers"; }

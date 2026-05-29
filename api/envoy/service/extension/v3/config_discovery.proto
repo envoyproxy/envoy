@@ -16,7 +16,6 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/extens
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Extension config discovery service (ECDS)]
-
 // A service that supports dynamic configuration updates for a specific filter.
 // Currently, ECDS is supported for network filters, HTTP filters, UDP session filters, and listener filters.
 // Please check :ref:`Extension Config Discovery Service (ECDS) API <config_overview_extension_discovery>`.
@@ -40,7 +39,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // .. note::
 //   Filters that are configured using ECDS are warmed. For more details see
 //   :ref:`ExtensionConfigSource <envoy_v3_api_msg_config.core.v3.ExtensionConfigSource>`.
-//
+
 // Return extension configurations.
 service ExtensionConfigDiscoveryService {
   option (envoy.annotations.resource).type = "envoy.config.core.v3.TypedExtensionConfig";

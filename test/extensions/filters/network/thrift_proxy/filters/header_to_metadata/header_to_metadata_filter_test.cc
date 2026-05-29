@@ -19,7 +19,7 @@ namespace HeaderToMetadataFilter {
 namespace {
 
 MATCHER_P(MapEq, rhs, "") {
-  const ProtobufWkt::Struct& obj = arg;
+  const Protobuf::Struct& obj = arg;
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
     EXPECT_EQ(obj.fields().at(entry.first).string_value(), entry.second);
@@ -28,7 +28,7 @@ MATCHER_P(MapEq, rhs, "") {
 }
 
 MATCHER_P(MapEqNum, rhs, "") {
-  const ProtobufWkt::Struct& obj = arg;
+  const Protobuf::Struct& obj = arg;
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
     EXPECT_EQ(obj.fields().at(entry.first).number_value(), entry.second);
@@ -37,7 +37,7 @@ MATCHER_P(MapEqNum, rhs, "") {
 }
 
 MATCHER_P(MapEqValue, rhs, "") {
-  const ProtobufWkt::Struct& obj = arg;
+  const Protobuf::Struct& obj = arg;
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
     EXPECT_TRUE(TestUtility::protoEqual(obj.fields().at(entry.first), entry.second));
@@ -284,10 +284,10 @@ request_rules:
 )EOF";
   initializeFilter(request_config_yaml);
 
-  ProtobufWkt::Value value;
+  Protobuf::Value value;
   auto* s = value.mutable_struct_value();
 
-  ProtobufWkt::Value v;
+  Protobuf::Value v;
   v.set_string_value("blafoo");
   (*s->mutable_fields())["k1"] = v;
   v.set_number_value(2019.07);
@@ -295,7 +295,7 @@ request_rules:
   v.set_bool_value(true);
   (*s->mutable_fields())["k3"] = v;
 
-  std::map<std::string, ProtobufWkt::Value> expected = {{"proto_key", value}};
+  std::map<std::string, Protobuf::Value> expected = {{"proto_key", value}};
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEqValue(expected)));
 
   std::string data;

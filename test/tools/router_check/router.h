@@ -15,7 +15,7 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/global.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -121,7 +121,16 @@ private:
   /*
    * Performs direct-response reply actions for a response entry.
    */
-  void sendLocalReply(ToolConfig& tool_config, const Router::DirectResponseEntry& entry);
+  void sendLocalReply(ToolConfig& tool_config, const Router::DirectResponseEntry& entry,
+                      Envoy::StreamInfo::StreamInfoImpl& stream_info);
+
+  /**
+   * Apply dynamic metadata to stream_info, similar to how the set_metadata filter works.
+   */
+  void applyDynamicMetadata(
+      Envoy::StreamInfo::StreamInfoImpl& stream_info,
+      const Envoy::Protobuf::RepeatedPtrField<
+          envoy::extensions::filters::http::set_metadata::v3::Metadata>& dynamic_metadata);
 
   bool compareCluster(ToolConfig& tool_config,
                       const envoy::RouterCheckToolSchema::ValidationAssert& expected,

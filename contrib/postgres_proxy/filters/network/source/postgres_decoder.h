@@ -8,6 +8,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "contrib/common/sqlutils/source/sqlutils.h"
+#include "contrib/postgres/protocol/postgres_protocol.h"
 #include "contrib/postgres_proxy/filters/network/source/postgres_message.h"
 #include "contrib/postgres_proxy/filters/network/source/postgres_session.h"
 
@@ -207,11 +208,6 @@ protected:
   // while sending other packets. Currently used only when negotiating
   // upstream SSL.
   Buffer::OwnedImpl temp_storage_;
-
-  // MAX_STARTUP_PACKET_LENGTH is defined in Postgres source code
-  // as maximum size of initial packet.
-  // https://github.com/postgres/postgres/search?q=MAX_STARTUP_PACKET_LENGTH&type=code
-  static constexpr uint64_t MAX_STARTUP_PACKET_LENGTH = 10000;
 };
 
 } // namespace PostgresProxy

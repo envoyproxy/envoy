@@ -20,6 +20,7 @@ typedef struct { // NOLINT(modernize-use-using)
   uint64_t len;
 } Cstring;
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 struct httpRequest;
 
 typedef struct { // NOLINT(modernize-use-using)
@@ -28,6 +29,7 @@ typedef struct { // NOLINT(modernize-use-using)
   int state;
 } processState;
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 typedef struct httpRequest { // NOLINT(modernize-use-using)
   Cstring plugin_name;
   uint64_t configId;
@@ -36,6 +38,7 @@ typedef struct httpRequest { // NOLINT(modernize-use-using)
   uint32_t worker_id;
   // This flag will be read & written by different threads, so it need to be atomic
   _Atomic(int) is_golang_processing_log;
+  // NOLINTNEXTLINE(readability-identifier-naming)
 } httpRequest;
 
 typedef struct { // NOLINT(modernize-use-using)
@@ -123,6 +126,7 @@ CAPIStatus envoyGoFilterHttpGetStringProperty(void* r, void* key_data, int key_l
                                               uint64_t* value_data, int* value_len, int* rc);
 CAPIStatus envoyGoFilterHttpGetStringSecret(void* r, void* key_data, int key_len,
                                             uint64_t* value_data, int* value_len);
+CAPIStatus envoyGoFilterHttpSetDrainConnectionUponCompletion(void* r);
 
 /* These APIs have nothing to do with request */
 void envoyGoFilterLog(uint32_t level, void* message_data, int message_len);

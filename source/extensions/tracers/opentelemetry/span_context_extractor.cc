@@ -61,13 +61,13 @@ absl::StatusOr<SpanContext> SpanContextExtractor::extractSpanContext() {
   }
   absl::string_view version = propagation_header_components[0];
   absl::string_view trace_id = propagation_header_components[1];
-  absl::string_view parent_id = propagation_header_components[2];
+  absl::string_view span_id = propagation_header_components[2];
   absl::string_view trace_flags = propagation_header_components[3];
   if (version.size() != kVersionHexSize || trace_id.size() != kTraceIdHexSize ||
-      parent_id.size() != kParentIdHexSize || trace_flags.size() != kTraceFlagsHexSize) {
+      span_id.size() != kParentIdHexSize || trace_flags.size() != kTraceFlagsHexSize) {
     return absl::InvalidArgumentError("Invalid traceparent field sizes");
   }
-  if (!isValidHex(version) || !isValidHex(trace_id) || !isValidHex(parent_id) ||
+  if (!isValidHex(version) || !isValidHex(trace_id) || !isValidHex(span_id) ||
       !isValidHex(trace_flags)) {
     return absl::InvalidArgumentError("Invalid header hex");
   }
@@ -76,7 +76,7 @@ absl::StatusOr<SpanContext> SpanContextExtractor::extractSpanContext() {
   if (isAllZeros(trace_id)) {
     return absl::InvalidArgumentError("Invalid trace id");
   }
-  if (isAllZeros(parent_id)) {
+  if (isAllZeros(span_id)) {
     return absl::InvalidArgumentError("Invalid parent id");
   }
 
@@ -89,21 +89,11 @@ absl::StatusOr<SpanContext> SpanContextExtractor::extractSpanContext() {
   // it is invalid and MUST be discarded. Because we're already checking for the
   // traceparent header above, we don't need to check here.
   // See https://www.w3.org/TR/trace-context/#processing-model-for-working-with-trace-context
-  absl::string_view tracestate_key = OpenTelemetryConstants::get().TRACE_STATE.key();
-  std::vector<std::string> tracestate_values;
-  // Multiple tracestate header fields MUST be handled as specified by RFC7230 Section 3.2.2 Field
-  // Order.
-  trace_context_.forEach(
-      [&tracestate_key, &tracestate_values](absl::string_view key, absl::string_view value) {
-        if (key == tracestate_key) {
-          tracestate_values.push_back(std::string{value});
-        }
-        return true;
-      });
-  std::string tracestate = absl::StrJoin(tracestate_values, ",");
+  const auto tracestate_values = OpenTelemetryConstants::get().TRACE_STATE.getAll(trace_context_);
 
-  SpanContext span_context(version, trace_id, parent_id, sampled, tracestate);
-  return span_context;
+  SpanContext parent_context(version, trace_id, span_id, sampled,
+                             absl::StrJoin(tracestate_values, ","));
+  return parent_context;
 }
 
 } // namespace OpenTelemetry

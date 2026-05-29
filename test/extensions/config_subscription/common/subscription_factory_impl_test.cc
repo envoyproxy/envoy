@@ -31,14 +31,15 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using ::testing::_;
-using ::testing::Invoke;
-using ::testing::Return;
-using ::testing::ReturnRef;
-
 namespace Envoy {
 namespace Config {
 namespace {
+
+using ::testing::_;
+using ::testing::Eq;
+using ::testing::Invoke;
+using ::testing::Return;
+using ::testing::ReturnRef;
 
 enum class LegacyOrUnified { Legacy, Unified };
 
@@ -57,7 +58,7 @@ public:
   SubscriptionPtr
   subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config) {
     return THROW_OR_RETURN_VALUE(subscription_factory_.subscriptionFromConfigSource(
-                                     config, Config::TypeUrl::get().ClusterLoadAssignment,
+                                     config, Config::TestTypeUrl::get().ClusterLoadAssignment,
                                      *stats_store_.rootScope(), callbacks_, resource_decoder_, {}),
                                  SubscriptionPtr);
   }
@@ -65,7 +66,8 @@ public:
   SubscriptionPtr subscriptionOverAdsGrpcMux(GrpcMuxSharedPtr grpc_mux,
                                              const envoy::config::core::v3::ConfigSource& config) {
     return THROW_OR_RETURN_VALUE(subscription_factory_.subscriptionOverAdsGrpcMux(
-                                     grpc_mux, config, Config::TypeUrl::get().ClusterLoadAssignment,
+                                     grpc_mux, config,
+                                     Config::TestTypeUrl::get().ClusterLoadAssignment,
                                      *stats_store_.rootScope(), callbacks_, resource_decoder_, {}),
                                  SubscriptionPtr);
   }
@@ -369,7 +371,7 @@ TEST_F(SubscriptionFactoryTest, FilesystemSubscription) {
   config.set_path(test_path);
   auto* watcher = new Filesystem::MockWatcher();
   EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
-  EXPECT_CALL(*watcher, addWatch(test_path, _, _));
+  EXPECT_CALL(*watcher, addWatch(Eq(test_path), _, _));
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
   subscriptionFromConfigSource(config)->start({"foo"});
 }
@@ -386,7 +388,7 @@ TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscription) {
   std::string test_path = TestEnvironment::temporaryDirectory();
   auto* watcher = new Filesystem::MockWatcher();
   EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
-  EXPECT_CALL(*watcher, addWatch(test_path, _, _));
+  EXPECT_CALL(*watcher, addWatch(Eq(test_path), _, _));
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
   // Unix paths start with /, Windows with c:/.
   const std::string file_path = test_path[0] == '/' ? test_path.substr(1) : test_path;
@@ -659,7 +661,7 @@ TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedV2Transport) {
 
   EXPECT_THAT(subscription_factory_
                   .subscriptionFromConfigSource(
-                      config, Config::TypeUrl::get().ClusterLoadAssignment,
+                      config, Config::TestTypeUrl::get().ClusterLoadAssignment,
                       *stats_store_.rootScope(), callbacks_, resource_decoder_, {})
                   .status()
                   .message(),

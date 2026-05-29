@@ -49,7 +49,7 @@ public:
   static constexpr absl::string_view AuthorizationCredentialFormat = "{}/{}";
 };
 
-using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::StringMatcher>;
+using AwsSigningHeaderMatcherVector = std::vector<envoy::type::matcher::v3::StringMatcher>;
 
 /**
  * Implementation of the Signature V4 signing process.
@@ -63,7 +63,8 @@ public:
   SignerBaseImpl(absl::string_view service_name, absl::string_view region,
                  const CredentialsProviderChainSharedPtr& credentials_provider_chain,
                  Server::Configuration::CommonFactoryContext& context,
-                 const AwsSigningHeaderExclusionVector& matcher_config,
+                 const AwsSigningHeaderMatcherVector& exclude_matcher_config,
+                 const AwsSigningHeaderMatcherVector& include_matcher_config,
                  const bool query_string = false,
                  const uint16_t expiration_time = SignatureQueryParameterValues::DefaultExpiration)
       : service_name_(service_name), region_(region),
@@ -72,8 +73,12 @@ public:
         expiration_time_(expiration_time), time_source_(context.timeSource()),
         long_date_formatter_(std::string(SignatureConstants::LongDateFormat)),
         short_date_formatter_(std::string(SignatureConstants::ShortDateFormat)) {
-    for (const auto& matcher : matcher_config) {
+    for (const auto& matcher : exclude_matcher_config) {
       excluded_header_matchers_.emplace_back(
+          std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
+    }
+    for (const auto& matcher : include_matcher_config) {
+      included_header_matchers_.emplace_back(
           std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
     }
   }
@@ -152,6 +157,7 @@ protected:
       Http::Headers::get().ForwardedFor.get(), Http::Headers::get().ForwardedProto.get(),
       "x-amzn-trace-id"};
   std::vector<Matchers::StringMatcherPtr> excluded_header_matchers_;
+  std::vector<Matchers::StringMatcherPtr> included_header_matchers_;
   CredentialsProviderChainSharedPtr credentials_provider_chain_;
   const bool query_string_;
   const uint16_t expiration_time_;

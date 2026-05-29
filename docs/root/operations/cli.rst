@@ -138,6 +138,7 @@ following are the command line options that Envoy supports.
    :%v:	The actual message to log ("some user text")
    :%_:	The actual message to log, but with escaped newlines (from (if using ``%v``) "some user text\nbelow", to "some user text\\nbelow")
    :%j:	The actual message to log as JSON escaped string (https://tools.ietf.org/html/rfc7159#page-8).
+   :%N:	The Envoy version string: ``{revision}/{version}/{status}/{build_type}/{ssl_version}`` (e.g. "c93f9f6c1e5adddd10a3e3646c7e049c649ae177/1.38.0/Clean/RELEASE/BoringSSL"), matching the output of :option:`--version`.
    :%t:	Thread id ("1232")
    :%P:	Process id ("3456")
    :%n:	Logger's name ("filter")
@@ -274,6 +275,15 @@ following are the command line options that Envoy supports.
   when tailing :ref:`access logs <arch_overview_access_logs>` in order to
   get more (or less) immediate flushing.
 
+.. option:: --file-flush-min-size-kb <integer>
+
+  *(optional)* The minimum size in kilobytes for file flushing. Defaults to 64.
+  This setting is used during file creation to determine the minimum buffer size
+  before flushing to files. The buffer will flush every time it gets full, or every time
+  the interval has elapsed, whichever comes first. Adjusting this setting is useful
+  when tailing :ref:`access logs <arch_overview_access_logs>` in order to
+  get more (or less) immediate flushing.
+
 .. option:: --drain-time-s <integer>
 
   *(optional)* The time in seconds that Envoy will drain connections during
@@ -378,7 +388,7 @@ following are the command line options that Envoy supports.
 
   * build mode - either ``RELEASE`` or ``DEBUG``,
 
-  * TLS library - either ``BoringSSL`` or ``BoringSSL-FIPS``.
+  * TLS library - ``BoringSSL``, ``BoringSSL-FIPS``, ``AWS-LC-FIPS``, or ``OpenSSL``.
 
 .. option:: --enable-core-dump
 

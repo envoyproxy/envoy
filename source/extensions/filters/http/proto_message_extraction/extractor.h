@@ -24,7 +24,7 @@ namespace ProtoMessageExtraction {
 
 using ::Envoy::Protobuf::Type;
 
-using TypeFinder = std::function<const Envoy::ProtobufWkt::Type*(const std::string&)>;
+using TypeFinder = std::function<const Envoy::Protobuf::Type*(const std::string&)>;
 
 struct ExtractedMessageResult {
   const TypeFinder* type_finder;
@@ -35,8 +35,8 @@ struct ExtractedMessageResult {
       response_data;
 
   // Extracted struct with a "@type" field.
-  ProtobufWkt::Struct request_type_struct;
-  ProtobufWkt::Struct response_type_struct;
+  Protobuf::Struct request_type_struct;
+  Protobuf::Struct response_type_struct;
 };
 
 class Extractor {
@@ -57,8 +57,10 @@ public:
   // is the last message. It only keeps the result from the first one the last.
   virtual void processResponse(Protobuf::field_extraction::MessageData& message) = 0;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   virtual const ExtractedMessageResult& GetResult() const = 0;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   virtual void ClearResult() = 0;
 };
 

@@ -1,4 +1,10 @@
 admin:
+  allow_paths:
+  - exact: /quitquitquit
+  - exact: "/stats"
+  - exact: "/contention"
+  - exact: "/stream"
+  - prefix: "/healthcheck"
   access_log:
   - name: envoy.access_loggers.file
     typed_config:

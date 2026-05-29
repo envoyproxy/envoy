@@ -306,6 +306,18 @@ public class JniLibrary {
   public static native void callClearTestRootCertificateFromNative();
 
   /**
+   * Mimic a call to AndroidNetworkLibrary#getDefaultNetworkHandle from native code.
+   * To be used for testing only.
+   */
+  public static native long callGetDefaultNetworkHandleFromNative();
+
+  /**
+   * Mimic a call to AndroidNetworkLibrary#getAllConnectedNetworks from native code.
+   * To be used for testing only.
+   */
+  public static native long[][] callGetAllConnectedNetworksFromNative();
+
+  /**
    * Given a filter name, create the proto config for adding the native filter
    *
    * @param filterName the name of the native filter
@@ -327,19 +339,21 @@ public class JniLibrary {
       long dnsFailureRefreshSecondsBase, long dnsFailureRefreshSecondsMax,
       long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds, byte[][] dnsPreresolveHostnames,
       boolean enableDNSCache, long dnsCacheSaveIntervalSeconds, int dnsNumRetries,
-      boolean enableDrainPostDnsRefresh, boolean enableHttp3, String http3ConnectionOptions,
-      String http3ClientConnectionOptions, byte[][] quicHints, byte[][] quicCanonicalSuffixes,
-      boolean enableGzipDecompression, boolean enableBrotliDecompression,
-      int numTimeoutsToTriggerPortMigration, boolean enableSocketTagging,
-      boolean enableInterfaceBinding, long h2ConnectionKeepaliveIdleIntervalMilliseconds,
-      long h2ConnectionKeepaliveTimeoutSeconds, long maxConnectionsPerHost,
-      long streamIdleTimeoutSeconds, long perTryIdleTimeoutSeconds, String appVersion, String appId,
-      boolean trustChainVerification, byte[][] filterChain,
+      boolean enableDrainPostDnsRefresh, boolean enableHttp3, boolean enableEarlyData,
+      String http3ConnectionOptions, String http3ClientConnectionOptions, byte[][] quicHints,
+      byte[][] quicCanonicalSuffixes, boolean enableGzipDecompression,
+      boolean enableBrotliDecompression, int numTimeoutsToTriggerPortMigration,
+      boolean enableSocketTagging, boolean enableInterfaceBinding,
+      long h2ConnectionKeepaliveIdleIntervalMilliseconds, long h2ConnectionKeepaliveTimeoutSeconds,
+      long maxConnectionsPerHost, long streamIdleTimeoutSeconds, long perTryIdleTimeoutSeconds,
+      String appVersion, String appId, boolean trustChainVerification, byte[][] filterChain,
       boolean enablePlatformCertificatesValidation, String upstreamTlsSni, byte[][] runtimeGuards,
-      long h3ConnectionKeepaliveInitialIntervalMilliseconds);
+      long h3ConnectionKeepaliveInitialIntervalMilliseconds, boolean useQuicPlatformPacketWriter,
+      boolean enableQuicConnectionMigration, boolean migrateIdleQuicConnection,
+      long maxIdleTimeBeforeQuicMigrationSeconds, long maxTimeOnNonDefaultNetworkSeconds);
 
   /**
    * Returns true if the runtime feature is enabled.
    */
-  public static native boolean isRuntimeFeatureEnabled(String featureName);
+  public static native boolean runtimeFeatureEnabled(String featureName);
 }

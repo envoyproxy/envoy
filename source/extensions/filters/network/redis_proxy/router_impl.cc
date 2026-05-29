@@ -85,8 +85,8 @@ PrefixRoutes::PrefixRoutes(
       absl::AsciiStrToLower(&copy);
     }
 
-    auto success = prefix_lookup_table_.add(
-        copy.c_str(), std::make_shared<Prefix>(route, upstreams_, runtime), false);
+    auto success =
+        prefix_lookup_table_.add(copy, std::make_shared<Prefix>(route, upstreams_, runtime), false);
     if (!success) {
       throw EnvoyException(fmt::format("prefix `{}` already exists.", route.prefix()));
     }
@@ -139,7 +139,7 @@ void PrefixRoutes::formatKey(std::string& key, std::string redis_key_formatter,
   auto providers = *Formatter::SubstitutionFormatParser::parse(redis_key_formatter);
   std::string formatted_key;
   for (Formatter::FormatterProviderPtr& provider : providers) {
-    auto provider_formatted_key = provider->formatValueWithContext({}, stream_info);
+    auto provider_formatted_key = provider->formatValue({}, stream_info);
     if (provider_formatted_key.has_string_value()) {
       formatted_key = formatted_key + provider_formatted_key.string_value();
     }

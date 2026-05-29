@@ -4,8 +4,6 @@
 #include "source/common/json/json_loader.h"
 #include "source/extensions/access_loggers/fluentd/substitution_formatter.h"
 
-#include "test/mocks/access_log/mocks.h"
-#include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -19,7 +17,7 @@ namespace Fluentd {
 namespace {
 
 TEST(FluentdFormatterImplTest, FormatMsgpack) {
-  ProtobufWkt::Struct log_struct;
+  Protobuf::Struct log_struct;
   (*log_struct.mutable_fields())["Message"].set_string_value("SomeValue");
   (*log_struct.mutable_fields())["LogType"].set_string_value("%ACCESS_LOG_TYPE%");
 

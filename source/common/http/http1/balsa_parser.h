@@ -82,15 +82,6 @@ private:
   ParserStatus status_ = ParserStatus::Ok;
   // An error message, often seemingly arbitrary to match http-parser behavior.
   absl::string_view error_message_;
-  // Latched value of `envoy.reloadable_features.http1_balsa_delay_reset`.
-  const bool delay_reset_ =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_balsa_delay_reset");
-  // Latched value of `envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done`.
-  const bool wait_for_first_byte_before_msg_done_ = Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done");
-  // Latched value of `envoy.reloadable_features.http1_balsa_allow_cr_or_lf_at_request_start`.
-  const bool allow_newlines_between_requests_ = Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.http1_balsa_allow_cr_or_lf_at_request_start");
 };
 
 } // namespace Http1

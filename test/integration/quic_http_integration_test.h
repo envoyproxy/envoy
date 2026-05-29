@@ -30,15 +30,17 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/socket_interface_swap.h"
 #include "test/integration/ssl_utility.h"
-#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "quiche/quic/core/crypto/quic_client_session_cache.h"
+#include "quiche/quic/core/http/quic_connection_migration_manager.h"
+#include "quiche/quic/core/quic_path_validator.h"
 #include "quiche/quic/core/quic_utils.h"
 #include "quiche/quic/test_tools/quic_sent_packet_manager_peer.h"
 #include "quiche/quic/test_tools/quic_session_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
+using testing::Eq;
 namespace Envoy {
 namespace Quic {
 class CodecClientCallbacksForTest : public Http::CodecClientCallbacks {
@@ -56,18 +58,17 @@ public:
 class TestEnvoyQuicClientConnection : public EnvoyQuicClientConnection {
 public:
   TestEnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
-                                Network::Address::InstanceConstSharedPtr& initial_peer_address,
                                 quic::QuicConnectionHelperInterface& helper,
                                 quic::QuicAlarmFactory& alarm_factory,
+                                quic::QuicPacketWriter* writer, bool owns_writer,
                                 const quic::ParsedQuicVersionVector& supported_versions,
-                                Network::Address::InstanceConstSharedPtr local_addr,
                                 Event::Dispatcher& dispatcher,
-                                const Network::ConnectionSocket::OptionsSharedPtr& options,
-                                bool validation_failure_on_path_response,
-                                quic::ConnectionIdGeneratorInterface& generator)
-      : EnvoyQuicClientConnection(server_connection_id, initial_peer_address, helper, alarm_factory,
-                                  supported_versions, local_addr, dispatcher, options, generator,
-                                  /*prefer_gro=*/true),
+                                Network::ConnectionSocketPtr&& connection_socket,
+                                quic::ConnectionIdGeneratorInterface& generator,
+                                bool validation_failure_on_path_response)
+      : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, writer, owns_writer,
+                                  supported_versions, dispatcher, std::move(connection_socket),
+                                  generator),
         dispatcher_(dispatcher),
         validation_failure_on_path_response_(validation_failure_on_path_response) {}
 
@@ -237,16 +238,38 @@ public:
     // supported by server, this connection will fail.
     // TODO(danzh) Implement retry upon version mismatch and modify test frame work to specify a
     // different version set on server side to test that.
+    auto& persistent_info =
+        static_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
+    QuicClientPacketWriterFactory::CreationResult creation_result =
+        persistent_info.writer_factory_->createSocketAndQuicPacketWriter(
+            server_addr_, quic::kInvalidNetworkHandle, local_addr, options);
+    quic::QuicForceBlockablePacketWriter* wrapper = nullptr;
+    if (quiche_handles_migration_) {
+      wrapper = new quic::QuicForceBlockablePacketWriter();
+      // Owns the inner writer.
+      wrapper->set_writer(creation_result.writer_.release());
+    }
     auto connection = std::make_unique<TestEnvoyQuicClientConnection>(
-        getNextConnectionId(), server_addr_, conn_helper_, alarm_factory_,
-        quic::ParsedQuicVersionVector{supported_versions_[0]}, local_addr, *dispatcher_, options,
-        validation_failure_on_path_response_, connection_id_generator_);
+        getNextConnectionId(), conn_helper_, alarm_factory_,
+        (quiche_handles_migration_
+             ? wrapper
+             : static_cast<quic::QuicPacketWriter*>(creation_result.writer_.release())),
+        /*owns_writer=*/true, quic::ParsedQuicVersionVector{supported_versions_[0]}, *dispatcher_,
+        std::move(creation_result.socket_), connection_id_generator_,
+        validation_failure_on_path_response_);
+    EnvoyQuicClientConnection::EnvoyQuicMigrationHelper* migration_helper = nullptr;
+    if (quiche_handles_migration_) {
+      migration_helper = &connection->getOrCreateMigrationHelper(*persistent_info.writer_factory_,
+                                                                 quic::kInvalidNetworkHandle, {});
+    } else {
+      connection->setWriterFactory(*persistent_info.writer_factory_);
+    }
     quic_connection_ = connection.get();
     ASSERT(quic_connection_persistent_info_ != nullptr);
-    auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
     OptRef<Http::HttpServerPropertiesCache> cache;
     auto session = std::make_unique<EnvoyQuicClientSession>(
-        persistent_info.quic_config_, supported_versions_, std::move(connection),
+        persistent_info.quic_config_, supported_versions_, std::move(connection), wrapper,
+        migration_helper, migration_config_,
         quic::QuicServerId{
             (host.empty() ? transport_socket_factory_->clientContextConfig()->serverNameIndication()
                           : host),
@@ -444,24 +467,25 @@ public:
     constexpr auto timeout_first = std::chrono::seconds(15 * TIMEOUT_FACTOR);
     constexpr auto timeout_subsequent = std::chrono::milliseconds(10 * TIMEOUT_FACTOR);
     if (version_ == Network::Address::IpVersion::v4) {
-      test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_cx_total", 8u, timeout_first);
+      test_server_->waitForCounter("listener.127.0.0.1_0.downstream_cx_total", Eq(8u),
+                                   timeout_first);
     } else {
-      test_server_->waitForCounterEq("listener.[__1]_0.downstream_cx_total", 8u, timeout_first);
+      test_server_->waitForCounter("listener.[__1]_0.downstream_cx_total", Eq(8u), timeout_first);
     }
     for (size_t i = 0; i < concurrency_; ++i) {
       if (version_ == Network::Address::IpVersion::v4) {
-        test_server_->waitForGaugeEq(
-            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_active", i), 1u,
+        test_server_->waitForGauge(
+            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_active", i), Eq(1u),
             timeout_subsequent);
-        test_server_->waitForCounterEq(
-            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_total", i), 1u,
+        test_server_->waitForCounter(
+            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_total", i), Eq(1u),
             timeout_subsequent);
       } else {
-        test_server_->waitForGaugeEq(
-            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_active", i), 1u,
+        test_server_->waitForGauge(
+            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_active", i), Eq(1u),
             timeout_subsequent);
-        test_server_->waitForCounterEq(
-            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_total", i), 1u,
+        test_server_->waitForCounter(
+            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_total", i), Eq(1u),
             timeout_subsequent);
       }
     }
@@ -492,6 +516,8 @@ protected:
   quic::DeterministicConnectionIdGenerator connection_id_generator_{
       quic::kQuicDefaultConnectionIdLength};
   std::string client_alpn_;
+  quic::QuicConnectionMigrationConfig migration_config_{quicConnectionMigrationDisableAllConfig()};
+  bool quiche_handles_migration_{false};
 };
 
 class QuicHttpIntegrationTest : public QuicHttpIntegrationTestBase,
@@ -546,25 +572,25 @@ public:
     constexpr auto timeout_first = std::chrono::seconds(15 * TIMEOUT_FACTOR);
     constexpr auto timeout_subsequent = std::chrono::milliseconds(10 * TIMEOUT_FACTOR);
     if (version_ == Network::Address::IpVersion::v4) {
-      test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_cx_total", 16u,
-                                     timeout_first);
+      test_server_->waitForCounter("listener.127.0.0.1_0.downstream_cx_total", Eq(16u),
+                                   timeout_first);
     } else {
-      test_server_->waitForCounterEq("listener.[__1]_0.downstream_cx_total", 16u, timeout_first);
+      test_server_->waitForCounter("listener.[__1]_0.downstream_cx_total", Eq(16u), timeout_first);
     }
     for (size_t i = 0; i < concurrency_; ++i) {
       if (version_ == Network::Address::IpVersion::v4) {
-        test_server_->waitForGaugeEq(
-            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_active", i), 2u,
+        test_server_->waitForGauge(
+            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_active", i), Eq(2u),
             timeout_subsequent);
-        test_server_->waitForCounterEq(
-            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_total", i), 2u,
+        test_server_->waitForCounter(
+            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_total", i), Eq(2u),
             timeout_subsequent);
       } else {
-        test_server_->waitForGaugeEq(
-            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_active", i), 2u,
+        test_server_->waitForGauge(
+            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_active", i), Eq(2u),
             timeout_subsequent);
-        test_server_->waitForCounterEq(
-            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_total", i), 2u,
+        test_server_->waitForCounter(
+            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_total", i), Eq(2u),
             timeout_subsequent);
       }
     }

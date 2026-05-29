@@ -138,7 +138,8 @@ public:
   ListenerFactoryContextBaseImpl(Envoy::Server::Instance& server,
                                  ProtobufMessage::ValidationVisitor& validation_visitor,
                                  const envoy::config::listener::v3::Listener& config,
-                                 Server::DrainManagerPtr drain_manager);
+                                 Server::DrainManagerPtr drain_manager, Stats::ScopeSharedPtr scope,
+                                 Stats::ScopeSharedPtr listener_scope);
 
   Init::Manager& initManager() override;
   Network::DrainDecision& drainDecision() override;
@@ -167,7 +168,8 @@ public:
   PerListenerFactoryContextImpl(Envoy::Server::Instance& server,
                                 ProtobufMessage::ValidationVisitor& validation_visitor,
                                 const envoy::config::listener::v3::Listener& config_message,
-                                ListenerImpl& listener_impl, DrainManagerPtr drain_manager);
+                                ListenerImpl& listener_impl, DrainManagerPtr drain_manager,
+                                Stats::ScopeSharedPtr scope, Stats::ScopeSharedPtr listener_scope);
 
   PerListenerFactoryContextImpl(
       std::shared_ptr<ListenerFactoryContextBaseImpl> listener_factory_context_base,
@@ -259,7 +261,7 @@ public:
     return socket_factories_;
   }
   void debugLog(const std::string& message);
-  void dumpListenerConfig(ProtobufWkt::Any& dump) const;
+  void dumpListenerConfig(Protobuf::Any& dump) const;
   void initialize();
   DrainManager& localDrainManager() const {
     return listener_factory_context_->listener_factory_context_base_->drainManager();
@@ -294,6 +296,9 @@ public:
   }
   uint32_t perConnectionBufferLimitBytes() const override {
     return per_connection_buffer_limit_bytes_;
+  }
+  std::chrono::milliseconds perConnectionBufferHighWatermarkTimeout() const override {
+    return per_connection_buffer_high_watermark_timeout_;
   }
   std::chrono::milliseconds listenerFiltersTimeout() const override {
     return listener_filters_timeout_;
@@ -356,7 +361,8 @@ public:
 private:
   ListenerImpl(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
-               bool workers_started, uint64_t hash, absl::Status& creation_status);
+               bool workers_started, uint64_t hash, Stats::ScopeSharedPtr scope,
+               Stats::ScopeSharedPtr listener_scope, absl::Status& creation_status);
   struct UdpListenerConfigImpl : public Network::UdpListenerConfig {
     UdpListenerConfigImpl(const envoy::config::listener::v3::UdpListenerConfig config)
         : config_(config) {}
@@ -408,8 +414,7 @@ private:
   absl::Status buildUdpListenerFactory(const envoy::config::listener::v3::Listener& config,
                                        uint32_t concurrency);
   void buildListenSocketOptions(const envoy::config::listener::v3::Listener& config,
-                                std::vector<std::reference_wrapper<const Protobuf::RepeatedPtrField<
-                                    envoy::config::core::v3::SocketOption>>>& address_opts_list);
+                                std::vector<Network::Socket::OptionsSharedPtr>& address_opts_list);
   absl::Status createListenerFilterFactories(const envoy::config::listener::v3::Listener& config);
   absl::Status validateFilterChains(const envoy::config::listener::v3::Listener& config);
   absl::Status buildFilterChains(const envoy::config::listener::v3::Listener& config);
@@ -442,6 +447,7 @@ private:
   const bool mptcp_enabled_;
   const bool hand_off_restored_destination_connections_;
   const uint32_t per_connection_buffer_limit_bytes_;
+  const std::chrono::milliseconds per_connection_buffer_high_watermark_timeout_;
   const uint64_t listener_tag_;
   const std::string name_;
   const bool added_via_api_;

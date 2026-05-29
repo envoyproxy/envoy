@@ -75,7 +75,7 @@ ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
 ProxyFilter::~ProxyFilter() { ASSERT(!delay_timer_); }
 
 void ProxyFilter::setDynamicMetadata(std::string operation, std::string resource) {
-  ProtobufWkt::Struct metadata(
+  Protobuf::Struct metadata(
       (*read_callbacks_->connection()
             .streamInfo()
             .dynamicMetadata()

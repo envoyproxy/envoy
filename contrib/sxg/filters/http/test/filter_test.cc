@@ -620,7 +620,7 @@ TEST_F(FilterTest, ResponseExceedsMaxPayloadSize) {
       {":path", "/hello.html"}};
   Http::TestResponseHeaderMapImpl response_headers{
       {"content-type", "text/html"}, {":status", "200"}, {"x-should-encode-sxg", "true"}};
-  EXPECT_CALL(encoder_callbacks_, encoderBufferLimit).WillRepeatedly(Return(10));
+  EXPECT_CALL(encoder_callbacks_, bufferLimit).WillRepeatedly(Return(10));
   testFallbackToHtml(request_headers, response_headers, true, false);
 }
 
@@ -634,9 +634,7 @@ TEST_F(FilterTest, ResponseExceedsMaxPayloadSizeEncodeFail) {
       {":path", "/hello.html"}};
   Http::TestResponseHeaderMapImpl response_headers{
       {"content-type", "text/html"}, {":status", "200"}, {"x-should-encode-sxg", "true"}};
-  EXPECT_CALL(encoder_callbacks_, encoderBufferLimit)
-      .WillOnce(Return(100000))
-      .WillRepeatedly(Return(10));
+  EXPECT_CALL(encoder_callbacks_, bufferLimit).WillOnce(Return(100000)).WillRepeatedly(Return(10));
   testFallbackToHtml(request_headers, response_headers, true, true);
 }
 

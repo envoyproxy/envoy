@@ -1,9 +1,11 @@
 #include "source/extensions/filters/common/rbac/matchers.h"
 
+#include "envoy/common/exception.h"
 #include "envoy/config/rbac/v3/rbac.pb.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/common/rbac/matcher_extension.h"
 #include "source/extensions/filters/common/rbac/principal_extension.h"
 
@@ -23,9 +25,12 @@ MatcherConstPtr Matcher::create(const envoy::config::rbac::v3::Permission& permi
     return std::make_unique<const OrMatcher>(permission.or_rules(), validation_visitor, context);
   case envoy::config::rbac::v3::Permission::RuleCase::kHeader:
     return std::make_unique<const HeaderMatcher>(permission.header(), context);
-  case envoy::config::rbac::v3::Permission::RuleCase::kDestinationIp:
-    return std::make_unique<const IPMatcher>(permission.destination_ip(),
-                                             IPMatcher::Type::DownstreamLocal);
+  case envoy::config::rbac::v3::Permission::RuleCase::kDestinationIp: {
+    auto matcher_result =
+        IPMatcher::create(permission.destination_ip(), IPMatcher::Type::DownstreamLocal);
+    THROW_IF_NOT_OK_REF(matcher_result.status());
+    return std::move(matcher_result.value());
+  }
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationPort:
     return std::make_unique<const PortMatcher>(permission.destination_port());
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationPortRange:
@@ -74,15 +79,24 @@ MatcherConstPtr Matcher::create(const envoy::config::rbac::v3::Principal& princi
     return std::make_unique<const OrMatcher>(principal.or_ids(), context);
   case envoy::config::rbac::v3::Principal::IdentifierCase::kAuthenticated:
     return std::make_unique<const AuthenticatedMatcher>(principal.authenticated(), context);
-  case envoy::config::rbac::v3::Principal::IdentifierCase::kSourceIp:
-    return std::make_unique<const IPMatcher>(principal.source_ip(),
-                                             IPMatcher::Type::ConnectionRemote);
-  case envoy::config::rbac::v3::Principal::IdentifierCase::kDirectRemoteIp:
-    return std::make_unique<const IPMatcher>(principal.direct_remote_ip(),
-                                             IPMatcher::Type::DownstreamDirectRemote);
-  case envoy::config::rbac::v3::Principal::IdentifierCase::kRemoteIp:
-    return std::make_unique<const IPMatcher>(principal.remote_ip(),
-                                             IPMatcher::Type::DownstreamRemote);
+  case envoy::config::rbac::v3::Principal::IdentifierCase::kSourceIp: {
+    auto matcher_result =
+        IPMatcher::create(principal.source_ip(), IPMatcher::Type::ConnectionRemote);
+    THROW_IF_NOT_OK_REF(matcher_result.status());
+    return std::move(matcher_result.value());
+  }
+  case envoy::config::rbac::v3::Principal::IdentifierCase::kDirectRemoteIp: {
+    auto matcher_result =
+        IPMatcher::create(principal.direct_remote_ip(), IPMatcher::Type::DownstreamDirectRemote);
+    THROW_IF_NOT_OK_REF(matcher_result.status());
+    return std::move(matcher_result.value());
+  }
+  case envoy::config::rbac::v3::Principal::IdentifierCase::kRemoteIp: {
+    auto matcher_result =
+        IPMatcher::create(principal.remote_ip(), IPMatcher::Type::DownstreamRemote);
+    THROW_IF_NOT_OK_REF(matcher_result.status());
+    return std::move(matcher_result.value());
+  }
   case envoy::config::rbac::v3::Principal::IdentifierCase::kHeader:
     return std::make_unique<const HeaderMatcher>(principal.header(), context);
   case envoy::config::rbac::v3::Principal::IdentifierCase::kAny:
@@ -174,30 +188,104 @@ bool NotMatcher::matches(const Network::Connection& connection,
   return !matcher_->matches(connection, headers, info);
 }
 
+HeaderMatcher::HeaderMatcher(const envoy::config::route::v3::HeaderMatcher& matcher,
+                             Server::Configuration::CommonFactoryContext& context)
+    : header_(Http::HeaderUtility::createHeaderData(matcher, context)),
+      match_headers_individually_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.rbac_match_headers_individually")) {}
+
 bool HeaderMatcher::matches(const Network::Connection&,
                             const Envoy::Http::RequestHeaderMap& headers,
                             const StreamInfo::StreamInfo&) const {
+  if (match_headers_individually_) {
+    return header_->matchesHeadersIndividually(headers);
+  }
   return header_->matchesHeaders(headers);
+}
+
+// static
+absl::StatusOr<std::unique_ptr<IPMatcher>>
+IPMatcher::create(const envoy::config::core::v3::CidrRange& range, Type type) {
+  // Convert single range to CidrRange with proper error handling.
+  auto cidr_result = Network::Address::CidrRange::create(range);
+  if (!cidr_result.ok()) {
+    return absl::InvalidArgumentError(
+        fmt::format("Failed to create CIDR range: {}", cidr_result.status().message()));
+  }
+
+  std::vector<Network::Address::CidrRange> ranges;
+  ranges.push_back(std::move(cidr_result.value()));
+
+  // Create LC Trie directly following the pattern from Unified IP Matcher.
+  // Note: LcTrie constructor may throw EnvoyException on invalid input, but this
+  // should not happen as we've already validated the CIDR range above.
+  auto trie = std::make_unique<Network::LcTrie::LcTrie<bool>>(
+      std::vector<std::pair<bool, std::vector<Network::Address::CidrRange>>>{{true, ranges}});
+
+  return std::unique_ptr<IPMatcher>(new IPMatcher(std::move(trie), type));
+}
+
+// static
+absl::StatusOr<std::unique_ptr<IPMatcher>>
+IPMatcher::create(const Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange>& ranges,
+                  Type type) {
+  if (ranges.empty()) {
+    return absl::InvalidArgumentError("Empty IP range list provided");
+  }
+
+  // Convert protobuf ranges to CidrRange vector.
+  std::vector<Network::Address::CidrRange> cidr_ranges;
+  cidr_ranges.reserve(ranges.size());
+  for (const auto& range : ranges) {
+    auto cidr_result = Network::Address::CidrRange::create(range);
+    if (!cidr_result.ok()) {
+      return absl::InvalidArgumentError(
+          fmt::format("Failed to create CIDR range: {}", cidr_result.status().message()));
+    }
+    cidr_ranges.push_back(std::move(cidr_result.value()));
+  }
+
+  // Create LC Trie directly following the pattern from Unified IP Matcher.
+  // Note: LcTrie constructor may throw EnvoyException on invalid input, but this
+  // should not happen as we've already validated the CIDR range above.
+  auto trie = std::make_unique<Network::LcTrie::LcTrie<bool>>(
+      std::vector<std::pair<bool, std::vector<Network::Address::CidrRange>>>{{true, cidr_ranges}});
+
+  return std::unique_ptr<IPMatcher>(new IPMatcher(std::move(trie), type));
+}
+
+IPMatcher::IPMatcher(std::unique_ptr<Network::LcTrie::LcTrie<bool>> trie, Type type)
+    : trie_(std::move(trie)), type_(type) {}
+
+const Network::Address::InstanceConstSharedPtr&
+IPMatcher::extractIpAddress(const Network::Connection& connection,
+                            const StreamInfo::StreamInfo& info) const {
+  switch (type_) {
+  case ConnectionRemote:
+    return connection.connectionInfoProvider().remoteAddress();
+  case DownstreamLocal:
+    return info.downstreamAddressProvider().localAddress();
+  case DownstreamDirectRemote:
+    return info.downstreamAddressProvider().directRemoteAddress();
+  case DownstreamRemote:
+    return info.downstreamAddressProvider().remoteAddress();
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap&,
                         const StreamInfo::StreamInfo& info) const {
-  Envoy::Network::Address::InstanceConstSharedPtr ip;
-  switch (type_) {
-  case ConnectionRemote:
-    ip = connection.connectionInfoProvider().remoteAddress();
-    break;
-  case DownstreamLocal:
-    ip = info.downstreamAddressProvider().localAddress();
-    break;
-  case DownstreamDirectRemote:
-    ip = info.downstreamAddressProvider().directRemoteAddress();
-    break;
-  case DownstreamRemote:
-    ip = info.downstreamAddressProvider().remoteAddress();
-    break;
+  // Extract IP address using reference to avoid shared_ptr copies.
+  const auto& address = extractIpAddress(connection, info);
+  // Guard against non-IP addresses (e.g., pipe) or missing address.
+  if (!address) {
+    return false;
   }
-  return range_.isInRange(*ip.get());
+  const auto* ip = address->ip();
+  if (ip == nullptr) {
+    return false;
+  }
+  return !trie_->getData(address).empty();
 }
 
 bool PortMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
@@ -268,7 +356,8 @@ bool MetadataMatcher::matches(const Network::Connection&, const Envoy::Http::Req
                               const StreamInfo::StreamInfo& info) const {
   if (metadata_source_ == envoy::config::rbac::v3::MetadataSource::ROUTE) {
     // Return false if there's no route since we can't match its metadata
-    return info.route() ? matcher_.match(info.route()->metadata()) : false;
+    const auto route = info.route();
+    return route ? matcher_.match(route->metadata()) : false;
   }
   return matcher_.match(info.dynamicMetadata());
 }
@@ -288,7 +377,7 @@ bool PolicyMatcher::matches(const Network::Connection& connection,
                             const StreamInfo::StreamInfo& info) const {
   return permissions_.matches(connection, headers, info) &&
          principals_.matches(connection, headers, info) &&
-         (expr_ == nullptr ? true : Expr::matches(*expr_, info, headers));
+         (expr_ ? expr_->matches(info, headers) : true);
 }
 
 bool RequestedServerNameMatcher::matches(const Network::Connection& connection,

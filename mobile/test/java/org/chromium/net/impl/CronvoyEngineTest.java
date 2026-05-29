@@ -79,6 +79,16 @@ public class CronvoyEngineTest {
   }
 
   @Test
+  public void getEngineHandle_returnsUnderlyingEnvoyEngineHandle() {
+    long contextHandle = cronvoyEngine.getEngineHandle();
+    long envoyEngineHandle = cronvoyEngine.getEnvoyEngine().getEngineHandle();
+
+    assertThat(contextHandle).isNotEqualTo(0L);
+    assertThat(envoyEngineHandle).isNotEqualTo(0L);
+    assertThat(contextHandle).isEqualTo(envoyEngineHandle);
+  }
+
+  @Test
   public void get_simple() throws Exception {
     mockWebServer.enqueue(new MockResponse().setBody("hello, world"));
     mockWebServer.start();
@@ -94,10 +104,10 @@ public class CronvoyEngineTest {
     // Do some basic stats accounting.
     String stats = cronvoyEngine.getEnvoyEngine().dumpStats();
     Map<String, String> statsMap = StatsUtils.statsToList(stats);
-    assertThat(statsMap.containsKey("http.hcm.downstream_rq_2xx"));
-    assertThat(statsMap.containsKey("http.hcm.downstream_total"));
-    assertThat(statsMap.containsKey("runtime.load_success"));
-    assertThat(statsMap.get("runtime.load_success")).isEqualTo("1");
+    assertThat(statsMap).containsKey("http.hcm.downstream_rq_2xx");
+    assertThat(statsMap).containsKey("http.hcm.downstream_rq_total");
+    assertThat(statsMap).containsKey("runtime.load_success");
+    assertThat(statsMap.get("runtime.load_success")).isEqualTo("2");
   }
 
   @Test

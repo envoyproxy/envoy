@@ -1,7 +1,9 @@
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
 #include "envoy/upstream/load_balancer.h"
 
-#include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
+#include "source/common/upstream/cluster_factory_impl.h"
+#include "source/extensions/clusters/dns/dns_cluster.h"
+#include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/registry.h"
@@ -13,6 +15,7 @@ namespace Common {
 namespace Aws {
 namespace {
 
+using testing::Ge;
 using testing::Return;
 
 const std::string AWS_REQUEST_SIGNING_CONFIG_SIGV4 = R"EOF(
@@ -105,6 +108,19 @@ typed_config:
   - prefix: x-envoy
   - prefix: x-forwarded
   - exact: x-amzn-trace-id
+)EOF";
+
+const std::string AWS_REQUEST_SIGNING_CONFIG_SIGV4_INCLUDED_HEADERS = R"EOF(
+name: envoy.filters.http.aws_request_signing
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigning
+  service_name: vpc-lattice-svcs
+  region: ap-southeast-2
+  signing_algorithm: aws_sigv4
+  use_unsigned_payload: true
+  match_included_headers:
+  - prefix: x-custom
+  - exact: user-agent
 )EOF";
 
 const std::string AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL = R"EOF(
@@ -228,6 +244,8 @@ public:
     TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI",
                                "http://127.0.0.1/path/to/creds", 1);
     TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
+
+    addBootstrapDefaultDns();
   }
 
   ~AwsRequestSigningIntegrationTest() override {
@@ -255,6 +273,16 @@ public:
       protocol_options.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
       protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
       ConfigHelper::setProtocolOptions(*cluster, protocol_options);
+    });
+  }
+
+  void addBootstrapDefaultDns() {
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* typed_dns_resolver_config = bootstrap.mutable_typed_dns_resolver_config();
+      typed_dns_resolver_config->set_name("envoy.network.dns_resolver.getaddrinfo");
+      envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
+          config;
+      typed_dns_resolver_config->mutable_typed_config()->PackFrom(config);
     });
   }
 
@@ -359,7 +387,37 @@ TEST_P(AwsRequestSigningIntegrationTest, SigV4AIntegrationUpstream) {
   EXPECT_FALSE(
       upstream_request_->headers().get(Http::LowerCaseString("x-amz-content-sha256")).empty());
 }
-class MockLogicalDnsClusterFactory : public Upstream::LogicalDnsClusterFactory {
+
+TEST_P(AwsRequestSigningIntegrationTest, SigV4IntegrationWithIncludedHeaders) {
+
+  config_helper_.prependFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_INCLUDED_HEADERS, true);
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/path"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-custom-header", "custom-value"},
+                                                 {"user-agent", "test-agent"},
+                                                 {"x-other-header", "other-value"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  // check that AWS signing headers are present
+  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("authorization")).empty());
+  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("x-amz-date")).empty());
+  // check that included headers are present
+  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("x-custom-header")).empty());
+  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("user-agent")).empty());
+  // check that non-included headers are still forwarded
+  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("x-other-header")).empty());
+}
+
+class MockLogicalDnsClusterFactory : public Upstream::DnsClusterFactory {
 public:
   MockLogicalDnsClusterFactory() = default;
   ~MockLogicalDnsClusterFactory() override = default;
@@ -384,7 +442,7 @@ public:
     use_lds_ = false;
   }
   NiceMock<MockLogicalDnsClusterFactory> logical_dns_cluster_factory_;
-  Registry::InjectFactory<Envoy::Upstream::LogicalDnsClusterFactory> dns_cluster_factory_;
+  Registry::InjectFactory<Envoy::Upstream::DnsClusterFactory> dns_cluster_factory_;
   NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
 
@@ -477,9 +535,9 @@ TEST_F(InitializeFilterTest, TestWithOneClusterStandard) {
 
   initialize();
 
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
-                                 "southeast-2.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
+  test_server_->waitForCounter("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                               "southeast-2.credential_refreshes_performed",
+                               Ge(1), std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithOneClusterCustomWebIdentity) {
@@ -491,9 +549,9 @@ TEST_F(InitializeFilterTest, TestWithOneClusterCustomWebIdentity) {
   addCustomCredentialChainFilter();
   initialize();
 
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
-                                 "southeast-2.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
+  test_server_->waitForCounter("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                               "southeast-2.credential_refreshes_performed",
+                               Ge(1), std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithOneClusterStandardUpstream) {
@@ -509,9 +567,9 @@ TEST_F(InitializeFilterTest, TestWithOneClusterStandardUpstream) {
   addUpstreamProtocolOptions();
   initialize();
 
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
-                                 "southeast-2.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
+  test_server_->waitForCounter("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                               "southeast-2.credential_refreshes_performed",
+                               Ge(1), std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersUpstreamCheckForSingletonIMDS) {
@@ -535,9 +593,9 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersUpstreamCheckForSingletonIMDS) {
 
   initialize();
   // We should see a successful credential refresh
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.ec2_instance_metadata_server_"
-                                 "internal.credential_refreshes_performed",
-                                 1);
+  test_server_->waitForCounter("aws.metadata_credentials_provider.ec2_instance_metadata_server_"
+                               "internal.credential_refreshes_performed",
+                               Ge(1));
   // If credential refresh has succeeded, then check we added only a single cluster via the
   // extension
   EXPECT_EQ(test_server_->counter("cluster_manager.cluster_added"), 1);
@@ -553,9 +611,9 @@ TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevel) {
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
 
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
-                                 "southeast-2.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
+  test_server_->waitForCounter("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                               "southeast-2.credential_refreshes_performed",
+                               Ge(1), std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevelAndStandard) {
@@ -569,9 +627,9 @@ TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevelAndStandard) {
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
 
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
-                                 "southeast-2.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
+  test_server_->waitForCounter("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                               "southeast-2.credential_refreshes_performed",
+                               Ge(1), std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersStandard) {
@@ -586,13 +644,13 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersStandard) {
   addStandardFilter();
   initialize();
   std::vector<Stats::GaugeSharedPtr> gauges = test_server_->gauges();
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.ecs_task_"
-                                 "metadata_server_internal.credential_refreshes_performed",
-                                 1);
+  test_server_->waitForCounter("aws.metadata_credentials_provider.ecs_task_"
+                               "metadata_server_internal.credential_refreshes_performed",
+                               Ge(1));
 
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
-                                 "southeast-2.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
+  test_server_->waitForCounter("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                               "southeast-2.credential_refreshes_performed",
+                               Ge(1), std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevel) {
@@ -606,13 +664,13 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevel) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.ecs_task_"
-                                 "metadata_server_internal.credential_refreshes_performed",
-                                 1);
+  test_server_->waitForCounter("aws.metadata_credentials_provider.ecs_task_"
+                               "metadata_server_internal.credential_refreshes_performed",
+                               Ge(1));
 
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
-                                 "southeast-2.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
+  test_server_->waitForCounter("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                               "southeast-2.credential_refreshes_performed",
+                               Ge(1), std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithIAMRolesAnywhereCluster) {
@@ -627,9 +685,9 @@ TEST_F(InitializeFilterTest, TestWithIAMRolesAnywhereCluster) {
 
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROLES_ANYWHERE);
   initialize();
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.rolesanywhere_ap-southeast-2_"
-                                 "amazonaws_com.credential_refreshes_performed",
-                                 1);
+  test_server_->waitForCounter("aws.metadata_credentials_provider.rolesanywhere_ap-southeast-2_"
+                               "amazonaws_com.credential_refreshes_performed",
+                               Ge(1));
 }
 
 TEST_F(InitializeFilterTest, TestWithIAMRolesAnywhereCustom) {
@@ -645,9 +703,9 @@ TEST_F(InitializeFilterTest, TestWithIAMRolesAnywhereCustom) {
 
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROLES_ANYWHERE_CUSTOM);
   initialize();
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.rolesanywhere_ap-southeast-2_"
-                                 "amazonaws_com.credential_refreshes_performed",
-                                 1);
+  test_server_->waitForCounter("aws.metadata_credentials_provider.rolesanywhere_ap-southeast-2_"
+                               "amazonaws_com.credential_refreshes_performed",
+                               Ge(1));
 }
 
 TEST_F(InitializeFilterTest, TestWithMultipleWebidentityRouteLevel) {
@@ -747,21 +805,21 @@ TEST_F(InitializeFilterTest, TestWithMultipleWebidentityRouteLevel) {
 
   initialize();
 
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
-                                 "southeast-1.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
-                                 "southeast-2.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-eu-"
-                                 "west-1.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-eu-"
-                                 "west-2.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-eu-"
-                                 "west-3.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
+  test_server_->waitForCounter("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                               "southeast-1.credential_refreshes_performed",
+                               Ge(1), std::chrono::seconds(10));
+  test_server_->waitForCounter("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                               "southeast-2.credential_refreshes_performed",
+                               Ge(1), std::chrono::seconds(10));
+  test_server_->waitForCounter("aws.metadata_credentials_provider.sts_token_service_internal-eu-"
+                               "west-1.credential_refreshes_performed",
+                               Ge(1), std::chrono::seconds(10));
+  test_server_->waitForCounter("aws.metadata_credentials_provider.sts_token_service_internal-eu-"
+                               "west-2.credential_refreshes_performed",
+                               Ge(1), std::chrono::seconds(10));
+  test_server_->waitForCounter("aws.metadata_credentials_provider.sts_token_service_internal-eu-"
+                               "west-3.credential_refreshes_performed",
+                               Ge(1), std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelAndStandard) {
@@ -776,13 +834,13 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelAndStandard) {
   addStandardFilter();
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.ecs_task_"
-                                 "metadata_server_internal.credential_refreshes_performed",
-                                 1);
+  test_server_->waitForCounter("aws.metadata_credentials_provider.ecs_task_"
+                               "metadata_server_internal.credential_refreshes_performed",
+                               Ge(1));
 
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
-                                 "southeast-2.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
+  test_server_->waitForCounter("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                               "southeast-2.credential_refreshes_performed",
+                               Ge(1), std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersStandardInstanceProfile) {
@@ -793,13 +851,13 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersStandardInstanceProfile) {
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
   addStandardFilter();
   initialize();
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.ec2_instance_"
-                                 "metadata_server_internal.credential_refreshes_performed",
-                                 1);
+  test_server_->waitForCounter("aws.metadata_credentials_provider.ec2_instance_"
+                               "metadata_server_internal.credential_refreshes_performed",
+                               Ge(1));
 
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
-                                 "southeast-2.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
+  test_server_->waitForCounter("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                               "southeast-2.credential_refreshes_performed",
+                               Ge(1), std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelInstanceProfile) {
@@ -810,13 +868,13 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelInstanceProfile) {
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.ec2_instance_"
-                                 "metadata_server_internal.credential_refreshes_performed",
-                                 1);
+  test_server_->waitForCounter("aws.metadata_credentials_provider.ec2_instance_"
+                               "metadata_server_internal.credential_refreshes_performed",
+                               Ge(1));
 
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
-                                 "southeast-2.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
+  test_server_->waitForCounter("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                               "southeast-2.credential_refreshes_performed",
+                               Ge(1), std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelAndStandardInstanceProfile) {
@@ -828,13 +886,13 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelAndStandardInstancePro
   addStandardFilter();
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.ec2_instance_"
-                                 "metadata_server_internal.credential_refreshes_performed",
-                                 1);
+  test_server_->waitForCounter("aws.metadata_credentials_provider.ec2_instance_"
+                               "metadata_server_internal.credential_refreshes_performed",
+                               Ge(1));
 
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
-                                 "southeast-2.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
+  test_server_->waitForCounter("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                               "southeast-2.credential_refreshes_performed",
+                               Ge(1), std::chrono::seconds(10));
 }
 
 class CdsInteractionTest : public testing::Test, public HttpIntegrationTest {
@@ -865,7 +923,7 @@ public:
   }
 
   NiceMock<MockLogicalDnsClusterFactory> logical_dns_cluster_factory_;
-  Registry::InjectFactory<Envoy::Upstream::LogicalDnsClusterFactory> dns_cluster_factory_;
+  Registry::InjectFactory<Envoy::Upstream::DnsClusterFactory> dns_cluster_factory_;
   NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
 
@@ -929,12 +987,12 @@ TEST_F(CdsInteractionTest, CDSUpdateDoesNotRemoveOurClusters) {
   cds_helper_.setCds({cluster_});
 
   initialize();
-  test_server_->waitForCounterGe("cluster_manager.cluster_added", 2);
+  test_server_->waitForCounter("cluster_manager.cluster_added", Ge(2));
 
   cluster_.set_name("testing");
   cds_helper_.setCds({cluster_});
 
-  test_server_->waitForCounterGe("cluster_manager.cds.update_success", 2);
+  test_server_->waitForCounter("cluster_manager.cds.update_success", Ge(2));
   EXPECT_EQ(1, test_server_->counter("cluster_manager.cluster_removed")->value());
   EXPECT_EQ(3, test_server_->counter("cluster_manager.cluster_added")->value());
 }

@@ -6,6 +6,7 @@
 #include "test/extensions/filters/common/lua/lua_wrappers.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -51,20 +52,23 @@ protected:
         testPrint(type(object:ssl()))
       end
     )EOF"};
-    testing::InSequence s;
     setup(SCRIPT);
 
-    // Setup secure connection if required.
-    EXPECT_CALL(Const(connection_), ssl()).WillOnce(Return(secure ? ssl_ : nullptr));
+    // Setup secure connection via StreamInfo's downstreamAddressProvider.
+    // Use ON_CALL for downstreamAddressProvider since it's called multiple times.
+    ON_CALL(stream_info_, downstreamAddressProvider())
+        .WillByDefault(ReturnRef(downstream_address_provider_));
+    ON_CALL(downstream_address_provider_, sslConnection())
+        .WillByDefault(Return(secure ? ssl_ : nullptr));
 
-    ConnectionWrapper::create(coroutine_->luaState(), &connection_);
+    ConnectionWrapper::create(coroutine_->luaState(), stream_info_);
     EXPECT_CALL(printer_, testPrint(secure ? "secure" : "plain"));
-    EXPECT_CALL(Const(connection_), ssl()).WillOnce(Return(secure ? ssl_ : nullptr));
     EXPECT_CALL(printer_, testPrint(secure ? "userdata" : "nil"));
     start("callMe");
   }
 
-  NiceMock<Envoy::Network::MockConnection> connection_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  NiceMock<Network::MockConnectionInfoProvider> downstream_address_provider_;
   std::shared_ptr<NiceMock<Envoy::Ssl::MockConnectionInfo>> ssl_;
 };
 

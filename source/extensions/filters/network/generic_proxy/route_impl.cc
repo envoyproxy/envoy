@@ -18,7 +18,7 @@ namespace NetworkFilters {
 namespace GenericProxy {
 
 RouteSpecificFilterConfigConstSharedPtr RouteEntryImpl::createRouteSpecificFilterConfig(
-    const std::string& name, const ProtobufWkt::Any& typed_config,
+    const std::string& name, const Protobuf::Any& typed_config,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
 
@@ -88,7 +88,7 @@ VirtualHostImpl::VirtualHostImpl(const ProtoVirtualHost& virtual_host_config,
 }
 
 RouteEntryConstSharedPtr VirtualHostImpl::routeEntry(const MatchInput& request) const {
-  Matcher::MatchResult match_result = Matcher::evaluateMatch<MatchInput>(*matcher_, request);
+  Matcher::ActionMatchResult match_result = Matcher::evaluateMatch<MatchInput>(*matcher_, request);
 
   if (match_result.isMatch()) {
     Matcher::ActionConstSharedPtr action = match_result.actionByMove();

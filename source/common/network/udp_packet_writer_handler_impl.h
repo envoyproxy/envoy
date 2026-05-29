@@ -35,6 +35,10 @@ public:
             /*err=*/Api::IoError::none()};
   }
 
+  void setBlocked() { write_blocked_ = true; }
+
+  Network::IoHandle& ioHandle() { return io_handle_; }
+
 private:
   bool write_blocked_{false};
   Network::IoHandle& io_handle_;
@@ -42,8 +46,9 @@ private:
 
 class UdpDefaultWriterFactory : public Network::UdpPacketWriterFactory {
 public:
-  Network::UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle,
-                                                    Stats::Scope&) override {
+  Network::UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle, Stats::Scope&,
+                                                    Envoy::Event::Dispatcher&,
+                                                    absl::AnyInvocable<void() &&>) override {
     return std::make_unique<UdpDefaultWriter>(io_handle);
   }
 };

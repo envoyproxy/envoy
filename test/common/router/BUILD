@@ -7,7 +7,6 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_binary",
     "envoy_cc_test_library",
-    "envoy_directory_genrule",
     "envoy_package",
     "envoy_proto_library",
 )
@@ -15,6 +14,16 @@ load(
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+# Generated fuzz config corpus
+#
+# you can regenerate these with the following commands:
+#
+# rm -rf test/common/router/route_corpus/generated
+# mkdir test/common/router/route_corpus/generated
+# bazel build //test/common/router:corpus_from_config_impl
+# tar xf bazel-bin/test/common/router/corpus_from_config_impl.tar.gz -C test/common/router/route_corpus/generated
+# git add test/common/router/route_corpus/generated
 
 envoy_cc_test(
     name = "config_impl_test",
@@ -40,7 +49,7 @@ envoy_cc_test_library(
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
         "//test/fuzz:utility_lib",
         "//test/mocks/router:router_mocks",
-        "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:retry_priority_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
@@ -49,6 +58,51 @@ envoy_cc_test_library(
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
+)
+
+# envoy_cc_test_binary is generating mostly static binary regardless of config
+envoy_cc_test_binary(
+    name = "config_impl_test_static",
+    rbe_pool = "6gig",
+    deps = [
+        ":config_impl_test_lib",
+        "//test:main",
+    ],
+)
+
+sh_binary(
+    name = "corpus_from_config_impl_sh",
+    srcs = ["corpus_from_config_impl.sh"],
+)
+
+genrule(
+    name = "corpus_from_config_impl",
+    testonly = 1,
+    srcs = [
+        # This is deliberately in srcs, since we run into host/target confusion
+        # otherwise in oss-fuzz builds.
+        ":config_impl_test_static",
+    ],
+    outs = ["corpus_from_config_impl.tar.gz"],
+    cmd = """
+    export GENRULE_OUTPUT_DIR=$$(mktemp -d)
+    $(location corpus_from_config_impl_sh) \
+      $(location //test/common/router:config_impl_test_static)
+    # normalize the output as the test build side effect is not deterministic.
+    sed -i 's/[[:space:]]*$$//' $$GENRULE_OUTPUT_DIR/*
+    sed -i 's|^goo\\.gle/debug[a-z]*|goo.gle/debugproto|' $$GENRULE_OUTPUT_DIR/*
+    # Dedupe the resulting corpus files.
+    # Files are saved in the root of the tarball (have their dirs stripped)
+    md5sum $$GENRULE_OUTPUT_DIR/* \
+      | sort -k1,1 -u \
+      | cut -d' ' -f3- \
+      | tar -czf $@ --transform='s|.*/||' -T -
+    """,
+    exec_properties = select({
+        "//bazel:engflow_rbe_x86_64": {"Pool": "6gig"},
+        "//conditions:default": {},
+    }),
+    tools = [":corpus_from_config_impl_sh"],
 )
 
 envoy_cc_test(
@@ -63,6 +117,7 @@ envoy_cc_test(
         "//source/common/router:config_lib",
         "//source/common/router:delegating_route_lib",
         "//test/integration:http_integration_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
     ],
@@ -75,9 +130,9 @@ envoy_cc_benchmark_binary(
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/router:config_lib",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
@@ -127,7 +182,6 @@ envoy_cc_test(
         "//source/common/json:json_loader_lib",
         "//source/common/router:rds_lib",
         "//source/server/admin:admin_lib",
-        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/matcher:matcher_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:instance_mocks",
@@ -150,7 +204,7 @@ envoy_cc_test(
         "//source/common/router:scoped_config_lib",
         "//test/mocks/router:router_mocks",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
@@ -176,11 +230,11 @@ envoy_cc_test(
         "//test/mocks/matcher:matcher_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/router:router_mocks",
-        "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -200,10 +254,8 @@ envoy_cc_test(
         "//source/common/router:vhds_lib",
         "//source/server/admin:admin_lib",
         "//test/mocks/config:config_mocks",
-        "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
-        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
@@ -240,52 +292,10 @@ envoy_proto_library(
     ],
 )
 
-# envoy_cc_test_binary is generating mostly static binary regardless of config
-envoy_cc_test_binary(
-    name = "config_impl_test_static",
-    rbe_pool = "6gig",
-    deps = [
-        ":config_impl_test_lib",
-        "//test:main",
-    ],
-)
-
-sh_binary(
-    name = "corpus_from_config_impl_sh",
-    srcs = ["corpus_from_config_impl.sh"],
-)
-
-envoy_directory_genrule(
-    name = "corpus_from_config_impl",
-    testonly = 1,
-    srcs = [
-        # This is deliberately in srcs, since we run into host/target confusion
-        # otherwise in oss-fuzz builds.
-        ":config_impl_test_static",
-    ],
-    cmd = " ".join([
-        "$(location corpus_from_config_impl_sh)",
-        "$(location //test/common/router:config_impl_test_static)",
-    ]),
-    exec_properties = select({
-        "//bazel:engflow_rbe_x86_64": {"Pool": "6gig"},
-        "//conditions:default": {},
-    }),
-    tools = [":corpus_from_config_impl_sh"],
-)
-
 filegroup(
     name = "route_corpus",
     testonly = 1,
-    srcs = select({
-        # TODO(asraa): Clean this up for cross-compilation. Right now we assume
-        # the host and target are the same on x86 builds, so we only execute the
-        # corpus generation binary on x86 platforms.
-        "//bazel:x86": [":corpus_from_config_impl"],
-        "//conditions:default": [],
-    }) + glob([
-        "route_corpus/**",
-    ]),
+    srcs = glob(["route_corpus/**"]),
 )
 
 envoy_cc_fuzz_test(
@@ -294,13 +304,11 @@ envoy_cc_fuzz_test(
     srcs = ["route_fuzz_test.cc"],
     corpus = ":route_corpus",
     rbe_pool = "6gig",
-    # The :config_impl_test_static target does not build with coverage
-    tags = ["nocoverage"],
     deps = [
         ":route_fuzz_proto_cc_proto",
         "//source/common/router:config_lib",
         "//test/fuzz:utility_lib",
-        "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
@@ -308,16 +316,26 @@ envoy_cc_fuzz_test(
 envoy_cc_test(
     name = "router_ratelimit_test",
     srcs = ["router_ratelimit_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
     rbe_pool = "6gig",
+    tags = ["skip_on_windows"],
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:header_map_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:config_lib",
         "//source/common/router:router_ratelimit_lib",
+        "//source/extensions/formatter/cel:config",
         "//test/mocks/http:http_mocks",
         "//test/mocks/ratelimit:ratelimit_mocks",
         "//test/mocks/router:router_mocks",
-        "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
@@ -347,7 +365,6 @@ envoy_cc_test(
         "//source/extensions/upstreams/http/tcp:config",
         "//test/common/http:common_lib",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
@@ -355,9 +372,9 @@ envoy_cc_test(
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:host_mocks",
         "//test/test_common:environment_lib",
-        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/common/mutation_rules/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/generic/v3:pkg_cc_proto",
@@ -387,10 +404,10 @@ envoy_cc_test_library(
         "//source/extensions/upstreams/http/tcp:config",
         "//test/common/http:common_lib",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
@@ -417,16 +434,14 @@ envoy_cc_test(
         "//source/extensions/upstreams/http/generic:config",
         "//test/common/http:common_lib",
         "//test/mocks/access_log:access_log_mocks",
-        "//test/mocks/filesystem:filesystem_mocks",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
@@ -447,10 +462,7 @@ envoy_cc_test(
         "//source/extensions/upstreams/http/generic:config",
         "//test/common/http:common_lib",
         "//test/integration/filters:add_header_filter_config_lib",
-        "//test/mocks/access_log:access_log_mocks",
-        "//test/mocks/filesystem:filesystem_mocks",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
@@ -460,6 +472,16 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "router_outlier_detection_test",
+    srcs = ["router_outlier_detection_test.cc"],
+    deps = [
+        ":router_test_base_lib",
+        "//source/common/router:router_lib",
+        "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
     ],
 )
 
@@ -487,9 +509,10 @@ envoy_cc_test(
         "//source/common/router:header_parser_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:filter_state_lib",
+        "//test/common/formatter:command_extension_lib",
         "//test/common/stream_info:test_int_accessor_lib",
-        "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:host_mocks",
@@ -552,10 +575,10 @@ envoy_cc_benchmark_binary(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/router:config_lib",
-        "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
@@ -572,7 +595,7 @@ envoy_cc_benchmark_binary(
     deps = [
         "//source/common/router:router_lib",
         "//test/common/stream_info:test_util",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 

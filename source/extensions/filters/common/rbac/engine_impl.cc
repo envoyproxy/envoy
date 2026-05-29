@@ -33,7 +33,7 @@ REGISTER_FACTORY(ActionFactory, Envoy::Matcher::ActionFactory<ActionContext>);
 void generateLog(StreamInfo::StreamInfo& info, EnforcementMode mode, bool log) {
   // If not shadow enforcement, set shared log metadata.
   if (mode != EnforcementMode::Shadow) {
-    ProtobufWkt::Struct log_metadata;
+    Protobuf::Struct log_metadata;
     auto& log_fields = *log_metadata.mutable_fields();
     log_fields[DynamicMetadataKeysSingleton::get().AccessLogKey].set_bool_value(log);
     info.setDynamicMetadata(DynamicMetadataKeysSingleton::get().CommonNamespace, log_metadata);
@@ -45,17 +45,24 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
     ProtobufMessage::ValidationVisitor& validation_visitor,
     Server::Configuration::CommonFactoryContext& context, const EnforcementMode mode)
     : action_(rules.action()), mode_(mode) {
-  // guard expression builder by presence of a condition in policies
+  // Create arena-based builder for backward compatibility if any policy has condition
+  // but does NOT use cel_config in order to preserve the existing RBAC arena optimization.
   for (const auto& policy : rules.policies()) {
-    if (policy.second.has_condition()) {
-      builder_ = Expr::createBuilder(&constant_arena_);
+    if (policy.second.has_condition() && !policy.second.has_cel_config()) {
+      builder_with_arena_ = std::make_unique<ExprBuilderWithArena>();
+      builder_with_arena_->builder_ptr_ =
+          Expr::createBuilder({}, &builder_with_arena_->constant_arena_);
+      builder_with_arena_->builder_instance_ = std::make_shared<Expr::BuilderInstance>(
+          std::move(builder_with_arena_->builder_ptr_), nullptr);
       break;
     }
   }
 
   for (const auto& policy : rules.policies()) {
-    policies_.emplace(policy.first, std::make_unique<PolicyMatcher>(policy.second, builder_.get(),
-                                                                    validation_visitor, context));
+    policies_.emplace(policy.first,
+                      std::make_unique<PolicyMatcher>(
+                          policy.second, validation_visitor, context,
+                          builder_with_arena_ ? builder_with_arena_->builder_instance_ : nullptr));
   }
 }
 
@@ -134,7 +141,7 @@ bool RoleBasedAccessControlMatcherEngineImpl::handleAction(
     StreamInfo::StreamInfo& info, std::string* effective_policy_id) const {
   Http::Matching::HttpMatchingDataImpl data(info);
   data.onRequestHeaders(headers);
-  const ::Envoy::Matcher::MatchResult result =
+  const ::Envoy::Matcher::ActionMatchResult result =
       Envoy::Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
   ASSERT(result.isComplete());
   if (result.isMatch()) {

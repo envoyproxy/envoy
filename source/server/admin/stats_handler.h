@@ -43,7 +43,8 @@ public:
    * @param response buffer into which to write response
    * @return http response code
    */
-  Http::Code prometheusStats(absl::string_view path_and_query, Buffer::Instance& response);
+  Http::Code prometheusStats(const Http::RequestHeaderMap& request_headers,
+                             Http::ResponseHeaderMap& response_headers, Buffer::Instance& response);
 
   /**
    * Checks the server_ to see if a flush is needed, and then renders the
@@ -52,7 +53,10 @@ public:
    * @params params the already-parsed parameters.
    * @param response buffer into which to write response
    */
-  Http::Code prometheusFlushAndRender(const StatsParams& params, Buffer::Instance& response);
+  Http::Code prometheusFlushAndRender(const StatsParams& params,
+                                      const Http::RequestHeaderMap& request_headers,
+                                      Http::ResponseHeaderMap& response_headers,
+                                      Buffer::Instance& response);
 
   /**
    * Renders the stats as prometheus. This is broken out as a separately
@@ -65,10 +69,11 @@ public:
    * @params params the already-parsed parameters.
    * @param response buffer into which to write response
    */
-  static void prometheusRender(Stats::Store& stats,
-                               const Stats::CustomStatNamespaces& custom_namespaces,
-                               const Upstream::ClusterManager& cluster_manager,
-                               const StatsParams& params, Buffer::Instance& response);
+  static void
+  prometheusRender(Stats::Store& stats, const Stats::CustomStatNamespaces& custom_namespaces,
+                   const Upstream::ClusterManager& cluster_manager, const StatsParams& params,
+                   const Http::RequestHeaderMap& request_headers,
+                   Http::ResponseHeaderMap& response_headers, Buffer::Instance& response);
 
   Http::Code handlerContention(Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
@@ -91,11 +96,6 @@ public:
                                        const Upstream::ClusterManager& cm,
                                        StatsRequest::UrlHandlerFn url_handler_fn = nullptr);
   Admin::RequestPtr makeRequest(AdminStream&);
-
-private:
-  static Http::Code prometheusStats(absl::string_view path_and_query, Buffer::Instance& response,
-                                    Stats::Store& stats,
-                                    Stats::CustomStatNamespaces& custom_namespaces);
 };
 
 } // namespace Server

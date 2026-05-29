@@ -6,7 +6,6 @@
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/server/instance.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
@@ -219,16 +218,15 @@ filter_state_rules:
 
   // Wrong selector
   StreamInfo::FilterStateImpl filter_state2(StreamInfo::FilterState::LifeSpan::FilterChain);
-  filter_state2.setData(
-      "jwt_selector", std::make_unique<Router::StringAccessorImpl>("wrong_selector"),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state2.setData("jwt_selector",
+                        std::make_unique<Router::StringAccessorImpl>("wrong_selector"),
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_TRUE(filter_conf->findVerifier(Http::TestRequestHeaderMapImpl(), filter_state2) ==
               nullptr);
 
   // correct selector
   StreamInfo::FilterStateImpl filter_state3(StreamInfo::FilterState::LifeSpan::FilterChain);
   filter_state3.setData("jwt_selector", std::make_unique<Router::StringAccessorImpl>("selector1"),
-                        StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_TRUE(filter_conf->findVerifier(Http::TestRequestHeaderMapImpl(), filter_state3) !=
               nullptr);
@@ -236,7 +234,6 @@ filter_state_rules:
   // correct selector
   StreamInfo::FilterStateImpl filter_state4(StreamInfo::FilterState::LifeSpan::FilterChain);
   filter_state4.setData("jwt_selector", std::make_unique<Router::StringAccessorImpl>("selector2"),
-                        StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_TRUE(filter_conf->findVerifier(Http::TestRequestHeaderMapImpl(), filter_state4) !=
               nullptr);
@@ -338,26 +335,6 @@ providers:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THAT_THROWS_MESSAGE(FilterConfigImpl(proto_config, "", context), EnvoyException,
                              HasSubstr("invalid URI"));
-}
-
-TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksInvalidUriValidationDisabled) {
-  // Disabling this runtime feature should allow invalid URIs.
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.jwt_authn_validate_uri", "false"}});
-  const char config[] = R"(
-providers:
-  provider1:
-    issuer: issuer1
-    remote_jwks:
-      http_uri:
-        uri: http://www.not\nvalid.com
-)";
-
-  JwtAuthentication proto_config;
-  TestUtility::loadFromYaml(config, proto_config);
-
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_NO_THROW(FilterConfigImpl(proto_config, "", context));
 }
 
 TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksValidUri) {

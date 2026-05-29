@@ -4,6 +4,7 @@ package envoy.RouterCheckToolSchema;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/route/v3/route_components.proto";
+import "envoy/extensions/filters/http/set_metadata/v3/set_metadata.proto";
 import "google/protobuf/wrappers.proto";
 import "validate/validate.proto";
 
@@ -69,6 +70,9 @@ message ValidationInput {
   // specified by the other config options and should not be set here.
   repeated envoy.config.core.v3.HeaderValue additional_request_headers = 10;
   repeated envoy.config.core.v3.HeaderValue additional_response_headers = 11;
+
+  // Metadata to be added to the request as input for route determination.
+  repeated envoy.extensions.filters.http.set_metadata.v3.Metadata dynamic_metadata = 12;
 
   // Runtime setting key to enable for the test case.
   // If a route depends on the runtime, the route will be enabled based on the random_value defined

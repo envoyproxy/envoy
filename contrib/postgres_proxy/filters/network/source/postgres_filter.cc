@@ -1,5 +1,4 @@
 #include "contrib/postgres_proxy/filters/network/source/postgres_filter.h"
-#include "postgres_filter.h"
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/connection.h"
@@ -185,7 +184,7 @@ void PostgresFilter::incStatements(StatementType type) {
 
 void PostgresFilter::processQuery(const std::string& sql) {
   if (config_->enable_sql_parsing_) {
-    ProtobufWkt::Struct metadata;
+    Protobuf::Struct metadata;
 
     auto result = Common::SQLUtils::SQLUtils::setMetadata(sql, decoder_->getAttributes(), metadata);
 

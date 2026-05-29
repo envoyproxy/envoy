@@ -65,7 +65,7 @@ RichKafkaConsumer::~RichKafkaConsumer() {
   consumer_->unassign();
   consumer_->close();
 
-  ENVOY_LOG(debug, "Kafka consumer [{}] closed succesfully", topic_);
+  ENVOY_LOG(debug, "Kafka consumer [{}] closed successfully", topic_);
 }
 
 // Read timeout constants.

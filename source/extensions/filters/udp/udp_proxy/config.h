@@ -49,11 +49,11 @@ public:
                       Server::Configuration::FactoryContext& context);
 
   const std::string proxyHost(const StreamInfo::StreamInfo& stream_info) const override {
-    return proxy_host_formatter_->formatWithContext({}, stream_info);
+    return proxy_host_formatter_->format({}, stream_info);
   }
 
   const std::string targetHost(const StreamInfo::StreamInfo& stream_info) const override {
-    return target_host_formatter_->formatWithContext({}, stream_info);
+    return target_host_formatter_->format({}, stream_info);
   }
 
   const absl::optional<uint32_t>& proxyPort() const override { return proxy_port_; };
@@ -74,9 +74,9 @@ public:
       return;
     }
 
-    filter_state->setData(
-        TunnelResponseHeaders::key(), std::make_shared<TunnelResponseHeaders>(std::move(headers)),
-        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+    filter_state->setData(TunnelResponseHeaders::key(),
+                          std::make_shared<TunnelResponseHeaders>(std::move(headers)),
+                          StreamInfo::FilterState::LifeSpan::Connection);
   }
 
   void
@@ -88,7 +88,6 @@ public:
 
     filter_state->setData(TunnelResponseTrailers::key(),
                           std::make_shared<TunnelResponseTrailers>(std::move(trailers)),
-                          StreamInfo::FilterState::StateType::ReadOnly,
                           StreamInfo::FilterState::LifeSpan::Connection);
   }
 

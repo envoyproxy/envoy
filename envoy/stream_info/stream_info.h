@@ -248,11 +248,22 @@ struct ResponseCodeDetailValues {
   const std::string FilterAddedInvalidRequestData = "filter_added_invalid_request_data";
   // A filter called addDecodedData at the wrong point in the filter chain.
   const std::string FilterAddedInvalidResponseData = "filter_added_invalid_response_data";
+  // Data was received for a CONNECT request before 200 response headers were sent.
+  const std::string EarlyConnectData = "early_connect_data";
   // Changes or additions to details should be reflected in
   // docs/root/configuration/http/http_conn_man/response_code_details.rst
 };
 
 using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailValues>;
+
+/**
+ * Type of connection close which is detected from the socket.
+ */
+enum class DetectedCloseType {
+  Normal,      // The normal socket close from Envoy's connection perspective.
+  LocalReset,  // The local reset initiated from Envoy.
+  RemoteReset, // The peer reset detected by the connection.
+};
 
 /**
  * Constants for the locally closing a connection. This is used in response code
@@ -272,6 +283,7 @@ struct LocalCloseReasonValues {
   const std::string TransportSocketTimeout = "transport_socket_timeout";
   const std::string TriggeredDelayedCloseTimeout = "triggered_delayed_close_timeout";
   const std::string TcpProxyInitializationFailure = "tcp_initializion_failure:";
+  const std::string TcpProxyDrainClose = "tcp_proxy_drain_close";
   const std::string TcpSessionIdleTimeout = "tcp_session_idle_timeout";
   const std::string MaxConnectionDurationReached = "max_connection_duration_reached";
   const std::string ClosingUpstreamTcpDueToDownstreamRemoteClose =
@@ -282,6 +294,7 @@ struct LocalCloseReasonValues {
       "closing_upstream_tcp_connection_due_to_downstream_reset_close";
   const std::string NonPooledTcpConnectionHostHealthFailure =
       "non_pooled_tcp_connection_host_health_failure";
+  const std::string BufferHighWatermarkTimeout = "buffer_high_watermark_timeout_reached";
 };
 
 using LocalCloseReasons = ConstSingleton<LocalCloseReasonValues>;
@@ -329,6 +342,14 @@ struct UpstreamTiming {
     last_upstream_rx_byte_received_ = time_source.monotonicTime();
   }
 
+  /**
+   * Sets the time when the first byte of the response body is received from upstream.
+   */
+  void onFirstUpstreamRxBodyByteReceived(TimeSource& time_source) {
+    ASSERT(!first_upstream_rx_body_byte_received_);
+    first_upstream_rx_body_byte_received_ = time_source.monotonicTime();
+  }
+
   void onUpstreamConnectStart(TimeSource& time_source) {
     ASSERT(!upstream_connect_start_);
     upstream_connect_start_ = time_source.monotonicTime();
@@ -355,6 +376,7 @@ struct UpstreamTiming {
   absl::optional<MonotonicTime> last_upstream_tx_byte_sent_;
   absl::optional<MonotonicTime> first_upstream_rx_byte_received_;
   absl::optional<MonotonicTime> last_upstream_rx_byte_received_;
+  absl::optional<MonotonicTime> first_upstream_rx_body_byte_received_;
 
   absl::optional<MonotonicTime> upstream_connect_start_;
   absl::optional<MonotonicTime> upstream_connect_complete_;
@@ -438,9 +460,17 @@ struct BytesMeter {
   uint64_t wireBytesReceived() const { return wire_bytes_received_; }
   uint64_t headerBytesSent() const { return header_bytes_sent_; }
   uint64_t headerBytesReceived() const { return header_bytes_received_; }
+  uint64_t decompressedHeaderBytesSent() const { return decompressed_header_bytes_sent_; }
+  uint64_t decompressedHeaderBytesReceived() const { return decompressed_header_bytes_received_; }
 
   void addHeaderBytesSent(uint64_t added_bytes) { header_bytes_sent_ += added_bytes; }
   void addHeaderBytesReceived(uint64_t added_bytes) { header_bytes_received_ += added_bytes; }
+  void addDecompressedHeaderBytesSent(uint64_t added_bytes) {
+    decompressed_header_bytes_sent_ += added_bytes;
+  }
+  void addDecompressedHeaderBytesReceived(uint64_t added_bytes) {
+    decompressed_header_bytes_received_ += added_bytes;
+  }
   void addWireBytesSent(uint64_t added_bytes) { wire_bytes_sent_ += added_bytes; }
   void addWireBytesReceived(uint64_t added_bytes) { wire_bytes_received_ += added_bytes; }
 
@@ -448,6 +478,8 @@ struct BytesMeter {
     SystemTime snapshot_time;
     uint64_t header_bytes_sent{};
     uint64_t header_bytes_received{};
+    uint64_t decompressed_header_bytes_sent{};
+    uint64_t decompressed_header_bytes_received{};
     uint64_t wire_bytes_sent{};
     uint64_t wire_bytes_received{};
   };
@@ -457,6 +489,10 @@ struct BytesMeter {
     downstream_periodic_logging_bytes_snapshot_->snapshot_time = snapshot_time;
     downstream_periodic_logging_bytes_snapshot_->header_bytes_sent = header_bytes_sent_;
     downstream_periodic_logging_bytes_snapshot_->header_bytes_received = header_bytes_received_;
+    downstream_periodic_logging_bytes_snapshot_->decompressed_header_bytes_sent =
+        decompressed_header_bytes_sent_;
+    downstream_periodic_logging_bytes_snapshot_->decompressed_header_bytes_received =
+        decompressed_header_bytes_received_;
     downstream_periodic_logging_bytes_snapshot_->wire_bytes_sent = wire_bytes_sent_;
     downstream_periodic_logging_bytes_snapshot_->wire_bytes_received = wire_bytes_received_;
   }
@@ -466,6 +502,10 @@ struct BytesMeter {
     upstream_periodic_logging_bytes_snapshot_->snapshot_time = snapshot_time;
     upstream_periodic_logging_bytes_snapshot_->header_bytes_sent = header_bytes_sent_;
     upstream_periodic_logging_bytes_snapshot_->header_bytes_received = header_bytes_received_;
+    upstream_periodic_logging_bytes_snapshot_->decompressed_header_bytes_sent =
+        decompressed_header_bytes_sent_;
+    upstream_periodic_logging_bytes_snapshot_->decompressed_header_bytes_received =
+        decompressed_header_bytes_received_;
     upstream_periodic_logging_bytes_snapshot_->wire_bytes_sent = wire_bytes_sent_;
     upstream_periodic_logging_bytes_snapshot_->wire_bytes_received = wire_bytes_received_;
   }
@@ -493,6 +533,8 @@ struct BytesMeter {
     // Accumulate existing bytes.
     header_bytes_sent_ += existing.header_bytes_sent_;
     header_bytes_received_ += existing.header_bytes_received_;
+    decompressed_header_bytes_sent_ += existing.decompressed_header_bytes_sent_;
+    decompressed_header_bytes_received_ += existing.decompressed_header_bytes_received_;
     wire_bytes_sent_ += existing.wire_bytes_sent_;
     wire_bytes_received_ += existing.wire_bytes_received_;
   }
@@ -500,6 +542,8 @@ struct BytesMeter {
 private:
   uint64_t header_bytes_sent_{};
   uint64_t header_bytes_received_{};
+  uint64_t decompressed_header_bytes_sent_{};
+  uint64_t decompressed_header_bytes_received_{};
   uint64_t wire_bytes_sent_{};
   uint64_t wire_bytes_received_{};
   std::unique_ptr<BytesSnapshot> downstream_periodic_logging_bytes_snapshot_;
@@ -596,6 +640,27 @@ public:
   virtual const std::string& upstreamTransportFailureReason() const PURE;
 
   /**
+   * @param close_type the upstream detected close type.
+   */
+  virtual void setUpstreamDetectedCloseType(DetectedCloseType close_type) PURE;
+
+  /**
+   * @return StreamInfo::DetectedCloseType the upstream detected close type.
+   */
+  virtual DetectedCloseType upstreamDetectedCloseType() const PURE;
+
+  /**
+   * @param reason the upstream local close reason.
+   */
+  virtual void setUpstreamLocalCloseReason(absl::string_view reason) PURE;
+
+  /**
+   * @return absl::string_view the upstream local close reason, if local close did not occur an
+   * empty string view is returned.
+   */
+  virtual absl::string_view upstreamLocalCloseReason() const PURE;
+
+  /**
    * @param host the selected upstream host for the request.
    */
   virtual void setUpstreamHost(Upstream::HostDescriptionConstSharedPtr host) PURE;
@@ -624,6 +689,26 @@ public:
 
   virtual void setUpstreamProtocol(Http::Protocol protocol) PURE;
   virtual absl::optional<Http::Protocol> upstreamProtocol() const PURE;
+
+  /**
+   * Add a host to the list of upstream hosts that were attempted for this request.
+   * This is useful for tracking retry behavior in access logs.
+   * @param host the host description that was attempted.
+   */
+  virtual void addUpstreamHostAttempted(Upstream::HostDescriptionConstSharedPtr host) PURE;
+
+  /**
+   * @return the list of all upstream hosts that were attempted for this request,
+   * in the order they were attempted. This includes both successful and failed attempts.
+   */
+  virtual const std::vector<Upstream::HostDescriptionConstSharedPtr>&
+  upstreamHostsAttempted() const PURE;
+
+  /**
+   * @return the list of all upstream connection IDs that were attempted for this request,
+   * in the order they were attempted. This helps identify connection reuse patterns.
+   */
+  virtual const std::vector<uint64_t>& upstreamConnectionIdsAttempted() const PURE;
 };
 
 /**
@@ -840,15 +925,26 @@ public:
   virtual const Network::ConnectionInfoProvider& downstreamAddressProvider() const PURE;
 
   /**
-   * @return const Router::RouteConstSharedPtr Get the route selected for this request.
+   * @return OptRef<const Router::Route> Get the route selected for this request.
    */
-  virtual Router::RouteConstSharedPtr route() const PURE;
+  virtual OptRef<const Router::Route> route() const PURE;
 
   /**
-   * @return const Router::VirtualHostConstSharedPtr& Get the virtual host selected for this
-   * request.
+   * @return Router::RouteConstSharedPtr Get the route selected for this request, extended to
+   * allow a caller to extend or transfer ownership.
    */
-  virtual const Router::VirtualHostConstSharedPtr& virtualHost() const PURE;
+  virtual Router::RouteConstSharedPtr routeSharedPtr() const PURE;
+
+  /**
+   * @return OptRef<const Router::VirtualHost> Get the virtual host selected for this request.
+   */
+  virtual OptRef<const Router::VirtualHost> virtualHost() const PURE;
+
+  /**
+   * @return Router::VirtualHostConstSharedPtr Get the virtual host selected for this request,
+   * extended to allow a caller to extend or transfer ownership.
+   */
+  virtual Router::VirtualHostConstSharedPtr virtualHostSharedPtr() const PURE;
 
   /**
    * @return const envoy::config::core::v3::Metadata& the dynamic metadata associated with this
@@ -863,14 +959,14 @@ public:
    * @param value the struct to set on the namespace. A merge will be performed with new values for
    * the same key overriding existing.
    */
-  virtual void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) PURE;
+  virtual void setDynamicMetadata(const std::string& name, const Protobuf::Struct& value) PURE;
 
   /**
    * @param name the namespace used in the metadata in reverse DNS format, for example:
    * envoy.test.my_filter.
    * @param value of type protobuf any to set on the namespace.
    */
-  virtual void setDynamicTypedMetadata(const std::string& name, const ProtobufWkt::Any& value) PURE;
+  virtual void setDynamicTypedMetadata(const std::string& name, const Protobuf::Any& value) PURE;
 
   /**
    * Object on which filters can share data on a per-request basis. For singleton data objects, only
@@ -898,11 +994,15 @@ public:
   setUpstreamClusterInfo(const Upstream::ClusterInfoConstSharedPtr& upstream_cluster_info) PURE;
 
   /**
-   * @return Upstream Connection's ClusterInfo.
-   * This returns an optional to differentiate between unset(absl::nullopt),
-   * no route or cluster does not exist(nullptr), and set to a valid cluster(not nullptr).
+   * @return OptRef<const Upstream::ClusterInfo> Get the cluster info for this request.
    */
-  virtual absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const PURE;
+  virtual OptRef<const Upstream::ClusterInfo> upstreamClusterInfo() const PURE;
+
+  /**
+   * @return Upstream::ClusterInfoConstSharedPtr Get the cluster info for this request, extended to
+   * allow a caller to extend or transfer ownership.
+   */
+  virtual Upstream::ClusterInfoConstSharedPtr upstreamClusterInfoSharedPtr() const PURE;
 
   /**
    * @param provider The unique id implementation this stream uses.
@@ -985,6 +1085,27 @@ public:
   virtual void setDownstreamTransportFailureReason(absl::string_view failure_reason) PURE;
 
   /**
+   * @param reason the downstream local close reason.
+   */
+  virtual void setDownstreamLocalCloseReason(absl::string_view reason) PURE;
+
+  /**
+   * @return absl::string_view the downstream local close reason, if local close did not occur an
+   * empty string view is returned.
+   */
+  virtual absl::string_view downstreamLocalCloseReason() const PURE;
+
+  /**
+   * @param close_type the downstream detected close type.
+   */
+  virtual void setDownstreamDetectedCloseType(DetectedCloseType close_type) PURE;
+
+  /**
+   * @return DetectedCloseType the downstream detected close type.
+   */
+  virtual DetectedCloseType downstreamDetectedCloseType() const PURE;
+
+  /**
    * Checked by routing filters before forwarding a request upstream.
    * @return to override the scheme header to match the upstream transport
    * protocol at routing filters.
@@ -1028,6 +1149,18 @@ public:
    * finished sending and receiving.
    */
   virtual void setShouldDrainConnectionUponCompletion(bool should_drain) PURE;
+
+  /**
+   * @return the codec level stream ID for the associated stream.
+   * This should be implemented to call the codecStreamId() method on the
+   * associated Http::Stream object.
+   */
+  virtual absl::optional<uint32_t> codecStreamId() const PURE;
+
+  /**
+   * @param id the codec level stream ID for the associated stream.
+   */
+  virtual void setCodecStreamId(absl::optional<uint32_t> id) PURE;
 };
 
 // An enum representation of the Proxy-Status error space.

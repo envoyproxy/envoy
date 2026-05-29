@@ -1,5 +1,7 @@
 #pragma once
 
+#include <sys/types.h>
+
 #include <string>
 
 #include "envoy/access_log/access_log.h"
@@ -33,11 +35,11 @@ namespace AccessLog {
 
 class AccessLogManagerImpl : public AccessLogManager, Logger::Loggable<Logger::Id::main> {
 public:
-  AccessLogManagerImpl(std::chrono::milliseconds file_flush_interval_msec, Api::Api& api,
-                       Event::Dispatcher& dispatcher, Thread::BasicLockable& lock,
-                       Stats::Store& stats_store)
-      : file_flush_interval_msec_(file_flush_interval_msec), api_(api), dispatcher_(dispatcher),
-        lock_(lock),
+  AccessLogManagerImpl(std::chrono::milliseconds file_flush_interval_msec,
+                       uint64_t min_flush_size_kb, Api::Api& api, Event::Dispatcher& dispatcher,
+                       Thread::BasicLockable& lock, Stats::Store& stats_store)
+      : file_flush_interval_msec_(file_flush_interval_msec),
+        file_min_flush_size_kb_(min_flush_size_kb), api_(api), dispatcher_(dispatcher), lock_(lock),
         file_stats_{ACCESS_LOG_FILE_STATS(POOL_COUNTER_PREFIX(stats_store, "filesystem."),
                                           POOL_GAUGE_PREFIX(stats_store, "filesystem."))} {}
   ~AccessLogManagerImpl() override;
@@ -49,6 +51,7 @@ public:
 
 private:
   const std::chrono::milliseconds file_flush_interval_msec_;
+  const uint64_t file_min_flush_size_kb_{64};
   Api::Api& api_;
   Event::Dispatcher& dispatcher_;
   Thread::BasicLockable& lock_;
@@ -67,7 +70,7 @@ class AccessLogFileImpl : public AccessLogFile {
 public:
   AccessLogFileImpl(Filesystem::FilePtr&& file, Event::Dispatcher& dispatcher,
                     Thread::BasicLockable& lock, AccessLogFileStats& stats,
-                    std::chrono::milliseconds flush_interval_msec,
+                    std::chrono::milliseconds flush_interval_msec, uint64_t min_flush_size_kb,
                     Thread::ThreadFactory& thread_factory);
   ~AccessLogFileImpl() override;
 
@@ -86,9 +89,6 @@ private:
   void doWrite(Buffer::Instance& buffer);
   void flushThreadFunc();
   void createFlushStructures();
-
-  // Minimum size before the flush thread will be told to flush.
-  static const uint64_t MIN_FLUSH_SIZE = 1024 * 64;
 
   Filesystem::FilePtr file_;
 
@@ -130,6 +130,8 @@ private:
   const std::chrono::milliseconds flush_interval_msec_; // Time interval buffer gets flushed no
                                                         // matter if it reached the MIN_FLUSH_SIZE
                                                         // or not.
+  const uint64_t min_flush_size_{
+      64 * 1024}; // Minimum size before the flush thread will be told to flush.
   AccessLogFileStats& stats_;
 };
 

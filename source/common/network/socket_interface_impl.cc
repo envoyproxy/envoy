@@ -12,8 +12,8 @@
 #include "source/common/network/win32_socket_handle_impl.h"
 
 #if defined(__linux__) && !defined(__ANDROID_API__) && defined(ENVOY_ENABLE_IO_URING)
-#include "source/common/io/io_uring_worker_factory_impl.h"
 #include "source/common/io/io_uring_impl.h"
+#include "source/common/io/io_uring_worker_factory_impl.h"
 #include "source/common/network/io_uring_socket_handle_impl.h"
 #endif
 

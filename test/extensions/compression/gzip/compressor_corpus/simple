@@ -1,1 +1,4 @@
-aaaaaaaaaaaaaaaabbbbbbbbbcccccccccccccccccccc
+compression_level: SPEED
+window_bits: 10
+memory_level: 1
+data_chunks: "aaaaaaaaaaaaaaaabbbbbbbbbccccccccccccccccc"

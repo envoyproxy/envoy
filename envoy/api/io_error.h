@@ -44,6 +44,8 @@ public:
     NetworkUnreachable,
     // Invalid arguments passed in.
     InvalidArgument,
+    // No buffer space available.
+    NoBufferSpace,
     // Other error codes cannot be mapped to any one above in getErrorCode().
     UnknownError
   };

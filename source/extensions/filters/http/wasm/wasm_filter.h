@@ -23,6 +23,9 @@ public:
 
   FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& config,
                Server::Configuration::UpstreamFactoryContext& context);
+
+  FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& config,
+               Server::Configuration::ServerFactoryContext& context);
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

@@ -22,7 +22,7 @@ TEST(OmitCanaryHostsRetryPredicateTest, PredicateTest) {
 
   ASSERT_NE(nullptr, factory);
 
-  ProtobufWkt::Struct config;
+  Protobuf::Struct config;
   auto predicate = factory->createHostPredicate(config, 3);
 
   auto host1 = std::make_shared<NiceMock<Upstream::MockHost>>();

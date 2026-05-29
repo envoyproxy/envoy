@@ -40,13 +40,13 @@ logic for a specific key. Incoming config metadata (via xDS) is converted
 to class objects at config load time. Filters can then obtain a typed
 variant of the metadata at runtime (per request or connection), thereby
 eliminating the need for filters to repeatedly convert from
-``ProtobufWkt::Struct`` to some internal object during request/connection
+``Protobuf::Struct`` to some internal object during request/connection
 processing.
 
 For example, a filter that desires to have a convenience wrapper class over
 an opaque metadata with key ``xxx.service.policy`` in ``ClusterInfo`` could
 register a factory ``ServicePolicyFactory`` that inherits from
-``ClusterTypedMetadataFactory``. The factory translates the ``ProtobufWkt::Struct``
+``ClusterTypedMetadataFactory``. The factory translates the ``Protobuf::Struct``
 into an instance of ``ServicePolicy`` class (inherited from
 ``FilterState::Object``). When a ``Cluster`` is created, the associated
 ``ServicePolicy`` instance will be created and cached. Note that typed
@@ -87,8 +87,8 @@ connection and HTTP stream (i.e., HTTP request/response pair)
 respectively. ``StreamInfo`` contains a set of fixed attributes as part of
 the class definition (e.g., HTTP protocol, requested server name, etc.). In
 addition, it provides a facility to store typed objects in a map
-(``map<string, FilterState::Object>``). The state stored per filter can be
-either write-once (immutable), or write-many (mutable).
+(``map<string, FilterState::Object>``). The state stored per filter is
+write-many (mutable).
 
 See :ref:`the well-known dynamic metadata <well_known_dynamic_metadata>` and
 :ref:`the well-known filter state <well_known_filter_state>` for the reference

@@ -131,8 +131,7 @@ public:
         Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(factory_name);
     auto proto_message = cluster1->info_->lb_factory_->createEmptyConfigProto();
     cluster1->info_->typed_lb_config_ =
-        cluster1->info_->lb_factory_->loadConfig(*server_.server_factory_context_, *proto_message)
-            .value();
+        cluster1->info_->lb_factory_->loadConfig(factory_.server_context_, *proto_message).value();
 
     InSequence s;
     EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
@@ -185,7 +184,7 @@ private:
 
     Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext* context) override {
       if (context && context->requestStreamInfo()) {
-        ProtobufWkt::Struct value;
+        Protobuf::Struct value;
         (*value.mutable_fields())["foo"] = ValueUtil::stringValue("bar");
         context->requestStreamInfo()->setDynamicMetadata("envoy.load_balancers.metadata_writer",
                                                          value);
@@ -1040,7 +1039,7 @@ public:
     // Sending non-mergeable updates.
     cluster_->prioritySet().updateHosts(
         0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts,
-        {}, 123, absl::nullopt, 100);
+        {}, absl::nullopt, 100);
   }
 
   Cluster* cluster_{};
@@ -1107,9 +1106,10 @@ TEST_F(PreconnectTest, PreconnectOnWithOverrideHost) {
   initialize(1.1);
 
   NiceMock<MockLoadBalancerContext> context;
+  Upstream::LoadBalancerContext::OverrideHost override_host{"127.0.0.1:80", false};
   EXPECT_CALL(context, overrideHostToSelect())
-      .WillRepeatedly(Return(absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>(
-          std::make_pair("127.0.0.1:80", false))));
+      .WillRepeatedly(
+          Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host)));
 
   // Only allocate connection pool once.
   EXPECT_CALL(factory_, allocateTcpConnPool_)

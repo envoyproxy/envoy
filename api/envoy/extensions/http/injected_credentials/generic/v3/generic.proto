@@ -31,4 +31,11 @@ message Generic {
   // If not set, filter will default to: ``Authorization``
   string header = 2
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+
+  // The prefix to prepend to the credential value before injecting it into the header.
+  // This is useful for adding a scheme such as ``Bearer `` or ``Basic `` to the credential.
+  // For example, if the credential is ``xyz123`` and the prefix is ``Bearer ``, the
+  // final header value will be ``Bearer xyz123``.
+  // If not set, the raw credential value will be injected without any prefix.
+  string header_value_prefix = 3;
 }

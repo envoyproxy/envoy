@@ -39,7 +39,10 @@ jobs:
       check-name: mobile-format
 
   container:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
+      actions: read
       contents: read
       packages: read
     if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-format }}

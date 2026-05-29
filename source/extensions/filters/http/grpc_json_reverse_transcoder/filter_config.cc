@@ -40,7 +40,6 @@ using ResponseTranslator = ::google::grpc::transcoding::JsonRequestTranslator;
 using ResponseInfo = ::google::grpc::transcoding::RequestInfo;
 using ::envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
     GrpcJsonReverseTranscoder;
-using ::google::api::HttpRule;
 using ::google::grpc::transcoding::Transcoder;
 using ::google::grpc::transcoding::TranscoderInputStream;
 using ::google::grpc::transcoding::TypeHelper;
@@ -50,7 +49,7 @@ GrpcJsonReverseTranscoderConfig::GrpcJsonReverseTranscoderConfig(
   Protobuf::FileDescriptorSet descriptor_set;
   if (!transcoder_config.descriptor_path().empty()) {
     auto file_or_error = api.fileSystem().fileReadToEnd(transcoder_config.descriptor_path());
-    THROW_IF_NOT_OK(file_or_error.status());
+    THROW_IF_NOT_OK_REF(file_or_error.status());
     if (!descriptor_set.ParseFromString(file_or_error.value())) {
       throw EnvoyException("Unable to parse proto descriptor");
     }
@@ -94,6 +93,8 @@ GrpcJsonReverseTranscoderConfig::GrpcJsonReverseTranscoderConfig(
 
 const Protobuf::MethodDescriptor*
 GrpcJsonReverseTranscoderConfig::GetMethodDescriptor(absl::string_view path) const {
+  // HCM guarantees the `:path` header is non-empty here.
+  ASSERT(!path.empty());
   std::string grpc_method = absl::StrReplaceAll(path.substr(1), {{"/", "."}});
   return descriptor_pool_.FindMethodByName(grpc_method);
 }
@@ -123,15 +124,15 @@ bool GrpcJsonReverseTranscoderConfig::IsRequestNestedHttpBody(
   if (http_request_body_field.empty() || http_request_body_field == "*") {
     return false;
   }
-  const ProtobufWkt::Type* request_type = type_helper_->Info()->GetTypeByTypeUrl(request_type_url);
-  std::vector<const ProtobufWkt::Field*> request_body_field_path;
+  const Protobuf::Type* request_type = type_helper_->Info()->GetTypeByTypeUrl(request_type_url);
+  std::vector<const Protobuf::Field*> request_body_field_path;
   absl::Status status = type_helper_->ResolveFieldPath(*request_type, http_request_body_field,
                                                        &request_body_field_path);
   if (!status.ok() || request_body_field_path.empty()) {
     ENVOY_LOG(error, "Failed to resolve the request type: {}", request_type_url);
     return false;
   }
-  const ProtobufWkt::Type* request_body_type =
+  const Protobuf::Type* request_body_type =
       type_helper_->Info()->GetTypeByTypeUrl(request_body_field_path.back()->type_url());
 
   return request_body_type != nullptr &&

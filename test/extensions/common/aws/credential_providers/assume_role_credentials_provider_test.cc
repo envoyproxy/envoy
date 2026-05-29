@@ -94,7 +94,8 @@ public:
 
     auto signer = std::make_unique<SigV4SignerImpl>(
         STS_SERVICE_NAME, "region", credentials_provider_chain, context_,
-        Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
+        Extensions::Common::Aws::AwsSigningHeaderMatcherVector{},
+        Extensions::Common::Aws::AwsSigningHeaderMatcherVector{});
 
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     provider_ = std::make_shared<AssumeRoleCredentialsProvider>(
@@ -388,8 +389,9 @@ TEST_F(AssumeRoleCredentialsProviderTest, ExpiredTokenException) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  // bad expiration format will cause a refresh of 1 hour - 5s (3595 seconds) by default
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(3595)), nullptr));
+  // bad expiration format will cause a refresh of 1 hour - 60s grace period (3540 seconds) by
+  // default
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(3540)), nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -432,8 +434,9 @@ TEST_F(AssumeRoleCredentialsProviderTest, BadExpirationFormat) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  // bad expiration format will cause a refresh of 1 hour - 5s (3595 seconds) by default
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(3595)), nullptr));
+  // bad expiration format will cause a refresh of 1 hour - 60s grace period (3540 seconds) by
+  // default
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(3540)), nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -469,8 +472,8 @@ TEST_F(AssumeRoleCredentialsProviderTest, FullCachedCredentialsWithMissingExpira
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  // No expiration should fall back to a one hour - 5s (3595s) refresh
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(3595)), nullptr));
+  // No expiration should fall back to a one hour - 60s grace period (3540s) refresh
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(3540)), nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -504,7 +507,8 @@ TEST_F(AssumeRoleCredentialsProviderTest, RefreshOnNormalCredentialExpiration) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::hours(2)), nullptr));
+  // 2 hours - 60s grace period = 7140 seconds
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(7140000), nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -538,7 +542,8 @@ TEST_F(AssumeRoleCredentialsProviderTest, RefreshOnNormalCredentialExpirationInt
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::hours(2)), nullptr));
+  // 2 hours - 60s grace period = 7140 seconds
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(7140000), nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -632,7 +637,27 @@ TEST_F(AssumeRoleCredentialsProviderTest, Coverage) {
 TEST_F(AssumeRoleCredentialsProviderTest, WithSessionDuration) {
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
 
-  expectDocument(200, std::move(R"EOF(
+  // Custom matcher for request with session duration parameter.
+  Http::TestRequestHeaderMapImpl headers_with_duration{
+      {":path", "/?Version=2011-06-15&Action=AssumeRole&RoleArn=aws:iam::123456789012:role/"
+                "arn&RoleSessionName=role-session-name&DurationSeconds=3600"},
+      {":authority", "sts.region.amazonaws.com"},
+      {":scheme", "https"},
+      {":method", "GET"},
+      {"Accept", "application/json"},
+      {"x-amz-content-sha256", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+      {"x-amz-security-token", "token"},
+      {"x-amz-date", "20180102T030405Z"},
+      {"authorization",
+       "AWS4-HMAC-SHA256 Credential=akid/20180102/region/sts/aws4_request, "
+       "SignedHeaders=accept;host;x-amz-content-sha256;x-amz-date;x-amz-security-token, "
+       "Signature=88533b93b82077848fa88b5d1fe69540a0916960fdd48a1df66b764dc73a6d9a"}};
+
+  // Use a custom expectation for this test to verify the DurationSeconds parameter.
+  EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers_with_duration), _, _))
+      .WillRepeatedly(Invoke(
+          [](Http::RequestMessage&, Tracing::Span&, MetadataFetcher::MetadataReceiver& receiver) {
+            receiver.onMetadataSuccess(std::move(R"EOF(
 {
   "AssumeRoleResponse": {
     "AssumeRoleResult": {
@@ -645,6 +670,7 @@ TEST_F(AssumeRoleCredentialsProviderTest, WithSessionDuration) {
   }
 }
 )EOF"));
+          }));
 
   // Setup provider with session duration
   ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
@@ -670,7 +696,8 @@ TEST_F(AssumeRoleCredentialsProviderTest, WithSessionDuration) {
                                                                                 defaults);
   auto signer = std::make_unique<SigV4SignerImpl>(
       STS_SERVICE_NAME, "region", credentials_provider_chain, context_,
-      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
+      Extensions::Common::Aws::AwsSigningHeaderMatcherVector{},
+      Extensions::Common::Aws::AwsSigningHeaderMatcherVector{});
 
   provider_ = std::make_shared<AssumeRoleCredentialsProvider>(
       context_, mock_manager_, cluster_name,
@@ -800,7 +827,6 @@ TEST_F(AssumeRoleCredentialsProviderTest, MetadataFetcherCreateAndCancel) {
 
   setupProvider();
 
-  // First refresh - covers line 88 (!metadata_fetcher_)
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
   EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
@@ -808,8 +834,7 @@ TEST_F(AssumeRoleCredentialsProviderTest, MetadataFetcherCreateAndCancel) {
   provider_friend.onClusterAddOrUpdate();
   timer_->invokeCallback();
 
-  // Second refresh - covers line 94 (metadata_fetcher_->cancel())
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
   EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
   provider_friend.onClusterAddOrUpdate();
@@ -840,7 +865,8 @@ TEST_F(AssumeRoleCredentialsProviderTest, CredentialsPendingReturn) {
 
   auto signer = std::make_unique<SigV4SignerImpl>(
       STS_SERVICE_NAME, "region", credentials_provider_chain, context_,
-      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
+      Extensions::Common::Aws::AwsSigningHeaderMatcherVector{},
+      Extensions::Common::Aws::AwsSigningHeaderMatcherVector{});
 
   provider_ = std::make_shared<AssumeRoleCredentialsProvider>(
       context_, mock_manager_, cluster_name,
@@ -860,6 +886,117 @@ TEST_F(AssumeRoleCredentialsProviderTest, CredentialsPendingReturn) {
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   delete (raw_metadata_fetcher_);
+}
+
+TEST_F(AssumeRoleCredentialsProviderTest, WithExternalId) {
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+
+  // Custom matcher for request with external ID parameter.
+  Http::TestRequestHeaderMapImpl headers_with_external_id{
+      {":path", "/?Version=2011-06-15&Action=AssumeRole&RoleArn=aws:iam::123456789012:role/"
+                "arn&RoleSessionName=role-session-name&ExternalId=test-external-id"},
+      {":authority", "sts.region.amazonaws.com"},
+      {":scheme", "https"},
+      {":method", "GET"},
+      {"Accept", "application/json"},
+      {"x-amz-content-sha256", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+      {"x-amz-security-token", "token"},
+      {"x-amz-date", "20180102T030405Z"},
+      {"authorization",
+       "AWS4-HMAC-SHA256 Credential=akid/20180102/region/sts/aws4_request, "
+       "SignedHeaders=accept;host;x-amz-content-sha256;x-amz-date;x-amz-security-token, "
+       "Signature=cc05851f97c3e6c1d8c28c205a1dcbb6248a944375f3e7b349800c2b3744fc48"}};
+
+  EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers_with_external_id), _, _))
+      .WillRepeatedly(Invoke(
+          [](Http::RequestMessage&, Tracing::Span&, MetadataFetcher::MetadataReceiver& receiver) {
+            receiver.onMetadataSuccess(std::move(R"EOF(
+{
+  "AssumeRoleResponse": {
+    "AssumeRoleResult": {
+      "Credentials": {
+        "AccessKeyId": "test-access-key",
+        "SecretAccessKey": "test-secret-key",
+        "SessionToken": "test-session-token"
+      }
+    }
+  }
+}
+)EOF"));
+          }));
+
+  // Setup provider with external ID.
+  ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
+  envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider cred_provider = {};
+  cred_provider.set_role_arn("aws:iam::123456789012:role/arn");
+  cred_provider.set_role_session_name("role-session-name");
+  cred_provider.set_external_id("test-external-id");
+
+  mock_manager_ = std::make_shared<MockAwsClusterManager>();
+  EXPECT_CALL(*mock_manager_, getUriFromClusterName(_))
+      .WillRepeatedly(Return("sts.region.amazonaws.com:443"));
+
+  auto cluster_name = "credentials_provider_cluster";
+  envoy::extensions::common::aws::v3::AwsCredentialProvider defaults;
+  envoy::extensions::common::aws::v3::EnvironmentCredentialProvider env_provider;
+  TestEnvironment::setEnvVar("AWS_ACCESS_KEY_ID", "akid", 1);
+  TestEnvironment::setEnvVar("AWS_SECRET_ACCESS_KEY", "secret", 1);
+  TestEnvironment::setEnvVar("AWS_SESSION_TOKEN", "token", 1);
+
+  defaults.mutable_environment_credential_provider()->CopyFrom(env_provider);
+  auto credentials_provider_chain =
+      std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(context_, "region",
+                                                                                defaults);
+  auto signer = std::make_unique<SigV4SignerImpl>(
+      STS_SERVICE_NAME, "region", credentials_provider_chain, context_,
+      Extensions::Common::Aws::AwsSigningHeaderMatcherVector{},
+      Extensions::Common::Aws::AwsSigningHeaderMatcherVector{});
+
+  provider_ = std::make_shared<AssumeRoleCredentialsProvider>(
+      context_, mock_manager_, cluster_name,
+      [this](Upstream::ClusterManager&, absl::string_view) {
+        metadata_fetcher_.reset(raw_metadata_fetcher_);
+        return std::move(metadata_fetcher_);
+      },
+      "region", MetadataFetcher::MetadataReceiver::RefreshState::Ready, std::chrono::seconds(2),
+      std::move(signer), cred_provider);
+
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+
+  auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+  provider_friend.onClusterAddOrUpdate();
+  timer_->invokeCallback();
+
+  const auto credentials = provider_->getCredentials();
+  EXPECT_TRUE(credentials.accessKeyId().has_value());
+  EXPECT_EQ("test-access-key", credentials.accessKeyId().value());
+}
+
+// Tests ASAN failure when cancel wrapper is not used
+TEST_F(AssumeRoleCredentialsProviderTest, CancelWrapperPreventsUseAfterFree) {
+  std::function<void()> captured_callback;
+
+  EXPECT_CALL(context_.thread_local_, runOnAllThreads(testing::_, testing::_))
+      .WillOnce(testing::Invoke([&captured_callback](const std::function<void()>&,
+                                                     const std::function<void()>& complete_cb) {
+        captured_callback = complete_cb;
+      }));
+
+  setupProvider();
+
+  {
+    auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+    provider_friend.setCredentialsToAllThreads(std::make_unique<Credentials>());
+
+    ASSERT_TRUE(captured_callback != nullptr);
+
+    provider_friend.provider_.reset();
+    provider_.reset();
+  }
+
+  captured_callback();
+  delete raw_metadata_fetcher_;
 }
 
 } // namespace Aws

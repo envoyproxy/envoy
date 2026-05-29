@@ -28,7 +28,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace OverrideHost {
 
 using ::envoy::extensions::load_balancing_policies::override_host::v3::OverrideHost;
@@ -70,9 +70,11 @@ public:
                                     RandomGenerator& random, TimeSource& time_source) const;
 
   const std::vector<OverrideSource>& overrideHostSources() const { return override_host_sources_; }
+  const absl::optional<Config::MetadataKey>& selectedHostKey() const { return selected_host_key_; }
 
 private:
   OverrideHostLbConfig(std::vector<OverrideSource>&& override_host_sources,
+                       absl::optional<Config::MetadataKey>&& selected_host_key,
                        TypedLoadBalancerFactory* fallback_load_balancer_factory,
                        LoadBalancerConfigPtr&& fallback_load_balancer_config);
 
@@ -88,6 +90,7 @@ private:
   const FallbackLbConfig fallback_picker_lb_config_;
 
   const std::vector<OverrideSource> override_host_sources_;
+  const absl::optional<Config::MetadataKey> selected_host_key_;
 };
 
 // Load balancer for the dynamic forwarding, supporting external endpoint
@@ -148,6 +151,10 @@ private:
     HostConstSharedPtr getEndpoint(OverrideHostFilterState& override_host_state);
     HostConstSharedPtr findHost(absl::string_view endpoint);
 
+    HostSelectionResponse chooseHostInternal(LoadBalancerContext* context);
+
+    void addSelectedHostKey(LoadBalancerContext* context, HostSelectionResponse& response);
+
     // Lookup the list of endpoints selected by the LbTrafficExtension in the
     // header or in the request metadata.
     // TODO(wbpcode): will absl::InlinedVector be used here be better?
@@ -182,6 +189,8 @@ private:
     // Called by worker threads to create a thread-local load balancer.
     LoadBalancerPtr create(LoadBalancerParams params) override;
 
+    bool recreateOnHostChange() const override { return false; }
+
   private:
     // Hosts in the load balancer. Owned by the cluster manager.
     const OverrideHostLbConfig& config_;
@@ -195,6 +204,6 @@ private:
 };
 
 } // namespace OverrideHost
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

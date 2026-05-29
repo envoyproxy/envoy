@@ -14,10 +14,9 @@
 #include "source/common/version/version.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
-#include "test/config/v2_link_hacks.h"
-#include "test/integration/ads_integration.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/utility.h"
+#include "test/integration/xdstp_config_sources_integration.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
@@ -25,149 +24,21 @@
 #include "gtest/gtest.h"
 
 using testing::AssertionResult;
+using testing::Eq;
+using testing::Ge;
 
 namespace Envoy {
 
 // Tests for xDS-TP based config sources (defined in the bootstrap), without the
 // ads_config definition.
-class XdsTpConfigsIntegrationTest : public AdsDeltaSotwIntegrationSubStateParamTest,
-                                    public HttpIntegrationTest {
+class XdsTpConfigsIntegrationTest : public XdsTpConfigsIntegration {
 public:
-  XdsTpConfigsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(),
-                            ConfigHelper::httpProxyConfig(false)) {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
-                                      (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
-                                       sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta)
-                                          ? "true"
-                                          : "false");
-    // Not using the normal xds upstream, but the
-    // authority1_upstream_/default_upstream.
-    create_xds_upstream_ = false;
-    // Not testing TLS in this case.
-    tls_xds_upstream_ = false;
-    sotw_or_delta_ = sotwOrDelta();
-    setUpstreamProtocol(Http::CodecType::HTTP2);
-  }
-
-  FakeUpstream* createAdsUpstream() {
-    ASSERT(!tls_xds_upstream_);
-    addFakeUpstream(Http::CodecType::HTTP2);
-    return fake_upstreams_.back().get();
-  }
-
-  void TearDown() override {
-    cleanupXdsConnection(authority1_xds_connection_);
-    cleanupXdsConnection(default_authority_xds_connection_);
-  }
-
-  void createUpstreams() override {
-    HttpIntegrationTest::createUpstreams();
-    // An upstream for authority1 (H/2), an upstream for the default_authority (H/2), and an
-    // upstream for a backend (H/1).
-    authority1_upstream_ = createAdsUpstream();
-    default_authority_upstream_ = createAdsUpstream();
-    addFakeUpstream(Http::CodecType::HTTP1);
-  }
-
-  bool isSotw() const {
-    return sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
-           sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw;
-  }
-
-  // Adds config_source for authority1.com and a default_config_source for
-  // default_authority.com.
-  void initialize() override {
-    config_helper_.addRuntimeOverride(
-        "envoy.reloadable_features.xdstp_based_config_singleton_subscriptions", "true");
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      // Add the first config_source.
-      {
-        auto* config_source1 = bootstrap.mutable_config_sources()->Add();
-        config_source1->mutable_authorities()->Add()->set_name("authority1.com");
-        auto* api_config_source = config_source1->mutable_api_config_source();
-        api_config_source->set_api_type(
-            isSotw() ? envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC
-                     : envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC);
-        api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
-        api_config_source->set_set_node_on_first_message_only(true);
-        auto* grpc_service = api_config_source->add_grpc_services();
-        setGrpcService(*grpc_service, "authority1_cluster", authority1_upstream_->localAddress());
-        auto* xds_cluster = bootstrap.mutable_static_resources()->add_clusters();
-        xds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-        xds_cluster->set_name("authority1_cluster");
-      }
-      // Add the default config source.
-      {
-        auto* default_config_source = bootstrap.mutable_default_config_source();
-        default_config_source->mutable_authorities()->Add()->set_name("default_authority.com");
-        auto* api_config_source = default_config_source->mutable_api_config_source();
-        api_config_source->set_api_type(
-            isSotw() ? envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC
-                     : envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC);
-        api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
-        api_config_source->set_set_node_on_first_message_only(true);
-        auto* grpc_service = api_config_source->add_grpc_services();
-        setGrpcService(*grpc_service, "default_authority_cluster",
-                       default_authority_upstream_->localAddress());
-        auto* xds_cluster = bootstrap.mutable_static_resources()->add_clusters();
-        xds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-        xds_cluster->set_name("default_authority_cluster");
-      }
-    });
-    HttpIntegrationTest::initialize();
-  }
-
-  void connectAuthority1() {
-    AssertionResult result =
-        authority1_upstream_->waitForHttpConnection(*dispatcher_, authority1_xds_connection_);
-    RELEASE_ASSERT(result, result.message());
-    result = authority1_xds_connection_->waitForNewStream(*dispatcher_, authority1_xds_stream_);
-    RELEASE_ASSERT(result, result.message());
-    authority1_xds_stream_->startGrpcStream();
-  }
-
-  void connectDefaultAuthority() {
-    AssertionResult result = default_authority_upstream_->waitForHttpConnection(
-        *dispatcher_, default_authority_xds_connection_);
-    RELEASE_ASSERT(result, result.message());
-    result = default_authority_xds_connection_->waitForNewStream(*dispatcher_,
-                                                                 default_authority_xds_stream_);
-    RELEASE_ASSERT(result, result.message());
-    default_authority_xds_stream_->startGrpcStream();
-  }
-
-  void cleanupXdsConnection(FakeHttpConnectionPtr& connection) {
-    if (connection != nullptr) {
-      AssertionResult result = connection->close();
-      RELEASE_ASSERT(result, result.message());
-      result = connection->waitForDisconnect();
-      RELEASE_ASSERT(result, result.message());
-      connection.reset();
-    }
-  }
-
-  envoy::config::endpoint::v3::ClusterLoadAssignment
-  buildClusterLoadAssignment(const std::string& name) {
-    // The last fake upstream is the emulated server.
-    return ConfigHelper::buildClusterLoadAssignment(
-        name, Network::Test::getLoopbackAddressString(ipVersion()),
-        fake_upstreams_.back().get()->localAddress()->ip()->port());
-  }
-
-  // Data members that emulate the authority1 server.
-  FakeUpstream* authority1_upstream_;
-  FakeHttpConnectionPtr authority1_xds_connection_;
-  FakeStreamPtr authority1_xds_stream_;
-
-  // Data members that emulate the default_authority server.
-  FakeUpstream* default_authority_upstream_;
-  FakeHttpConnectionPtr default_authority_xds_connection_;
-  FakeStreamPtr default_authority_xds_stream_;
+  XdsTpConfigsIntegrationTest() = default;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, XdsTpConfigsIntegrationTest,
-                         ADS_INTEGRATION_PARAMS);
+                         ADS_INTEGRATION_PARAMS,
+                         XdsTpConfigsIntegrationTest::protocolTestParamsToString);
 
 // Validate that a bootstrap cluster that has an xds-tp based config EDS source
 // works.
@@ -207,12 +78,12 @@ TEST_P(XdsTpConfigsIntegrationTest, EdsOnlyConfigAuthority1) {
 
     // Authority1 should receive the EDS request.
     EXPECT_TRUE(compareDiscoveryRequest(
-        Config::TypeUrl::get().ClusterLoadAssignment, "",
+        Config::TestTypeUrl::get().ClusterLoadAssignment, "",
         {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1"},
         {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1"},
         {}, true, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
     sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-        Config::TypeUrl::get().ClusterLoadAssignment,
+        Config::TestTypeUrl::get().ClusterLoadAssignment,
         {buildClusterLoadAssignment(
             "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/"
             "cluster1")},
@@ -223,14 +94,14 @@ TEST_P(XdsTpConfigsIntegrationTest, EdsOnlyConfigAuthority1) {
 
     // Expect an EDS ACK.
     EXPECT_TRUE(compareDiscoveryRequest(
-        Config::TypeUrl::get().ClusterLoadAssignment, "1",
+        Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
         {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1"},
         {}, {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
   };
 
   initialize();
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   // Try to send a request and see that it reaches the backend (backend 3).
   testRouterHeaderOnlyRequestAndResponse(nullptr, 3);
   cleanupUpstreamAndDownstream();
@@ -274,7 +145,7 @@ TEST_P(XdsTpConfigsIntegrationTest, EdsOnlyConfigAuthority1Update) {
 
     // Authority1 should receive the EDS request.
     EXPECT_TRUE(compareDiscoveryRequest(
-        Config::TypeUrl::get().ClusterLoadAssignment, "",
+        Config::TestTypeUrl::get().ClusterLoadAssignment, "",
         {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1"},
         {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1"},
         {}, true, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
@@ -282,24 +153,24 @@ TEST_P(XdsTpConfigsIntegrationTest, EdsOnlyConfigAuthority1Update) {
     auto cla = buildClusterLoadAssignment(
         "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1");
     sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-        Config::TypeUrl::get().ClusterLoadAssignment, {cla}, {cla}, {}, "1", {},
+        Config::TestTypeUrl::get().ClusterLoadAssignment, {cla}, {cla}, {}, "1", {},
         authority1_xds_stream_.get());
 
     // Expect an EDS ACK.
     EXPECT_TRUE(compareDiscoveryRequest(
-        Config::TypeUrl::get().ClusterLoadAssignment, "1",
+        Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
         {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1"},
         {}, {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
   };
 
   initialize();
 
-  test_server_->waitForCounterEq(
+  test_server_->waitForCounter(
       "cluster.xdstp_authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/"
       "cluster1.update_success",
-      1);
+      Eq(1));
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   // Try to send a request and see that it reaches the backend (backend 3).
   testRouterHeaderOnlyRequestAndResponse(nullptr, 3);
   cleanupUpstreamAndDownstream();
@@ -312,19 +183,19 @@ TEST_P(XdsTpConfigsIntegrationTest, EdsOnlyConfigAuthority1Update) {
   // Send an update to the load-assignment.
   cla.mutable_endpoints(0)->mutable_locality()->set_sub_zone("new_sub_zone");
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-      Config::TypeUrl::get().ClusterLoadAssignment, {cla}, {cla}, {}, "2", {},
+      Config::TestTypeUrl::get().ClusterLoadAssignment, {cla}, {cla}, {}, "2", {},
       authority1_xds_stream_.get());
 
   // Expect an EDS ACK.
   EXPECT_TRUE(compareDiscoveryRequest(
-      Config::TypeUrl::get().ClusterLoadAssignment, "2",
+      Config::TestTypeUrl::get().ClusterLoadAssignment, "2",
       {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1"},
       {}, {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
 
-  test_server_->waitForCounterEq(
+  test_server_->waitForCounter(
       "cluster.xdstp_authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/"
       "cluster1.update_success",
-      2);
+      Eq(2));
 }
 
 // Validate that a bootstrap cluster that has an xds-tp based config EDS source
@@ -365,14 +236,14 @@ TEST_P(XdsTpConfigsIntegrationTest, EdsOnlyConfigDefaultSource) {
 
     // Default Authority should receive the EDS request.
     EXPECT_TRUE(compareDiscoveryRequest(
-        Config::TypeUrl::get().ClusterLoadAssignment, "",
+        Config::TestTypeUrl::get().ClusterLoadAssignment, "",
         {"xdstp://default_authority.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/"
          "cluster1"},
         {"xdstp://default_authority.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/"
          "cluster1"},
         {}, true, Grpc::Status::WellKnownGrpcStatus::Ok, "", default_authority_xds_stream_.get()));
     sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-        Config::TypeUrl::get().ClusterLoadAssignment,
+        Config::TestTypeUrl::get().ClusterLoadAssignment,
         {buildClusterLoadAssignment(
             "xdstp://default_authority.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/"
             "cluster1")},
@@ -383,7 +254,7 @@ TEST_P(XdsTpConfigsIntegrationTest, EdsOnlyConfigDefaultSource) {
 
     // Expect an EDS ACK.
     EXPECT_TRUE(compareDiscoveryRequest(
-        Config::TypeUrl::get().ClusterLoadAssignment, "1",
+        Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
         {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1"},
         {}, {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "",
         default_authority_xds_stream_.get()));
@@ -391,12 +262,138 @@ TEST_P(XdsTpConfigsIntegrationTest, EdsOnlyConfigDefaultSource) {
 
   initialize();
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   // Try to send a request and see that it reaches the backend (backend 3).
   testRouterHeaderOnlyRequestAndResponse(nullptr, 3);
   cleanupUpstreamAndDownstream();
 }
 
-// TODO(adisuissa): add a test that validates that two clusters with the same
-// config source multiplex the request on the same stream.
+// Validate that two clusters with the same source multiplex the request on the
+// same stream.
+TEST_P(XdsTpConfigsIntegrationTest, TwoClustersWithEdsOnlyConfigAuthority1) {
+  // Setup a static cluster that requires EDS from authority1.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* static_resources = bootstrap.mutable_static_resources();
+
+    // Add 2 EDS clusters that will fetch endpoints from authority1.
+    static_resources->mutable_clusters()->Add()->CopyFrom(
+        TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(
+            R"EOF(
+                name: xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1
+                type: EDS
+                eds_cluster_config: {}
+            )EOF"));
+    static_resources->mutable_clusters()->Add()->CopyFrom(
+        TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(
+            R"EOF(
+                name: xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster2
+                type: EDS
+                eds_cluster_config: {}
+            )EOF"));
+  });
+
+  // Update the route to the xdstp-based cluster.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_route_config()
+            ->mutable_virtual_hosts(0)
+            ->mutable_routes(0)
+            ->mutable_route()
+            ->set_cluster("xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/"
+                          "clusters/cluster1");
+      });
+
+  // Envoy will request the endpoints of the cluster in the bootstrap during the
+  // initialization phase. This will make sure the xDS server answers with the
+  // correct assignment.
+  on_server_init_function_ = [this]() {
+    connectAuthority1();
+    connectDefaultAuthority();
+
+    // Authority1 should receive the EDS request containing the 2 resources.
+    EXPECT_TRUE(compareDiscoveryRequest(
+        Config::TestTypeUrl::get().ClusterLoadAssignment, "",
+        {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1",
+         "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster2"},
+        {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1",
+         "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster2"},
+        {}, true, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
+    sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+        Config::TestTypeUrl::get().ClusterLoadAssignment,
+        {buildClusterLoadAssignment(
+             "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/"
+             "cluster1"),
+         buildClusterLoadAssignment(
+             "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/"
+             "cluster2")},
+        {buildClusterLoadAssignment(
+             "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/"
+             "cluster1"),
+         buildClusterLoadAssignment(
+             "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/"
+             "cluster2")},
+        {}, "1", {}, authority1_xds_stream_.get());
+
+    // Expect an EDS ACK.
+    EXPECT_TRUE(compareDiscoveryRequest(
+        Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
+        {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1",
+         "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster2"},
+        {}, {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
+  };
+
+  initialize();
+
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+  EXPECT_EQ(5, test_server_->gauge("cluster_manager.active_clusters")->value());
+  // Try to send a request and see that it reaches the backend (backend 3).
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 3);
+  cleanupUpstreamAndDownstream();
+}
+
+// Validate that a bootstrap cluster that has an xds-tp based config RDS source
+// works.
+TEST_P(XdsTpConfigsIntegrationTest, RdsOnlyConfigAuthority1) {
+  test_requires_additional_upstream_ = false;
+  const std::string route_config_name =
+      "xdstp://authority1.com/envoy.config.route.v3.RouteConfiguration/my_routes/route1";
+  // Set up the listener to point to an RDS resource (that will route to the
+  // the default cluster_0).
+  // Update the route to the xdstp-based cluster.
+  config_helper_.addConfigModifier(
+      [&route_config_name](
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) { hcm.mutable_rds()->set_route_config_name(route_config_name); });
+
+  // Envoy will request the routes of the listener in the bootstrap during the
+  // initialization phase. This will make sure the xDS server answers with the
+  // correct assignment.
+  on_server_init_function_ = [this, &route_config_name]() {
+    connectAuthority1();
+    connectDefaultAuthority();
+
+    // Authority1 should receive the RDS request.
+    EXPECT_TRUE(compareDiscoveryRequest(
+        Config::TestTypeUrl::get().RouteConfiguration, "", {route_config_name}, {route_config_name},
+        {}, true, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
+    sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+        Config::TestTypeUrl::get().RouteConfiguration,
+        {ConfigHelper::buildRouteConfig(route_config_name, "cluster_0")},
+        {ConfigHelper::buildRouteConfig(route_config_name, "cluster_0")}, {}, "1", {},
+        authority1_xds_stream_.get());
+
+    // Expect an RDS ACK.
+    EXPECT_TRUE(compareDiscoveryRequest(
+        Config::TestTypeUrl::get().RouteConfiguration, "1", {route_config_name}, {}, {}, false,
+        Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
+  };
+  initialize();
+
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+  // Try to send a request and see that it reaches the backend (backend 0).
+  testRouterHeaderOnlyRequestAndResponse(nullptr);
+  cleanupUpstreamAndDownstream();
+}
+
 } // namespace Envoy

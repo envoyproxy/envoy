@@ -24,8 +24,8 @@ public:
   ExtractorImpl(
       const TypeFinder& type_finder, const google::grpc::transcoding::TypeHelper& type_helper,
       absl::string_view request_type_url, absl::string_view response_type_url,
-      // const Envoy::ProtobufWkt::Type* request_type,
-      // const Envoy::ProtobufWkt::Type* response_type,
+      // const Envoy::Protobuf::Type* request_type,
+      // const Envoy::Protobuf::Type* response_type,
       const envoy::extensions::filters::http::proto_message_extraction::v3::MethodExtraction&
           method_extraction)
       : method_extraction_(method_extraction), request_type_url_(request_type_url),

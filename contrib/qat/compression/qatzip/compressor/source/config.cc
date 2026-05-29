@@ -58,7 +58,7 @@ unsigned int streamBufferSizeUint(Protobuf::uint32 stream_buffer_size) {
 
 QatzipCompressorFactory::QatzipCompressorFactory(
     const envoy::extensions::compression::qatzip::compressor::v3alpha::Qatzip& qatzip,
-    Server::Configuration::FactoryContext& context)
+    Server::Configuration::GenericFactoryContext& context)
     : chunk_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(qatzip, chunk_size, DefaultChunkSize)),
       tls_slot_(context.serverFactoryContext().threadLocal().allocateSlot()) {
   QzSessionParams_T params;
@@ -108,14 +108,14 @@ QzSession_T* QatzipCompressorFactory::QatzipThreadLocal::getSession() {
 Envoy::Compression::Compressor::CompressorFactoryPtr
 QatzipCompressorLibraryFactory::createCompressorFactoryFromProtoTyped(
     const envoy::extensions::compression::qatzip::compressor::v3alpha::Qatzip& proto_config,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::GenericFactoryContext& context) {
   return std::make_unique<QatzipCompressorFactory>(proto_config, context);
 }
 #endif
 
 Envoy::Compression::Compressor::CompressorFactoryPtr
 QatzipCompressorLibraryFactory::createCompressorFactoryFromProto(
-    const Protobuf::Message& proto_config, Server::Configuration::FactoryContext& context) {
+    const Protobuf::Message& proto_config, Server::Configuration::GenericFactoryContext& context) {
 
   const envoy::extensions::compression::qatzip::compressor::v3alpha::Qatzip config =
       MessageUtil::downcastAndValidate<

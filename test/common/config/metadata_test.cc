@@ -33,20 +33,97 @@ TEST(MetadataTest, MetadataValuePath) {
   std::vector<std::string> path{"test_obj", "inner_key"};
   // not found case
   EXPECT_EQ(Metadata::metadataValue(&metadata, filter, path).kind_case(),
-            ProtobufWkt::Value::KindCase::KIND_NOT_SET);
-  ProtobufWkt::Struct& filter_struct = (*metadata.mutable_filter_metadata())[filter];
+            Protobuf::Value::KindCase::KIND_NOT_SET);
+  Protobuf::Struct& filter_struct = (*metadata.mutable_filter_metadata())[filter];
   auto obj = MessageUtil::keyValueStruct("inner_key", "inner_value");
-  ProtobufWkt::Value val;
+  Protobuf::Value val;
   *val.mutable_struct_value() = obj;
   (*filter_struct.mutable_fields())["test_obj"] = val;
   EXPECT_EQ(Metadata::metadataValue(&metadata, filter, path).string_value(), "inner_value");
   // not found with longer path
   path.push_back("bad_key");
   EXPECT_EQ(Metadata::metadataValue(&metadata, filter, path).kind_case(),
-            ProtobufWkt::Value::KindCase::KIND_NOT_SET);
+            Protobuf::Value::KindCase::KIND_NOT_SET);
   // empty path returns not found
   EXPECT_EQ(Metadata::metadataValue(&metadata, filter, std::vector<std::string>{}).kind_case(),
-            ProtobufWkt::Value::KindCase::KIND_NOT_SET);
+            Protobuf::Value::KindCase::KIND_NOT_SET);
+}
+
+TEST(MetadataTest, MetadataLabelMatch) {
+  envoy::config::core::v3::Metadata metadata;
+  const std::string filter = "com.test";
+  Protobuf::Struct& filter_struct = (*metadata.mutable_filter_metadata())[filter];
+
+  // Set up metadata fields
+  (*filter_struct.mutable_fields())["key1"] = ValueUtil::stringValue("val1");
+
+  Protobuf::Value list_val;
+  auto* list = list_val.mutable_list_value();
+  *list->add_values() = ValueUtil::stringValue("v1");
+  *list->add_values() = ValueUtil::stringValue("v2");
+  (*filter_struct.mutable_fields())["key2"] = list_val;
+
+  // Case 1: Simple match
+  {
+    Metadata::LabelSet labels;
+    labels.push_back({"key1", ValueUtil::stringValue("val1")});
+    EXPECT_TRUE(Metadata::metadataLabelMatch(labels, &metadata, filter, false));
+  }
+
+  // Case 2: No match (wrong value)
+  {
+    Metadata::LabelSet labels;
+    labels.push_back({"key1", ValueUtil::stringValue("val2")});
+    EXPECT_FALSE(Metadata::metadataLabelMatch(labels, &metadata, filter, false));
+  }
+
+  // Case 3: No match (missing key)
+  {
+    Metadata::LabelSet labels;
+    labels.push_back({"missing_key", ValueUtil::stringValue("val1")});
+    EXPECT_FALSE(Metadata::metadataLabelMatch(labels, &metadata, filter, false));
+  }
+
+  // Case 4: List match with list_as_any = true
+  {
+    Metadata::LabelSet labels;
+    labels.push_back({"key2", ValueUtil::stringValue("v1")});
+    EXPECT_TRUE(Metadata::metadataLabelMatch(labels, &metadata, filter, true));
+
+    labels.clear();
+    labels.push_back({"key2", ValueUtil::stringValue("v2")});
+    EXPECT_TRUE(Metadata::metadataLabelMatch(labels, &metadata, filter, true));
+  }
+
+  // Case 5: List no match with list_as_any = true
+  {
+    Metadata::LabelSet labels;
+    labels.push_back({"key2", ValueUtil::stringValue("v3")});
+    EXPECT_FALSE(Metadata::metadataLabelMatch(labels, &metadata, filter, true));
+  }
+
+  // Case 6: List no match with list_as_any = false
+  {
+    Metadata::LabelSet labels;
+    labels.push_back({"key2", ValueUtil::stringValue("v1")});
+    EXPECT_FALSE(Metadata::metadataLabelMatch(labels, &metadata, filter, false));
+  }
+
+  // Case 7: null metadata
+  {
+    Metadata::LabelSet labels;
+    EXPECT_TRUE(Metadata::metadataLabelMatch(labels, nullptr, filter, false));
+    labels.push_back({"key1", ValueUtil::stringValue("val1")});
+    EXPECT_FALSE(Metadata::metadataLabelMatch(labels, nullptr, filter, false));
+  }
+
+  // Case 8: filter not found
+  {
+    Metadata::LabelSet labels;
+    EXPECT_TRUE(Metadata::metadataLabelMatch(labels, &metadata, "non_existent", false));
+    labels.push_back({"key1", ValueUtil::stringValue("val1")});
+    EXPECT_FALSE(Metadata::metadataLabelMatch(labels, &metadata, "non_existent", false));
+  }
 }
 
 class TypedMetadataTest : public testing::Test {
@@ -65,17 +142,16 @@ public:
   class FoobarFactory : public TypedMetadataFactory {
   public:
     // Throws EnvoyException (conversion failure) if d is empty.
-    std::unique_ptr<const TypedMetadata::Object>
-    parse(const ProtobufWkt::Struct& d) const override {
+    std::unique_ptr<const TypedMetadata::Object> parse(const Protobuf::Struct& d) const override {
       if (d.fields().find("name") != d.fields().end()) {
         return std::make_unique<Foo>(d.fields().at("name").string_value());
       }
       throw EnvoyException("Cannot create a Foo when Struct metadata is empty.");
     }
 
-    std::unique_ptr<const TypedMetadata::Object> parse(const ProtobufWkt::Any& d) const override {
+    std::unique_ptr<const TypedMetadata::Object> parse(const Protobuf::Any& d) const override {
       if (!(d.type_url().empty())) {
-        return std::make_unique<Foo>(std::string(d.value()));
+        return std::make_unique<Foo>(MessageUtil::bytesToString(d.value()));
       }
       throw EnvoyException("Cannot create a Foo when Any metadata is empty.");
     }
@@ -97,7 +173,7 @@ public:
     std::string name() const override { return "baz"; }
     using FoobarFactory::parse;
     // Override Any parse() to just return nullptr.
-    std::unique_ptr<const TypedMetadata::Object> parse(const ProtobufWkt::Any&) const override {
+    std::unique_ptr<const TypedMetadata::Object> parse(const Protobuf::Any&) const override {
       return nullptr;
     }
   };
@@ -126,7 +202,7 @@ TEST_F(TypedMetadataTest, OkTestStruct) {
 // Tests data parsing and retrieving when only Any field present in the metadata.
 TEST_F(TypedMetadataTest, OkTestAny) {
   envoy::config::core::v3::Metadata metadata;
-  ProtobufWkt::Any any;
+  Protobuf::Any any;
   any.set_type_url("type.googleapis.com/waldo");
   any.set_value("fred");
   (*metadata.mutable_typed_filter_metadata())[bar_factory_.name()] = any;
@@ -139,7 +215,7 @@ TEST_F(TypedMetadataTest, OkTestAny) {
 // also Any data parsing method just return nullptr.
 TEST_F(TypedMetadataTest, OkTestAnyParseReturnNullptr) {
   envoy::config::core::v3::Metadata metadata;
-  ProtobufWkt::Any any;
+  Protobuf::Any any;
   any.set_type_url("type.googleapis.com/waldo");
   any.set_value("fred");
   (*metadata.mutable_typed_filter_metadata())[baz_factory_.name()] = any;
@@ -153,7 +229,7 @@ TEST_F(TypedMetadataTest, OkTestBothSameFactory) {
   envoy::config::core::v3::Metadata metadata;
   (*metadata.mutable_filter_metadata())[foo_factory_.name()] =
       MessageUtil::keyValueStruct("name", "garply");
-  ProtobufWkt::Any any;
+  Protobuf::Any any;
   any.set_type_url("type.googleapis.com/waldo");
   any.set_value("fred");
   (*metadata.mutable_typed_filter_metadata())[foo_factory_.name()] = any;
@@ -170,7 +246,7 @@ TEST_F(TypedMetadataTest, OkTestBothDifferentFactory) {
   envoy::config::core::v3::Metadata metadata;
   (*metadata.mutable_filter_metadata())[foo_factory_.name()] =
       MessageUtil::keyValueStruct("name", "garply");
-  ProtobufWkt::Any any;
+  Protobuf::Any any;
   any.set_type_url("type.googleapis.com/waldo");
   any.set_value("fred");
   (*metadata.mutable_typed_filter_metadata())[bar_factory_.name()] = any;
@@ -192,7 +268,7 @@ TEST_F(TypedMetadataTest, OkTestBothSameFactoryAnyParseReturnNullptr) {
   envoy::config::core::v3::Metadata metadata;
   (*metadata.mutable_filter_metadata())[baz_factory_.name()] =
       MessageUtil::keyValueStruct("name", "garply");
-  ProtobufWkt::Any any;
+  Protobuf::Any any;
   any.set_type_url("type.googleapis.com/waldo");
   any.set_value("fred");
   (*metadata.mutable_typed_filter_metadata())[baz_factory_.name()] = any;
@@ -237,7 +313,7 @@ TEST_F(TypedMetadataTest, StructMetadataRefreshTest) {
 // Tests data parsing and retrieving when Any metadata updates.
 TEST_F(TypedMetadataTest, AnyMetadataRefreshTest) {
   envoy::config::core::v3::Metadata metadata;
-  ProtobufWkt::Any any;
+  Protobuf::Any any;
   any.set_type_url("type.googleapis.com/waldo");
   any.set_value("fred");
   (*metadata.mutable_typed_filter_metadata())[bar_factory_.name()] = any;
@@ -262,7 +338,7 @@ TEST_F(TypedMetadataTest, AnyMetadataRefreshTest) {
 // Tests empty Struct metadata parsing case.
 TEST_F(TypedMetadataTest, InvalidStructMetadataTest) {
   envoy::config::core::v3::Metadata metadata;
-  (*metadata.mutable_filter_metadata())[foo_factory_.name()] = ProtobufWkt::Struct();
+  (*metadata.mutable_filter_metadata())[foo_factory_.name()] = Protobuf::Struct();
   EXPECT_THROW_WITH_MESSAGE(TypedMetadataImpl<TypedMetadataFactory> typed(metadata),
                             Envoy::EnvoyException,
                             "Cannot create a Foo when Struct metadata is empty.");
@@ -271,7 +347,7 @@ TEST_F(TypedMetadataTest, InvalidStructMetadataTest) {
 // Tests empty Any metadata parsing case.
 TEST_F(TypedMetadataTest, InvalidAnyMetadataTest) {
   envoy::config::core::v3::Metadata metadata;
-  (*metadata.mutable_typed_filter_metadata())[bar_factory_.name()] = ProtobufWkt::Any();
+  (*metadata.mutable_typed_filter_metadata())[bar_factory_.name()] = Protobuf::Any();
   EXPECT_THROW_WITH_MESSAGE(TypedMetadataImpl<TypedMetadataFactory> typed(metadata),
                             Envoy::EnvoyException,
                             "Cannot create a Foo when Any metadata is empty.");

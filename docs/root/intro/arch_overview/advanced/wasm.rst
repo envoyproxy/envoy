@@ -66,12 +66,15 @@ Wasm ABI exposes Envoy-specific host attributes via the dedicated `proxy_get_pro
 standard :ref:`attributes <arch_overview_attributes>` and the values are returned via the type-specific binary
 serialization.
 
+.. _arch_overview_wasm_foreign_functions:
+
 Foreign functions
 -----------------
 
 Envoy offers additional functionality over the Proxy-Wasm ABI via `proxy_call_foreign_function
 <https://github.com/proxy-wasm/spec/tree/main/abi-versions/v0.2.1#proxy_call_foreign_function>`_ binary interface:
 
+* ``sign`` creates cryptographic signatures.
 * ``verify_signature`` verifies cryptographic signatures.
 * ``compress`` applies ``zlib`` compression.
 * ``uncompress`` applies ``zlib`` decompression.

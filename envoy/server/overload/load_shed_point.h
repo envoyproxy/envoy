@@ -27,6 +27,11 @@ public:
   const std::string H2ServerGoAwayOnDispatch =
       "envoy.load_shed_points.http2_server_go_away_on_dispatch";
 
+  // Envoy will send a GOAWAY and immediately close the connection while processing HTTP2 requests
+  // at the codec level.
+  const std::string H2ServerGoAwayAndCloseOnDispatch =
+      "envoy.load_shed_points.http2_server_go_away_and_close_on_dispatch";
+
   // Envoy will close the connections before creating codec if Envoy is under pressure,
   // typically memory. This happens once geting data from the connection.
   const std::string HcmCodecCreation = "envoy.load_shed_points.hcm_ondata_creating_codec";
@@ -40,6 +45,16 @@ public:
   // to serve the downstream request, the downstream request will fail.
   const std::string ConnectionPoolNewConnection =
       "envoy.load_shed_points.connection_pool_new_connection";
+
+  // Envoy will send GOAWAY and immediately close the connection while
+  // processing HTTP3 requests at the codec level.
+  const std::string H3ServerGoAwayAndCloseOnDispatch =
+      "envoy.load_shed_points.http3_server_go_away_and_close_on_dispatch";
+
+  // Envoy will send a GOAWAY while processing HTTP3 requests at the codec level
+  // which will eventually drain the HPPT/3 connection.
+  const std::string H3ServerGoAwayOnDispatch =
+      "envoy.load_shed_points.http3_server_go_away_on_dispatch";
 };
 
 using LoadShedPointName = ConstSingleton<LoadShedPointNameValues>;

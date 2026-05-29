@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <vector>
@@ -282,6 +283,14 @@ public:
   buildRouteConfig(const std::string& name, const std::string& cluster,
                    bool header_mutations = false);
 
+  static envoy::config::route::v3::RouteConfiguration
+  buildRouteConfigWithVhdsOverAds(const std::string& name);
+
+  static envoy::config::route::v3::VirtualHost buildVirtualHost(const std::string& name,
+                                                                const std::string& domain,
+                                                                const std::string& prefix,
+                                                                const std::string& cluster);
+
   // Builds a standard Endpoint suitable for population by finalize().
   static envoy::config::endpoint::v3::Endpoint buildEndpoint(const std::string& address);
 
@@ -415,6 +424,14 @@ public:
   // Set limits on pending upstream outbound frames.
   void setUpstreamOutboundFramesLimits(uint32_t max_all_frames, uint32_t max_control_frames);
 
+  // Set limits on HTTP/2 concurrent streams.
+  void setDownstreamHttp2MaxConcurrentStreams(uint32_t max_streams);
+  void setUpstreamHttp2MaxConcurrentStreams(uint32_t max_streams);
+
+  // Set limits on HTTP/2 window sizes.
+  void setDownstreamHttp2WindowSize(uint32_t stream_window, uint32_t connection_window);
+  void setUpstreamHttp2WindowSize(uint32_t stream_window, uint32_t connection_window);
+
   // Return the bootstrap configuration for hand-off to Envoy.
   const envoy::config::bootstrap::v3::Bootstrap& bootstrap() { return bootstrap_; }
 
@@ -437,7 +454,7 @@ public:
   void addRuntimeOverride(absl::string_view key, absl::string_view value);
 
   // Add typed_filter_metadata to the first listener.
-  void addListenerTypedMetadata(absl::string_view key, ProtobufWkt::Any& packed_value);
+  void addListenerTypedMetadata(absl::string_view key, Protobuf::Any& packed_value);
 
   // Add filter_metadata to a cluster with the given name
   void addClusterFilterMetadata(absl::string_view metadata_yaml,

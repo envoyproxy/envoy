@@ -29,7 +29,7 @@ public:
 private:
   Ssl::PrivateKeyConnectionCallbacks& cb_;
   Event::Dispatcher& dispatcher_;
-  Event::FileEventPtr ssl_async_event_{};
+  Event::FileEventPtr ssl_async_event_;
   QatHandle& handle_;
   bssl::UniquePtr<EVP_PKEY> pkey_;
 };
@@ -51,12 +51,12 @@ public:
   Ssl::BoringSslPrivateKeyMethodSharedPtr getBoringSslPrivateKeyMethod() override;
 
 private:
-  Ssl::BoringSslPrivateKeyMethodSharedPtr method_{};
+  Ssl::BoringSslPrivateKeyMethodSharedPtr method_;
   std::shared_ptr<QatManager> manager_;
   std::shared_ptr<QatSection> section_;
   Api::Api& api_;
   bssl::UniquePtr<EVP_PKEY> pkey_;
-  LibQatCryptoSharedPtr libqat_{};
+  LibQatCryptoSharedPtr libqat_;
   bool initialized_{};
 };
 

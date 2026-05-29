@@ -29,6 +29,8 @@ envoy_cc_library(
     hdrs = ["config.h"],
     deps = [
         "//source/common/config:datasource_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:resolver_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -57,8 +59,16 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "command_splitter_lib",
-    srcs = ["command_splitter_impl.cc"],
-    hdrs = ["command_splitter_impl.h"],
+    srcs = [
+        "cluster_response_handler.cc",
+        "command_splitter_impl.cc",
+        "info_command_handler.cc",
+    ],
+    hdrs = [
+        "cluster_response_handler.h",
+        "command_splitter_impl.h",
+        "info_command_handler.h",
+    ],
     deps = [
         ":command_splitter_interface",
         ":conn_pool_lib",
@@ -67,12 +77,13 @@ envoy_cc_library(
         "//envoy/stats:timespan_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/common:trie_lookup_table_lib",
+        "//source/common/common:radix_tree_lib",
         "//source/common/stats:timespan_lib",
         "//source/extensions/filters/network/common/redis:client_lib",
         "//source/extensions/filters/network/common/redis:fault_lib",
         "//source/extensions/filters/network/common/redis:supported_commands_lib",
         "//source/extensions/filters/network/common/redis:utility_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
     ],
 )
 
@@ -172,7 +183,7 @@ envoy_cc_library(
         "//envoy/stream_info:stream_info_interface",
         "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:cluster_manager_interface",
-        "//source/common/common:trie_lookup_table_lib",
+        "//source/common/common:radix_tree_lib",
         "//source/extensions/filters/network/common/redis:codec_lib",
         "//source/extensions/filters/network/common/redis:supported_commands_lib",
         "//source/extensions/filters/network/common/redis:utility_lib",

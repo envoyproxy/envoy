@@ -17,7 +17,7 @@ MockRequestFramesHandler::MockRequestFramesHandler() = default;
 
 MockStreamFilterConfig::MockStreamFilterConfig() {
   ON_CALL(*this, createEmptyConfigProto()).WillByDefault(Invoke([]() {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }));
   ON_CALL(*this, createFilterFactoryFromProto(_, _, _))
       .WillByDefault(Return([](FilterChainFactoryCallbacks&) {}));
@@ -25,14 +25,6 @@ MockStreamFilterConfig::MockStreamFilterConfig() {
   ON_CALL(*this, configTypes()).WillByDefault(Invoke([this]() {
     return NamedFilterConfigFactory::configTypes();
   }));
-}
-
-MockFilterChainManager::MockFilterChainManager() {
-  ON_CALL(*this, applyFilterFactoryCb(_, _))
-      .WillByDefault(Invoke([this](FilterContext context, FilterFactoryCb& factory) {
-        contexts_.push_back(context);
-        factory(callbacks_);
-      }));
 }
 
 MockDecoderFilter::MockDecoderFilter() {

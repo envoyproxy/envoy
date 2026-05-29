@@ -9,8 +9,6 @@ android_library(
     name = "envoy_engine_lib",
     srcs = [
         "AndroidEngineImpl.java",
-        "AndroidNetworkMonitor.java",
-        "AndroidNetworkMonitorV2.java",
         "AndroidProxyMonitor.java",
         "UpstreamHttpProtocol.java",
     ],
@@ -21,14 +19,16 @@ android_library(
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
         "//library/java/io/envoyproxy/envoymobile/engine/types:envoy_c_types_lib",
         "//library/java/io/envoyproxy/envoymobile/utilities",
+        "//library/java/io/envoyproxy/envoymobile/utilities:network_utilities",
         "@maven//:androidx_annotation_annotation",
-        "@maven//:androidx_core_core",
     ],
 )
 
 android_library(
     name = "envoy_base_engine_lib",
     srcs = [
+        "AndroidNetworkMonitor.java",
+        "AndroidNetworkMonitorV2.java",
         "ByteBuffers.java",
         "EnvoyConfiguration.java",
         "EnvoyEngine.java",
@@ -52,6 +52,7 @@ android_library(
     deps = [
         "//library/java/io/envoyproxy/envoymobile/engine/types:envoy_c_types_lib",
         "@maven//:androidx_annotation_annotation",
+        "@maven//:androidx_core_core",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_protobuf_protobuf_javalite",
     ],

@@ -1,0 +1,159 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.mcp.v3;
+
+import "google/protobuf/wrappers.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.mcp.v3";
+option java_outer_classname = "McpProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/mcp/v3;mcpv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: MCP]
+// MCP filter :ref:`configuration overview <config_http_filters_mcp>`.
+// [#extension: envoy.filters.http.mcp]
+
+// This filter will inspect and get attributes from MCP traffic.
+// [#next-free-field: 8]
+message Mcp {
+  // Traffic handling mode for non-MCP traffic.
+  enum TrafficMode {
+    // Proxies the HTTP request and response without MCP spec check.
+    // This is the default mode.
+    PASS_THROUGH = 0;
+
+    // Reject requests that are not following MCP spec.
+    // Valid MCP requests are:
+    // - POST requests with JSON-RPC 2.0 messages
+    // - GET requests for SSE streams (with Accept: text/event-stream)
+    // - DELETE requests for session termination (with MCP-Session-Id header)
+    REJECT_NO_MCP = 1;
+  }
+
+  // Where to store parsed MCP request attributes.
+  enum RequestStorageMode {
+    // Unspecified. Uses default behavior (same as DYNAMIC_METADATA).
+    MODE_UNSPECIFIED = 0;
+
+    // Store request attributes in dynamic metadata only.
+    // This is the default behavior.
+    DYNAMIC_METADATA = 1;
+
+    // Store request attributes in filter state only.
+    FILTER_STATE = 2;
+
+    // Store request attributes in both dynamic metadata and filter state.
+    DYNAMIC_METADATA_AND_FILTER_STATE = 3;
+  }
+
+  message TraceContextPropagationConfig {
+    option (xds.annotations.v3.message_status).work_in_progress = true;
+  }
+
+  message BaggagePropagationConfig {
+    option (xds.annotations.v3.message_status).work_in_progress = true;
+  }
+
+  // Configures how the filter handles non-MCP traffic.
+  TrafficMode traffic_mode = 1 [(validate.rules).enum = {defined_only: true}];
+
+  // When set to true, the filter will clear the route cache after setting dynamic metadata.
+  // This allows the route to be re-selected based on the MCP metadata (e.g., method, params).
+  // Defaults to false.
+  bool clear_route_cache = 2;
+
+  // Maximum size of the request body to buffer for JSON-RPC validation.
+  // If the request body exceeds this size, the request is rejected with ``413 Payload Too Large``.
+  // This limit applies to both ``REJECT_NO_MCP`` and ``PASS_THROUGH`` modes to prevent unbounded buffering.
+  //
+  // It defaults to 8KB (8192 bytes) and the maximum allowed value is 10MB (10485760 bytes).
+  //
+  // Setting it to 0 would disable the limit. It is not recommended to do so in production.
+  google.protobuf.UInt32Value max_request_body_size = 3 [(validate.rules).uint32 = {lte: 10485760}];
+
+  // Parser configuration, this provide the attribute extraction override.
+  ParserConfig parser_config = 4;
+
+  // Where to store parsed MCP request attributes.
+  // Controls whether attributes are written to dynamic metadata, filter state, or both.
+  // Default is DYNAMIC_METADATA when unspecified.
+  RequestStorageMode request_storage_mode = 5 [(validate.rules).enum = {defined_only: true}];
+
+  // If set, extract and validate W3C trace context from the MCP request body
+  // (params._meta.traceparent & params._meta.tracestate) and propagate it in HTTP headers
+  // ``traceparent`` and ``tracestate`` (respectively).
+  //
+  // The traceparent and tracestate fields are validated and propagated according to the spec at
+  // ``https://www.w3.org/TR/trace-context/``.
+  //
+  // If unset (default), do not extract or inject trace context.
+  TraceContextPropagationConfig propagate_trace_context = 6;
+
+  // If set, extract and validate W3C baggage from the MCP request body (params._meta.baggage) and
+  // copy it to the HTTP header ``baggage``.
+  //
+  // The baggage field is validated according to the spec at ``https://www.w3.org/TR/baggage/``.
+
+  // Note that this is independent of ``propagate_trace_context``.
+  // Also note that if this is set, the downstream request's baggage header will be overwritten if
+  // the MCP request body contains a valid baggage field.
+  //
+  // If unset (default), do not extract or inject baggage.
+  BaggagePropagationConfig propagate_baggage = 7;
+}
+
+// Parser configuration with method-specific rules.
+// This configuration allows overriding the default attribute extraction behavior for specific MCP methods.
+message ParserConfig {
+  // A single attribute extraction rule.
+  message AttributeExtractionRule {
+    // JSON path to extract (e.g., "params.name", "params.uri").
+    // The path is a dot-separated string representing the location of the field in the JSON payload.
+    // For example, "params.name" extracts the "name" field from the "params" object.
+    string path = 1 [(validate.rules).string = {min_len: 1}];
+  }
+
+  // Configuration for a specific MCP method.
+  message MethodConfig {
+    // Method name (e.g., "tools/call", "resources/read", "initialize").
+    // This matches the "method" field in the JSON-RPC request.
+    string method = 1 [(validate.rules).string = {min_len: 1}];
+
+    // The group/category name to assign to this method (e.g., "tool", "lifecycle").
+    // This will be emitted to dynamic metadata under the key specified by group_metadata_key.
+    // If empty, the built-in group classification is used.
+    string group = 2;
+
+    // Attributes to extract for this method.
+    // If empty, only default attributes (jsonrpc, method) are extracted.
+    repeated AttributeExtractionRule extraction_rules = 3;
+  }
+
+  // List of rules for classification and extraction.
+  // Rules are evaluated in order; the first match wins.
+  // If no rule matches, extraction defaults are used and group falls back to built-in classification.
+  // Built-in groups: lifecycle, tool, resource, prompt, notification, logging, sampling, completion, unknown.
+  repeated MethodConfig methods = 1;
+
+  // The dynamic metadata key where the group name will be stored.
+  // If empty, group classification is disabled.
+  string group_metadata_key = 2;
+}
+
+// Per-route override configuration for MCP filter
+message McpOverride {
+  // Optional per-route traffic mode override
+  Mcp.TrafficMode traffic_mode = 1 [(validate.rules).enum = {defined_only: true}];
+
+  // Optional per-route max request body size override.
+  // When set, this overrides the global max_request_body_size for this route.
+  // It defaults to 8KB (8192 bytes) and the maximum allowed value is 10MB (10485760 bytes).
+  google.protobuf.UInt32Value max_request_body_size = 2 [(validate.rules).uint32 = {lte: 10485760}];
+}

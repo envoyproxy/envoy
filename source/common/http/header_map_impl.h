@@ -15,7 +15,6 @@
 #include "source/common/common/non_copyable.h"
 #include "source/common/common/utility.h"
 #include "source/common/http/headers.h"
-#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {

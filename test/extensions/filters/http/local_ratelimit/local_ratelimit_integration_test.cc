@@ -8,6 +8,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -54,10 +56,10 @@ protected:
       RELEASE_ASSERT(result, result.message());
       xds_stream_->startGrpcStream();
 
-      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
+      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
                                               {route_config_name}, true));
       sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-          Config::TypeUrl::get().RouteConfiguration,
+          Config::TestTypeUrl::get().RouteConfiguration,
           {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
               initial_route_config)},
           "1");
@@ -86,10 +88,10 @@ protected:
       RELEASE_ASSERT(result, result.message());
       xds_stream_->startGrpcStream();
 
-      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
+      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "",
                                               {"local_cluster"}, true));
       sendSotwDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-          Config::TypeUrl::get().ClusterLoadAssignment,
+          Config::TestTypeUrl::get().ClusterLoadAssignment,
           {TestUtility::parseYaml<envoy::config::endpoint::v3::ClusterLoadAssignment>(
               initial_local_cluster_endpoints)},
           "1");
@@ -171,17 +173,16 @@ protected:
     EXPECT_EQ(expected_body_size, response->body().size());
     EXPECT_THAT(
         response->headers(),
-        Http::HeaderValueOf(
+        ContainsHeader(
             Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit,
             expected_limit));
+    EXPECT_THAT(response->headers(),
+                ContainsHeader(Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get()
+                                   .XRateLimitRemaining,
+                               expected_remaining));
     EXPECT_THAT(
         response->headers(),
-        Http::HeaderValueOf(Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get()
-                                .XRateLimitRemaining,
-                            expected_remaining));
-    EXPECT_THAT(
-        response->headers(),
-        Http::HeaderValueOf(
+        ContainsHeader(
             Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitReset,
             expected_reset));
   }
@@ -309,6 +310,48 @@ typed_config:
       max_tokens: 1
       tokens_per_fill: 1
       fill_interval: 1000s
+  rate_limits:
+  - actions:  # any actions in here
+    - request_headers:
+        header_name: x-envoy-downstream-service-cluster
+        descriptor_key: client_cluster
+  local_rate_limit_per_downstream_connection: {}
+)EOF";
+
+  static constexpr absl::string_view filter_config_with_shadow_mode_ =
+      R"EOF(
+name: envoy.filters.http.local_ratelimit
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+  stat_prefix: http_local_rate_limiter
+  max_dynamic_descriptors: {}
+  token_bucket:
+    max_tokens: 2
+    tokens_per_fill: 1
+    fill_interval: 1000s
+  filter_enabled:
+    runtime_key: local_rate_limit_enabled
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+  filter_enforced:
+    runtime_key: local_rate_limit_enforced
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+  response_headers_to_add:
+    - append_action: OVERWRITE_IF_EXISTS_OR_ADD
+      header:
+        key: x-local-rate-limit
+        value: 'true'
+  descriptors:
+  - entries:
+    - key: client_cluster
+    token_bucket:
+      max_tokens: 1
+      tokens_per_fill: 1
+      fill_interval: 1000s
+    shadow_mode: true
   rate_limits:
   - actions:  # any actions in here
     - request_headers:
@@ -479,6 +522,43 @@ TEST_P(LocalRateLimitFilterIntegrationTest, DynamicDesciptorsBasicTest) {
   cleanupUpstreamAndDownstream();
 }
 
+TEST_P(LocalRateLimitFilterIntegrationTest, ShadowModeTest) {
+  initializeFilter(fmt::format(filter_config_with_shadow_mode_, 20, "false"));
+  // filter is adding dynamic descriptors based on the request header
+  // 'x-envoy-downstream-service-cluster' and the token bucket is set to 1 token per fill interval
+  // of 1000s which means only one request is allowed per 1000s for each unique value of
+  // 'x-envoy-downstream-service-cluster' header.
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  sendAndVerifyRequest("foo", "200", 0);
+  cleanupUpstreamAndDownstream();
+
+  // Since shadow mode is true, should be allowed.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  sendAndVerifyRequest("foo", "200", 0);
+  cleanupUpstreamAndDownstream();
+
+  test_server_->waitForCounter("http_local_rate_limiter.http_local_rate_limit.shadow_mode", Eq(1));
+  EXPECT_EQ(
+      1,
+      test_server_->counter("http_local_rate_limiter.http_local_rate_limit.shadow_mode")->value());
+
+  // The next request with a different cluster, 'bar', should be allowed.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  sendAndVerifyRequest("bar", "200", 0);
+  cleanupUpstreamAndDownstream();
+
+  // Since shadow mode is true, should be allowed.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  sendAndVerifyRequest("bar", "200", 0);
+  cleanupUpstreamAndDownstream();
+
+  test_server_->waitForCounter("http_local_rate_limiter.http_local_rate_limit.shadow_mode", Eq(2));
+  EXPECT_EQ(
+      2,
+      test_server_->counter("http_local_rate_limiter.http_local_rate_limit.shadow_mode")->value());
+}
+
 TEST_P(LocalRateLimitFilterIntegrationTest, DesciptorsBasicTestWithMinimumMaxDynamicDescriptors) {
   auto max_dynamic_descriptors = 1;
   initializeFilter(
@@ -633,10 +713,10 @@ TEST_P(LocalRateLimitFilterIntegrationTest, BasicTestPerRouteAndRds) {
 
   // Update route config by RDS when request is sending. Test whether RDS can work normally.
   sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-      Config::TypeUrl::get().RouteConfiguration,
+      Config::TestTypeUrl::get().RouteConfiguration,
       {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(update_route_config_)},
       "2");
-  test_server_->waitForCounterGe("http.config_test.rds.basic_routes.update_success", 2);
+  test_server_->waitForCounter("http.config_test.rds.basic_routes.update_success", Ge(2));
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(upstream_request_->complete());
@@ -677,18 +757,18 @@ TEST_P(LocalRateLimitFilterIntegrationTest, TestLocalClusterRateLimit) {
   ASSERT(share_provider_manager != nullptr);
   auto share_provider = share_provider_manager->getShareProvider({});
 
-  test_server_->waitForGaugeEq("cluster.local_cluster.membership_total", 1);
+  test_server_->waitForGauge("cluster.local_cluster.membership_total", Eq(1));
   simTime().advanceTimeWait(std::chrono::milliseconds(1));
 
   EXPECT_EQ(1.0, share_provider->getTokensShareFactor());
 
   sendSotwDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-      Config::TypeUrl::get().ClusterLoadAssignment,
+      Config::TestTypeUrl::get().ClusterLoadAssignment,
       {TestUtility::parseYaml<envoy::config::endpoint::v3::ClusterLoadAssignment>(
           update_local_cluster_endpoints_)},
       "2");
 
-  test_server_->waitForGaugeEq("cluster.local_cluster.membership_total", 2);
+  test_server_->waitForGauge("cluster.local_cluster.membership_total", Eq(2));
   simTime().advanceTimeWait(std::chrono::milliseconds(1));
 
   EXPECT_EQ(0.5, share_provider->getTokensShareFactor());

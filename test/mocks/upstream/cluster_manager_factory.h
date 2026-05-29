@@ -5,7 +5,6 @@
 #include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
 #include "source/common/singleton/manager_impl.h"
 
-#include "test/mocks/secret/mocks.h"
 #include "test/test_common/thread_factory_for_test.h"
 
 #include "gmock/gmock.h"
@@ -46,7 +45,8 @@ public:
 
   MOCK_METHOD(absl::StatusOr<CdsApiPtr>, createCds,
               (const envoy::config::core::v3::ConfigSource& cds_config,
-               const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm));
+               const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm,
+               bool support_multi_ads_sources));
 };
 
 } // namespace Upstream

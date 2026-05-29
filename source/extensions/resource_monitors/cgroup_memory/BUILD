@@ -16,7 +16,7 @@ envoy_cc_library(
         "//envoy/common:pure_lib",
         "//envoy/filesystem:filesystem_interface",
         "//source/common/common:assert_lib",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -31,7 +31,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:fmt_lib",
         "//source/common/common:thread_lib",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 

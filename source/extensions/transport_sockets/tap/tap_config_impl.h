@@ -27,7 +27,7 @@ public:
 
 private:
   void initEvent(envoy::data::tap::v3::SocketEvent&);
-  void initStreamingEvent(envoy::data::tap::v3::SocketEvent&);
+  void initStreamingEvent(envoy::data::tap::v3::SocketEvent&, uint64_t);
   void makeStreamedTraceIfNeeded() {
     if (streamed_trace_ == nullptr) {
       streamed_trace_ = Extensions::Common::Tap::makeTraceWrapper();
@@ -48,6 +48,8 @@ private:
   }
   void pegSubmitCounter(const bool is_streaming);
   bool shouldSendStreamedMsgByConfiguredSize() const;
+  bool shouldSubmitStreamedDataPerConfiguredSizeByAgedDuration() const;
+  void submitStreamedDataPerConfiguredSize();
   void handleSendingStreamTappedMsgPerConfigSize(const Buffer::Instance& data,
                                                  const uint32_t total_bytes, const bool is_read,
                                                  const bool is_end_stream);
@@ -55,6 +57,15 @@ private:
   // (This means that per transport socket buffer trace, the minimum amount
   // which triggering to send the tapped messages size is 9 bytes).
   static constexpr uint32_t DefaultMinBufferedBytes = 9;
+  // It isn't easy to meet data submit threshold when the configured byte size is too large
+  // and the tapped data volume is low, therefore, set below buffer aged duration (seconds)
+  // to make sure that the tapped data is submitted in time.
+  static constexpr uint32_t DefaultBufferedAgedDuration = 15;
+  // The tapped data from Transport socket may be incomplete
+  // for some protocols (e.g., HTTP/2 frames may span multiple reads/writes).
+  // Add sequence number to allow the receiver to reconstruct byte order and
+  // determine completeness, similar to TCP sequence numbers.
+  uint64_t seq_num_ = 0;
   SocketTapConfigSharedPtr config_;
   Extensions::Common::Tap::PerTapSinkHandleManagerPtr sink_handle_;
   const Network::Connection& connection_;

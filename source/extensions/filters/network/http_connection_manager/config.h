@@ -36,6 +36,7 @@
 #include "source/common/network/cidr_range.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/filters/network/common/factory_base.h"
+#include "source/extensions/filters/network/http_connection_manager/forward_client_cert_details.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
@@ -138,9 +139,7 @@ public:
       FilterConfigProviderManager& filter_config_provider_manager, absl::Status& creation_status);
 
   // Http::FilterChainFactory
-  bool createFilterChain(
-      Http::FilterChainManager& manager,
-      const Http::FilterChainOptions& = Http::EmptyFilterChainOptions{}) const override;
+  bool createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) const override;
   using FilterFactoriesList = Envoy::Http::FilterChainUtility::FilterFactoriesList;
   struct FilterConfig {
     std::unique_ptr<FilterFactoriesList> filter_factories;
@@ -148,8 +147,7 @@ public:
   };
   bool createUpgradeFilterChain(absl::string_view upgrade_type,
                                 const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
-                                Http::FilterChainManager& manager,
-                                const Http::FilterChainOptions& options) const override;
+                                Http::FilterChainFactoryCallbacks& callbacks) const override;
 
   // Http::ConnectionManagerConfig
   const Http::RequestIDExtensionSharedPtr& requestIDExtension() override {
@@ -184,6 +182,9 @@ public:
     return http1_safe_max_connection_duration_;
   }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
+  absl::optional<std::chrono::milliseconds> streamFlushTimeout() const override {
+    return stream_flush_timeout_;
+  }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
   std::chrono::milliseconds requestHeadersTimeout() const override {
     return request_headers_timeout_;
@@ -217,8 +218,12 @@ public:
   bool skipXffAppend() const override { return skip_xff_append_; }
   const std::string& via() const override { return via_; }
   Http::ForwardClientCertType forwardClientCert() const override { return forward_client_cert_; }
+  Http::ClientCertFormat clientCertFormat() const override { return forward_client_cert_format_; }
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
+  }
+  const Matcher::MatchTreePtr<Http::HttpMatchingData>& forwardClientCertMatcher() const override {
+    return forward_client_cert_matcher_;
   }
   Tracing::TracerSharedPtr tracer() override { return tracer_; }
   const Http::TracingConnectionManagerConfig* tracingConfig() override {
@@ -274,6 +279,12 @@ public:
   bool addProxyProtocolConnectionState() const override {
     return add_proxy_protocol_connection_state_;
   }
+  const absl::flat_hash_set<uint32_t>& httpsDestinationPorts() const override {
+    return https_destination_ports_;
+  }
+  const absl::flat_hash_set<uint32_t>& httpDestinationPorts() const override {
+    return http_destination_ports_;
+  }
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
@@ -308,7 +319,9 @@ private:
   const bool skip_xff_append_;
   const std::string via_;
   Http::ForwardClientCertType forward_client_cert_;
+  Http::ClientCertFormat forward_client_cert_format_{};
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
+  Matcher::MatchTreePtr<Http::HttpMatchingData> forward_client_cert_matcher_;
   Config::ConfigProviderManager* scoped_routes_config_provider_manager_;
   FilterConfigProviderManager& filter_config_provider_manager_;
   CodecType codec_type_;
@@ -330,6 +343,7 @@ private:
   const bool http1_safe_max_connection_duration_;
   absl::optional<std::chrono::milliseconds> max_stream_duration_;
   std::chrono::milliseconds stream_idle_timeout_;
+  absl::optional<std::chrono::milliseconds> stream_flush_timeout_;
   std::chrono::milliseconds request_timeout_;
   std::chrono::milliseconds request_headers_timeout_;
   Router::RouteConfigProviderSharedPtr route_config_provider_;
@@ -352,8 +366,8 @@ private:
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
   LocalReply::LocalReplyPtr local_reply_;
-  std::vector<Http::OriginalIPDetectionSharedPtr> original_ip_detection_extensions_{};
-  std::vector<Http::EarlyHeaderMutationPtr> early_header_mutation_extensions_{};
+  std::vector<Http::OriginalIPDetectionSharedPtr> original_ip_detection_extensions_;
+  std::vector<Http::EarlyHeaderMutationPtr> early_header_mutation_extensions_;
 
   // Default idle timeout is 5 minutes if nothing is specified in the HCM config.
   static const uint64_t StreamIdleTimeoutMs = 5 * 60 * 1000;
@@ -370,6 +384,8 @@ private:
   const bool append_local_overload_;
   const bool append_x_forwarded_port_;
   const bool add_proxy_protocol_connection_state_;
+  const absl::flat_hash_set<uint32_t> https_destination_ports_;
+  const absl::flat_hash_set<uint32_t> http_destination_ports_;
 };
 
 /**

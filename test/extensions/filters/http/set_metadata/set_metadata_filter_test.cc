@@ -45,12 +45,12 @@ public:
     filter_->onDestroy();
   }
 
-  void checkKeyInt(const ProtobufWkt::Struct& s, std::string key, int val) {
+  void checkKeyInt(const Protobuf::Struct& s, std::string key, int val) {
     const auto& fields = s.fields();
     const auto it = fields.find(key);
     ASSERT_NE(it, fields.end());
     const auto& pbval = it->second;
-    ASSERT_EQ(pbval.kind_case(), ProtobufWkt::Value::kNumberValue);
+    ASSERT_EQ(pbval.kind_case(), Protobuf::Value::kNumberValue);
     EXPECT_EQ(pbval.number_value(), val);
   }
 
@@ -80,7 +80,7 @@ TEST_F(SetMetadataFilterTest, DeprecatedSimple) {
   const auto it_tags = fields.find("tags");
   ASSERT_NE(it_tags, fields.end());
   const auto& tags = it_tags->second;
-  ASSERT_EQ(tags.kind_case(), ProtobufWkt::Value::kStructValue);
+  ASSERT_EQ(tags.kind_case(), Protobuf::Value::kStructValue);
   checkKeyInt(tags.struct_value(), "mytag0", 1);
 }
 
@@ -125,18 +125,18 @@ TEST_F(SetMetadataFilterTest, DeprecatedWithMerge) {
   const auto it_mylist = fields.find("mylist");
   ASSERT_NE(it_mylist, fields.end());
   const auto& mylist = it_mylist->second;
-  ASSERT_EQ(mylist.kind_case(), ProtobufWkt::Value::kListValue);
+  ASSERT_EQ(mylist.kind_case(), Protobuf::Value::kListValue);
   const auto& vals = mylist.list_value().values();
   ASSERT_EQ(vals.size(), 2);
-  ASSERT_EQ(vals[0].kind_case(), ProtobufWkt::Value::kStringValue);
+  ASSERT_EQ(vals[0].kind_case(), Protobuf::Value::kStringValue);
   EXPECT_EQ(vals[0].string_value(), "a");
-  ASSERT_EQ(vals[1].kind_case(), ProtobufWkt::Value::kStringValue);
+  ASSERT_EQ(vals[1].kind_case(), Protobuf::Value::kStringValue);
   EXPECT_EQ(vals[1].string_value(), "b");
 
   const auto it_tags = fields.find("tags");
   ASSERT_NE(it_tags, fields.end());
   const auto& tags = it_tags->second;
-  ASSERT_EQ(tags.kind_case(), ProtobufWkt::Value::kStructValue);
+  ASSERT_EQ(tags.kind_case(), Protobuf::Value::kStructValue);
   const auto& tags_struct = tags.struct_value();
 
   checkKeyInt(tags_struct, "mytag0", 1);
@@ -163,7 +163,7 @@ TEST_F(SetMetadataFilterTest, UntypedSimple) {
   const auto it_tags = fields.find("tags");
   ASSERT_NE(it_tags, fields.end());
   const auto& tags = it_tags->second;
-  ASSERT_EQ(tags.kind_case(), ProtobufWkt::Value::kStructValue);
+  ASSERT_EQ(tags.kind_case(), Protobuf::Value::kStructValue);
   checkKeyInt(tags.struct_value(), "mytag0", 1);
 }
 
@@ -228,18 +228,18 @@ TEST_F(SetMetadataFilterTest, UntypedWithAllowOverwrite) {
   const auto it_mylist = fields.find("mylist");
   ASSERT_NE(it_mylist, fields.end());
   const auto& mylist = it_mylist->second;
-  ASSERT_EQ(mylist.kind_case(), ProtobufWkt::Value::kListValue);
+  ASSERT_EQ(mylist.kind_case(), Protobuf::Value::kListValue);
   const auto& vals = mylist.list_value().values();
   ASSERT_EQ(vals.size(), 2);
-  ASSERT_EQ(vals[0].kind_case(), ProtobufWkt::Value::kStringValue);
+  ASSERT_EQ(vals[0].kind_case(), Protobuf::Value::kStringValue);
   EXPECT_EQ(vals[0].string_value(), "a");
-  ASSERT_EQ(vals[1].kind_case(), ProtobufWkt::Value::kStringValue);
+  ASSERT_EQ(vals[1].kind_case(), Protobuf::Value::kStringValue);
   EXPECT_EQ(vals[1].string_value(), "b");
 
   const auto it_tags = fields.find("tags");
   ASSERT_NE(it_tags, fields.end());
   const auto& tags = it_tags->second;
-  ASSERT_EQ(tags.kind_case(), ProtobufWkt::Value::kStructValue);
+  ASSERT_EQ(tags.kind_case(), Protobuf::Value::kStructValue);
   const auto& tags_struct = tags.struct_value();
 
   checkKeyInt(tags_struct, "mytag0", 1);
@@ -280,16 +280,16 @@ TEST_F(SetMetadataFilterTest, UntypedWithNoAllowOverwrite) {
   const auto it_mylist = fields.find("mylist");
   ASSERT_NE(it_mylist, fields.end());
   const auto& mylist = it_mylist->second;
-  ASSERT_EQ(mylist.kind_case(), ProtobufWkt::Value::kListValue);
+  ASSERT_EQ(mylist.kind_case(), Protobuf::Value::kListValue);
   const auto& vals = mylist.list_value().values();
   ASSERT_EQ(vals.size(), 1);
-  ASSERT_EQ(vals[0].kind_case(), ProtobufWkt::Value::kStringValue);
+  ASSERT_EQ(vals[0].kind_case(), Protobuf::Value::kStringValue);
   EXPECT_EQ(vals[0].string_value(), "a");
 
   const auto it_tags = fields.find("tags");
   ASSERT_NE(it_tags, fields.end());
   const auto& tags = it_tags->second;
-  ASSERT_EQ(tags.kind_case(), ProtobufWkt::Value::kStructValue);
+  ASSERT_EQ(tags.kind_case(), Protobuf::Value::kStructValue);
   const auto& tags_struct = tags.struct_value();
 
   checkKeyInt(tags_struct, "mytag0", 1);
@@ -392,7 +392,7 @@ TEST_F(SetMetadataFilterTest, UntypedWithDeprecated) {
   const auto it_tags = fields.find("tags");
   ASSERT_NE(it_tags, fields.end());
   const auto& tags = it_tags->second;
-  ASSERT_EQ(tags.kind_case(), ProtobufWkt::Value::kStructValue);
+  ASSERT_EQ(tags.kind_case(), Protobuf::Value::kStructValue);
   checkKeyInt(tags.struct_value(), "mytag0", 1);
 }
 
@@ -422,7 +422,7 @@ TEST_F(SetMetadataFilterTest, TypedWithDeprecated) {
   const auto it_tags = fields.find("tags");
   ASSERT_NE(it_tags, fields.end());
   const auto& tags = it_tags->second;
-  ASSERT_EQ(tags.kind_case(), ProtobufWkt::Value::kStructValue);
+  ASSERT_EQ(tags.kind_case(), Protobuf::Value::kStructValue);
   checkKeyInt(tags.struct_value(), "mytag0", 0);
 
   // Verify that `metadata` contains our typed Config.
@@ -447,6 +447,115 @@ TEST_F(SetMetadataFilterTest, LogsErrorWhenNoValueConfigured) {
       "warn",
       "set_metadata filter configuration contains metadata entries without value or typed_value",
       runFilter(metadata, yaml_config));
+}
+
+TEST_F(SetMetadataFilterTest, RouteSpecificConfigOverride) {
+  const std::string global_yaml = R"EOF(
+    metadata:
+    - metadata_namespace: thenamespace
+      value:
+        global_key: global_val
+  )EOF";
+
+  const std::string route_yaml = R"EOF(
+    metadata:
+    - metadata_namespace: thenamespace
+      value:
+        route_key: route_val
+      allow_overwrite: true
+  )EOF";
+
+  envoy::extensions::filters::http::set_metadata::v3::Config proto_global_config;
+  TestUtility::loadFromYaml(global_yaml, proto_global_config);
+  NiceMock<Stats::MockIsolatedStatsStore> local_stats_store;
+  config_ = std::make_shared<Config>(proto_global_config, *local_stats_store.rootScope(), "");
+  filter_ = std::make_shared<SetMetadataFilter>(config_);
+
+  envoy::extensions::filters::http::set_metadata::v3::Config proto_route_config;
+  TestUtility::loadFromYaml(route_yaml, proto_route_config);
+  auto route_config =
+      std::make_shared<Config>(proto_route_config, *local_stats_store.rootScope(), "");
+
+  Http::TestRequestHeaderMapImpl headers;
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info;
+  filter_->setDecoderFilterCallbacks(decoder_callbacks);
+
+  EXPECT_CALL(decoder_callbacks, mostSpecificPerFilterConfig())
+      .WillRepeatedly(testing::Return(route_config.get()));
+
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(ReturnRef(req_info));
+  EXPECT_CALL(req_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+
+  const auto& filter_metadata = metadata.filter_metadata();
+  const auto it_namespace = filter_metadata.find("thenamespace");
+  ASSERT_NE(it_namespace, filter_metadata.end());
+  const auto& fields = it_namespace->second.fields();
+
+  const auto it_global = fields.find("global_key");
+  ASSERT_NE(it_global, fields.end());
+  EXPECT_EQ(it_global->second.string_value(), "global_val");
+
+  const auto it_route = fields.find("route_key");
+  ASSERT_NE(it_route, fields.end());
+  EXPECT_EQ(it_route->second.string_value(), "route_val");
+}
+
+TEST_F(SetMetadataFilterTest, RouteSpecificConfigOverwriteDenied) {
+  const std::string global_yaml = R"EOF(
+    metadata:
+    - metadata_namespace: thenamespace
+      value:
+        key: global_val
+  )EOF";
+
+  const std::string route_yaml = R"EOF(
+    metadata:
+    - metadata_namespace: thenamespace
+      value:
+        key: route_val
+  )EOF";
+
+  envoy::extensions::filters::http::set_metadata::v3::Config proto_global_config;
+  TestUtility::loadFromYaml(global_yaml, proto_global_config);
+  NiceMock<Stats::MockIsolatedStatsStore> local_stats_store;
+  config_ = std::make_shared<Config>(proto_global_config, *local_stats_store.rootScope(), "");
+  filter_ = std::make_shared<SetMetadataFilter>(config_);
+
+  envoy::extensions::filters::http::set_metadata::v3::Config proto_route_config;
+  TestUtility::loadFromYaml(route_yaml, proto_route_config);
+  auto route_config =
+      std::make_shared<Config>(proto_route_config, *local_stats_store.rootScope(), "");
+
+  Http::TestRequestHeaderMapImpl headers;
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info;
+  filter_->setDecoderFilterCallbacks(decoder_callbacks);
+
+  EXPECT_CALL(decoder_callbacks, mostSpecificPerFilterConfig())
+      .WillRepeatedly(testing::Return(route_config.get()));
+
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(ReturnRef(req_info));
+  EXPECT_CALL(req_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+
+  const auto& filter_metadata = metadata.filter_metadata();
+  const auto it_namespace = filter_metadata.find("thenamespace");
+  ASSERT_NE(it_namespace, filter_metadata.end());
+  const auto& fields = it_namespace->second.fields();
+
+  const auto it_global = fields.find("key");
+  ASSERT_NE(it_global, fields.end());
+  EXPECT_EQ(it_global->second.string_value(), "global_val");
+
+  EXPECT_EQ(1, route_config->stats().overwrite_denied_.value());
 }
 
 } // namespace SetMetadataFilter

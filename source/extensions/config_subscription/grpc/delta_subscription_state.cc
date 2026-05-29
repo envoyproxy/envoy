@@ -13,7 +13,6 @@ namespace Config {
 
 DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                                                UntypedConfigUpdateCallbacks& watch_map,
-                                               const LocalInfo::LocalInfo& local_info,
                                                Event::Dispatcher& dispatcher,
                                                XdsConfigTrackerOptRef xds_config_tracker)
     // TODO(snowp): Hard coding VHDS here is temporary until we can move it away from relying on
@@ -37,7 +36,7 @@ DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
             watch_map_.onConfigUpdate({}, removed_resources, "");
           },
           dispatcher, dispatcher.timeSource()),
-      type_url_(std::move(type_url)), watch_map_(watch_map), local_info_(local_info),
+      type_url_(std::move(type_url)), watch_map_(watch_map),
       xds_config_tracker_(xds_config_tracker) {}
 
 void DeltaSubscriptionState::updateSubscriptionInterest(
@@ -136,7 +135,7 @@ bool DeltaSubscriptionState::subscriptionUpdatePending() const {
   // because even if it's empty, it won't be interpreted as legacy wildcard subscription, which can
   // only for the first request in the stream. So sending an empty request at this point should be
   // harmless.
-  return must_send_discovery_request_;
+  return dynamic_context_changed_;
 }
 
 void DeltaSubscriptionState::markStreamFresh(bool should_send_initial_resource_versions) {
@@ -151,9 +150,7 @@ UpdateAck DeltaSubscriptionState::handleResponse(
   UpdateAck ack(message.nonce(), type_url_);
   TRY_ASSERT_MAIN_THREAD { handleGoodResponse(message); }
   END_TRY
-  catch (const EnvoyException& e) {
-    handleBadResponse(e, ack);
-  }
+  CATCH(const EnvoyException& e, { handleBadResponse(e, ack); });
   return ack;
 }
 
@@ -190,56 +187,45 @@ bool DeltaSubscriptionState::isHeartbeatResponse(
 void DeltaSubscriptionState::handleGoodResponse(
     envoy::service::discovery::v3::DeltaDiscoveryResponse& message) {
   absl::flat_hash_set<std::string> names_added_removed;
-  // TODO(adisuissa): remove the non_heartbeat_resources structure once
-  // "envoy.reloadable_features.xds_prevent_resource_copy" is deprecated.
-  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> non_heartbeat_resources;
+
   for (const auto& resource : message.resources()) {
     if (!names_added_removed.insert(resource.name()).second) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("duplicate name {} found among added/updated resources", resource.name()));
     }
     if (isHeartbeatResponse(resource)) {
       continue;
-    }
-    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.xds_prevent_resource_copy")) {
-      non_heartbeat_resources.Add()->CopyFrom(resource);
     }
     // DeltaDiscoveryResponses for unresolved aliases don't contain an actual resource
     if (!resource.has_resource() && resource.aliases_size() > 0) {
       continue;
     }
     if (message.type_url() != resource.resource().type_url()) {
-      throw EnvoyException(fmt::format("type URL {} embedded in an individual Any does not match "
-                                       "the message-wide type URL {} in DeltaDiscoveryResponse {}",
-                                       resource.resource().type_url(), message.type_url(),
-                                       message.DebugString()));
+      throwEnvoyExceptionOrPanic(
+          fmt::format("type URL {} embedded in an individual Any does not match "
+                      "the message-wide type URL {} in DeltaDiscoveryResponse {}",
+                      resource.resource().type_url(), message.type_url(), message.DebugString()));
     }
   }
   for (const auto& name : message.removed_resources()) {
     if (!names_added_removed.insert(name).second) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("duplicate name {} found in the union of added+removed resources", name));
     }
   }
 
-  absl::Span<const envoy::service::discovery::v3::Resource* const> non_heartbeat_resources_span;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.xds_prevent_resource_copy")) {
-    // Reorder the resources in the response, having all the non-heartbeat
-    // resources at the front of the list. Note that although there's no
-    // requirement to keep stable ordering, we do so to process the resources in
-    // the order they were sent.
-    auto last_non_heartbeat = std::stable_partition(
-        message.mutable_resources()->begin(), message.mutable_resources()->end(),
-        [&](const envoy::service::discovery::v3::Resource& resource) {
-          return !isHeartbeatResponse(resource);
-        });
+  // Reorder the resources in the response, having all the non-heartbeat
+  // resources at the front of the list. Note that although there's no
+  // requirement to keep stable ordering, we do so to process the resources in
+  // the order they were sent.
+  auto last_non_heartbeat = std::stable_partition(
+      message.mutable_resources()->begin(), message.mutable_resources()->end(),
+      [&](const envoy::service::discovery::v3::Resource& resource) {
+        return !isHeartbeatResponse(resource);
+      });
 
-    non_heartbeat_resources_span = absl::MakeConstSpan(
-        message.resources().data(), last_non_heartbeat - message.resources().begin());
-  } else {
-    non_heartbeat_resources_span =
-        absl::MakeConstSpan(non_heartbeat_resources.data(), non_heartbeat_resources.size());
-  }
+  auto non_heartbeat_resources_span = absl::MakeConstSpan(
+      message.resources().data(), last_non_heartbeat - message.resources().begin());
   watch_map_.onConfigUpdate(non_heartbeat_resources_span, message.removed_resources(),
                             message.system_version_info());
 
@@ -305,7 +291,6 @@ void DeltaSubscriptionState::handleEstablishmentFailure() {
 envoy::service::discovery::v3::DeltaDiscoveryRequest
 DeltaSubscriptionState::getNextRequestAckless() {
   envoy::service::discovery::v3::DeltaDiscoveryRequest request;
-  must_send_discovery_request_ = false;
   if (!any_request_sent_yet_in_current_stream_) {
     any_request_sent_yet_in_current_stream_ = true;
     const bool is_legacy_wildcard = isInitialRequestForLegacyWildcard();
@@ -348,7 +333,6 @@ DeltaSubscriptionState::getNextRequestAckless() {
   names_removed_.clear();
 
   request.set_type_url(type_url_);
-  request.mutable_node()->MergeFrom(local_info_.node());
   return request;
 }
 

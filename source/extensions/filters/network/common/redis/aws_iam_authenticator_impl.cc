@@ -70,7 +70,8 @@ absl::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::initAws
   auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
       aws_iam_config.service_name().empty() ? DEFAULT_SERVICE_NAME : aws_iam_config.service_name(),
       region, credentials_provider_chain.value(), context,
-      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true,
+      Extensions::Common::Aws::AwsSigningHeaderMatcherVector{},
+      Extensions::Common::Aws::AwsSigningHeaderMatcherVector{}, true,
       PROTOBUF_GET_SECONDS_OR_DEFAULT(aws_iam_config, expiration_time, 60));
 
   return std::make_shared<AwsIamAuthenticatorImpl>(std::move(signer));

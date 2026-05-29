@@ -23,6 +23,7 @@ public:
   // ConnPoolImplBase::ActiveClient
   bool closingWithIncompleteStream() const override;
   RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override;
+  RequestEncoder& newStreamEncoder(ResponseDecoderHandlePtr response_decoder_handle) override;
 
   uint32_t numActiveStreams() const override {
     // Override the parent class using the codec for numActiveStreams.
@@ -36,13 +37,15 @@ public:
     Envoy::Http::ActiveClient::releaseResources();
   }
 
-  struct StreamWrapper : public RequestEncoderWrapper,
-                         public ResponseDecoderWrapper,
+  struct StreamWrapper : public ResponseDecoderWrapper,
+                         public RequestEncoderWrapper,
                          public StreamCallbacks,
                          public Event::DeferredDeletable,
                          protected Logger::Loggable<Logger::Id::pool> {
   public:
     StreamWrapper(ResponseDecoder& response_decoder, ActiveClient& parent);
+    StreamWrapper(ResponseDecoderHandlePtr response_decoder_handle, ActiveClient& parent);
+
     ~StreamWrapper() override;
 
     // StreamEncoderWrapper

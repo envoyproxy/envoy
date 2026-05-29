@@ -53,7 +53,7 @@ TEST_P(AdminInstanceTest, ConfigDump) {
   Buffer::OwnedImpl response2;
   Http::TestResponseHeaderMapImpl header_map;
   auto entry = admin_.getConfigTracker().add("foo", [](const Matchers::StringMatcher&) {
-    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    auto msg = std::make_unique<Protobuf::StringValue>();
     msg->set_value("bar");
     return msg;
   });
@@ -77,24 +77,24 @@ TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
   // Add configs in random order and validate config_dump dumps in the order.
   auto bootstrap_entry =
       admin_.getConfigTracker().add("bootstrap", [](const Matchers::StringMatcher&) {
-        auto msg = std::make_unique<ProtobufWkt::StringValue>();
+        auto msg = std::make_unique<Protobuf::StringValue>();
         msg->set_value("bootstrap_config");
         return msg;
       });
   auto route_entry = admin_.getConfigTracker().add("routes", [](const Matchers::StringMatcher&) {
-    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    auto msg = std::make_unique<Protobuf::StringValue>();
     msg->set_value("routes_config");
     return msg;
   });
   auto listener_entry =
       admin_.getConfigTracker().add("listeners", [](const Matchers::StringMatcher&) {
-        auto msg = std::make_unique<ProtobufWkt::StringValue>();
+        auto msg = std::make_unique<Protobuf::StringValue>();
         msg->set_value("listeners_config");
         return msg;
       });
   auto cluster_entry =
       admin_.getConfigTracker().add("clusters", [](const Matchers::StringMatcher&) {
-        auto msg = std::make_unique<ProtobufWkt::StringValue>();
+        auto msg = std::make_unique<Protobuf::StringValue>();
         msg->set_value("clusters_config");
         return msg;
       });
@@ -723,7 +723,7 @@ TEST_P(AdminInstanceTest, ConfigDumpNonExistentResource) {
   Buffer::OwnedImpl response;
   Http::TestResponseHeaderMapImpl header_map;
   auto listeners = admin_.getConfigTracker().add("listeners", [](const Matchers::StringMatcher&) {
-    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    auto msg = std::make_unique<Protobuf::StringValue>();
     msg->set_value("listeners_config");
     return msg;
   });

@@ -33,8 +33,8 @@ SlotPtr InstanceImpl::allocateSlot() {
     slots_.push_back(slot.get());
     return slot;
   }
-  const uint32_t idx = free_slot_indexes_.front();
-  free_slot_indexes_.pop_front();
+  const uint32_t idx = free_slot_indexes_.back();
+  free_slot_indexes_.pop_back();
   ASSERT(idx < slots_.size());
   SlotPtr slot = std::make_unique<SlotImpl>(*this, idx);
   slots_[idx] = slot.get();
@@ -248,6 +248,7 @@ void InstanceImpl::shutdownThread() {
   //                     number than the first. This is an edge case that does not exist anywhere
   //                     in the code today, but we can keep this in mind if things become more
   //                     complicated in the future.
+  // NOLINTNEXTLINE(modernize-loop-convert)
   for (auto it = thread_local_data_.data_.rbegin(); it != thread_local_data_.data_.rend(); ++it) {
     it->reset();
   }

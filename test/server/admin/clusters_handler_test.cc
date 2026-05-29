@@ -245,6 +245,84 @@ fake_cluster::1.2.3.4:80::local_origin_success_rate::93.2
   EXPECT_EQ(expected_text, response2.toString());
 }
 
+TEST_P(AdminInstanceTest, TestClusterFilter) {
+  Upstream::ClusterManager::ClusterInfoMaps cluster_maps;
+  ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_maps));
+
+  auto createCluster = [&](const std::string& name) {
+    auto cluster = std::make_unique<NiceMock<Upstream::MockClusterMockPrioritySet>>();
+    ON_CALL(*cluster->info_, name()).WillByDefault(testing::ReturnRefOfCopy(name));
+    ON_CALL(Const(*cluster), outlierDetector()).WillByDefault(Return(nullptr));
+    cluster_maps.active_clusters_.emplace(name, *cluster);
+    return cluster;
+  };
+
+  auto cluster1 = createCluster("test-bar-1");
+  auto cluster2 = createCluster("test-foo-2");
+  auto cluster3 = createCluster("test-baz-3");
+  auto cluster4 = createCluster("test-bar-4");
+
+  Buffer::OwnedImpl response;
+  Http::TestResponseHeaderMapImpl header_map;
+  EXPECT_EQ(Http::Code::OK,
+            getCallback("/clusters?format=json&filter=^test-bar-1$", header_map, response));
+  std::string output_json = response.toString();
+  envoy::admin::v3::Clusters output_proto;
+  TestUtility::loadFromJson(output_json, output_proto);
+  EXPECT_EQ(1, output_proto.cluster_statuses_size());
+  EXPECT_EQ("test-bar-1", output_proto.cluster_statuses(0).name());
+  response.drain(response.length());
+
+  EXPECT_EQ(Http::Code::OK,
+            getCallback("/clusters?format=json&filter=^test", header_map, response));
+  output_json = response.toString();
+  TestUtility::loadFromJson(output_json, output_proto);
+  std::vector<std::string> cluster_names;
+  for (const auto& cluster_status : output_proto.cluster_statuses()) {
+    cluster_names.push_back(cluster_status.name());
+  }
+  EXPECT_THAT(cluster_names, testing::UnorderedElementsAre("test-bar-1", "test-foo-2", "test-baz-3",
+                                                           "test-bar-4"));
+  response.drain(response.length());
+  cluster_names.clear();
+
+  EXPECT_EQ(Http::Code::OK, getCallback("/clusters?format=json&filter=bar", header_map, response));
+  output_json = response.toString();
+  TestUtility::loadFromJson(output_json, output_proto);
+  for (const auto& cluster_status : output_proto.cluster_statuses()) {
+    cluster_names.push_back(cluster_status.name());
+  }
+  EXPECT_THAT(cluster_names, testing::UnorderedElementsAre("test-bar-1", "test-bar-4"));
+  response.drain(response.length());
+  cluster_names.clear();
+
+  EXPECT_EQ(Http::Code::OK,
+            getCallback("/clusters?format=json&filter=test-foo-5", header_map, response));
+  output_json = response.toString();
+  TestUtility::loadFromJson(output_json, output_proto);
+  EXPECT_EQ(0, output_proto.cluster_statuses_size());
+  response.drain(response.length());
+
+  EXPECT_EQ(Http::Code::OK, getCallback("/clusters?format=json&filter=", header_map, response));
+  output_json = response.toString();
+  TestUtility::loadFromJson(output_json, output_proto);
+  for (const auto& cluster_status : output_proto.cluster_statuses()) {
+    cluster_names.push_back(cluster_status.name());
+  }
+  EXPECT_THAT(cluster_names, testing::UnorderedElementsAre("test-bar-1", "test-foo-2", "test-baz-3",
+                                                           "test-bar-4"));
+  response.drain(response.length());
+  cluster_names.clear();
+
+  EXPECT_EQ(Http::Code::OK,
+            getCallback("/clusters?filter=^(test-bar-1|test-baz-3)$", header_map, response));
+  std::string output_text = response.toString();
+  EXPECT_THAT(output_text, testing::HasSubstr("test-bar-1"));
+  EXPECT_THAT(output_text, testing::HasSubstr("test-baz-3"));
+  EXPECT_THAT(output_text, testing::Not(testing::HasSubstr("test-foo-2")));
+  EXPECT_THAT(output_text, testing::Not(testing::HasSubstr("test-bar-4")));
+}
+
 TEST_P(AdminInstanceTest, TestSetHealthFlag) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Event::MockDispatcher dispatcher;

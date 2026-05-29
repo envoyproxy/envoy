@@ -9,7 +9,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace Common {
 
 template <class ProtoType, class Impl>
@@ -109,6 +109,6 @@ private:
 };
 
 } // namespace Common
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

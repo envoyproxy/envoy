@@ -11,10 +11,7 @@
 #include "test/common/upstream/test_cluster_manager.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/config/xds_manager.h"
-#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
-#include "test/mocks/server/instance.h"
-#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_update_callbacks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
@@ -35,10 +32,7 @@ envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV2Yaml(const std::stri
 class AggregateClusterUpdateTest : public Event::TestUsingSimulatedTime,
                                    public testing::TestWithParam<bool> {
 public:
-  AggregateClusterUpdateTest()
-      : ads_mux_(std::make_shared<NiceMock<Config::MockGrpcMux>>()),
-        http_context_(stats_store_.symbolTable()), grpc_context_(stats_store_.symbolTable()),
-        router_context_(stats_store_.symbolTable()) {}
+  AggregateClusterUpdateTest() : ads_mux_(std::make_shared<NiceMock<Config::MockGrpcMux>>()) {}
 
   void initialize(const std::string& yaml_config) {
     auto bootstrap = parseBootstrapFromV2Yaml(yaml_config);
@@ -46,11 +40,9 @@ public:
     bootstrap.mutable_cluster_manager()->set_enable_deferred_cluster_creation(use_deferred_cluster);
     // Replace the adsMux to have mocked GrpcMux object that will allow invoking
     // methods when creating the cluster-manager.
-    ON_CALL(xds_manager_, adsMux()).WillByDefault(Return(ads_mux_));
+    ON_CALL(factory_.server_context_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux_));
     cluster_manager_ = Upstream::TestClusterManagerImpl::createTestClusterManager(
-        bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
-        factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
-        *factory_.api_, http_context_, grpc_context_, router_context_, server_, xds_manager_);
+        bootstrap, factory_, factory_.server_context_);
     ON_CALL(factory_.server_context_, clusterManager()).WillByDefault(ReturnRef(*cluster_manager_));
     THROW_IF_NOT_OK(cluster_manager_->initialize(bootstrap));
 
@@ -59,18 +51,10 @@ public:
     cluster_ = cluster_manager_->getThreadLocalCluster("aggregate_cluster");
   }
 
-  Stats::IsolatedStoreImpl stats_store_;
-  NiceMock<Server::MockAdmin> admin_;
   NiceMock<Upstream::TestClusterManagerFactory> factory_;
   Upstream::ThreadLocalCluster* cluster_;
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux_;
-  NiceMock<Config::MockXdsManager> xds_manager_;
   std::unique_ptr<Upstream::TestClusterManagerImpl> cluster_manager_;
-  AccessLog::MockAccessLogManager log_manager_;
-  Http::ContextImpl http_context_;
-  Grpc::ContextImpl grpc_context_;
-  Router::ContextImpl router_context_;
-  NiceMock<Server::MockInstance> server_;
 
   const std::string default_yaml_config_ = R"EOF(
  static_resources:
@@ -168,7 +152,7 @@ TEST_P(AggregateClusterUpdateTest, LoadBalancingTest) {
       Upstream::HostSetImpl::partitionHosts(
           std::make_shared<Upstream::HostVector>(Upstream::HostVector{host1, host2, host3}),
           Upstream::HostsPerLocalityImpl::empty()),
-      nullptr, {host1, host2, host3}, {}, 0, absl::nullopt, 100);
+      nullptr, {host1, host2, host3}, {}, absl::nullopt, 100);
 
   // Set up the HostSet with 1 healthy, 1 degraded and 1 unhealthy.
   Upstream::HostSharedPtr host4 = Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.4:80");
@@ -182,7 +166,7 @@ TEST_P(AggregateClusterUpdateTest, LoadBalancingTest) {
       Upstream::HostSetImpl::partitionHosts(
           std::make_shared<Upstream::HostVector>(Upstream::HostVector{host4, host5, host6}),
           Upstream::HostsPerLocalityImpl::empty()),
-      nullptr, {host4, host5, host6}, {}, 0, absl::nullopt, 100);
+      nullptr, {host4, host5, host6}, {}, absl::nullopt, 100);
 
   Upstream::HostConstSharedPtr host;
   for (int i = 0; i < 33; ++i) {
@@ -219,7 +203,7 @@ TEST_P(AggregateClusterUpdateTest, LoadBalancingTest) {
       Upstream::HostSetImpl::partitionHosts(
           std::make_shared<Upstream::HostVector>(Upstream::HostVector{host7, host8, host9}),
           Upstream::HostsPerLocalityImpl::empty()),
-      nullptr, {host7, host8, host9}, {}, 0, absl::nullopt, 100);
+      nullptr, {host7, host8, host9}, {}, absl::nullopt, 100);
 
   // Priority set
   //   Priority 0: 1/3 healthy, 1/3 degraded
@@ -279,11 +263,9 @@ TEST_P(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters)
   auto bootstrap = parseBootstrapFromV2Yaml(config);
   // Replace the adsMux to have mocked GrpcMux object that will allow invoking
   // methods when creating the cluster-manager.
-  ON_CALL(xds_manager_, adsMux()).WillByDefault(Return(ads_mux_));
+  ON_CALL(factory_.server_context_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux_));
   cluster_manager_ = Upstream::TestClusterManagerImpl::createTestClusterManager(
-      bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
-      factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
-      *factory_.api_, http_context_, grpc_context_, router_context_, server_, xds_manager_);
+      bootstrap, factory_, factory_.server_context_);
   ON_CALL(factory_.server_context_, clusterManager()).WillByDefault(ReturnRef(*cluster_manager_));
   THROW_IF_NOT_OK(cluster_manager_->initialize(bootstrap));
 
@@ -309,7 +291,7 @@ TEST_P(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters)
       Upstream::HostSetImpl::partitionHosts(
           std::make_shared<Upstream::HostVector>(Upstream::HostVector{host1, host2, host3}),
           Upstream::HostsPerLocalityImpl::empty()),
-      nullptr, {host1, host2, host3}, {}, 0, absl::nullopt, 100);
+      nullptr, {host1, host2, host3}, {}, absl::nullopt, 100);
 
   for (int i = 0; i < 50; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));

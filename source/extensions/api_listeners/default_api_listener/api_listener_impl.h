@@ -109,6 +109,9 @@ protected:
       void removeReadFilter(Network::ReadFilterSharedPtr) override {
         IS_ENVOY_BUG("Unexpected function call");
       }
+      void addAccessLogHandler(AccessLog::InstanceSharedPtr) override {
+        IS_ENVOY_BUG("Unexpected function call");
+      }
       bool initializeReadFilters() override { return true; }
 
       // Network::Connection
@@ -118,6 +121,7 @@ protected:
       void removeConnectionCallbacks(Network::ConnectionCallbacks& cb) override {
         callbacks_.remove(&cb);
       }
+      const Network::ConnectionSocketPtr& getSocket() const override { PANIC("not implemented"); }
       void addBytesSentCallback(Network::Connection::BytesSentCb) override {
         IS_ENVOY_BUG("Unexpected function call");
       }
@@ -132,8 +136,8 @@ protected:
       }
       void close(Network::ConnectionCloseType) override {}
       void close(Network::ConnectionCloseType, absl::string_view) override {}
-      Network::DetectedCloseType detectedCloseType() const override {
-        return Network::DetectedCloseType::Normal;
+      StreamInfo::DetectedCloseType detectedCloseType() const override {
+        return StreamInfo::DetectedCloseType::Normal;
       };
       Event::Dispatcher& dispatcher() const override { return dispatcher_; }
       uint64_t id() const override { return 12345; }
@@ -165,6 +169,9 @@ protected:
       bool connecting() const override { return false; }
       void write(Buffer::Instance&, bool) override { IS_ENVOY_BUG("Unexpected function call"); }
       void setBufferLimits(uint32_t) override { IS_ENVOY_BUG("Unexpected function call"); }
+      void setBufferHighWatermarkTimeout(std::chrono::milliseconds) override {
+        IS_ENVOY_BUG("Unexpected function call");
+      }
       uint32_t bufferLimit() const override { return 65000; }
       bool aboveHighWatermark() const override { return false; }
       const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() const override {

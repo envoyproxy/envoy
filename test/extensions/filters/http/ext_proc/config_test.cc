@@ -45,6 +45,11 @@ TEST(HttpExtProcConfigTest, CorrectConfig) {
     receiving_namespaces:
       untyped:
       - ns2
+    cluster_metadata_forwarding_namespaces:
+      typed:
+      - cluster_ns1
+      untyped:
+      - cluster_ns2
   )EOF";
 
   ExternalProcessingFilterConfig factory;
@@ -125,7 +130,7 @@ TEST(HttpExtProcConfigTest, CorrectHttpServiceConfigServerContext) {
   TestUtility::loadFromYaml(yaml, *proto_config);
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  EXPECT_CALL(context, messageValidationVisitor());
+  EXPECT_CALL(context, messageValidationVisitor()).Times(testing::AtLeast(1));
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProtoWithServerContext(*proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
@@ -254,54 +259,6 @@ TEST(HttpExtProcConfigTest, InvalidFullDuplexStreamedConfig) {
   EXPECT_EQ(result.status().message(),
             "If the ext_proc filter has the request_body_mode set to FULL_DUPLEX_STREAMED, "
             "then the request_trailer_mode has to be set to SEND");
-}
-
-TEST(HttpExtProcConfigTest, InvalidRequestFullDuplexStreamedFailureModeAllowConfig) {
-  std::string yaml = R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: ext_proc_server
-  failure_mode_allow: true
-  processing_mode:
-    request_body_mode: FULL_DUPLEX_STREAMED
-    request_trailer_mode: SEND
-  )EOF";
-
-  ExternalProcessingFilterConfig factory;
-  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
-  TestUtility::loadFromYaml(yaml, *proto_config);
-
-  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
-  auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_EQ(result.status().message(),
-            "If the ext_proc filter has either the request_body_mode or the response_body_mode set "
-            "to FULL_DUPLEX_STREAMED, then the failure_mode_allow has to be left as false");
-}
-
-TEST(HttpExtProcConfigTest, InvalidResponseFullDuplexStreamedFailureModeAllowConfig) {
-  std::string yaml = R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: ext_proc_server
-  failure_mode_allow: true
-  processing_mode:
-    response_body_mode: FULL_DUPLEX_STREAMED
-    response_trailer_mode: SEND
-  )EOF";
-
-  ExternalProcessingFilterConfig factory;
-  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
-  TestUtility::loadFromYaml(yaml, *proto_config);
-
-  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
-  auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_EQ(result.status().message(),
-            "If the ext_proc filter has either the request_body_mode or the response_body_mode set "
-            "to FULL_DUPLEX_STREAMED, then the failure_mode_allow has to be left as false");
 }
 
 TEST(HttpExtProcConfigTest, GrpcServiceHttpServiceBothSet) {
@@ -565,6 +522,50 @@ TEST(HttpExtProcConfigTest, FullDuplexStreamedValidation) {
 
   auto other_result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   EXPECT_TRUE(other_result.ok());
+}
+
+TEST(HttpExtProcConfigTest, StatusOnErrorConfig) {
+  std::string yaml = R"EOF(
+  grpc_service:
+    google_grpc:
+      target_uri: ext_proc_server
+      stat_prefix: google
+  status_on_error:
+    code: 503
+  )EOF";
+
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  cb(filter_callback);
+}
+
+TEST(HttpExtProcConfigTest, StatusOnErrorDefaultConfig) {
+  std::string yaml = R"EOF(
+  grpc_service:
+    google_grpc:
+      target_uri: ext_proc_server
+      stat_prefix: google
+  )EOF";
+
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  cb(filter_callback);
 }
 
 } // namespace

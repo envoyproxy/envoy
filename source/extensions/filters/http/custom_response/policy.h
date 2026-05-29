@@ -20,7 +20,7 @@ class CustomResponseFilter;
 
 // Base class for custom response policies.
 class Policy : public std::enable_shared_from_this<Policy>,
-               public Matcher::ActionBase<ProtobufWkt::Any> {
+               public Matcher::ActionBase<Protobuf::Any> {
 public:
   virtual Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool,
                                                   CustomResponseFilter&) const PURE;

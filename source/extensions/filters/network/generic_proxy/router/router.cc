@@ -21,8 +21,8 @@ namespace Router {
 namespace {
 
 struct ReasonViewAndFlag {
-  absl::string_view view{};
-  absl::optional<StreamInfo::CoreResponseFlag> flag{};
+  absl::string_view view;
+  absl::optional<StreamInfo::CoreResponseFlag> flag;
 };
 
 static constexpr ReasonViewAndFlag ReasonViewAndFlags[] = {
@@ -92,9 +92,7 @@ void UpstreamRequest::resetStream(StreamResetReason reason, absl::string_view re
   if (span_ != nullptr) {
     span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     span_->setTag(Tracing::Tags::get().ErrorReason, resetReasonToViewAndFlag(reason).view);
-    TraceContextBridge trace_context{*parent_.request_stream_};
-    Tracing::TracerUtility::finalizeSpan(*span_, trace_context, stream_info_,
-                                         tracing_config_.value().get(), true);
+    Tracing::TracerUtility::finalizeSpan(*span_, stream_info_, tracing_config_.value().get(), true);
   }
 
   // Notify the parent filter that the upstream request has been reset.
@@ -110,9 +108,7 @@ void UpstreamRequest::clearStream(bool close_connection) {
             close_connection);
 
   if (span_ != nullptr) {
-    TraceContextBridge trace_context{*parent_.request_stream_};
-    Tracing::TracerUtility::finalizeSpan(*span_, trace_context, stream_info_,
-                                         tracing_config_.value().get(), true);
+    Tracing::TracerUtility::finalizeSpan(*span_, stream_info_, tracing_config_.value().get(), true);
   }
 
   generic_upstream_->removeUpstreamRequest(stream_id_);
@@ -205,17 +201,25 @@ void UpstreamRequest::onUpstreamSuccess() {
             parent_.config_->bindUpstreamConnection() ? "bound" : "owned");
   onUpstreamConnectionReady();
 
-  const auto upstream_host = upstream_info_->upstream_host_.get();
-  const Tracing::UpstreamContext upstream_context(
-      upstream_host, upstream_host ? &upstream_host->cluster() : nullptr,
-      Tracing::ServiceType::Unknown, false);
+  // Only inject trace context if propagation is not disabled.
+  // When noContextPropagation is true, spans are still reported but trace context
+  // headers are not injected into upstream requests.
+  const bool no_context_propagation =
+      tracing_config_.has_value() && tracing_config_->noContextPropagation();
 
-  TraceContextBridge trace_context{*parent_.request_stream_};
+  if (!no_context_propagation) {
+    const auto upstream_host = upstream_info_->upstream_host_.get();
+    const Tracing::UpstreamContext upstream_context(
+        upstream_host, upstream_host ? &upstream_host->cluster() : nullptr,
+        Tracing::ServiceType::Unknown, false);
 
-  if (span_ != nullptr) {
-    span_->injectContext(trace_context, upstream_context);
-  } else {
-    parent_.callbacks_->activeSpan().injectContext(trace_context, upstream_context);
+    TraceContextBridge trace_context{*parent_.request_stream_};
+
+    if (span_ != nullptr) {
+      span_->injectContext(trace_context, upstream_context);
+    } else {
+      parent_.callbacks_->activeSpan().injectContext(trace_context, upstream_context);
+    }
   }
 
   sendHeaderFrameToUpstream();
@@ -243,6 +247,13 @@ void UpstreamRequest::onDecodingSuccess(ResponseHeaderFramePtr response_header_f
   } else {
     // Codec does not provide the start time and use the current time as the start time.
     upstream_info_->upstreamTiming().onFirstUpstreamRxByteReceived(parent_.time_source_);
+  }
+
+  if (!response_header_frame->status().ok()) {
+    if (span_ != nullptr) {
+      span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+      span_->setTag(Tracing::Tags::get().ErrorReason, "upstream_failure");
+    }
   }
 
   if (response_header_frame->frameFlags().endStream()) {

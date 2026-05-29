@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package envoy_mobile.extensions.quic_packet_writer.platform;
+
+import "google/protobuf/wrappers.proto";
+
+// Configuration for the platform aware QUIC packet writer factory.
+message QuicPlatformPacketWriterConfig {
+}

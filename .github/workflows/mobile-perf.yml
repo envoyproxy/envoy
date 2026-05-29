@@ -39,7 +39,10 @@ jobs:
       check-name: mobile-perf
 
   build:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
+      actions: read
       contents: read
       packages: read
     if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-perf }}
@@ -48,7 +51,7 @@ jobs:
     uses: ./.github/workflows/_mobile_container_ci.yml
     with:
       args: ${{ matrix.args }}
-      command: ./bazelw
+      command: bazel
       ref: ${{ matrix.ref }}
       request: ${{ needs.load.outputs.request }}
       source: ${{ matrix.source }}
@@ -64,7 +67,9 @@ jobs:
         - name: Current size
           args: >-
             build
-            --config=mobile-remote-release-clang
+            --config=ci
+            --config=mobile-rbe
+            --config=mobile-release
             //test/performance:test_binary_size
           # Ensure files don't leak back into the main binary
           source: |-
@@ -74,13 +79,18 @@ jobs:
         - name: Main size
           args: >-
             build
-            --config=mobile-remote-release-clang
+            --config=ci
+            --config=mobile-rbe
+            --config=mobile-release
             //test/performance:test_binary_size
           ref: main
           target: size-main
 
   compare:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
+      actions: read
       contents: read
       packages: read
     if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-perf }}

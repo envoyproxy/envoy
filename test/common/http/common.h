@@ -7,7 +7,6 @@
 #include "source/common/http/codec_client.h"
 
 #include "test/mocks/common.h"
-#include "test/mocks/event/mocks.h"
 
 namespace Envoy {
 /**
@@ -31,6 +30,7 @@ public:
   }
   void raiseGoAway(Http::GoAwayErrorCode error_code) { onGoAway(error_code); }
   Event::Timer* idleTimer() { return idle_timer_.get(); }
+  void triggerIdleTimeout() { onIdleTimeout(); }
   using Http::CodecClient::onSettings;
 
   DestroyCb destroy_cb_;

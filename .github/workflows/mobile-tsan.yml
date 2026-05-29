@@ -40,7 +40,10 @@ jobs:
       run-id: ${{ github.event.workflow_run.id }}
 
   tsan:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
+      actions: read
       contents: read
       packages: read
     if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-tsan }}
@@ -50,7 +53,9 @@ jobs:
     with:
       args: >-
         test
-        --config=mobile-remote-ci-linux-tsan
+        --config=ci
+        --config=mobile-rbe
+        --config=mobile-tsan
         //test/common/...
         //test/cc/...
       request: ${{ needs.load.outputs.request }}

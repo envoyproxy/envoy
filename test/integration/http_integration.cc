@@ -32,9 +32,9 @@
 #include "source/common/quic/quic_client_transport_socket_factory.h"
 #endif
 
+#include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_impl.h"
-#include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/server_ssl_socket.h"
 
 #include "test/common/upstream/utility.h"
@@ -45,7 +45,6 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/registry.h"
 
 #include "absl/time/time.h"
 #include "base_integration_test.h"
@@ -54,6 +53,7 @@
 namespace Envoy {
 namespace {
 
+using testing::Eq;
 using testing::HasSubstr;
 
 envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::CodecType
@@ -323,7 +323,7 @@ HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
 
 HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
                                          Network::Address::IpVersion version,
-                                         const std::string& config)
+                                         const envoy::config::bootstrap::v3::Bootstrap& config)
     : HttpIntegrationTest::HttpIntegrationTest(
           downstream_protocol,
           [version](int) {
@@ -335,16 +335,13 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
 HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
                                          const InstanceConstSharedPtrFn& upstream_address_fn,
                                          Network::Address::IpVersion version,
-                                         const std::string& config)
+                                         const envoy::config::bootstrap::v3::Bootstrap& config)
     : BaseIntegrationTest(upstream_address_fn, version, config),
       downstream_protocol_(downstream_protocol), quic_stat_names_(stats_store_.symbolTable()) {
   // Legacy integration tests expect the default listener to be named "http" for
   // lookupPort calls.
   config_helper_.renameListener("http");
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
-  // Allow extension lookup by name in the integration tests.
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.no_extension_lookup_by_name",
-                                    "false");
 
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -403,7 +400,7 @@ void HttpIntegrationTest::initialize() {
   // Needs to outlive all QUIC connections.
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   auto quic_connection_persistent_info =
-      Quic::createPersistentQuicInfoForCluster(*dispatcher_, *cluster);
+      Quic::createPersistentQuicInfoForCluster(*dispatcher_, *cluster, server_factory_context_);
   // Config IETF QUIC flow control window.
   quic_connection_persistent_info->quic_config_
       .SetInitialMaxStreamDataBytesIncomingBidirectionalToSend(
@@ -787,15 +784,15 @@ void HttpIntegrationTest::testRouterVirtualClusters() {
   auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
   checkSimpleRequestSuccess(0, 0, response.get());
 
-  test_server_->waitForCounterEq("vhost.integration.vcluster.test_vcluster.upstream_rq_total", 1);
-  test_server_->waitForCounterEq("vhost.integration.vcluster.other.upstream_rq_total", 0);
+  test_server_->waitForCounter("vhost.integration.vcluster.test_vcluster.upstream_rq_total", Eq(1));
+  test_server_->waitForCounter("vhost.integration.vcluster.other.upstream_rq_total", Eq(0));
 
   auto response2 =
       sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
   checkSimpleRequestSuccess(0, 0, response2.get());
 
-  test_server_->waitForCounterEq("vhost.integration.vcluster.test_vcluster.upstream_rq_total", 1);
-  test_server_->waitForCounterEq("vhost.integration.vcluster.other.upstream_rq_total", 1);
+  test_server_->waitForCounter("vhost.integration.vcluster.test_vcluster.upstream_rq_total", Eq(1));
+  test_server_->waitForCounter("vhost.integration.vcluster.other.upstream_rq_total", Eq(1));
 }
 
 // Make sure route level stats are generated correctly.
@@ -820,8 +817,8 @@ void HttpIntegrationTest::testRouteStats() {
   auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
   checkSimpleRequestSuccess(0, 0, response.get());
 
-  test_server_->waitForCounterEq("vhost.integration.route.test_route.upstream_rq_total", 1);
-  test_server_->waitForCounterEq("vhost.integration.route.test_route.upstream_rq_completed", 1);
+  test_server_->waitForCounter("vhost.integration.route.test_route.upstream_rq_total", Eq(1));
+  test_server_->waitForCounter("vhost.integration.route.test_route.upstream_rq_completed", Eq(1));
 }
 
 void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
@@ -1250,7 +1247,11 @@ void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_com
                                                absl::string_view initial_code) {
   if (with_encoder_filter) {
     // Add a filter to make sure 100s play well with them.
-    config_helper_.prependFilter("name: passthrough-filter");
+    config_helper_.prependFilter(R"EOF(
+      name: passthrough-filter
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.PassthroughFilterConfig
+    )EOF");
   }
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1317,11 +1318,19 @@ void HttpIntegrationTest::testTwoRequests(bool network_backup) {
   // created while the socket appears to be in the high watermark state, and regression tests that
   // flow control will be corrected as the socket "becomes unblocked"
   if (network_backup) {
-    config_helper_.prependFilter(
-        fmt::format(R"EOF(
-  name: pause-filter{}
-  )EOF",
-                    downstreamProtocol() == Http::CodecType::HTTP3 ? "-for-quic" : ""));
+    if (downstreamProtocol() == Http::CodecType::HTTP3) {
+      config_helper_.prependFilter(R"EOF(
+        name: pause-filter-for-quic
+        typed_config:
+          "@type": type.googleapis.com/test.integration.filters.PauseFilterForQuicConfig
+      )EOF");
+    } else {
+      config_helper_.prependFilter(R"EOF(
+        name: pause-filter
+        typed_config:
+          "@type": type.googleapis.com/test.integration.filters.PauseFilterConfig
+      )EOF");
+    }
   }
   initialize();
 
@@ -1463,6 +1472,14 @@ void HttpIntegrationTest::testLargeResponseHeaders(uint32_t size, uint32_t count
   // `count` parameter is the number of headers to be added. The actual request byte size will
   // exceed `size` due to the keys and other headers. The actual request header count will exceed
   // `count` by four due to default headers.
+
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3::HttpConnectionManager& hcm) -> void {
+    // Disable route timeout to prevent 504 on slow CI (#44416).
+    auto* route =
+        hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
+    route->mutable_timeout()->set_seconds(0);
+  });
 
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     ConfigHelper::HttpProtocolOptions protocol_options;
@@ -1711,7 +1728,7 @@ void HttpIntegrationTest::testAdminDrain(Http::CodecType admin_request_type) {
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
 
   // Validate that the listeners have been stopped.
-  test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
+  test_server_->waitForCounter("listener_manager.listener_stopped", Eq(1));
 
   // Validate that port is closed and can be bound by other sockets.
   // This does not work for HTTP/3 because the port is not closed until the listener is completely
@@ -1723,9 +1740,11 @@ void HttpIntegrationTest::testAdminDrain(Http::CodecType admin_request_type) {
 
 void HttpIntegrationTest::simultaneousRequest(uint32_t request1_bytes, uint32_t request2_bytes,
                                               uint32_t response1_bytes, uint32_t response2_bytes) {
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   FakeStreamPtr upstream_request1;
   FakeStreamPtr upstream_request2;
@@ -1807,13 +1826,6 @@ std::string HttpIntegrationTest::upstreamProtocolStatsRoot() const {
   return "invalid";
 }
 
-std::string HttpIntegrationTest::listenerStatPrefix(const std::string& stat_name) {
-  if (version_ == Network::Address::IpVersion::v4) {
-    return "listener.127.0.0.1_0." + stat_name;
-  }
-  return "listener.[__1]_0." + stat_name;
-}
-
 void HttpIntegrationTest::expectUpstreamBytesSentAndReceived(BytesCountExpectation h1_expectation,
                                                              BytesCountExpectation h2_expectation,
                                                              BytesCountExpectation h3_expectation,
@@ -1888,18 +1900,21 @@ void HttpIntegrationTest::expectDownstreamBytesSentAndReceived(BytesCountExpecta
 }
 
 void Http2RawFrameIntegrationTest::startHttp2Session() {
+  startHttp2Session(Http2Frame::makeEmptySettingsFrame());
+}
+
+void Http2RawFrameIntegrationTest::startHttp2Session(const Http2Frame& settings) {
   ASSERT_TRUE(tcp_client_->write(Http2Frame::Preamble, false, false));
 
-  // Send empty initial SETTINGS frame.
-  auto settings = Http2Frame::makeEmptySettingsFrame();
+  // Send initial SETTINGS frame.
   ASSERT_TRUE(tcp_client_->write(std::string(settings), false, false));
 
   // Read initial SETTINGS frame from the server.
   readFrame();
 
-  // Send an SETTINGS ACK.
-  settings = Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::Ack);
-  ASSERT_TRUE(tcp_client_->write(std::string(settings), false, false));
+  // Send a SETTINGS ACK.
+  auto settings_ack = Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::Ack);
+  ASSERT_TRUE(tcp_client_->write(std::string(settings_ack), false, false));
 
   // read pending SETTINGS and WINDOW_UPDATE frames
   readFrame();
@@ -1907,6 +1922,10 @@ void Http2RawFrameIntegrationTest::startHttp2Session() {
 }
 
 void Http2RawFrameIntegrationTest::beginSession() {
+  beginSession(Http2Frame::makeEmptySettingsFrame());
+}
+
+void Http2RawFrameIntegrationTest::beginSession(const Http2Frame& settings) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
   // set lower outbound frame limits to make tests run faster
@@ -1918,7 +1937,7 @@ void Http2RawFrameIntegrationTest::beginSession() {
       envoy::config::core::v3::SocketOption::STATE_PREBIND,
       ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_RCVBUF), 1024));
   tcp_client_ = makeTcpConnection(lookupPort("http"), options);
-  startHttp2Session();
+  startHttp2Session(settings);
 }
 
 Http2Frame Http2RawFrameIntegrationTest::readFrame() {

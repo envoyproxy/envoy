@@ -40,7 +40,7 @@ const NodeContextRenderers& nodeParamCbs() {
 }
 
 void mergeMetadataJson(Protobuf::Map<std::string, std::string>& params,
-                       const ProtobufWkt::Struct& metadata, const std::string& prefix) {
+                       const Protobuf::Struct& metadata, const std::string& prefix) {
 #ifdef ENVOY_ENABLE_YAML
   for (const auto& it : metadata.fields()) {
     absl::StatusOr<std::string> json_or_error = MessageUtil::getJsonStringFromMessage(it.second);

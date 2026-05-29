@@ -18,7 +18,7 @@ using GrpcStatus = Grpc::Status::WellKnownGrpcStatus;
 class EndStreamResponseTest : public testing::Test {
 protected:
   void compareJson(const std::string& expected, const std::string& actual) {
-    ProtobufWkt::Value expected_value, actual_value;
+    Protobuf::Value expected_value, actual_value;
     TestUtility::loadFromJson(expected, expected_value);
     TestUtility::loadFromJson(actual, actual_value);
     EXPECT_TRUE(TestUtility::protoEqual(expected_value, actual_value));
@@ -43,7 +43,7 @@ TEST_F(EndStreamResponseTest, StatusCodeToConnectUnaryStatus) {
 }
 
 TEST_F(EndStreamResponseTest, SerializeJsonError) {
-  ProtobufWkt::Any detail;
+  Protobuf::Any detail;
   detail.set_type_url("type.url");
   detail.set_value("protobuf");
   const std::vector<std::pair<Error, std::string>> test_set = {

@@ -54,7 +54,6 @@ The following statistics are supported:
   clear_route_cache_ignored, Counter, The number of clear cache request that were ignored
   clear_route_cache_disabled, Counter, The number of clear cache requests that were rejected from being disabled
   clear_route_cache_upstream_ignored, Counter, The number of clear cache request that were ignored if the filter is in upstream
-  send_immediate_resp_upstream_ignored, Counter, The number of send immediate response messages that were ignored if the filter is in upstream
 
 Access Log Fields
 ------------------
@@ -94,6 +93,8 @@ Available field names:
   response_trailer_call_status, Integer, gRPC status code for response trailer call
   bytes_sent, Integer, Total bytes sent to external processor (Envoy gRPC only)
   bytes_received, Integer, Total bytes received from external processor (Envoy gRPC only)
+  immediate_responses_sent, Integer, Total number of immediate responses sent
+  server_half_closed, Integer, Number of streams closed by the server
 
 Example usage in access log configuration:
 

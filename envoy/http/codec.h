@@ -10,6 +10,7 @@
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/grpc/status.h"
+#include "envoy/http/codec_runtime_overrides.h"
 #include "envoy/http/header_formatter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/metadata_interface.h"
@@ -36,20 +37,6 @@ struct CodecStats;
 namespace Http3 {
 struct CodecStats;
 }
-
-// Legacy default value of 60K is safely under both codec default limits.
-static constexpr uint32_t DEFAULT_MAX_REQUEST_HEADERS_KB = 60;
-// Default maximum number of headers.
-static constexpr uint32_t DEFAULT_MAX_HEADERS_COUNT = 100;
-
-constexpr absl::string_view MaxRequestHeadersCountOverrideKey =
-    "envoy.reloadable_features.max_request_headers_count";
-constexpr absl::string_view MaxResponseHeadersCountOverrideKey =
-    "envoy.reloadable_features.max_response_headers_count";
-constexpr absl::string_view MaxRequestHeadersSizeOverrideKey =
-    "envoy.reloadable_features.max_request_headers_size_kb";
-constexpr absl::string_view MaxResponseHeadersSizeOverrideKey =
-    "envoy.reloadable_features.max_response_headers_size_kb";
 
 class Stream;
 class RequestDecoder;
@@ -211,6 +198,23 @@ public:
                                        StreamInfo::StreamInfo& stream_info) PURE;
 };
 
+class ResponseDecoder;
+
+/**
+ * A handle to a ResponseDecoder. This handle can be used to check if the underlying decoder is
+ * still valid and to get a reference to it.
+ */
+class ResponseDecoderHandle {
+public:
+  virtual ~ResponseDecoderHandle() = default;
+
+  /**
+   * @return a reference to the underlying decoder if it is still valid.
+   */
+  virtual OptRef<ResponseDecoder> get() PURE;
+};
+using ResponseDecoderHandlePtr = std::unique_ptr<ResponseDecoderHandle>;
+
 /**
  * Decodes an HTTP stream. These are callbacks fired into a sink. This interface contains methods
  * common to both the request and response path.
@@ -317,9 +321,16 @@ public:
    * @param os the ostream to dump state to
    * @param indent_level the depth, for pretty-printing.
    *
+
    * This function is called on Envoy fatal errors so should avoid memory allocation.
    */
   virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
+
+  /**
+   * @return A handle to the response decoder. Caller can check the response decoder's liveness via
+   * the handle.
+   */
+  virtual ResponseDecoderHandlePtr createResponseDecoderHandle() PURE;
 };
 
 /**
@@ -452,6 +463,16 @@ public:
    * Get the bytes meter for this stream.
    */
   virtual const StreamInfo::BytesMeterSharedPtr& bytesMeter() PURE;
+
+  /**
+   * @return absl::optional<uint32_t> the codec level stream ID if available
+   * or nullopt if not applicable or not yet assigned.
+   *
+   * HTTP/1 streams return nullopt.
+   * HTTP/2 streams return the HTTP/2 stream ID or nullopt if not available.
+   * HTTP/3 streams return the HTTP/3 stream ID or nullopt if not available.
+   */
+  virtual absl::optional<uint32_t> codecStreamId() const PURE;
 };
 
 /**

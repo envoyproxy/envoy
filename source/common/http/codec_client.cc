@@ -12,6 +12,7 @@
 #include "source/common/http/http2/codec_impl.h"
 #include "source/common/http/status.h"
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_codec_impl.h"
@@ -24,7 +25,9 @@ CodecClient::CodecClient(CodecType type, Network::ClientConnectionPtr&& connecti
                          Upstream::HostDescriptionConstSharedPtr host,
                          Event::Dispatcher& dispatcher)
     : type_(type), host_(host), connection_(std::move(connection)),
-      idle_timeout_(host_->cluster().idleTimeout()) {
+      idle_timeout_(host_->cluster().idleTimeout()),
+      enable_idle_timer_only_when_connected_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.codec_client_enable_idle_timer_only_when_connected")) {
   if (type_ != CodecType::HTTP3) {
     // Make sure upstream connections process data and then the FIN, rather than processing
     // TCP disconnects immediately. (see https://github.com/envoyproxy/envoy/issues/1679 for
@@ -36,7 +39,11 @@ CodecClient::CodecClient(CodecType type, Network::ClientConnectionPtr&& connecti
 
   if (idle_timeout_) {
     idle_timer_ = dispatcher.createTimer([this]() -> void { onIdleTimeout(); });
-    enableIdleTimer();
+    // If the runtime flag is disabled, start the idle timer immediately even when connection
+    // is not yet established, restoring the old behavior.
+    if (!enable_idle_timer_only_when_connected_) {
+      enableIdleTimer();
+    }
   }
 
   // We just universally set no delay on connections. Theoretically we might at some point want
@@ -53,13 +60,16 @@ void CodecClient::connect() {
   if (!connection_->connecting()) {
     ASSERT(connection_->state() == Network::Connection::State::Open);
     connected_ = true;
+    enableIdleTimer();
   } else {
     ENVOY_CONN_LOG(debug, "connecting", *connection_);
     connection_->connect();
   }
 }
 
-void CodecClient::close(Network::ConnectionCloseType type) { connection_->close(type); }
+void CodecClient::close(Network::ConnectionCloseType type, absl::string_view details) {
+  connection_->close(type, details);
+}
 
 void CodecClient::deleteRequest(ActiveRequest& request) {
   connection_->dispatcher().deferredDelete(request.removeFromList(active_requests_));
@@ -71,8 +81,16 @@ void CodecClient::deleteRequest(ActiveRequest& request) {
   }
 }
 
+RequestEncoder& CodecClient::newStream(ResponseDecoderHandlePtr response_decoder_handle) {
+  return enlistAndCreateEncoder(
+      std::make_unique<ActiveRequest>(*this, std::move(response_decoder_handle)));
+}
+
 RequestEncoder& CodecClient::newStream(ResponseDecoder& response_decoder) {
-  ActiveRequestPtr request(new ActiveRequest(*this, response_decoder));
+  return enlistAndCreateEncoder(std::make_unique<ActiveRequest>(*this, response_decoder));
+}
+
+RequestEncoder& CodecClient::enlistAndCreateEncoder(ActiveRequestPtr request) {
   request->setEncoder(codec_->newStream(*request));
   LinkedList::moveIntoList(std::move(request), active_requests_);
 
@@ -87,6 +105,7 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::Connected) {
     ENVOY_CONN_LOG(debug, "connected", *connection_);
     connected_ = true;
+    enableIdleTimer();
     return;
   }
 
@@ -243,11 +262,13 @@ void CodecClient::ActiveRequest::decodeHeaders(ResponseHeaderMapPtr&& headers, b
                      failure_details, *headers);
       if ((parent_.codec_->protocol() == Protocol::Http2 &&
            !parent_.host_->cluster()
+                .httpProtocolOptions()
                 .http2Options()
                 .override_stream_error_on_invalid_http_message()
                 .value()) ||
           (parent_.codec_->protocol() == Protocol::Http3 &&
            !parent_.host_->cluster()
+                .httpProtocolOptions()
                 .http3Options()
                 .override_stream_error_on_invalid_http_message()
                 .value())) {
@@ -279,14 +300,15 @@ CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& 
       proxied = true;
     }
     codec_ = std::make_unique<Http1::ClientConnectionImpl>(
-        *connection_, host->cluster().http1CodecStats(), *this, host->cluster().http1Settings(),
+        *connection_, host->cluster().http1CodecStats(), *this,
+        host->cluster().httpProtocolOptions().http1Settings(),
         host->cluster().maxResponseHeadersKb(), host->cluster().maxResponseHeadersCount(), proxied);
     break;
   }
   case CodecType::HTTP2:
     codec_ = std::make_unique<Http2::ClientConnectionImpl>(
         *connection_, *this, host->cluster().http2CodecStats(), random_generator,
-        host->cluster().http2Options(),
+        host->cluster().httpProtocolOptions().http2Options(),
         host->cluster().maxResponseHeadersKb().value_or(Http::DEFAULT_MAX_REQUEST_HEADERS_KB),
         host->cluster().maxResponseHeadersCount(), Http2::ProdNghttp2SessionFactory::get());
     break;
@@ -294,7 +316,8 @@ CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& 
 #ifdef ENVOY_ENABLE_QUIC
     auto& quic_session = dynamic_cast<Quic::EnvoyQuicClientSession&>(*connection_);
     codec_ = std::make_unique<Quic::QuicHttpClientConnectionImpl>(
-        quic_session, *this, host->cluster().http3CodecStats(), host->cluster().http3Options(),
+        quic_session, *this, host->cluster().http3CodecStats(),
+        host->cluster().httpProtocolOptions().http3Options(),
         host->cluster().maxResponseHeadersKb().value_or(Http::DEFAULT_MAX_REQUEST_HEADERS_KB),
         host->cluster().maxResponseHeadersCount());
     // Initialize the session after max request header size is changed in above http client

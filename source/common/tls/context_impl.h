@@ -53,7 +53,7 @@ struct TlsContext {
   // for "not an ECDSA context".
   CurveNID ec_group_curve_name_ = EC_CURVE_INVALID_NID;
   bool is_must_staple_{};
-  Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider_{};
+  Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider_;
 
 #ifdef ENVOY_ENABLE_QUIC
   quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain> quic_cert_;
@@ -121,9 +121,11 @@ public:
 protected:
   friend class ContextImplPeer;
 
-  ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
-              Server::Configuration::CommonFactoryContext& factory_context,
-              Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status);
+  ContextImpl(
+      Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
+      const std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>& tls_certificates,
+      Server::Configuration::CommonFactoryContext& factory_context,
+      Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status);
 
   /**
    * The global SSL-library index used for storing a pointer to the context
@@ -183,7 +185,6 @@ public:
   std::string category() const override { return "envoy.ssl.server_context_factory"; }
   virtual absl::StatusOr<Ssl::ServerContextSharedPtr>
   createServerContext(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
-                      const std::vector<std::string>& server_names,
                       Server::Configuration::CommonFactoryContext& factory_context,
                       Ssl::ContextAdditionalInitFunc additional_init) PURE;
 };

@@ -98,14 +98,13 @@ for how to update or override dependencies.
     ```
 
     ### Linux
-    On Linux, we recommend using the prebuilt Clang+LLVM package from [LLVM official site](http://releases.llvm.org/download.html) for Clang 14.
-
-    Extract the tar.xz and run the following:
+    Envoy uses a hermetic Clang toolchain that is automatically downloaded by Bazel, so you do not
+    need to install Clang manually. To use it, add `--config=clang` to your build command:
     ```console
-    bazel/setup_clang.sh <PATH_TO_EXTRACTED_CLANG_LLVM>
+    bazel build --config=clang envoy
     ```
 
-    This will setup a `clang.bazelrc` file in Envoy source root. If you want to make clang as default, run the following:
+    If you want to make clang the default, add it to your `user.bazelrc`:
     ```console
     echo "build --config=clang" >> user.bazelrc
     ```
@@ -365,7 +364,7 @@ for more details.
 ## Supported compiler versions
 
 We now require Clang >= 18 due to C++20 support (for Clang >= 14, your mileage may vary) and tcmalloc requirement. GCC >= 13 is also known to work for C++20.
-Currently the CI is running with Clang 14.
+Currently the CI is running with Clang 18.
 
 ## Clang STL debug symbols
 
@@ -697,13 +696,15 @@ The following optional features can be enabled on the Bazel build command-line:
   is required and target platform is Linux, then `bazel/exported_symbols.txt` can be used to land it.
 * Perf annotation with `--define perf_annotation=enabled` (see
   source/common/common/perf_annotation.h for details).
-* BoringSSL can be built in a FIPS-compliant mode with `--define boringssl=fips`
-  (see [FIPS 140-2](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/ssl#fips-140-2) for details).
+* BoringSSL can be built in a FIPS-compliant mode with `--config=boringssl-fips`
+  (see [FIPS 140-2](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/ssl#fips-140-2) for details,
+  and [SSL.md](SSL.md) more information about SSL BUILDS).
+* AWS-LC FIPS can be used with `--config=aws-lc-fips`. (see for [SSL.md](SSL.md) more information about SSL BUILDS).
 * ASSERT() can be configured to log failures and increment a stat counter in a release build with
   `--define log_fast_debug_assert_in_release=enabled`. SLOW_ASSERT()s can be included with `--define log_debug_assert_in_release=enabled`. The default behavior is to compile all debug assertions out of
   release builds so that the condition is not evaluated. This option has no effect in debug builds.
 * memory-debugging (scribbling over memory after allocation and before freeing) with
-  `--define tcmalloc=debug`. Note this option cannot be used with FIPS-compliant mode BoringSSL and
+  `--define tcmalloc=debug`. Note this option cannot be used with FIPS mode and
   tcmalloc is built from the sources of Gperftools.
 * Default [path normalization](https://github.com/envoyproxy/envoy/issues/6435) with
   `--define path_normalization_by_default=true`. Note this still could be disable by explicit xDS config.
@@ -714,8 +715,8 @@ The following optional features can be enabled on the Bazel build command-line:
 * Process logging for Android applications can be enabled with `--define logger=android`.
 * Excluding assertions for known issues with `--define disable_known_issue_asserts=true`.
   A KNOWN_ISSUE_ASSERT is an assertion that should pass (like all assertions), but sometimes fails for some as-yet unidentified or unresolved reason. Because it is known to potentially fail, it can be compiled out even when DEBUG is true, when this flag is set. This allows Envoy to be run in production with assertions generally enabled, without crashing for known issues. KNOWN_ISSUE_ASSERT should only be used for newly-discovered issues that represent benign violations of expectations.
-* Envoy can be linked to [`zlib-ng`](https://github.com/zlib-ng/zlib-ng) instead of
-  [`zlib`](https://zlib.net) with `--define zlib=ng`.
+* Envoy is built using [`zlib-ng`](https://github.com/zlib-ng/zlib-ng), you can link an alternative implementation
+  using e.g. `--@envoy//bazel:zlib=@zlib`. This would require registering the zlib repository with Bazel.
 
 ## Enabling and disabling extensions
 
@@ -846,7 +847,7 @@ have seen some issues with seeing the artifacts tab. If you can't see it, log ou
 then log back in and it should start working.
 
 The latest coverage report for main is available
-[here](https://storage.googleapis.com/envoy-postsubmit/main/coverage/index.html). The latest fuzz coverage report for main is available [here](https://storage.googleapis.com/envoy-postsubmit/main/fuzz_coverage/index.html).
+[here](https://storage.googleapis.com/envoy-cncf-postsubmit/main/coverage/index.html). The latest fuzz coverage report for main is available [here](https://storage.googleapis.com/envoy-cncf-postsubmit/main/fuzz_coverage/index.html).
 
 It's also possible to specialize the coverage build to a specified test or test dir. This is useful
 when doing things like exploring the coverage of a fuzzer over its corpus. This can be done by
@@ -934,14 +935,17 @@ tools/gen_compilation_database.py --exclude_contrib
 # Running format linting without docker
 
 Note that if you run the `check_spelling.py` script you will need to have `aspell` installed.
+Prefer to run it via bazel as the environment will contain the dictionary used.
 
 You can run clang-format directly, without docker:
 
 ```shell
 bazel run //tools/code_format:check_format -- check
-./tools/spelling/check_spelling_pedantic.py check
+# Target root needs to be an absolute path to your envoy repository to run on
+# the entire codebase by default.
+bazel run //tools/spelling:check_spelling_pedantic -- check --target_root=$(pwd)
 bazel run //tools/code_format:check_format -- fix
-./tools/spelling/check_spelling_pedantic.py fix
+bazel run //tools/spelling:check_spelling_pedantic -- fix --target_root=$(pwd)
 ```
 
 # Advanced caching setup

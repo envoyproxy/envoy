@@ -12,6 +12,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "matching/data_impl.h"
 
@@ -42,6 +43,16 @@ void recordLatestDataFilter(typename Filters::Iterator current_filter,
   // though filter M > N was the filter that inserted data into the buffer.
   if (current_filter != filters.begin() && latest_filter == std::prev(current_filter)->get()) {
     latest_filter = current_filter->get();
+  }
+}
+
+void finalizeHeaders(FilterManagerCallbacks& callbacks, StreamInfo::StreamInfo& stream_info,
+                     ResponseHeaderMap& headers) {
+  const auto route = stream_info.route();
+  if (route && route->routeEntry() != nullptr) {
+    const Formatter::Context formatter_context{
+        callbacks.requestHeaders().ptr(), &headers, {}, {}, {}, &callbacks.activeSpan()};
+    route->routeEntry()->finalizeResponseHeaders(headers, formatter_context, stream_info);
   }
 }
 
@@ -280,17 +291,30 @@ OptRef<const Tracing::Config> ActiveStreamFilterBase::tracingConfig() const {
   return parent_.filter_manager_callbacks_.tracingConfig();
 }
 
-Upstream::ClusterInfoConstSharedPtr ActiveStreamFilterBase::clusterInfo() {
+OptRef<const Upstream::ClusterInfo> ActiveStreamFilterBase::clusterInfo() {
   return parent_.filter_manager_callbacks_.clusterInfo();
 }
 
-Router::RouteConstSharedPtr ActiveStreamFilterBase::route() { return getRoute(); }
+Upstream::ClusterInfoConstSharedPtr ActiveStreamFilterBase::clusterInfoSharedPtr() {
+  return parent_.filter_manager_callbacks_.clusterInfoSharedPtr();
+}
 
-Router::RouteConstSharedPtr ActiveStreamFilterBase::getRoute() const {
+OptRef<const Router::Route> ActiveStreamFilterBase::route() { return getRoute(); }
+
+OptRef<const Router::Route> ActiveStreamFilterBase::getRoute() const {
   if (parent_.filter_manager_callbacks_.downstreamCallbacks()) {
     return parent_.filter_manager_callbacks_.downstreamCallbacks()->route(nullptr);
   }
   return parent_.streamInfo().route();
+}
+
+Router::RouteConstSharedPtr ActiveStreamFilterBase::routeSharedPtr() { return getRouteSharedPtr(); }
+
+Router::RouteConstSharedPtr ActiveStreamFilterBase::getRouteSharedPtr() const {
+  if (parent_.filter_manager_callbacks_.downstreamCallbacks()) {
+    return parent_.filter_manager_callbacks_.downstreamCallbacks()->routeSharedPtr(nullptr);
+  }
+  return parent_.streamInfo().routeSharedPtr();
 }
 
 void ActiveStreamFilterBase::resetIdleTimer() {
@@ -299,16 +323,16 @@ void ActiveStreamFilterBase::resetIdleTimer() {
 
 const Router::RouteSpecificFilterConfig*
 ActiveStreamFilterBase::mostSpecificPerFilterConfig() const {
-  auto current_route = getRoute();
-  if (current_route == nullptr) {
+  const auto current_route = getRoute();
+  if (!current_route) {
     return nullptr;
   }
   return current_route->mostSpecificPerFilterConfig(filter_context_.config_name);
 }
 
 Router::RouteSpecificFilterConfigs ActiveStreamFilterBase::perFilterConfigs() const {
-  Router::RouteConstSharedPtr current_route = getRoute();
-  if (current_route == nullptr) {
+  const auto current_route = getRoute();
+  if (!current_route) {
     return {};
   }
 
@@ -345,6 +369,10 @@ ResponseTrailerMapOptRef ActiveStreamFilterBase::responseTrailers() {
   return parent_.filter_manager_callbacks_.responseTrailers();
 }
 
+void ActiveStreamFilterBase::setBufferLimit(uint64_t limit) { parent_.setBufferLimit(limit); }
+
+uint64_t ActiveStreamFilterBase::bufferLimit() { return parent_.buffer_limit_; }
+
 void ActiveStreamFilterBase::sendLocalReply(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
@@ -353,7 +381,6 @@ void ActiveStreamFilterBase::sendLocalReply(
     streamInfo().filterState()->setData(
         LocalReplyFilterStateKey,
         std::make_shared<LocalReplyOwnerObject>(filter_context_.config_name),
-        StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::FilterChain);
   }
 
@@ -373,10 +400,7 @@ bool ActiveStreamEncoderFilter::canContinue() {
   // As with ActiveStreamDecoderFilter::canContinue() make sure we do not
   // continue if a local reply has been sent or ActiveStreamDecoderFilter::recreateStream() is
   // called, etc.
-  return !parent_.state_.encoder_filter_chain_complete_ &&
-         (!Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.filter_chain_aborted_can_not_continue") ||
-          !parent_.stopEncoderFilterChain());
+  return !parent_.state_.encoder_filter_chain_complete_ && !parent_.stopEncoderFilterChain();
 }
 
 Buffer::InstancePtr ActiveStreamDecoderFilter::createBuffer() {
@@ -455,6 +479,12 @@ void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance&
     headers_continued_ = true;
     doHeaders(false);
   }
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.ext_proc_inject_data_with_state_update")) {
+    parent_.state().observed_decode_end_stream_ = end_stream;
+    ENVOY_STREAM_LOG(trace, "injectDecodedDataToFilterChain with end_stream updated: {}", parent_,
+                     end_stream);
+  }
   parent_.decodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
@@ -479,7 +509,9 @@ void ActiveStreamDecoderFilter::sendLocalReply(
   ActiveStreamFilterBase::sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
 
-void ActiveStreamDecoderFilter::sendGoAwayAndClose() { parent_.sendGoAwayAndClose(); }
+void ActiveStreamDecoderFilter::sendGoAwayAndClose(bool graceful) {
+  parent_.sendGoAwayAndClose(graceful);
+}
 
 void ActiveStreamDecoderFilter::encode1xxHeaders(ResponseHeaderMapPtr&& headers) {
   // If Envoy is not configured to proxy 100-Continue responses, swallow the 100 Continue
@@ -541,11 +573,6 @@ void ActiveStreamDecoderFilter::requestDataTooLarge() {
   }
 }
 
-void FilterManager::applyFilterFactoryCb(FilterContext context, FilterFactoryCb& factory) {
-  FilterChainFactoryCallbacksImpl callbacks(*this, context);
-  factory(callbacks);
-}
-
 void FilterManager::maybeContinueDecoding(StreamDecoderFilters::Iterator continue_data_entry) {
   if (continue_data_entry != decoder_filters_.end()) {
     // We use the continueDecoding() code since it will correctly handle not calling
@@ -560,6 +587,11 @@ void FilterManager::maybeContinueDecoding(StreamDecoderFilters::Iterator continu
 
 void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHeaderMap& headers,
                                   bool end_stream) {
+  // If the stream has been reset, do not process any more frames.
+  if (stopDecoderFilterChain()) {
+    return;
+  }
+
   // Headers filter iteration should always start with the next filter if available.
   StreamDecoderFilters::Iterator entry =
       commonDecodePrefix(filter, FilterIterationStartState::AlwaysStartFromNext);
@@ -868,6 +900,11 @@ void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMa
   ScopeTrackerScopeState scope(&*this, dispatcher_);
   filter_manager_callbacks_.resetIdleTimer();
 
+  // If the stream has been reset, do not process any more frames.
+  if (stopDecoderFilterChain()) {
+    return;
+  }
+
   // Filter iteration may start at the current filter.
   StreamDecoderFilters::Iterator entry =
       commonDecodePrefix(filter, FilterIterationStartState::CanStartFromCurrent);
@@ -1014,9 +1051,7 @@ void DownstreamFilterManager::sendLocalReply(
 
   if (!filter_manager_callbacks_.responseHeaders().has_value() &&
       (!filter_manager_callbacks_.informationalHeaders().has_value() ||
-       (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.local_reply_traverses_filter_chain_after_1xx") &&
-        !(state_.filter_call_state_ & FilterCallState::IsEncodingMask)))) {
+       !(state_.filter_call_state_ & FilterCallState::IsEncodingMask))) {
     // If the response has not started at all, or if the only response so far is an informational
     // 1xx that has already been fully processed, send the response through the filter chain.
 
@@ -1026,10 +1061,16 @@ void DownstreamFilterManager::sendLocalReply(
       // route refreshment in the response filter chain.
       cb->route(nullptr);
     }
-
-    // We only prepare a local reply to execute later if we're actively
-    // invoking filters to avoid re-entrant in filters.
-    if (state_.filter_call_state_ & FilterCallState::IsDecodingMask) {
+    // We only prepare a local reply to execute later if we're actively invoking filters to avoid
+    // re-entrant in filters.
+    //
+    // For reverse connections (where upstream initiates the connection to downstream), we need to
+    // send local replies immediately rather than queuing them. This ensures proper handling of the
+    // reversed connection flow and prevents potential issues with connection state and filter chain
+    // processing.
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.reverse_conn_force_local_reply") &&
+        (state_.filter_call_state_ & FilterCallState::IsDecodingMask)) {
       prepareLocalReplyViaFilterChain(is_grpc_request, code, body, modify_headers, is_head_request,
                                       grpc_status, details);
     } else {
@@ -1075,9 +1116,7 @@ void DownstreamFilterManager::prepareLocalReplyViaFilterChain(
   prepared_local_reply_ = Utility::prepareLocalReply(
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
-            if (streamInfo().route() && streamInfo().route()->routeEntry()) {
-              streamInfo().route()->routeEntry()->finalizeResponseHeaders(headers, streamInfo());
-            }
+            finalizeHeaders(filter_manager_callbacks_, streamInfo(), headers);
             if (modify_headers) {
               modify_headers(headers);
             }
@@ -1126,9 +1165,7 @@ void DownstreamFilterManager::sendLocalReplyViaFilterChain(
       state_.destroyed_,
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
-            if (streamInfo().route() && streamInfo().route()->routeEntry()) {
-              streamInfo().route()->routeEntry()->finalizeResponseHeaders(headers, streamInfo());
-            }
+            finalizeHeaders(filter_manager_callbacks_, streamInfo(), headers);
             if (modify_headers) {
               modify_headers(headers);
             }
@@ -1159,9 +1196,7 @@ void DownstreamFilterManager::sendDirectLocalReply(
       state_.destroyed_,
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
-            if (streamInfo().route() && streamInfo().route()->routeEntry()) {
-              streamInfo().route()->routeEntry()->finalizeResponseHeaders(headers, streamInfo());
-            }
+            finalizeHeaders(filter_manager_callbacks_, streamInfo(), headers);
             if (modify_headers) {
               modify_headers(headers);
             }
@@ -1638,7 +1673,7 @@ void FilterManager::callLowWatermarkCallbacks() {
   }
 }
 
-void FilterManager::setBufferLimit(uint32_t new_limit) {
+void FilterManager::setBufferLimit(uint64_t new_limit) {
   ENVOY_STREAM_LOG(debug, "setting buffer limit to {}", *this, new_limit);
   buffer_limit_ = new_limit;
   if (buffered_request_data_) {
@@ -1658,7 +1693,7 @@ void FilterManager::contextOnContinue(ScopeTrackedObjectStack& tracked_object_st
 
 FilterManager::UpgradeResult
 FilterManager::createUpgradeFilterChain(const FilterChainFactory& filter_chain_factory,
-                                        const FilterChainOptionsImpl& options) {
+                                        FilterChainFactoryCallbacksImpl& callbacks) {
   const HeaderEntry* upgrade = nullptr;
   if (filter_manager_callbacks_.requestHeaders()) {
     upgrade = filter_manager_callbacks_.requestHeaders()->Upgrade();
@@ -1676,7 +1711,7 @@ FilterManager::createUpgradeFilterChain(const FilterChainFactory& filter_chain_f
 
   const Router::RouteEntry::UpgradeMap* upgrade_map = filter_manager_callbacks_.upgradeMap();
   return filter_chain_factory.createUpgradeFilterChain(upgrade->value().getStringView(),
-                                                       upgrade_map, *this, options)
+                                                       upgrade_map, callbacks)
              ? UpgradeResult::UpgradeAccepted
              : UpgradeResult::UpgradeRejected;
 }
@@ -1703,13 +1738,13 @@ FilterManager::createFilterChain(const FilterChainFactory& filter_chain_factory)
   OptRef<DownstreamStreamFilterCallbacks> downstream_callbacks =
       filter_manager_callbacks_.downstreamCallbacks();
 
-  FilterChainOptionsImpl options(streamInfo().route());
+  FilterChainFactoryCallbacksImpl callbacks(*this);
 
   UpgradeResult upgrade = UpgradeResult::UpgradeUnneeded;
 
   // Only try the upgrade filter chain for downstream filter chains.
   if (downstream_callbacks.has_value()) {
-    upgrade = createUpgradeFilterChain(filter_chain_factory, options);
+    upgrade = createUpgradeFilterChain(filter_chain_factory, callbacks);
     if (upgrade == UpgradeResult::UpgradeAccepted) {
       // Upgrade filter chain is created. Return the result directly.
       state_.create_chain_result_ = CreateChainResult(true, upgrade);
@@ -1720,7 +1755,7 @@ FilterManager::createFilterChain(const FilterChainFactory& filter_chain_factory)
   }
 
   state_.create_chain_result_ =
-      CreateChainResult(filter_chain_factory.createFilterChain(*this, options), upgrade);
+      CreateChainResult(filter_chain_factory.createFilterChain(callbacks), upgrade);
   return state_.create_chain_result_;
 }
 
@@ -1752,12 +1787,6 @@ void ActiveStreamDecoderFilter::removeDownstreamWatermarkCallbacks(
                    &watermark_callbacks) != parent_.watermark_callbacks_.end());
   parent_.watermark_callbacks_.remove(&watermark_callbacks);
 }
-
-void ActiveStreamDecoderFilter::setDecoderBufferLimit(uint32_t limit) {
-  parent_.setBufferLimit(limit);
-}
-
-uint32_t ActiveStreamDecoderFilter::decoderBufferLimit() { return parent_.buffer_limit_; }
 
 bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers) {
   // Because the filter's and the HCM view of if the stream has a body and if
@@ -1871,6 +1900,12 @@ void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance&
     headers_continued_ = true;
     doHeaders(false);
   }
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.ext_proc_inject_data_with_state_update")) {
+    parent_.state_.observed_encode_end_stream_ = end_stream;
+    ENVOY_STREAM_LOG(trace, "injectEncodedDataToFilterChain with end_stream updated: {}", parent_,
+                     end_stream);
+  }
   parent_.encodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
@@ -1892,12 +1927,6 @@ void ActiveStreamEncoderFilter::onEncoderFilterBelowWriteBufferLowWatermark() {
   ENVOY_STREAM_LOG(debug, "Enabling upstream stream due to filter callbacks.", parent_);
   parent_.callLowWatermarkCallbacks();
 }
-
-void ActiveStreamEncoderFilter::setEncoderBufferLimit(uint32_t limit) {
-  parent_.setBufferLimit(limit);
-}
-
-uint32_t ActiveStreamEncoderFilter::encoderBufferLimit() { return parent_.buffer_limit_; }
 
 void ActiveStreamEncoderFilter::continueEncoding() { commonContinue(); }
 
@@ -1968,18 +1997,15 @@ Buffer::BufferMemoryAccountSharedPtr ActiveStreamDecoderFilter::account() const 
 
 void ActiveStreamDecoderFilter::setUpstreamOverrideHost(
     Upstream::LoadBalancerContext::OverrideHost upstream_override_host) {
-  parent_.upstream_override_host_.first.assign(upstream_override_host.first);
-  parent_.upstream_override_host_.second = upstream_override_host.second;
+  parent_.upstream_override_host_ = std::move(upstream_override_host);
 }
 
-absl::optional<Upstream::LoadBalancerContext::OverrideHost>
+OptRef<const Upstream::LoadBalancerContext::OverrideHost>
 ActiveStreamDecoderFilter::upstreamOverrideHost() const {
-  if (parent_.upstream_override_host_.first.empty()) {
-    return absl::nullopt;
+  if (parent_.upstream_override_host_.host.empty()) {
+    return {};
   }
-  return Upstream::LoadBalancerContext::OverrideHost{
-      absl::string_view(parent_.upstream_override_host_.first),
-      parent_.upstream_override_host_.second};
+  return parent_.upstream_override_host_;
 }
 
 } // namespace Http

@@ -58,7 +58,7 @@ private:
   const std::string plugin_name_;
   const std::string so_id_;
   const std::string so_path_;
-  const ProtobufWkt::Any plugin_config_;
+  const Protobuf::Any plugin_config_;
 
   Dso::HttpTcpBridgeDsoPtr dso_lib_;
   uint64_t config_id_{0};

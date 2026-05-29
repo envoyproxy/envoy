@@ -230,15 +230,10 @@ std::list<DnsResponse>& AppleDnsResolverImpl::PendingResolution::finalAddressLis
     pending_response_.all_responses_.insert(pending_response_.all_responses_.end(),
                                             pending_response_.v4_responses_.begin(),
                                             pending_response_.v4_responses_.end());
-    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.prefer_ipv6_dns_on_macos")) {
-      pending_response_.all_responses_.insert(pending_response_.all_responses_.end(),
-                                              pending_response_.v6_responses_.begin(),
-                                              pending_response_.v6_responses_.end());
-    } else {
-      pending_response_.all_responses_.insert(pending_response_.all_responses_.begin(),
-                                              pending_response_.v6_responses_.begin(),
-                                              pending_response_.v6_responses_.end());
-    }
+    // Prefer IPv6 addresses by inserting them at the beginning of the response list
+    pending_response_.all_responses_.insert(pending_response_.all_responses_.begin(),
+                                            pending_response_.v6_responses_.begin(),
+                                            pending_response_.v6_responses_.end());
     return pending_response_.all_responses_;
   }
   IS_ENVOY_BUG("unexpected DnsLookupFamily enum");

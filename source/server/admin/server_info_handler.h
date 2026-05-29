@@ -32,6 +32,9 @@ public:
 
   Http::Code handlerMemory(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                            AdminStream&);
+
+  Http::Code handleMemoryTcmallocStats(Http::ResponseHeaderMap& response_headers,
+                                       Buffer::Instance& response, AdminStream&);
 };
 
 } // namespace Server

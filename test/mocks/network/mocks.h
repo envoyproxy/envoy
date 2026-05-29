@@ -55,6 +55,7 @@ public:
   MOCK_METHOD(void, addReadFilter, (ReadFilterSharedPtr filter));
   MOCK_METHOD(void, removeReadFilter, (ReadFilterSharedPtr filter));
   MOCK_METHOD(bool, initializeReadFilters, ());
+  MOCK_METHOD(void, addAccessLogHandler, (AccessLog::InstanceSharedPtr handler));
 };
 
 class MockDnsResolver : public DnsResolver {
@@ -192,6 +193,8 @@ public:
   MOCK_METHOD(const ConnectionSocket&, socket, ());
   MOCK_METHOD(void, injectWriteDataToFilterChain, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(void, disableClose, (bool disable));
+  MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
+  MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
 
   testing::NiceMock<MockConnection> connection_;
   testing::NiceMock<MockConnectionSocket> socket_;
@@ -336,6 +339,10 @@ public:
   MOCK_METHOD(void, startDraining, ());
   MOCK_METHOD(absl::string_view, name, (), (const));
   MOCK_METHOD(bool, addedViaApi, (), (const));
+  MOCK_METHOD(const FilterChainInfoSharedPtr&, filterChainInfo, (), (const));
+
+  envoy::config::core::v3::Metadata metadata_;
+  FilterChainInfoSharedPtr filter_chain_info_;
 };
 
 class MockFilterChainInfo : public FilterChainInfo {
@@ -344,8 +351,11 @@ public:
 
   // Network::FilterChainInfo
   MOCK_METHOD(absl::string_view, name, (), (const));
+  MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
+  MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
 
   std::string filter_chain_name_{"mock"};
+  envoy::config::core::v3::Metadata metadata_;
 };
 
 class MockFilterChainManager : public FilterChainManager {
@@ -436,15 +446,17 @@ public:
   MOCK_METHOD(ConnectionSocket&, socket, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(void, continueFilterChain, (bool));
-  MOCK_METHOD(void, setDynamicMetadata, (const std::string&, const ProtobufWkt::Struct&));
-  MOCK_METHOD(void, setDynamicTypedMetadata, (const std::string&, const ProtobufWkt::Any& value));
+  MOCK_METHOD(void, setDynamicMetadata, (const std::string&, const Protobuf::Struct&));
+  MOCK_METHOD(void, setDynamicTypedMetadata, (const std::string&, const Protobuf::Any& value));
   MOCK_METHOD(envoy::config::core::v3::Metadata&, dynamicMetadata, ());
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, dynamicMetadata, (), (const));
   MOCK_METHOD(StreamInfo::FilterState&, filterState, (), ());
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, (), ());
   MOCK_METHOD(void, useOriginalDst, (bool));
 
   StreamInfo::FilterStateImpl filter_state_;
   NiceMock<MockConnectionSocket> socket_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
 class MockListenSocketFactory : public ListenSocketFactory {
@@ -465,7 +477,9 @@ public:
   MockUdpPacketWriterFactory() = default;
 
   MOCK_METHOD(Network::UdpPacketWriterPtr, createUdpPacketWriter,
-              (Network::IoHandle&, Stats::Scope&), ());
+              (Network::IoHandle&, Stats::Scope&, Envoy::Event::Dispatcher&,
+               absl::AnyInvocable<void() &&>),
+              ());
 };
 
 class MockUdpListenerConfig : public UdpListenerConfig {
@@ -502,6 +516,7 @@ public:
   MOCK_METHOD(bool, bindToPort, (), (const));
   MOCK_METHOD(bool, handOffRestoredDestinationConnections, (), (const));
   MOCK_METHOD(uint32_t, perConnectionBufferLimitBytes, (), (const));
+  MOCK_METHOD(std::chrono::milliseconds, perConnectionBufferHighWatermarkTimeout, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, listenerFiltersTimeout, (), (const));
   MOCK_METHOD(bool, continueOnListenerFiltersTimeout, (), (const));
   MOCK_METHOD(Stats::Scope&, listenerScope, ());
@@ -567,6 +582,7 @@ public:
   MOCK_METHOD(void, enableListeners, ());
   MOCK_METHOD(void, setListenerRejectFraction, (UnitFloat), (override));
   MOCK_METHOD(const std::string&, statPrefix, (), (const));
+  MOCK_METHOD(void, closeIdleHttpConnections, (bool), (override));
 
   uint64_t num_handler_connections_{};
 };
@@ -588,6 +604,10 @@ public:
   MOCK_METHOD(const std::string&, addressAsString, (), (const));
   MOCK_METHOD(bool, isAnyAddress, (), (const));
   MOCK_METHOD(bool, isUnicastAddress, (), (const));
+  MOCK_METHOD(bool, isLinkLocalAddress, (), (const));
+  MOCK_METHOD(bool, isUniqueLocalAddress, (), (const));
+  MOCK_METHOD(bool, isSiteLocalAddress, (), (const));
+  MOCK_METHOD(bool, isTeredoAddress, (), (const));
   MOCK_METHOD(const Address::Ipv4*, ipv4, (), (const));
   MOCK_METHOD(const Address::Ipv6*, ipv6, (), (const));
   MOCK_METHOD(uint32_t, port, (), (const));
@@ -615,6 +635,7 @@ public:
   MOCK_METHOD(socklen_t, sockAddrLen, (), (const));
   MOCK_METHOD(absl::string_view, addressType, (), (const));
   MOCK_METHOD(absl::optional<std::string>, networkNamespace, (), (const));
+  MOCK_METHOD(Address::InstanceConstSharedPtr, withNetworkNamespace, (absl::string_view), (const));
 
   const std::string& asString() const override { return physical_; }
   absl::string_view asStringView() const override { return physical_; }
@@ -755,6 +776,30 @@ public:
                        [to_version](auto version) { return to_version == version; });
   }
   const std::vector<Address::IpVersion> versions_;
+};
+
+class MockConnectionInfoProvider : public ConnectionInfoProvider {
+public:
+  MOCK_METHOD(const Address::InstanceConstSharedPtr&, localAddress, (), (const, override));
+  MOCK_METHOD(const Address::InstanceConstSharedPtr&, directLocalAddress, (), (const, override));
+  MOCK_METHOD(bool, localAddressRestored, (), (const, override));
+  MOCK_METHOD(const Address::InstanceConstSharedPtr&, remoteAddress, (), (const, override));
+  MOCK_METHOD(const Address::InstanceConstSharedPtr&, directRemoteAddress, (), (const, override));
+  MOCK_METHOD(absl::string_view, requestedServerName, (), (const, override));
+  MOCK_METHOD(const std::vector<std::string>&, requestedApplicationProtocols, (),
+              (const, override));
+  MOCK_METHOD(absl::optional<uint64_t>, connectionID, (), (const, override));
+  MOCK_METHOD(absl::optional<absl::string_view>, interfaceName, (), (const, override));
+  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const, override));
+  MOCK_METHOD(Envoy::Ssl::ConnectionInfoConstSharedPtr, sslConnection, (), (const, override));
+  MOCK_METHOD(absl::string_view, ja3Hash, (), (const, override));
+  MOCK_METHOD(const absl::optional<std::chrono::milliseconds>&, roundTripTime, (),
+              (const, override));
+  MOCK_METHOD(Envoy::OptRef<const Envoy::Network::FilterChainInfo>, filterChainInfo, (),
+              (const, override));
+  MOCK_METHOD(Envoy::OptRef<const Envoy::Network::ListenerInfo>, listenerInfo, (),
+              (const, override));
+  MOCK_METHOD(absl::string_view, ja4Hash, (), (const, override));
 };
 
 } // namespace Network

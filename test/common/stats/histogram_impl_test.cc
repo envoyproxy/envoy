@@ -58,6 +58,12 @@ TEST_F(HistogramSettingsImplTest, Matching) {
   {
     envoy::config::metrics::v3::HistogramBucketSettings setting;
     setting.mutable_match()->set_prefix("a");
+    setting.mutable_bins()->set_value(5);
+    buckets_configs_.push_back(setting);
+  }
+  {
+    envoy::config::metrics::v3::HistogramBucketSettings setting;
+    setting.mutable_match()->set_prefix("a");
     setting.mutable_buckets()->Add(1);
     setting.mutable_buckets()->Add(2);
     buckets_configs_.push_back(setting);
@@ -74,6 +80,8 @@ TEST_F(HistogramSettingsImplTest, Matching) {
   initialize();
   EXPECT_EQ(settings_->buckets("abcd"), ConstSupportedBuckets({1, 2}));
   EXPECT_EQ(settings_->buckets("bcde"), ConstSupportedBuckets({3, 4}));
+  EXPECT_EQ(settings_->bins("ab"), 5);
+  EXPECT_EQ(settings_->bins("ba"), absl::nullopt);
 }
 
 // Test that earlier configs take precedence over later configs when both match.
@@ -83,6 +91,7 @@ TEST_F(HistogramSettingsImplTest, Priority) {
     setting.mutable_match()->set_prefix("a");
     setting.mutable_buckets()->Add(1);
     setting.mutable_buckets()->Add(2);
+    setting.mutable_bins()->set_value(1);
     buckets_configs_.push_back(setting);
   }
 
@@ -91,10 +100,13 @@ TEST_F(HistogramSettingsImplTest, Priority) {
     setting.mutable_match()->set_prefix("ab");
     setting.mutable_buckets()->Add(3);
     setting.mutable_buckets()->Add(4);
+    setting.mutable_bins()->set_value(2);
+    buckets_configs_.push_back(setting);
   }
 
   initialize();
   EXPECT_EQ(settings_->buckets("abcd"), ConstSupportedBuckets({1, 2}));
+  EXPECT_EQ(settings_->bins("abcd"), 1);
 }
 
 TEST_F(HistogramSettingsImplTest, ScaledPercent) {

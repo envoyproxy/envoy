@@ -1,3 +1,5 @@
+# DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
+# Envoy library targets
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
 load(
@@ -5,9 +7,7 @@ load(
     "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
     "EXTENSION_CONFIG_VISIBILITY",
 )
-
-# DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
-# Envoy library targets
+load("@rules_cc//cc:defs.bzl", "cc_library")
 load(
     ":envoy_internal.bzl",
     "envoy_copts",
@@ -29,7 +29,8 @@ def tcmalloc_external_deps(repository):
         (
             _repo("//bazel:debug_tcmalloc"),
             _repo("//bazel:gperftools_tcmalloc"),
-        ): [_repo("//bazel/foreign_cc:gperftools")],
+        ): [_repo("//bazel/external:gperftools")],
+        (_repo("//bazel:jemalloc_enabled"),): [_repo("//bazel/foreign_cc:jemalloc")],
         "//conditions:default": [_repo("//bazel:tcmalloc_all_libs")],
     })
 
@@ -38,7 +39,7 @@ def tcmalloc_external_deps(repository):
 # all envoy targets pass through an envoy-declared Starlark function where they can be modified
 # before being passed to a native bazel function.
 def envoy_basic_cc_library(name, deps = [], external_deps = [], **kargs):
-    native.cc_library(
+    cc_library(
         name = name,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps],
         **kargs
@@ -62,7 +63,7 @@ def envoy_cc_extension(
         alwayslink = alwayslink,
         **kwargs
     )
-    native.cc_library(
+    cc_library(
         name = ext_name,
         tags = tags,
         deps = select({
@@ -101,7 +102,8 @@ def envoy_cc_library(
         alwayslink = None,
         defines = [],
         local_defines = [],
-        linkopts = []):
+        linkopts = [],
+        target_compatible_with = []):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
     exec_properties = exec_properties | select({
@@ -117,11 +119,12 @@ def envoy_cc_library(
             "//conditions:default": 1,
         })
 
-    native.cc_library(
+    cc_library(
         name = name,
         srcs = srcs,
         hdrs = hdrs,
         copts = envoy_copts(repository) + envoy_pch_copts(repository, "//source/common/common:common_pch") + copts,
+        data = [repository + "//bazel:check_removed_fips_define"],
         linkopts = linkopts,
         visibility = visibility,
         tags = tags,
@@ -136,11 +139,12 @@ def envoy_cc_library(
         include_prefix = include_prefix,
         defines = envoy_mobile_defines(repository) + defines,
         local_defines = local_defines,
+        target_compatible_with = target_compatible_with,
     )
 
     # Intended for usage by external consumers. This allows them to disambiguate
     # include paths via `external/envoy...`
-    native.cc_library(
+    cc_library(
         name = name + "_with_external_headers",
         hdrs = hdrs,
         copts = envoy_copts(repository) + copts,
@@ -149,6 +153,7 @@ def envoy_cc_library(
         deps = [":" + name],
         strip_include_prefix = strip_include_prefix,
         include_prefix = include_prefix,
+        target_compatible_with = target_compatible_with,
     )
 
 # Used to specify a library that only builds on POSIX

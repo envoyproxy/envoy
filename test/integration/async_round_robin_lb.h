@@ -29,7 +29,7 @@ public:
 };
 
 // Factory code to create the AsyncRoundRobin LB.
-class AsyncRoundRobinFactory : public Extensions::LoadBalancingPolices::Common::FactoryBase<
+class AsyncRoundRobinFactory : public Extensions::LoadBalancingPolicies::Common::FactoryBase<
                                    test::integration::lb::AsyncRoundRobin, AsyncRoundRobinCreator> {
 public:
   AsyncRoundRobinFactory() : FactoryBase("envoy.load_balancing_policies.async_round_robin") {}

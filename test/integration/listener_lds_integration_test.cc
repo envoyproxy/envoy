@@ -23,6 +23,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 using testing::StartsWith;
 
 namespace Envoy {
@@ -172,7 +174,7 @@ public:
                        const std::string& version) {
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
-    response.set_type_url(Config::TypeUrl::get().Listener);
+    response.set_type_url(Config::TestTypeUrl::get().Listener);
     for (const auto& listener_config : listener_configs) {
       response.add_resources()->PackFrom(listener_config);
     }
@@ -194,7 +196,7 @@ public:
   void sendRdsResponse(const std::string& route_config, const std::string& version) {
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
-    response.set_type_url(Config::TypeUrl::get().RouteConfiguration);
+    response.set_type_url(Config::TestTypeUrl::get().RouteConfiguration);
     const auto route_configuration =
         TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(route_config);
     response.add_resources()->PackFrom(route_configuration);
@@ -268,7 +270,7 @@ TEST_P(ListenerIntegrationTest, CleanlyRejectsUnknownFilterConfigProto) {
   };
   initialize();
   registerTestServerPorts({listener_name_});
-  test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_rejected", Ge(1));
 }
 
 TEST_P(ListenerIntegrationTest, RejectsUnsupportedTypedPerFilterConfig) {
@@ -314,7 +316,7 @@ TEST_P(ListenerIntegrationTest, RejectsUnsupportedTypedPerFilterConfig) {
   };
   initialize();
   registerTestServerPorts({listener_name_});
-  test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_rejected", Ge(1));
 }
 
 TEST_P(ListenerIntegrationTest, RejectsUnknownHttpFilter) {
@@ -353,7 +355,7 @@ TEST_P(ListenerIntegrationTest, RejectsUnknownHttpFilter) {
   };
   initialize();
   registerTestServerPorts({listener_name_});
-  test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_rejected", Ge(1));
 }
 
 TEST_P(ListenerIntegrationTest, IgnoreUnknownOptionalHttpFilter) {
@@ -393,7 +395,7 @@ TEST_P(ListenerIntegrationTest, IgnoreUnknownOptionalHttpFilter) {
   };
   initialize();
   registerTestServerPorts({listener_name_});
-  test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 0);
+  test_server_->waitForCounter("listener_manager.lds.update_rejected", Ge(0));
 }
 
 // Tests that a LDS deletion before Server initManager been initialized will not block the Server
@@ -406,7 +408,7 @@ TEST_P(ListenerIntegrationTest, RemoveLastUninitializedListener) {
   };
   initialize();
   registerTestServerPorts({listener_name_});
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   // testing-listener-0 is not initialized as we haven't push any RDS yet.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   // Workers not started, the LDS added listener 0 is in active_listeners_ list.
@@ -414,7 +416,7 @@ TEST_P(ListenerIntegrationTest, RemoveLastUninitializedListener) {
 
   // This actually deletes the only listener.
   sendLdsResponse(std::vector<std::string>{}, "2");
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 2);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(2));
   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 0);
   // Server instance is ready now because the listener's destruction marked the listener
   // initialized.
@@ -428,7 +430,7 @@ TEST_P(ListenerMultiAddressesIntegrationTest, BasicSuccessWithMultiAddresses) {
     createRdsStream(route_table_name_);
   };
   initialize();
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   // Workers not started, the LDS added listener 0 is in active_listeners_ list.
@@ -445,14 +447,14 @@ TEST_P(ListenerMultiAddressesIntegrationTest, BasicSuccessWithMultiAddresses) {
           route: {{ cluster: {} }}
 )EOF";
   sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "1");
-  test_server_->waitForCounterGe(
-      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), 1);
+  test_server_->waitForCounter(
+      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), Ge(1));
   // Now testing-listener-0 finishes initialization, Server initManager will be ready.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
 
   test_server_->waitUntilListenersReady();
   // NOTE: The line above doesn't tell you if listener is up and listening.
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   // Request is sent to cluster_0.
 
   int response_size = 800;
@@ -502,7 +504,7 @@ TEST_P(ListenerMultiAddressesIntegrationTest, BasicSuccessWithMultiAddressesAndS
     createRdsStream(route_table_name_);
   };
   initialize();
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   // Workers not started, the LDS added listener 0 is in active_listeners_ list.
@@ -519,14 +521,14 @@ TEST_P(ListenerMultiAddressesIntegrationTest, BasicSuccessWithMultiAddressesAndS
           route: {{ cluster: {} }}
 )EOF";
   sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "1");
-  test_server_->waitForCounterGe(
-      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), 1);
+  test_server_->waitForCounter(
+      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), Ge(1));
   // Now testing-listener-0 finishes initialization, Server initManager will be ready.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
 
   test_server_->waitUntilListenersReady();
   // NOTE: The line above doesn't tell you if listener is up and listening.
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   // Request is sent to cluster_0.
 
   int response_size = 800;
@@ -584,7 +586,7 @@ TEST_P(ListenerMultiAddressesIntegrationTest,
     createRdsStream(route_table_name_);
   };
   initialize();
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   // Workers not started, the LDS added listener 0 is in active_listeners_ list.
@@ -601,14 +603,14 @@ TEST_P(ListenerMultiAddressesIntegrationTest,
           route: {{ cluster: {} }}
 )EOF";
   sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "1");
-  test_server_->waitForCounterGe(
-      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), 1);
+  test_server_->waitForCounter(
+      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), Ge(1));
   // Now testing-listener-0 finishes initialization, Server initManager will be ready.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
 
   test_server_->waitUntilListenersReady();
   // NOTE: The line above doesn't tell you if listener is up and listening.
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   // Request is sent to cluster_0.
 
   int response_size = 800;
@@ -654,7 +656,7 @@ TEST_P(ListenerIntegrationTest, BasicSuccess) {
     createRdsStream(route_table_name_);
   };
   initialize();
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   // Workers not started, the LDS added listener 0 is in active_listeners_ list.
@@ -671,14 +673,14 @@ TEST_P(ListenerIntegrationTest, BasicSuccess) {
           route: {{ cluster: {} }}
 )EOF";
   sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "1");
-  test_server_->waitForCounterGe(
-      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), 1);
+  test_server_->waitForCounter(
+      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), Ge(1));
   // Now testing-listener-0 finishes initialization, Server initManager will be ready.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
 
   test_server_->waitUntilListenersReady();
   // NOTE: The line above doesn't tell you if listener is up and listening.
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   // Request is sent to cluster_0.
 
   codec_client_ = makeHttpConnection(lookupPort(listener_name_));
@@ -705,7 +707,7 @@ TEST_P(ListenerIntegrationTest, MultipleLdsUpdatesSharingListenSocketFactory) {
     createRdsStream(route_table_name_);
   };
   initialize();
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   // Workers not started, the LDS added listener 0 is in active_listeners_ list.
@@ -722,21 +724,21 @@ TEST_P(ListenerIntegrationTest, MultipleLdsUpdatesSharingListenSocketFactory) {
           route: {{ cluster: {} }}
 )EOF";
   sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "1");
-  test_server_->waitForCounterGe(
-      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), 1);
+  test_server_->waitForCounter(
+      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), Ge(1));
   // Now testing-listener-0 finishes initialization, Server initManager will be ready.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
 
   test_server_->waitUntilListenersReady();
   // NOTE: The line above doesn't tell you if listener is up and listening.
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   // Make a connection to the listener from version 1.
   codec_client_ = makeHttpConnection(lookupPort(listener_name_));
   // Ensure Envoy has accepted the connection before starting reloads.
   if (version_ == Network::Address::IpVersion::v4) {
-    test_server_->waitForCounterGe("listener.127.0.0.1_0.downstream_cx_total", 1);
+    test_server_->waitForCounter("listener.127.0.0.1_0.downstream_cx_total", Ge(1));
   } else {
-    test_server_->waitForCounterGe("listener.[__1]_0.downstream_cx_total", 1);
+    test_server_->waitForCounter("listener.[__1]_0.downstream_cx_total", Ge(1));
   }
 
   for (int version = 2; version <= 10; version++) {
@@ -749,7 +751,7 @@ TEST_P(ListenerIntegrationTest, MultipleLdsUpdatesSharingListenSocketFactory) {
     sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"),
                     absl::StrCat(version));
 
-    test_server_->waitForCounterGe("listener_manager.listener_create_success", version);
+    test_server_->waitForCounter("listener_manager.listener_create_success", Ge(version));
 
     // Wait for the client to be disconnected.
     ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -782,7 +784,7 @@ TEST_P(ListenerMultiAddressesIntegrationTest,
 #if defined(__aarch64__)
   return;
 #endif
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   // Workers not started, the LDS added listener 0 is in active_listeners_ list.
@@ -799,14 +801,14 @@ TEST_P(ListenerMultiAddressesIntegrationTest,
           route: {{ cluster: {} }}
 )EOF";
   sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "1");
-  test_server_->waitForCounterGe(
-      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), 1);
+  test_server_->waitForCounter(
+      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), Ge(1));
   // Now testing-listener-0 finishes initialization, Server initManager will be ready.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
 
   test_server_->waitUntilListenersReady();
   // NOTE: The line above doesn't tell you if listener is up and listening.
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   // Make a connection to the listener from version 1.
   codec_client_ = makeHttpConnection(lookupPort("address1"));
 
@@ -820,7 +822,7 @@ TEST_P(ListenerMultiAddressesIntegrationTest,
     sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"),
                     absl::StrCat(version));
 
-    test_server_->waitForCounterGe("listener_manager.listener_create_success", version);
+    test_server_->waitForCounter("listener_manager.listener_create_success", Ge(version));
 
     // Wait for the client to be disconnected.
     ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -863,7 +865,7 @@ TEST_P(ListenerMultiAddressesIntegrationTest, MultipleAddressesListenerInPlaceUp
   };
   setDrainTime(std::chrono::seconds(30));
   initialize();
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   // Workers not started, the LDS added listener 0 is in active_listeners_ list.
@@ -880,23 +882,23 @@ TEST_P(ListenerMultiAddressesIntegrationTest, MultipleAddressesListenerInPlaceUp
           route: {{ cluster: {} }}
 )EOF";
   sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "1");
-  test_server_->waitForCounterGe(
-      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), 1);
+  test_server_->waitForCounter(
+      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), Ge(1));
   // Now testing-listener-0 finishes initialization, Server initManager will be ready.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
 
   test_server_->waitUntilListenersReady();
   // NOTE: The line above doesn't tell you if listener is up and listening.
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
 
   // Trigger a listener in-place updating.
   listener_config_.mutable_filter_chains(0)->mutable_filters(0)->set_name("http_filter");
   sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
   sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "2");
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
-  test_server_->waitForCounterEq("listener_manager.listener_in_place_updated", 1);
-  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(2));
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Eq(1));
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(1));
 
   const uint32_t response_size = 800;
   const uint32_t request_size = 10;
@@ -940,7 +942,7 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterInPlaceUpdate) {
   };
   setDrainTime(std::chrono::seconds(30));
   initialize();
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   // Workers not started, the LDS added listener 0 is in active_listeners_ list.
@@ -957,23 +959,23 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterInPlaceUpdate) {
           route: {{ cluster: {} }}
 )EOF";
   sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "1");
-  test_server_->waitForCounterGe(
-      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), 1);
+  test_server_->waitForCounter(
+      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), Ge(1));
   // Now testing-listener-0 finishes initialization, Server initManager will be ready.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
 
   test_server_->waitUntilListenersReady();
   // NOTE: The line above doesn't tell you if listener is up and listening.
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
 
   // Trigger a listener in-place updating.
   listener_config_.mutable_filter_chains(0)->mutable_filters(0)->set_name("http_filter");
   sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
   sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "2");
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
-  test_server_->waitForCounterEq("listener_manager.listener_in_place_updated", 1);
-  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(2));
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Eq(1));
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(1));
 
   // Make a new connection to the new listener.
   codec_client_ = makeHttpConnection(lookupPort(listener_name_));
@@ -992,8 +994,8 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterInPlaceUpdate) {
 
   // Remove the active listener.
   sendLdsResponse(std::vector<std::string>{}, "3");
-  test_server_->waitForGaugeEq("listener_manager.total_listeners_active", 0);
-  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
+  test_server_->waitForGauge("listener_manager.total_listeners_active", Eq(0));
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(1));
 
   // All the listen socket are closed. include the sockets in the active listener and
   // the sockets in the filter chain draining listener. The new connection should be reset.
@@ -1011,7 +1013,7 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterInPlaceUpdate) {
   }
 
   // Ensure the old listener is still in filter chain draining.
-  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(1));
 }
 
 // Create a listener, then do two in-place updates for the listener.
@@ -1025,7 +1027,7 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterMultipleInPlaceUpdate) {
   };
   setDrainTime(std::chrono::seconds(30));
   initialize();
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   // Workers not started, the LDS added listener 0 is in active_listeners_ list.
@@ -1042,32 +1044,32 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterMultipleInPlaceUpdate) {
           route: {{ cluster: {} }}
 )EOF";
   sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "1");
-  test_server_->waitForCounterGe(
-      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), 1);
+  test_server_->waitForCounter(
+      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), Ge(1));
   // Now testing-listener-0 finishes initialization, Server initManager will be ready.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
 
   test_server_->waitUntilListenersReady();
   // NOTE: The line above doesn't tell you if listener is up and listening.
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
 
   // Trigger a listener in-place updating.
   listener_config_.mutable_filter_chains(0)->mutable_filters(0)->set_name("http_filter");
   sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
   sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "2");
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
-  test_server_->waitForCounterEq("listener_manager.listener_in_place_updated", 1);
-  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(2));
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Eq(1));
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(1));
 
   // Trigger second listener in-place updating.
   listener_config_.mutable_filter_chains(0)->mutable_filters(0)->set_name("http_filter2");
   sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
   sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "2");
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 3);
-  test_server_->waitForCounterEq("listener_manager.listener_in_place_updated", 2);
-  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 2);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(3));
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Eq(2));
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(2));
 
   // Make a new connection to the new listener.
   codec_client_ = makeHttpConnection(lookupPort(listener_name_));
@@ -1086,8 +1088,8 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterMultipleInPlaceUpdate) {
 
   // Remove the active listener.
   sendLdsResponse(std::vector<std::string>{}, "3");
-  test_server_->waitForGaugeEq("listener_manager.total_listeners_active", 0);
-  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 2);
+  test_server_->waitForGauge("listener_manager.total_listeners_active", Eq(0));
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(2));
 
   // All the listen socket are closed. include the sockets in the active listener and
   // the sockets in the filter chain draining listener. The new connection should be reset.
@@ -1105,7 +1107,7 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterMultipleInPlaceUpdate) {
   }
 
   // Ensure the old listener is still in filter chain draining.
-  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 2);
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(2));
 }
 
 TEST_P(ListenerIntegrationTest, ChangeListenerAddress) {
@@ -1115,7 +1117,7 @@ TEST_P(ListenerIntegrationTest, ChangeListenerAddress) {
     createRdsStream(route_table_name_);
   };
   initialize();
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   // Workers not started, the LDS added listener 0 is in active_listeners_ list.
@@ -1132,14 +1134,14 @@ TEST_P(ListenerIntegrationTest, ChangeListenerAddress) {
           route: {{ cluster: {} }}
 )EOF";
   sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "1");
-  test_server_->waitForCounterGe(
-      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), 1);
+  test_server_->waitForCounter(
+      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), Ge(1));
   // Now testing-listener-0 finishes initialization, Server initManager will be ready.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
 
   test_server_->waitUntilListenersReady();
   // NOTE: The line above doesn't tell you if listener is up and listening.
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   const uint32_t old_port = lookupPort(listener_name_);
   // Make a connection to the listener from version 1.
   codec_client_ = makeHttpConnection(old_port);
@@ -1150,7 +1152,7 @@ TEST_P(ListenerIntegrationTest, ChangeListenerAddress) {
   sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
   sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "2");
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(2));
   registerTestServerPorts({listener_name_});
   // Verify that the listener was updated and that the next connection will be to the new listener.
   // (Note that connecting to 127.0.0.1 works whether the listener address is 127.0.0.1 or 0.0.0.0.)
@@ -1223,7 +1225,7 @@ public:
                        const std::string& version) {
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
-    response.set_type_url(Config::TypeUrl::get().Listener);
+    response.set_type_url(Config::TestTypeUrl::get().Listener);
     for (const auto& listener_config : listener_configs) {
       response.add_resources()->PackFrom(listener_config);
     }
@@ -1252,7 +1254,7 @@ public:
 
   envoy::config::listener::v3::Listener listener_config_;
   FakeHttpConnectionPtr lds_connection_;
-  FakeStreamPtr lds_stream_{};
+  FakeStreamPtr lds_stream_;
 };
 
 TEST_P(ListenerFilterIntegrationTest, InspectDataFilterDrainData) {
@@ -1450,7 +1452,8 @@ TEST_P(ListenerFilterIntegrationTest, InspectDataFiltersClientCloseConnectionWit
   if (result == true) {
     tcp_client->waitForDisconnect();
   }
-  test_server_->waitForCounterEq("listener.listener_0.downstream_listener_filter_remote_close", 1);
+  test_server_->waitForCounter("listener.listener_0.downstream_listener_filter_remote_close",
+                               Eq(1));
 #endif
 }
 
@@ -1504,10 +1507,10 @@ TEST_P(ListenerFilterIntegrationTest, UpdateListenerFilterOrder) {
   };
   use_lds_ = false;
   initialize();
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   test_server_->waitUntilListenersReady();
   // NOTE: The line above doesn't tell you if listener is up and listening.
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   // Workers not started, the LDS added test_listener is in active_listeners_ list.
   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
   registerTestServerPorts({"test_listener"});
@@ -1528,8 +1531,8 @@ TEST_P(ListenerFilterIntegrationTest, UpdateListenerFilterOrder) {
   listener_config_.mutable_listener_filters()->SwapElements(0, 1);
   ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
   sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
-  test_server_->waitForCounterEq("listener_manager.listener_in_place_updated", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(2));
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Eq(1));
 
   IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("test_listener"));
   ASSERT_TRUE(tcp_client2->write(data));
@@ -1579,10 +1582,10 @@ TEST_P(ListenerFilterIntegrationTest, UpdateListenerWithDifferentSocketOptions) 
   };
   use_lds_ = false;
   initialize();
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   test_server_->waitUntilListenersReady();
   // NOTE: The line above doesn't tell you if listener is up and listening.
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   // Workers not started, the LDS added test_listener is in active_listeners_ list.
   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
   registerTestServerPorts({"test_listener"});
@@ -1603,7 +1606,7 @@ TEST_P(ListenerFilterIntegrationTest, UpdateListenerWithDifferentSocketOptions) 
   listener_config_.mutable_socket_options(0)->set_int_value(4);
   ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
   sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(2));
 
   // We want to test update listener with same address but different socket options. But
   // the test is using zero port address. It turns out when create a new socket on zero
@@ -1662,10 +1665,10 @@ TEST_P(ListenerFilterIntegrationTest,
   };
   use_lds_ = false;
   initialize();
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
   test_server_->waitUntilListenersReady();
   // NOTE: The line above doesn't tell you if listener is up and listening.
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   // Workers not started, the LDS added test_listener is in active_listeners_ list.
   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
   registerTestServerPorts({"test_listener"});
@@ -1677,7 +1680,7 @@ TEST_P(ListenerFilterIntegrationTest,
   ASSERT_TRUE(fake_upstream_connection->waitForData(data.size(), &data));
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
-  test_server_->waitForGaugeEq("listener.listener_stat.downstream_cx_active", 0);
+  test_server_->waitForGauge("listener.listener_stat.downstream_cx_active", Eq(0));
 
   auto* socket_option = listener_config_.add_socket_options();
   socket_option->set_level(IPPROTO_IP);
@@ -1693,7 +1696,7 @@ TEST_P(ListenerFilterIntegrationTest,
       "duplicate address",
       {
         sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
-        test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
+        test_server_->waitForCounter("listener_manager.lds.update_rejected", Ge(1));
         IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("test_listener"));
         ASSERT_TRUE(tcp_client2->write(data));
         FakeRawConnectionPtr fake_upstream_connection2;
@@ -1703,6 +1706,119 @@ TEST_P(ListenerFilterIntegrationTest,
         ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
       });
 }
+
+#ifdef __linux__
+TEST_P(ListenerFilterIntegrationTest, BasicSuccessWithMultiAddressesAndKeepalive) {
+  if (!ENVOY_SOCKET_SO_KEEPALIVE.hasValue()) {
+    GTEST_SKIP() << "Keepalive is not supported on this platform.";
+  }
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Add the static cluster to serve LDS.
+    auto* lds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    lds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    lds_cluster->set_name("lds_cluster");
+    ConfigHelper::setHttp2(*lds_cluster);
+  });
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
+    listener_config_.set_name("listener_foo");
+    listener_config_.mutable_tcp_keepalive();
+
+    auto* additional_addr = listener_config_.mutable_additional_addresses()->Add();
+    additional_addr->mutable_tcp_keepalive()->mutable_keepalive_probes()->set_value(3);
+
+    auto* address = additional_addr->mutable_address()->mutable_socket_address();
+    address->set_address("127.0.0.1");
+    address->set_port_value(0);
+
+    bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
+    auto* lds_config_source = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
+    lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* lds_api_config_source = lds_config_source->mutable_api_config_source();
+    lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+    lds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+    envoy::config::core::v3::GrpcService* grpc_service = lds_api_config_source->add_grpc_services();
+    setGrpcService(*grpc_service, "lds_cluster", fake_upstreams_[1]->localAddress());
+  });
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
+  };
+  use_lds_ = false;
+  initialize();
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
+  test_server_->waitUntilListenersReady();
+  // NOTE: The line above doesn't tell you if listener is up and listening.
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+  // Workers not started, the LDS added test_listener is in active_listeners_ list.
+  EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
+  registerTestServerPorts({"test_listener_1"});
+  std::string data = "hello";
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("test_listener_1"));
+  ASSERT_TRUE(tcp_client->write(data));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(data.size(), &data));
+  tcp_client->close();
+
+  int opt_value = 0;
+  socklen_t opt_len = sizeof(opt_value);
+  // Keepalive must be enabled on the first address.
+  EXPECT_TRUE(getSocketOption("listener_foo", ENVOY_SOCKET_SO_KEEPALIVE.level(),
+                              ENVOY_SOCKET_SO_KEEPALIVE.option(), &opt_value, &opt_len));
+  EXPECT_EQ(opt_len, sizeof(opt_value));
+  EXPECT_EQ(1, opt_value);
+
+  // Keepalive must be enabled on the second address.
+  EXPECT_TRUE(getSocketOption("listener_foo", ENVOY_SOCKET_SO_KEEPALIVE.level(),
+                              ENVOY_SOCKET_SO_KEEPALIVE.option(), &opt_value, &opt_len, 1));
+  EXPECT_EQ(opt_len, sizeof(opt_value));
+  EXPECT_EQ(1, opt_value);
+
+  EXPECT_TRUE(getSocketOption("listener_foo", ENVOY_SOCKET_TCP_KEEPCNT.level(),
+                              ENVOY_SOCKET_TCP_KEEPCNT.option(), &opt_value, &opt_len, 1));
+  EXPECT_EQ(opt_len, sizeof(opt_value));
+  EXPECT_EQ(3, opt_value);
+
+  // Update the config where default keepalive time is changed and keepalive is explicitly disabled
+  // on the additional address.
+  listener_config_.mutable_tcp_keepalive()->mutable_keepalive_time()->set_value(74);
+  listener_config_.mutable_additional_addresses(0)
+      ->mutable_tcp_keepalive()
+      ->mutable_keepalive_time()
+      ->set_value(0);
+
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(2));
+
+  registerTestServerPorts({"test_listener_1"});
+  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("test_listener_1"));
+  ASSERT_TRUE(tcp_client2->write(data));
+  FakeRawConnectionPtr fake_upstream_connection2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
+  ASSERT_TRUE(fake_upstream_connection2->waitForData(data.size(), &data));
+  tcp_client2->close();
+  ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
+
+  // Keepalive must be enabled on the first address.
+  EXPECT_TRUE(getSocketOption("listener_foo", ENVOY_SOCKET_SO_KEEPALIVE.level(),
+                              ENVOY_SOCKET_SO_KEEPALIVE.option(), &opt_value, &opt_len));
+  EXPECT_EQ(opt_len, sizeof(opt_value));
+  EXPECT_EQ(1, opt_value);
+
+  EXPECT_TRUE(getSocketOption("listener_foo", ENVOY_SOCKET_TCP_KEEPIDLE.level(),
+                              ENVOY_SOCKET_TCP_KEEPIDLE.option(), &opt_value, &opt_len));
+  EXPECT_EQ(opt_len, sizeof(opt_value));
+  EXPECT_EQ(74, opt_value);
+
+  // Keepalive must be disabled on the second address.
+  EXPECT_TRUE(getSocketOption("listener_foo", ENVOY_SOCKET_SO_KEEPALIVE.level(),
+                              ENVOY_SOCKET_SO_KEEPALIVE.option(), &opt_value, &opt_len, 1));
+  EXPECT_EQ(opt_len, sizeof(opt_value));
+  EXPECT_EQ(0, opt_value);
+}
+#endif
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ListenerFilterIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
@@ -1739,7 +1855,7 @@ public:
           // link time.
           auto& filter = *src_listener_config.add_listener_filters();
           filter.set_name("envoy.filters.listener.original_dst");
-          filter.mutable_typed_config()->PackFrom(ProtobufWkt::Struct());
+          filter.mutable_typed_config()->PackFrom(Protobuf::Struct());
           auto& virtual_listener_config = *bootstrap.mutable_static_resources()->add_listeners();
           virtual_listener_config = src_listener_config;
           virtual_listener_config.mutable_use_original_dst()->set_value(false);
@@ -1819,8 +1935,8 @@ TEST_P(RebalancerTest, BindToPortUpdate) {
   // Create an LDS response with the new config, and reload config.
   new_config_helper.setLds("1");
 
-  test_server_->waitForCounterEq("listener_manager.listener_modified", 1);
-  test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", 0);
+  test_server_->waitForCounter("listener_manager.listener_modified", Eq(1));
+  test_server_->waitForGauge("listener_manager.total_listeners_draining", Eq(0));
 
   verifyBalance();
 }

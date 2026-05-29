@@ -39,7 +39,10 @@ jobs:
       check-name: mobile-ios-tests
 
   tests:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
+      actions: read
       contents: read
       packages: read
     uses: ./.github/workflows/_run.yml
@@ -48,7 +51,8 @@ jobs:
     name: ios-tests
     with:
       args: ${{ matrix.args }}
-      command: ./bazelw
+      bind-mount: false
+      command: bazel
       container-command:
       docker-ipv6: false
       request: ${{ needs.load.outputs.request }}
@@ -68,14 +72,18 @@ jobs:
         - name: Run swift library tests
           args: >-
             test
-            --config=mobile-remote-ci-macos-ios-swift
+            --config=ci
+            --config=mobile-rbe
+            --config=mobile-ios-swift
             //test/swift/...
           target: swift-tests
           timeout-minutes: 120
         - name: Run Objective-C library tests
           args: >-
             test
-            --config=mobile-remote-ci-macos-ios-obj-c
+            --config=ci
+            --config=mobile-rbe
+            --config=mobile-ios-obj-c
             //test/objective-c/...
             //test/cc/unit:envoy_config_test
           target: c-and-objc-tests

@@ -36,12 +36,13 @@ public:
   MockGrpcMuxFactory(absl::string_view name = "envoy.config_mux.grpc_mux_factory") : name_(name) {
     ON_CALL(*this, create(_, _, _, _, _, _, _, _, _, _, _, _))
         .WillByDefault(Invoke(
-            [](std::unique_ptr<Grpc::RawAsyncClient>&&, std::unique_ptr<Grpc::RawAsyncClient>&&,
+            [](std::shared_ptr<Grpc::RawAsyncClient>&&, std::shared_ptr<Grpc::RawAsyncClient>&&,
                Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
                const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
                std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
                OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-               bool) -> std::shared_ptr<Config::GrpcMux> {
+               std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
+                -> std::shared_ptr<Config::GrpcMux> {
               return std::make_shared<NiceMock<MockGrpcMux>>();
             }));
   }
@@ -50,11 +51,12 @@ public:
   void shutdownAll() override {}
 
   MOCK_METHOD(std::shared_ptr<Config::GrpcMux>, create,
-              (std::unique_ptr<Grpc::RawAsyncClient>&&, std::unique_ptr<Grpc::RawAsyncClient>&&,
+              (std::shared_ptr<Grpc::RawAsyncClient>&&, std::shared_ptr<Grpc::RawAsyncClient>&&,
                Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
                const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
                std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
-               OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>, bool));
+               OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
+               std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>));
   const std::string name_;
 };
 
@@ -64,14 +66,14 @@ class FakeConfigValidatorFactory : public Config::ConfigValidatorFactory {
 public:
   FakeConfigValidatorFactory() = default;
 
-  Config::ConfigValidatorPtr createConfigValidator(const ProtobufWkt::Any&,
+  Config::ConfigValidatorPtr createConfigValidator(const Protobuf::Any&,
                                                    ProtobufMessage::ValidationVisitor&) override {
     return nullptr;
   }
 
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     // Using Value instead of a custom empty config proto. This is only allowed in tests.
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Value()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Value()};
   }
 
   std::string name() const override { return "envoy.fake_validator"; }
@@ -90,12 +92,19 @@ public:
   MOCK_METHOD(Config::SubscriptionPtr, create, (SubscriptionData & data), (override));
 };
 
-class XdsManagerImplTest : public testing::Test {
+class XdsManagerImplTest : public testing::TestWithParam<bool> {
 public:
   XdsManagerImplTest()
       : xds_manager_impl_(dispatcher_, api_, stats_, local_info_, validation_context_, server_) {
     ON_CALL(validation_context_, staticValidationVisitor())
         .WillByDefault(ReturnRef(validation_visitor_));
+    if (GetParam()) {
+      scoped_runtime_.mergeValues(
+          {{"envoy.restart_features.use_cached_grpc_client_for_xds", "true"}});
+    } else {
+      scoped_runtime_.mergeValues(
+          {{"envoy.restart_features.use_cached_grpc_client_for_xds", "false"}});
+    }
   }
 
   void initialize(const std::string& bootstrap_yaml = "") {
@@ -115,16 +124,20 @@ public:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   XdsManagerImpl xds_manager_impl_;
+  TestScopedRuntime scoped_runtime_;
 };
 
+INSTANTIATE_TEST_SUITE_P(XdsManagerImplTest, XdsManagerImplTest,
+                         ::testing::ValuesIn({false, true}));
+
 // Validates that a call to shutdown succeeds.
-TEST_F(XdsManagerImplTest, ShutdownSuccessful) {
+TEST_P(XdsManagerImplTest, ShutdownSuccessful) {
   initialize();
   xds_manager_impl_.shutdown();
 }
 
 // Validates that ADS replacement fails when ADS isn't configured.
-TEST_F(XdsManagerImplTest, AdsReplacementNoPriorAdsRejection) {
+TEST_P(XdsManagerImplTest, AdsReplacementNoPriorAdsRejection) {
   // Make the server return a bootstrap that returns a non-ADS config.
   initialize(R"EOF(
   static_resources:
@@ -162,25 +175,25 @@ TEST_F(XdsManagerImplTest, AdsReplacementNoPriorAdsRejection) {
 }
 
 // Validates that ADS replacement with primary source only works.
-TEST_F(XdsManagerImplTest, AdsReplacementPrimaryOnly) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.restart_features.xds_failover_support", "true"}});
+TEST_P(XdsManagerImplTest, AdsReplacementPrimaryOnly) {
+  scoped_runtime_.mergeValues({{"envoy.restart_features.xds_failover_support", "true"}});
   testing::InSequence s;
   NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<Config::MuxFactory> registry(factory);
   // Replace the created GrpcMux mock.
   std::shared_ptr<NiceMock<MockGrpcMux>> ads_mux_shared(std::make_shared<NiceMock<MockGrpcMux>>());
-  NiceMock<Config::MockGrpcMux>& ads_mux(*ads_mux_shared.get());
+  NiceMock<Config::MockGrpcMux>& ads_mux(*ads_mux_shared);
   EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
       .WillOnce(Invoke(
-          [&ads_mux_shared](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-                            std::unique_ptr<Grpc::RawAsyncClient>&& failover_async_client,
+          [&ads_mux_shared](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+                            std::shared_ptr<Grpc::RawAsyncClient>&& failover_async_client,
                             Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
                             const envoy::config::core::v3::ApiConfigSource&,
                             const LocalInfo::LocalInfo&,
                             std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
                             OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-                            bool) -> std::shared_ptr<Config::GrpcMux> {
+                            std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
+              -> std::shared_ptr<Config::GrpcMux> {
             EXPECT_NE(primary_async_client, nullptr);
             EXPECT_EQ(failover_async_client, nullptr);
             return ads_mux_shared;
@@ -237,10 +250,10 @@ TEST_F(XdsManagerImplTest, AdsReplacementPrimaryOnly) {
   )EOF",
                             new_ads_config);
 
-  Grpc::RawAsyncClientPtr failover_client;
+  Grpc::RawAsyncClientSharedPtr failover_client;
   EXPECT_CALL(ads_mux, updateMuxSource(_, _, _, _, ProtoEq(new_ads_config)))
-      .WillOnce(Invoke([](Grpc::RawAsyncClientPtr&& primary_async_client,
-                          Grpc::RawAsyncClientPtr&& failover_async_client, Stats::Scope&,
+      .WillOnce(Invoke([](Grpc::RawAsyncClientSharedPtr&& primary_async_client,
+                          Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope&,
                           BackOffStrategyPtr&&,
                           const envoy::config::core::v3::ApiConfigSource&) -> absl::Status {
         EXPECT_NE(primary_async_client, nullptr);
@@ -252,26 +265,26 @@ TEST_F(XdsManagerImplTest, AdsReplacementPrimaryOnly) {
 }
 
 // Validates that ADS replacement with primary and failover sources works.
-TEST_F(XdsManagerImplTest, AdsReplacementPrimaryAndFailover) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.restart_features.xds_failover_support", "true"}});
+TEST_P(XdsManagerImplTest, AdsReplacementPrimaryAndFailover) {
+  scoped_runtime_.mergeValues({{"envoy.restart_features.xds_failover_support", "true"}});
   testing::InSequence s;
   NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<Config::MuxFactory> registry(factory);
   // Replace the created GrpcMux mock.
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux_shared(
       std::make_shared<NiceMock<Config::MockGrpcMux>>());
-  NiceMock<Config::MockGrpcMux>& ads_mux(*ads_mux_shared.get());
+  NiceMock<Config::MockGrpcMux>& ads_mux(*ads_mux_shared);
   EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
       .WillOnce(Invoke(
-          [&ads_mux_shared](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-                            std::unique_ptr<Grpc::RawAsyncClient>&& failover_async_client,
+          [&ads_mux_shared](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+                            std::shared_ptr<Grpc::RawAsyncClient>&& failover_async_client,
                             Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
                             const envoy::config::core::v3::ApiConfigSource&,
                             const LocalInfo::LocalInfo&,
                             std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
                             OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-                            bool) -> std::shared_ptr<Config::GrpcMux> {
+                            std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
+              -> std::shared_ptr<Config::GrpcMux> {
             EXPECT_NE(primary_async_client, nullptr);
             EXPECT_NE(failover_async_client, nullptr);
             return ads_mux_shared;
@@ -332,10 +345,10 @@ TEST_F(XdsManagerImplTest, AdsReplacementPrimaryAndFailover) {
   )EOF",
                             new_ads_config);
 
-  Grpc::RawAsyncClientPtr failover_client;
+  Grpc::RawAsyncClientSharedPtr failover_client;
   EXPECT_CALL(ads_mux, updateMuxSource(_, _, _, _, ProtoEq(new_ads_config)))
-      .WillOnce(Invoke([](Grpc::RawAsyncClientPtr&& primary_async_client,
-                          Grpc::RawAsyncClientPtr&& failover_async_client, Stats::Scope&,
+      .WillOnce(Invoke([](Grpc::RawAsyncClientSharedPtr&& primary_async_client,
+                          Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope&,
                           BackOffStrategyPtr&&,
                           const envoy::config::core::v3::ApiConfigSource&) -> absl::Status {
         EXPECT_NE(primary_async_client, nullptr);
@@ -347,7 +360,7 @@ TEST_F(XdsManagerImplTest, AdsReplacementPrimaryAndFailover) {
 }
 
 // Validates that setAdsConfigSource validation failure is detected.
-TEST_F(XdsManagerImplTest, AdsReplacementInvalidConfig) {
+TEST_P(XdsManagerImplTest, AdsReplacementInvalidConfig) {
   testing::InSequence s;
   NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<MuxFactory> registry(factory);
@@ -390,7 +403,7 @@ TEST_F(XdsManagerImplTest, AdsReplacementInvalidConfig) {
 }
 
 // Validates that ADS replacement with unknown cluster fails.
-TEST_F(XdsManagerImplTest, AdsReplacementUnknownCluster) {
+TEST_P(XdsManagerImplTest, AdsReplacementUnknownCluster) {
   testing::InSequence s;
   NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<MuxFactory> registry(factory);
@@ -433,19 +446,25 @@ TEST_F(XdsManagerImplTest, AdsReplacementUnknownCluster) {
   )EOF",
                             new_ads_config);
 
-  // Emulates an error for gRPC-cluster not found.
-  EXPECT_CALL(cm_.async_client_manager_, factoryForGrpcService(_, _, _))
-      .WillOnce(
-          Return(ByMove(absl::InvalidArgumentError("Unknown gRPC client cluster 'ads_cluster2'"))));
+  if (GetParam()) {
+    // Emulates an error for gRPC-cluster not found.
+    EXPECT_CALL(cm_.async_client_manager_, getOrCreateRawAsyncClientWithHashKey(_, _, _))
+        .WillOnce(Return(
+            ByMove(absl::InvalidArgumentError("Unknown gRPC client cluster 'ads_cluster2'"))));
+  } else {
+    // Emulates an error for gRPC-cluster not found.
+    EXPECT_CALL(cm_.async_client_manager_, factoryForGrpcService(_, _, _))
+        .WillOnce(Return(
+            ByMove(absl::InvalidArgumentError("Unknown gRPC client cluster 'ads_cluster2'"))));
+  }
   const auto res = xds_manager_impl_.setAdsConfigSource(new_ads_config);
   EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
   EXPECT_EQ(res.message(), "Unknown gRPC client cluster 'ads_cluster2'");
 }
 
 // Validates that ADS replacement with unknown failover cluster fails.
-TEST_F(XdsManagerImplTest, AdsReplacementUnknownFailoverCluster) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.restart_features.xds_failover_support", "true"}});
+TEST_P(XdsManagerImplTest, AdsReplacementUnknownFailoverCluster) {
+  scoped_runtime_.mergeValues({{"envoy.restart_features.xds_failover_support", "true"}});
   testing::InSequence s;
   NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<MuxFactory> registry(factory);
@@ -509,24 +528,36 @@ TEST_F(XdsManagerImplTest, AdsReplacementUnknownFailoverCluster) {
   // Emulates a successful finding of the primary_ads_cluster.
   envoy::config::core::v3::GrpcService expected_primary_grpc_service;
   expected_primary_grpc_service.mutable_envoy_grpc()->set_cluster_name("primary_ads_cluster");
-  EXPECT_CALL(cm_.async_client_manager_,
-              factoryForGrpcService(ProtoEq(expected_primary_grpc_service), _, _))
-      .WillOnce(Return(ByMove(std::make_unique<Grpc::MockAsyncClientFactory>())));
+  if (GetParam()) {
+    EXPECT_CALL(cm_.async_client_manager_, getOrCreateRawAsyncClientWithHashKey(_, _, _))
+        .WillOnce(Return(ByMove(std::make_shared<Grpc::MockAsyncClient>())));
+  } else {
+    EXPECT_CALL(cm_.async_client_manager_,
+                factoryForGrpcService(ProtoEq(expected_primary_grpc_service), _, _))
+        .WillOnce(Return(ByMove(std::make_unique<Grpc::MockAsyncClientFactory>())));
+  }
   // Emulates an error for non_existent_failover_ads_cluster not found.
   envoy::config::core::v3::GrpcService expected_failover_grpc_service;
   expected_failover_grpc_service.mutable_envoy_grpc()->set_cluster_name(
       "non_existent_failover_ads_cluster");
-  EXPECT_CALL(cm_.async_client_manager_,
-              factoryForGrpcService(ProtoEq(expected_failover_grpc_service), _, _))
-      .WillOnce(Return(ByMove(absl::InvalidArgumentError(
-          "Unknown gRPC client cluster 'non_existent_failover_ads_cluster'"))));
+  if (GetParam()) {
+    // Emulates an error for gRPC-cluster not found.
+    EXPECT_CALL(cm_.async_client_manager_, getOrCreateRawAsyncClientWithHashKey(_, _, _))
+        .WillOnce(Return(ByMove(absl::InvalidArgumentError(
+            "Unknown gRPC client cluster 'non_existent_failover_ads_cluster'"))));
+  } else {
+    EXPECT_CALL(cm_.async_client_manager_,
+                factoryForGrpcService(ProtoEq(expected_failover_grpc_service), _, _))
+        .WillOnce(Return(ByMove(absl::InvalidArgumentError(
+            "Unknown gRPC client cluster 'non_existent_failover_ads_cluster'"))));
+  }
   const auto res = xds_manager_impl_.setAdsConfigSource(new_ads_config);
   EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
   EXPECT_EQ(res.message(), "Unknown gRPC client cluster 'non_existent_failover_ads_cluster'");
 }
 
 // Validates that ADS replacement fails when ADS type is different (SotW <-> Delta).
-TEST_F(XdsManagerImplTest, AdsReplacementDifferentAdsTypeRejection) {
+TEST_P(XdsManagerImplTest, AdsReplacementDifferentAdsTypeRejection) {
   NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<MuxFactory> registry(factory);
 
@@ -574,7 +605,7 @@ TEST_F(XdsManagerImplTest, AdsReplacementDifferentAdsTypeRejection) {
 }
 
 // Validates that ADS replacement fails when a wrong backoff strategy is used.
-TEST_F(XdsManagerImplTest, AdsReplacementInvalidBackoffRejection) {
+TEST_P(XdsManagerImplTest, AdsReplacementInvalidBackoffRejection) {
   NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<Config::MuxFactory> registry(factory);
 
@@ -624,7 +655,7 @@ TEST_F(XdsManagerImplTest, AdsReplacementInvalidBackoffRejection) {
 }
 
 // Validates that ADS replacement of unsupported API type is rejected.
-TEST_F(XdsManagerImplTest, AdsReplacementUnsupportedTypeRejection) {
+TEST_P(XdsManagerImplTest, AdsReplacementUnsupportedTypeRejection) {
   NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<Config::MuxFactory> registry(factory);
 
@@ -675,7 +706,7 @@ TEST_F(XdsManagerImplTest, AdsReplacementUnsupportedTypeRejection) {
 
 // Validates that ADS replacement fails when there are a different number of custom validators
 // defined between the original ADS config and the replacement.
-TEST_F(XdsManagerImplTest, AdsReplacementNumberOfCustomValidatorsRejection) {
+TEST_P(XdsManagerImplTest, AdsReplacementNumberOfCustomValidatorsRejection) {
   NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<MuxFactory> registry(factory);
   FakeConfigValidatorFactory fake_config_validator_factory;
@@ -729,7 +760,7 @@ TEST_F(XdsManagerImplTest, AdsReplacementNumberOfCustomValidatorsRejection) {
 
 // Validates that ADS replacement fails when a custom validators with some
 // different contents is used compared to the original ADS config.
-TEST_F(XdsManagerImplTest, AdsReplacementContentsOfCustomValidatorsRejection) {
+TEST_P(XdsManagerImplTest, AdsReplacementContentsOfCustomValidatorsRejection) {
   NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<Config::MuxFactory> registry(factory);
   FakeConfigValidatorFactory fake_config_validator_factory;
@@ -789,6 +820,52 @@ TEST_F(XdsManagerImplTest, AdsReplacementContentsOfCustomValidatorsRejection) {
               HasSubstr("Cannot replace config_validators in ADS config (different contents)"));
 }
 
+// Validates that ADS initialization fails when the primary gRPC client is null.
+TEST_P(XdsManagerImplTest, AdsInitializationFailsWithNullPrimaryClient) {
+  NiceMock<MockGrpcMuxFactory> factory;
+  Registry::InjectFactory<MuxFactory> registry(factory);
+  initialize(R"EOF(
+  dynamic_resources:
+    ads_config:
+      api_type: GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: ads_cluster
+  static_resources:
+    clusters:
+    - name: ads_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: ads_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF");
+
+  if (GetParam()) { // use_cached_grpc_client_for_xds is true
+    EXPECT_CALL(cm_.async_client_manager_, getOrCreateRawAsyncClientWithHashKey(_, _, _))
+        .WillOnce(Return(ByMove(absl::StatusOr<Grpc::RawAsyncClientSharedPtr>(nullptr))));
+  } else { // use_cached_grpc_client_for_xds is false
+    auto mock_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
+    EXPECT_CALL(*mock_factory, createUncachedRawAsyncClient())
+        .WillOnce(Return(ByMove(absl::StatusOr<Grpc::RawAsyncClientPtr>(nullptr))));
+    EXPECT_CALL(cm_.async_client_manager_, factoryForGrpcService(_, _, _))
+        .WillOnce(
+            Return(ByMove(absl::StatusOr<Grpc::AsyncClientFactoryPtr>(std::move(mock_factory)))));
+  }
+
+  const auto res = xds_manager_impl_.initializeAdsConnections(server_.bootstrap_);
+  EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_EQ(res.message(), "gRPC client construction failed for primary cluster.");
+}
+
 /*
  * Tests that cover the usage of xDS-TP based configuration-sources.
  */
@@ -810,13 +887,14 @@ public:
     if (enable_authority_a) {
       EXPECT_CALL(grpc_mux_factory_, create(_, _, _, _, _, _, _, _, _, _, _, _))
           .WillOnce(Invoke(
-              [&](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-                  std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
+              [&](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+                  std::shared_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
                   Random::RandomGenerator&, Stats::Scope&,
                   const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
                   std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
                   OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-                  bool) -> std::shared_ptr<Config::GrpcMux> {
+                  std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
+                  -> std::shared_ptr<Config::GrpcMux> {
                 EXPECT_NE(primary_async_client, nullptr);
                 return authority_A_mux_;
               }));
@@ -824,13 +902,14 @@ public:
     if (enable_authority_b) {
       EXPECT_CALL(grpc_mux_factory_, create(_, _, _, _, _, _, _, _, _, _, _, _))
           .WillOnce(Invoke(
-              [&](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-                  std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
+              [&](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+                  std::shared_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
                   Random::RandomGenerator&, Stats::Scope&,
                   const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
                   std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
                   OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-                  bool) -> std::shared_ptr<Config::GrpcMux> {
+                  std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
+                  -> std::shared_ptr<Config::GrpcMux> {
                 EXPECT_NE(primary_async_client, nullptr);
                 return authority_B_mux_;
               }));
@@ -838,13 +917,14 @@ public:
     if (enable_default_authority) {
       EXPECT_CALL(grpc_mux_factory_, create(_, _, _, _, _, _, _, _, _, _, _, _))
           .WillOnce(Invoke(
-              [&](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-                  std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
+              [&](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+                  std::shared_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
                   Random::RandomGenerator&, Stats::Scope&,
                   const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
                   std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
                   OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-                  bool) -> std::shared_ptr<Config::GrpcMux> {
+                  std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
+                  -> std::shared_ptr<Config::GrpcMux> {
                 EXPECT_NE(primary_async_client, nullptr);
                 return default_mux_;
               }));
@@ -1168,13 +1248,15 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceDeltaGrpc) {
   NiceMock<MockGrpcMuxFactory> factory("envoy.config_mux.new_grpc_mux_factory");
   Registry::InjectFactory<Config::MuxFactory> registry(factory);
   EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
-      .WillOnce(Invoke(
-          [&](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-              std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&, Random::RandomGenerator&,
-              Stats::Scope&, const envoy::config::core::v3::ApiConfigSource&,
-              const LocalInfo::LocalInfo&, std::unique_ptr<Config::CustomConfigValidators>&&,
-              BackOffStrategyPtr&&, OptRef<Config::XdsConfigTracker>,
-              OptRef<Config::XdsResourcesDelegate>, bool) -> std::shared_ptr<Config::GrpcMux> {
+      .WillOnce(
+          Invoke([&](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+                     std::shared_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
+                     Random::RandomGenerator&, Stats::Scope&,
+                     const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
+                     std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
+                     OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
+                     std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
+                     -> std::shared_ptr<Config::GrpcMux> {
             EXPECT_NE(primary_async_client, nullptr);
             return authority_A_mux_;
           }));
@@ -2308,6 +2390,128 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonXdstpResourceRequiresConfigSourc
       HasSubstr(fmt::format("Given subscrption to resource {} must either have an xDS-TP based "
                             "resource or a config must be provided.",
                             resource_name)));
+}
+
+// Validate that the pause-resume works on all gRPC-based ADS mux objects.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, PauseResume) {
+  testing::InSequence s;
+  // Have a config-source and default_config_source with authority_2.com in each of them.
+  initialize(R"EOF(
+  config_sources:
+  - authorities:
+    - name: authority_1.com
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: config_source1_cluster
+  default_config_source:
+    authorities:
+    - name: authority_2.com
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: default_config_source_cluster
+  static_resources:
+    clusters:
+    - name: config_source1_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: config_source1_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+    - name: default_config_source_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: default_config_source_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11002
+  )EOF",
+             true, false, true);
+
+  // Validate pause() on a single type.
+  {
+    const std::string type_url = "type.googleapis.com/some.Type";
+    const std::vector<std::string> types{type_url};
+    bool authority_a_resumed = false;
+    bool default_authority_resumed = false;
+
+    // Validate that pause() on a single type is invoked on the underlying authorities mux objects,
+    // and that resume() is invoked when the cleanup object goes out of scope.
+    {
+      EXPECT_CALL(*authority_A_mux_, pause(types))
+          .WillOnce(testing::Invoke(
+              [&authority_a_resumed](const std::vector<std::string>) -> ScopedResume {
+                return std::make_unique<Cleanup>(
+                    [&authority_a_resumed]() { authority_a_resumed = true; });
+              }));
+      EXPECT_CALL(*default_mux_, pause(types))
+          .WillOnce(testing::Invoke(
+              [&default_authority_resumed](const std::vector<std::string>) -> ScopedResume {
+                return std::make_unique<Cleanup>(
+                    [&default_authority_resumed]() { default_authority_resumed = true; });
+              }));
+      ScopedResume pause_object = xds_manager_impl_.pause(type_url);
+
+      // When the pause object gets out of scope, the resume should be invoked.
+      EXPECT_FALSE(authority_a_resumed);
+      EXPECT_FALSE(default_authority_resumed);
+    }
+    // The pause object is out of scope, the authorities should be resumed.
+    EXPECT_TRUE(authority_a_resumed);
+    EXPECT_TRUE(default_authority_resumed);
+  }
+
+  // Validate pause() on multiple types.
+  {
+    const std::string type_url1 = "type.googleapis.com/some.Type1";
+    const std::string type_url2 = "type.googleapis.com/some.Type2";
+    const std::vector<std::string> types{type_url1, type_url2};
+    bool authority_a_resumed = false;
+    bool default_authority_resumed = false;
+
+    // Validate that pause() on multiple types is invoked on the underlying authorities mux objects,
+    // and that resume() is invoked when the cleanup object goes out of scope.
+    {
+      EXPECT_CALL(*authority_A_mux_, pause(types))
+          .WillOnce(testing::Invoke(
+              [&authority_a_resumed](const std::vector<std::string>) -> ScopedResume {
+                return std::make_unique<Cleanup>(
+                    [&authority_a_resumed]() { authority_a_resumed = true; });
+              }));
+      EXPECT_CALL(*default_mux_, pause(types))
+          .WillOnce(testing::Invoke(
+              [&default_authority_resumed](const std::vector<std::string>) -> ScopedResume {
+                return std::make_unique<Cleanup>(
+                    [&default_authority_resumed]() { default_authority_resumed = true; });
+              }));
+      ScopedResume pause_object = xds_manager_impl_.pause(types);
+
+      // When the pause object gets out of scope, the resume should be invoked.
+      EXPECT_FALSE(authority_a_resumed);
+      EXPECT_FALSE(default_authority_resumed);
+    }
+    // The pause object is out of scope, the authorities should be resumed.
+    EXPECT_TRUE(authority_a_resumed);
+    EXPECT_TRUE(default_authority_resumed);
+  }
 }
 
 } // namespace

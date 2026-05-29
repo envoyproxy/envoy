@@ -25,10 +25,15 @@ envoy_cc_library(
         ":use_android_system_helper": ["-DUSE_ANDROID_SYSTEM_HELPER"],
         "//conditions:default": [],
     }),
+    linkopts = select({
+        ":use_android_system_helper": ["-landroid"],
+        "//conditions:default": [],
+    }),
     repository = "@envoy",
     deps = [
         ":default_system_helper_lib",
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
+        "//library/common/network:network_types_lib",
     ] + select({
         ":use_android_system_helper": [
             "//library/jni:android_jni_utility_lib",
@@ -37,6 +42,7 @@ envoy_cc_library(
         "//conditions:default": [],
     }) + select({
         "@envoy//bazel:apple": [
+            "//library/common/network:apple_network_change_monitor_lib",
             "//library/common/network:apple_platform_cert_verifier",
         ],
         "//conditions:default": [],

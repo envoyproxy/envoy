@@ -67,7 +67,7 @@ public:
    * Returns nil if metadata is not found or cannot be processed.
    */
   static int processDynamicTypedMetadataFromLuaCall(
-      lua_State* state, const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_metadata_map);
+      lua_State* state, const Protobuf::Map<std::string, Protobuf::Any>& typed_metadata_map);
 
   /**
    * Push a Lua value onto the stack that represents the value of a field

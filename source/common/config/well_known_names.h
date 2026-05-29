@@ -179,6 +179,8 @@ public:
   const std::string GOOGLE_GRPC_CLIENT_PREFIX = "envoy.google_grpc_client_prefix";
   // TLS certificate.
   const std::string TLS_CERTIFICATE = "envoy.tls_certificate";
+  // XDS resource name
+  const std::string XDS_RESOURCE_NAME = "envoy.xds_resource_name";
 
   // Mapping from the names above to their respective regex strings.
   const std::vector<std::pair<std::string, std::string>> name_regex_pairs_;

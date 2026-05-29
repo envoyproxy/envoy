@@ -46,6 +46,19 @@ response_rules:
     metadata_namespace: envoy.filters.http.thrift_to_metadata
     key: response_reply_type
     value: "error"
+- field_selector:
+    child:
+      id: 1
+      name: foo
+    id: 2
+    name: bar
+  on_present:
+    metadata_namespace: envoy.lb
+    key: bar
+  on_missing:
+    metadata_namespace: envoy.lb
+    key: bar
+    value: "unknown"
   )";
 
   ThriftToMetadataConfig factory;
@@ -151,6 +164,32 @@ protocol: TWITTER
   EXPECT_THROW(
       factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
       EnvoyException);
+}
+
+TEST(Factory, BasicWithServerContext) {
+  const std::string yaml = R"(
+request_rules:
+- field: PROTOCOL
+  on_present:
+    metadata_namespace: envoy.lb
+    key: protocol
+  on_missing:
+    metadata_namespace: envoy.lb
+    key: protocol
+    value: "unknown"
+  )";
+
+  ThriftToMetadataConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  auto callback =
+      factory.createFilterFactoryFromProtoWithServerContext(*proto_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  callback(filter_callback);
 }
 
 } // namespace ThriftToMetadata

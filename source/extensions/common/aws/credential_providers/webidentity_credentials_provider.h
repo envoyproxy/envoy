@@ -41,7 +41,8 @@ public:
 
 private:
   const std::string sts_endpoint_;
-  absl::optional<Config::DataSource::DataSourceProviderPtr> web_identity_data_source_provider_;
+  absl::optional<Config::DataSource::DataSourceProviderPtr<std::string>>
+      web_identity_data_source_provider_;
   const std::string role_arn_;
   const std::string role_session_name_;
 

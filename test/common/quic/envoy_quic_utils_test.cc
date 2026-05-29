@@ -1,4 +1,5 @@
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
@@ -236,6 +237,14 @@ TEST(EnvoyQuicUtilsTest, ConvertQuicConfig) {
     quic_ccopts.append(quic::QuicTagToString(ccopt));
   }
   EXPECT_EQ(quic_ccopts, "6RTOAKD4");
+
+  config.mutable_enable_scone()->set_value(true);
+  convertQuicConfig(config, quic_config);
+  EXPECT_TRUE(quic_config.parse_scone_packets());
+
+  config.mutable_enable_scone()->set_value(false);
+  convertQuicConfig(config, quic_config);
+  EXPECT_FALSE(quic_config.parse_scone_packets());
 }
 
 TEST(EnvoyQuicUtilsTest, HeaderMapMaxSizeLimit) {
@@ -366,6 +375,16 @@ TEST(EnvoyQuicUtilsTest, CreateConnectionSocket) {
 #endif
   }
   connection_socket->close();
+
+  no_local_addr = nullptr;
+  connection_socket = createConnectionSocket(
+      peer_addr, no_local_addr, nullptr, /*network*/ 1,
+      [](Network::ConnectionSocket& socket, quic::QuicNetworkHandle network) {
+        EXPECT_EQ(1, network);
+        socket.close();
+      });
+  EXPECT_FALSE(connection_socket->isOpen());
+  EXPECT_FALSE(connection_socket->ioHandle().wasConnected());
 
   Network::Address::InstanceConstSharedPtr local_addr_v6 =
       std::make_shared<Network::Address::Ipv6Instance>("::1", 0, nullptr, /*v6only*/ true);

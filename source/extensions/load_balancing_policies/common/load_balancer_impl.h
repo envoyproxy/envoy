@@ -20,9 +20,11 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/runtime/runtime_protos.h"
 #include "source/common/upstream/edf_scheduler.h"
 #include "source/common/upstream/load_balancer_context_base.h"
+#include "source/extensions/load_balancing_policies/common/locality_wrr.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -244,8 +246,14 @@ protected:
   // The total count of healthy hosts across all priority levels.
   uint32_t total_healthy_hosts_;
 
+  // Processes any dirty priorities accumulated by PriorityUpdateCb.
+  // Idempotent: safe to call multiple times (no-op if dirty set is empty).
+  void processDirtyPriorities();
+
 private:
   Common::CallbackHandlePtr priority_update_cb_;
+  Common::CallbackHandlePtr member_update_cb_;
+  absl::flat_hash_set<uint32_t> dirty_priorities_;
 };
 
 /**
@@ -435,6 +443,16 @@ private:
     return absl::nullopt;
   }
 
+  absl::optional<uint32_t> chooseHealthyLocality(HostSet& host_set) const {
+    ASSERT(per_priority_state_[host_set.priority()]->locality_wrr_);
+    return per_priority_state_[host_set.priority()]->locality_wrr_->chooseHealthyLocality();
+  };
+
+  absl::optional<uint32_t> chooseDegradedLocality(HostSet& host_set) const {
+    ASSERT(per_priority_state_[host_set.priority()]->locality_wrr_);
+    return per_priority_state_[host_set.priority()]->locality_wrr_->chooseDegradedLocality();
+  };
+
   // The set of local Envoy instances which are load balancing across priority_set_.
   const PrioritySet* local_priority_set_;
 
@@ -447,18 +465,27 @@ private:
     // for each of the non-local localities to determine what traffic should be
     // routed where.
     std::vector<uint64_t> residual_capacity_;
+
+    // Locality Weighted Round Robin config.
+    std::unique_ptr<LocalityWrr> locality_wrr_;
   };
   using PerPriorityStatePtr = std::unique_ptr<PerPriorityState>;
+
+  void rebuildLocalityWrrForPriority(uint32_t priority);
+
   // Routing state broken out for each priority level in priority_set_.
   std::vector<PerPriorityStatePtr> per_priority_state_;
   Common::CallbackHandlePtr priority_update_cb_;
+  Common::CallbackHandlePtr member_update_cb_;
   Common::CallbackHandlePtr local_priority_set_member_update_cb_handle_;
+  absl::flat_hash_set<uint32_t> dirty_priorities_;
 
   // Config for zone aware routing.
   const uint64_t min_cluster_size_;
   const absl::optional<uint32_t> force_local_zone_min_size_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const uint32_t routing_enabled_;
+  const LocalityLbConfig::ZoneAwareLbConfig::LocalityBasis locality_basis_;
   const bool fail_traffic_on_panic_ : 1;
 
   // If locality weight aware routing is enabled.
@@ -538,6 +565,7 @@ private:
   absl::flat_hash_map<HostsSource, Scheduler, HostsSourceHash> scheduler_;
   Common::CallbackHandlePtr priority_update_cb_;
   Common::CallbackHandlePtr member_update_cb_;
+  absl::flat_hash_set<uint32_t> dirty_priorities_;
 
 protected:
   // Slow start related config

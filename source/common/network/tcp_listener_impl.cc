@@ -39,8 +39,8 @@ bool TcpListenerImpl::rejectCxOverGlobalLimit() const {
     // Try to allocate resource within overload manager. We do it once here, instead of checking if
     // it is possible to allocate resource in this method and then actually allocating it later in
     // the code to avoid race conditions.
-    return !(overload_state_->tryAllocateResource(
-        Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1));
+    return !overload_state_->tryAllocateResource(
+        Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1);
   } else {
     // If the connection limit is not set, don't limit the connections, but still track them.
     // TODO(tonya11en): In integration tests, threadsafeSnapshot is necessary since the
@@ -50,6 +50,13 @@ bool TcpListenerImpl::rejectCxOverGlobalLimit() const {
     const uint64_t global_cx_limit = runtime_.threadsafeSnapshot()->getInteger(
         Runtime::Keys::GlobalMaxCxRuntimeKey, std::numeric_limits<uint64_t>::max());
     return AcceptedSocketImpl::acceptedSocketCount() >= global_cx_limit;
+  }
+}
+
+void TcpListenerImpl::releaseGlobalCxLimitResource() const {
+  if (track_global_cx_limit_in_overload_manager_) {
+    overload_state_->tryDeallocateResource(
+        Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1);
   }
 }
 
@@ -80,6 +87,9 @@ absl::Status TcpListenerImpl::onSocketEvent(short flags) {
       continue;
     } else if ((listener_accept_ != nullptr && listener_accept_->shouldShedLoad()) ||
                random_.bernoulli(reject_fraction_)) {
+      // rejectCxOverGlobalLimit() returned false, meaning it allocated a connection resource.
+      // Since we're rejecting due to load shedding, we must release that resource.
+      releaseGlobalCxLimitResource();
       io_handle->close();
       cb_.onReject(TcpListenerCallbacks::RejectCause::OverloadAction);
       continue;
@@ -90,7 +100,10 @@ absl::Status TcpListenerImpl::onSocketEvent(short flags) {
     Address::InstanceConstSharedPtr local_address = local_address_;
     if (!local_address) {
       auto address_or_error = io_handle->localAddress();
-      RETURN_IF_NOT_OK_REF(address_or_error.status());
+      if (!address_or_error.status().ok()) {
+        releaseGlobalCxLimitResource();
+        return address_or_error.status();
+      }
       local_address = std::move(address_or_error.value());
     }
 
@@ -105,12 +118,18 @@ absl::Status TcpListenerImpl::onSocketEvent(short flags) {
     Address::InstanceConstSharedPtr remote_address;
     if (remote_addr.ss_family == AF_UNIX) {
       auto address_or_error = io_handle->peerAddress();
-      RETURN_IF_NOT_OK_REF(address_or_error.status());
+      if (!address_or_error.status().ok()) {
+        releaseGlobalCxLimitResource();
+        return address_or_error.status();
+      }
       remote_address = std::move(address_or_error.value());
     } else {
       auto address_or_error = Address::addressFromSockAddr(
           remote_addr, remote_addr_len, local_address->ip()->version() == Address::IpVersion::v6);
-      RETURN_IF_NOT_OK_REF(address_or_error.status());
+      if (!address_or_error.status().ok()) {
+        releaseGlobalCxLimitResource();
+        return address_or_error.status();
+      }
       remote_address = std::move(address_or_error.value());
     }
 

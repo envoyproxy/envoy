@@ -41,55 +41,62 @@ convertHeaderEntry(Protobuf::Arena& arena,
 
 // SSL Extractors implementation
 const SslExtractorsValues& SslExtractorsValues::get() {
-  CONSTRUCT_ON_FIRST_USE(SslExtractorsValues,
-                         absl::flat_hash_map<absl::string_view, SslExtractor>{
-                             {TLSVersion,
-                              [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
-                                return CelValue::CreateString(&info.tlsVersion());
-                              }},
-                             {SubjectLocalCertificate,
-                              [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
-                                return CelValue::CreateString(&info.subjectLocalCertificate());
-                              }},
-                             {SubjectPeerCertificate,
-                              [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
-                                return CelValue::CreateString(&info.subjectPeerCertificate());
-                              }},
-                             {URISanLocalCertificate,
-                              [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
-                                if (info.uriSanLocalCertificate().empty()) {
-                                  return {};
-                                }
-                                return CelValue::CreateString(&info.uriSanLocalCertificate()[0]);
-                              }},
-                             {URISanPeerCertificate,
-                              [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
-                                if (info.uriSanPeerCertificate().empty()) {
-                                  return {};
-                                }
-                                return CelValue::CreateString(&info.uriSanPeerCertificate()[0]);
-                              }},
-                             {DNSSanLocalCertificate,
-                              [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
-                                if (info.dnsSansLocalCertificate().empty()) {
-                                  return {};
-                                }
-                                return CelValue::CreateString(&info.dnsSansLocalCertificate()[0]);
-                              }},
-                             {DNSSanPeerCertificate,
-                              [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
-                                if (info.dnsSansPeerCertificate().empty()) {
-                                  return {};
-                                }
-                                return CelValue::CreateString(&info.dnsSansPeerCertificate()[0]);
-                              }},
-                             {SHA256PeerCertificateDigest,
-                              [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
-                                if (info.sha256PeerCertificateDigest().empty()) {
-                                  return {};
-                                }
-                                return CelValue::CreateString(&info.sha256PeerCertificateDigest());
-                              }}});
+  CONSTRUCT_ON_FIRST_USE(
+      SslExtractorsValues,
+      absl::flat_hash_map<absl::string_view, SslExtractor>{
+          {TLSVersion,
+           [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+             return CelValue::CreateString(&info.tlsVersion());
+           }},
+          {SubjectLocalCertificate,
+           [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+             return CelValue::CreateString(&info.subjectLocalCertificate());
+           }},
+          {SubjectPeerCertificate,
+           [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+             return CelValue::CreateString(&info.subjectPeerCertificate());
+           }},
+          {URISanLocalCertificate,
+           [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+             if (info.uriSanLocalCertificate().empty()) {
+               return {};
+             }
+             return CelValue::CreateString(&info.uriSanLocalCertificate()[0]);
+           }},
+          {URISanPeerCertificate,
+           [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+             if (info.uriSanPeerCertificate().empty()) {
+               return {};
+             }
+             return CelValue::CreateString(&info.uriSanPeerCertificate()[0]);
+           }},
+          {DNSSanLocalCertificate,
+           [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+             if (info.dnsSansLocalCertificate().empty()) {
+               return {};
+             }
+             return CelValue::CreateString(&info.dnsSansLocalCertificate()[0]);
+           }},
+          {DNSSanPeerCertificate,
+           [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+             if (info.dnsSansPeerCertificate().empty()) {
+               return {};
+             }
+             return CelValue::CreateString(&info.dnsSansPeerCertificate()[0]);
+           }},
+          {SHA256PeerCertificateDigest,
+           [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+             if (info.sha256PeerCertificateDigest().empty()) {
+               return {};
+             }
+             return CelValue::CreateString(&info.sha256PeerCertificateDigest());
+           }},
+          {PeerCertificate, [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+             if (info.pemEncodedPeerCertificate().empty()) {
+               return {};
+             }
+             return CelValue::CreateString(&info.pemEncodedPeerCertificate());
+           }}});
 }
 
 namespace {
@@ -112,6 +119,13 @@ const RequestLookupValues& RequestLookupValues::get() {
           {Headers,
            [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
              return CelValue::CreateMap(&wrapper.headers_);
+           }},
+          {HeadersBytes,
+           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.headers_.value_ != nullptr) {
+               return CelValue::CreateInt64(wrapper.headers_.value_->byteSize());
+             }
+             return CelValue::CreateInt64(0);
            }},
           {Time,
            [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
@@ -235,6 +249,13 @@ const ResponseLookupValues& ResponseLookupValues::get() {
           {Headers,
            [](const ResponseWrapper& wrapper) -> absl::optional<CelValue> {
              return CelValue::CreateMap(&wrapper.headers_);
+           }},
+          {HeadersBytes,
+           [](const ResponseWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.headers_.value_ != nullptr) {
+               return CelValue::CreateInt64(wrapper.headers_.value_->byteSize());
+             }
+             return CelValue::CreateInt64(0);
            }},
           {Trailers,
            [](const ResponseWrapper& wrapper) -> absl::optional<CelValue> {
@@ -400,6 +421,23 @@ const UpstreamLookupValues& UpstreamLookupValues::get() {
           {UpstreamRequestAttemptCount,
            [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
              return CelValue::CreateUint64(wrapper.info_.attemptCount().value_or(0));
+           }},
+          {UpstreamNumEndpoints,
+           [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
+             if (const auto cluster_info = wrapper.info_.upstreamClusterInfo()) {
+               return CelValue::CreateUint64(
+                   cluster_info->endpointStats().membership_total_.value());
+             }
+             return {};
+           }},
+          {UpstreamServerName, [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.info_.upstreamInfo().has_value()) {
+               auto ssl_info = wrapper.info_.upstreamInfo().value().get().upstreamSslConnection();
+               if (ssl_info != nullptr && !ssl_info->sni().empty()) {
+                 return CelValue::CreateString(&ssl_info->sni());
+               }
+             }
+             return {};
            }}});
 }
 
@@ -421,8 +459,8 @@ const XDSLookupValues& XDSLookupValues::get() {
                return {};
              }
              const auto cluster_info = wrapper.info_->upstreamClusterInfo();
-             if (cluster_info && cluster_info.value()) {
-               return CelValue::CreateString(&cluster_info.value()->name());
+             if (cluster_info) {
+               return CelValue::CreateString(&cluster_info->name());
              }
              return {};
            }},
@@ -432,9 +470,8 @@ const XDSLookupValues& XDSLookupValues::get() {
                return {};
              }
              const auto cluster_info = wrapper.info_->upstreamClusterInfo();
-             if (cluster_info && cluster_info.value()) {
-               return CelProtoWrapper::CreateMessage(&cluster_info.value()->metadata(),
-                                                     &wrapper.arena_);
+             if (cluster_info) {
+               return CelProtoWrapper::CreateMessage(&cluster_info->metadata(), &wrapper.arena_);
              }
              return {};
            }},
@@ -458,8 +495,8 @@ const XDSLookupValues& XDSLookupValues::get() {
              if (wrapper.info_ == nullptr) {
                return {};
              }
-             const auto& vhost = wrapper.info_->virtualHost();
-             if (vhost == nullptr) {
+             const auto vhost = wrapper.info_->virtualHost();
+             if (!vhost) {
                return {};
              }
              return CelValue::CreateString(&vhost->name());
@@ -469,8 +506,8 @@ const XDSLookupValues& XDSLookupValues::get() {
              if (wrapper.info_ == nullptr) {
                return {};
              }
-             const auto& vhost = wrapper.info_->virtualHost();
-             if (vhost == nullptr) {
+             const auto vhost = wrapper.info_->virtualHost();
+             if (!vhost) {
                return {};
              }
              return CelProtoWrapper::CreateMessage(&vhost->metadata(), &wrapper.arena_);
@@ -682,11 +719,11 @@ absl::optional<CelValue> FilterStateWrapper::operator[](CelValue key) const {
       // field support, but callers only want to access the whole object.
       if (object->hasFieldSupport()) {
         return CelValue::CreateMap(
-            ProtobufWkt::Arena::Create<FilterStateObjectWrapper>(&arena_, object));
+            Protobuf::Arena::Create<FilterStateObjectWrapper>(&arena_, object));
       }
       absl::optional<std::string> serialized = object->serializeAsString();
       if (serialized.has_value()) {
-        std::string* out = ProtobufWkt::Arena::Create<std::string>(&arena_, serialized.value());
+        std::string* out = Protobuf::Arena::Create<std::string>(&arena_, serialized.value());
         return CelValue::CreateBytes(out);
       }
     }

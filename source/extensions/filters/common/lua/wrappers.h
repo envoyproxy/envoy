@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/common/lua/lua.h"
@@ -53,14 +54,14 @@ private:
 class MetadataMapWrapper;
 
 struct MetadataMapHelper {
-  static void setValue(lua_State* state, const ProtobufWkt::Value& value);
+  static void setValue(lua_State* state, const Protobuf::Value& value);
   static void createTable(lua_State* state,
-                          const Protobuf::Map<std::string, ProtobufWkt::Value>& fields);
-  static ProtobufWkt::Value loadValue(lua_State* state);
+                          const Protobuf::Map<std::string, Protobuf::Value>& fields);
+  static Protobuf::Value loadValue(lua_State* state);
 
 private:
-  static ProtobufWkt::Struct loadStruct(lua_State* state);
-  static ProtobufWkt::ListValue loadList(lua_State* state, int length);
+  static Protobuf::Struct loadStruct(lua_State* state);
+  static Protobuf::ListValue loadList(lua_State* state, int length);
   static int tableLength(lua_State* state);
 };
 
@@ -77,7 +78,7 @@ public:
 
 private:
   MetadataMapWrapper& parent_;
-  Protobuf::Map<std::string, ProtobufWkt::Value>::const_iterator current_;
+  Protobuf::Map<std::string, Protobuf::Value>::const_iterator current_;
 };
 
 /**
@@ -85,7 +86,7 @@ private:
  */
 class MetadataMapWrapper : public BaseLuaObject<MetadataMapWrapper> {
 public:
-  MetadataMapWrapper(const ProtobufWkt::Struct& metadata) : metadata_{metadata} {}
+  MetadataMapWrapper(const Protobuf::Struct& metadata) : metadata_{metadata} {}
 
   static ExportedFunctions exportedFunctions() {
     return {{"get", static_luaGet}, {"__pairs", static_luaPairs}};
@@ -111,7 +112,7 @@ private:
     iterator_.reset();
   }
 
-  const ProtobufWkt::Struct metadata_;
+  const Protobuf::Struct metadata_;
   LuaDeathRef<MetadataMapIterator> iterator_;
 
   friend class MetadataMapIterator;
@@ -157,6 +158,8 @@ public:
             {"sha256PeerCertificateDigest", static_luaSha256PeerCertificateDigest},
             {"serialNumberPeerCertificate", static_luaSerialNumberPeerCertificate},
             {"issuerPeerCertificate", static_luaIssuerPeerCertificate},
+            {"sha256PeerCertificateIssuerDigest", static_luaSha256PeerCertificateIssuerDigest},
+            {"serialNumberPeerCertificateIssuer", static_luaSerialNumberPeerCertificateIssuer},
             {"subjectPeerCertificate", static_luaSubjectPeerCertificate},
             {"parsedSubjectPeerCertificate", static_luaParsedSubjectPeerCertificate},
             {"uriSanPeerCertificate", static_luaUriSanPeerCertificate},
@@ -216,6 +219,20 @@ private:
    * there is no peer certificate, or no issuer.
    */
   DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaIssuerPeerCertificate);
+
+  /**
+   * Returns the SHA-256 digest of the second certificate in the validated peer certificate chain
+   * (i.e., the certificate that directly signed the peer leaf certificate). Returns empty string
+   * if the validated chain contains fewer than two certificates.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaSha256PeerCertificateIssuerDigest);
+
+  /**
+   * Returns the serial number of the second certificate in the validated peer certificate chain
+   * (i.e., the certificate that directly signed the peer leaf certificate). Returns empty string
+   * if the validated chain contains fewer than two certificates.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaSerialNumberPeerCertificateIssuer);
 
   /**
    * Returns the subject field of the peer certificate in RFC 2253 format. Returns empty string if
@@ -317,26 +334,30 @@ private:
 
 /**
  * Lua wrapper for Network::Connection.
+ *
+ * TODO(dio): Remove the ssl() method once the deprecation period has passed.
+ * Users should migrate to streamInfo():downstreamSslConnection() instead.
  */
 class ConnectionWrapper : public BaseLuaObject<ConnectionWrapper> {
 public:
-  ConnectionWrapper(const Network::Connection* connection) : connection_{connection} {}
+  ConnectionWrapper(const StreamInfo::StreamInfo& stream_info) : stream_info_{stream_info} {}
 
-  // TODO(dio): Remove this in favor of StreamInfo::downstreamSslConnection wrapper since ssl() in
-  // envoy/network/connection.h is subject to removal.
   static ExportedFunctions exportedFunctions() { return {{"ssl", static_luaSsl}}; }
 
 private:
   /**
-   * Get the Ssl::Connection wrapper
+   * Get the Ssl::Connection wrapper.
    * @return object if secured and nil if not.
+   *
+   * @note DEPRECATED: Use streamInfo():downstreamSslConnection() instead.
+   *       This method will be removed in a future release.
    */
   DECLARE_LUA_FUNCTION(ConnectionWrapper, luaSsl);
 
   // Envoy::Lua::BaseLuaObject
   void onMarkDead() override { ssl_connection_wrapper_.reset(); }
 
-  const Network::Connection* connection_;
+  const StreamInfo::StreamInfo& stream_info_;
   LuaDeathRef<SslConnectionWrapper> ssl_connection_wrapper_;
 };
 

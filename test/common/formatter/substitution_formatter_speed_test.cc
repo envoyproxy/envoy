@@ -12,7 +12,7 @@ namespace Envoy {
 namespace {
 
 std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> makeJsonFormatter() {
-  ProtobufWkt::Struct struct_format;
+  Protobuf::Struct struct_format;
   const std::string format_yaml = R"EOF(
     remote_address: '%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%'
     start_time: '%START_TIME(%Y/%m/%dT%H:%M:%S%z %s)%'
@@ -71,7 +71,7 @@ static void BM_AccessLogFormatter(benchmark::State& state) {
 
   size_t output_bytes = 0;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    output_bytes += formatter->formatWithContext({}, *stream_info).length();
+    output_bytes += formatter->format({}, *stream_info).length();
   }
   benchmark::DoNotOptimize(output_bytes);
 }
@@ -82,7 +82,7 @@ static void BM_AccessLogFormatterTextMockJson(benchmark::State& state) {
   testing::NiceMock<MockTimeSystem> time_system;
 
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo(time_system);
-  ProtobufWkt::Struct struct_format;
+  Protobuf::Struct struct_format;
   const std::string format_yaml = R"EOF(
     remote_address: '%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%'
     start_time: '%START_TIME(%Y/%m/%dT%H:%M:%S%z %s)%'
@@ -104,7 +104,7 @@ static void BM_AccessLogFormatterTextMockJson(benchmark::State& state) {
 
   size_t output_bytes = 0;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    output_bytes += formatter->formatWithContext({}, *stream_info).length();
+    output_bytes += formatter->format({}, *stream_info).length();
   }
   benchmark::DoNotOptimize(output_bytes);
 }
@@ -119,7 +119,7 @@ static void BM_JsonAccessLogFormatter(benchmark::State& state) {
 
   size_t output_bytes = 0;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    output_bytes += json_formatter->formatWithContext({}, *stream_info).length();
+    output_bytes += json_formatter->format({}, *stream_info).length();
   }
   benchmark::DoNotOptimize(output_bytes);
 }

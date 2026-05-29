@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <functional>
 #include <list>
-#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -28,8 +27,10 @@
 #include "envoy/tcp/async_tcp_client.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/load_stats_reporter.h"
 
 #include "source/common/common/cleanup.h"
+#include "source/common/common/thread.h"
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/common/http/http_server_properties_cache_manager_impl.h"
@@ -38,9 +39,10 @@
 #include "source/common/tcp/async_tcp_client_impl.h"
 #include "source/common/upstream/cluster_discovery_manager.h"
 #include "source/common/upstream/host_utility.h"
-#include "source/common/upstream/load_stats_reporter.h"
 #include "source/common/upstream/priority_conn_pool_map.h"
 #include "source/common/upstream/upstream_impl.h"
+
+#include "absl/container/btree_map.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -53,15 +55,11 @@ public:
   using LazyCreateDnsResolver = std::function<Network::DnsResolverSharedPtr()>;
 
   ProdClusterManagerFactory(Server::Configuration::ServerFactoryContext& context,
-                            Stats::Store& stats, ThreadLocal::Instance& tls,
-                            Http::Context& http_context, LazyCreateDnsResolver dns_resolver_fn,
-                            Ssl::ContextManager& ssl_context_manager,
-                            Quic::QuicStatNames& quic_stat_names, Server::Instance& server)
-      : context_(context), stats_(stats), tls_(tls), http_context_(http_context),
-        dns_resolver_fn_(dns_resolver_fn), ssl_context_manager_(ssl_context_manager),
+                            LazyCreateDnsResolver dns_resolver_fn,
+                            Quic::QuicStatNames& quic_stat_names)
+      : context_(context), stats_(context.serverScope().store()), dns_resolver_fn_(dns_resolver_fn),
         quic_stat_names_(quic_stat_names),
-        alternate_protocols_cache_manager_(context.httpServerPropertiesCacheManager()),
-        server_(server) {}
+        alternate_protocols_cache_manager_(context.httpServerPropertiesCacheManager()) {}
 
   // Upstream::ClusterManagerFactory
   absl::StatusOr<ClusterManagerPtr>
@@ -88,19 +86,14 @@ public:
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) override;
   absl::StatusOr<CdsApiPtr> createCds(const envoy::config::core::v3::ConfigSource& cds_config,
                                       const xds::core::v3::ResourceLocator* cds_resources_locator,
-                                      ClusterManager& cm) override;
+                                      ClusterManager& cm, bool support_multi_ads_sources) override;
 
 protected:
   Server::Configuration::ServerFactoryContext& context_;
   Stats::Store& stats_;
-  ThreadLocal::Instance& tls_;
-  Http::Context& http_context_;
-
   LazyCreateDnsResolver dns_resolver_fn_;
-  Ssl::ContextManager& ssl_context_manager_;
   Quic::QuicStatNames& quic_stat_names_;
   Http::HttpServerPropertiesCacheManager& alternate_protocols_cache_manager_;
-  Server::Instance& server_;
 };
 
 // For friend declaration in ClusterManagerInitHelper.
@@ -142,9 +135,9 @@ public:
    *        initialized. The cluster manager can use this for post-init processing.
    */
   ClusterManagerInitHelper(
-      ClusterManager& cm,
+      Config::XdsManager& xds_manager,
       const std::function<absl::Status(ClusterManagerCluster&)>& per_cluster_init_callback)
-      : cm_(cm), per_cluster_init_callback_(per_cluster_init_callback) {}
+      : xds_manager_(xds_manager), per_cluster_init_callback_(per_cluster_init_callback) {}
 
   enum class State {
     // Initial state. During this state all static clusters are loaded. Any primary clusters
@@ -188,7 +181,7 @@ private:
   void maybeFinishInitialize();
   absl::Status onClusterInit(ClusterManagerCluster& cluster);
 
-  ClusterManager& cm_;
+  Config::XdsManager& xds_manager_;
   std::function<absl::Status(ClusterManagerCluster& cluster)> per_cluster_init_callback_;
   CdsApi* cds_{};
   ClusterManager::PrimaryClustersReadyCallback primary_clusters_initialized_callback_;
@@ -280,9 +273,27 @@ public:
     return clusters_maps;
   }
 
+  void forEachActiveCluster(std::function<void(const Cluster&)> cb) const override {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
+    for (const auto& [unused_name, cluster_data] : active_clusters_) {
+      cb(*cluster_data->cluster_);
+    }
+  }
+
   OptRef<const Cluster> getActiveCluster(const std::string& cluster_name) const override {
     ASSERT_IS_MAIN_OR_TEST_THREAD();
     if (const auto& it = active_clusters_.find(cluster_name); it != active_clusters_.end()) {
+      return *it->second->cluster_;
+    }
+    return absl::nullopt;
+  }
+
+  OptRef<const Cluster> getActiveOrWarmingCluster(const std::string& cluster_name) const override {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
+    if (const auto& it = active_clusters_.find(cluster_name); it != active_clusters_.end()) {
+      return *it->second->cluster_;
+    }
+    if (const auto& it = warming_clusters_.find(cluster_name); it != warming_clusters_.end()) {
       return *it->second->cluster_;
     }
     return absl::nullopt;
@@ -310,6 +321,7 @@ public:
     // Make sure we destroy all potential outgoing connections before this returns.
     cds_api_.reset();
     xds_manager_.shutdown();
+    load_stats_reporter_.reset();
     active_clusters_.clear();
     warming_clusters_.clear();
     updateClusterCounts();
@@ -370,7 +382,8 @@ public:
   void drainConnections(const std::string& cluster,
                         DrainConnectionsHostPredicate predicate) override;
 
-  void drainConnections(DrainConnectionsHostPredicate predicate) override;
+  void drainConnections(DrainConnectionsHostPredicate predicate,
+                        ConnectionPool::DrainBehavior drain_behavior) override;
 
   absl::Status checkActiveStaticCluster(const std::string& cluster) override;
 
@@ -398,14 +411,8 @@ protected:
   // clusterManagerFromProto() static method. The init() method must be called after construction.
   ClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                      ClusterManagerFactory& factory,
-                     Server::Configuration::CommonFactoryContext& context, Stats::Store& stats,
-                     ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                     const LocalInfo::LocalInfo& local_info,
-                     AccessLog::AccessLogManager& log_manager,
-                     Event::Dispatcher& main_thread_dispatcher, OptRef<Server::Admin> admin,
-                     Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
-                     Router::Context& router_context, Server::Instance& server,
-                     Config::XdsManager& xds_manager, absl::Status& creation_status);
+                     Server::Configuration::ServerFactoryContext& context,
+                     absl::Status& creation_status);
 
   virtual void postThreadLocalRemoveHosts(const Cluster& cluster, const HostVector& hosts_removed);
 
@@ -475,25 +482,23 @@ protected:
    */
   class OdCdsApiHandleImpl : public OdCdsApiHandle {
   public:
-    static OdCdsApiHandlePtr create(ClusterManagerImpl& parent, OdCdsApiSharedPtr odcds) {
-      return std::make_unique<OdCdsApiHandleImpl>(parent, std::move(odcds));
+    static OdCdsApiHandlePtr create(ClusterManagerImpl& parent, uint64_t config_source_key) {
+      return std::make_unique<OdCdsApiHandleImpl>(parent, config_source_key);
     }
 
-    OdCdsApiHandleImpl(ClusterManagerImpl& parent, OdCdsApiSharedPtr odcds)
-        : parent_(parent), odcds_(std::move(odcds)) {
-      ASSERT(odcds_ != nullptr);
-    }
+    OdCdsApiHandleImpl(ClusterManagerImpl& parent, uint64_t config_source_key)
+        : parent_(parent), config_source_key_(config_source_key) {}
 
     ClusterDiscoveryCallbackHandlePtr
     requestOnDemandClusterDiscovery(absl::string_view name, ClusterDiscoveryCallbackPtr callback,
                                     std::chrono::milliseconds timeout) override {
-      return parent_.requestOnDemandClusterDiscovery(odcds_, std::string(name), std::move(callback),
-                                                     timeout);
+      return parent_.requestOnDemandClusterDiscovery(config_source_key_, std::string(name),
+                                                     std::move(callback), timeout);
     }
 
   private:
     ClusterManagerImpl& parent_;
-    OdCdsApiSharedPtr odcds_;
+    uint64_t config_source_key_;
   };
 
   virtual void postThreadLocalClusterUpdate(ClusterManagerCluster& cm_cluster,
@@ -549,7 +554,7 @@ private:
     struct TcpConnPoolsContainer {
       TcpConnPoolsContainer(HostHandlePtr&& host_handle) : host_handle_(std::move(host_handle)) {}
 
-      using ConnPools = std::map<std::vector<uint8_t>, Tcp::ConnectionPool::InstancePtr>;
+      using ConnPools = absl::btree_map<std::vector<uint8_t>, Tcp::ConnectionPool::InstancePtr>;
 
       // Destroyed after pools.
       const HostHandlePtr host_handle_;
@@ -618,7 +623,7 @@ private:
                        PrioritySet::UpdateHostsParams&& update_hosts_params,
                        LocalityWeightsConstSharedPtr locality_weights,
                        const HostVector& hosts_added, const HostVector& hosts_removed,
-                       uint64_t seed, absl::optional<bool> weighted_priority_health,
+                       absl::optional<bool> weighted_priority_health,
                        absl::optional<uint32_t> overprovisioning_factor,
                        HostMapConstSharedPtr cross_priority_host_map);
 
@@ -776,8 +781,7 @@ private:
         : cluster_config_(cluster_config), config_hash_(cluster_config_hash),
           version_info_(version_info), cluster_(std::move(cluster)),
           last_updated_(time_source.systemTime()), added_via_api_(added_via_api),
-          avoid_cds_removal_(avoid_cds_removal), added_or_updated_{},
-          required_for_ads_(required_for_ads) {}
+          avoid_cds_removal_(avoid_cds_removal), required_for_ads_(required_for_ads) {}
 
     bool blockUpdate(uint64_t hash) { return !added_via_api_ || config_hash_ == hash; }
 
@@ -811,7 +815,7 @@ private:
     // Keep smaller fields near the end to reduce padding
     const bool added_via_api_ : 1;
     const bool avoid_cds_removal_ : 1;
-    bool added_or_updated_ : 1;
+    bool added_or_updated_ : 1 = false;
     const bool required_for_ads_ : 1;
   };
 
@@ -824,7 +828,7 @@ private:
 
   using ClusterDataPtr = std::unique_ptr<ClusterData>;
   // This map is ordered so that config dumping is consistent.
-  using ClusterMap = std::map<std::string, ClusterDataPtr>;
+  using ClusterMap = absl::btree_map<std::string, ClusterDataPtr>;
 
   struct PendingUpdates {
     ~PendingUpdates() { disableTimer(); }
@@ -899,7 +903,7 @@ private:
                               std::function<ConnectionPool::Instance*()> preconnect_pool);
 
   ClusterDiscoveryCallbackHandlePtr
-  requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, std::string name,
+  requestOnDemandClusterDiscovery(uint64_t subscription_key, std::string name,
                                   ClusterDiscoveryCallbackPtr callback,
                                   std::chrono::milliseconds timeout);
 
@@ -907,6 +911,10 @@ private:
 
 protected:
   ClusterInitializationMap cluster_initialization_map_;
+  // OdCDS subscriptions keyed by config source hash. Subscriptions persist for the lifetime
+  // of ClusterManagerImpl to avoid complexity around cleanup. A future optimization could
+  // add proper lifetime management to close unnecessary connections.
+  absl::flat_hash_map<uint64_t, OdCdsApiSharedPtr> odcds_subscriptions_;
 
 private:
   /**
@@ -922,7 +930,7 @@ private:
 
   bool deferralIsSupportedForCluster(const ClusterInfoConstSharedPtr& info) const;
 
-  Server::Instance& server_;
+  Server::Configuration::ServerFactoryContext& context_;
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;
   Stats::Store& stats_;

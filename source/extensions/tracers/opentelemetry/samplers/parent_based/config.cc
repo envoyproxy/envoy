@@ -16,7 +16,7 @@ SamplerSharedPtr
 ParentBasedSamplerFactory::createSampler(const Protobuf::Message& config,
                                          Server::Configuration::TracerFactoryContext& context) {
   auto mptr = Envoy::Config::Utility::translateAnyToFactoryConfig(
-      dynamic_cast<const ProtobufWkt::Any&>(config), context.messageValidationVisitor(), *this);
+      dynamic_cast<const Protobuf::Any&>(config), context.messageValidationVisitor(), *this);
   const auto& proto_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::tracers::opentelemetry::samplers::v3::ParentBasedSamplerConfig&>(
       *mptr, context.messageValidationVisitor());

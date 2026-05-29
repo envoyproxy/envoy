@@ -6,6 +6,7 @@
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/common/stream_info/test_util.h"
 #include "test/fuzz/common.pb.h"
@@ -71,7 +72,7 @@ replaceInvalidStringValues(const envoy::config::core::v3::Metadata& upstream_met
     // This clears any invalid characters in string values. It may not be likely a coverage-driven
     // fuzzer will explore recursive structs, so this case is not handled here.
     for (auto& field : *metadata_struct.second.mutable_fields()) {
-      if (field.second.kind_case() == ProtobufWkt::Value::kStringValue) {
+      if (field.second.kind_case() == Protobuf::Value::kStringValue) {
         field.second.set_string_value(replaceInvalidCharacters(field.second.string_value()));
       }
     }
@@ -208,8 +209,8 @@ inline std::vector<std::string> parseHttpData(const test::fuzz::HttpData& data) 
       data_chunks.push_back(http_data);
     }
   } else if (data.has_proto_body()) {
-    const std::string serialized = data.proto_body().message().value();
-    data_chunks = absl::StrSplit(serialized, absl::ByLength(data.proto_body().chunk_size()));
+    data_chunks = absl::StrSplit(MessageUtil::bytesToString(data.proto_body().message().value()),
+                                 absl::ByLength(data.proto_body().chunk_size()));
   }
 
   return data_chunks;

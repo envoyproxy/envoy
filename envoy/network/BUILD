@@ -31,8 +31,8 @@ envoy_cc_library(
         "//envoy/event:deferred_deletable",
         "//envoy/ssl:connection_interface",
         "//envoy/stream_info:stream_info_interface",
-        "@com_google_absl//absl/numeric:int128",
-        "@com_google_absl//absl/types:span",
+        "@abseil-cpp//absl/numeric:int128",
+        "@abseil-cpp//absl/types:span",
     ],
 )
 
@@ -86,6 +86,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "udp_packet_writer_factory_factory_interface",
+    hdrs = ["udp_packet_writer_factory_factory.h"],
+    deps = [
+        ":udp_packet_writer_handler_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:factory_context_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "dns_interface",
     hdrs = ["dns.h"],
     deps = [
@@ -108,8 +119,8 @@ envoy_cc_library(
     hdrs = ["drain_decision.h"],
     deps = [
         "//envoy/common:callback",
-        "@com_google_absl//absl/base",
-        "@com_google_absl//absl/status",
+        "@abseil-cpp//absl/base",
+        "@abseil-cpp//absl/status",
     ],
 )
 
@@ -125,8 +136,10 @@ envoy_cc_library(
         ":listen_socket_interface",
         ":listener_filter_buffer_interface",
         ":transport_socket_interface",
+        "//envoy/access_log:access_log_interface",
         "//envoy/buffer:buffer_interface",
         "//envoy/config:extension_config_provider_interface",
+        "//envoy/config:typed_metadata_interface",
         "//envoy/stream_info:stream_info_interface",
         "//envoy/upstream:host_description_interface",
         "//source/common/protobuf",
@@ -138,7 +151,7 @@ envoy_cc_library(
     hdrs = ["hash_policy.h"],
     deps = [
         ":connection_interface",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -153,7 +166,7 @@ envoy_cc_library(
         "//envoy/event:file_event_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 

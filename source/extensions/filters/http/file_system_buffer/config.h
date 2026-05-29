@@ -28,6 +28,12 @@ public:
           config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 
+  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+      const envoy::extensions::filters::http::file_system_buffer::v3::FileSystemBufferFilterConfig&
+          config,
+      const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& context) override;
+
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::file_system_buffer::v3::FileSystemBufferFilterConfig&

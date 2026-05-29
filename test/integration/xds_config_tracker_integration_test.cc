@@ -17,6 +17,8 @@
 #include "absl/synchronization/mutex.h"
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -113,7 +115,7 @@ public:
 
   std::string name() const override { return "envoy.config.xds.test_xds_tracker"; };
 
-  Config::XdsConfigTrackerPtr createXdsConfigTracker(const ProtobufWkt::Any&,
+  Config::XdsConfigTrackerPtr createXdsConfigTracker(const Protobuf::Any&,
                                                      ProtobufMessage::ValidationVisitor&,
                                                      Api::Api& api, Event::Dispatcher&) override {
     return std::make_unique<TestXdsConfigTracker>(api.rootScope());
@@ -197,17 +199,17 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerSuccessCount) {
   Registry::InjectFactory<Config::XdsConfigTrackerFactory> registered(factory);
 
   initialize();
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
 
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      Config::TypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster1_, cluster2_}, {}, "1");
+      Config::TestTypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster1_, cluster2_}, {}, "1");
 
   // 3 because the statically specified CDS server itself counts as a cluster.
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(3));
 
   // onConfigAccepted is called when all the resources are accepted.
-  test_server_->waitForCounterEq("test_xds_tracker.on_config_accepted", 1);
-  test_server_->waitForCounterEq("test_xds_tracker.on_config_metadata_read", 0);
+  test_server_->waitForCounter("test_xds_tracker.on_config_accepted", Eq(1));
+  test_server_->waitForCounter("test_xds_tracker.on_config_metadata_read", Eq(0));
   EXPECT_EQ(1, test_server_->counter("test_xds_tracker.on_config_accepted")->value());
 }
 
@@ -217,22 +219,22 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerSuccessCountWithWrapper)
   Registry::InjectFactory<Config::XdsConfigTrackerFactory> registered(factory);
 
   initialize();
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
 
   // Add a typed metadata to the Resource wrapper.
   test::envoy::config::xds::TestTrackerMetadata test_metadata;
-  ProtobufWkt::Any packed_value;
+  Protobuf::Any packed_value;
   packed_value.PackFrom(test_metadata);
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      Config::TypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster1_, cluster2_}, {}, "1",
+      Config::TestTypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster1_, cluster2_}, {}, "1",
       {{kTestKey, packed_value}});
 
   // 3 because the statically specified CDS server itself counts as a cluster.
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(3));
 
   // onConfigAccepted is called when all the resources are accepted.
-  test_server_->waitForCounterEq("test_xds_tracker.on_config_accepted", 1);
-  test_server_->waitForCounterEq("test_xds_tracker.on_config_metadata_read", 2);
+  test_server_->waitForCounter("test_xds_tracker.on_config_accepted", Eq(1));
+  test_server_->waitForCounter("test_xds_tracker.on_config_metadata_read", Eq(2));
   EXPECT_EQ(1, test_server_->counter("test_xds_tracker.on_config_accepted")->value());
 }
 
@@ -241,7 +243,7 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerFailureCount) {
   Registry::InjectFactory<Config::XdsConfigTrackerFactory> registered(factory);
 
   initialize();
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
 
   const auto route_config =
       TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
@@ -256,10 +258,10 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerFailureCount) {
     )EOF");
 
   sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-      Config::TypeUrl::get().Cluster, {route_config}, {route_config}, {}, "3");
+      Config::TestTypeUrl::get().Cluster, {route_config}, {route_config}, {}, "3");
 
   // Resources are rejected because Message's TypeUrl != Resource's
-  test_server_->waitForCounterEq("test_xds_tracker.on_config_rejected", 1);
+  test_server_->waitForCounter("test_xds_tracker.on_config_rejected", Eq(1));
   EXPECT_EQ(1, test_server_->counter("test_xds_tracker.on_config_rejected")->value());
 }
 
@@ -270,22 +272,22 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerPartialUpdate) {
   initialize();
   // The first of duplicates has already been successfully applied,
   // and a duplicate exception should be threw.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      Config::TypeUrl::get().Cluster, {cluster1_, cluster1_, cluster2_},
+      Config::TestTypeUrl::get().Cluster, {cluster1_, cluster1_, cluster2_},
       {cluster1_, cluster1_, cluster2_}, {}, "5");
 
   // For Delta, the response will be rejected when checking the message due to the duplication.
   // For SotW, both clusters are accepted, but the internal exception is not empty.
   if (sotw_or_delta_ == Grpc::SotwOrDelta::Delta ||
       sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedDelta) {
-    test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
+    test_server_->waitForCounter("cluster_manager.cluster_added", Ge(1));
   } else {
-    test_server_->waitForCounterGe("cluster_manager.cluster_added", 3);
+    test_server_->waitForCounter("cluster_manager.cluster_added", Ge(3));
   }
 
   // onConfigRejected is called if there is any exception even some resources are accepted.
-  test_server_->waitForCounterEq("test_xds_tracker.on_config_rejected", 1);
+  test_server_->waitForCounter("test_xds_tracker.on_config_rejected", Eq(1));
   EXPECT_EQ(1, test_server_->counter("test_xds_tracker.on_config_rejected")->value());
 
   // onConfigAccepted is called only when all the resources in a response are successfully ingested.

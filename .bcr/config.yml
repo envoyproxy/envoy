@@ -1,0 +1,5 @@
+moduleRoots:
+- "."
+- api
+- mobile
+- mobile/envoy_build_config

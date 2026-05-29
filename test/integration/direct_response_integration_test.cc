@@ -10,14 +10,13 @@ public:
 
   void TearDown() override { cleanupUpstreamAndDownstream(); }
 
-  // The default value for body size in bytes is 4096.
-  void testDirectResponseBodySize(uint32_t body_size_bytes = 4096) {
-    const std::string body_content(body_size_bytes, 'a');
+  void configureDirectResponseBody(absl::string_view body_content, uint32_t max_body_size_bytes) {
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void {
           auto* route_config = hcm.mutable_route_config();
-          route_config->mutable_max_direct_response_body_size_bytes()->set_value(body_size_bytes);
+          route_config->mutable_max_direct_response_body_size_bytes()->set_value(
+              max_body_size_bytes);
 
           auto* route = route_config->mutable_virtual_hosts(0)->mutable_routes(0);
 
@@ -29,6 +28,9 @@ public:
         });
 
     initialize();
+  }
+
+  std::unique_ptr<IntegrationStreamDecoder> getDirectBodyResponse() {
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
     auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
@@ -38,16 +40,36 @@ public:
         {":authority", "host"},
     });
     auto response = std::move(encoder_decoder.second);
-    ASSERT_TRUE(response->waitForEndStream());
-    ASSERT_TRUE(response->complete());
-    EXPECT_EQ("200", response->headers().getStatusValue());
-    EXPECT_EQ(body_size_bytes, response->body().size());
-    EXPECT_EQ(body_content, response->body());
+    EXPECT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    return response;
+  }
+
+  void configureDirectResponseWithBodyFormat(absl::string_view body = "") {
+    config_helper_.addConfigModifier(
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) -> void {
+          auto* route_config = hcm.mutable_route_config();
+          auto* route = route_config->mutable_virtual_hosts(0)->mutable_routes(0);
+
+          route->mutable_match()->set_prefix("/direct");
+
+          auto* direct_response = route->mutable_direct_response();
+          direct_response->set_status(200);
+          if (!body.empty()) {
+            direct_response->mutable_body()->set_inline_string(body);
+          }
+          auto* body_format = direct_response->mutable_body_format();
+          body_format->mutable_text_format_source()->set_inline_string(
+              "prefix %LOCAL_REPLY_BODY% suffix");
+        });
+
+    initialize();
   }
 
   // Test direct response with a file as the body.
-  void testDirectResponseFile() {
-    TestEnvironment::writeStringToFileForTest("file_direct.txt", "dummy");
+  void configureDirectResponseFile(absl::string_view content) {
+    TestEnvironment::writeStringToFileForTest("file_direct.txt", std::string{content});
     const std::string filename = TestEnvironment::temporaryPath("file_direct.txt");
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -65,42 +87,16 @@ public:
         });
 
     initialize();
-    codec_client_ = makeHttpConnection(lookupPort("http"));
+  }
 
-    auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
-        {":method", "POST"},
-        {":path", "/direct"},
-        {":scheme", "http"},
-        {":authority", "host"},
-    });
-    auto response = std::move(encoder_decoder.second);
-    ASSERT_TRUE(response->waitForEndStream());
-    ASSERT_TRUE(response->complete());
-    EXPECT_EQ("200", response->headers().getStatusValue());
-    EXPECT_EQ("dummy", response->body());
-
-    codec_client_->close();
-
+  void updateResponseFile(absl::string_view new_contents) {
     // Update the file and validate that the response is updated.
-    TestEnvironment::writeStringToFileForTest("file_direct_updated.txt", "dummy-updated");
+    TestEnvironment::writeStringToFileForTest("file_direct_updated.txt", std::string{new_contents});
     TestEnvironment::renameFile(TestEnvironment::temporaryPath("file_direct_updated.txt"),
                                 TestEnvironment::temporaryPath("file_direct.txt"));
     // This is needed to avoid a race between file rename, and the file being reloaded by data
     // source provider.
     timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(10));
-    codec_client_ = makeHttpConnection(lookupPort("http"));
-    auto encoder_decoder_updated = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
-        {":method", "POST"},
-        {":path", "/direct"},
-        {":scheme", "http"},
-        {":authority", "host"},
-    });
-    auto updated_response = std::move(encoder_decoder_updated.second);
-    ASSERT_TRUE(updated_response->waitForEndStream());
-    ASSERT_TRUE(updated_response->complete());
-    EXPECT_EQ("200", updated_response->headers().getStatusValue());
-    EXPECT_EQ("dummy-updated", updated_response->body());
-    codec_client_->close();
   }
 };
 
@@ -110,23 +106,79 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DirectResponseIntegrationTest,
 
 TEST_P(DirectResponseIntegrationTest, DefaultDirectResponseBodySize) {
   // The default of direct response body size is 4KB.
-  testDirectResponseBodySize();
+  constexpr uint32_t size_bytes = 4 * 1024;
+  const std::string body_content(size_bytes, 'a');
+  configureDirectResponseBody(body_content, size_bytes);
+  auto response = getDirectBodyResponse();
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(body_content, response->body());
 }
 
-TEST_P(DirectResponseIntegrationTest, DirectResponseBodySizeLarge) {
+TEST_P(DirectResponseIntegrationTest, DirectResponseBodySizeLargeIgnoresBufferLimits) {
   // Test with a large direct response body size, and with constrained buffer limits.
   config_helper_.setBufferLimits(1024, 1024);
   // Envoy takes much time to load the big configuration in TSAN mode and will result in the test to
-  // be flaky. See https://github.com/envoyproxy/envoy/issues/33957 for more detail and context.
-  // We reduce the body size from 4MB to 2MB to reduce the size of configuration to make the CI more
-  // stable.
-  testDirectResponseBodySize(/*1000*/ 500 * 4096);
+  // be flaky if the body size is 4MB.
+  // See https://github.com/envoyproxy/envoy/issues/33957 for more detail and context.
+  // So we use 2MB.
+  constexpr uint32_t size_bytes = 2 * 1024 * 1024;
+  const std::string body_content(size_bytes, 'a');
+  configureDirectResponseBody(body_content, size_bytes);
+  auto response = getDirectBodyResponse();
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(body_content, response->body());
 }
 
 TEST_P(DirectResponseIntegrationTest, DirectResponseBodySizeSmall) {
-  testDirectResponseBodySize(1);
+  constexpr uint32_t size_bytes = 1;
+  const std::string body_content(size_bytes, 'a');
+  configureDirectResponseBody(body_content, size_bytes);
+  auto response = getDirectBodyResponse();
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(body_content, response->body());
 }
 
-TEST_P(DirectResponseIntegrationTest, DefaultDirectResponseFile) { testDirectResponseFile(); }
+TEST_P(DirectResponseIntegrationTest, DirectResponseWithBodyFormatAndNoBody) {
+  configureDirectResponseWithBodyFormat();
+  auto response = getDirectBodyResponse();
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("prefix  suffix", response->body());
+}
+
+TEST_P(DirectResponseIntegrationTest, DirectResponseWithBodyFormat) {
+  configureDirectResponseWithBodyFormat("inner");
+  auto response = getDirectBodyResponse();
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("prefix inner suffix", response->body());
+}
+
+TEST_P(DirectResponseIntegrationTest, DefaultDirectResponseFileCanBeUpdated) {
+  configureDirectResponseFile("dummy");
+  auto response = getDirectBodyResponse();
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("dummy", response->body());
+
+  codec_client_->close();
+
+  updateResponseFile("dummy-updated");
+
+  response = getDirectBodyResponse();
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("dummy-updated", response->body());
+}
+
+TEST_P(DirectResponseIntegrationTest, DefaultDirectResponseFileDoesNotUpdateBeyondSizeLimit) {
+  configureDirectResponseFile("dummy");
+  auto response = getDirectBodyResponse();
+  codec_client_->close();
+
+  // Default max size is 4096, so what if the file resizes to 4097?
+  const std::string response_data(4097, 'a');
+  updateResponseFile(response_data);
+
+  response = getDirectBodyResponse();
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("dummy", response->body());
+}
 
 } // namespace Envoy

@@ -7,6 +7,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -206,7 +208,7 @@ resources:
   TestEnvironment::createSymlink(temp_path + "/data_2", temp_path + "/..data.new");
   TestEnvironment::renameFile(temp_path + "/..data.new", temp_path + "/..data");
 
-  test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 1);
+  test_server_->waitForCounter("runtime.load_success", Ge(initial_load_success_ + 1));
   EXPECT_EQ(1, test_server_->gauge("runtime.num_layers")->value());
   EXPECT_EQ(1, test_server_->gauge("runtime.num_keys")->value());
   EXPECT_EQ("bar", getRuntimeKey("foo"));
@@ -223,7 +225,7 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   EXPECT_EQ("yar", getRuntimeKey("bar"));
   EXPECT_EQ("", getRuntimeKey("baz"));
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_layer"},
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Runtime, "", {"some_rtds_layer"},
                                       {"some_rtds_layer"}, {}, true));
   auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
     name: some_rtds_layer
@@ -232,8 +234,8 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
       baz: meh
   )EOF");
   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
-      Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
-  test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 1);
+      Config::TestTypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
+  test_server_->waitForCounter("runtime.load_success", Ge(initial_load_success_ + 1));
 
   EXPECT_EQ("bar", getRuntimeKey("foo"));
   EXPECT_EQ("yar", getRuntimeKey("bar"));
@@ -244,16 +246,16 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   EXPECT_EQ(initial_keys_ + 1, test_server_->gauge("runtime.num_keys")->value());
   EXPECT_EQ(3, test_server_->gauge("runtime.num_layers")->value());
 
-  EXPECT_TRUE(
-      compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "1", {"some_rtds_layer"}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Runtime, "1", {"some_rtds_layer"},
+                                      {}, {}));
   some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
     name: some_rtds_layer
     layer:
       baz: saz
   )EOF");
   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
-      Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "2");
-  test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 2);
+      Config::TestTypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "2");
+  test_server_->waitForCounter("runtime.load_success", Ge(initial_load_success_ + 2));
 
   EXPECT_EQ("whatevs", getRuntimeKey("foo"));
   EXPECT_EQ("yar", getRuntimeKey("bar"));
@@ -276,7 +278,7 @@ TEST_P(RtdsIntegrationTest, RtdsUpdate) {
   EXPECT_EQ("yar", getRuntimeKey("bar"));
   EXPECT_EQ("", getRuntimeKey("baz"));
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_layer"},
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Runtime, "", {"some_rtds_layer"},
                                       {"some_rtds_layer"}, {}, true));
   auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
     name: some_rtds_layer
@@ -286,10 +288,10 @@ TEST_P(RtdsIntegrationTest, RtdsUpdate) {
   )EOF");
 
   // Use the Resource wrapper no matter if it is Sotw or Delta.
-  sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
-      Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1",
-      {{"test", ProtobufWkt::Any()}});
-  test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 1);
+  sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(Config::TestTypeUrl::get().Runtime,
+                                                              {some_rtds_layer}, {some_rtds_layer},
+                                                              {}, "1", {{"test", Protobuf::Any()}});
+  test_server_->waitForCounter("runtime.load_success", Ge(initial_load_success_ + 1));
 
   EXPECT_EQ("bar", getRuntimeKey("foo"));
   EXPECT_EQ("yar", getRuntimeKey("bar"));
@@ -333,11 +335,11 @@ TEST_P(RtdsIntegrationTest, RtdsAfterAsyncPrimaryClusterInitialization) {
   // Respond to the initial health check, which should complete initialization of primary clusters.
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-  test_server_->waitForGaugeEq("cluster.dummy_cluster.membership_healthy", 1);
+  test_server_->waitForGauge("cluster.dummy_cluster.membership_healthy", Eq(1));
 
   // After this xDS connection should be established. Verify that dynamic runtime values are loaded.
   acceptXdsConnection();
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_layer"},
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Runtime, "", {"some_rtds_layer"},
                                       {"some_rtds_layer"}, {}, true));
   auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
     name: some_rtds_layer
@@ -346,8 +348,8 @@ TEST_P(RtdsIntegrationTest, RtdsAfterAsyncPrimaryClusterInitialization) {
       baz: meh
   )EOF");
   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
-      Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
-  test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 1);
+      Config::TestTypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
+  test_server_->waitForCounter("runtime.load_success", Ge(initial_load_success_ + 1));
 
   EXPECT_EQ("bar", getRuntimeKey("foo"));
   EXPECT_EQ("yar", getRuntimeKey("bar"));

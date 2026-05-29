@@ -15,7 +15,7 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -654,6 +654,32 @@ TEST(HttpUtility, parseHttp2Settings) {
   }
 
   {
+
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.safe_http2_options", "false"}});
+
+    using ::Envoy::Http2::Utility::OptionsLimits;
+    auto http2_options = parseHttp2OptionsFromV3Yaml("{}");
+    EXPECT_EQ(OptionsLimits::DEFAULT_HPACK_TABLE_SIZE, http2_options.hpack_table_size().value());
+    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS_LEGACY,
+              http2_options.max_concurrent_streams().value());
+    EXPECT_EQ(OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE_LEGACY,
+              http2_options.initial_stream_window_size().value());
+    EXPECT_EQ(OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE_LEGACY,
+              http2_options.initial_connection_window_size().value());
+    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES,
+              http2_options.max_outbound_frames().value());
+    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES,
+              http2_options.max_outbound_control_frames().value());
+    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD,
+              http2_options.max_consecutive_inbound_frames_with_empty_payload().value());
+    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM,
+              http2_options.max_inbound_priority_frames_per_stream().value());
+    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT,
+              http2_options.max_inbound_window_update_frames_per_data_frame_sent().value());
+  }
+
+  {
     const std::string yaml = R"EOF(
 hpack_table_size: 1
 max_concurrent_streams: 2
@@ -709,7 +735,7 @@ TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
                   .value());
 
   // If the HCM value is present it will take precedence over the old value.
-  ProtobufWkt::BoolValue hcm_value;
+  Protobuf::BoolValue hcm_value;
   hcm_value.set_value(false);
   EXPECT_FALSE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options, true, hcm_value)
                    .value()
@@ -732,7 +758,7 @@ TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
 
 TEST(HttpUtility, ValidateStreamErrorConfigurationForHttp1) {
   envoy::config::core::v3::Http1ProtocolOptions http1_options;
-  ProtobufWkt::BoolValue hcm_value;
+  Protobuf::BoolValue hcm_value;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
 
@@ -772,7 +798,7 @@ TEST(HttpUtility, ValidateStreamErrorConfigurationForHttp1) {
 
 TEST(HttpUtility, AllowCustomMethods) {
   envoy::config::core::v3::Http1ProtocolOptions http1_options;
-  ProtobufWkt::BoolValue hcm_value;
+  Protobuf::BoolValue hcm_value;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
 

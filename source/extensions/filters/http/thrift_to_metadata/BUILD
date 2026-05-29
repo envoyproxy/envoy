@@ -23,6 +23,7 @@ envoy_cc_library(
         "//source/extensions/filters/network/thrift_proxy:decoder_lib",
         "//source/extensions/filters/network/thrift_proxy:passthrough_decoder_event_handler_lib",
         "//source/extensions/filters/network/thrift_proxy:thrift_lib",
+        "//source/extensions/filters/network/thrift_proxy/filters/payload_to_metadata:payload_extractor_lib",
         "@envoy_api//envoy/extensions/filters/http/thrift_to_metadata/v3:pkg_cc_proto",
     ],
 )

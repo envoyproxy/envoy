@@ -24,8 +24,17 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message LocalityLbConfig {
   // Configuration for :ref:`zone aware routing
   // <arch_overview_load_balancing_zone_aware_routing>`.
-  // [#next-free-field: 6]
+  // [#next-free-field: 7]
   message ZoneAwareLbConfig {
+    // Basis for computing per-locality percentages in zone-aware routing.
+    enum LocalityBasis {
+      // Use the number of healthy hosts in each locality.
+      HEALTHY_HOSTS_NUM = 0;
+
+      // Use the weights of healthy hosts in each locality.
+      HEALTHY_HOSTS_WEIGHT = 1;
+    }
+
     // Configures Envoy to always route requests to the local zone regardless of the
     // upstream zone structure. In Envoy's default configuration, traffic is distributed proportionally
     // across all upstream hosts while trying to maximize local routing when possible. The approach
@@ -67,6 +76,12 @@ message LocalityLbConfig {
         [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
     ForceLocalZone force_local_zone = 5;
+
+    // Determines how locality percentages are computed:
+    // - HEALTHY_HOSTS_NUM: proportional to the count of healthy hosts.
+    // - HEALTHY_HOSTS_WEIGHT: proportional to the weights of healthy hosts.
+    // Default value is HEALTHY_HOSTS_NUM if unset.
+    LocalityBasis locality_basis = 6;
   }
 
   // Configuration for :ref:`locality weighted load balancing

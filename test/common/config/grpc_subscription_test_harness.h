@@ -72,16 +72,18 @@ public:
         /*xds_config_tracker_=*/XdsConfigTrackerOptRef(),
         /*backoff_strategy_=*/std::move(backoff_strategy),
         /*target_xds_authority_=*/"",
-        /*eds_resources_cache_=*/nullptr};
+        /*eds_resources_cache_=*/nullptr,
+        /*skip_subsequent_node_=*/true};
 
     if (should_use_unified_) {
-      mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(grpc_mux_context, true);
+      mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(grpc_mux_context);
     } else {
-      mux_ = std::make_shared<Config::GrpcMuxImpl>(grpc_mux_context, true);
+      mux_ = std::make_shared<Config::GrpcMuxImpl>(grpc_mux_context);
     }
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
-        mux_, callbacks_, resource_decoder_, stats_, Config::TypeUrl::get().ClusterLoadAssignment,
-        dispatcher_, init_fetch_timeout, false, SubscriptionOptions());
+        mux_, callbacks_, resource_decoder_, stats_,
+        Config::TestTypeUrl::get().ClusterLoadAssignment, dispatcher_, init_fetch_timeout, false,
+        SubscriptionOptions());
   }
 
   ~GrpcSubscriptionTestHarness() override {
@@ -111,7 +113,7 @@ public:
       expected_request.set_version_info(version);
     }
     expected_request.set_response_nonce(last_response_nonce_);
-    expected_request.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
+    expected_request.set_type_url(Config::TestTypeUrl::get().ClusterLoadAssignment);
     if (error_code != Grpc::Status::WellKnownGrpcStatus::Ok) {
       ::google::rpc::Status* error_detail = expected_request.mutable_error_detail();
       error_detail->set_code(error_code);
@@ -159,7 +161,7 @@ public:
     response->set_version_info(version);
     last_response_nonce_ = std::to_string(HashUtil::xxHash64(version));
     response->set_nonce(last_response_nonce_);
-    response->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
+    response->set_type_url(Config::TestTypeUrl::get().ClusterLoadAssignment);
     response->mutable_control_plane()->set_identifier("ground_control_foo123");
     Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::ClusterLoadAssignment> typed_resources;
     for (const auto& cluster : cluster_names) {

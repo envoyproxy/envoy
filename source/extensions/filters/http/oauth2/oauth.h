@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/http/filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,15 +29,16 @@ public:
                                            const std::string& refresh_token,
                                            std::chrono::seconds expires_in) PURE;
 
-  virtual void onRefreshAccessTokenFailure() PURE;
+  virtual Http::FilterHeadersStatus onRefreshAccessTokenFailure() PURE;
 
-  virtual void sendUnauthorizedResponse() PURE;
+  virtual Http::FilterHeadersStatus handleOAuthFailure(const std::string& reason,
+                                                       const std::string& extra_details = "") PURE;
 };
 
 /**
  * Describes the authentication type used by the client when communicating with the auth server.
  */
-enum class AuthType { UrlEncodedBody, BasicAuth };
+enum class AuthType { UrlEncodedBody, BasicAuth, TlsClientAuth };
 
 } // namespace Oauth2
 } // namespace HttpFilters

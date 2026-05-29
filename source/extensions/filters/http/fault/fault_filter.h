@@ -77,7 +77,7 @@ public:
     return response_rate_limit_percent_runtime_;
   }
   bool disableDownstreamClusterStats() const { return disable_downstream_cluster_stats_; }
-  const Envoy::ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
+  const Envoy::Protobuf::Struct& filterMetadata() const { return filter_metadata_; }
 
 private:
   class RuntimeKeyValues {
@@ -98,7 +98,7 @@ private:
   Filters::Common::Fault::FaultAbortConfigPtr request_abort_config_;
   std::string upstream_cluster_; // restrict faults to specific upstream cluster
   const std::vector<Http::HeaderUtility::HeaderDataPtr> fault_filter_headers_;
-  absl::flat_hash_set<std::string> downstream_nodes_{}; // Inject failures for specific downstream
+  absl::flat_hash_set<std::string> downstream_nodes_; // Inject failures for specific downstream
   absl::optional<uint64_t> max_active_faults_;
 
   Filters::Common::Fault::FaultRateLimitConfigPtr response_rate_limit_;
@@ -111,7 +111,7 @@ private:
   const std::string response_rate_limit_percent_runtime_;
   const bool disable_downstream_cluster_stats_;
 
-  const Envoy::ProtobufWkt::Struct filter_metadata_;
+  const Envoy::Protobuf::Struct filter_metadata_;
 };
 
 /**
@@ -223,16 +223,16 @@ private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Event::TimerPtr delay_timer_;
-  std::string downstream_cluster_{};
+  std::string downstream_cluster_;
   std::unique_ptr<Stats::StatNameDynamicStorage> downstream_cluster_storage_;
   const FaultSettings* fault_settings_;
   bool fault_active_{};
   std::unique_ptr<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter> response_limiter_;
-  std::string downstream_cluster_delay_percent_key_{};
-  std::string downstream_cluster_abort_percent_key_{};
-  std::string downstream_cluster_delay_duration_key_{};
-  std::string downstream_cluster_abort_http_status_key_{};
-  std::string downstream_cluster_abort_grpc_status_key_{};
+  std::string downstream_cluster_delay_percent_key_;
+  std::string downstream_cluster_abort_percent_key_;
+  std::string downstream_cluster_delay_duration_key_;
+  std::string downstream_cluster_abort_http_status_key_;
+  std::string downstream_cluster_abort_grpc_status_key_;
 };
 
 } // namespace Fault

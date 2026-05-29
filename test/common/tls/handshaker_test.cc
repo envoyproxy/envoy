@@ -66,6 +66,17 @@ protected:
     server_ssl_ = bssl::UniquePtr<SSL>(SSL_new(server_ctx_.get()));
     SSL_set_accept_state(server_ssl_.get());
     ASSERT_NE(key, nullptr);
+
+#ifdef ENVOY_SSL_OPENSSL
+    // In TLS1.3 OpenSSL server will send session ticket after an ssl handshake.
+    // While technically not part of the handshake, it's part of the server state-machine,
+    // and SSL_do_handshake will return errors (SSL_ERROR_WANT_WRITE) on the server-side if
+    // the session tickets (2 by default) have not been read by the client.
+    // To avoid this altogether, we disable session tickets by setting the number of tickets
+    // to generate for a new session to zero.
+    ossl_SSL_set_num_tickets(server_ssl_.get(), 0); // TODO: Could we hide this in SSL_CTX_new() ?
+#endif
+
     ASSERT_EQ(1, SSL_set_chain_and_key(server_ssl_.get(), chain.data(), chain.size(), key.get(),
                                        nullptr));
 
@@ -242,6 +253,71 @@ TEST_F(HandshakerTest, NormalOperationWithSslHandshakerImplForTest) {
   }
 
   EXPECT_EQ(post_io_action, Network::PostIoAction::Close);
+}
+
+// Test that SslExtendedSocketInfoImpl properly stores and retrieves certificate validation errors.
+TEST_F(HandshakerTest, SslExtendedSocketInfoCertValidationError) {
+  NiceMock<Network::MockConnection> mock_connection;
+  ON_CALL(mock_connection, state).WillByDefault(Return(Network::Connection::State::Closed));
+
+  NiceMock<MockHandshakeCallbacks> handshake_callbacks;
+  ON_CALL(handshake_callbacks, connection()).WillByDefault(ReturnRef(mock_connection));
+
+  SslHandshakerImpl handshaker(std::move(server_ssl_), 0, &handshake_callbacks);
+
+  // Get the extended socket info through the SSL ex_data mechanism
+  auto* extended_info =
+      reinterpret_cast<Ssl::SslExtendedSocketInfo*>(SSL_get_ex_data(handshaker.ssl(), 0));
+  ASSERT_NE(extended_info, nullptr);
+
+  // Initially, the certificate validation error should be empty.
+  EXPECT_TRUE(extended_info->certificateValidationError().empty());
+
+  // Set the certificate validation error.
+  const std::string error_msg =
+      "verify cert failed: X509_verify_cert: certificate verification error at depth 0: "
+      "certificate has expired";
+  extended_info->setCertificateValidationError(error_msg);
+
+  // Verify the error is properly stored and retrievable.
+  EXPECT_EQ(error_msg, extended_info->certificateValidationError());
+
+  // Test that we can overwrite the error.
+  const std::string new_error_msg = "verify cert failed: SAN matcher";
+  extended_info->setCertificateValidationError(new_error_msg);
+  EXPECT_EQ(new_error_msg, extended_info->certificateValidationError());
+}
+
+// Test that ValidateResultCallbackImpl properly stores error details.
+TEST_F(HandshakerTest, ValidateResultCallbackStoresErrorDetails) {
+  NiceMock<Network::MockConnection> mock_connection;
+  ON_CALL(mock_connection, state).WillByDefault(Return(Network::Connection::State::Open));
+
+  NiceMock<MockHandshakeCallbacks> handshake_callbacks;
+  ON_CALL(handshake_callbacks, connection()).WillByDefault(ReturnRef(mock_connection));
+
+  SslHandshakerImpl handshaker(std::move(server_ssl_), 0, &handshake_callbacks);
+
+  // Get the extended socket info
+  auto* extended_info =
+      reinterpret_cast<Ssl::SslExtendedSocketInfo*>(SSL_get_ex_data(handshaker.ssl(), 0));
+  ASSERT_NE(extended_info, nullptr);
+
+  // Create a validation callback (simulating async validation)
+  auto callback = extended_info->createValidateResultCallback();
+  ASSERT_NE(callback, nullptr);
+
+  // Simulate validation failure with error details
+  const std::string error_details =
+      "verify cert failed: X509_verify_cert: certificate verification error at depth 1: "
+      "unable to get local issuer certificate";
+  callback->onCertValidationResult(false, Ssl::ClientValidationStatus::Failed, error_details,
+                                   SSL_AD_UNKNOWN_CA);
+
+  // Verify the error was stored in extended socket info
+  EXPECT_EQ(error_details, extended_info->certificateValidationError());
+  EXPECT_EQ(Ssl::ClientValidationStatus::Failed, extended_info->certificateValidationStatus());
+  EXPECT_EQ(SSL_AD_UNKNOWN_CA, extended_info->certificateValidationAlert());
 }
 
 } // namespace

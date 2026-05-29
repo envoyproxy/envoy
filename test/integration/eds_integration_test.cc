@@ -14,17 +14,10 @@
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
-
-MATCHER_P2(SingleHeaderValueIs, key, value,
-           absl::StrFormat("Header \"%s\" equals \"%s\"", key, value)) {
-  const auto hdr = arg.get(::Envoy::Http::LowerCaseString(std::string(key)));
-  if (hdr.size() != 1) {
-    return false;
-  }
-  return hdr[0]->value() == value;
-}
 
 void validateClusters(const Upstream::ClusterManager::ClusterInfoMap& active_cluster_map,
                       const std::string& cluster, size_t expected_active_clusters,
@@ -97,6 +90,7 @@ public:
     uint32_t healthy_endpoints = 0;
     uint32_t degraded_endpoints = 0;
     uint32_t disable_active_hc_endpoints = 0;
+    absl::optional<uint32_t> load_balancing_weight = absl::nullopt;
     absl::optional<bool> weighted_priority_health = absl::nullopt;
     absl::optional<uint32_t> overprovisioning_factor = absl::nullopt;
     absl::optional<uint32_t> drop_overload_numerator = absl::nullopt;
@@ -146,6 +140,10 @@ public:
         endpoint->mutable_endpoint()
             ->mutable_health_check_config()
             ->set_disable_active_health_check(true);
+      }
+      if (endpoint_setting.load_balancing_weight.has_value()) {
+        endpoint->mutable_load_balancing_weight()->set_value(
+            endpoint_setting.load_balancing_weight.value());
       }
     }
 
@@ -210,7 +208,7 @@ public:
     }
     cds_helper_.setCds({cluster_});
     initialize();
-    test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+    test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
   }
 
   void initializeTest(bool http_active_hc) { initializeTest(http_active_hc, nullptr); }
@@ -227,7 +225,7 @@ public:
 
     // Check deferred.
     if (deferred_cluster_creation_) {
-      test_server_->waitForGaugeEq("thread_local_cluster_manager.worker_0.clusters_inflated", 0);
+      test_server_->waitForGauge("thread_local_cluster_manager.worker_0.clusters_inflated", Eq(0));
     }
     BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
         lookupPort("http"), "GET", "/cluster_0", "", downstream_protocol_, version_, "foo.com");
@@ -235,7 +233,7 @@ public:
     EXPECT_EQ(status, response->headers().getStatusValue());
     if (numerator == 100) {
       EXPECT_THAT(response->headers(),
-                  SingleHeaderValueIs("x-envoy-unconditional-drop-overload", "true"));
+                  ContainsHeader("x-envoy-unconditional-drop-overload", "true"));
     }
     cleanupUpstreamAndDownstream();
   }
@@ -278,14 +276,14 @@ TEST_P(EdsIntegrationTest, Http2HcClusterRewarming) {
   // Wait for the first HC and verify the host is healthy. This should warm the initial cluster.
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-  test_server_->waitForGaugeEq("cluster.cluster_0.membership_healthy", 1);
+  test_server_->waitForGauge("cluster.cluster_0.membership_healthy", Eq(1));
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
 
   // Trigger a CDS update. This should cause a new cluster to require warming, blocked on the host
   // being health checked.
   cluster_.mutable_circuit_breakers()->add_thresholds()->mutable_max_connections()->set_value(100);
   cds_helper_.setCds({cluster_});
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(1));
   EXPECT_EQ(1, test_server_->gauge("cluster_manager.warming_clusters")->value());
 
   // We need to do a bunch of work to get a hold of second hc connection.
@@ -303,7 +301,7 @@ TEST_P(EdsIntegrationTest, Http2HcClusterRewarming) {
   // Respond with a health check. This will cause the previous cluster to be destroyed inline as
   // part of processing the response.
   upstream_request->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
   EXPECT_EQ(0, test_server_->gauge("cluster_manager.warming_clusters")->value());
 
   // Since the second connection is not managed by the integration test base we need to close it
@@ -328,7 +326,7 @@ TEST_P(EdsIntegrationTest, EndpointDisableActiveHCFlag) {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-  test_server_->waitForGaugeEq("cluster.cluster_0.membership_healthy", 1);
+  test_server_->waitForGauge("cluster.cluster_0.membership_healthy", Eq(1));
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
 
@@ -366,7 +364,7 @@ TEST_P(EdsIntegrationTest, RemoveAfterHcFail) {
   // Wait for the first HC and verify the host is healthy.
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-  test_server_->waitForGaugeEq("cluster.cluster_0.membership_healthy", 1);
+  test_server_->waitForGauge("cluster.cluster_0.membership_healthy", Eq(1));
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
 
   // Clear out the host and verify the host is still healthy.
@@ -379,7 +377,7 @@ TEST_P(EdsIntegrationTest, RemoveAfterHcFail) {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "503"}, {"connection", "close"}}, true);
-  test_server_->waitForGaugeEq("cluster.cluster_0.membership_healthy", 0);
+  test_server_->waitForGauge("cluster.cluster_0.membership_healthy", Eq(0));
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
 }
 
@@ -418,8 +416,8 @@ TEST_P(EdsIntegrationTest, LocalityUpdateActiveHealthStatusReuse) {
   // Wait for the first HC to arrive to the upstream.
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-  test_server_->waitForCounterEq("cluster.cluster_0.health_check.attempt", 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_0.health_check.attempt", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.health_check.success", Ge(1));
   cleanupUpstreamAndDownstream();
 
   // After the first hc there should be no upstream healthy host, and any
@@ -434,7 +432,7 @@ TEST_P(EdsIntegrationTest, LocalityUpdateActiveHealthStatusReuse) {
   response.reset();
 
   // Wait for scheduled updates (update-merge-window).
-  test_server_->waitForCounterEq("cluster_manager.cluster_updated_via_merge", 1);
+  test_server_->waitForCounter("cluster_manager.cluster_updated_via_merge", Eq(1));
 
   // Now the upstream should be healthy.
   // There should only be 1 endpoint, and it should be healthy (according to EDS).
@@ -461,7 +459,7 @@ TEST_P(EdsIntegrationTest, LocalityUpdateActiveHealthStatusReuse) {
 
   // There should be 3 membership changes (+2 compared to the previous, as the
   // memberships of priority 0 and 1 have changed).
-  test_server_->waitForCounterEq("cluster.cluster_0.membership_change", 3);
+  test_server_->waitForCounter("cluster.cluster_0.membership_change", Eq(3));
   // There should still be be 1 endpoint, and it should stay healthy.
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
@@ -484,7 +482,7 @@ TEST_P(EdsIntegrationTest, LocalityUpdateActiveHealthStatusReuse) {
   cleanupUpstreamAndDownstream();
   // There should be 3 membership changes (+1 compared to the previous, as the
   // membership of the first locality has changed).
-  test_server_->waitForCounterEq("cluster.cluster_0.membership_change", 4);
+  test_server_->waitForCounter("cluster.cluster_0.membership_change", Eq(4));
   // There should still be be 1 endpoint, and it should stay healthy.
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
@@ -507,13 +505,13 @@ TEST_P(EdsIntegrationTest, FinishWarmingIgnoreHealthCheck) {
   // being health checked.
   cluster_.mutable_circuit_breakers()->add_thresholds()->mutable_max_connections()->set_value(100);
   cds_helper_.setCds({cluster_});
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(1));
 
   // Clear out the host before the health check finishes (regardless of success/error/timeout) and
   // ensure that warming_clusters goes to 0 to avoid a permanent warming state.
   options.total_endpoints = 0;
   setEndpoints(options, true, false);
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
 }
 
 // Verifies that endpoints are ignored until health checked when configured to.
@@ -532,7 +530,7 @@ TEST_P(EdsIntegrationTest, EndpointWarmingSuccessfulHc) {
   // The other endpoint should still be excluded.
   waitForNextUpstreamRequest(0);
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-  test_server_->waitForGaugeEq("cluster.cluster_0.membership_excluded", 0);
+  test_server_->waitForGauge("cluster.cluster_0.membership_excluded", Eq(0));
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
 }
@@ -554,7 +552,7 @@ TEST_P(EdsIntegrationTest, EndpointWarmingFailedHc) {
   // The other endpoint should still be excluded.
   waitForNextUpstreamRequest(0);
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
-  test_server_->waitForGaugeEq("cluster.cluster_0.membership_excluded", 0);
+  test_server_->waitForGauge("cluster.cluster_0.membership_excluded", Eq(0));
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
 }
@@ -696,7 +694,11 @@ TEST_P(EdsIntegrationTest, BatchMemberUpdateCb) {
 }
 
 TEST_P(EdsIntegrationTest, StatsReadyFilter) {
-  config_helper_.prependFilter("name: eds-ready-filter");
+  config_helper_.prependFilter(R"EOF(
+    name: eds-ready-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.EdsReadyFilterConfig
+  )EOF");
   initializeTest(false);
 
   // Initial state: no healthy endpoints
@@ -739,14 +741,14 @@ TEST_P(EdsIntegrationTest, DataplaneTrafficForDeferredCluster) {
   setEndpoints(options);
 
   // Check deferred.
-  test_server_->waitForGaugeEq("thread_local_cluster_manager.worker_0.clusters_inflated", 0);
+  test_server_->waitForGauge("thread_local_cluster_manager.worker_0.clusters_inflated", Eq(0));
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/cluster_0", "", downstream_protocol_, version_, "foo.com");
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   cleanupUpstreamAndDownstream();
-  test_server_->waitForGaugeEq("thread_local_cluster_manager.worker_0.clusters_inflated", 1);
+  test_server_->waitForGauge("thread_local_cluster_manager.worker_0.clusters_inflated", Eq(1));
 
   const auto& active_cluster_map =
       test_server_->server().clusterManager().clusters().active_clusters_;
@@ -776,13 +778,13 @@ TEST_P(EdsIntegrationTest, DataplaneTrafficAfterEdsUpdateOfInitializedCluster) {
   options.healthy_endpoints = 1;
   setEndpoints(options);
 
-  test_server_->waitForGaugeEq("thread_local_cluster_manager.worker_0.clusters_inflated", 0);
+  test_server_->waitForGauge("thread_local_cluster_manager.worker_0.clusters_inflated", Eq(0));
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/cluster_0", "", downstream_protocol_, version_, "foo.com");
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   cleanupUpstreamAndDownstream();
-  test_server_->waitForGaugeEq("thread_local_cluster_manager.worker_0.clusters_inflated", 1);
+  test_server_->waitForGauge("thread_local_cluster_manager.worker_0.clusters_inflated", Eq(1));
   const auto& active_cluster_map =
       test_server_->server().clusterManager().clusters().active_clusters_;
   {
@@ -814,6 +816,45 @@ TEST_P(EdsIntegrationTest, DataplaneTrafficAfterEdsUpdateOfInitializedCluster) {
 TEST_P(EdsIntegrationTest, DropOverloadTestForEdsClusterNoDrop) { dropOverloadTest(0, "200"); }
 
 TEST_P(EdsIntegrationTest, DropOverloadTestForEdsClusterAllDrop) { dropOverloadTest(100, "503"); }
+
+TEST_P(EdsIntegrationTest, LoadBalancerRejectsEndpoints) {
+  autonomous_upstream_ = true;
+  initializeTest(false /* http_active_hc */, [](envoy::config::cluster::v3::Cluster& cluster) {
+    // Maglev (and all load balancers that inherit `ThreadAwareLoadBalancerBase`) has a
+    // constraint that the total endpoint weights must not exceed uint32_max. Use this to generate
+    // errors instead of writing a test load balancing extension.
+    cluster.set_lb_policy(::envoy::config::cluster::v3::Cluster::MAGLEV);
+  });
+  EndpointSettingOptions options;
+  options.total_endpoints = 4;
+  options.healthy_endpoints = 4;
+  options.load_balancing_weight = UINT32_MAX - 1;
+  setEndpoints(options, true, false);
+  test_server_->waitForCounter("cluster.cluster_0.update_rejected", Ge(1));
+}
+
+TEST_P(EdsIntegrationTest, LoadBalancerRejectsEndpointsWithHealthcheck) {
+  cluster_.mutable_common_lb_config()->set_ignore_new_hosts_until_first_hc(true);
+  autonomous_upstream_ = true;
+  initializeTest(true /* http_active_hc */, [](envoy::config::cluster::v3::Cluster& cluster) {
+    // Disable the healthy panic threshold, which causes the initial update from the EDS update
+    // to not include any of the hosts so that there isn't an error detected for the weights
+    // until after a health check passes.
+    cluster.mutable_common_lb_config()->mutable_healthy_panic_threshold();
+
+    // Maglev (and all load balancers that inherit `ThreadAwareLoadBalancerBase`) has a
+    // constraint that the total endpoint weights must not exceed uint32_max. Use this to generate
+    // errors instead of writing a test load balancing extension.
+    cluster.set_lb_policy(::envoy::config::cluster::v3::Cluster::MAGLEV);
+  });
+
+  EndpointSettingOptions options;
+  options.total_endpoints = 4;
+  options.healthy_endpoints = 4;
+  options.load_balancing_weight = UINT32_MAX - 1;
+  setEndpoints(options, true, false);
+  test_server_->waitForCounter("cluster.cluster_0.update_rejected", Ge(1));
+}
 
 } // namespace
 } // namespace Envoy

@@ -7,12 +7,14 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/grpc/async_client_manager.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/utility.h"
 
 #include "absl/status/status.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Config {
@@ -30,18 +32,18 @@ absl::StatusOr<Upstream::ClusterConstOptRef> Utility::checkCluster(absl::string_
                                                                    absl::string_view cluster_name,
                                                                    Upstream::ClusterManager& cm,
                                                                    bool allow_added_via_api) {
-  const auto cluster = cm.clusters().getCluster(cluster_name);
-  if (!cluster.has_value()) {
+  const auto cluster = cm.getActiveOrWarmingCluster(std::string(cluster_name));
+  if (!cluster) {
     return absl::InvalidArgumentError(
         fmt::format("{}: unknown cluster '{}'", error_prefix, cluster_name));
   }
 
-  if (!allow_added_via_api && cluster->get().info()->addedViaApi()) {
+  if (!allow_added_via_api && cluster->info()->addedViaApi()) {
     return absl::InvalidArgumentError(fmt::format(
         "{}: invalid cluster '{}': currently only static (non-CDS) clusters are supported",
         error_prefix, cluster_name));
   }
-  return cluster;
+  return Upstream::ClusterConstOptRef(*cluster);
 }
 
 absl::Status Utility::checkLocalInfo(absl::string_view error_prefix,
@@ -240,10 +242,10 @@ bool isApiTypeNonAggregated(const envoy::config::core::v3::ApiConfigSource::ApiT
 }
 } // namespace
 
-absl::StatusOr<Grpc::AsyncClientFactoryPtr> Utility::factoryForGrpcApiConfigSource(
-    Grpc::AsyncClientManager& async_client_manager,
-    const envoy::config::core::v3::ApiConfigSource& api_config_source, Stats::Scope& scope,
-    bool skip_cluster_check, int grpc_service_idx, bool xdstp_config_source) {
+absl::StatusOr<Envoy::OptRef<const envoy::config::core::v3::GrpcService>>
+Utility::getGrpcConfigFromApiConfigSource(
+    const envoy::config::core::v3::ApiConfigSource& api_config_source, int grpc_service_idx,
+    bool xdstp_config_source) {
   RETURN_IF_NOT_OK(checkApiConfigSourceNames(
       api_config_source,
       Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support") ? 2 : 1));
@@ -264,19 +266,32 @@ absl::StatusOr<Grpc::AsyncClientFactoryPtr> Utility::factoryForGrpcApiConfigSour
 
   if (grpc_service_idx >= api_config_source.grpc_services_size()) {
     // No returned factory in case there's no entry.
-    return nullptr;
+    return absl::nullopt;
   }
 
-  envoy::config::core::v3::GrpcService grpc_service;
-  grpc_service.MergeFrom(api_config_source.grpc_services(grpc_service_idx));
-
-  return async_client_manager.factoryForGrpcService(grpc_service, scope, skip_cluster_check);
+  return Envoy::makeOptRef(api_config_source.grpc_services(grpc_service_idx));
 }
 
-absl::Status Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
+absl::StatusOr<Grpc::AsyncClientFactoryPtr> Utility::factoryForGrpcApiConfigSource(
+    Grpc::AsyncClientManager& async_client_manager,
+    const envoy::config::core::v3::ApiConfigSource& api_config_source, Stats::Scope& scope,
+    bool skip_cluster_check, int grpc_service_idx, bool xdstp_config_source) {
+
+  absl::StatusOr<Envoy::OptRef<const envoy::config::core::v3::GrpcService>> maybe_grpc_service =
+      getGrpcConfigFromApiConfigSource(api_config_source, grpc_service_idx, xdstp_config_source);
+  RETURN_IF_NOT_OK(maybe_grpc_service.status());
+
+  if (!maybe_grpc_service.value().has_value()) {
+    return nullptr;
+  }
+  return async_client_manager.factoryForGrpcService(*maybe_grpc_service.value(), scope,
+                                                    skip_cluster_check);
+}
+
+absl::Status Utility::translateOpaqueConfig(const Protobuf::Any& typed_config,
                                             ProtobufMessage::ValidationVisitor& validation_visitor,
                                             Protobuf::Message& out_proto) {
-  static const std::string struct_type(ProtobufWkt::Struct::default_instance().GetTypeName());
+  static const std::string struct_type(Protobuf::Struct::default_instance().GetTypeName());
   static const std::string typed_struct_type(
       xds::type::v3::TypedStruct::default_instance().GetTypeName());
   static const std::string legacy_typed_struct_type(
@@ -322,7 +337,7 @@ absl::Status Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config
       RETURN_IF_NOT_OK(MessageUtil::unpackTo(typed_config, out_proto));
     } else {
 #ifdef ENVOY_ENABLE_YAML
-      ProtobufWkt::Struct struct_config;
+      Protobuf::Struct struct_config;
       RETURN_IF_NOT_OK(MessageUtil::unpackTo(typed_config, struct_config));
       MessageUtil::jsonConvert(struct_config, validation_visitor, out_proto);
 #else

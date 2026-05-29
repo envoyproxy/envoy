@@ -2,6 +2,7 @@
 
 #include <net/if.h>
 
+#include <csetjmp>
 #include <memory>
 
 #include "envoy/common/platform.h"
@@ -16,8 +17,8 @@
 
 #include "fmt/ostream.h"
 #include "library/common/network/network_type_socket_option_impl.h"
-#include "library/common/network/network_types.h"
 #include "library/common/network/src_addr_socket_option_impl.h"
+#include "library/common/system/system_helper.h"
 
 // Used on Linux (requires root/CAP_NET_RAW)
 #ifdef SO_BINDTODEVICE
@@ -77,14 +78,17 @@ constexpr absl::string_view BaseDnsCache = "base_dns_cache";
 
 // The number of faults allowed on a newly-established connection before switching socket mode.
 constexpr unsigned int InitialFaultThreshold = 1;
-// The number of faults allowed on a previously-successful connection (i.e. able to send and receive
-// L7 bytes) before switching socket mode.
-constexpr unsigned int MaxFaultThreshold = 3;
 
-ConnectivityManagerImpl::DefaultNetworkState ConnectivityManagerImpl::network_state_{
-    1, 0, MaxFaultThreshold, SocketMode::DefaultPreferredNetworkMode};
-
-Thread::MutexBasicLockable ConnectivityManagerImpl::network_mutex_{};
+ConnectivityManagerImpl::ConnectivityManagerImpl(Upstream::ClusterManager& cluster_manager,
+                                                 DnsCacheManagerSharedPtr dns_cache_manager)
+    : cluster_manager_(cluster_manager), quic_observer_registry_factory_(*this),
+      dns_cache_manager_(dns_cache_manager) {
+  initializeNetworkStates();
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.mobile_use_network_observer_registry")) {
+    cluster_manager_.createNetworkObserverRegistries(quic_observer_registry_factory_);
+  }
+}
 
 envoy_netconf_t ConnectivityManagerImpl::setPreferredNetwork(int network) {
   Thread::LockGuard lock{network_mutex_};
@@ -97,14 +101,19 @@ envoy_netconf_t ConnectivityManagerImpl::setPreferredNetwork(int network) {
   //  return network_state_.configuration_key_ - 1;
   //}
 
-  ENVOY_LOG_EVENT(debug, "netconf_network_change", "{}", std::to_string(static_cast<int>(network)));
+  setPreferredNetworkNoLock(network);
+  return network_state_.configuration_key_;
+}
+
+void ConnectivityManagerImpl::setPreferredNetworkNoLock(int network_type)
+    ABSL_EXCLUSIVE_LOCKS_REQUIRED(network_mutex_) {
+  ENVOY_LOG_EVENT(debug, "netconf_network_change", "network_type changed to {}",
+                  std::to_string(static_cast<int>(network_type)));
 
   network_state_.configuration_key_++;
-  network_state_.network_ = network;
+  network_state_.network_ = network_type;
   network_state_.remaining_faults_ = 1;
   network_state_.socket_mode_ = SocketMode::DefaultPreferredNetworkMode;
-
-  return network_state_.configuration_key_;
 }
 
 void ConnectivityManagerImpl::setProxySettings(ProxySettingsConstSharedPtr new_proxy_settings) {
@@ -244,7 +253,8 @@ void RefreshDnsWithPostDrainHandler::onDnsResolutionComplete(
 
   // Pass predicate to only drain connections to the resolved host (for any cluster).
   cluster_manager_.drainConnections(
-      [resolved_host](const Upstream::Host& host) { return host.hostname() == resolved_host; });
+      [resolved_host](const Upstream::Host& host) { return host.hostname() == resolved_host; },
+      ConnectionPool::DrainBehavior::DrainExistingConnections);
 }
 
 void ConnectivityManagerImpl::setDrainPostDnsRefreshEnabled(bool enabled) {
@@ -275,7 +285,11 @@ void ConnectivityManagerImpl::refreshDns(envoy_netconf_t configuration_key,
       return;
     }
   }
+  doRefreshDns(configuration_key, drain_connections);
+}
 
+void ConnectivityManagerImpl::doRefreshDns(envoy_netconf_t configuration_key,
+                                           bool drain_connections) {
   if (auto dns_cache = dnsCache()) {
     ENVOY_LOG_EVENT(debug, "netconf_refresh_dns", "{}", std::to_string(configuration_key));
 
@@ -323,11 +337,15 @@ Socket::OptionsSharedPtr ConnectivityManagerImpl::getUpstreamSocketOptions(int n
     return getAlternateInterfaceSocketOptions(network);
   }
 
-  // Envoy uses the hash signature of overridden socket options to choose a connection pool.
-  // Setting a dummy socket option is a hack that allows us to select a different
-  // connection pool without materially changing the socket configuration.
   auto options = std::make_shared<Socket::Options>();
-  options->push_back(std::make_shared<NetworkTypeSocketOptionImpl>(network));
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.decouple_explicit_drain_pools_and_dns_refresh")) {
+    // Envoy uses the hash signature of overridden socket options to choose a connection pool.
+    // Setting a dummy socket option is a hack that allows us to select a different
+    // connection pool without materially changing the socket configuration when
+    // pools are not explicitly drained during network change.
+    options->push_back(std::make_shared<NetworkTypeSocketOptionImpl>(network));
+  }
 
   return options;
 }
@@ -458,11 +476,168 @@ ConnectivityManagerImpl::enumerateInterfaces([[maybe_unused]] unsigned short fam
   return pairs;
 }
 
-ConnectivityManagerSharedPtr ConnectivityManagerFactory::get() {
+int connectionTypeToCompoundNetworkType(ConnectionType connection_type) {
+  int compound_type = 0;
+  switch (connection_type) {
+  case ConnectionType::CONNECTION_2G:
+    compound_type |= (static_cast<int>(NetworkType::WWAN) | static_cast<int>(NetworkType::WWAN_2G));
+    break;
+  case ConnectionType::CONNECTION_3G:
+    compound_type |= (static_cast<int>(NetworkType::WWAN) | static_cast<int>(NetworkType::WWAN_3G));
+    break;
+  case ConnectionType::CONNECTION_4G:
+    compound_type |= (static_cast<int>(NetworkType::WWAN) | static_cast<int>(NetworkType::WWAN_4G));
+    break;
+  case ConnectionType::CONNECTION_5G:
+    compound_type |= (static_cast<int>(NetworkType::WWAN) | static_cast<int>(NetworkType::WWAN_5G));
+    break;
+  case ConnectionType::CONNECTION_WIFI:
+  case ConnectionType::CONNECTION_ETHERNET:
+    compound_type |= static_cast<int>(NetworkType::WLAN);
+    break;
+  case ConnectionType::CONNECTION_NONE:
+    break;
+  case ConnectionType::CONNECTION_BLUETOOTH:
+  case ConnectionType::CONNECTION_UNKNOWN:
+    compound_type = static_cast<int>(NetworkType::Generic);
+    break;
+  }
+  return compound_type;
+}
+
+void ConnectivityManagerImpl::onDefaultNetworkChangedAndroid(ConnectionType connection_type,
+                                                             NetworkHandle net_id) {
+  bool already_connected{false};
+  envoy_netconf_t current_configuration_key{0};
+  {
+    Thread::LockGuard lock{network_mutex_};
+    ENVOY_LOG_EVENT(debug, "android_default_network_changed",
+                    "default network changed from {} to {}, new connection_type {}, ",
+                    default_network_handle_, net_id, static_cast<int>(connection_type));
+    if (net_id == default_network_handle_) {
+      return;
+    }
+    current_configuration_key = network_state_.configuration_key_;
+    default_network_handle_ = net_id;
+    if (connected_networks_.find(net_id) != connected_networks_.end()) {
+      // Android Lollipop had race conditions where CONNECTIVITY_ACTION intents
+      // were sent out before the network was actually made the default.
+      // Delay switching to the new default until Android platform notifies that the network
+      // connected.
+      setPreferredNetworkNoLock(connectionTypeToCompoundNetworkType(connection_type));
+      current_configuration_key = network_state_.configuration_key_;
+      already_connected = true;
+    }
+  }
+  if (already_connected) {
+    if (default_network_change_callback_ != nullptr) {
+      default_network_change_callback_(current_configuration_key);
+    }
+    for (std::reference_wrapper<Quic::EnvoyMobileQuicNetworkObserverRegistry> registry :
+         quic_observer_registry_factory_.getCreatedObserverRegistries()) {
+      registry.get().onNetworkMadeDefault(net_id);
+    }
+  }
+}
+
+void ConnectivityManagerImpl::onNetworkDisconnectAndroid(NetworkHandle net_id) {
+  {
+    Thread::LockGuard lock{network_mutex_};
+    if (net_id == default_network_handle_) {
+      default_network_handle_ = kInvalidNetworkHandle;
+    }
+    if (connected_networks_.erase(net_id) == 0) {
+      return;
+    }
+  }
+  for (std::reference_wrapper<Quic::EnvoyMobileQuicNetworkObserverRegistry> registry :
+       quic_observer_registry_factory_.getCreatedObserverRegistries()) {
+    registry.get().onNetworkDisconnected(net_id);
+  }
+}
+
+void ConnectivityManagerImpl::onNetworkConnectAndroid(ConnectionType connection_type,
+                                                      NetworkHandle net_id) {
+  bool is_default_network{false};
+  envoy_netconf_t current_configuration_key{0};
+  {
+    Thread::LockGuard lock{network_mutex_};
+    if (connected_networks_.find(net_id) != connected_networks_.end()) {
+      return;
+    }
+    connected_networks_[net_id] = connection_type;
+    current_configuration_key = network_state_.configuration_key_;
+    if (net_id == default_network_handle_) {
+      // The reported default network finally gets connected.
+      is_default_network = true;
+      setPreferredNetworkNoLock(connectionTypeToCompoundNetworkType(connection_type));
+      current_configuration_key = network_state_.configuration_key_;
+    }
+  }
+  if (is_default_network) {
+    if (default_network_change_callback_ != nullptr) {
+      default_network_change_callback_(current_configuration_key);
+    }
+  }
+
+  // Android Lollipop would send many duplicate notifications.
+  // This was later fixed in Android Marshmallow.
+  // Deduplicate them here by avoiding sending duplicate notifications.
+  for (std::reference_wrapper<Quic::EnvoyMobileQuicNetworkObserverRegistry> registry :
+       quic_observer_registry_factory_.getCreatedObserverRegistries()) {
+    registry.get().onNetworkConnected(net_id);
+    if (is_default_network) {
+      registry.get().onNetworkMadeDefault(net_id);
+    }
+  }
+}
+
+void ConnectivityManagerImpl::purgeActiveNetworkListAndroid(
+    const std::vector<NetworkHandle>& active_network_ids) {
+  std::vector<int64_t> disconnected_networks;
+  {
+    Thread::LockGuard lock{network_mutex_};
+    for (auto& i : connected_networks_) {
+      if (std::find(active_network_ids.begin(), active_network_ids.end(), i.first) ==
+          active_network_ids.end()) {
+        disconnected_networks.push_back(i.first);
+      }
+    }
+  }
+  for (auto disconnected_network : disconnected_networks) {
+    onNetworkDisconnectAndroid(disconnected_network);
+  }
+}
+
+void ConnectivityManagerImpl::initializeNetworkStates() {
+  NetworkHandle default_net_id = SystemHelper::getInstance().getDefaultNetworkHandle();
+  std::vector<std::pair<int64_t, ConnectionType>> all_connected_networks =
+      SystemHelper::getInstance().getAllConnectedNetworks();
+
+  Thread::LockGuard lock{network_mutex_};
+  default_network_handle_ = default_net_id;
+  for (auto& entry : all_connected_networks) {
+    connected_networks_[entry.first] = entry.second;
+  }
+}
+
+NetworkHandle ConnectivityManagerImpl::getDefaultNetwork() {
+  Thread::LockGuard lock{network_mutex_};
+  return default_network_handle_;
+}
+
+absl::flat_hash_map<NetworkHandle, ConnectionType>
+ConnectivityManagerImpl::getAllConnectedNetworks() {
+  Thread::LockGuard lock{network_mutex_};
+  return connected_networks_;
+}
+
+ConnectivityManagerImplSharedPtr ConnectivityManagerFactory::get() {
   return context_.serverFactoryContext().singletonManager().getTyped<ConnectivityManagerImpl>(
       SINGLETON_MANAGER_REGISTERED_NAME(connectivity_manager), [this] {
         Envoy::Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl
             cache_manager_factory{context_};
+
         return std::make_shared<ConnectivityManagerImpl>(
             context_.serverFactoryContext().clusterManager(), cache_manager_factory.get());
       });

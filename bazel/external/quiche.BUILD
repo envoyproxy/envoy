@@ -1,4 +1,5 @@
 load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
 load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
@@ -8,12 +9,12 @@ load(
 load(
     "@envoy//bazel/external:quiche.bzl",
     "envoy_quic_cc_library",
+    "envoy_quic_cc_test",
     "envoy_quic_cc_test_library",
     "envoy_quiche_platform_impl_cc_library",
     "envoy_quiche_platform_impl_cc_test_library",
     "quiche_copts",
 )
-load("@rules_proto//proto:defs.bzl", "proto_library")
 
 licenses(["notice"])  # Apache 2
 
@@ -94,7 +95,7 @@ envoy_cc_test(
     repository = "@envoy",
     deps = [
         ":quiche_common_platform_test",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -176,8 +177,8 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:variant",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:variant",
     ],
 )
 
@@ -443,8 +444,8 @@ envoy_cc_library(
         ":http2_header_byte_listener_interface_lib",
         ":http2_no_op_headers_handler_lib",
         ":quiche_common_callbacks",
-        "@com_google_absl//absl/algorithm",
-        "@com_google_absl//absl/cleanup",
+        "@abseil-cpp//absl/algorithm",
+        "@abseil-cpp//absl/cleanup",
     ],
 )
 
@@ -607,7 +608,7 @@ envoy_cc_test(
         ":quiche_common_platform_expect_bug",
         ":quiche_common_platform_export",
         ":quiche_common_platform_test",
-        "@com_google_absl//absl/functional:bind_front",
+        "@abseil-cpp//absl/functional:bind_front",
     ],
 )
 
@@ -1098,7 +1099,7 @@ envoy_cc_library(
     deps = [
         ":http2_constants_lib",
         ":http2_hpack_hpack_constants_lib",
-        ":http2_hpack_hpack_static_table_entries_lib",
+        ":http2_hpack_hpack_lib",
         ":quiche_common_circular_deque_lib",
         ":quiche_common_platform",
     ],
@@ -1253,12 +1254,6 @@ envoy_cc_library(
     copts = quiche_copts,
     repository = "@envoy",
     deps = [":quiche_common_platform"],
-)
-
-envoy_cc_library(
-    name = "http2_hpack_hpack_static_table_entries_lib",
-    hdrs = ["quiche/http2/hpack/hpack_static_table_entries.inc"],
-    repository = "@envoy",
 )
 
 envoy_cc_library(
@@ -1810,13 +1805,10 @@ envoy_quic_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_quic_cc_library(
     name = "quic_core_bandwidth_lib",
     srcs = ["quiche/quic/core/quic_bandwidth.cc"],
     hdrs = ["quiche/quic/core/quic_bandwidth.h"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_constants_lib",
         ":quic_core_time_lib",
@@ -2121,6 +2113,26 @@ envoy_quic_cc_library(
 )
 
 envoy_quic_cc_library(
+    name = "quic_core_congestion_control_bbr3_sender_lib",
+    srcs = ["quiche/quic/core/congestion_control/bbr3_sender.cc"],
+    hdrs = ["quiche/quic/core/congestion_control/bbr3_sender.h"],
+    deps = [
+        ":quic_core_bandwidth_lib",
+        ":quic_core_congestion_control_bandwidth_sampler_lib",
+        ":quic_core_congestion_control_bbr2_lib",
+        ":quic_core_congestion_control_bbr_lib",
+        ":quic_core_congestion_control_congestion_control_interface_lib",
+        ":quic_core_congestion_control_rtt_stats_lib",
+        ":quic_core_congestion_control_windowed_filter_lib",
+        ":quic_core_crypto_encryption_lib",
+        ":quic_core_tag_lib",
+        ":quic_core_types_lib",
+        ":quic_platform_base",
+        ":quiche_common_print_elements_lib",
+    ],
+)
+
+envoy_quic_cc_library(
     name = "quic_core_congestion_control_general_loss_algorithm_lib",
     srcs = ["quiche/quic/core/congestion_control/general_loss_algorithm.cc"],
     hdrs = ["quiche/quic/core/congestion_control/general_loss_algorithm.h"],
@@ -2167,6 +2179,7 @@ envoy_quic_cc_library(
         ":quic_core_bandwidth_lib",
         ":quic_core_config_lib",
         ":quic_core_congestion_control_bbr2_lib",
+        ":quic_core_congestion_control_bbr3_sender_lib",
         ":quic_core_congestion_control_bbr_lib",
         ":quic_core_congestion_control_prague_sender_lib",
         ":quic_core_congestion_control_tcp_cubic_bytes_lib",
@@ -2273,7 +2286,7 @@ envoy_quic_cc_library(
         ":quic_platform_export",
         ":quiche_common_platform",
         ":quiche_common_text_utils_lib",
-        "@com_google_absl//absl/strings:str_format",
+        "@abseil-cpp//absl/strings:str_format",
     ],
 )
 
@@ -2381,13 +2394,10 @@ envoy_quic_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_quic_cc_library(
     name = "quic_core_constants_lib",
     srcs = ["quiche/quic/core/quic_constants.cc"],
     hdrs = ["quiche/quic/core/quic_constants.h"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_types_lib",
         ":quic_platform_export",
@@ -2408,8 +2418,8 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_logging",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -2417,7 +2427,6 @@ envoy_quic_cc_library(
     name = "quic_core_crypto_crypto_handshake_lib",
     srcs = [
         "quiche/quic/core/crypto/cert_compressor.cc",
-        "quiche/quic/core/crypto/channel_id.cc",
         "quiche/quic/core/crypto/crypto_framer.cc",
         "quiche/quic/core/crypto/crypto_handshake.cc",
         "quiche/quic/core/crypto/crypto_handshake_message.cc",
@@ -2431,7 +2440,6 @@ envoy_quic_cc_library(
     ],
     hdrs = [
         "quiche/quic/core/crypto/cert_compressor.h",
-        "quiche/quic/core/crypto/channel_id.h",
         "quiche/quic/core/crypto/crypto_framer.h",
         "quiche/quic/core/crypto/crypto_handshake.h",
         "quiche/quic/core/crypto/crypto_handshake_message.h",
@@ -2472,7 +2480,7 @@ envoy_quic_cc_library(
         ":quic_core_versions_lib",
         ":quic_platform",
         ":quiche_common_wire_serialization",
-        "@envoy//bazel/foreign_cc:zlib",
+        "@envoy//bazel:zlib",
     ],
 )
 
@@ -2494,7 +2502,7 @@ envoy_quic_cc_library(
         ":quic_core_crypto_client_proof_source_lib",
         ":quic_core_crypto_crypto_handshake_lib",
         ":quiche_common_platform_client_stats",
-        "@envoy//bazel/foreign_cc:zlib",
+        "@envoy//bazel:zlib",
     ],
 )
 
@@ -2515,7 +2523,7 @@ envoy_quic_cc_library(
         ":quic_core_proto_crypto_server_config_proto_header",
         ":quic_core_server_id_lib",
         ":quic_server_crypto_tls_handshake_lib",
-        "@envoy//bazel/foreign_cc:zlib",
+        "@envoy//bazel:zlib",
     ],
 )
 
@@ -2647,8 +2655,8 @@ envoy_quic_cc_library(
         ":quic_core_data_lib",
         ":quic_platform_base",
         ":quiche_common_endian_lib",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/container:node_hash_map",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/container:node_hash_map",
     ],
 )
 
@@ -2770,9 +2778,9 @@ envoy_cc_library(
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -2786,7 +2794,7 @@ envoy_cc_library(
         ":quiche_common_lib",
         ":quiche_common_platform_logging",
         ":quiche_common_status_utils",
-        "@com_google_absl//absl/status:statusor",
+        "@abseil-cpp//absl/status:statusor",
     ],
 )
 
@@ -2798,8 +2806,8 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-        "@com_google_absl//absl/functional:any_invocable",
-        "@com_google_absl//absl/functional:function_ref",
+        "@abseil-cpp//absl/functional:any_invocable",
+        "@abseil-cpp//absl/functional:function_ref",
     ],
 )
 
@@ -2855,7 +2863,10 @@ envoy_cc_library(
 envoy_quic_cc_library(
     name = "quic_core_framer_lib",
     srcs = ["quiche/quic/core/quic_framer.cc"],
-    hdrs = ["quiche/quic/core/quic_framer.h"],
+    hdrs = [
+        "quiche/quic/core/quic_framer.h",
+        "quiche/quic/core/scone.h",
+    ],
     deps = [
         ":quic_core_connection_id_generator_interface_lib",
         ":quic_core_constants_lib",
@@ -2872,11 +2883,11 @@ envoy_quic_cc_library(
         ":quic_platform_base",
         ":quiche_common_text_utils_lib",
         ":quiche_common_wire_serialization",
-        "@com_google_absl//absl/cleanup",
+        "@abseil-cpp//absl/cleanup",
     ],
 )
 
-envoy_cc_library(
+envoy_quic_cc_library(
     name = "quic_core_frames_frames_lib",
     srcs = [
         "quiche/quic/core/frames/quic_ack_frame.cc",
@@ -2884,12 +2895,12 @@ envoy_cc_library(
         "quiche/quic/core/frames/quic_blocked_frame.cc",
         "quiche/quic/core/frames/quic_connection_close_frame.cc",
         "quiche/quic/core/frames/quic_crypto_frame.cc",
+        "quiche/quic/core/frames/quic_datagram_frame.cc",
         "quiche/quic/core/frames/quic_frame.cc",
         "quiche/quic/core/frames/quic_goaway_frame.cc",
         "quiche/quic/core/frames/quic_handshake_done_frame.cc",
         "quiche/quic/core/frames/quic_immediate_ack_frame.cc",
         "quiche/quic/core/frames/quic_max_streams_frame.cc",
-        "quiche/quic/core/frames/quic_message_frame.cc",
         "quiche/quic/core/frames/quic_new_connection_id_frame.cc",
         "quiche/quic/core/frames/quic_new_token_frame.cc",
         "quiche/quic/core/frames/quic_padding_frame.cc",
@@ -2911,13 +2922,13 @@ envoy_cc_library(
         "quiche/quic/core/frames/quic_blocked_frame.h",
         "quiche/quic/core/frames/quic_connection_close_frame.h",
         "quiche/quic/core/frames/quic_crypto_frame.h",
+        "quiche/quic/core/frames/quic_datagram_frame.h",
         "quiche/quic/core/frames/quic_frame.h",
         "quiche/quic/core/frames/quic_goaway_frame.h",
         "quiche/quic/core/frames/quic_handshake_done_frame.h",
         "quiche/quic/core/frames/quic_immediate_ack_frame.h",
         "quiche/quic/core/frames/quic_inlined_frame.h",
         "quiche/quic/core/frames/quic_max_streams_frame.h",
-        "quiche/quic/core/frames/quic_message_frame.h",
         "quiche/quic/core/frames/quic_mtu_discovery_frame.h",
         "quiche/quic/core/frames/quic_new_connection_id_frame.h",
         "quiche/quic/core/frames/quic_new_token_frame.h",
@@ -2934,15 +2945,12 @@ envoy_cc_library(
         "quiche/quic/core/frames/quic_streams_blocked_frame.h",
         "quiche/quic/core/frames/quic_window_update_frame.h",
     ],
-    copts = quiche_copts,
     # TODO: Work around initializer in anonymous union in fastbuild build.
     # Remove this after upstream fix.
     defines = select({
         "@envoy//bazel:windows_x86_64": ["QUIC_FRAME_DEBUG=0"],
         "//conditions:default": [],
     }),
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_constants_lib",
         ":quic_core_error_codes_lib",
@@ -2994,21 +3002,20 @@ envoy_cc_library(
         ":quiche_common_lib",
         ":quiche_common_platform_bug_tracker",
         ":quiche_common_platform_logging",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
 envoy_cc_library(
     name = "quiche_common_quiche_stream_lib",
     srcs = [],
-    hdrs = ["quiche/common/quiche_stream.h"],
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
         ":quiche_common_mem_slice",
         ":quiche_common_platform_export",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:span",
     ],
 )
 
@@ -3020,22 +3027,26 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":quiche_common_platform_export",
-        "@com_google_absl//absl/base:prefetch",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
+        "@abseil-cpp//absl/base:prefetch",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:span",
     ],
 )
 
 envoy_quic_cc_library(
     name = "quic_core_http_client_lib",
     srcs = [
+        "quiche/quic/core/http/quic_connection_migration_manager.cc",
         "quiche/quic/core/http/quic_spdy_client_session.cc",
         "quiche/quic/core/http/quic_spdy_client_session_base.cc",
+        "quiche/quic/core/http/quic_spdy_client_session_with_migration.cc",
         "quiche/quic/core/http/quic_spdy_client_stream.cc",
     ],
     hdrs = [
+        "quiche/quic/core/http/quic_connection_migration_manager.h",
         "quiche/quic/core/http/quic_spdy_client_session.h",
         "quiche/quic/core/http/quic_spdy_client_session_base.h",
+        "quiche/quic/core/http/quic_spdy_client_session_with_migration.h",
         "quiche/quic/core/http/quic_spdy_client_stream.h",
     ],
     deps = [
@@ -3047,10 +3058,12 @@ envoy_quic_cc_library(
         ":quic_core_http_server_initiated_spdy_stream_lib",
         ":quic_core_http_spdy_session_lib",
         ":quic_core_packets_lib",
+        ":quic_core_path_context_factory_interface_lib",
         ":quic_core_qpack_qpack_streams_lib",
         ":quic_core_server_id_lib",
         ":quic_core_types_lib",
         ":quic_core_utils_lib",
+        ":quic_force_blockable_packet_writer_lib",
         ":quic_platform_base",
     ],
 )
@@ -3082,7 +3095,7 @@ envoy_quic_cc_library(
         ":quic_core_http_spdy_utils_lib",
         ":quic_core_types_lib",
         ":quic_platform_base",
-        "@com_google_absl//absl/base:nullability",
+        "@abseil-cpp//absl/base:nullability",
     ],
 )
 
@@ -3205,6 +3218,13 @@ envoy_quic_cc_library(
 )
 
 envoy_quic_cc_library(
+    name = "quic_force_blockable_packet_writer_lib",
+    srcs = ["quiche/quic/core/quic_force_blockable_packet_writer.cc"],
+    hdrs = ["quiche/quic/core/quic_force_blockable_packet_writer.h"],
+    deps = [":quic_core_packet_writer_lib"],
+)
+
+envoy_quic_cc_library(
     name = "quic_core_http_spdy_stream_body_manager_lib",
     srcs = ["quiche/quic/core/http/quic_spdy_stream_body_manager.cc"],
     hdrs = ["quiche/quic/core/http/quic_spdy_stream_body_manager.h"],
@@ -3293,7 +3313,7 @@ envoy_cc_library(
             ":quic_core_alarm_factory_lib",
             ":quic_core_clock_lib",
             ":quic_core_udp_socket_lib",
-            "@com_google_absl//absl/base:core_headers",
+            "@abseil-cpp//absl/base:core_headers",
         ],
     }),
 )
@@ -3318,12 +3338,12 @@ envoy_cc_library(
         ":quic_platform_socket_address",
         ":quiche_common_platform_export",
         ":quiche_common_platform_logging",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/container:flat_hash_set",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:span",
     ],
 )
 
@@ -3357,11 +3377,11 @@ envoy_cc_library(
             ":quic_platform_socket_address",
             ":quiche_common_buffer_allocator_lib",
             ":quiche_common_platform",
-            "@com_google_absl//absl/status:statusor",
-            "@com_google_absl//absl/strings",
-            "@com_google_absl//absl/types:optional",
-            "@com_google_absl//absl/types:span",
-            "@com_google_absl//absl/types:variant",
+            "@abseil-cpp//absl/status:statusor",
+            "@abseil-cpp//absl/strings",
+            "@abseil-cpp//absl/types:optional",
+            "@abseil-cpp//absl/types:span",
+            "@abseil-cpp//absl/types:variant",
         ],
     }),
 )
@@ -3391,6 +3411,16 @@ envoy_quic_cc_library(
         ":quic_core_arena_scoped_ptr_lib",
         ":quic_core_types_lib",
         ":quic_platform_base",
+    ],
+)
+
+envoy_quic_cc_library(
+    name = "quic_core_path_context_factory_interface_lib",
+    hdrs = ["quiche/quic/core/quic_path_context_factory.h"],
+    deps = [
+        ":quic_core_path_validator_lib",
+        ":quic_platform_export",
+        ":quic_platform_socket_address",
     ],
 )
 
@@ -3494,7 +3524,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_quic_cc_library(
     name = "quic_core_packets_lib",
     srcs = [
         "quiche/quic/core/quic_packets.cc",
@@ -3504,9 +3534,6 @@ envoy_cc_library(
         "quiche/quic/core/quic_packets.h",
         "quiche/quic/core/quic_write_blocked_list.h",
     ],
-    copts = quiche_copts,
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":http2_core_priority_write_scheduler_lib",
         ":quic_core_ack_listener_interface_lib",
@@ -3907,7 +3934,7 @@ envoy_quic_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_quic_cc_library(
     name = "quic_stream_priority_lib",
     srcs = [
         "quiche/quic/core/quic_stream_priority.cc",
@@ -3915,10 +3942,7 @@ envoy_cc_library(
     hdrs = [
         "quiche/quic/core/quic_stream_priority.h",
     ],
-    copts = quiche_copts,
     external_deps = ["ssl"],
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_types_lib",
         ":quic_platform_export",
@@ -3983,9 +4007,7 @@ envoy_quic_cc_library(
         ":quic_core_server_id_lib",
         ":quic_core_session_notifier_interface_lib",
         ":quic_core_stream_frame_data_producer_lib",
-        ":quic_core_stream_send_buffer_base_lib",
         ":quic_core_stream_send_buffer_inlining_lib",
-        ":quic_core_stream_send_buffer_lib",
         ":quic_core_stream_sequencer_buffer_lib",
         ":quic_core_types_lib",
         ":quic_core_utils_lib",
@@ -4063,28 +4085,12 @@ envoy_quic_cc_library(
 )
 
 envoy_quic_cc_library(
-    name = "quic_core_stream_send_buffer_base_lib",
-    srcs = ["quiche/quic/core/quic_stream_send_buffer_base.cc"],
-    hdrs = ["quiche/quic/core/quic_stream_send_buffer_base.h"],
-    deps = [
-        ":quic_core_interval_lib",
-        ":quic_core_interval_set_lib",
-        ":quic_core_types_lib",
-        ":quic_platform_base",
-        ":quic_platform_bug_tracker",
-        ":quiche_common_mem_slice",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-envoy_quic_cc_library(
     name = "quic_core_inlined_string_view_lib",
     hdrs = ["quiche/quic/core/quic_inlined_string_view.h"],
     deps = [
         ":quic_platform_base",
-        "@com_google_absl//absl/numeric:bits",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/numeric:bits",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -4098,31 +4104,12 @@ envoy_quic_cc_library(
         ":quic_core_interval_deque_lib",
         ":quic_core_interval_lib",
         ":quic_core_interval_set_lib",
-        ":quic_core_stream_send_buffer_base_lib",
         ":quic_core_types_lib",
         ":quic_platform_base",
         ":quic_platform_bug_tracker",
         ":quiche_common_mem_slice",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-envoy_quic_cc_library(
-    name = "quic_core_stream_send_buffer_lib",
-    srcs = ["quiche/quic/core/quic_stream_send_buffer.cc"],
-    hdrs = ["quiche/quic/core/quic_stream_send_buffer.h"],
-    deps = [
-        ":quic_core_data_lib",
-        ":quic_core_frames_frames_lib",
-        ":quic_core_interval_deque_lib",
-        ":quic_core_interval_lib",
-        ":quic_core_interval_set_lib",
-        ":quic_core_stream_send_buffer_base_lib",
-        ":quic_core_types_lib",
-        ":quic_core_utils_lib",
-        ":quic_platform_base",
-        ":quiche_common_circular_deque_lib",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:span",
     ],
 )
 
@@ -4210,7 +4197,7 @@ envoy_quic_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_quic_cc_library(
     name = "quic_core_types_lib",
     srcs = [
         "quiche/quic/core/quic_connection_id.cc",
@@ -4222,10 +4209,7 @@ envoy_cc_library(
         "quiche/quic/core/quic_packet_number.h",
         "quiche/quic/core/quic_types.h",
     ],
-    copts = quiche_copts,
     external_deps = ["ssl"],
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_crypto_random_lib",
         ":quic_core_error_codes_lib",
@@ -4298,13 +4282,10 @@ envoy_quic_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_quic_cc_library(
     name = "quic_core_utils_lib",
     srcs = ["quiche/quic/core/quic_utils.cc"],
     hdrs = ["quiche/quic/core/quic_utils.h"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_constants_lib",
         ":quic_core_crypto_random_lib",
@@ -4329,13 +4310,10 @@ envoy_quic_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_quic_cc_library(
     name = "quic_core_versions_lib",
     srcs = ["quiche/quic/core/quic_versions.cc"],
     hdrs = ["quiche/quic/core/quic_versions.h"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_crypto_random_lib",
         ":quic_core_tag_lib",
@@ -4360,6 +4338,16 @@ envoy_quic_cc_test_library(
     name = "quic_test_tools_connection_id_manager_peer_lib",
     hdrs = ["quiche/quic/test_tools/quic_connection_id_manager_peer.h"],
     deps = [":quic_core_connection_id_manager"],
+)
+
+envoy_quic_cc_test_library(
+    name = "quic_test_tools_crypto_stream_peer_lib",
+    srcs = ["quiche/quic/test_tools/quic_crypto_stream_peer.cc"],
+    hdrs = ["quiche/quic/test_tools/quic_crypto_stream_peer.h"],
+    deps = [
+        ":quic_core_session_lib",
+        ":quic_core_types_lib",
+    ],
 )
 
 envoy_quic_cc_test_library(
@@ -4514,26 +4502,14 @@ envoy_quic_cc_test_library(
 )
 
 envoy_quic_cc_test_library(
-    name = "quic_test_tools_stream_send_buffer_peer_lib",
-    srcs = ["quiche/quic/test_tools/quic_stream_send_buffer_peer.cc"],
-    hdrs = ["quiche/quic/test_tools/quic_stream_send_buffer_peer.h"],
-    deps = [
-        ":quic_core_stream_send_buffer_lib",
-        ":quic_test_tools_interval_deque_peer_lib",
-    ],
-)
-
-envoy_quic_cc_test_library(
     name = "quic_test_tools_stream_peer_lib",
     srcs = ["quiche/quic/test_tools/quic_stream_peer.cc"],
     hdrs = ["quiche/quic/test_tools/quic_stream_peer.h"],
     deps = [
         ":quic_core_packets_lib",
         ":quic_core_session_lib",
-        ":quic_core_stream_send_buffer_lib",
         ":quic_platform_base",
         ":quic_test_tools_flow_controller_peer_lib",
-        ":quic_test_tools_stream_send_buffer_peer_lib",
     ],
 )
 
@@ -4600,6 +4576,7 @@ envoy_quic_cc_test_library(
         ":quic_server_session_lib",
         ":quic_test_tools_config_peer_lib",
         ":quic_test_tools_connection_id_manager_peer_lib",
+        ":quic_test_tools_crypto_stream_peer_lib",
         ":quic_test_tools_framer_peer_lib",
         ":quic_test_tools_mock_clock_lib",
         ":quic_test_tools_mock_random_lib",
@@ -4698,7 +4675,7 @@ envoy_cc_library(
         ":quiche_common_buffer_allocator_lib",
         ":quiche_common_callbacks",
         ":quiche_common_platform_export",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -4708,7 +4685,7 @@ envoy_quiche_platform_impl_cc_library(
         "quiche/common/platform/default/quiche_platform_impl/quiche_googleurl_impl.h",
     ],
     deps = [
-        "@com_googlesource_googleurl//url",
+        "@googleurl//url",
     ],
 )
 
@@ -4775,10 +4752,10 @@ envoy_quiche_platform_impl_cc_library(
         "quiche/common/platform/default/quiche_platform_impl/quiche_logging_impl.h",
     ],
     deps = [
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/log:absl_check",
-        "@com_google_absl//absl/log:absl_log",
-        "@com_google_absl//absl/log:flags",
+        "@abseil-cpp//absl/flags:flag",
+        "@abseil-cpp//absl/log:absl_check",
+        "@abseil-cpp//absl/log:absl_log",
+        "@abseil-cpp//absl/log:flags",
     ],
 )
 
@@ -5052,7 +5029,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":quiche_common_platform_export",
-        "@com_google_absl//absl/container:inlined_vector",
+        "@abseil-cpp//absl/container:inlined_vector",
     ],
 )
 
@@ -5068,6 +5045,7 @@ envoy_cc_test_library(
         ":quiche_common_platform_googleurl",
         ":quiche_common_platform_iovec",
         ":quiche_common_platform_test",
+        "@abseil-cpp//absl/status:status_matchers",
         "@envoy//test/common/quic/platform:quiche_test_helpers_impl_lib",
         "@envoy//test/common/quic/platform:quiche_test_impl_lib",
     ],
@@ -5080,18 +5058,20 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":quiche_common_platform_export",
-        "@com_google_absl//absl/hash",
-        "@com_google_absl//absl/strings:str_format",
+        "@abseil-cpp//absl/hash",
+        "@abseil-cpp//absl/strings:str_format",
     ],
 )
 
 envoy_cc_library(
     name = "quiche_common_lib",
     srcs = [
+        "quiche/common/moq_varint.cc",
         "quiche/common/quiche_data_reader.cc",
         "quiche/common/quiche_data_writer.cc",
     ],
     hdrs = [
+        "quiche/common/moq_varint.h",
         "quiche/common/quiche_data_reader.h",
         "quiche/common/quiche_data_writer.h",
         "quiche/common/quiche_linked_hash_map.h",
@@ -5101,6 +5081,8 @@ envoy_cc_library(
     deps = [
         ":quiche_common_endian_lib",
         ":quiche_common_platform",
+        "@abseil-cpp//absl/base",
+        "@abseil-cpp//absl/numeric:bits",
     ],
 )
 
@@ -5149,6 +5131,7 @@ envoy_cc_test(
         ":http2_test_tools_test_utils_lib",
         ":quiche_common_platform_test",
         ":quiche_http_header_block_lib",
+        "@abseil-cpp//absl/functional:bind_front",
     ],
 )
 
@@ -5162,24 +5145,22 @@ envoy_cc_library(
         ":quiche_common_platform",
         ":quiche_common_platform_export",
         ":quiche_common_platform_logging",
-        "@com_google_absl//absl/algorithm:container",
-        "@com_google_absl//absl/container:flat_hash_set",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
-        "@com_google_absl//absl/types:optional",
-        "@com_google_absl//absl/types:span",
-        "@com_google_absl//absl/types:variant",
+        "@abseil-cpp//absl/algorithm:container",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
+        "@abseil-cpp//absl/types:optional",
+        "@abseil-cpp//absl/types:span",
+        "@abseil-cpp//absl/types:variant",
     ],
 )
 
-envoy_cc_test(
+envoy_quic_cc_test(
     name = "quiche_common_test",
     srcs = [
         "quiche/common/quiche_linked_hash_map_test.cc",
         "quiche/common/quiche_mem_slice_storage_test.cc",
     ],
-    copts = quiche_copts,
-    repository = "@envoy",
     deps = [
         ":quiche_common_lib",
         ":quiche_common_mem_slice_storage",
@@ -5200,12 +5181,10 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_library(
+envoy_quic_cc_library(
     name = "quiche_common_mem_slice_storage",
     srcs = ["quiche/common/quiche_mem_slice_storage.cc"],
     hdrs = ["quiche/common/quiche_mem_slice_storage.h"],
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_types_lib",
         ":quic_core_utils_lib",
@@ -5335,8 +5314,8 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":quiche_common_text_utils_lib",
-        "@com_google_absl//absl/container:flat_hash_set",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -5368,7 +5347,7 @@ envoy_cc_library(
         ":quiche_common_callbacks",
         ":quiche_common_platform_export",
         ":quiche_common_platform_lower_case_string",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -5383,7 +5362,7 @@ envoy_cc_library(
         ":quiche_common_platform_bug_tracker",
         ":quiche_common_platform_export",
         ":quiche_common_platform_logging",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -5396,7 +5375,7 @@ envoy_cc_test(
         ":quiche_balsa_simple_buffer_lib",
         ":quiche_common_platform_expect_bug",
         ":quiche_common_platform_test",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -5410,8 +5389,8 @@ envoy_cc_library(
         ":quiche_common_platform",
         ":quiche_common_platform_export",
         ":quiche_common_text_utils_lib",
-        "@com_google_absl//absl/container:flat_hash_set",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -5444,9 +5423,9 @@ envoy_cc_library(
         ":quiche_common_platform_export",
         ":quiche_common_platform_header_policy",
         ":quiche_common_platform_logging",
-        "@com_google_absl//absl/container:flat_hash_set",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/memory",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -5464,10 +5443,10 @@ envoy_cc_test(
         ":quiche_common_platform_logging",
         ":quiche_common_platform_test",
         ":quiche_common_test_tools_test_utils_lib",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/memory",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
     ],
 )
 
@@ -5490,7 +5469,7 @@ envoy_cc_library(
         ":quiche_common_platform_bug_tracker",
         ":quiche_common_platform_export",
         ":quiche_common_platform_logging",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -5510,9 +5489,9 @@ envoy_cc_test(
         ":quiche_common_platform_expect_bug",
         ":quiche_common_platform_logging",
         ":quiche_common_platform_test",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
+        "@abseil-cpp//absl/flags:flag",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
     ],
 )
 
@@ -5533,8 +5512,8 @@ envoy_cc_library(
         ":quiche_common_quiche_vectorized_io_utils_lib",
         ":quiche_common_status_utils",
         ":quiche_common_structured_headers_lib",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/time",
-        "@com_google_absl//absl/types:span",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/time",
+        "@abseil-cpp//absl/types:span",
     ],
 )

@@ -69,27 +69,31 @@ to build an Envoy static binary and run tests.
 
 The build image defaults to `envoyproxy/envoy-build-ubuntu` on Linux and
 `envoyproxy/envoy-build-windows2019` on Windows, but you can choose build image by setting
-`IMAGE_NAME` in the environment.
+`ENVOY_BUILD_IMAGE` in the environment.
 
 In case your setup is behind a proxy, set `http_proxy` and `https_proxy` to the proxy servers before
 invoking the build.
 
 ```bash
-IMAGE_NAME=envoyproxy/envoy-build-ubuntu http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
+ENVOY_BUILD_IMAGE=docker.io/envoyproxy/envoy-build-ubuntu:<tag> http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
 ```
 
 Besides `http_proxy` and `https_proxy`, maybe you need to set `go_proxy` to replace the default GOPROXY in China.
 
 ```bash
-IMAGE_NAME=envoyproxy/envoy-build-ubuntu go_proxy=https://goproxy.cn,direct http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
+ENVOY_BUILD_IMAGE=docker.io/envoyproxy/envoy-build-ubuntu:<tag> go_proxy=https://goproxy.cn,direct http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
 ```
 
-To force the Envoy build image to be refreshed by Docker you can set `ENVOY_DOCKER_PULL=true`.
+## Resource Requirements and Troubleshooting
 
-```bash
-ENVOY_DOCKER_PULL=true ./ci/run_envoy_docker.sh <build_script_args>
-```
+Envoy requires a lot of resources (disk/memory/cpu) to build, especially the first time its built, as bazel does not yet have anything cached.
 
+**Memory Requirements:**
+- Envoy builds can be memory-intensive and require substantial RAM
+- If you have less than 2GB of RAM per CPU core, you may want to limit the number of parallel build jobs
+- To limit build parallelism, add or modify the jobs setting in your `user.bazelrc` file with a line that follows the format "build --jobs=X/2" where X is the number of GB of RAM that your system has e.g.: `"build --jobs=4"` for a system with 8GB of memory in the `user.bazlerc` file that you created
+
+This configuration helps prevent out-of-memory errors that can cause builds to crash.
 
 # Generating compile commands
 
@@ -183,7 +187,7 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `fuzz <test>` &mdash; build and run a specified fuzz test or test dir under `-c dbg --config=asan-fuzzer` with clang. If specifying a single fuzz test, must use the full target name with "_with_libfuzzer" for `<test>`.
 * `compile_time_options` &mdash; build Envoy and run tests with various compile-time options toggled to their non-default state, to ensure they still build.
 * `compile_time_options <test>` &mdash; build Envoy and run a specified test or test dir with various compile-time options toggled to their non-default state, to ensure they still build.
-* `clang_tidy <files>` &mdash; build and run clang-tidy specified source files, if no files specified, runs against the diff with the last GitHub commit.
+* `clang-tidy <targets>` &mdash; build and run clang-tidy on the specified Bazel targets. If no targets are provided, it uses `CLANG_TIDY_TARGETS` when set, otherwise the default target set.
 * `check_proto_format`&mdash; check configuration, formatting and build issues in API proto files.
 * `fix_proto_format`&mdash; fix configuration, formatting and build issues in API proto files.
 * `check_and_fix_proto_format` &mdash; check and fix configuration, fomatting and build issues in API proto files.

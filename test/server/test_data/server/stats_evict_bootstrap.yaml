@@ -1,0 +1,11 @@
+node:
+  id: bootstrap_id
+  cluster: bootstrap_cluster
+  locality:
+    zone: bootstrap_zone
+    sub_zone: bootstrap_sub_zone
+stats_sinks:
+- name: envoy.custom_stats_sink
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Struct
+stats_eviction_interval: 10s

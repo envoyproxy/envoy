@@ -47,8 +47,9 @@ public:
     return base_route_->filterDisabled(name);
   }
   const std::string& routeName() const override { return base_route_->routeName(); }
-  const VirtualHostConstSharedPtr& virtualHost() const override {
-    return base_route_->virtualHost();
+  const VirtualHost& virtualHost() const override { return base_route_->virtualHost(); }
+  VirtualHostConstSharedPtr virtualHostSharedPtr() const override {
+    return base_route_->virtualHostSharedPtr();
   }
 
 protected:
@@ -79,7 +80,7 @@ public:
   const Router::RouteEntry* routeEntry() const override { return this; }
 
   // Router::ResponseEntry
-  void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
+  void finalizeResponseHeaders(Http::ResponseHeaderMap& headers, const Formatter::Context& context,
                                const StreamInfo::StreamInfo& stream_info) const override;
   Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                   bool do_formatting = true) const override;
@@ -88,9 +89,10 @@ public:
   const std::string& clusterName() const override;
   Http::Code clusterNotFoundResponseCode() const override;
   const CorsPolicy* corsPolicy() const override;
-  absl::optional<std::string>
-  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
-  void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
+  std::string currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers,
+                                         const Formatter::Context& context,
+                                         const StreamInfo::StreamInfo& stream_info) const override;
+  void finalizeRequestHeaders(Http::RequestHeaderMap& headers, const Formatter::Context& context,
                               const StreamInfo::StreamInfo& stream_info,
                               bool insert_envoy_original_path) const override;
   Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
@@ -100,14 +102,15 @@ public:
   const HedgePolicy& hedgePolicy() const override;
   Upstream::ResourcePriority priority() const override;
   const RateLimitPolicy& rateLimitPolicy() const override;
-  const RetryPolicy& retryPolicy() const override;
+  const RetryPolicyConstSharedPtr& retryPolicy() const override;
   const Router::PathMatcherSharedPtr& pathMatcher() const override;
   const Router::PathRewriterSharedPtr& pathRewriter() const override;
   const InternalRedirectPolicy& internalRedirectPolicy() const override;
-  uint32_t retryShadowBufferLimit() const override;
+  uint64_t requestBodyBufferLimit() const override;
   const std::vector<Router::ShadowPolicyPtr>& shadowPolicies() const override;
   std::chrono::milliseconds timeout() const override;
   absl::optional<std::chrono::milliseconds> idleTimeout() const override;
+  absl::optional<std::chrono::milliseconds> flushTimeout() const override;
   bool usingNewTimeouts() const override;
   absl::optional<std::chrono::milliseconds> maxStreamDuration() const override;
   absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const override;
@@ -145,8 +148,10 @@ public:
 
   const std::string& clusterName() const override { return cluster_name_; }
 
-private:
-  const std::string cluster_name_;
+protected:
+  // Keep this as non-const member since some derived class may want to update the cluster name
+  // dynamically based on the request.
+  std::string cluster_name_;
 };
 
 } // namespace Router

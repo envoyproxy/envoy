@@ -170,7 +170,7 @@ envoy_extension_cc_benchmark_binary(
         "//test/mocks/network:network_mocks",
         "//test/test_common:printers_lib",
         "//test/test_common:simulated_time_system_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 
@@ -209,6 +209,8 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/network/common/redis:fault_lib",
         "//source/extensions/filters/network/redis_proxy:config",
+        "//source/extensions/load_balancing_policies/ring_hash:config",
+        "//source/extensions/network/dns_resolver/getaddrinfo:config",
         "//test/integration:integration_lib",
         "@envoy_api//envoy/service/redis_auth/v3:pkg_cc_proto",
     ],
@@ -226,8 +228,7 @@ envoy_extension_cc_benchmark_binary(
         "//source/extensions/filters/network/redis_proxy:command_splitter_lib",
         "//source/extensions/filters/network/redis_proxy:router_lib",
         "//test/test_common:printers_lib",
-        "//test/test_common:simulated_time_system_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 

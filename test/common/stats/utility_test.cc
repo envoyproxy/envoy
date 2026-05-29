@@ -36,7 +36,7 @@ protected:
             {{pool_.add("tag1"), pool_.add("value1")}, {pool_.add("tag2"), pool_.add("value2")}}) {
     switch (GetParam()) {
     case StoreType::ThreadLocal:
-      alloc_ = std::make_unique<AllocatorImpl>(*symbol_table_),
+      alloc_ = std::make_unique<Allocator>(*symbol_table_),
       store_ = std::make_unique<ThreadLocalStoreImpl>(*alloc_);
       break;
     case StoreType::Isolated:
@@ -159,7 +159,7 @@ protected:
 
   SymbolTablePtr symbol_table_;
   StatNamePool pool_;
-  std::unique_ptr<AllocatorImpl> alloc_;
+  std::unique_ptr<Allocator> alloc_;
   std::unique_ptr<Store> store_;
   ScopeSharedPtr scope_;
   absl::flat_hash_set<std::string> results_;

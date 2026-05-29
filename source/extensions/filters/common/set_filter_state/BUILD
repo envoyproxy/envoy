@@ -13,6 +13,7 @@ envoy_cc_library(
     srcs = ["filter_config.cc"],
     hdrs = ["filter_config.h"],
     deps = [
+        "//envoy/common:hashable_interface",
         "//envoy/formatter:substitution_formatter_interface",
         "//envoy/registry",
         "//envoy/stream_info:filter_state_interface",

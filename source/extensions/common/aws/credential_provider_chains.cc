@@ -39,12 +39,27 @@ CommonCredentialsProviderChain::customCredentialsProviderChain(
         "Custom credential provider chain must have at least one credential provider");
   }
 
-  return std::make_shared<CommonCredentialsProviderChain>(context, region,
-                                                          credential_provider_config);
+  auto chain =
+      std::make_shared<CommonCredentialsProviderChain>(context, region, credential_provider_config);
+  chain->setupSubscriptions();
+  return chain;
 }
 CredentialsProviderChainSharedPtr CommonCredentialsProviderChain::defaultCredentialsProviderChain(
     Server::Configuration::ServerFactoryContext& context, absl::string_view region) {
-  return std::make_shared<CommonCredentialsProviderChain>(context, region, absl::nullopt);
+  auto chain = std::make_shared<CommonCredentialsProviderChain>(context, region, absl::nullopt);
+  chain->setupSubscriptions();
+  return chain;
+}
+
+void CommonCredentialsProviderChain::setupSubscriptions() {
+  for (auto& provider : providers_) {
+    // Set up subscription for each provider that supports it
+    auto metadata_provider = std::dynamic_pointer_cast<MetadataCredentialsProviderBase>(provider);
+    if (metadata_provider) {
+      storeSubscription(metadata_provider->subscribeToCredentialUpdates(
+          std::static_pointer_cast<CredentialSubscriberCallbacks>(shared_from_this())));
+    }
+  }
 }
 
 CommonCredentialsProviderChain::CommonCredentialsProviderChain(
@@ -118,10 +133,15 @@ CommonCredentialsProviderChain::CommonCredentialsProviderChain(
   }
 
   if (chain_to_create.has_assume_role_credential_provider()) {
-    const auto& assume_role_config = chain_to_create.assume_role_credential_provider();
+    auto assume_role_config = chain_to_create.assume_role_credential_provider();
 
     const auto sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
     const auto cluster_name = stsClusterName(region);
+
+    // Default session name if not provided.
+    if (assume_role_config.role_session_name().empty()) {
+      assume_role_config.set_role_session_name(sessionName(context.api()));
+    }
 
     ENVOY_LOG(debug,
               "Using assumerole credentials provider with STS endpoint: {} and session name: {}",
@@ -144,6 +164,19 @@ CommonCredentialsProviderChain::CommonCredentialsProviderChain(
     if (!web_identity.has_web_identity_token_data_source()) {
       web_identity.mutable_web_identity_token_data_source()->set_filename(
           absl::NullSafeStringView(std::getenv(AWS_WEB_IDENTITY_TOKEN_FILE)));
+    }
+
+    // Ensure we always have a watched directory configured for file-based token sources. This
+    // ensures we automatically pick up tokens replaced on the filesystem.
+    if (web_identity.web_identity_token_data_source().has_filename() &&
+        !web_identity.web_identity_token_data_source().has_watched_directory()) {
+      auto split = context.api().fileSystem().splitPathFromFilename(
+          web_identity.web_identity_token_data_source().filename());
+      if (split.ok() && !split->directory_.empty()) {
+        web_identity.mutable_web_identity_token_data_source()
+            ->mutable_watched_directory()
+            ->set_path(split->directory_);
+      }
     }
 
     if (web_identity.role_arn().empty()) {
@@ -253,7 +286,8 @@ CredentialsProviderSharedPtr CommonCredentialsProviderChain::createAssumeRoleCre
   // Create our own signer specifically for signing AssumeRole API call
   auto signer = std::make_unique<SigV4SignerImpl>(
       STS_SERVICE_NAME, region, credentials_provider_chain, context,
-      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
+      Extensions::Common::Aws::AwsSigningHeaderMatcherVector{},
+      Extensions::Common::Aws::AwsSigningHeaderMatcherVector{});
 
   auto credential_provider = std::make_shared<AssumeRoleCredentialsProvider>(
       context, aws_cluster_manager, cluster_name, MetadataFetcher::create, region, refresh_state,
@@ -267,8 +301,7 @@ CredentialsProviderSharedPtr CommonCredentialsProviderChain::createAssumeRoleCre
     credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
   }
 
-  storeSubscription(credential_provider->subscribeToCredentialUpdates(*this));
-
+  // Note: Subscription will be set up after construction
   return credential_provider;
 };
 
@@ -303,8 +336,7 @@ CredentialsProviderSharedPtr CommonCredentialsProviderChain::createContainerCred
     credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
   }
 
-  storeSubscription(credential_provider->subscribeToCredentialUpdates(*this));
-
+  // Note: Subscription will be set up after construction
   return credential_provider;
 }
 
@@ -337,8 +369,7 @@ CommonCredentialsProviderChain::createInstanceProfileCredentialsProvider(
     credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
   }
 
-  storeSubscription(credential_provider->subscribeToCredentialUpdates(*this));
-
+  // Note: Subscription will be set up after construction
   return credential_provider;
 }
 
@@ -369,8 +400,7 @@ CredentialsProviderSharedPtr CommonCredentialsProviderChain::createWebIdentityCr
     credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
   }
 
-  storeSubscription(credential_provider->subscribeToCredentialUpdates(*this));
-
+  // Note: Subscription will be set up after construction
   return credential_provider;
 };
 

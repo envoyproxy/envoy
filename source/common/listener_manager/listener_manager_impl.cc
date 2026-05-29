@@ -32,9 +32,9 @@
 #include "source/common/quic/quic_server_transport_socket_factory.h"
 #endif
 
+#include "source/common/listener_manager/filter_chain_manager_impl.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/drain_manager_impl.h"
-#include "source/common/listener_manager/filter_chain_manager_impl.h"
 #include "source/server/transport_socket_config_impl.h"
 
 namespace Envoy {
@@ -202,7 +202,6 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
       return absl::InvalidArgumentError(fmt::format("UDP listener filter: {} is configured with "
                                                     "unsupported dynamic configuration",
                                                     proto_config.name()));
-      return ret;
     }
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -293,16 +292,22 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
                                         worker_index);
     };
 
-    auto result = Network::Utility::execInNetworkNamespace(fn, netns.value().c_str());
+    // Here we're running `fn` in a different network namespace. It will return a `absl::StatusOr`
+    // that wraps the result of the function we pass in, which is another `absl::StatusOr`.
+    auto outer_result = Network::Utility::execInNetworkNamespace(fn, netns.value().c_str());
 
-    // We have a nested absl::StatusOr type, so if there were no issues with changing the namespace,
-    // we want to return the inner absl::StatusOr.
-    if (result->ok()) {
-      return result->value();
+    // We have a nested absl::StatusOr type. The "outer" result is the result of our attempt to jump
+    // between network namespaces. The "inner" result is that of the `createListenSocketInternal`
+    // function we passed in to run in the other netns.
+    if (outer_result.ok()) {
+      // We successfully jumped network namespaces and ran `createListenSocketInternal` in that
+      // namespace before jumping back. Here we return the result of that
+      // `createListenSocketInternal` function.
+      return outer_result.value();
     }
 
-    // The result was not ok, so we want to return the outer status.
-    return result.status();
+    // The "outer" result was not ok, which means we failed to jump network namespaces.
+    return outer_result.status();
   }
 #endif
 
@@ -329,7 +334,8 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
     if (!io_handle) {
       return absl::InvalidArgumentError("failed to create socket using custom interface");
     }
-    return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options);
+    return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options,
+                                                      absl::nullopt, bind_type != BindType::NoBind);
   }
 
   // Continue with standard socket creation for addresses using the default interface.
@@ -343,7 +349,7 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
           fmt::format("socket type {} not supported for pipes", toString(socket_type)));
     }
     const std::string addr = fmt::format("unix://{}", address->asString());
-    const int fd = server_.hotRestart().duplicateParentListenSocket(addr, worker_index);
+    const int fd = server_.hotRestart().duplicateParentListenSocket(addr, worker_index, "");
     Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>(fd);
     if (io_handle->isOpen()) {
       ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
@@ -363,7 +369,8 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
   const std::string addr = absl::StrCat(scheme, address->asString());
 
   if (bind_type != BindType::NoBind) {
-    const int fd = server_.hotRestart().duplicateParentListenSocket(addr, worker_index);
+    const int fd = server_.hotRestart().duplicateParentListenSocket(
+        addr, worker_index, address->networkNamespace().value_or(""));
     if (fd != -1) {
       ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
       Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>(fd);
@@ -681,6 +688,13 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
     stats_.listener_modified_.inc();
   }
 
+  // Notify callbacks when the listener is directly placed into the active list (workers not
+  // started). When workers are started, the notification will be fired from onListenerWarmed()
+  // or inPlaceFilterChainUpdate() instead.
+  if (!workers_started_) {
+    notifyListenerUpdateCallbacks(name, new_listener_ref);
+  }
+
   new_listener_ref.initialize();
   return true;
 }
@@ -867,6 +881,8 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
 
   warming_listeners_.erase(existing_warming_listener);
   updateWarmingActiveGauges();
+
+  notifyListenerUpdateCallbacks(listener.name(), listener);
 }
 
 void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener) {
@@ -895,6 +911,8 @@ void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener) {
 
   warming_listeners_.erase(existing_warming_listener);
   updateWarmingActiveGauges();
+
+  notifyListenerUpdateCallbacks(listener.name(), **existing_active_listener);
 }
 
 void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& draining_listener,
@@ -992,6 +1010,8 @@ bool ListenerManagerImpl::removeListenerInternal(const std::string& name,
       drainListener(std::move(listener));
     }
   }
+
+  notifyListenerRemovalCallbacks(name);
 
   stats_.listener_removed_.inc();
   updateWarmingActiveGauges();
@@ -1196,7 +1216,7 @@ ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
       std::move(factory_or_error.value()), std::move(*factory_list_or_error),
       std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(filter_chain, transport_socket_connect_timeout, 0)),
-      filter_chain.name(), added_via_api);
+      added_via_api, filter_chain);
 
   filter_chain_res->setFilterChainFactoryContext(std::move(filter_chain_factory_context));
   return filter_chain_res;
@@ -1323,6 +1343,33 @@ void ListenerManagerImpl::maybeCloseSocketsForListener(ListenerImpl& listener) {
 
 ApiListenerOptRef ListenerManagerImpl::apiListener() {
   return api_listener_ ? ApiListenerOptRef(std::ref(*api_listener_)) : absl::nullopt;
+}
+
+ListenerUpdateCallbacksHandlePtr
+ListenerManagerImpl::addListenerUpdateCallbacks(ListenerUpdateCallbacks& cb) {
+  return std::make_unique<ListenerUpdateCallbacksHandleImpl>(cb, update_callbacks_);
+}
+
+template <typename F> void ListenerManagerImpl::notifyListenerCallbacks(F notify_fn) {
+  for (auto cb_it = update_callbacks_.begin(); cb_it != update_callbacks_.end();) {
+    // The current callback may remove itself from the list, so a handle for
+    // the next item is fetched before calling the callback.
+    auto curr_cb_it = cb_it;
+    ++cb_it;
+    notify_fn(*curr_cb_it);
+  }
+}
+
+void ListenerManagerImpl::notifyListenerUpdateCallbacks(absl::string_view listener_name,
+                                                        Network::ListenerConfig& listener_config) {
+  notifyListenerCallbacks([&](ListenerUpdateCallbacks* cb) {
+    cb->onListenerAddOrUpdate(listener_name, listener_config);
+  });
+}
+
+void ListenerManagerImpl::notifyListenerRemovalCallbacks(const std::string& listener_name) {
+  notifyListenerCallbacks(
+      [&](ListenerUpdateCallbacks* cb) { cb->onListenerRemoval(listener_name); });
 }
 
 REGISTER_FACTORY(DefaultListenerManagerFactoryImpl, ListenerManagerFactory);

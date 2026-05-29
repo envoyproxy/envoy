@@ -11,7 +11,6 @@
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
 #include "test/mocks/http/conn_pool.h"
 #include "test/mocks/network/connection.h"
-#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/options.h"
@@ -105,7 +104,7 @@ public:
 
     // Allow touch() to still be strict.
     EXPECT_CALL(*host_map_[host], address()).Times(AtLeast(0));
-    EXPECT_CALL(*host_map_[host], addressList(_)).Times(AtLeast(0));
+    EXPECT_CALL(*host_map_[host], addressList()).Times(AtLeast(0));
     EXPECT_CALL(*host_map_[host], isIpAddress()).Times(AtLeast(0));
     EXPECT_CALL(*host_map_[host], resolvedHost()).Times(AtLeast(0));
   }
@@ -126,10 +125,10 @@ public:
   Upstream::MockLoadBalancerContext* setFilterStateHostAndReturnContext(const std::string& host) {
     StreamInfo::FilterStateSharedPtr filter_state = lb_context_.requestStreamInfo()->filterState();
 
-    filter_state->setData(
-        "envoy.upstream.dynamic_host", std::make_shared<Router::StringAccessorImpl>(host),
-        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection,
-        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+    filter_state->setData("envoy.upstream.dynamic_host",
+                          std::make_shared<Router::StringAccessorImpl>(host),
+                          StreamInfo::FilterState::LifeSpan::Connection,
+                          StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
 
     return &lb_context_;
   }

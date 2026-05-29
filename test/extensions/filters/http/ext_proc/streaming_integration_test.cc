@@ -138,7 +138,7 @@ protected:
   }
 
   TestProcessor test_processor_;
-  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_;
   IntegrationStreamDecoderPtr client_response_;
   std::atomic<uint64_t> processor_request_hash_;
   std::atomic<uint64_t> processor_response_hash_;
@@ -175,8 +175,8 @@ TEST_P(StreamingIntegrationTest, PostAndProcessHeadersOnly) {
       [](grpc::ServerContext* ctx) {
         // Verify that the metadata set in the grpc client configuration
         // above is actually sent to our RPC.
-        auto request_id = ctx->client_metadata().find("x-request-id");
-        ASSERT_NE(request_id, ctx->client_metadata().end());
+        auto [request_id, request_id_end] = ctx->client_metadata().equal_range("x-request-id");
+        ASSERT_NE(request_id, request_id_end);
         EXPECT_EQ(request_id->second, "sent some metadata");
       });
 

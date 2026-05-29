@@ -11,68 +11,17 @@
 #include "test/extensions/filters/http/dynamic_forward_proxy/test_resolver.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
+#include "test/integration/utility.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
+using testing::Eq;
+using testing::Ge;
 using testing::HasSubstr;
 
 namespace Envoy {
 namespace {
-
-class OsSysCallsWithMockedDns : public Api::OsSysCallsImpl {
-public:
-  static addrinfo* makeAddrInfo(const Network::Address::InstanceConstSharedPtr& addr) {
-    addrinfo* ai = reinterpret_cast<addrinfo*>(malloc(sizeof(addrinfo)));
-    memset(ai, 0, sizeof(addrinfo));
-    ai->ai_protocol = IPPROTO_TCP;
-    ai->ai_socktype = SOCK_STREAM;
-    if (addr->ip()->ipv4() != nullptr) {
-      ai->ai_family = AF_INET;
-    } else {
-      ai->ai_family = AF_INET6;
-    }
-    sockaddr_storage* storage =
-        reinterpret_cast<sockaddr_storage*>(malloc(sizeof(sockaddr_storage)));
-    ai->ai_addr = reinterpret_cast<sockaddr*>(storage);
-    memcpy(ai->ai_addr, addr->sockAddr(), addr->sockAddrLen());
-    ai->ai_addrlen = addr->sockAddrLen();
-    return ai;
-  }
-
-  Api::SysCallIntResult getaddrinfo(const char* node, const char* /*service*/,
-                                    const addrinfo* /*hints*/, addrinfo** res) override {
-    *res = nullptr;
-    if (absl::string_view{"localhost"} == node || absl::string_view{"127.0.0.1"} == node ||
-        absl::string_view{"::1"} == node) {
-      if (ip_version_ == Network::Address::IpVersion::v6) {
-        *res = makeAddrInfo(Network::Utility::getIpv6LoopbackAddress());
-      } else {
-        *res = makeAddrInfo(Network::Utility::getCanonicalIpv4LoopbackAddress());
-      }
-      return {0, 0};
-    }
-    if (nonexisting_addresses_.find(node) != nonexisting_addresses_.end()) {
-      return {EAI_NONAME, 0};
-    }
-    std::cerr << "Mock DNS does not have entry for: " << node << std::endl;
-    return {-1, 128};
-  }
-  void freeaddrinfo(addrinfo* ai) override {
-    while (ai != nullptr) {
-      addrinfo* p = ai;
-      ai = ai->ai_next;
-      free(p->ai_addr);
-      free(p);
-    }
-  }
-
-  void setIpVersion(Network::Address::IpVersion version) { ip_version_ = version; }
-
-  Network::Address::IpVersion ip_version_ = Network::Address::IpVersion::v4;
-
-  absl::flat_hash_set<absl::string_view> nonexisting_addresses_ = {"doesnotexist.example.com",
-                                                                   "itdoesnotexist"};
-};
 
 class ProxyFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                    public HttpIntegrationTest {
@@ -111,7 +60,8 @@ public:
       bool use_sub_cluster = false, double dns_query_timeout = 5,
       bool disable_dns_refresh_on_failure = false,
       bool allow_dynamic_host_from_filter_state = false,
-      const absl::optional<std::string>& prepend_custom_filter_config_yaml = absl::nullopt) {
+      const absl::optional<std::string>& prepend_custom_filter_config_yaml = absl::nullopt,
+      bool use_dfp_even_when_cluster_resolves_hosts = false) {
     const std::string filter_use_sub_cluster = R"EOF(
 name: dynamic_forward_proxy
 typed_config:
@@ -140,13 +90,16 @@ typed_config:
         disable_dns_refresh_on_failure, max_pending_requests, key_value_config_,
         typed_dns_resolver_config,
         allow_dynamic_host_from_filter_state ? "allow_dynamic_host_from_filter_state: true" : "");
-    const std::string stream_info_filter_config_str = fmt::format(R"EOF(
-name: stream-info-to-headers-filter
-)EOF");
+    const std::string stream_info_filter_config_str = R"EOF(
+      name: stream-info-to-headers-filter
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+    )EOF";
 
     if (prepend_custom_filter_config_yaml.has_value()) {
       // Prepend DFP filter.
-      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts")) {
+      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts") ||
+          use_dfp_even_when_cluster_resolves_hosts) {
         config_helper_.prependFilter(use_sub_cluster ? filter_use_sub_cluster
                                                      : filter_use_dns_cache);
       } else if (use_sub_cluster) {
@@ -161,7 +114,8 @@ name: stream-info-to-headers-filter
       // Prepend stream_info_filter.
       config_helper_.prependFilter(stream_info_filter_config_str);
     } else {
-      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts")) {
+      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts") ||
+          use_dfp_even_when_cluster_resolves_hosts) {
         config_helper_.prependFilter(use_sub_cluster ? filter_use_sub_cluster
                                                      : filter_use_dns_cache);
       } else if (use_sub_cluster) {
@@ -173,9 +127,11 @@ name: stream-info-to-headers-filter
       config_helper_.prependFilter(stream_info_filter_config_str);
     }
 
-    config_helper_.prependFilter(fmt::format(R"EOF(
-name: stream-info-to-headers-filter
-)EOF"));
+    config_helper_.prependFilter(R"EOF(
+      name: stream-info-to-headers-filter
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+    )EOF");
 
     // Add default DNS resolver as getAddrInfo in the bootstrap.
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -301,8 +257,8 @@ typed_config:
 
     // CDS cluster is loaded in createUpstreams() to handle late H3 information.
     HttpIntegrationTest::initialize();
-    test_server_->waitForCounterEq("cluster_manager.cluster_added", 1);
-    test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+    test_server_->waitForCounter("cluster_manager.cluster_added", Eq(1));
+    test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
 
     default_request_headers_.setHost(
         fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port()));
@@ -369,9 +325,11 @@ typed_config:
   void requestWithBodyTest() {
     int64_t original_usec = dispatcher_->timeSource().monotonicTime().time_since_epoch().count();
 
-    config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+    config_helper_.prependFilter(R"EOF(
+      name: stream-info-to-headers-filter
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+    )EOF");
 
     initializeWithArgs(1024, 1024, "");
     codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -441,7 +399,7 @@ typed_config:
     // Close the upstream connection and wait for it to be detected.
     ASSERT_TRUE(fake_upstream_connection_->close());
     fake_upstream_connection_.reset();
-    test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+    test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
 
     IntegrationStreamDecoderPtr response2 =
         codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -557,9 +515,11 @@ TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithTrace) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
 
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
   autonomous_upstream_ = true;
@@ -583,9 +543,11 @@ TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithoutTrace) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
 
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
   autonomous_upstream_ = true;
@@ -606,9 +568,11 @@ TEST_P(ProxyFilterIntegrationTest, DisableResolveTimeout) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
 
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
   autonomous_upstream_ = true;
@@ -627,9 +591,11 @@ TEST_P(ProxyFilterIntegrationTest, DisableRefreshOnFailureContainsFailedHost) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
 
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
   autonomous_upstream_ = true;
@@ -666,9 +632,11 @@ TEST_P(ProxyFilterIntegrationTest, DisableRefreshOnFailureContainsSuccessfulHost
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
 
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
   autonomous_upstream_ = true;
@@ -720,9 +688,11 @@ TEST_P(ProxyFilterIntegrationTest, ParallelRequests) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
 
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
   autonomous_upstream_ = true;
@@ -745,9 +715,11 @@ TEST_P(ProxyFilterIntegrationTest, ParallelRequestsWithFakeResolver) {
 
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   upstream_tls_ = false;
   autonomous_upstream_ = true;
@@ -757,9 +729,11 @@ TEST_P(ProxyFilterIntegrationTest, ParallelRequestsWithFakeResolver) {
   // Kick off the first request.
   auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   // Wait fo the query to kick off
-  test_server_->waitForCounterEq("dns_cache.foo.dns_query_attempt", 1);
+  test_server_->waitForCounter("dns_cache.foo.dns_query_attempt", Eq(1));
   // Start the next request before unblocking the resolve.
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  // Wait for both requests to be received downstream before unblocking DNS.
+  test_server_->waitForCounter("http.config_test.downstream_rq_total", Eq(2));
   Network::TestResolver::unblockResolve();
 
   ASSERT_TRUE(response1->waitForEndStream());
@@ -849,8 +823,8 @@ TEST_P(ProxyFilterIntegrationTest, ReloadClusterAndAttachToCache) {
   // Cause a cluster reload via CDS.
   cluster_.mutable_circuit_breakers()->add_thresholds()->mutable_max_connections()->set_value(100);
   cds_helper_.setCds({cluster_});
-  test_server_->waitForCounterEq("cluster_manager.cluster_modified", 1);
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForCounter("cluster_manager.cluster_modified", Eq(1));
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
 
   // We need to wait until the workers have gotten the new cluster update. The only way we can
   // know this currently is when the connection pools drain and terminate.
@@ -886,7 +860,7 @@ TEST_P(ProxyFilterWithSimtimeIntegrationTest, RemoveHostViaTTL) {
 
   // > 5m
   simTime().advanceTimeWait(std::chrono::milliseconds(300001));
-  test_server_->waitForGaugeEq("dns_cache.foo.num_hosts", 0);
+  test_server_->waitForGauge("dns_cache.foo.num_hosts", Eq(0));
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_removed")->value());
 }
 
@@ -1124,7 +1098,7 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileShortTtl) {
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_http1_total")->value());
 
   // Wait for the host to be removed due to short TTL
-  test_server_->waitForCounterGe("dns_cache.foo.host_removed", 1);
+  test_server_->waitForCounter("dns_cache.foo.host_removed", Ge(1));
 
   // Send a request and expect an error due to 1) removed host and 2) DNS resolution fail.
   response = codec_client_->makeHeaderOnlyRequest(request_headers);
@@ -1155,7 +1129,7 @@ TEST_P(ProxyFilterIntegrationTest, StreamPersistAcrossShortTtlResFail) {
 
   // When the TTL is hit, the host will be removed from the DNS cache. This
   // won't break the outstanding connection.
-  test_server_->waitForCounterGe("dns_cache.foo.host_removed", 1);
+  test_server_->waitForCounter("dns_cache.foo.host_removed", Ge(1));
 
   // Kick off a new request before the first is served.
   auto response2 = codec_client_->makeHeaderOnlyRequest(request_headers);
@@ -1201,8 +1175,8 @@ TEST_P(ProxyFilterIntegrationTest, StreamPersistAcrossShortTtlResSuccess) {
 
   // When the TTL is hit, the host will be removed from the DNS cache. This
   // won't break the outstanding connection.
-  // test_server_->waitForCounterGe("dns.cares.resolve_total", 1);
-  test_server_->waitForCounterGe("dns_cache.foo.dns_query_success", 1);
+  // test_server_->waitForCounter("dns.cares.resolve_total", Ge(1));
+  test_server_->waitForCounter("dns_cache.foo.dns_query_success", Ge(1));
 
   // Kick off a new request before the first is served.
   auto response2 = codec_client_->makeHeaderOnlyRequest(request_headers);
@@ -1237,7 +1211,7 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileShortTtlHostActive) {
   waitForNextUpstreamRequest();
 
   // Wait for the host to be removed due to short TTL
-  test_server_->waitForCounterGe("dns_cache.foo.host_removed", 1);
+  test_server_->waitForCounter("dns_cache.foo.host_removed", Ge(1));
 
   // Finish the response.
   upstream_request_->encodeHeaders(default_response_headers_, true);
@@ -1268,7 +1242,7 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileAndTestHappyEyeballs) {
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
   // Wait for the request to be received.
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_total", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_total", Eq(1));
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
   EXPECT_TRUE(response->waitForEndStream());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.cache_load")->value());
@@ -1277,6 +1251,8 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileAndTestHappyEyeballs) {
 
 #if defined(ENVOY_ENABLE_QUIC)
 TEST_P(ProxyFilterIntegrationTest, UseCacheFileAndHttp3) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http3_happy_eyeballs", "true"}});
   upstream_cert_name_ = ""; // Force standard TLS
   dns_hostname_ = "sni.lyft.com";
   autonomous_upstream_ = true;
@@ -1301,7 +1277,7 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileAndHttp3) {
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
   // Wait for the request to be received.
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_total", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_total", Eq(1));
   EXPECT_TRUE(response->waitForEndStream());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.cache_load")->value());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
@@ -1336,7 +1312,7 @@ TEST_P(ProxyFilterIntegrationTest, MultipleRequestsLowStreamLimit) {
   // Start another request.
   IntegrationStreamDecoderPtr response2 =
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_total", 2);
+  test_server_->waitForCounter("http.config_test.downstream_rq_total", Eq(2));
   // Make sure the stream is not received.
   ASSERT_FALSE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_,
                                                            std::chrono::milliseconds(100)));
@@ -1355,7 +1331,7 @@ TEST_P(ProxyFilterIntegrationTest, MultipleRequestsLowStreamLimit) {
   ASSERT_TRUE(response2->waitForEndStream());
   EXPECT_TRUE(response2->complete());
   EXPECT_EQ("200", response2->headers().getStatusValue());
-  test_server_->waitForCounterEq("dns_cache.foo.dns_query_attempt", 1);
+  test_server_->waitForCounter("dns_cache.foo.dns_query_attempt", Eq(1));
 }
 
 TEST_P(ProxyFilterIntegrationTest, MultipleRequestsForceRefreshOff) {
@@ -1431,7 +1407,7 @@ TEST_P(ProxyFilterIntegrationTest, TestQueueingBasedOnCircuitBreakers) {
   IntegrationStreamDecoderPtr response2 =
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   // Make sure the stream is received, but no new connection is established.
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_total", 2);
+  test_server_->waitForCounter("http.config_test.downstream_rq_total", Eq(2));
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
 
   // Finish the first stream.
@@ -1488,19 +1464,19 @@ TEST_P(ProxyFilterIntegrationTest, SubClusterReloadCluster) {
       sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
   checkSimpleRequestSuccess(1024, 1024, response.get());
   // one more sub cluster
-  test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  test_server_->waitForCounterEq("cluster_manager.cluster_modified", 0);
-  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 0);
+  test_server_->waitForCounter("cluster_manager.cluster_added", Eq(2));
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
+  test_server_->waitForCounter("cluster_manager.cluster_modified", Eq(0));
+  test_server_->waitForCounter("cluster_manager.cluster_removed", Eq(0));
 
   // Cause a cluster reload via CDS.
   cluster_.mutable_circuit_breakers()->add_thresholds()->mutable_max_connections()->set_value(100);
   cds_helper_.setCds({cluster_});
   // sub cluster is removed
-  test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  test_server_->waitForCounterEq("cluster_manager.cluster_modified", 1);
-  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 1);
+  test_server_->waitForCounter("cluster_manager.cluster_added", Eq(2));
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
+  test_server_->waitForCounter("cluster_manager.cluster_modified", Eq(1));
+  test_server_->waitForCounter("cluster_manager.cluster_removed", Eq(1));
 
   // We need to wait until the workers have gotten the new cluster update. The only way we can
   // know this currently is when the connection pools drain and terminate.
@@ -1511,70 +1487,8 @@ TEST_P(ProxyFilterIntegrationTest, SubClusterReloadCluster) {
   // Now send another request. This should create a new sub cluster.
   response = sendRequestAndWaitForResponse(request_headers, 512, default_response_headers_, 512);
   checkSimpleRequestSuccess(512, 512, response.get());
-  test_server_->waitForCounterEq("cluster_manager.cluster_added", 3);
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-}
-
-// Verify that we expire sub clusters and not remove on CDS.
-TEST_P(ProxyFilterWithSimtimeIntegrationTest, RemoveViaTTLAndDFPUpdateWithoutAvoidCDSRemoval) {
-  const std::string cluster_yaml = R"EOF(
-    name: fake_cluster
-    connect_timeout: 0.250s
-    type: STATIC
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: fake_cluster
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 11001
-  )EOF";
-  auto cluster = Upstream::parseClusterFromV3Yaml(cluster_yaml);
-  // make runtime guard false
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update", "false");
-  initializeWithArgs(1024, 1024, "", typed_dns_resolver_config_, true);
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},
-      {":path", "/test/long/url"},
-      {":scheme", "http"},
-      {":authority",
-       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
-
-  auto response =
-      sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
-  checkSimpleRequestSuccess(1024, 1024, response.get());
-  // one more cluster
-  test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
-  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 0);
-  cleanupUpstreamAndDownstream();
-
-  // Sub cluster expected to be removed after ttl
-  // > 5m
-  simTime().advanceTimeWait(std::chrono::milliseconds(300001));
-  test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
-  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 1);
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  response = sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
-  checkSimpleRequestSuccess(1024, 1024, response.get());
-
-  // sub cluster added again
-  test_server_->waitForCounterEq("cluster_manager.cluster_added", 3);
-  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 1);
-  cleanupUpstreamAndDownstream();
-
-  // Make update to DFP cluster
-  cluster_.mutable_circuit_breakers()->add_thresholds()->mutable_max_connections()->set_value(100);
-  cds_helper_.setCds({cluster_});
-
-  // sub cluster removed due to dfp cluster update
-  test_server_->waitForCounterEq("cluster_manager.cluster_added", 3);
-  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 2);
+  test_server_->waitForCounter("cluster_manager.cluster_added", Eq(3));
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
 }
 
 // Verify that we expire sub clusters.
@@ -1592,14 +1506,14 @@ TEST_P(ProxyFilterWithSimtimeIntegrationTest, RemoveSubClusterViaTTL) {
       sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
   checkSimpleRequestSuccess(1024, 1024, response.get());
   // one more cluster
-  test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
-  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 0);
+  test_server_->waitForCounter("cluster_manager.cluster_added", Eq(2));
+  test_server_->waitForCounter("cluster_manager.cluster_removed", Eq(0));
   cleanupUpstreamAndDownstream();
 
   // > 5m
   simTime().advanceTimeWait(std::chrono::milliseconds(300001));
-  test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
-  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 1);
+  test_server_->waitForCounter("cluster_manager.cluster_added", Eq(2));
+  test_server_->waitForCounter("cluster_manager.cluster_removed", Eq(1));
 }
 
 // Test sub clusters overflow.
@@ -1655,8 +1569,6 @@ TEST_P(ProxyFilterIntegrationTest, SubClusterWithIpHost) {
 
 // Verify that no DFP clusters are removed when CDS Reload is triggered.
 TEST_P(ProxyFilterIntegrationTest, CDSReloadNotRemoveDFPCluster) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update", "true");
   const std::string cluster_yaml = R"EOF(
     name: fake_cluster
     connect_timeout: 0.250s
@@ -1687,19 +1599,19 @@ TEST_P(ProxyFilterIntegrationTest, CDSReloadNotRemoveDFPCluster) {
       sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
   checkSimpleRequestSuccess(1024, 1024, response.get());
   // one more sub cluster
-  test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  test_server_->waitForCounterEq("cluster_manager.cluster_modified", 0);
-  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 0);
+  test_server_->waitForCounter("cluster_manager.cluster_added", Eq(2));
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
+  test_server_->waitForCounter("cluster_manager.cluster_modified", Eq(0));
+  test_server_->waitForCounter("cluster_manager.cluster_removed", Eq(0));
 
   // Cause a cluster reload via CDS.
   cds_helper_.setCds({cluster_, cluster});
   // a new cluster is added and no dfp cluster is removed
-  test_server_->waitForCounterEq("cluster_manager.cluster_added", 3);
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  test_server_->waitForCounterEq("cluster_manager.cluster_modified", 0);
+  test_server_->waitForCounter("cluster_manager.cluster_added", Eq(3));
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
+  test_server_->waitForCounter("cluster_manager.cluster_modified", Eq(0));
   // No DFP cluster should be removed.
-  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 0);
+  test_server_->waitForCounter("cluster_manager.cluster_removed", Eq(0));
 
   // The fake upstream connection should stay connected
   ASSERT_TRUE(fake_upstream_connection_->connected());
@@ -1709,8 +1621,8 @@ TEST_P(ProxyFilterIntegrationTest, CDSReloadNotRemoveDFPCluster) {
   checkSimpleRequestSuccess(512, 512, response.get());
 
   // No new cluster should be added as DFP cluster already exists
-  test_server_->waitForCounterEq("cluster_manager.cluster_added", 3);
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForCounter("cluster_manager.cluster_added", Eq(3));
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
 }
 
 TEST_P(ProxyFilterIntegrationTest, ResetStreamDuringDnsLookup) {
@@ -1736,6 +1648,36 @@ TEST_P(ProxyFilterIntegrationTest, ResetStreamDuringDnsLookup) {
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("504", response->headers().getStatusValue());
+}
+
+// This test validates that processing of DNS resolutions on worker threads is handled correctly.
+// The test uses specific scenario where DFP filter AND async resolution in DFP cluster are enabled.
+// Normally DFP filter is not needed, however this configuration can occur as the
+// envoy.reloadable_features.dfp_cluster_resolves_hosts flag is now enabled by default. The test
+// also requires the Host header to be modified between DFP and Router filters to trigger abnormal
+// behavior in the DNS resolution processing loop.
+TEST_P(ProxyFilterIntegrationTest, DoubleResolution) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.dfp_cluster_resolves_hosts", "true");
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.skip_dns_lookup_for_proxied_requests", "true");
+  upstream_tls_ = false;
+  autonomous_upstream_ = true;
+  // Add DFP filter even if async DNS resolution is enabled.
+  config_helper_.prependFilter(R"EOF(
+    name: modify-host-filter
+    typed_config:
+      "@type": type.googleapis.com/test.extensions.filters.http.dynamic_forward_proxy.ModifyHostFilterConfig
+  )EOF");
+  initializeWithArgs(1024, 1024, "", typed_dns_resolver_config_, false, 5, false, false,
+                     absl::nullopt, true);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  // The host modification filter sets a non-existing host which should result in a 503.
+  EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
 } // namespace

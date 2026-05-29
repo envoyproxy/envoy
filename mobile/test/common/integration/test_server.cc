@@ -145,10 +145,6 @@ TestServer::TestServer()
 void TestServer::start(TestServerType type, int port) {
   port_ = port;
   ASSERT(!upstream_);
-  // pre-setup: see https://github.com/envoyproxy/envoy/blob/main/test/test_runner.cc
-  Logger::Context logging_state(spdlog::level::level_enum::err,
-                                "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v", lock_, false, false);
-  // end pre-setup
   Network::DownstreamTransportSocketFactoryPtr factory;
 
   Extensions::TransportSockets::Tls::forceRegisterServerContextFactoryImpl();
@@ -349,11 +345,10 @@ Network::DownstreamTransportSocketFactoryPtr TestServer::createUpstreamTlsContex
     tls_context.mutable_common_tls_context()->add_alpn_protocols("h2");
   }
   auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-      tls_context, factory_context, false);
+      tls_context, factory_context, {}, false);
   static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-      std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),
-      std::vector<std::string>{});
+      std::move(cfg), context_manager_, *upstream_stats_store->rootScope());
 }
 
 } // namespace Envoy

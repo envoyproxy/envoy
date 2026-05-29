@@ -7,6 +7,7 @@
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "gtest/gtest.h"
 
@@ -18,28 +19,28 @@ std::string toUsec(MonotonicTime time) { return absl::StrCat(time.time_since_epo
 } // namespace
 
 void addValueHeaders(Http::ResponseHeaderMap& headers, std::string key_prefix,
-                     const ProtobufWkt::Value& val) {
+                     const Protobuf::Value& val) {
   switch (val.kind_case()) {
-  case ProtobufWkt::Value::kNullValue:
+  case Protobuf::Value::kNullValue:
     headers.addCopy(Http::LowerCaseString(key_prefix), "null");
     break;
-  case ProtobufWkt::Value::kNumberValue:
+  case Protobuf::Value::kNumberValue:
     headers.addCopy(Http::LowerCaseString(key_prefix), std::to_string(val.number_value()));
     break;
-  case ProtobufWkt::Value::kStringValue:
+  case Protobuf::Value::kStringValue:
     headers.addCopy(Http::LowerCaseString(key_prefix), val.string_value());
     break;
-  case ProtobufWkt::Value::kBoolValue:
+  case Protobuf::Value::kBoolValue:
     headers.addCopy(Http::LowerCaseString(key_prefix), val.bool_value() ? "true" : "false");
     break;
-  case ProtobufWkt::Value::kListValue: {
+  case Protobuf::Value::kListValue: {
     const auto& vals = val.list_value().values();
     for (auto i = 0; i < vals.size(); ++i) {
       addValueHeaders(headers, key_prefix + "." + std::to_string(i), vals[i]);
     }
     break;
   }
-  case ProtobufWkt::Value::kStructValue:
+  case Protobuf::Value::kStructValue:
     for (const auto& field : val.struct_value().fields()) {
       addValueHeaders(headers, key_prefix + "." + field.first, field.second);
     }
@@ -151,8 +152,10 @@ public:
 };
 
 constexpr char StreamInfoToHeadersFilter::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<StreamInfoToHeadersFilter>,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<StreamInfoToHeadersFilter,
+                             test::integration::filters::StreamInfoToHeadersFilterConfig>,
+    Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 
 } // namespace Envoy

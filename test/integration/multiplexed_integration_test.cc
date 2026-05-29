@@ -9,8 +9,6 @@
 #include "source/common/quic/client_connection_factory_impl.h"
 #endif
 
-#include "absl/synchronization/mutex.h"
-
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -30,8 +28,11 @@
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/mutex.h"
 #include "gtest/gtest.h"
 
+using ::testing::Eq;
+using ::testing::Ge;
 using ::testing::HasSubstr;
 using ::testing::MatchesRegex;
 
@@ -104,6 +105,14 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, MultiplexedIntegrationTestWithSimulatedTime
                              {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
+class MultiplexedIntegrationTestWithSimulatedTimeHttp2Only : public Event::TestUsingSimulatedTime,
+                                                             public MultiplexedIntegrationTest {};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, MultiplexedIntegrationTestWithSimulatedTimeHttp2Only,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecType::HTTP2}, {Http::CodecType::HTTP2})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
 TEST_P(MultiplexedIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false, false);
 }
@@ -114,9 +123,11 @@ TEST_P(MultiplexedIntegrationTest, Http3StreamInfoDownstreamHandshakeTiming) {
     return;
   }
 
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -242,7 +253,52 @@ TEST_P(MultiplexedIntegrationTest, CodecStreamIdleTimeout) {
   std::string flush_timeout_counter(downstreamProtocol() == Http::CodecType::HTTP3
                                         ? "http3.tx_flush_timeout"
                                         : "http2.tx_flush_timeout");
-  test_server_->waitForCounterEq(flush_timeout_counter, 1);
+  test_server_->waitForCounter(flush_timeout_counter, Eq(1));
+  ASSERT_TRUE(response->waitForReset());
+}
+
+// Test that the codec stream flush timeout can be overridden independently from
+// the connection manager stream idle timeout.
+TEST_P(MultiplexedIntegrationTest, CodecStreamIdleTimeoutOverride) {
+  config_helper_.setBufferLimits(1024, 1024);
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        // Disable the generic stream idle timeout. This will be overridden by the
+        // stream_flush_timeout and the test should work exactly the same as the
+        // CodecStreamIdleTimeout test.
+        hcm.mutable_stream_idle_timeout()->set_seconds(0);
+        hcm.mutable_stream_idle_timeout()->set_nanos(0);
+
+        hcm.mutable_stream_flush_timeout()->set_seconds(0);
+        constexpr uint64_t FlushTimeoutMs = 400;
+        hcm.mutable_stream_flush_timeout()->set_nanos(FlushTimeoutMs * 1000 * 1000);
+      });
+  initialize();
+  const size_t stream_flow_control_window =
+      downstream_protocol_ == Http::CodecType::HTTP3 ? 32 * 1024 : 65535;
+  envoy::config::core::v3::Http2ProtocolOptions http2_options =
+      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+          envoy::config::core::v3::Http2ProtocolOptions())
+          .value();
+  http2_options.mutable_initial_stream_window_size()->set_value(stream_flow_control_window);
+#ifdef ENVOY_ENABLE_QUIC
+  if (downstream_protocol_ == Http::CodecType::HTTP3) {
+    dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
+        .quic_config_.SetInitialStreamFlowControlWindowToSend(stream_flow_control_window);
+    dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
+        .quic_config_.SetInitialSessionFlowControlWindowToSend(stream_flow_control_window);
+  }
+#endif
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(stream_flow_control_window + 2000, true);
+  std::string flush_timeout_counter(downstreamProtocol() == Http::CodecType::HTTP3
+                                        ? "http3.tx_flush_timeout"
+                                        : "http2.tx_flush_timeout");
+  test_server_->waitForCounter(flush_timeout_counter, Eq(1));
   ASSERT_TRUE(response->waitForReset());
 }
 
@@ -269,14 +325,16 @@ TEST_P(MultiplexedIntegrationTest, Http2DownstreamKeepalive) {
 
   // This call is NOT running the event loop of the client, so downstream PINGs will
   // not receive a response.
-  test_server_->waitForCounterEq("http2.keepalive_timeout", 1,
-                                 std::chrono::milliseconds(timeout_ms * 2));
+  test_server_->waitForCounter("http2.keepalive_timeout", Eq(1),
+                               std::chrono::milliseconds(timeout_ms * 2));
 
   ASSERT_TRUE(response->waitForReset());
 }
 
 static std::string response_metadata_filter = R"EOF(
 name: response-metadata-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.ResponseMetadataFilterConfig
 )EOF";
 
 class MetadataIntegrationTest : public HttpProtocolIntegrationTest {
@@ -457,7 +515,7 @@ TEST_P(MetadataIntegrationTest, ProxyMetadataInResponse) {
   // The downstream codec should send one.
   std::string counter =
       absl::StrCat("cluster.cluster_0.", upstreamProtocolStatsRoot(), ".rx_reset");
-  test_server_->waitForCounterEq(counter, 1);
+  test_server_->waitForCounter(counter, Eq(1));
 }
 
 TEST_P(MetadataIntegrationTest, ProxyMultipleMetadata) {
@@ -790,6 +848,8 @@ TEST_P(MetadataIntegrationTest, RequestMetadataThenTrailers) {
 
 static std::string request_metadata_filter = R"EOF(
 name: request-metadata-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.RequestMetadataFilterConfig
 )EOF";
 
 TEST_P(MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
@@ -969,6 +1029,8 @@ void MetadataIntegrationTest::testRequestMetadataWithStopAllFilter() {
 
 static std::string metadata_stop_all_filter = R"EOF(
 name: metadata-stop-all-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.MetadataStopAllFilterConfig
 )EOF";
 
 TEST_P(MetadataIntegrationTest, RequestMetadataWithStopAllFilterBeforeMetadataFilter) {
@@ -984,6 +1046,8 @@ TEST_P(MetadataIntegrationTest, RequestMetadataWithStopAllFilterAfterMetadataFil
 TEST_P(MetadataIntegrationTest, TestAddEncodedMetadata) {
   config_helper_.prependFilter(R"EOF(
 name: encode-headers-return-stop-all-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.EncodeHeadersReturnStopAllFilterConfig
 )EOF");
 
   initialize();
@@ -1089,7 +1153,11 @@ TEST_P(MultiplexedIntegrationTest, BadFrame) {
 
 // Test GoAway from L7 decoder filters with StopIteration.
 TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByFilter) {
-  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  config_helper_.addFilter(R"EOF(
+    name: send-goaway-during-decode-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SendGoawayFilterConfig
+  )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(
@@ -1105,7 +1173,11 @@ TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByFilter) {
 
 // Test GoAway from L7 decoder filters with Continue.
 TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByFilterContinue) {
-  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  config_helper_.addFilter(R"EOF(
+    name: send-goaway-during-decode-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SendGoawayFilterConfig
+  )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(
@@ -1125,7 +1197,11 @@ TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByEncoderFilterStopIterat
   FakeHttpConnectionPtr fake_upstream_connection;
   Http::RequestEncoder* encoder;
   FakeStreamPtr upstream_request;
-  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  config_helper_.addFilter(R"EOF(
+    name: send-goaway-during-decode-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SendGoawayFilterConfig
+  )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =
@@ -1157,7 +1233,11 @@ TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByEncoderFilterContinue) 
   FakeHttpConnectionPtr fake_upstream_connection;
   Http::RequestEncoder* encoder;
   FakeStreamPtr upstream_request;
-  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  config_helper_.addFilter(R"EOF(
+    name: send-goaway-during-decode-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SendGoawayFilterConfig
+  )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =
@@ -1186,7 +1266,11 @@ TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByEncoderFilterContinue) 
 
 // Test sending GoAway during SendLocalReply from L7 encoder filters.
 TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredInLocalReplyEncoderFilter) {
-  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  config_helper_.addFilter(R"EOF(
+    name: send-goaway-during-decode-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SendGoawayFilterConfig
+  )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -1257,11 +1341,11 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayAfterTooManyResets) {
 
   // Envoy should disconnect client due to premature reset check
   ASSERT_TRUE(codec_client_->waitForDisconnect());
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", total_streams);
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_too_many_premature_resets", 1);
+  test_server_->waitForCounter("http.config_test.downstream_rq_rx_reset", Eq(total_streams));
+  test_server_->waitForCounter("http.config_test.downstream_rq_too_many_premature_resets", Eq(1));
 }
 
-TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayQuicklyAfterTooManyResets) {
+TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, GoAwayQuicklyAfterTooManyResets) {
   EXCLUDE_DOWNSTREAM_HTTP3; // Need to wait for the server to reset the stream
                             // before opening new one.
   const int total_streams = 100;
@@ -1283,8 +1367,72 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayQuicklyAfterTooManyRes
 
   // Envoy should disconnect client due to premature reset check
   ASSERT_TRUE(codec_client_->waitForDisconnect());
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", num_reset_streams);
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_too_many_premature_resets", 1);
+  test_server_->waitForCounter("http.config_test.downstream_rq_rx_reset", Eq(num_reset_streams));
+  test_server_->waitForCounter("http.config_test.downstream_rq_too_many_premature_resets", Eq(1));
+}
+
+TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, TooManyRequestResetAndNoRecursion) {
+  if (downstreamProtocol() != Http::CodecType::HTTP2 ||
+      upstreamProtocol() != Http::CodecType::HTTP2) {
+    // This test is only valid for HTTP/2 and HTTP/3.
+    return;
+  }
+
+  config_helper_.setDownstreamHttp2MaxConcurrentStreams(60000);
+  config_helper_.setUpstreamHttp2MaxConcurrentStreams(60000);
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()
+        ->mutable_clusters(0)
+        ->mutable_circuit_breakers()
+        ->add_thresholds()
+        ->mutable_max_requests()
+        ->set_value(60000);
+  });
+
+  config_helper_.addRuntimeOverride("overload.premature_reset_total_stream_count",
+                                    absl::StrCat(100));
+
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+  initialize();
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"}, {":path", "/healthcheck"}, {":scheme", "http"}, {":authority", "host"}};
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const int pending_streams = 1800; // 18000 in local or this consume too much resource.
+  std::vector<std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>> encoder_decoders;
+  encoder_decoders.reserve(pending_streams);
+
+  const int pending_streams_per_iteration = pending_streams / 4;
+  for (size_t i = 0; i < 4; i++) {
+    for (size_t j = 0; j < pending_streams_per_iteration; ++j) {
+      // Send and wait
+      encoder_decoders.emplace_back(codec_client_->startRequest(headers));
+    }
+    test_server_->waitForCounter("http.config_test.downstream_rq_total",
+                                 Eq(pending_streams_per_iteration * (i + 1)),
+                                 TestUtility::DefaultTimeout * 5);
+  }
+
+  // Reset 50 streams and then the connection should be closed because too much premature resets.
+  // All streams should be reset correctly without recursion.
+  for (int i = 0; i < 50; ++i) {
+    // Send and reset
+    auto encoder_decoder = codec_client_->startRequest(headers);
+    request_encoder_ = &encoder_decoder.first;
+    auto response = std::move(encoder_decoder.second);
+    codec_client_->sendReset(*request_encoder_);
+    ASSERT_TRUE(response->waitForReset());
+  }
+
+  // Envoy should disconnect client due to premature reset check
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  test_server_->waitForCounter("http.config_test.downstream_rq_rx_reset", Eq(pending_streams + 50),
+                               TestUtility::DefaultTimeout * 5);
+  // If there is recursion, this result won't be 1.
+  test_server_->waitForCounter("http.config_test.downstream_rq_too_many_premature_resets", Eq(1));
 }
 
 TEST_P(MultiplexedIntegrationTestWithSimulatedTime, DontGoAwayAfterTooManyResetsForLongStreams) {
@@ -1310,11 +1458,11 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTime, DontGoAwayAfterTooManyResets
     auto encoder_decoder = codec_client_->startRequest(headers);
     request_encoder_ = &encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
-    test_server_->waitForCounterEq(request_counter, i + 1);
+    test_server_->waitForCounter(request_counter, Eq(i + 1));
     timeSystem().advanceTimeWait(std::chrono::seconds(2 * stream_lifetime_seconds));
     codec_client_->sendReset(*request_encoder_);
     ASSERT_TRUE(response->waitForReset());
-    test_server_->waitForCounterEq(reset_counter, i + 1);
+    test_server_->waitForCounter(reset_counter, Eq(i + 1));
   }
 }
 
@@ -1476,7 +1624,7 @@ TEST_P(MultiplexedIntegrationTest, IdleTimeoutWithSimultaneousRequests) {
   // Do not send any requests and validate idle timeout kicks in after both the requests are done.
   ASSERT_TRUE(fake_upstream_connection1->waitForDisconnect());
   ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 2);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_idle_timeout", Ge(2));
 }
 
 // Test request mirroring / shadowing with an HTTP/2 downstream and a request with a body.
@@ -1783,6 +1931,8 @@ TEST_P(MultiplexedIntegrationTest, EmptyTrailers) {
 TEST_P(MultiplexedIntegrationTest, TestEncode1xxHeaders) {
   static std::string encode1xx_local_reply_config = R"EOF(
   name: encode1xx-local-reply-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.Encode1xxLocalReplyFilterConfig
   )EOF";
   config_helper_.prependFilter(encode1xx_local_reply_config);
   config_helper_.addConfigModifier(
@@ -1812,9 +1962,13 @@ TEST_P(MultiplexedIntegrationTest, TestEncode1xxHeaders) {
 TEST_P(MultiplexedIntegrationTest, TestEncode1xxHeadersWithLocalReplyDuringData) {
   std::string local_reply_during_decode_config = R"EOF(
   name: local-reply-during-decode
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.LocalReplyDuringDecodeConfig
   )EOF";
   std::string add_response_metadata_config = R"EOF(
   name: response-metadata-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.ResponseMetadataFilterConfig
   )EOF";
   config_helper_.prependFilter(local_reply_during_decode_config);
   config_helper_.prependFilter(add_response_metadata_config);
@@ -2210,7 +2364,7 @@ TEST_P(Http2FrameIntegrationTest, UpstreamRemoteMalformedFrameEndstreamWith1xxHe
   const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
   ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
 
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
 
   // A malformed frame is translated to 103 header with END_STREAM by the underlying codec.
   // Typically we should get a protocol error, but this should not crash Envoy.
@@ -2230,7 +2384,7 @@ TEST_P(Http2FrameIntegrationTest, UpstreamRemoteMalformedFrameEndstreamWith1xxHe
   EXPECT_EQ(Http2Frame::Type::Headers, response.type());
 
   tcp_client_->close();
-  test_server_->waitForGaugeEq("http.config_test.downstream_rq_active", 0);
+  test_server_->waitForGauge("http.config_test.downstream_rq_active", Eq(0));
 }
 
 TEST_P(Http2FrameIntegrationTest, MaxConcurrentStreamsIsRespected) {
@@ -2250,7 +2404,7 @@ TEST_P(Http2FrameIntegrationTest, MaxConcurrentStreamsIsRespected) {
 
   ASSERT_TRUE(tcp_client_->write(buffer, false, false));
   tcp_client_->waitForDisconnect();
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy_local", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy_local", Ge(1));
 }
 
 // Regression test.
@@ -2296,10 +2450,10 @@ TEST_P(Http2FrameIntegrationTest, AdjustUpstreamSettingsMaxStreams) {
       Http2Frame::SettingsFlags::None, {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 1}});
   std::string settings_data(settings_frame);
   ASSERT_TRUE(fake_upstream_connection1->write(settings_data));
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total",
-                                 settings_data.size());
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_rx_bytes_total",
+                               Ge(settings_data.size()));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Eq(1));
 
   // Start another request, it should create another upstream connection because of the max
   // concurrent streams of upstream connection created above.
@@ -2307,8 +2461,8 @@ TEST_P(Http2FrameIntegrationTest, AdjustUpstreamSettingsMaxStreams) {
   sendFrame(Http2Frame::makePostRequest(3, "host", "/path/to/long/url"));
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
   ASSERT_TRUE(fake_upstream_connection2->write(std::string(settings_frame)));
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 2);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 2);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(2));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Eq(2));
 
   // Adjust the max concurrent streams of one connection created above to 2.
   auto bytes_read = test_server_->counter("cluster.cluster_0.upstream_cx_rx_bytes_total");
@@ -2316,19 +2470,19 @@ TEST_P(Http2FrameIntegrationTest, AdjustUpstreamSettingsMaxStreams) {
       Http2Frame::SettingsFlags::None, {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 3}});
   std::string settings_data2(settings_frame2);
   ASSERT_TRUE(fake_upstream_connection1->write(settings_data2));
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total",
-                                 bytes_read + settings_data2.size());
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_rx_bytes_total",
+                               Ge(bytes_read + settings_data2.size()));
   // Now create another request.
   sendFrame(Http2Frame::makePostRequest(5, "host", "/path/to/long/url"));
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 3);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 2);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(3));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Eq(2));
 
   // The configured max concurrent streams is 2, even the SETTINGS frame above wants to
   // set the max concurrent streams to 3, it still reaches the upper bound. So the new request
   // below should result in the third connection.
   sendFrame(Http2Frame::makePostRequest(7, "host", "/path/to/long/url"));
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 4);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 3);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(4));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Eq(3));
 
   // Cleanup.
   tcp_client_->close();
@@ -2344,7 +2498,7 @@ TEST_P(Http2FrameIntegrationTest, UpstreamSettingsMaxStreamsAfterGoAway) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
   ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
 
   // Send RST_STREAM, GOAWAY and SETTINGS(0 max streams)
   const Http2Frame rst_stream =
@@ -2357,7 +2511,7 @@ TEST_P(Http2FrameIntegrationTest, UpstreamSettingsMaxStreamsAfterGoAway) {
       absl::StrCat(std::string(rst_stream), std::string(go_away_frame),
                    std::string(settings_max_connections_frame))));
 
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_close_notify", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_close_notify", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_protocol_error")->value());
 
   // Cleanup.
@@ -2374,7 +2528,7 @@ TEST_P(Http2FrameIntegrationTest, UpstreamGoAway) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
   ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
 
   const Http2Frame rst_stream =
       Http2Frame::makeResetStreamFrame(client_stream_idx, Http2Frame::ErrorCode::FlowControlError);
@@ -2384,7 +2538,7 @@ TEST_P(Http2FrameIntegrationTest, UpstreamGoAway) {
       absl::StrCat(std::string(rst_stream), std::string(go_away_frame))));
   ASSERT_TRUE(fake_upstream_connection->close());
 
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_close_notify", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_close_notify", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_protocol_error")->value());
 
   // Cleanup.
@@ -2402,11 +2556,11 @@ TEST_P(Http2FrameIntegrationTest, UpstreamProtocolError) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
   ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
 
   ASSERT_TRUE(fake_upstream_connection->write("abcdefg this is not a valid h2 frame"));
 
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_protocol_error", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_protocol_error", Ge(1));
 
   // Cleanup.
   tcp_client_->close();
@@ -2424,14 +2578,14 @@ TEST_P(Http2FrameIntegrationTest, UpstreamWindowUpdateAfterGoAway) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
   ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
 
   // Start a second request and wait for it to reach the upstream. This is to exercise the case
   // where numActiveRequests > 0 at the time that GOAWAY is received from upstream, which is needed
   // to replicate the original assertion failure.
   sendFrame(
       Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(1), "host", "/path/to/long/url"));
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 2);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(2));
 
   // Send RST_STREAM, GOAWAY followed by WINDOW_UPDATE
   const Http2Frame rst_stream =
@@ -2445,7 +2599,7 @@ TEST_P(Http2FrameIntegrationTest, UpstreamWindowUpdateAfterGoAway) {
   ASSERT_TRUE(fake_upstream_connection->write(absl::StrCat(
       std::string(rst_stream), std::string(go_away_frame), std::string(window_update_frame))));
 
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_close_notify", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_close_notify", Ge(1));
 
   // Cleanup.
   tcp_client_->close();
@@ -2680,6 +2834,8 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithMetadata) {
 
   config_helper_.prependFilter(R"EOF(
   name: metadata-control-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.MetadataControlFilterConfig
   )EOF");
 
   const int kRequestsSentPerIOCycle = 20;
@@ -2734,7 +2890,11 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequestsDecodeHeadersEndsRequest) {
   // The local-reply-during-decode will call sendLocalReply, completing them
   // when processing headers. This will cause the ConnectionManagerImpl::ActiveRequest
   // object to be removed from the streams_ list during the onDeferredRequestProcessing call.
-  config_helper_.addFilter("{ name: local-reply-during-decode }");
+  config_helper_.addFilter(R"EOF(
+    name: local-reply-during-decode
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.LocalReplyDuringDecodeConfig
+  )EOF");
   // Process more than 1 deferred request at a time to validate the removal of elements from
   // the list does not break reverse iteration.
   config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "3");
@@ -2818,7 +2978,11 @@ void Http2FrameIntegrationTest::sendRequestsAndResponses(uint32_t num_requests) 
 
 // Validate that GOAWAY is triggered by a L7 filter.
 TEST_P(Http2FrameIntegrationTest, SendGoAwayTriggerredByDecodingFilter) {
-  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  config_helper_.addFilter(R"EOF(
+    name: send-goaway-during-decode-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SendGoawayFilterConfig
+  )EOF");
   beginSession();
   uint32_t num_requests = 10;
   std::string buffer;
@@ -2839,7 +3003,11 @@ TEST_P(Http2FrameIntegrationTest, SendGoAwayTriggerredByDecodingFilter) {
 
 // GOAWAY is not triggered by a L7 filter.
 TEST_P(Http2FrameIntegrationTest, SendGoAwayNotTriggerredByDecodingFilter) {
-  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  config_helper_.addFilter(R"EOF(
+    name: send-goaway-during-decode-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SendGoawayFilterConfig
+  )EOF");
   beginSession();
   std::string buffer;
   auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(1), "a", "/",
@@ -2861,7 +3029,11 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithTrailersWithFilterChainPau
   const int kRequestsSentPerIOCycle = 20;
   // Add filter that stops iteration in the decodeHeaders and resumes in
   // decodeData to verify that downstream end_stream is handled correctly by the filter manager.
-  config_helper_.addFilter("name: stop-in-headers-continue-in-body-filter");
+  config_helper_.addFilter(R"EOF(
+    name: stop-in-headers-continue-in-body-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StopInHeadersContinueInBodyFilterConfig
+  )EOF");
   config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "1");
   sendRequestsAndResponses(kRequestsSentPerIOCycle);
 }
@@ -2877,7 +3049,11 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithTrailersNoPauseInFilterCha
 TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithTrailersDecodeHeadersEndsRequest) {
   const int kRequestsSentPerIOCycle = 20;
   autonomous_upstream_ = true;
-  config_helper_.addFilter("{ name: local-reply-during-decode }");
+  config_helper_.addFilter(R"EOF(
+    name: local-reply-during-decode
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.LocalReplyDuringDecodeConfig
+  )EOF");
   config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "6");
   beginSession();
 
@@ -2945,8 +3121,8 @@ TEST_P(Http2FrameIntegrationTest, MultipleHeaderOnlyRequestsFollowedByReset) {
   }
 
   ASSERT_TRUE(tcp_client_->write(buffer, false, false));
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset",
-                                 kRequestsSentPerIOCycle);
+  test_server_->waitForCounter("http.config_test.downstream_rq_rx_reset",
+                               Eq(kRequestsSentPerIOCycle));
   // Client should remain connected
   ASSERT_TRUE(tcp_client_->connected());
   tcp_client_->close();
@@ -2976,7 +3152,7 @@ TEST_P(Http2FrameIntegrationTest, ResettingDeferredRequestsTriggersPrematureRese
   ASSERT_TRUE(tcp_client_->write(buffer, false, false));
   // Envoy should close the client connection due to too many premature resets
   tcp_client_->waitForDisconnect();
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_too_many_premature_resets", 1);
+  test_server_->waitForCounter("http.config_test.downstream_rq_too_many_premature_resets", Eq(1));
   tcp_client_->close();
 }
 
@@ -2998,6 +3174,9 @@ TEST_P(Http2FrameIntegrationTest, CloseConnectionWithDeferredStreams) {
             ->mutable_timeout()
             ->set_seconds(0);
       });
+  config_helper_.setDownstreamHttp2MaxConcurrentStreams(20001);
+  config_helper_.setUpstreamHttp2MaxConcurrentStreams(20001);
+
   beginSession();
 
   std::string buffer;
@@ -3012,8 +3191,8 @@ TEST_P(Http2FrameIntegrationTest, CloseConnectionWithDeferredStreams) {
   tcp_client_->close();
   // Test that Envoy can clean-up deferred streams
   // Make the timeout longer to accommodate non optimized builds
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", kRequestsSentPerIOCycle,
-                                 TestUtility::DefaultTimeout * 10);
+  test_server_->waitForCounter("http.config_test.downstream_rq_rx_reset",
+                               Eq(kRequestsSentPerIOCycle), TestUtility::DefaultTimeout * 10);
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FrameIntegrationTest,
@@ -3198,7 +3377,7 @@ TEST_P(MultiplexedIntegrationTest, InconsistentContentLength) {
     EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
     EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("inconsistent_content_length"));
   } else if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
-    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+    EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
     EXPECT_THAT(waitForAccessLog(access_log_name_), "http2.violation.of.messaging.rule");
   } else {
     EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
@@ -3389,22 +3568,23 @@ TEST_P(SocketSwappableMultiplexedIntegrationTest, BackedUpDownstreamConnectionCl
   auto response_decoder = codec_client_->makeRequestWithBody(default_request_headers_, 10);
 
   waitForNextUpstreamRequest();
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(1000, false);
 
   // We should trigger pause at least once, and eventually have at least 1k
   // bytes buffered.
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_flow_control_paused_reading_total", 1);
-  test_server_->waitForGaugeGe("http.config_test.downstream_cx_tx_bytes_buffered", 1000);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_paused_reading_total",
+                               Ge(1));
+  test_server_->waitForGauge("http.config_test.downstream_cx_tx_bytes_buffered", Ge(1000));
 
   // Close downstream, check cleanup.
   codec_client_->close();
 
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
-  test_server_->waitForGaugeEq("http.config_test.downstream_rq_active", 0);
-  test_server_->waitForGaugeEq("http.config_test.downstream_cx_tx_bytes_buffered", 0);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(0));
+  test_server_->waitForGauge("http.config_test.downstream_rq_active", Eq(0));
+  test_server_->waitForGauge("http.config_test.downstream_cx_tx_bytes_buffered", Eq(0));
 }
 
 TEST_P(SocketSwappableMultiplexedIntegrationTest, BackedUpUpstreamConnectionClose) {
@@ -3422,19 +3602,674 @@ TEST_P(SocketSwappableMultiplexedIntegrationTest, BackedUpUpstreamConnectionClos
 
   // We should trigger pause at least once, and eventually have at least 1k
   // bytes buffered.
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_flow_control_backed_up_total", 1);
-  test_server_->waitForCounterGe("http.config_test.downstream_flow_control_paused_reading_total",
-                                 1);
-  test_server_->waitForGaugeGe("cluster.cluster_0.upstream_cx_tx_bytes_buffered", 1000);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_backed_up_total", Ge(1));
+  test_server_->waitForCounter("http.config_test.downstream_flow_control_paused_reading_total",
+                               Ge(1));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_cx_tx_bytes_buffered", Ge(1000));
 
   // Close upstream, check cleanup.
   fake_upstreams_[0].reset();
 
   ASSERT_TRUE(response_decoder->waitForAnyTermination());
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
-  test_server_->waitForGaugeEq("http.config_test.downstream_rq_active", 0);
-  test_server_->waitForGaugeGe("cluster.cluster_0.upstream_cx_tx_bytes_buffered", 0);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(0));
+  test_server_->waitForGauge("http.config_test.downstream_rq_active", Eq(0));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_cx_tx_bytes_buffered", Ge(0));
+}
+
+TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogation) {
+  // There are four streams created in total, client stream, Envoy server stream,
+  // Envoy client stream and upstream server stream.
+  // When we close a stream actively with a specific reset reason, we expect the peer
+  // to receive the related error code in onStreamClose().
+  // But note, the onStreamClose() for the active closing side will also be called.
+  // But the error code for active closing side will always be 0 if the Oghttp2 is used.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.reset_ignore_upstream_reason",
+                                    "true");
+
+  initialize();
+
+  {
+    // At the downstream side, because a complete local reply will be send before resetting
+    // the stream, so the stream close code observed at downstream side will be NO_ERROR (0).
+    // So, we expect 1 log entry with "closed: 2" for Oghttp2 and 2 log entries with "closed: 2"
+    // for other implementations.
+    size_t log_num = 0;
+    if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+      log_num = 1;
+    } else {
+      log_num = 2;
+    }
+
+    // The ProtocolError will be translated to OGHTTP2_PROTOCOL_ERROR (1).
+    EXPECT_LOG_CONTAINS_N_TIMES("debug", "closed: 1", log_num, {
+      codec_client_ = makeHttpConnection(lookupPort("http"));
+      auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+      auto response = std::move(encoder_decoder.second);
+      waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
+      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+      // This will result in the router to send a local reply. And because the downstream request
+      // is not complete yet, it will finally result in resetting of the downstream stream.
+      upstream_request_->encodeResetStream(Http::StreamResetReason::ProtocolError);
+      ASSERT_TRUE(response->waitForReset());
+      EXPECT_EQ(Http::StreamResetReason::RemoteResetNoError, response->resetReason());
+
+      cleanupUpstreamAndDownstream();
+    });
+  }
+
+  {
+    // For reason LocalReset, it will be translated to default HTTP2 stream error code.
+    // At the downstream side, because a complete local reply will be send before resetting
+    // the stream, so the stream close code observed at downstream side will be NO_ERROR (0).
+    // So, we expect 1 log entry with "closed: 2" for Oghttp2 and 2 log entries with "closed: 2"
+    // for other implementations.
+    size_t log_num = 0;
+    if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+      log_num = 1;
+    } else {
+      log_num = 2;
+    }
+
+    // The LocalReset will be translated to default code OGHTTP2_INTERNAL_ERROR (2).
+    EXPECT_LOG_CONTAINS_N_TIMES("debug", "closed: 2", log_num, {
+      codec_client_ = makeHttpConnection(lookupPort("http"));
+      auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+      auto response = std::move(encoder_decoder.second);
+      waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
+      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+      // This will result in the router to send a local reply. And because the downstream request
+      // is not complete yet, it will finally result in resetting of the stream.
+      upstream_request_->encodeResetStream(Http::StreamResetReason::LocalReset);
+      ASSERT_TRUE(response->waitForReset());
+      EXPECT_EQ(Http::StreamResetReason::RemoteResetNoError, response->resetReason());
+
+      cleanupUpstreamAndDownstream();
+    });
+  }
+}
+
+TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogationToDownstream) {
+  // There are four streams created in total, client stream, Envoy server stream,
+  // Envoy client stream and upstream server stream.
+  // When we close a stream actively with a specific reset reason, we expect the peer
+  // to receive the related error code in onStreamClose().
+  // But note, the onStreamClose() for the active closing side will also be called.
+  // But the error code for active closing side will always be 0 if the Oghttp2 is used.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.reset_ignore_upstream_reason",
+                                    "false");
+
+  initialize();
+
+  {
+    size_t log_num = 0;
+    if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+      log_num = 2;
+    } else {
+      log_num = 4;
+    }
+
+    // The ProtocolError will be translated to OGHTTP2_PROTOCOL_ERROR (1).
+    EXPECT_LOG_CONTAINS_N_TIMES("debug", "closed: 1", log_num, {
+      codec_client_ = makeHttpConnection(lookupPort("http"));
+      auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+      auto response = std::move(encoder_decoder.second);
+      waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
+      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+      // This will result in the router to send a local reply. And because the downstream request
+      // is not complete yet, it will finally result in resetting of the downstream stream.
+      upstream_request_->encodeResetStream(Http::StreamResetReason::ProtocolError);
+      ASSERT_TRUE(response->waitForReset());
+      EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
+
+      cleanupUpstreamAndDownstream();
+    });
+  }
+
+  {
+    // For reason LocalReset, it will be translated to default HTTP2 stream error code.
+    // At the downstream side, because a complete local reply will be send before resetting
+    // the stream, so the stream close code observed at downstream side will be NO_ERROR (0).
+    // So, we expect 1 log entry with "closed: 2" for Oghttp2 and 2 log entries with "closed: 2"
+    // for other implementations.
+    size_t log_num = 0;
+    if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+      log_num = 1;
+    } else {
+      log_num = 2;
+    }
+
+    // The LocalReset will be translated to default code OGHTTP2_INTERNAL_ERROR (2).
+    EXPECT_LOG_CONTAINS_N_TIMES("debug", "closed: 2", log_num, {
+      codec_client_ = makeHttpConnection(lookupPort("http"));
+      auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+      auto response = std::move(encoder_decoder.second);
+      waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
+      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+      // This will result in the router to send a local reply. And because the downstream request
+      // is not complete yet, it will finally result in resetting of the stream.
+      upstream_request_->encodeResetStream(Http::StreamResetReason::LocalReset);
+      ASSERT_TRUE(response->waitForReset());
+      EXPECT_EQ(Http::StreamResetReason::RemoteResetNoError, response->resetReason());
+
+      cleanupUpstreamAndDownstream();
+    });
+  }
+}
+
+TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogationLegacy) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.reset_with_error", "false");
+
+  std::vector<Http::StreamResetReason> reasons = {Http::StreamResetReason::ProtocolError,
+                                                  Http::StreamResetReason::LocalReset};
+  std::vector<Http::StreamResetReason> result_reasons = {
+      Http::StreamResetReason::RemoteResetNoError, Http::StreamResetReason::RemoteResetNoError};
+
+  // There are four streams created in total, client stream, Envoy server stream,
+  // Envoy client stream and upstream server stream.
+  // When we close a stream actively with a specific reset reason, we expect the peer
+  // to receive the related error code in onStreamClose().
+  // But note, the onStreamClose() for the active closing side will also be called.
+  // But the error code for active closing side will always be 0 if the Oghttp2 is used.
+
+  initialize();
+  for (size_t i = 0; i < reasons.size(); ++i) {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+
+    // In legacy code path, both the ProtocolError and LocalReset will be translated
+    // to OGHTTP2_NO_ERROR (0). So, we expect 4 log entries with "closed: 0" for both cases.
+    EXPECT_LOG_CONTAINS_N_TIMES("debug", "closed: 0", 4, {
+      auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+      auto response = std::move(encoder_decoder.second);
+      waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
+      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+      // This will result in the router to send a local reply. And because the downstream request
+      // is not complete yet, it will finally result in resetting of the stream.
+      upstream_request_->encodeResetStream(reasons[i]);
+      ASSERT_TRUE(response->waitForReset());
+      EXPECT_EQ(result_reasons[i], response->resetReason());
+    });
+
+    cleanupUpstreamAndDownstream();
+  }
+}
+
+// RFC 9113 Section 8.1: When the upstream sends a complete gRPC response (HEADERS + DATA +
+// trailers with END_STREAM) followed by RST_STREAM(NO_ERROR), and the response body is large
+// enough to trigger chunked decoding in the upstream H2 codec (body > connection buffer limit),
+// the trailers get buffered. The RST_STREAM(NO_ERROR) is then processed before the buffered
+// trailers are delivered, causing the RST_STREAM to reach the router as RemoteReset instead of
+// being silently consumed by the preemptive reset in onUpstreamComplete.
+// This test verifies that the complete response (including trailers) is forwarded to the client.
+TEST_P(Http2FrameIntegrationTest, UpstreamRstStreamNoErrorWithBufferedTrailers) {
+  config_helper_.setBufferLimits(1024, 1024);
+  beginSession();
+
+  const uint32_t stream_idx = 1;
+  sendFrame(Http2Frame::makePostRequest(stream_idx, "host", "/"));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(Http2Frame::makeEmptySettingsFrame())));
+
+  // HEADERS (200, EndHeaders, no EndStream)
+  const auto response_headers = Http2Frame::makeHeadersFrameWithStatus(
+      "200", stream_idx, Http2Frame::HeadersFlags::EndHeaders);
+
+  // DATA: >1024 bytes to trigger chunked decoding (defer_processing_segment_size_ = buffer limit).
+  // This causes body_buffered_ = true after the first chunk is decoded, which in turn causes
+  // trailers to be buffered via maybeDeferDecodeTrailers().
+  const std::string large_body(2000, 'a');
+  const auto response_data =
+      Http2Frame::makeDataFrame(stream_idx, large_body, Http2Frame::DataFlags::None);
+
+  // Trailers: HEADERS with EndStream | EndHeaders containing "grpc-status: 0".
+  std::string hpack_trailers;
+  hpack_trailers.push_back(0x00);
+  hpack_trailers.push_back(0x0b);
+  hpack_trailers.append("grpc-status");
+  hpack_trailers.push_back(0x01);
+  hpack_trailers.push_back('0');
+  const auto trailers =
+      Http2Frame::makeRawFrame(Http2Frame::Type::Headers,
+                               static_cast<uint8_t>(Http2Frame::HeadersFlags::EndStream) |
+                                   static_cast<uint8_t>(Http2Frame::HeadersFlags::EndHeaders),
+                               stream_idx, hpack_trailers);
+
+  // RST_STREAM (NO_ERROR)
+  const auto rst_stream =
+      Http2Frame::makeResetStreamFrame(stream_idx, Http2Frame::ErrorCode::NoError);
+
+  // Send all frames in a single write so they're processed in the same dispatch.
+  // The codec will: decode headers (immediate), chunk data (buffer remainder),
+  // buffer trailers (body_buffered_), then process RST_STREAM.
+  ASSERT_TRUE(fake_upstream_connection->write(
+      absl::StrCat(std::string(response_headers), std::string(response_data), std::string(trailers),
+                   std::string(rst_stream))));
+
+  auto readNextResponseFrame = [this]() -> Http2Frame {
+    while (true) {
+      auto frame = readFrame();
+      if (frame.type() != Http2Frame::Type::WindowUpdate &&
+          frame.type() != Http2Frame::Type::Settings && frame.type() != Http2Frame::Type::Ping) {
+        return frame;
+      }
+    }
+  };
+
+  // Response HEADERS — should be 200 OK, not a 503 local error reply.
+  auto headers_frame = readNextResponseFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, headers_frame.type());
+  EXPECT_EQ(Http2Frame::ResponseStatus::Ok, headers_frame.responseStatus())
+      << "Expected 200 OK from upstream, not a local error reply";
+
+  // Response DATA — may be split across multiple frames due to buffer limits.
+  Http2Frame next_frame;
+  do {
+    next_frame = readNextResponseFrame();
+  } while (next_frame.type() == Http2Frame::Type::Data && !next_frame.endStream());
+
+  // Response trailers (HEADERS with END_STREAM) — the complete response must be forwarded.
+  // If the bug triggers, we'll get RST_STREAM here instead of trailers.
+  auto trailers_frame = next_frame;
+  if (trailers_frame.type() == Http2Frame::Type::RstStream) {
+    ASSERT_GE(trailers_frame.size(), Http2Frame::HeaderSize + 4);
+    const uint8_t* p = trailers_frame.data() + Http2Frame::HeaderSize;
+    const uint32_t error_code = (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
+    EXPECT_EQ(Http2Frame::Type::Headers, trailers_frame.type())
+        << "Expected trailers (HEADERS with END_STREAM) but got RST_STREAM with error code "
+        << error_code
+        << ". The RST_STREAM(NO_ERROR) from upstream was likely processed before the buffered "
+           "trailers were delivered, causing the response to be truncated.";
+  } else {
+    EXPECT_EQ(Http2Frame::Type::Headers, trailers_frame.type())
+        << "Expected trailers (HEADERS with END_STREAM) but got frame type "
+        << static_cast<int>(trailers_frame.type());
+    EXPECT_TRUE(trailers_frame.endStream());
+  }
+
+  tcp_client_->close();
+}
+
+// Verify old behavior when the runtime guard is disabled: RST_STREAM(NO_ERROR) after a complete
+// response with buffered trailers causes the response to be truncated (trailers discarded) and
+// an error RST_STREAM sent downstream instead.
+TEST_P(Http2FrameIntegrationTest, UpstreamRstStreamNoErrorWithBufferedTrailersLegacy) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.http_preserve_rst_no_error",
+                                    "false");
+  config_helper_.setBufferLimits(1024, 1024);
+  beginSession();
+
+  const uint32_t stream_idx = 1;
+  sendFrame(Http2Frame::makePostRequest(stream_idx, "host", "/"));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(Http2Frame::makeEmptySettingsFrame())));
+
+  const auto response_headers = Http2Frame::makeHeadersFrameWithStatus(
+      "200", stream_idx, Http2Frame::HeadersFlags::EndHeaders);
+
+  const std::string large_body(2000, 'a');
+  const auto response_data =
+      Http2Frame::makeDataFrame(stream_idx, large_body, Http2Frame::DataFlags::None);
+
+  std::string hpack_trailers;
+  hpack_trailers.push_back(0x00);
+  hpack_trailers.push_back(0x0b);
+  hpack_trailers.append("grpc-status");
+  hpack_trailers.push_back(0x01);
+  hpack_trailers.push_back('0');
+  const auto trailers =
+      Http2Frame::makeRawFrame(Http2Frame::Type::Headers,
+                               static_cast<uint8_t>(Http2Frame::HeadersFlags::EndStream) |
+                                   static_cast<uint8_t>(Http2Frame::HeadersFlags::EndHeaders),
+                               stream_idx, hpack_trailers);
+
+  const auto rst_stream =
+      Http2Frame::makeResetStreamFrame(stream_idx, Http2Frame::ErrorCode::NoError);
+
+  ASSERT_TRUE(fake_upstream_connection->write(
+      absl::StrCat(std::string(response_headers), std::string(response_data), std::string(trailers),
+                   std::string(rst_stream))));
+
+  auto readNextResponseFrame = [this]() -> Http2Frame {
+    while (true) {
+      auto frame = readFrame();
+      if (frame.type() != Http2Frame::Type::WindowUpdate &&
+          frame.type() != Http2Frame::Type::Settings && frame.type() != Http2Frame::Type::Ping) {
+        return frame;
+      }
+    }
+  };
+
+  auto headers_frame = readNextResponseFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, headers_frame.type());
+  EXPECT_EQ(Http2Frame::ResponseStatus::Ok, headers_frame.responseStatus());
+
+  // Consume DATA frames, then expect RST_STREAM (old buggy behavior: trailers discarded).
+  auto next_frame = readNextResponseFrame();
+  while (next_frame.type() == Http2Frame::Type::Data) {
+    next_frame = readNextResponseFrame();
+  }
+  EXPECT_EQ(Http2Frame::Type::RstStream, next_frame.type())
+      << "With runtime guard disabled, expected RST_STREAM (old behavior) but got frame type "
+      << static_cast<int>(next_frame.type());
+  ASSERT_GE(next_frame.size(), Http2Frame::HeaderSize + 4);
+  const uint8_t* p = next_frame.data() + Http2Frame::HeaderSize;
+  const uint32_t error_code = (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
+  EXPECT_NE(0u, error_code) << "With runtime guard disabled, RST_STREAM error code should not be "
+                               "NO_ERROR (old behavior sends an error reset)";
+
+  tcp_client_->close();
+}
+
+// Verify that RST_STREAM with an actual error code (not NO_ERROR) still correctly resets the stream
+// even when trailers are buffered.
+TEST_P(Http2FrameIntegrationTest, UpstreamRstStreamWithErrorAndBufferedTrailers) {
+  config_helper_.setBufferLimits(1024, 1024);
+  beginSession();
+
+  const uint32_t stream_idx = 1;
+  sendFrame(Http2Frame::makePostRequest(stream_idx, "host", "/"));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(Http2Frame::makeEmptySettingsFrame())));
+
+  const auto response_headers = Http2Frame::makeHeadersFrameWithStatus(
+      "200", stream_idx, Http2Frame::HeadersFlags::EndHeaders);
+
+  const std::string large_body(2000, 'a');
+  const auto response_data =
+      Http2Frame::makeDataFrame(stream_idx, large_body, Http2Frame::DataFlags::None);
+
+  std::string hpack_trailers;
+  hpack_trailers.push_back(0x00);
+  hpack_trailers.push_back(0x0b);
+  hpack_trailers.append("grpc-status");
+  hpack_trailers.push_back(0x01);
+  hpack_trailers.push_back('0');
+  const auto trailers =
+      Http2Frame::makeRawFrame(Http2Frame::Type::Headers,
+                               static_cast<uint8_t>(Http2Frame::HeadersFlags::EndStream) |
+                                   static_cast<uint8_t>(Http2Frame::HeadersFlags::EndHeaders),
+                               stream_idx, hpack_trailers);
+
+  // RST_STREAM with INTERNAL_ERROR (not NO_ERROR)
+  const auto rst_stream =
+      Http2Frame::makeResetStreamFrame(stream_idx, Http2Frame::ErrorCode::InternalError);
+
+  ASSERT_TRUE(fake_upstream_connection->write(
+      absl::StrCat(std::string(response_headers), std::string(response_data), std::string(trailers),
+                   std::string(rst_stream))));
+
+  auto readNextResponseFrame = [this]() -> Http2Frame {
+    while (true) {
+      auto frame = readFrame();
+      if (frame.type() != Http2Frame::Type::WindowUpdate &&
+          frame.type() != Http2Frame::Type::Settings && frame.type() != Http2Frame::Type::Ping) {
+        return frame;
+      }
+    }
+  };
+
+  auto headers_frame = readNextResponseFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, headers_frame.type());
+
+  // With an actual error, the stream should be reset — we expect RST_STREAM downstream,
+  // not the complete response with trailers. Consume any DATA frames first.
+  auto next_frame = readNextResponseFrame();
+  while (next_frame.type() == Http2Frame::Type::Data) {
+    next_frame = readNextResponseFrame();
+  }
+  EXPECT_EQ(Http2Frame::Type::RstStream, next_frame.type())
+      << "Expected RST_STREAM for error reset but got frame type "
+      << static_cast<int>(next_frame.type());
+  ASSERT_GE(next_frame.size(), Http2Frame::HeaderSize + 4);
+  const uint8_t* p = next_frame.data() + Http2Frame::HeaderSize;
+  const uint32_t error_code = (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
+  EXPECT_NE(0u, error_code) << "RST_STREAM error code should not be NO_ERROR for an error reset";
+
+  tcp_client_->close();
+}
+
+// RFC 9113 Section 8.1: A server MAY send RST_STREAM(NO_ERROR) after sending a complete response
+// to request that the client stop sending the request body. The client MUST NOT discard the
+// response as a result of receiving such a RST_STREAM, and the proxy MUST NOT translate a
+// RST_STREAM(NO_ERROR) into an error.
+//
+// Verify that when the upstream sends a complete response (with END_STREAM on DATA) followed by
+// RST_STREAM(NO_ERROR) before the client has sent END_STREAM, Envoy forwards the response and
+// sends RST_STREAM(NO_ERROR) downstream (not an error code). Uses raw H2 frames on both sides
+// to ensure compliance without depending on Envoy codec interpretation for the upstream and
+// downstream.
+TEST_P(Http2FrameIntegrationTest, UpstreamCompleteResponseFollowedByRstStreamNoError) {
+  beginSession();
+
+  const uint32_t stream_idx = 1;
+  sendFrame(Http2Frame::makePostRequest(stream_idx, "host", "/"));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(Http2Frame::makeEmptySettingsFrame())));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
+
+  const auto response_headers = Http2Frame::makeHeadersFrameWithStatus(
+      "200", stream_idx, Http2Frame::HeadersFlags::EndHeaders);
+  const auto response_data =
+      Http2Frame::makeDataFrame(stream_idx, "hello", Http2Frame::DataFlags::EndStream);
+  const auto rst_stream =
+      Http2Frame::makeResetStreamFrame(stream_idx, Http2Frame::ErrorCode::NoError);
+
+  ASSERT_TRUE(fake_upstream_connection->write(absl::StrCat(
+      std::string(response_headers), std::string(response_data), std::string(rst_stream))));
+
+  auto readNextResponseFrame = [this]() -> Http2Frame {
+    while (true) {
+      auto frame = readFrame();
+      if (frame.type() != Http2Frame::Type::WindowUpdate &&
+          frame.type() != Http2Frame::Type::Settings && frame.type() != Http2Frame::Type::Ping) {
+        return frame;
+      }
+    }
+  };
+
+  auto headers_frame = readNextResponseFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, headers_frame.type());
+  EXPECT_EQ(Http2Frame::ResponseStatus::Ok, headers_frame.responseStatus())
+      << "Expected 200 OK from upstream, not a local error reply";
+
+  auto data_frame = readNextResponseFrame();
+  EXPECT_EQ(Http2Frame::Type::Data, data_frame.type());
+  EXPECT_TRUE(data_frame.endStream());
+
+  auto rst_frame = readNextResponseFrame();
+  ASSERT_EQ(Http2Frame::Type::RstStream, rst_frame.type());
+  ASSERT_GE(rst_frame.size(), Http2Frame::HeaderSize + 4);
+  const uint8_t* p = rst_frame.data() + Http2Frame::HeaderSize;
+  const uint32_t error_code = (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
+  EXPECT_EQ(0u, error_code) << "RST_STREAM error code must be NO_ERROR (0) per RFC 9113 "
+                               "Section 8.1, but got "
+                            << error_code;
+
+  tcp_client_->close();
+}
+
+// Same scenario as above, but with allow_multiplexed_upstream_half_close enabled and using
+// gRPC-style trailers (HEADERS with END_STREAM) instead of DATA with END_STREAM.
+// This exercises the path where the upstream stream stays open after the response is complete
+// (onUpstreamComplete returns early), so the server's RST_STREAM(NO_ERROR) reaches the router
+// as a RemoteReset via onUpstreamReset. The downstream RST_STREAM must still be NO_ERROR.
+TEST_P(Http2FrameIntegrationTest, UpstreamTrailersAndRstStreamNoErrorWithHalfClose) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
+  beginSession();
+
+  const uint32_t stream_idx = 1;
+  sendFrame(Http2Frame::makePostRequest(stream_idx, "host", "/"));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(Http2Frame::makeEmptySettingsFrame())));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
+
+  // HEADERS (200, EndHeaders, no EndStream)
+  const auto response_headers = Http2Frame::makeHeadersFrameWithStatus(
+      "200", stream_idx, Http2Frame::HeadersFlags::EndHeaders);
+
+  // DATA ("hello", no EndStream)
+  const auto response_data =
+      Http2Frame::makeDataFrame(stream_idx, "hello", Http2Frame::DataFlags::None);
+
+  // Trailers: a HEADERS frame with EndStream | EndHeaders, containing "grpc-status: 0".
+  // HPACK literal header without indexing, new name:
+  //   0x00 | name_len(0x0b) | "grpc-status" | value_len(0x01) | "0"
+  std::string hpack_trailers;
+  hpack_trailers.push_back(0x00);
+  hpack_trailers.push_back(0x0b);
+  hpack_trailers.append("grpc-status");
+  hpack_trailers.push_back(0x01);
+  hpack_trailers.push_back('0');
+  const auto trailers =
+      Http2Frame::makeRawFrame(Http2Frame::Type::Headers,
+                               static_cast<uint8_t>(Http2Frame::HeadersFlags::EndStream) |
+                                   static_cast<uint8_t>(Http2Frame::HeadersFlags::EndHeaders),
+                               stream_idx, hpack_trailers);
+
+  // RST_STREAM (NO_ERROR)
+  const auto rst_stream =
+      Http2Frame::makeResetStreamFrame(stream_idx, Http2Frame::ErrorCode::NoError);
+
+  // Send response + RST_STREAM in a single write.
+  ASSERT_TRUE(fake_upstream_connection->write(
+      absl::StrCat(std::string(response_headers), std::string(response_data), std::string(trailers),
+                   std::string(rst_stream))));
+
+  auto readNextResponseFrame = [this]() -> Http2Frame {
+    while (true) {
+      auto frame = readFrame();
+      if (frame.type() != Http2Frame::Type::WindowUpdate &&
+          frame.type() != Http2Frame::Type::Settings && frame.type() != Http2Frame::Type::Ping) {
+        return frame;
+      }
+    }
+  };
+
+  // Response HEADERS (200 OK).
+  auto headers_frame = readNextResponseFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, headers_frame.type());
+  EXPECT_EQ(Http2Frame::ResponseStatus::Ok, headers_frame.responseStatus())
+      << "Expected 200 OK from upstream, not a local error reply";
+
+  // Response DATA.
+  auto data_frame = readNextResponseFrame();
+  EXPECT_EQ(Http2Frame::Type::Data, data_frame.type());
+
+  // Response trailers (HEADERS with END_STREAM).
+  auto trailers_frame = readNextResponseFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, trailers_frame.type());
+  EXPECT_TRUE(trailers_frame.endStream());
+
+  // RST_STREAM must be NO_ERROR per RFC 9113 Section 8.1.
+  auto rst_frame = readNextResponseFrame();
+  ASSERT_EQ(Http2Frame::Type::RstStream, rst_frame.type());
+  ASSERT_GE(rst_frame.size(), Http2Frame::HeaderSize + 4);
+  const uint8_t* p = rst_frame.data() + Http2Frame::HeaderSize;
+  const uint32_t error_code = (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
+  EXPECT_EQ(0u, error_code) << "RST_STREAM error code must be NO_ERROR (0) per RFC 9113 "
+                               "Section 8.1, but got "
+                            << error_code;
+
+  tcp_client_->close();
+}
+
+// Same as UpstreamTrailersAndRstStreamNoErrorWithHalfClose, but the RST_STREAM is sent in a
+// separate write from the response, simulating separate TCP packets. This tests the case where
+// the RST_STREAM(NO_ERROR) arrives in a different event loop iteration from the response.
+TEST_P(Http2FrameIntegrationTest, UpstreamTrailersAndSeparateRstStreamNoError) {
+  beginSession();
+
+  const uint32_t stream_idx = 1;
+  sendFrame(Http2Frame::makePostRequest(stream_idx, "host", "/"));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(Http2Frame::makeEmptySettingsFrame())));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
+
+  // HEADERS (200, EndHeaders, no EndStream)
+  const auto response_headers = Http2Frame::makeHeadersFrameWithStatus(
+      "200", stream_idx, Http2Frame::HeadersFlags::EndHeaders);
+
+  // DATA ("hello", no EndStream)
+  const auto response_data =
+      Http2Frame::makeDataFrame(stream_idx, "hello", Http2Frame::DataFlags::None);
+
+  // Trailers with EndStream | EndHeaders containing "grpc-status: 0".
+  std::string hpack_trailers;
+  hpack_trailers.push_back(0x00);
+  hpack_trailers.push_back(0x0b);
+  hpack_trailers.append("grpc-status");
+  hpack_trailers.push_back(0x01);
+  hpack_trailers.push_back('0');
+  const auto trailers =
+      Http2Frame::makeRawFrame(Http2Frame::Type::Headers,
+                               static_cast<uint8_t>(Http2Frame::HeadersFlags::EndStream) |
+                                   static_cast<uint8_t>(Http2Frame::HeadersFlags::EndHeaders),
+                               stream_idx, hpack_trailers);
+
+  // Send the response (headers + data + trailers) first.
+  ASSERT_TRUE(fake_upstream_connection->write(absl::StrCat(
+      std::string(response_headers), std::string(response_data), std::string(trailers))));
+
+  auto readNextResponseFrame = [this]() -> Http2Frame {
+    while (true) {
+      auto frame = readFrame();
+      if (frame.type() != Http2Frame::Type::WindowUpdate &&
+          frame.type() != Http2Frame::Type::Settings && frame.type() != Http2Frame::Type::Ping) {
+        return frame;
+      }
+    }
+  };
+
+  // Read the response frames first — this implicitly waits for them to be forwarded.
+  // Response HEADERS (200 OK).
+  auto headers_frame = readNextResponseFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, headers_frame.type());
+  EXPECT_EQ(Http2Frame::ResponseStatus::Ok, headers_frame.responseStatus())
+      << "Expected 200 OK from upstream, not a local error reply";
+
+  // Response DATA.
+  auto data_frame = readNextResponseFrame();
+  EXPECT_EQ(Http2Frame::Type::Data, data_frame.type());
+
+  // Response trailers (HEADERS with END_STREAM).
+  auto trailers_frame = readNextResponseFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, trailers_frame.type());
+  EXPECT_TRUE(trailers_frame.endStream());
+
+  // Now send RST_STREAM(NO_ERROR) in a separate write, after the response is confirmed forwarded.
+  const auto rst_stream =
+      Http2Frame::makeResetStreamFrame(stream_idx, Http2Frame::ErrorCode::NoError);
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(rst_stream)));
+
+  // RST_STREAM must be NO_ERROR.
+  auto rst_frame = readNextResponseFrame();
+  ASSERT_EQ(Http2Frame::Type::RstStream, rst_frame.type());
+  ASSERT_GE(rst_frame.size(), Http2Frame::HeaderSize + 4);
+  const uint8_t* p = rst_frame.data() + Http2Frame::HeaderSize;
+  const uint32_t error_code = (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
+  EXPECT_EQ(0u, error_code) << "RST_STREAM error code must be NO_ERROR (0) per RFC 9113 "
+                               "Section 8.1, but got "
+                            << error_code;
+
+  tcp_client_->close();
 }
 
 } // namespace Envoy

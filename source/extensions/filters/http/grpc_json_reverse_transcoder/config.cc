@@ -24,6 +24,18 @@ Http::FilterFactoryCb GrpcJsonReverseTranscoderFactory::createFilterFactoryFromP
   };
 }
 
+Http::FilterFactoryCb
+GrpcJsonReverseTranscoderFactory::createFilterFactoryFromProtoWithServerContextTyped(
+    const envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
+        GrpcJsonReverseTranscoder& proto_config,
+    const std::string&, Server::Configuration::ServerFactoryContext& context) {
+  std::shared_ptr<GrpcJsonReverseTranscoderConfig> filter_config =
+      std::make_shared<GrpcJsonReverseTranscoderConfig>(proto_config, context.api());
+  return [filter_config](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<GrpcJsonReverseTranscoderFilter>(filter_config));
+  };
+}
+
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 GrpcJsonReverseTranscoderFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::

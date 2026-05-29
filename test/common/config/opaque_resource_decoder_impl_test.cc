@@ -16,7 +16,7 @@ class OpaqueResourceDecoderImplTest : public testing::Test {
 public:
   std::pair<ProtobufTypes::MessagePtr, std::string>
   decodeTypedResource(const envoy::config::endpoint::v3::ClusterLoadAssignment& typed_resource) {
-    ProtobufWkt::Any opaque_resource;
+    Protobuf::Any opaque_resource;
     opaque_resource.PackFrom(typed_resource);
     auto decoded_resource = resource_decoder_.decodeResource(opaque_resource);
     const std::string name = resource_decoder_.resourceName(*decoded_resource);
@@ -30,7 +30,7 @@ public:
 
 // Negative test for bad type URL in Any.
 TEST_F(OpaqueResourceDecoderImplTest, WrongType) {
-  ProtobufWkt::Any opaque_resource;
+  Protobuf::Any opaque_resource;
   opaque_resource.set_type_url("huh");
   EXPECT_THROW_WITH_REGEX(resource_decoder_.decodeResource(opaque_resource), EnvoyException,
                           "Unable to unpack");
@@ -39,7 +39,7 @@ TEST_F(OpaqueResourceDecoderImplTest, WrongType) {
 // If the Any is empty (no type set), the default instance of the opaque resource decoder type is
 // created.
 TEST_F(OpaqueResourceDecoderImplTest, Empty) {
-  ProtobufWkt::Any opaque_resource;
+  Protobuf::Any opaque_resource;
   const auto decoded_resource = resource_decoder_.decodeResource(opaque_resource);
   EXPECT_THAT(*decoded_resource, ProtoEq(envoy::config::endpoint::v3::ClusterLoadAssignment()));
   EXPECT_EQ("", resource_decoder_.resourceName(*decoded_resource));
@@ -61,7 +61,7 @@ TEST_F(OpaqueResourceDecoderImplTest, ValidateIgnored) {
   auto* unknown = strange_resource.GetReflection()->MutableUnknownFields(&strange_resource);
   // add a field that doesn't exist in the proto definition:
   unknown->AddFixed32(1000, 1);
-  ProtobufWkt::Any opaque_resource;
+  Protobuf::Any opaque_resource;
   opaque_resource.PackFrom(strange_resource);
   const auto decoded_resource = resource_decoder.decodeResource(opaque_resource);
   EXPECT_THAT(*decoded_resource, ProtoEq(strange_resource));

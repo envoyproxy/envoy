@@ -223,11 +223,10 @@ protected:
 
   void testDecodeRequestHitNoBody(CacheFilterSharedPtr filter) {
     // The filter should encode cached headers.
-    EXPECT_CALL(
-        decoder_callbacks_,
-        encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                      HeaderHasValueRef(Http::CustomHeaders::get().Age, age)),
-                       true));
+    EXPECT_CALL(decoder_callbacks_,
+                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                              ContainsHeader(Http::CustomHeaders::get().Age, age)),
+                               true));
 
     // The filter should not encode any data as the response has no body.
     EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
@@ -250,11 +249,10 @@ protected:
 
   void testDecodeRequestHitWithBody(CacheFilterSharedPtr filter, std::string body) {
     // The filter should encode cached headers.
-    EXPECT_CALL(
-        decoder_callbacks_,
-        encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                      HeaderHasValueRef(Http::CustomHeaders::get().Age, age)),
-                       false));
+    EXPECT_CALL(decoder_callbacks_,
+                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                              ContainsHeader(Http::CustomHeaders::get().Age, age)),
+                               false));
 
     // The filter should encode cached data.
     EXPECT_CALL(
@@ -483,7 +481,7 @@ TEST_F(CacheFilterTest, WatermarkEventsAreSentIfCacheBlocksStreamAndLimitExceede
   const std::string body1 = "abcde";
   const std::string body2 = "fghij";
   // Set the buffer limit to 2 bytes to ensure we send watermark events.
-  EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(::testing::Return(2));
+  EXPECT_CALL(encoder_callbacks_, bufferLimit()).WillRepeatedly(::testing::Return(2));
   auto mock_http_cache = std::make_shared<MockHttpCache>();
   MockLookupContext* mock_lookup_context = mock_http_cache->mockLookupContext();
   MockInsertContext* mock_insert_context = mock_http_cache->mockInsertContext();
@@ -549,7 +547,7 @@ TEST_F(CacheFilterTest, FilterDestroyedWhileWatermarkedSendsLowWatermarkEvent) {
   const std::string body1 = "abcde";
   const std::string body2 = "fghij";
   // Set the buffer limit to 2 bytes to ensure we send watermark events.
-  EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(::testing::Return(2));
+  EXPECT_CALL(encoder_callbacks_, bufferLimit()).WillRepeatedly(::testing::Return(2));
   auto mock_http_cache = std::make_shared<MockHttpCache>();
   MockLookupContext* mock_lookup_context = mock_http_cache->mockLookupContext();
   MockInsertContext* mock_insert_context = mock_http_cache->mockInsertContext();
@@ -753,7 +751,7 @@ TEST_F(CacheFilterTest, BodyReadFromCacheLimitedToBufferSizeChunks) {
   request_headers_.setHost("CacheHitWithBody");
   // Set the buffer limit to 5 bytes, and we will have the file be of size
   // 8 bytes.
-  EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(::testing::Return(5));
+  EXPECT_CALL(encoder_callbacks_, bufferLimit()).WillRepeatedly(::testing::Return(5));
   auto mock_http_cache = std::make_shared<MockHttpCache>();
   MockLookupContext* mock_lookup_context = mock_http_cache->mockLookupContext();
   EXPECT_CALL(*mock_lookup_context, getHeaders(_)).WillOnce([&](LookupHeadersCallback&& cb) {
@@ -1101,7 +1099,7 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
     receiveUpstreamBody(1, new_body, true);
 
     // The response headers should have the new status.
-    EXPECT_THAT(response_headers_, HeaderHasValueRef(Http::Headers::get().Status, "204"));
+    EXPECT_THAT(response_headers_, ContainsHeader(Http::Headers::get().Status, "204"));
 
     // The filter should not encode any data.
     EXPECT_CALL(encoder_callbacks_, addEncodedData).Times(0);
@@ -1136,11 +1134,10 @@ TEST_F(CacheFilterTest, SingleSatisfiableRange) {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Decode request 2 header
-    EXPECT_CALL(
-        decoder_callbacks_,
-        encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                      HeaderHasValueRef(Http::CustomHeaders::get().Age, age)),
-                       false));
+    EXPECT_CALL(decoder_callbacks_,
+                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                              ContainsHeader(Http::CustomHeaders::get().Age, age)),
+                               false));
 
     EXPECT_CALL(
         decoder_callbacks_,
@@ -1177,11 +1174,10 @@ TEST_F(CacheFilterTest, MultipleSatisfiableRanges) {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Decode request 2 header
-    EXPECT_CALL(
-        decoder_callbacks_,
-        encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                      HeaderHasValueRef(Http::CustomHeaders::get().Age, age)),
-                       false));
+    EXPECT_CALL(decoder_callbacks_,
+                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                              ContainsHeader(Http::CustomHeaders::get().Age, age)),
+                               false));
 
     EXPECT_CALL(
         decoder_callbacks_,
@@ -1220,11 +1216,10 @@ TEST_F(CacheFilterTest, NotSatisfiableRange) {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Decode request 2 header
-    EXPECT_CALL(
-        decoder_callbacks_,
-        encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                      HeaderHasValueRef(Http::CustomHeaders::get().Age, age)),
-                       true));
+    EXPECT_CALL(decoder_callbacks_,
+                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                              ContainsHeader(Http::CustomHeaders::get().Age, age)),
+                               true));
 
     // 416 response should not have a body, so we don't expect a call to encodeData
     EXPECT_CALL(decoder_callbacks_,
@@ -1599,7 +1594,7 @@ TEST_F(ValidationHeadersTest, InvalidLastModified) {
 
 TEST_F(CacheFilterTest, NoRouteShouldLocalReply) {
   request_headers_.setHost("NoRoute");
-  EXPECT_CALL(decoder_callbacks_, route()).WillOnce(Return(nullptr));
+  EXPECT_CALL(decoder_callbacks_, route()).WillOnce(Return(OptRef<const Router::Route>{}));
   {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
     // The filter should stop decoding iteration when decodeHeaders is called as a cache lookup is

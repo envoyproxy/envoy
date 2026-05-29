@@ -30,7 +30,7 @@ public:
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     // Using Struct instead of a custom filter config proto. This is only allowed in tests.
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
   }
 
   std::set<std::string> configTypes() override { return {}; }
@@ -60,6 +60,45 @@ public:
 class EmptyHttpDualFilterConfig : public EmptyHttpFilterConfig, public UpstreamFilterConfig {
 public:
   EmptyHttpDualFilterConfig(const std::string& name) : EmptyHttpFilterConfig(name) {}
+
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilter(const std::string& stat_prefix,
+               Server::Configuration::FactoryContext& context) override {
+    return createDualFilter(stat_prefix, context.serverFactoryContext());
+  }
+};
+
+template <class ProtoType>
+class UniqueEmptyHttpFilterConfig : public Server::Configuration::NamedHttpFilterConfigFactory {
+public:
+  virtual absl::StatusOr<Http::FilterFactoryCb>
+  createFilter(const std::string& stat_prefix, Server::Configuration::FactoryContext& context) PURE;
+
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message&, const std::string& stat_prefix,
+                               Server::Configuration::FactoryContext& context) override {
+    return createFilter(stat_prefix, context);
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new ProtoType()};
+  }
+
+  std::string name() const override { return name_; }
+
+protected:
+  UniqueEmptyHttpFilterConfig(const std::string& name) : name_(name) {}
+
+private:
+  const std::string name_;
+};
+
+template <class ProtoType>
+class UniqueEmptyHttpDualFilterConfig : public UniqueEmptyHttpFilterConfig<ProtoType>,
+                                        public UpstreamFilterConfig {
+public:
+  UniqueEmptyHttpDualFilterConfig(const std::string& name)
+      : UniqueEmptyHttpFilterConfig<ProtoType>(name) {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string& stat_prefix,

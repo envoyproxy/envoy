@@ -25,6 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Endpoints]
 
 // Upstream host identifier.
+// [#next-free-field: 6]
 message Endpoint {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.endpoint.Endpoint";
 
@@ -97,6 +98,20 @@ message Endpoint {
   // sorted by preference order of the addresses. This will only be supported
   // for STATIC and EDS clusters.
   repeated AdditionalAddress additional_addresses = 4;
+
+  // Optional alternative stat name for this endpoint. If not specified, the main address will be used
+  // as the stat name and be extracted as ``envoy.endpoint_address`` tag value in generated stats.
+  // If specified, the ``observability_name`` here will be used to replace the main address.
+  //
+  // .. note::
+  //
+  //   This field is ignored for logical DNS host implementation..
+  //
+  // This is useful when there are duplicate addresses in the cluster, for example when multiple
+  // endpoints share the same address but have different hostnames or metadata.
+  // In this case, the observability name can be used to differentiate between these endpoints in
+  // stats and logs.
+  string observability_name = 5;
 }
 
 // An Endpoint that Envoy can route traffic to.

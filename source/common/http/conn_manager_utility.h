@@ -141,6 +141,7 @@ private:
   static void appendXff(RequestHeaderMap& request_headers, Network::Connection& connection,
                         ConnectionManagerConfig& config);
   static void mutateXfccRequestHeader(RequestHeaderMap& request_headers,
+                                      const StreamInfo::StreamInfo& stream_info,
                                       Network::Connection& connection,
                                       ConnectionManagerConfig& config);
   static void sanitizeTEHeader(RequestHeaderMap& request_headers);

@@ -110,36 +110,20 @@ public:
 
   /**
    * Creates an UdpPacketWriter object for the given Udp Socket
-   * @param socket UDP socket used to send packets.
+   * @param io_handle The udp socket used for network I/O operations.
+   * @param scope Recording statistics associated with the writer.
+   * @param dispatcher Envoy dispatcher to schedule write block events.
+   * @param on_can_write_cb Callback to signal when the underlying socket
+   * becomes writable.
    * @return the UdpPacketWriter created.
    */
-  virtual UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle,
-                                                   Stats::Scope& scope) PURE;
+  virtual UdpPacketWriterPtr
+  createUdpPacketWriter(Network::IoHandle& io_handle, Stats::Scope& scope,
+                        Envoy::Event::Dispatcher& dispatcher,
+                        absl::AnyInvocable<void() &&> on_can_write_cb) PURE;
 };
 
 using UdpPacketWriterFactoryPtr = std::unique_ptr<UdpPacketWriterFactory>;
-
-/**
- * UdpPacketWriterFactoryFactory adds an extra layer of indirection In order to
- * support a UdpPacketWriterFactory whose behavior depends on the
- * TypedConfig for that factory. The UdpPacketWriterFactoryFactory is created
- * with a no-arg constructor based on the type of the config. Then this
- * `createUdpPacketWriterFactory1 can be called with the config to
- * create an actual UdpPacketWriterFactory.
- */
-class UdpPacketWriterFactoryFactory : public Envoy::Config::TypedFactory {
-public:
-  ~UdpPacketWriterFactoryFactory() override = default;
-
-  /**
-   * Creates an UdpPacketWriterFactory based on the specified config.
-   * @return the UdpPacketWriterFactory created.
-   */
-  virtual UdpPacketWriterFactoryPtr
-  createUdpPacketWriterFactory(const envoy::config::core::v3::TypedExtensionConfig& config) PURE;
-
-  std::string category() const override { return "envoy.udp_packet_writer"; }
-};
 
 } // namespace Network
 } // namespace Envoy

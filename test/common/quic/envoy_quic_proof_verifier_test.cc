@@ -86,7 +86,7 @@ public:
     EXPECT_CALL(cert_validation_ctx_config_, autoSniSanMatch()).WillRepeatedly(Return(false));
     auto context_or_error = Extensions::TransportSockets::Tls::ClientContextImpl::create(
         *store_.rootScope(), client_context_config_, factory_context_);
-    THROW_IF_NOT_OK(context_or_error.status());
+    THROW_IF_NOT_OK_REF(context_or_error.status());
     verifier_ = std::make_unique<EnvoyQuicProofVerifier>(std::move(*context_or_error));
   }
 
@@ -401,7 +401,9 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifySubjectAltNameListOverrideFailure) {
                                        {leaf_cert_}, ocsp_response, cert_sct, &verify_context_,
                                        &error_details, &verify_details, nullptr, nullptr))
       << error_details;
-  EXPECT_EQ("verify cert failed: verify SAN list", error_details);
+  EXPECT_EQ("verify cert failed: verify SAN list, expected SANs: [non-example.com], certificate "
+            "SANs: [www.example.org, mail.example.org, mail.example.com, 127.0.0.1]",
+            error_details);
   EXPECT_NE(verify_details, nullptr);
   EXPECT_FALSE(static_cast<CertVerifyResult&>(*verify_details).isValid());
 }

@@ -25,6 +25,7 @@
 #include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 #include "source/extensions/path/match/uri_template/config.h"
 #include "source/extensions/path/rewrite/uri_template/config.h"
+#include "source/extensions/quic/client_packet_writer/default_quic_client_packet_writer_factory_config.h"
 #include "source/extensions/request_id/uuid/config.h"
 #include "source/extensions/transport_sockets/http_11_proxy/config.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
@@ -44,6 +45,14 @@
 #include "source/extensions/udp_packet_writer/default/config.h"
 #endif
 
+#ifdef ENVOY_MOBILE_XDS
+#include "source/extensions/config_subscription/grpc/grpc_collection_subscription_factory.h"
+#include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
+#include "source/extensions/config_subscription/grpc/grpc_subscription_factory.h"
+#include "source/extensions/config_subscription/grpc/new_grpc_mux_impl.h"
+#include "source/common/tls/cert_validator/default_validator.h"
+#endif // ENVOY_MOBILE_XDS
+
 #include "source/common/quic/quic_client_transport_socket_factory.h"
 #include "extension_registry_platform_additions.h"
 #include "library/common/extensions/cert_validator/platform_bridge/config.h"
@@ -54,6 +63,7 @@
 #include "library/common/extensions/key_value/platform/config.h"
 #include "library/common/extensions/listener_managers/api_listener_manager/api_listener_manager.h"
 #include "library/common/extensions/retry/options/network_configuration/config.h"
+#include "library/common/extensions/quic_packet_writer/platform/config.h"
 
 namespace Envoy {
 
@@ -160,7 +170,10 @@ void ExtensionRegistry::registerFactories() {
   Upstream::forceRegisterDefaultUpstreamLocalAddressSelectorFactory();
 
   // This is required for load balancers of upstream clusters `base` and `base_clear`.
-  Envoy::Extensions::LoadBalancingPolices::ClusterProvided::forceRegisterFactory();
+  Envoy::Extensions::LoadBalancingPolicies::ClusterProvided::forceRegisterFactory();
+
+  Quic::forceRegisterDefaultQuicClientPacketWriterFactoryConfig();
+  Quic::forceRegisterQuicPlatformPacketWriterConfigFactory();
 
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
   // These are downstream factories required if Envoy Mobile is compiled with
@@ -185,6 +198,18 @@ void ExtensionRegistry::registerFactories() {
 #endif
 
   Quic::forceRegisterQuicClientTransportSocketConfigFactory();
+
+#ifdef ENVOY_MOBILE_XDS
+  // These extensions are required for xDS over gRPC using ADS, which is what Envoy Mobile
+  // supports for xDS.
+  Config::forceRegisterAdsConfigSubscriptionFactory();
+  Config::forceRegisterGrpcConfigSubscriptionFactory();
+  Config::forceRegisterAggregatedGrpcCollectionConfigSubscriptionFactory();
+  Config::forceRegisterAdsCollectionConfigSubscriptionFactory();
+  Config::forceRegisterGrpcMuxFactory();
+  Config::forceRegisterNewGrpcMuxFactory();
+  Extensions::TransportSockets::Tls::forceRegisterDefaultCertValidatorFactory();
+#endif // ENVOY_MOBILE_XDS
 }
 
 } // namespace Envoy

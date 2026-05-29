@@ -174,8 +174,8 @@ message QuicStopSendingFrame {
   uint32 error_code = 3;
 }
 
-message QuicMessageFrame {
-  uint32 message_id = 1;
+message QuicDatagramFrame {
+  uint32 datagram_id = 1;
   bytes data = 2;
 }
 
@@ -213,7 +213,7 @@ message QuicFrame {
     QuicPathResponseFrame path_response = 18;
     QuicPathChallengeFrame path_challenge = 19;
     QuicStopSendingFrame stop_sending = 20;
-    QuicMessageFrame message_frame = 21;
+    QuicDatagramFrame datagram_frame = 21;
     QuicNewTokenFrame new_token = 22;
     QuickAckFrequencyFrame ack_frequency = 23;
   }

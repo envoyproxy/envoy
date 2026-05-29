@@ -12,18 +12,19 @@
 #include "source/common/router/context_impl.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
 
+#include "test/common/quic/test_utils.h"
 #include "test/common/upstream/cluster_manager_impl_test_common.h"
 #include "test/common/upstream/test_cluster_manager.h"
 #include "test/config/v2_link_hacks.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/http/conn_pool.h"
 #include "test/mocks/matcher/mocks.h"
-#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/thread_aware_load_balancer.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -74,7 +75,7 @@ public:
     return std::make_unique<AlpnSocketFactory>();
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
 };
 
@@ -183,8 +184,9 @@ TEST_F(ClusterManagerImplTest, OutlierEventLog) {
   }
   )EOF";
 
-  EXPECT_CALL(log_manager_, createAccessLog(Filesystem::FilePathAndType{
-                                Filesystem::DestinationType::File, "foo"}));
+  EXPECT_CALL(
+      factory_.server_context_.access_log_manager_,
+      createAccessLog(Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"}));
   create(parseBootstrapFromV3Json(json));
 }
 
@@ -193,7 +195,7 @@ TEST_F(ClusterManagerImplTest, AdsCluster) {
   // can be set on.
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux =
       std::make_shared<NiceMock<Config::MockGrpcMux>>();
-  ON_CALL(xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
+  ON_CALL(factory_.server_context_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
 
   const std::string yaml = R"EOF(
   dynamic_resources:
@@ -229,7 +231,7 @@ TEST_F(ClusterManagerImplTest, AdsClusterStartsMuxOnlyOnce) {
   // can be set on.
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux =
       std::make_shared<NiceMock<Config::MockGrpcMux>>();
-  ON_CALL(xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
+  ON_CALL(factory_.server_context_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
 
   const std::string yaml = R"EOF(
   dynamic_resources:
@@ -1519,6 +1521,77 @@ TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
   factory_.tls_.shutdownThread();
 }
 
+TEST_F(ClusterManagerImplTest, GetActiveOrWarmingCluster) {
+  // Start with a static cluster.
+  const std::string bootstrap_yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: static_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: static_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+  create(parseBootstrapFromV3Yaml(bootstrap_yaml));
+
+  // Static cluster should be active.
+  EXPECT_NE(absl::nullopt, cluster_manager_->getActiveCluster("static_cluster"));
+  EXPECT_NE(absl::nullopt, cluster_manager_->getActiveOrWarmingCluster("static_cluster"));
+  EXPECT_EQ(absl::nullopt, cluster_manager_->getActiveOrWarmingCluster("non_existent_cluster"));
+
+  // Now, add a dynamic cluster. It will start in warming state.
+  const std::string warming_cluster_yaml = R"EOF(
+    name: warming_cluster
+    connect_timeout: 0.250s
+    type: EDS
+    eds_cluster_config:
+      eds_config:
+        api_config_source:
+          api_type: GRPC
+          grpc_services:
+            envoy_grpc:
+              cluster_name: static_cluster
+  )EOF";
+  auto warming_cluster_config = parseClusterFromV3Yaml(warming_cluster_yaml);
+
+  // Mock the cluster creation for the warming cluster.
+  std::shared_ptr<MockClusterMockPrioritySet> warming_cluster =
+      std::make_shared<NiceMock<MockClusterMockPrioritySet>>();
+  warming_cluster->info_->name_ = "warming_cluster";
+  std::function<void()> cluster_init_callback;
+  EXPECT_CALL(*warming_cluster, initialize(_)).WillOnce(SaveArg<0>(&cluster_init_callback));
+  EXPECT_CALL(factory_, clusterFromProto_(ProtoEq(warming_cluster_config), _, true))
+      .WillOnce(Return(std::make_pair(warming_cluster, nullptr)));
+
+  // Add the cluster.
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(warming_cluster_config, "version1"));
+
+  // The cluster should be in warming, not active.
+  EXPECT_EQ(absl::nullopt, cluster_manager_->getActiveCluster("warming_cluster"));
+  OptRef<const Cluster> cluster = cluster_manager_->getActiveOrWarmingCluster("warming_cluster");
+  EXPECT_NE(absl::nullopt, cluster);
+  EXPECT_EQ("warming_cluster", cluster->info()->name());
+
+  // Finish initialization. This should move it to active.
+  cluster_init_callback();
+
+  // Now the cluster should be active.
+  cluster = cluster_manager_->getActiveCluster("warming_cluster");
+  EXPECT_NE(absl::nullopt, cluster);
+  EXPECT_EQ("warming_cluster", cluster->info()->name());
+  cluster = cluster_manager_->getActiveOrWarmingCluster("warming_cluster");
+  EXPECT_NE(absl::nullopt, cluster);
+  EXPECT_EQ("warming_cluster", cluster->info()->name());
+}
+
 TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToTcpConnPool) {
   createWithBasicStaticCluster();
   NiceMock<MockLoadBalancerContext> context;
@@ -1542,7 +1615,8 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestNoOverrideHost) {
 
   auto to_create = new Tcp::ConnectionPool::MockInstance();
 
-  EXPECT_CALL(context, overrideHostToSelect()).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(context, overrideHostToSelect())
+      .WillOnce(Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>()));
 
   EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(to_create));
   EXPECT_CALL(*to_create, addIdleCallback(_));
@@ -1558,9 +1632,10 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithOverrideHost) {
 
   auto to_create = new Tcp::ConnectionPool::MockInstance();
 
+  Upstream::LoadBalancerContext::OverrideHost override_host_11001{"127.0.0.1:11001", false};
   EXPECT_CALL(context, overrideHostToSelect())
-      .WillRepeatedly(Return(absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>(
-          std::make_pair("127.0.0.1:11001", false))));
+      .WillRepeatedly(
+          Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host_11001)));
 
   EXPECT_CALL(factory_, allocateTcpConnPool_(_))
       .WillOnce(testing::Invoke([&](HostConstSharedPtr host) {
@@ -1588,10 +1663,10 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithNonExistingHost) {
 
   auto to_create = new Tcp::ConnectionPool::MockInstance();
 
+  Upstream::LoadBalancerContext::OverrideHost override_host_non_existing{"127.0.0.2:12345", false};
   EXPECT_CALL(context, overrideHostToSelect())
-      .WillRepeatedly(Return(absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>(
-          // Return non-existing host. Let the LB choose the host.
-          std::make_pair("127.0.0.2:12345", false))));
+      .WillRepeatedly(Return(
+          OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host_non_existing)));
 
   EXPECT_CALL(factory_, allocateTcpConnPool_(_))
       .WillOnce(testing::Invoke([&](HostConstSharedPtr host) {
@@ -1610,11 +1685,10 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithNonExistingHostStrict) 
   createWithBasicStaticCluster();
   NiceMock<MockLoadBalancerContext> context;
 
+  Upstream::LoadBalancerContext::OverrideHost override_host_strict{"127.0.0.2:12345", true};
   EXPECT_CALL(context, overrideHostToSelect())
-      .WillRepeatedly(Return(absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>(
-          // Return non-existing host and indicate strict mode.
-          // LB should not be allowed to choose host.
-          std::make_pair("127.0.0.2:12345", true))));
+      .WillRepeatedly(
+          Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host_strict)));
 
   // Requested upstream host 127.0.0.2:12345 is not part of the cluster.
   // Connection pool should not be created.
@@ -1623,6 +1697,23 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithNonExistingHostStrict) 
   auto opt_cp = cluster_manager_->getThreadLocalCluster("cluster_1")
                     ->tcpConnPool(ResourcePriority::Default, &context);
   EXPECT_FALSE(opt_cp.has_value());
+}
+
+TEST_F(ClusterManagerImplTest, StrictOverrideHostNotFoundReturnsCustomFailureStatus) {
+  createWithBasicStaticCluster();
+  NiceMock<MockLoadBalancerContext> context;
+
+  // Non-existing host with strict mode and custom failure status (421).
+  Upstream::LoadBalancerContext::OverrideHost override_host{"127.0.0.2:12345", true,
+                                                            Http::Code::MisdirectedRequest};
+  EXPECT_CALL(context, overrideHostToSelect())
+      .WillRepeatedly(
+          Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host)));
+
+  auto result = cluster_manager_->getThreadLocalCluster("cluster_1")->chooseHost(&context);
+  EXPECT_EQ(nullptr, result.host);
+  ASSERT_TRUE(result.failure_status.has_value());
+  EXPECT_EQ(Http::Code::MisdirectedRequest, result.failure_status.value());
 }
 
 TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToConnPool) {
@@ -1773,7 +1864,7 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     // Using Struct instead of a custom per-filter empty config proto
     // This is only allowed in tests.
-    return std::make_unique<Envoy::ProtobufWkt::Struct>();
+    return std::make_unique<Envoy::Protobuf::Struct>();
   }
   std::string name() const override { return "envoy.test.filter"; }
 };
@@ -1821,8 +1912,8 @@ class ClusterManagerInitHelperTest : public testing::Test {
 public:
   MOCK_METHOD(void, onClusterInit, (ClusterManagerCluster & cluster));
 
-  NiceMock<MockClusterManager> cm_;
-  ClusterManagerInitHelper init_helper_{cm_, [this](ClusterManagerCluster& cluster) {
+  NiceMock<Config::MockXdsManager> xds_manager_;
+  ClusterManagerInitHelper init_helper_{xds_manager_, [this](ClusterManagerCluster& cluster) {
                                           onClusterInit(cluster);
                                           return absl::OkStatus();
                                         }};
@@ -2265,7 +2356,7 @@ TEST_F(ClusterManagerImplTest, PassDownNetworkObserverRegistryToConnectionPool) 
   EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(cluster_api), "v1"));
   auto cluster_added_via_api = cluster_manager_->getThreadLocalCluster("added_via_api");
 
-  Quic::EnvoyQuicNetworkObserverRegistryFactory registry_factory;
+  Quic::TestEnvoyQuicNetworkObserverRegistryFactory registry_factory;
   cluster_manager_->createNetworkObserverRegistries(registry_factory);
 
   NiceMock<MockLoadBalancerContext> lb_context;
@@ -2439,6 +2530,7 @@ TEST_F(ClusterManagerImplTest, CheckAddressesList) {
 
 // Verify that non-IP additional addresses are rejected.
 TEST_F(ClusterManagerImplTest, RejectNonIpAdditionalAddresses) {
+  TestScopedRuntime scoped_runtime;
   const std::string bootstrap = R"EOF(
   static_resources:
     clusters:
@@ -2460,12 +2552,48 @@ TEST_F(ClusterManagerImplTest, RejectNonIpAdditionalAddresses) {
                   address: 127.0.0.1
                   port_value: 11001
   )EOF";
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.happy_eyeballs_sort_non_ip_addresses", "false"}});
   try {
     create(parseBootstrapFromV3Yaml(bootstrap));
     FAIL() << "Invalid address was not rejected";
   } catch (const EnvoyException& e) {
     EXPECT_STREQ("additional_addresses must be IP addresses.", e.what());
   }
+}
+
+TEST_F(ClusterManagerImplTest, AllowNonIpAdditionalAddresses) {
+  TestScopedRuntime scoped_runtime;
+  const std::string bootstrap = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_0
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: cluster_0
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              additionalAddresses:
+              - address:
+                  envoyInternalAddress:
+                   server_listener_name: internal_address
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.happy_eyeballs_sort_non_ip_addresses", "true"}});
+  create(parseBootstrapFromV3Yaml(bootstrap));
+
+  const auto& cluster = cluster_manager_->getThreadLocalCluster("cluster_0");
+  const auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(hosts[0]->addressListOrNull()->size(), 2);
+  EXPECT_EQ((*hosts[0]->addressListOrNull())[0]->asString(), "127.0.0.1:11001");
+  EXPECT_EQ((*hosts[0]->addressListOrNull())[1]->asString(), "envoy://internal_address/");
 }
 
 TEST_F(ClusterManagerImplTest, CheckActiveStaticCluster) {

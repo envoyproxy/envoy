@@ -8,6 +8,7 @@
 
 #include "source/common/common/matchers.h"
 
+using testing::Eq;
 namespace Envoy {
 
 // Helper functions to build API responses.
@@ -39,7 +40,7 @@ void XdsFuzzTest::updateListener(
     const std::vector<envoy::config::listener::v3::Listener>& added_or_updated,
     const std::vector<std::string>& removed) {
   ENVOY_LOG_MISC(debug, "Sending Listener DiscoveryResponse version {}", version_);
-  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(Config::TypeUrl::get().Listener,
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(Config::TestTypeUrl::get().Listener,
                                                                listeners, added_or_updated, removed,
                                                                std::to_string(version_));
 }
@@ -50,7 +51,7 @@ void XdsFuzzTest::updateRoute(
     const std::vector<std::string>& removed) {
   ENVOY_LOG_MISC(debug, "Sending Route DiscoveryResponse version {}", version_);
   sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-      Config::TypeUrl::get().RouteConfiguration, routes, added_or_updated, removed,
+      Config::TestTypeUrl::get().RouteConfiguration, routes, added_or_updated, removed,
       std::to_string(version_));
 }
 
@@ -161,7 +162,7 @@ void XdsFuzzTest::addListener(const std::string& listener_name, const std::strin
 
   // Use waitForAck instead of compareDiscoveryRequest as the client makes additional
   // DiscoveryRequests at launch that we might not want to respond to yet.
-  EXPECT_TRUE(waitForAck(Config::TypeUrl::get().Listener, std::to_string(version_)));
+  EXPECT_TRUE(waitForAck(Config::TestTypeUrl::get().Listener, std::to_string(version_)));
   if (removed) {
     verifier_.listenerUpdated(listener);
   } else {
@@ -179,7 +180,7 @@ void XdsFuzzTest::removeListener(const std::string& listener_name) {
   if (removed) {
     lds_update_success_++;
     updateListener(listeners_, {}, {listener_name});
-    EXPECT_TRUE(waitForAck(Config::TypeUrl::get().Listener, std::to_string(version_)));
+    EXPECT_TRUE(waitForAck(Config::TestTypeUrl::get().Listener, std::to_string(version_)));
     verifier_.listenerRemoved(listener_name);
   }
 }
@@ -198,7 +199,7 @@ void XdsFuzzTest::addRoute(const std::string& route_name) {
   updateRoute(routes_, {route}, {});
   verifier_.routeAdded(route);
 
-  EXPECT_TRUE(waitForAck(Config::TypeUrl::get().RouteConfiguration, std::to_string(version_)));
+  EXPECT_TRUE(waitForAck(Config::TestTypeUrl::get().RouteConfiguration, std::to_string(version_)));
 }
 
 /**
@@ -237,17 +238,15 @@ void XdsFuzzTest::replay() {
   initialize();
 
   // Set up cluster.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
                                                              {buildCluster("cluster_0")},
                                                              {buildCluster("cluster_0")}, {}, "0");
-  // TODO (dmitri-d) legacy delta sends node with every DiscoveryRequest, other mux implementations
-  // follow set_node_on_first_message_only config flag
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
-                                      {"cluster_0"}, {"cluster_0"}, {},
-                                      sotw_or_delta_ == Grpc::SotwOrDelta::Delta));
+  // All Mux implementations respect set_node_on_first_message_only config flag
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "",
+                                      {"cluster_0"}, {"cluster_0"}, {}, false));
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
+      Config::TestTypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
       {buildClusterLoadAssignment("cluster_0")}, {}, "0");
 
   // The client will not subscribe to the RouteConfiguration type URL until it receives a listener,
@@ -265,7 +264,7 @@ void XdsFuzzTest::replay() {
       addListener(listener_name, route_name);
       if (!sent_listener) {
         addRoute(route_name);
-        test_server_->waitForCounterEq("listener_manager.listener_create_success", 1, timeout_);
+        test_server_->waitForCounter("listener_manager.listener_create_success", Eq(1), timeout_);
       }
       sent_listener = true;
       break;
@@ -292,20 +291,20 @@ void XdsFuzzTest::replay() {
     }
     if (sent_listener) {
       // Wait for all of the updates to take effect.
-      test_server_->waitForGaugeEq("listener_manager.total_listeners_warming",
-                                   verifier_.numWarming(), timeout_);
-      test_server_->waitForGaugeEq("listener_manager.total_listeners_active", verifier_.numActive(),
+      test_server_->waitForGauge("listener_manager.total_listeners_warming",
+                                 Eq(verifier_.numWarming()), timeout_);
+      test_server_->waitForGauge("listener_manager.total_listeners_active",
+                                 Eq(verifier_.numActive()), timeout_);
+      test_server_->waitForGauge("listener_manager.total_listeners_draining",
+                                 Eq(verifier_.numDraining()), timeout_);
+      test_server_->waitForCounter("listener_manager.listener_modified",
+                                   Eq(verifier_.numModified()), timeout_);
+      test_server_->waitForCounter("listener_manager.listener_added", Eq(verifier_.numAdded()),
                                    timeout_);
-      test_server_->waitForGaugeEq("listener_manager.total_listeners_draining",
-                                   verifier_.numDraining(), timeout_);
-      test_server_->waitForCounterEq("listener_manager.listener_modified", verifier_.numModified(),
-                                     timeout_);
-      test_server_->waitForCounterEq("listener_manager.listener_added", verifier_.numAdded(),
-                                     timeout_);
-      test_server_->waitForCounterEq("listener_manager.listener_removed", verifier_.numRemoved(),
-                                     timeout_);
-      test_server_->waitForCounterEq("listener_manager.lds.update_success", lds_update_success_,
-                                     timeout_);
+      test_server_->waitForCounter("listener_manager.listener_removed", Eq(verifier_.numRemoved()),
+                                   timeout_);
+      test_server_->waitForCounter("listener_manager.lds.update_success", Eq(lds_update_success_),
+                                   timeout_);
     }
     logState();
   }

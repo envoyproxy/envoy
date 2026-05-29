@@ -178,7 +178,7 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
                                     UpdateHeadersCallback on_complete) {
   const auto& simple_lookup_context = static_cast<const SimpleLookupContext&>(lookup_context);
   const Key& key = simple_lookup_context.request().key();
-  absl::WriterMutexLock lock(&mutex_);
+  absl::WriterMutexLock lock(mutex_);
   auto iter = map_.find(key);
   auto post_complete = [on_complete = std::move(on_complete),
                         &dispatcher = simple_lookup_context.dispatcher()](bool result) mutable {
@@ -211,7 +211,7 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
 }
 
 SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
-  absl::ReaderMutexLock lock(&mutex_);
+  absl::ReaderMutexLock lock(mutex_);
   auto iter = map_.find(request.key());
   if (iter == map_.end()) {
     return Entry{};
@@ -234,7 +234,7 @@ SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
 bool SimpleHttpCache::insert(const Key& key, Http::ResponseHeaderMapPtr&& response_headers,
                              ResponseMetadata&& metadata, std::string&& body,
                              Http::ResponseTrailerMapPtr&& trailers) {
-  absl::WriterMutexLock lock(&mutex_);
+  absl::WriterMutexLock lock(mutex_);
   map_[key] = SimpleHttpCache::Entry{std::move(response_headers), std::move(metadata),
                                      std::move(body), std::move(trailers)};
   return true;
@@ -273,7 +273,7 @@ bool SimpleHttpCache::varyInsert(const Key& request_key,
                                  const Http::RequestHeaderMap& request_headers,
                                  const VaryAllowList& vary_allow_list,
                                  Http::ResponseTrailerMapPtr&& trailers) {
-  absl::WriterMutexLock lock(&mutex_);
+  absl::WriterMutexLock lock(mutex_);
 
   absl::btree_set<absl::string_view> vary_header_values =
       VaryHeaderUtils::getVaryValues(*response_headers);

@@ -14,6 +14,8 @@
 
 #include "source/extensions/filters/network/ext_proc/client_impl.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -43,6 +45,53 @@ struct NetworkExtProcStats {
 };
 
 /**
+ * Logging information for network ext_proc filter.
+ * This class stores aggregated statistics for logging and observability.
+ */
+class NetworkExtProcLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
+public:
+  explicit NetworkExtProcLoggingInfo() = default;
+
+  // Direction-specific aggregated statistics.
+  struct DirectionalStats {
+    uint64_t bytes_processed_{0};
+    uint32_t message_count_{0};
+    uint32_t grpc_calls_{0};
+    uint32_t grpc_errors_{0};
+    std::chrono::microseconds total_latency_{0};
+    std::chrono::microseconds max_latency_{0};
+    std::chrono::microseconds min_latency_{std::chrono::microseconds::max()};
+  };
+
+  // Record a gRPC call for network data processing.
+  void recordGrpcCall(std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
+                      bool is_read_direction);
+
+  // Add bytes processed for a direction.
+  void addBytesProcessed(uint64_t bytes, bool is_read_direction);
+
+  // Set connection info from the downstream connection.
+  void setConnectionInfo(const Network::Connection* connection);
+
+  // Accessors.
+  const DirectionalStats& readStats() const { return read_stats_; }
+  const DirectionalStats& writeStats() const { return write_stats_; }
+  uint64_t totalBytesProcessed() const {
+    return read_stats_.bytes_processed_ + write_stats_.bytes_processed_;
+  }
+  Grpc::Status::GrpcStatus lastCallStatus() const { return last_call_status_; }
+  const std::string& peerAddress() const { return peer_address_; }
+  const std::string& localAddress() const { return local_address_; }
+
+private:
+  DirectionalStats read_stats_;
+  DirectionalStats write_stats_;
+  std::string peer_address_;
+  std::string local_address_;
+  Grpc::Status::GrpcStatus last_call_status_{Grpc::Status::WellKnownGrpcStatus::Ok};
+};
+
+/**
  * Global configuration for Network ExtProc filter.
  */
 class Config {
@@ -57,6 +106,9 @@ public:
         typed_forwarding_namespaces_(
             config.metadata_options().forwarding_namespaces().typed().begin(),
             config.metadata_options().forwarding_namespaces().typed().end()),
+        untyped_receiving_namespaces_(
+            config.metadata_options().receiving_namespaces().untyped().begin(),
+            config.metadata_options().receiving_namespaces().untyped().end()),
         stats_(generateStats(config.stat_prefix(), scope)),
         message_timeout_(std::chrono::milliseconds(
             PROTOBUF_GET_MS_OR_DEFAULT(config, message_timeout, DefaultMessageTimeoutMs))) {};
@@ -77,6 +129,10 @@ public:
     return typed_forwarding_namespaces_;
   }
 
+  const absl::flat_hash_set<std::string>& untypedReceivingMetadataNamespaces() const {
+    return untyped_receiving_namespaces_;
+  }
+
   const NetworkExtProcStats& stats() const { return stats_; }
 
   const std::chrono::milliseconds& messageTimeout() const { return message_timeout_; }
@@ -94,6 +150,7 @@ private:
   const envoy::config::core::v3::GrpcService grpc_service_;
   const std::vector<std::string> untyped_forwarding_namespaces_;
   const std::vector<std::string> typed_forwarding_namespaces_;
+  const absl::flat_hash_set<std::string> untyped_receiving_namespaces_;
   NetworkExtProcStats stats_;
   const std::chrono::milliseconds message_timeout_;
 };
@@ -202,6 +259,10 @@ private:
   void closeConnection(const std::string& reason, Network::ConnectionCloseType close_type);
   void handleConnectionStatus(const ProcessingResponse& response);
 
+  void recordCallCompletion(Grpc::Status::GrpcStatus status, bool is_read_direction);
+
+  void initializeLoggingInfo();
+
   Envoy::Network::ReadFilterCallbacks* read_callbacks_{nullptr};
   Envoy::Network::WriteFilterCallbacks* write_callbacks_{nullptr};
 
@@ -213,6 +274,10 @@ private:
   const Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
   Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_{};
   DownstreamCallbacks downstream_callbacks_;
+
+  absl::optional<MonotonicTime> read_call_start_time_;
+  absl::optional<MonotonicTime> write_call_start_time_;
+  NetworkExtProcLoggingInfo* logging_info_{nullptr};
 
   bool processing_complete_{false};
 

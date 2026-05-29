@@ -505,15 +505,15 @@ TEST_F(JsonLoaderTest, LoadFromStruct) {
     ],
   })EOF";
 
-  const ProtobufWkt::Struct src = TestUtility::jsonToStruct(json_string);
+  const Protobuf::Struct src = TestUtility::jsonToStruct(json_string);
   ObjectSharedPtr json = Factory::loadFromProtobufStruct(src);
   const auto output_json = json->asJsonString();
   EXPECT_TRUE(TestUtility::jsonStringEqual(output_json, json_string));
 }
 
 TEST_F(JsonLoaderTest, LoadFromStructUnknownValueCase) {
-  ProtobufWkt::Struct src;
-  ProtobufWkt::Value value_not_set;
+  Protobuf::Struct src;
+  Protobuf::Value value_not_set;
   (*src.mutable_fields())["field"] = value_not_set;
   EXPECT_THROW_WITH_MESSAGE(Factory::loadFromProtobufStruct(src), EnvoyException,
                             "Protobuf value case not implemented");

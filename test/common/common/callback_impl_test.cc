@@ -21,7 +21,7 @@ public:
 TEST_F(CallbackManagerTest, All) {
   InSequence s;
 
-  CallbackManager<int> manager;
+  CallbackManager<absl::Status, int> manager;
   auto handle1 = manager.add([this](int arg) {
     called(arg);
     return absl::OkStatus();
@@ -55,7 +55,7 @@ TEST_F(CallbackManagerTest, All) {
 TEST_F(CallbackManagerTest, DestroyManagerBeforeHandle) {
   CallbackHandlePtr handle;
   {
-    CallbackManager<int> manager;
+    CallbackManager<absl::Status, int> manager;
     handle = manager.add([this](int arg) {
       called(arg);
       return absl::OkStatus();

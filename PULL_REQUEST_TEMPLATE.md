@@ -1,15 +1,27 @@
 <!--
 !!!ATTENTION!!!
 
-If you are fixing *any* crash or *any* potential security issue, *do not*
-open a pull request in this repo. Please report the issue via emailing
-envoy-security@googlegroups.com where the issue will be triaged appropriately.
+If you are fixing **any** crash or **any** potential security issue, **do not
+open a pull request**.
+
+Instead, please
+[open a GitHub Security Advisory](https://github.com/envoyproxy/envoy/security/advisories/new)
+(preferred). Alternatively, you may email
+envoy-security@googlegroups.com.
+
 Thank you in advance for helping to keep Envoy secure.
 
 !!!ATTENTION!!!
 
 For an explanation of how to fill out the fields, please see the relevant section
 in [PULL_REQUESTS.md](https://github.com/envoyproxy/envoy/blob/main/PULL_REQUESTS.md)
+
+!!!ATTENTION!!!
+
+Please check the [use of generative AI policy](https://github.com/envoyproxy/envoy/blob/main/CONTRIBUTING.md?plain=1#L41).
+
+You may use generative AI only if you fully understand the code. You need to disclose
+this usage in the PR description to ensure transparency.
 -->
 
 Commit Message:

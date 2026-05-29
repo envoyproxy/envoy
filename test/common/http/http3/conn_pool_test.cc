@@ -49,6 +49,8 @@ public:
             new NiceMock<Ssl::MockClientContextConfig>),
         context_);
     factory_->initialize();
+    quic_info_ = Quic::createPersistentQuicInfoForCluster(dispatcher_, mockHost().cluster_,
+                                                          context_.server_context_);
   }
 
   void initialize() {
@@ -61,9 +63,11 @@ public:
     Network::ConnectionSocket::OptionsSharedPtr options =
         std::make_shared<Network::Socket::Options>();
     options->push_back(socket_option_);
-    ON_CALL(*mockHost().cluster_.upstream_local_address_selector_, getUpstreamLocalAddressImpl(_))
+    ON_CALL(*mockHost().cluster_.upstream_local_address_selector_,
+            getUpstreamLocalAddressImpl(_, _))
         .WillByDefault(Invoke(
-            [](const Network::Address::InstanceConstSharedPtr&) -> Upstream::UpstreamLocalAddress {
+            [](const Network::Address::InstanceConstSharedPtr&,
+               OptRef<const Network::TransportSocketOptions>) -> Upstream::UpstreamLocalAddress {
               return Upstream::UpstreamLocalAddress({nullptr, nullptr});
             }));
     Network::TransportSocketOptionsConstSharedPtr transport_options;
@@ -71,7 +75,7 @@ public:
         allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
                          transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
                          makeOptRef<PoolConnectResultCallback>(connect_result_callback_),
-                         quic_info_, {observers_}, overload_manager_, happy_eyeballs_);
+                         *quic_info_, {observers_}, overload_manager_, happy_eyeballs_);
     EXPECT_EQ(3000, Http3ConnPoolImplPeer::getServerId(*pool_).port());
   }
 
@@ -81,7 +85,7 @@ public:
 
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   NiceMock<Event::MockDispatcher> dispatcher_;
-  Quic::PersistentQuicInfoImpl quic_info_{dispatcher_, 45};
+  std::unique_ptr<Quic::PersistentQuicInfoImpl> quic_info_;
   Upstream::HostSharedPtr host_{new NiceMock<Upstream::MockHost>};
   NiceMock<Random::MockRandomGenerator> random_;
   Upstream::ClusterConnectivityState state_;
@@ -135,7 +139,7 @@ TEST_F(Http3ConnPoolImplTest, FastFailWithoutSecretsLoaded) {
   ConnectionPool::InstancePtr pool =
       allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
                        transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
-                       makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_,
+                       makeOptRef<PoolConnectResultCallback>(connect_result_callback_), *quic_info_,
                        {observers_}, overload_manager_);
 
   EXPECT_EQ(static_cast<Http3ConnPoolImpl*>(pool.get())->instantiateActiveClient(), nullptr);
@@ -163,7 +167,7 @@ TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
   ConnectionPool::InstancePtr pool =
       allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
                        transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
-                       makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_,
+                       makeOptRef<PoolConnectResultCallback>(connect_result_callback_), *quic_info_,
                        {observers_}, overload_manager_);
 
   MockResponseDecoder decoder;
@@ -185,19 +189,21 @@ void Http3ConnPoolImplTest::createNewStream() {
   mockHost().cluster_.cluster_socket_options_ = std::make_shared<Network::Socket::Options>();
   std::shared_ptr<Network::MockSocketOption> cluster_socket_option{new Network::MockSocketOption()};
   mockHost().cluster_.cluster_socket_options_->push_back(cluster_socket_option);
-  EXPECT_CALL(*mockHost().cluster_.upstream_local_address_selector_, getUpstreamLocalAddressImpl(_))
-      .WillOnce(Invoke([&](const Network::Address::InstanceConstSharedPtr& address)
-                           -> Upstream::UpstreamLocalAddress {
-        if (happy_eyeballs_ && address_list_->size() == 2) {
-          EXPECT_EQ(address, (*address_list_)[1]);
-        } else {
-          EXPECT_EQ(address, test_address_);
-        }
-        Network::ConnectionSocket::OptionsSharedPtr options =
-            std::make_shared<Network::ConnectionSocket::Options>();
-        Network::Socket::appendOptions(options, mockHost().cluster_.cluster_socket_options_);
-        return Upstream::UpstreamLocalAddress({nullptr, options});
-      }));
+  EXPECT_CALL(*mockHost().cluster_.upstream_local_address_selector_,
+              getUpstreamLocalAddressImpl(_, _))
+      .WillOnce(Invoke(
+          [&](const Network::Address::InstanceConstSharedPtr& address,
+              OptRef<const Network::TransportSocketOptions>) -> Upstream::UpstreamLocalAddress {
+            if (happy_eyeballs_ && address_list_->size() == 2) {
+              EXPECT_EQ(address, (*address_list_)[1]);
+            } else {
+              EXPECT_EQ(address, test_address_);
+            }
+            Network::ConnectionSocket::OptionsSharedPtr options =
+                std::make_shared<Network::ConnectionSocket::Options>();
+            Network::Socket::appendOptions(options, mockHost().cluster_.cluster_socket_options_);
+            return Upstream::UpstreamLocalAddress({nullptr, options});
+          }));
   EXPECT_CALL(*cluster_socket_option, setOption(_, _)).Times(3u);
   EXPECT_CALL(*socket_option_, setOption(_, _)).Times(3u);
   // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
@@ -279,6 +285,25 @@ TEST_F(Http3ConnPoolImplTest, NewAndDrainClientBeforeConnect) {
   // Triggering the async connect callback after the client starts draining shouldn't cause crash.
   async_connect_callback->invokeCallback();
   cancellable->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+}
+
+TEST_F(Http3ConnPoolImplTest, MigrationEnabledNoDrain) {
+  quic_info_->migration_config_.migrate_session_on_network_change = true;
+  createNewStream();
+  EXPECT_FALSE(pool_->isIdle());
+  // Draining non-migratable connections should not drain the connection which might be able to
+  // migrate.
+  pool_->drainConnections(
+      Envoy::ConnectionPool::DrainBehavior::DrainExistingNonMigratableConnections);
+  EXPECT_FALSE(pool_->isIdle());
+}
+
+// These are no-op currently. Just test them to have test coverage.
+TEST_F(Http3ConnPoolImplTest, GetNetworkChangeEvents) {
+  createNewStream();
+  observers_.onNetworkConnected(-1);
+  observers_.onNetworkMadeDefault(-1);
+  observers_.onNetworkDisconnected(-1);
 }
 
 } // namespace Http3

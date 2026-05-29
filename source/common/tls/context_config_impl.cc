@@ -13,6 +13,7 @@
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/secret/sds_api.h"
+#include "source/common/shared_pool/shared_pool.h"
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
 #include "source/common/tls/ssl_handshaker.h"
 
@@ -23,6 +24,8 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
+
+SINGLETON_MANAGER_REGISTRATION(cipher_suites_pool);
 
 namespace {
 
@@ -71,7 +74,7 @@ std::vector<TlsCertificateConfigProviderSharedPtrWithName> getTlsCertificateConf
                 .secretManager()
                 .findOrCreateTlsCertificateProvider(
                     sds_secret_config.sds_config(), sds_secret_config.name(),
-                    factory_context.serverFactoryContext(), factory_context.initManager())});
+                    factory_context.serverFactoryContext(), factory_context.initManager(), true)});
       } else {
         // Load static secret.
         auto secret_provider =
@@ -133,7 +136,7 @@ getCertificateValidationContextConfigProvider(
       const std::string hash_id =
           generateCertificateHash(validation_context.trusted_ca().inline_bytes());
       if (!hash_id.empty()) {
-        ca_cert_id = absl::StrCat(ca_cert_id, "_", hash_id);
+        absl::StrAppend(&ca_cert_id, "_", hash_id);
       }
     }
     return CertificateValidationContextConfigProviderSharedPtrWithName{
@@ -179,6 +182,14 @@ compliancePolicyFromProto(
   }
 }
 
+std::shared_ptr<SharedPool::ObjectSharedPool<std::string>>
+getCipherSuitesPool(Singleton::Manager& singleton_manager, Event::Dispatcher& dispatcher) {
+  return singleton_manager.getTyped<SharedPool::ObjectSharedPool<std::string>>(
+      SINGLETON_MANAGER_REGISTERED_NAME(cipher_suites_pool), [&dispatcher] {
+        return std::make_shared<SharedPool::ObjectSharedPool<std::string>>(dispatcher);
+      });
+}
+
 } // namespace
 
 ContextConfigImpl::ContextConfigImpl(
@@ -194,8 +205,12 @@ ContextConfigImpl::ContextConfigImpl(
       lifecycle_notifier_(factory_context.serverFactoryContext().lifecycleNotifier()),
       auto_sni_san_match_(auto_sni_san_match),
       alpn_protocols_(RepeatedPtrUtil::join(config.alpn_protocols(), ",")),
-      cipher_suites_(StringUtil::nonEmptyStringOrDefault(
-          RepeatedPtrUtil::join(config.tls_params().cipher_suites(), ":"), default_cipher_suites)),
+      cipher_suites_(
+          getCipherSuitesPool(factory_context.serverFactoryContext().singletonManager(),
+                              factory_context.serverFactoryContext().mainThreadDispatcher())
+              ->getObject(StringUtil::nonEmptyStringOrDefault(
+                  RepeatedPtrUtil::join(config.tls_params().cipher_suites(), ":"),
+                  default_cipher_suites))),
       ecdh_curves_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().ecdh_curves(), ":"), default_curves)),
       signature_algorithms_(RepeatedPtrUtil::join(config.tls_params().signature_algorithms(), ":")),
@@ -414,21 +429,58 @@ ClientContextConfigImpl::ClientContextConfigImpl(
           FIPS_mode() ? DEFAULT_CURVES_FIPS : DEFAULT_CURVES, factory_context, creation_status),
       server_name_indication_(config.sni()), auto_host_sni_(config.auto_host_sni()),
       allow_renegotiation_(config.allow_renegotiation()),
-      enforce_rsa_key_usage_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforce_rsa_key_usage, false)),
+      enforce_rsa_key_usage_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforce_rsa_key_usage, true)),
       max_session_keys_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_session_keys, 1)) {
+
+  if (!enforce_rsa_key_usage_) {
+    ENVOY_LOG(
+        warn,
+        "The 'enforce_rsa_key_usage' option is set to false, which disables the enforcement of RSA "
+        "key usage. This option will be removed in the next version. The handshake will fail "
+        "if the keyUsage extension is present and incompatible with the "
+        "TLS usage. Please update the certificates to be compliant.");
+  }
+
   // BoringSSL treats this as a C string, so embedded NULL characters will not
   // be handled correctly.
   if (server_name_indication_.find('\0') != std::string::npos) {
     creation_status = absl::InvalidArgumentError("SNI names containing NULL-byte are not allowed");
     return;
   }
+
   // TODO(PiotrSikora): Support multiple TLS certificates.
   if ((config.common_tls_context().tls_certificates().size() +
-       config.common_tls_context().tls_certificate_sds_secret_configs().size()) > 1) {
+       config.common_tls_context().tls_certificate_sds_secret_configs().size()) > 1 &&
+      !config.common_tls_context().has_custom_tls_certificate_selector()) {
     creation_status = absl::InvalidArgumentError(
         "Multiple TLS certificates are not supported for client contexts");
     return;
   }
+
+  if (config.common_tls_context().has_custom_tls_certificate_selector()) {
+    const auto& provider_config = config.common_tls_context().custom_tls_certificate_selector();
+    Ssl::UpstreamTlsCertificateSelectorConfigFactory& provider_factory =
+        Config::Utility::getAndCheckFactory<Ssl::UpstreamTlsCertificateSelectorConfigFactory>(
+            provider_config);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+        provider_config.typed_config(), factory_context.messageValidationVisitor(),
+        provider_factory);
+    auto selector_factory = provider_factory.createUpstreamTlsCertificateSelectorFactory(
+        *message, factory_context, *this);
+    SET_AND_RETURN_IF_NOT_OK(selector_factory.status(), creation_status);
+    tls_certificate_selector_factory_ = *std::move(selector_factory);
+  }
+}
+
+void ClientContextConfigImpl::setSecretUpdateCallback(std::function<absl::Status()> callback) {
+  auto callback_with_notify = [this, callback] {
+    RETURN_IF_NOT_OK(callback());
+    if (tls_certificate_selector_factory_) {
+      return tls_certificate_selector_factory_->onConfigUpdate();
+    }
+    return absl::OkStatus();
+  };
+  ContextConfigImpl::setSecretUpdateCallback(callback_with_notify);
 }
 
 } // namespace Tls

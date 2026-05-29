@@ -7,6 +7,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/test_runtime.h"
 
 using testing::Return;
 using testing::ReturnRef;
@@ -29,8 +30,8 @@ public:
     ON_CALL(encoder_callbacks_, addEncodedTrailers()).WillByDefault(ReturnRef(response_trailers_));
     ON_CALL(decoder_callbacks_, decodingBuffer()).WillByDefault(Return(&buffer_));
     ON_CALL(encoder_callbacks_, encodingBuffer()).WillByDefault(Return(&buffer_));
-    ON_CALL(decoder_callbacks_, decoderBufferLimit()).WillByDefault(Return(1024));
-    ON_CALL(encoder_callbacks_, encoderBufferLimit()).WillByDefault(Return(1024));
+    ON_CALL(decoder_callbacks_, bufferLimit()).WillByDefault(Return(1024));
+    ON_CALL(encoder_callbacks_, bufferLimit()).WillByDefault(Return(1024));
     ON_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _))
         .WillByDefault(
             Invoke([&](Buffer::Instance& data, bool) -> void { data.drain(data.length()); }));
@@ -69,13 +70,21 @@ DEFINE_PROTO_FUZZER(
     return;
   }
 
-  // Limiting the max supported request body size to 128k.
+  // Limiting the max supported request or response body size to 64k.
+  const uint32_t max_body_size = 64 * 1024;
   if (input.request().has_proto_body()) {
-    const uint32_t max_body_size = 128 * 1024;
     if (input.request().proto_body().message().value().size() > max_body_size) {
       return;
     }
   }
+
+  if (input.response().ByteSizeLong() > max_body_size) {
+    return;
+  }
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ext_proc_inject_data_with_state_update", "true"}});
 
   static FuzzerMocks mocks;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
@@ -86,11 +95,12 @@ DEFINE_PROTO_FUZZER(
   ExternalProcessing::FilterConfigSharedPtr config;
 
   try {
+    auto builder_ptr = Envoy::Extensions::Filters::Common::Expr::createBuilder({});
+    auto builder = std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
+        std::move(builder_ptr));
     config = std::make_shared<ExternalProcessing::FilterConfig>(
         proto_config, std::chrono::milliseconds(200), 200, *stats_store.rootScope(), "", false,
-        std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
-            Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
-        mocks.factory_context_);
+        builder, mocks.factory_context_);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException during ext_proc filter config validation: {}", e.what());
     return;

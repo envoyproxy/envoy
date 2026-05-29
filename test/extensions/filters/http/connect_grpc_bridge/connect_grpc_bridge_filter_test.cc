@@ -27,7 +27,7 @@ protected:
   }
 
   bool jsonEqual(const std::string& expected, const std::string& actual) {
-    ProtobufWkt::Value expected_value, actual_value;
+    Protobuf::Value expected_value, actual_value;
     TestUtility::loadFromJson(expected, expected_value);
     TestUtility::loadFromJson(actual, actual_value);
     return TestUtility::protoEqual(expected_value, actual_value);
@@ -41,7 +41,7 @@ protected:
   }
 
   void addStatusDetails(google::rpc::Status& status, const Protobuf::Message& message) {
-    ProtobufWkt::Any any;
+    Protobuf::Any any;
     any.PackFrom(message);
     *status.add_details() = any;
   }

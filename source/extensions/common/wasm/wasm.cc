@@ -152,12 +152,12 @@ Word resolve_dns(Word dns_address_ptr, Word dns_address_size, Word token_ptr) {
     return WasmResult::InvalidMemoryAccess;
   }
   // Verify set and verify token_ptr before initiating the async resolve.
-  uint32_t token = context->wasm()->nextDnsToken();
-  if (!context->wasm()->setDatatype(token_ptr, token)) {
+  uint32_t token = context->envoyWasm()->nextDnsToken();
+  if (!context->envoyWasm()->setDatatype(token_ptr, token)) {
     return WasmResult::InvalidMemoryAccess;
   }
-  auto callback = [weak_wasm = std::weak_ptr<Wasm>(context->wasm()->sharedThis()), root_context,
-                   context_id = context->id(),
+  auto callback = [weak_wasm = std::weak_ptr<Wasm>(context->envoyWasm()->sharedThis()),
+                   root_context, context_id = context->id(),
                    token](Envoy::Network::DnsResolver::ResolutionStatus status, absl::string_view,
                           std::list<Envoy::Network::DnsResponse>&& response) {
     auto wasm = weak_wasm.lock();
@@ -166,17 +166,18 @@ Word resolve_dns(Word dns_address_ptr, Word dns_address_size, Word token_ptr) {
     }
     root_context->onResolveDns(token, status, std::move(response));
   };
-  if (!context->wasm()->dnsResolver()) {
+  if (!context->envoyWasm()->dnsResolver()) {
     envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
     Network::DnsResolverFactory& dns_resolver_factory =
         Network::createDefaultDnsResolverFactory(typed_dns_resolver_config);
-    context->wasm()->dnsResolver() = THROW_OR_RETURN_VALUE(
-        dns_resolver_factory.createDnsResolver(context->wasm()->dispatcher(),
-                                               context->wasm()->api(), typed_dns_resolver_config),
-        Network::DnsResolverSharedPtr);
+    context->envoyWasm()->dnsResolver() =
+        THROW_OR_RETURN_VALUE(dns_resolver_factory.createDnsResolver(
+                                  context->envoyWasm()->dispatcher(), context->envoyWasm()->api(),
+                                  typed_dns_resolver_config),
+                              Network::DnsResolverSharedPtr);
   }
-  context->wasm()->dnsResolver()->resolve(std::string(address.value()),
-                                          Network::DnsLookupFamily::Auto, callback);
+  context->envoyWasm()->dnsResolver()->resolve(std::string(address.value()),
+                                               Network::DnsLookupFamily::Auto, callback);
   return WasmResult::Ok;
 }
 
@@ -219,7 +220,7 @@ ContextBase* Wasm::createRootContext(const std::shared_ptr<PluginBase>& plugin) 
 
 ContextBase* Wasm::createVmContext() { return new Context(this); }
 
-void Wasm::log(const PluginSharedPtr& plugin, const Formatter::HttpFormatterContext& log_context,
+void Wasm::log(const PluginSharedPtr& plugin, const Formatter::Context& log_context,
                const StreamInfo::StreamInfo& info) {
   auto context = getRootContext(plugin, true);
   context->log(log_context, info);
@@ -372,8 +373,13 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
                  .value_or(code.empty() ? EMPTY_STRING : INLINE_STRING);
   }
 
+  // Include environment_variables in the vm_key so that a change to env vars triggers VM
+  // recreation, the same way a code change does. The env vars hash is appended to vm_id (which is
+  // small) rather than to code (which can be O(MB)), with a separator to avoid key collisions.
+  const std::size_t env_vars_hash = MessageUtil::hash(vm_config.environment_variables());
+  const std::string vm_id_with_env = absl::StrCat(vm_config.vm_id(), "|", env_vars_hash);
   auto vm_key = proxy_wasm::makeVmKey(
-      vm_config.vm_id(),
+      vm_id_with_env,
       THROW_OR_RETURN_VALUE(MessageUtil::anyToBytes(vm_config.configuration()), std::string), code);
   auto complete_cb = [cb, vm_key, plugin, scope, &api, &cluster_manager, &dispatcher,
                       &lifecycle_notifier, create_root_context_for_testing,

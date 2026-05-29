@@ -18,6 +18,7 @@ namespace Envoy {
 namespace Router {
 
 MockDirectResponseEntry::MockDirectResponseEntry() = default;
+
 MockDirectResponseEntry::~MockDirectResponseEntry() = default;
 
 TestRetryPolicy::TestRetryPolicy() { num_retries_ = 1; }
@@ -103,10 +104,9 @@ MockRouteEntry::MockRouteEntry()
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(cluster_name_));
   ON_CALL(*this, opaqueConfig()).WillByDefault(ReturnRef(opaque_config_));
   ON_CALL(*this, rateLimitPolicy()).WillByDefault(ReturnRef(rate_limit_policy_));
-  ON_CALL(*this, retryPolicy()).WillByDefault(ReturnRef(retry_policy_));
+  ON_CALL(*this, retryPolicy()).WillByDefault(ReturnRef(base_retry_policy_));
   ON_CALL(*this, internalRedirectPolicy()).WillByDefault(ReturnRef(internal_redirect_policy_));
-  ON_CALL(*this, retryShadowBufferLimit())
-      .WillByDefault(Return(std::numeric_limits<uint32_t>::max()));
+
   ON_CALL(*this, shadowPolicies()).WillByDefault(ReturnRef(shadow_policies_));
   ON_CALL(*this, timeout()).WillByDefault(Return(std::chrono::milliseconds(10)));
   ON_CALL(*this, includeVirtualHostRateLimits()).WillByDefault(Return(true));
@@ -120,6 +120,8 @@ MockRouteEntry::MockRouteEntry()
   ON_CALL(*this, pathMatcher()).WillByDefault(ReturnRef(path_matcher_));
   ON_CALL(*this, pathRewriter()).WillByDefault(ReturnRef(path_rewriter_));
   ON_CALL(*this, routeStatsContext()).WillByDefault(Return(RouteStatsContextOptRef()));
+  ON_CALL(*this, requestBodyBufferLimit())
+      .WillByDefault(Return(std::numeric_limits<uint64_t>::max()));
 }
 
 MockRouteEntry::~MockRouteEntry() = default;
@@ -144,7 +146,18 @@ MockDecorator::MockDecorator() {
 }
 MockDecorator::~MockDecorator() = default;
 
-MockRouteTracing::MockRouteTracing() = default;
+MockRouteTracing::MockRouteTracing() {
+  ON_CALL(*this, getCustomTags()).WillByDefault(ReturnRef(custom_tags_));
+  ON_CALL(*this, getClientSampling()).WillByDefault(ReturnRef(client_sampling_));
+  ON_CALL(*this, getRandomSampling()).WillByDefault(ReturnRef(random_sampling_));
+  ON_CALL(*this, getOverallSampling()).WillByDefault(ReturnRef(overall_sampling_));
+  ON_CALL(*this, operation()).WillByDefault(Invoke([this]() {
+    return makeOptRefFromPtr(operation_.get());
+  }));
+  ON_CALL(*this, upstreamOperation()).WillByDefault(Invoke([this]() {
+    return makeOptRefFromPtr(upstream_operation_.get());
+  }));
+}
 MockRouteTracing::~MockRouteTracing() = default;
 
 MockRoute::MockRoute() {
@@ -155,17 +168,17 @@ MockRoute::MockRoute() {
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, typedMetadata()).WillByDefault(ReturnRef(typed_metadata_));
   ON_CALL(*this, routeName()).WillByDefault(ReturnRef(route_name_));
-  ON_CALL(*this, virtualHost()).WillByDefault(ReturnRef(virtual_host_copy_));
+  ON_CALL(*this, virtualHost()).WillByDefault(ReturnRef(*virtual_host_));
+  ON_CALL(*this, virtualHostSharedPtr()).WillByDefault(Return(virtual_host_));
 
   // Route entry methods.
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(route_entry_.cluster_name_));
   ON_CALL(*this, opaqueConfig()).WillByDefault(ReturnRef(route_entry_.opaque_config_));
   ON_CALL(*this, rateLimitPolicy()).WillByDefault(ReturnRef(route_entry_.rate_limit_policy_));
-  ON_CALL(*this, retryPolicy()).WillByDefault(ReturnRef(route_entry_.retry_policy_));
+  ON_CALL(*this, retryPolicy()).WillByDefault(ReturnRef(route_entry_.base_retry_policy_));
   ON_CALL(*this, internalRedirectPolicy())
       .WillByDefault(ReturnRef(route_entry_.internal_redirect_policy_));
-  ON_CALL(*this, retryShadowBufferLimit())
-      .WillByDefault(Return(std::numeric_limits<uint32_t>::max()));
+
   ON_CALL(*this, shadowPolicies()).WillByDefault(ReturnRef(route_entry_.shadow_policies_));
   ON_CALL(*this, timeout()).WillByDefault(Return(std::chrono::milliseconds(10)));
   ON_CALL(*this, includeVirtualHostRateLimits()).WillByDefault(Return(true));
@@ -181,6 +194,8 @@ MockRoute::MockRoute() {
   ON_CALL(*this, pathMatcher()).WillByDefault(ReturnRef(route_entry_.path_matcher_));
   ON_CALL(*this, pathRewriter()).WillByDefault(ReturnRef(route_entry_.path_rewriter_));
   ON_CALL(*this, routeStatsContext()).WillByDefault(Return(RouteStatsContextOptRef()));
+  ON_CALL(*this, requestBodyBufferLimit())
+      .WillByDefault(Return(std::numeric_limits<uint64_t>::max()));
 }
 MockRoute::~MockRoute() = default;
 

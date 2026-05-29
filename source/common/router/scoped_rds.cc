@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/common/exception.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/route/v3/scoped_route.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -93,11 +94,13 @@ makeScopedRouteInfos(ProtobufTypes::ConstMessagePtrVector&& config_protos,
         MessageUtil::downcastAndValidate<const envoy::config::route::v3::ScopedRouteConfiguration&>(
             *config_proto, factory_context.messageValidationContext().staticValidationVisitor());
     if (!scoped_route_config.route_configuration_name().empty()) {
-      throw EnvoyException("Fetching routes via RDS (route_configuration_name) is not supported "
-                           "with inline scoped routes.");
+      throwEnvoyExceptionOrPanic(
+          "Fetching routes via RDS (route_configuration_name) is not supported "
+          "with inline scoped routes.");
     }
     if (!scoped_route_config.has_route_configuration()) {
-      throw EnvoyException("You must specify a route_configuration with inline scoped routes.");
+      throwEnvoyExceptionOrPanic(
+          "You must specify a route_configuration with inline scoped routes.");
     }
     RouteConfigProviderPtr route_config_provider =
         config_provider_manager.routeConfigProviderManager().createStaticRouteConfigProvider(
@@ -135,19 +138,19 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     ScopedRoutesConfigProviderManager& config_provider_manager)
     : DeltaConfigSubscriptionInstance("SRDS", manager_identifier, config_provider_manager,
                                       factory_context),
-      Envoy::Config::SubscriptionBase<envoy::config::route::v3::ScopedRouteConfiguration>(
-          factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
       factory_context_(factory_context), name_(name),
       scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
       stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))}),
+      resource_type_helper_(factory_context.messageValidationContext().dynamicValidationVisitor(),
+                            "name"),
       rds_config_source_(std::move(rds_config_source)), stat_prefix_(stat_prefix),
       route_config_provider_manager_(route_config_provider_manager) {
-  const auto resource_name = getResourceName();
+  const auto resource_name = resource_type_helper_.getResourceName();
   if (scoped_rds.srds_resources_locator().empty()) {
     subscription_ = THROW_OR_RETURN_VALUE(
         factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
             scoped_rds.scoped_rds_config_source(), Grpc::Common::typeUrl(resource_name), *scope_,
-            *this, resource_decoder_, {}),
+            *this, resource_type_helper_.resourceDecoder(), {}),
         Envoy::Config::SubscriptionPtr);
   } else {
     const auto srds_resources_locator = THROW_OR_RETURN_VALUE(
@@ -156,7 +159,7 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     subscription_ = THROW_OR_RETURN_VALUE(
         factory_context.clusterManager().subscriptionFactory().collectionSubscriptionFromUrl(
             srds_resources_locator, scoped_rds.scoped_rds_config_source(), resource_name, *scope_,
-            *this, resource_decoder_),
+            *this, resource_type_helper_.resourceDecoder()),
         Envoy::Config::SubscriptionPtr);
   }
 
@@ -288,7 +291,6 @@ absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
         scope_name_by_hash_.erase(scope_info_iter->second->scopeKey().hash());
       }
     }
-    rds.set_route_config_name(scoped_route_config.route_configuration_name());
     std::unique_ptr<RdsRouteConfigProviderHelper> rds_config_provider_helper;
     std::shared_ptr<ScopedRouteInfo> scoped_route_info = nullptr;
     if (scoped_route_config.has_route_configuration()) {
@@ -394,8 +396,6 @@ absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
     const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
-  // NOTE: deletes are done before adds/updates.
-  absl::flat_hash_map<std::string, ScopedRouteInfoConstSharedPtr> to_be_removed_scopes;
   // Destruction of resume_rds will lift the floodgate for new RDS subscriptions.
   // Note in the case of partial acceptance, accepted RDS subscriptions should be started
   // despite of any error.
@@ -413,9 +413,7 @@ absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
   // Pause RDS to not send a burst of RDS requests until we start all the new subscriptions.
   // In the case that localInitManager is uninitialized, RDS is already paused
   // either by Server init or LDS init.
-  if (factory_context_.clusterManager().adsMux()) {
-    resume_rds = factory_context_.clusterManager().adsMux()->pause(type_url);
-  }
+  resume_rds = factory_context_.xdsManager().pause(type_url);
   // if local init manager is initialized, the parent init manager may have gone away.
   if (localInitManager().state() == Init::Manager::State::Initialized) {
     srds_init_mgr =
@@ -579,8 +577,20 @@ void ScopedRdsConfigSubscription::onDemandRdsUpdate(
       thread_local_dispatcher.post([route_config_updated_cb] { route_config_updated_cb(true); });
     };
     std::string scope_name = iter->second;
+    // Guard against scopes with inline route_configuration (e.g. default_routes)
+    // which have an entry in scope_name_by_hash_ but not in route_provider_by_scope_.
+    // Using find() instead of operator[] to avoid inserting a null unique_ptr.
+    auto provider_iter = route_provider_by_scope_.find(scope_name);
+    if (provider_iter == route_provider_by_scope_.end() || provider_iter->second == nullptr) {
+      ENVOY_LOG(debug,
+                "srds: scope '{}' has no RDS provider (inline config), "
+                "returning false to on-demand callback",
+                scope_name);
+      thread_local_dispatcher.post([route_config_updated_cb] { route_config_updated_cb(false); });
+      return;
+    }
     // On demand initialization inside main thread.
-    route_provider_by_scope_[scope_name]->addOnDemandUpdateCallback(thread_local_updated_callback);
+    provider_iter->second->addOnDemandUpdateCallback(thread_local_updated_callback);
   });
 }
 

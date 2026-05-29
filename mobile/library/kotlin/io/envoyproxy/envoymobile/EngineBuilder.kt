@@ -16,6 +16,12 @@ open class EngineBuilder() {
   protected var logger: ((LogLevel, String) -> Unit)? = null
   protected var eventTracker: ((Map<String, String>) -> Unit)? = null
   protected var enableProxying = false
+  protected var useQuicPlatformPacketWriter = false
+  protected var enableQuicConnectionMigration = false
+  protected var migrateIdleQuicConnection = false
+  protected var maxIdleTimeBeforeQuicMigrationSeconds: Long = 0
+  protected var maxTimeOnNonDefaultNetworkSeconds: Long = 0
+
   private var runtimeGuards = mutableMapOf<String, Boolean>()
   private var engineType: () -> EnvoyEngine = {
     EnvoyEngineImpl(
@@ -41,6 +47,7 @@ open class EngineBuilder() {
   private var dnsNumRetries: Int? = null
   private var enableDrainPostDnsRefresh = false
   internal var enableHttp3 = true
+  private var enableEarlyData = true
   private var http3ConnectionOptions = ""
   private var http3ClientConnectionOptions = ""
   private var quicHints = mutableMapOf<String, Int>()
@@ -220,6 +227,17 @@ open class EngineBuilder() {
    */
   fun enableHttp3(enableHttp3: Boolean): EngineBuilder {
     this.enableHttp3 = enableHttp3
+    return this
+  }
+
+  /**
+   * Specify whether to enable early data (0-RTT) support. Defaults to true.
+   *
+   * @param enableEarlyData whether or not to enable early data.
+   * @return This builder.
+   */
+  fun enableEarlyData(enableEarlyData: Boolean): EngineBuilder {
+    this.enableEarlyData = enableEarlyData
     return this
   }
 
@@ -544,6 +562,7 @@ open class EngineBuilder() {
         dnsNumRetries ?: -1,
         enableDrainPostDnsRefresh,
         enableHttp3,
+        enableEarlyData,
         http3ConnectionOptions,
         http3ClientConnectionOptions,
         quicHints,
@@ -569,6 +588,11 @@ open class EngineBuilder() {
         enablePlatformCertificatesValidation,
         upstreamTlsSni,
         h3ConnectionKeepaliveInitialIntervalMilliseconds,
+        useQuicPlatformPacketWriter,
+        enableQuicConnectionMigration,
+        migrateIdleQuicConnection,
+        maxIdleTimeBeforeQuicMigrationSeconds,
+        maxTimeOnNonDefaultNetworkSeconds
       )
 
     return EngineImpl(engineType(), engineConfiguration, logLevel)

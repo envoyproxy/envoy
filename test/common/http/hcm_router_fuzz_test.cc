@@ -12,13 +12,13 @@
 #include "source/extensions/upstreams/http/tcp/upstream_request.h"
 
 #include "test/common/http/conn_manager_impl_test_base.h"
-#include "test/common/http/hcm_router_fuzz.pb.h"
+#include "test/common/http/hcm_router_fuzz.pb.validate.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 
@@ -47,8 +47,6 @@ public:
   // Filter
   Router::RetryStatePtr createRetryState(const Router::RetryPolicy&, RequestHeaderMap&,
                                          const Upstream::ClusterInfo&,
-                                         const Router::VirtualCluster*,
-                                         Router::RouteStatsContextOptRef,
                                          Server::Configuration::CommonFactoryContext&,
                                          Event::Dispatcher&, Upstream::ResourcePriority) override {
     EXPECT_EQ(nullptr, retry_state_);
@@ -220,6 +218,10 @@ public:
     vhost_ = mock_route_->virtual_host_;
 
     ON_CALL(*tlc_.cluster_.info_, maintenanceMode()).WillByDefault(Return(maintenance_));
+    mock_host_ = std::make_shared<NiceMock<Envoy::Upstream::MockHost>>();
+    ON_CALL(tlc_, chooseHost(_)).WillByDefault(Invoke([this](Upstream::LoadBalancerContext*) {
+      return Upstream::HostSelectionResponse{mock_host_, "foo"};
+    }));
   }
 
   void newUpstream(Router::GenericConnectionPoolCallbacks* request,
@@ -278,8 +280,8 @@ public:
     direct_response_entry_ = std::make_unique<Router::MockDirectResponseEntry>();
     direct_response_body_ = body;
     ON_CALL(*direct_response_entry_, responseCode()).WillByDefault(Return(code));
-    ON_CALL(*direct_response_entry_, responseBody())
-        .WillByDefault(ReturnRef(direct_response_body_));
+    ON_CALL(*direct_response_entry_, formatBody(_, _, _, _))
+        .WillByDefault(Return(direct_response_body_));
     ON_CALL(*direct_response_entry_, newUri(_)).WillByDefault(Return(new_uri));
     ON_CALL(*mock_route_, directResponseEntry())
         .WillByDefault(Return(direct_response_entry_.get()));
@@ -324,6 +326,7 @@ public:
   std::unique_ptr<Router::MockDirectResponseEntry> direct_response_entry_;
 
   std::string direct_response_body_;
+  std::shared_ptr<NiceMock<Envoy::Upstream::MockHost>> mock_host_;
 };
 
 // This class holds the upstream `FuzzCluster` instances. This has nothing
@@ -448,16 +451,15 @@ public:
         random_, Router::ShadowWriterPtr{shadow_writer_}, true /*emit_dynamic_stats*/,
         false /*start_child_span*/, true /*suppress_envoy_headers*/,
         false /*respect_expected_rq_timeout*/, true /*suppress_grpc_request_failure_code_stats*/,
-        false /*flush_upstream_log_on_upstream_stream*/, std::move(strict_headers_to_check),
+        false /*flush_upstream_log_on_upstream_stream*/,
+        false /*reject_connect_request_early_data*/, std::move(strict_headers_to_check),
         time_system_.timeSystem(), http_context_, router_context_);
     cluster_manager_.createDefaultClusters(*this);
     // Install the `RouterFuzzFilter` here
     ON_CALL(filter_factory_, createFilterChain(_))
-        .WillByDefault(Invoke([this](FilterChainManager& manager) -> bool {
-          FilterFactoryCb decoder_filter_factory = [this](FilterChainFactoryCallbacks& callbacks) {
-            callbacks.addStreamDecoderFilter(RouterFuzzFilter::create(filter_config_));
-          };
-          manager.applyFilterFactoryCb({}, decoder_filter_factory);
+        .WillByDefault(Invoke([this](FilterChainFactoryCallbacks& callbacks) -> bool {
+          callbacks.setFilterConfigName("");
+          callbacks.addStreamDecoderFilter(RouterFuzzFilter::create(filter_config_));
           return true;
         }));
     ON_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
@@ -605,6 +607,12 @@ private:
 #ifdef _DISABLE_STATIC_HARNESS
 
 DEFINE_PROTO_FUZZER(FuzzCase& input) {
+  try {
+    TestUtility::validate(input);
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG_MISC(debug, "EnvoyException during validation: {}", e.what());
+    return;
+  }
   auto harness = std::make_unique<Harness>();
   harness->fuzz(input);
 }
@@ -614,6 +622,12 @@ DEFINE_PROTO_FUZZER(FuzzCase& input) {
 static std::unique_ptr<Harness> harness = nullptr;
 static void cleanup() { harness = nullptr; }
 DEFINE_PROTO_FUZZER(FuzzCase& input) {
+  try {
+    TestUtility::validate(input);
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG_MISC(debug, "EnvoyException during validation: {}", e.what());
+    return;
+  }
   if (harness == nullptr) {
     harness = std::make_unique<Harness>();
     atexit(cleanup);

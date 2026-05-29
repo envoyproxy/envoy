@@ -148,13 +148,13 @@ The low watermark path is similar
 
 ## HTTP/1 and HTTP/2 filters
 
-Each HTTP and HTTP/2 filter has an opportunity to call `decoderBufferLimit()` or
-`encoderBufferLimit()` on creation. No filter should buffer more than the
+Each HTTP and HTTP/2 filter has an opportunity to call `bufferLimit()` or
+`bufferLimit()` on creation. No filter should buffer more than the
 configured bytes without calling the appropriate watermark callbacks or sending
 an error response.
 
-Filters may override the default limit with calls to `setDecoderBufferLimit()`
-and `setEncoderBufferLimit()`. These limits are applied as filters are created
+Filters may override the default limit with calls to `setBufferLimit()`
+and `setBufferLimit()`. These limits are applied as filters are created
 so filters later in the chain can override the limits set by prior filters.
 It is recommended that filters calling these functions should generally only
 perform increases to the buffer limit, to avoid potentially conflicting with

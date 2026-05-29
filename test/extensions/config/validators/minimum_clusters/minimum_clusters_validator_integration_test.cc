@@ -14,7 +14,6 @@
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -91,14 +90,15 @@ public:
     acceptXdsConnection();
 
     // Do the initial compareDiscoveryRequest / sendDiscoveryResponse for the clusters.
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
-    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
                                                                clusters_, clusters_, {}, "7");
 
     // We can continue the test once we're sure that Envoy's ClusterManager has made use of
     // the DiscoveryResponse describing cluster_1 that we sent.
     // 2 because the statically specified CDS server itself counts as a cluster.
-    test_server_->waitForGaugeGe("cluster_manager.active_clusters", initial_clusters_num + 1);
+    test_server_->waitForGauge("cluster_manager.active_clusters",
+                               testing::Ge(initial_clusters_num + 1));
 
     // Wait for our statically specified listener to become ready, and register its port in the
     // test framework's downstream listener port map.
@@ -164,12 +164,12 @@ TEST_P(MinimumClustersValidatorIntegrationTest, RemoveAllClustersThreshold0) {
                    return cluster.name();
                  });
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "7", {}, {}, {}));
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
-                                                             {removed_clusters_names}, "8");
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "7", {}, {}, {}));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster, {},
+                                                             {}, {removed_clusters_names}, "8");
 
   // Receive ACK.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "8", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "8", {}, {}, {}));
   EXPECT_EQ(1, test_server_->gauge("cluster_manager.active_clusters")->value());
 }
 
@@ -187,13 +187,13 @@ TEST_P(MinimumClustersValidatorIntegrationTest, RemoveAllClustersThreshold1) {
                    return cluster.name();
                  });
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "7", {}, {}, {}));
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
-                                                             {removed_clusters_names}, "8");
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "7", {}, {}, {}));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster, {},
+                                                             {}, {removed_clusters_names}, "8");
 
   // Receive NACK.
   EXPECT_TRUE(
-      compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "7", {}, {}, {}, false,
+      compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "7", {}, {}, {}, false,
                               Grpc::Status::WellKnownGrpcStatus::Internal,
                               "CDS update attempts to reduce clusters below configured minimum."));
   EXPECT_EQ(3, test_server_->gauge("cluster_manager.active_clusters")->value());

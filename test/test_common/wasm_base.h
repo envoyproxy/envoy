@@ -11,7 +11,6 @@
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/common/wasm/wasm.h"
 
-#include "test/mocks/grpc/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -76,7 +75,7 @@ public:
     auto vm_config = plugin_config.mutable_vm_config();
     vm_config->set_vm_id("vm_id");
     vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", runtime));
-    ProtobufWkt::StringValue vm_configuration_string;
+    Protobuf::StringValue vm_configuration_string;
     vm_configuration_string.set_value(vm_configuration_);
     vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
     vm_config->mutable_code()->mutable_local()->set_inline_bytes(code);
@@ -139,8 +138,8 @@ private:
   bool fail_open_ = false;
   absl::optional<bool> allow_on_headers_stop_iteration_ = absl::nullopt;
   std::string plugin_configuration_ = "";
-  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities_ = {};
-  envoy::extensions::wasm::v3::EnvironmentVariables envs_ = {};
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities_;
+  envoy::extensions::wasm::v3::EnvironmentVariables envs_;
 };
 
 template <typename Base = testing::Test> class WasmHttpFilterTestBase : public WasmTestBase<Base> {

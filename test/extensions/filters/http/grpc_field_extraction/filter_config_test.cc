@@ -220,8 +220,8 @@ TEST_F(FilterConfigTestException, ErrorParsingDescriptorInline) {
   parseConfigProto();
   *proto_config_.mutable_descriptor_set()->mutable_inline_bytes() = "123";
   EXPECT_THAT_THROWS_MESSAGE(
-      std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
-                                     *api_),
+      static_cast<void>(std::make_unique<FilterConfig>(
+          proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_)),
       EnvoyException, testing::HasSubstr("unable to parse proto descriptor from inline bytes:"));
 }
 
@@ -229,8 +229,8 @@ TEST_F(FilterConfigTestException, ErrorParsingDescriptorFromFile) {
   parseConfigProto();
   *proto_config_.mutable_descriptor_set()->mutable_filename() =
       TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem");
-  EXPECT_THAT_THROWS_MESSAGE(std::make_unique<FilterConfig>(
-                                 proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_),
+  EXPECT_THAT_THROWS_MESSAGE(static_cast<void>(std::make_unique<FilterConfig>(
+                                 proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_)),
                              EnvoyException,
                              testing::HasSubstr("unable to parse proto descriptor from file"));
 }
@@ -242,8 +242,8 @@ TEST_F(FilterConfigTestException, UnsupportedDescriptorSourceTyep) {
           .fileReadToEnd(TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
           .value();
   EXPECT_THAT_THROWS_MESSAGE(
-      std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
-                                     *api_),
+      static_cast<void>(std::make_unique<FilterConfig>(
+          proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_)),
       EnvoyException,
       testing::HasSubstr("unsupported DataSource case `3` for configuring `descriptor_set`"));
 }
@@ -265,8 +265,8 @@ extractions_by_method: {
       TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
 
   EXPECT_THAT_THROWS_MESSAGE(
-      std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
-                                     *api_),
+      static_cast<void>(std::make_unique<FilterConfig>(
+          proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_)),
       EnvoyException,
       testing::HasSubstr("couldn't find the gRPC method `not-found-in-proto-descriptor` defined in "
                          "the proto descriptor"));
@@ -289,8 +289,8 @@ extractions_by_method: {
       TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
 
   EXPECT_THAT_THROWS_MESSAGE(
-      std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
-                                     *api_),
+      static_cast<void>(std::make_unique<FilterConfig>(
+          proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_)),
       EnvoyException,
       testing::HasSubstr(
           R"(couldn't init extractor for method `apikeys.ApiKeys.CreateApiKey`: Invalid fieldPath (undefined-path): no 'undefined-path' field in 'type.googleapis.com/apikeys.CreateApiKeyRequest' message)"));
@@ -313,8 +313,8 @@ extractions_by_method: {
       TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
 
   EXPECT_THAT_THROWS_MESSAGE(
-      std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
-                                     *api_),
+      static_cast<void>(std::make_unique<FilterConfig>(
+          proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_)),
       EnvoyException,
       testing::HasSubstr(
           R"(couldn't init extractor for method `apikeys.ApiKeys.CreateApiKey`: leaf node 'bool' must be numerical/string)"));
@@ -337,8 +337,8 @@ extractions_by_method: {
       TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
 
   EXPECT_THAT_THROWS_MESSAGE(
-      std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
-                                     *api_),
+      static_cast<void>(std::make_unique<FilterConfig>(
+          proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_)),
       EnvoyException,
       testing::HasSubstr(
           R"(couldn't init extractor for method `apikeys.ApiKeys.CreateApiKey`: leaf node 'message' must be numerical/string)"));

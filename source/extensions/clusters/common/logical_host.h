@@ -46,11 +46,17 @@ public:
   CreateConnectionData createConnection(
       Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
       Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const override;
+  Upstream::Host::CreateConnectionData createOrcaReportingConnection(
+      Event::Dispatcher& dispatcher,
+      Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+      const envoy::config::core::v3::Metadata* metadata) const override;
 
   // Upstream::HostDescription
   SharedConstAddressVector addressListOrNull() const override;
   Network::Address::InstanceConstSharedPtr address() const override;
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override;
+  absl::string_view observabilityName() const override { return {}; }
+  Network::Address::InstanceConstSharedPtr orcaReportingAddress() const override;
 
 protected:
   LogicalHost(
@@ -85,6 +91,7 @@ public:
   // Upstream:HostDescription observers are delegated to logical_host_.
   bool canary() const override { return logical_host_->canary(); }
   MetadataConstSharedPtr metadata() const override { return logical_host_->metadata(); }
+  std::size_t metadataHash() const override { return logical_host_->metadataHash(); }
   const MetadataConstSharedPtr localityMetadata() const override {
     return logical_host_->localityMetadata();
   }
@@ -106,6 +113,7 @@ public:
     return logical_host_->hostnameForHealthChecks();
   }
   const std::string& hostname() const override { return logical_host_->hostname(); }
+  absl::string_view observabilityName() const override { return {}; }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
   SharedConstAddressVector addressListOrNull() const override {
     return logical_host_->addressListOrNull();
@@ -120,16 +128,26 @@ public:
     // Should never be called since real hosts are used only for forwarding.
     return nullptr;
   }
+  Network::Address::InstanceConstSharedPtr orcaReportingAddress() const override {
+    // Should never be called since real hosts are used only for forwarding.
+    return nullptr;
+  }
   absl::optional<MonotonicTime> lastHcPassTime() const override {
     return logical_host_->lastHcPassTime();
   }
   uint32_t priority() const override { return logical_host_->priority(); }
-  Network::UpstreamTransportSocketFactory&
-  resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
-                                const envoy::config::core::v3::Metadata* metadata) const override {
-    return logical_host_->resolveTransportSocketFactory(dest_address, metadata);
+  Network::UpstreamTransportSocketFactory& resolveTransportSocketFactory(
+      const Network::Address::InstanceConstSharedPtr& dest_address,
+      const envoy::config::core::v3::Metadata* metadata,
+      Network::TransportSocketOptionsConstSharedPtr transport_socket_options =
+          nullptr) const override {
+    return logical_host_->resolveTransportSocketFactory(dest_address, metadata,
+                                                        transport_socket_options);
   }
-  OptRef<HostLbPolicyData> lbPolicyData() const override { return logical_host_->lbPolicyData(); }
+  size_t lbPolicyDataCount() const override { return logical_host_->lbPolicyDataCount(); }
+  OptRef<HostLbPolicyData> lbPolicyDataAt(size_t index) const override {
+    return logical_host_->lbPolicyDataAt(index);
+  }
 
   // Upstream:HostDescription mutators are all no-ops, because logical_host_ is
   // const. These should never be called except during coverage tests.
@@ -145,7 +163,7 @@ public:
   void canary(bool) override {}
   void setLastHcPassTime(MonotonicTime) override {}
   void priority(uint32_t) override {}
-  void setLbPolicyData(HostLbPolicyDataPtr) override {}
+  void addLbPolicyData(HostLbPolicyDataPtr) override {}
 
 private:
   const Network::Address::InstanceConstSharedPtr address_;

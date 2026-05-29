@@ -26,7 +26,8 @@ public:
 private:
   Server::Configuration::ServerFactoryContext& context_;
   std::string profile_;
-  absl::optional<Config::DataSource::DataSourceProviderPtr> credential_file_data_source_provider_;
+  absl::optional<Config::DataSource::DataSourceProviderPtr<std::string>>
+      credential_file_data_source_provider_;
   bool has_watched_directory_ = false;
 
   bool needsRefresh() override;

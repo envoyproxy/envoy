@@ -33,8 +33,9 @@ public:
    *
    * @param host_address the upstream host that was finally selected.
    * @param headers the response headers.
+   * @return bool true if the selected host differs from the previously stored session host.
    */
-  virtual void onUpdate(absl::string_view host_address, ResponseHeaderMap& headers) PURE;
+  virtual bool onUpdate(absl::string_view host_address, ResponseHeaderMap& headers) PURE;
 };
 
 using SessionStatePtr = std::unique_ptr<SessionState>;

@@ -3,7 +3,6 @@
 #include "source/common/protobuf/protobuf.h"
 
 #include "test/integration/http_integration.h"
-#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -19,13 +18,16 @@ class IntegrationTest : public testing::TestWithParam<Network::Address::IpVersio
                         public HttpIntegrationTest {
 public:
   IntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
-    useAccessLog("%METADATA(VIRTUAL_HOST:metadata.test:test_key)%");
+    useAccessLog("%METADATA(VIRTUAL_HOST:metadata.test:test_key)%,"
+                 "%METADATA(VIRTUAL_HOST:metadata.test:test_trunc):10%,");
 
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) {
-          ProtobufWkt::Struct struct_value;
+          Protobuf::Struct struct_value;
           (*struct_value.mutable_fields())["test_key"] = ValueUtil::stringValue("test_value");
+          (*struct_value.mutable_fields())["test_trunc"] =
+              ValueUtil::stringValue("test_truncated_value");
 
           (*hcm.mutable_route_config()
                 ->mutable_virtual_hosts(0)
@@ -60,7 +62,35 @@ TEST_P(IntegrationTest, RouteNoMatch) {
   EXPECT_EQ("404", response->headers().getStatusValue());
 
   std::string log = waitForAccessLog(access_log_name_);
-  EXPECT_THAT(log, HasSubstr("test_value"));
+  EXPECT_THAT(log, HasSubstr("test_value,"));
+  EXPECT_THAT(log, HasSubstr("test_trunc,"));
+}
+
+TEST_P(IntegrationTest, ListenerMetadata) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* metadata = listener->mutable_metadata();
+    auto* filter_metadata = metadata->mutable_filter_metadata();
+
+    Protobuf::Struct struct_pb;
+    auto& fields = *struct_pb.mutable_fields();
+    fields["key"] = ValueUtil::stringValue("value");
+
+    (*filter_metadata)["com.test.metadata"] = struct_pb;
+  });
+
+  useAccessLog("%METADATA(LISTENER:com.test.metadata:key)%");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setPath("/expect");
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, HasSubstr("value"));
 }
 
 } // namespace

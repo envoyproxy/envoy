@@ -1,12 +1,10 @@
 load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 load("@envoy_repo//:path.bzl", "PATH")
+load("@envoy_toolshed//:utils.bzl", "json_merge")
 load("@rules_python//python:defs.bzl", "py_binary")
-load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_py_data", "envoy_pytool_binary")
-load("//tools/python:namespace.bzl", "envoy_py_namespace")
+load("//tools/base:envoy_python.bzl", "envoy_py_data")
 
 licenses(["notice"])  # Apache 2
-
-envoy_py_namespace()
 
 # Files to include when building or comparing the normalized API
 API_FILES = [
@@ -56,7 +54,7 @@ jq(
     """,
 )
 
-envoy_genjson(
+json_merge(
     name = "data_srcs",
     srcs = [
         ":proto_targets",
@@ -111,10 +109,13 @@ genrule(
     && git -C $$TEMPDIR ls-files -s api/ > $@ \
     && rm -rf $$TEMPDIR
     """,
+    # Requires git - this avoids adding git to rbe workers
+    # this could be resolved by the addition of rules_git
+    tags = ["no-remote-exec"],
     tools = [":formatted_api"],
 )
 
-envoy_pytool_binary(
+py_binary(
     name = "fetch_normalized_changes",
     srcs = ["fetch_normalized_changes.py"],
     args = [
@@ -149,7 +150,7 @@ genrule(
     ],
 )
 
-envoy_pytool_binary(
+py_binary(
     name = "proto_sync",
     srcs = ["proto_sync.py"],
     args = [

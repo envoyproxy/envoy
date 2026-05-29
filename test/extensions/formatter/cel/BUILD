@@ -26,6 +26,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/router:string_accessor_lib",
         "//source/extensions/formatter/cel:cel_lib",
         "//source/extensions/formatter/cel:config",
         "//test/mocks/server:factory_context_mocks",
@@ -36,7 +37,7 @@ envoy_extension_cc_test(
         {
             "//bazel:windows_x86_64": [],
             "//conditions:default": [
-                "@com_google_cel_cpp//parser",
+                "@cel-cpp//parser",
             ],
         },
     ),

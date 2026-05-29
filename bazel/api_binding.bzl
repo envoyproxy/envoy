@@ -27,13 +27,3 @@ def envoy_api_binding():
     # the API to https://github.com/envoyproxy/data-plane-api.
     if "envoy_api" not in native.existing_rules().keys():
         _default_envoy_api(name = "envoy_api", reldir = "api")
-
-    # TODO(https://github.com/envoyproxy/envoy/issues/7719) need to remove both bindings and use canonical rules
-    native.bind(
-        name = "api_httpbody_protos",
-        actual = "@com_google_googleapis//google/api:httpbody_cc_proto",
-    )
-    native.bind(
-        name = "http_api_protos",
-        actual = "@com_google_googleapis//google/api:annotations_cc_proto",
-    )

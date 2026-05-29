@@ -18,12 +18,12 @@ absl::Status CommandSyntaxChecker::verifySyntax(CommandSyntaxChecker::CommandSyn
                                                 absl::string_view command,
                                                 absl::string_view subcommand,
                                                 absl::optional<size_t> length) {
-  if ((flags == COMMAND_ONLY) && ((subcommand.length() != 0) || length.has_value())) {
+  if ((flags == COMMAND_ONLY) && ((!subcommand.empty()) || length.has_value())) {
     return absl::InvalidArgumentError(
         fmt::format("{} does not take any parameters or length", command));
   }
 
-  if ((flags & PARAMS_REQUIRED).any() && (subcommand.length() == 0)) {
+  if ((flags & PARAMS_REQUIRED).any() && (subcommand.empty())) {
     return absl::InvalidArgumentError(fmt::format("{} requires parameters", command));
   }
 
@@ -69,18 +69,21 @@ const absl::optional<std::string> SubstitutionFormatUtils::getHostname() {
   return hostname;
 }
 
-const ProtobufWkt::Value& SubstitutionFormatUtils::unspecifiedValue() {
+const Protobuf::Value& SubstitutionFormatUtils::unspecifiedValue() {
   return ValueUtil::nullValue();
 }
 
-void SubstitutionFormatUtils::truncate(std::string& str, absl::optional<size_t> max_length) {
+bool SubstitutionFormatUtils::truncate(std::string& str, absl::optional<size_t> max_length) {
   if (!max_length) {
-    return;
+    return false;
   }
 
   if (str.length() > max_length.value()) {
     str.resize(max_length.value());
+    return true;
   }
+
+  return false;
 }
 
 absl::string_view SubstitutionFormatUtils::truncateStringView(absl::string_view str,

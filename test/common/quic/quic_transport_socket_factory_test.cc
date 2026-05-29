@@ -113,10 +113,67 @@ downstream_tls_context:
                             "TLS Client Authentication is not supported over QUIC");
 }
 
+// QuicServerTransportSocketFactory implements DownstreamTransportSocketFactory
+// only so it can be stored on a FilterChain, not to actually create transport
+// sockets — QUIC connections use the QUICHE stack directly via
+// EnvoyQuicServerSession. Verify createDownstreamTransportSocket() panics if
+// accidentally called.
+TEST_F(QuicServerTransportSocketFactoryConfigTest, CreateDownstreamTransportSocketPanics) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF");
+
+  envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  Network::DownstreamTransportSocketFactoryPtr transport_socket_factory = THROW_OR_RETURN_VALUE(
+      config_factory_.createTransportSocketFactory(proto_config, context_, {}),
+      Network::DownstreamTransportSocketFactoryPtr);
+  EXPECT_DEATH(transport_socket_factory->createDownstreamTransportSocket(), "not implemented");
+}
+
+TEST_F(QuicServerTransportSocketFactoryConfigTest, GetSessionTicketConfig) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF");
+
+  envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  Network::DownstreamTransportSocketFactoryPtr transport_socket_factory = THROW_OR_RETURN_VALUE(
+      config_factory_.createTransportSocketFactory(proto_config, context_, {}),
+      Network::DownstreamTransportSocketFactoryPtr);
+  auto& quic_factory = static_cast<QuicServerTransportSocketFactory&>(*transport_socket_factory);
+  auto config = quic_factory.getSessionTicketConfig();
+  // Default config has no session ticket keys and doesn't disable resumption.
+  EXPECT_FALSE(config.has_keys);
+  EXPECT_FALSE(config.disable_stateless_resumption);
+  EXPECT_FALSE(config.handles_session_resumption);
+}
+
 class QuicClientTransportSocketFactoryTest : public testing::Test {
 public:
   QuicClientTransportSocketFactoryTest() {
     ON_CALL(context_.server_context_, threadLocal()).WillByDefault(ReturnRef(thread_local_));
+  }
+
+  void initialize() {
     EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
         .WillOnce(Return(nullptr));
     EXPECT_CALL(*context_config_, setSecretUpdateCallback(_))
@@ -135,12 +192,31 @@ public:
 };
 
 TEST_F(QuicClientTransportSocketFactoryTest, SupportedAlpns) {
+  initialize();
   context_config_->alpn_ = "h3,h3-draft29";
   factory_->initialize();
   EXPECT_THAT(factory_->supportedAlpnProtocols(), testing::ElementsAre("h3", "h3-draft29"));
 }
 
+TEST_F(QuicClientTransportSocketFactoryTest, TlsCertificateSelector) {
+  class TestSelector : public Ssl::UpstreamTlsCertificateSelectorFactory {
+  public:
+    Ssl::UpstreamTlsCertificateSelectorPtr
+    createUpstreamTlsCertificateSelector(Ssl::TlsCertificateSelectorContext&) override {
+      return nullptr;
+    }
+    absl::Status onConfigUpdate() override { return absl::OkStatus(); }
+  } selector;
+  EXPECT_CALL(*context_config_, tlsCertificateSelectorFactory()).WillOnce(Invoke([&]() {
+    return makeOptRef(selector);
+  }));
+  auto factory_or_error = Quic::QuicClientTransportSocketFactory::create(
+      std::unique_ptr<Envoy::Ssl::ClientContextConfig>(context_config_), context_);
+  EXPECT_FALSE(factory_or_error.ok());
+}
+
 TEST_F(QuicClientTransportSocketFactoryTest, GetCryptoConfig) {
+  initialize();
   factory_->initialize();
   EXPECT_TRUE(factory_->supportedAlpnProtocols().empty());
   EXPECT_EQ(nullptr, factory_->getCryptoConfig());

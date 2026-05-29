@@ -2,7 +2,7 @@
 
 #include "source/extensions/load_balancing_policies/random/config.h"
 
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/priority_set.h"
 
@@ -10,7 +10,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace Random {
 namespace {
 
@@ -45,6 +45,6 @@ TEST(RandomConfigTest, ValidateFail) {
 
 } // namespace
 } // namespace Random
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

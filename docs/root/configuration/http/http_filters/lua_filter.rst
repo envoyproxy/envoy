@@ -54,8 +54,8 @@ A simple example of configuring the Lua HTTP filter that contains only :ref:`def
 
 .. literalinclude:: _include/lua-filter.yaml
     :language: yaml
-    :lines: 34-46
-    :lineno-start: 34
+    :lines: 41-53
+    :lineno-start: 41
     :linenos:
     :caption: :download:`lua-filter.yaml <_include/lua-filter.yaml>`
 
@@ -137,7 +137,8 @@ individual filter instance/script can be tracked by providing a per-filter
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  error, Counter, Total script execution errors.
+  errors, Counter, Total script execution errors.
+  executions, Counter, Total number of times ``envoy_on_request`` and ``envoy_on_response`` was executed.
 
 Script examples
 ---------------
@@ -482,12 +483,20 @@ If no entry could be found by the filter config name, then the filter canonical 
 i.e. ``envoy.filters.http.lua`` will be used as an alternative. Note that this downgrade will be
 deprecated in the future.
 
+.. note::
+
+  This method will be deprecated in the future. In order to access route configuration,
+  consider using :ref:`route object's metadata() <config_http_filters_lua_route_wrapper_metadata>` instead,
+  which provides more consistent behavior. **Important**: route object's ``metadata()`` requires
+  metadata to be configured under the exact filter name and does not fall back to the
+  canonical name ``envoy.filters.http.lua``.
+
 Below is an example of a ``metadata`` in a :ref:`route entry <envoy_v3_api_msg_config.route.v3.Route>`.
 
 .. literalinclude:: _include/lua-filter.yaml
     :language: yaml
-    :lines: 26-32
-    :lineno-start: 26
+    :lines: 33-39
+    :lineno-start: 33
     :linenos:
     :caption: :download:`lua-filter.yaml <_include/lua-filter.yaml>`
 
@@ -677,6 +686,49 @@ Timestamp function. The timestamp is returned as a string. It represents the int
 since epoch. ``resolution`` is an optional enum parameter to indicate the resolution of the timestamp.
 Supported resolutions are ``EnvoyTimestampResolution.MILLISECOND`` and ``EnvoyTimestampResolution.MICROSECOND``.
 The default resolution is millisecond if ``resolution`` is not set.
+
+.. _config_http_filters_lua_stream_handle_api_virtual_host:
+
+``virtualHost()``
+^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local virtual_host = handle:virtualHost()
+
+Returns a virtual host object that provides access to the virtual host configuration. This method always returns
+a valid object, even when the request does not match any configured virtual host. However, if no virtual host
+matches, calling methods on the returned object will return ``nil`` or, in the case of the ``metadata()`` method,
+an empty metadata object.
+
+Returns a :ref:`virtual host object <config_http_filters_lua_virtual_host_wrapper>`.
+
+.. _config_http_filters_lua_stream_handle_api_route:
+
+``route()``
+^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local route = handle:route()
+
+Returns a route object that provides access to the route configuration. This method always returns
+a valid object, even when the request does not match any configured route. However, if no route
+matches, calling methods on the returned object will return ``nil`` or, in the case of the ``metadata()`` method,
+an empty metadata object.
+
+Returns a :ref:`route object <config_http_filters_lua_route_wrapper>`.
+
+``stats()``
+^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local stats = handle:stats()
+
+Returns a stats scope object that can be used to create and modify stats (counters, gauges, and
+histograms). See :ref:`Stats scope object API <config_http_filters_lua_stats_scope_wrapper>` for
+available methods.
 
 .. _config_http_filters_lua_header_wrapper:
 
@@ -1020,6 +1072,37 @@ Returns dynamic typed metadata for a given filter name. This provides type-safe 
     end
   end
 
+``filterState()``
+^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:filterState()
+
+Returns a :ref:`filter state object <config_http_filters_lua_stream_info_filter_state_wrapper>` that provides access to objects stored by filters during request processing.
+
+Filter state contains data shared between filters, such as routing decisions, authentication results, rate limiting state, and other processing information.
+
+Example usage:
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    local filter_state = request_handle:streamInfo():filterState()
+
+    -- Get authentication result
+    local auth_result = filter_state:get("auth.result")
+    if auth_result then
+      request_handle:headers():add("x-auth-result", auth_result)
+    end
+
+    -- Check rate limiting decision
+    local rate_limit_remaining = filter_state:get("rate_limit.remaining")
+    if rate_limit_remaining and rate_limit_remaining < 10 then
+      request_handle:headers():add("x-rate-limit-warning", "low")
+    end
+  end
+
 ``downstreamSslConnection()``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -1042,6 +1125,36 @@ Returns a downstream :ref:`SSL connection info object <config_http_filters_lua_s
 
 Returns the string representation of :repo:`requested server name <envoy/stream_info/stream_info.h>`
 (e.g. SNI in TLS) for the current request if present.
+
+``drainConnectionUponCompletion()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:drainConnectionUponCompletion()
+
+Marks the connection to be drained upon completion of the current request.
+
+* For HTTP/1.1, this will add a ``Connection: close`` header to the response.
+* For HTTP/2 and HTTP/3, this will trigger the sending of a ``GOAWAY`` frame.
+
+This is useful when you want to force clients to re-establish connections, for example:
+
+* After authorization failures to ensure clients reconnect with updated credentials.
+* When detecting network changes that may affect connection validity.
+* To implement custom connection lifecycle policies.
+
+Example usage:
+
+.. code-block:: lua
+
+  function envoy_on_response(response_handle)
+    -- Check for status from upstream and force connection drain on authorization failure.
+    local status_header = response_handle:headers():get(":status")
+    if status_header == "403" then
+      response_handle:streamInfo():drainConnectionUponCompletion()
+    end
+  end
 
 .. _config_http_filters_lua_cx_stream_info_wrapper:
 
@@ -1190,6 +1303,103 @@ its keys can only be ``string`` or ``numeric``.
 Iterates through every ``dynamicMetadata`` entry. ``key`` is a string that supplies a ``dynamicMetadata``
 key. ``value`` is a ``dynamicMetadata`` entry value.
 
+.. _config_http_filters_lua_stream_info_filter_state_wrapper:
+
+Filter state object API
+------------------------
+
+.. include:: ../../../_include/lua_common.rst
+
+``get()``
+^^^^^^^^^
+
+.. code-block:: lua
+
+  filterState:get(objectName)
+  filterState:get(objectName, fieldName)
+
+Gets a filter state object by name with optional field access. ``objectName`` is a string that specifies the name of the filter state object to retrieve. ``fieldName`` is an optional string that specifies a field name for objects that support field access.
+
+Returns the filter state value as a string. Returns ``nil`` if the object does not exist, cannot be serialized, or if the specified field doesn't exist.
+
+Objects that support field access can have specific fields retrieved using the optional second parameter.
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    local filter_state = request_handle:streamInfo():filterState()
+
+    -- All values returned as strings
+    local auth_token = filter_state:get("auth.token")
+    if auth_token then
+      request_handle:headers():add("x-auth-token", auth_token)
+    end
+
+    -- Boolean-like string values
+    local is_authenticated = filter_state:get("auth.authenticated")
+    if is_authenticated == "true" then
+      request_handle:headers():add("x-authenticated", "yes")
+    end
+
+    -- Access specific fields from objects that support field access
+    local user_name = filter_state:get("user.info", "name")
+    if user_name then
+      request_handle:headers():add("x-user-name", user_name)
+    end
+
+    local user_id_str = filter_state:get("user.info", "id")
+    if user_id_str then
+      local user_id = tonumber(user_id_str)
+      if user_id and user_id > 1000 then
+        request_handle:headers():add("x-premium-user", "true")
+      end
+    end
+  end
+
+``set()``
+^^^^^^^^^
+
+.. code-block:: lua
+
+  filterState:set(objectKey, factoryKey, payload)
+
+Sets a filter state object by name using a registered :ref:`object factory <well_known_filter_state>`.
+
+* ``objectKey`` is a string that specifies the name under which the object is stored in filter state.
+* ``factoryKey`` is a string that specifies the registered ``ObjectFactory`` name used to create the object. See :ref:`well-known filter state objects <well_known_filter_state>` for the list of available factory keys.
+* ``payload`` is a string passed to the factory's ``createFromBytes`` method.
+
+The object is stored with filter chain lifespan and no upstream sharing.
+
+Raises a Lua error if the factory key is not registered or if the factory fails to create an object from the given payload.
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    local filter_state = request_handle:streamInfo():filterState()
+
+    -- Set a simple string value using the generic string factory.
+    filter_state:set("my.custom.key", "envoy.string", "my-value")
+
+    -- Override upstream SNI.
+    filter_state:set("envoy.network.upstream_server_name", "envoy.network.upstream_server_name", "upstream.example.com")
+
+    -- Override upstream SAN validation with a comma-separated list.
+    filter_state:set("envoy.network.upstream_subject_alt_names", "envoy.network.upstream_subject_alt_names", "san1.example.com,san2.example.com")
+
+    -- Read back the SANs that were just set.
+    local sans = filter_state:get("envoy.network.upstream_subject_alt_names")
+    if sans then
+      request_handle:logInfo("Upstream SANs: " .. sans)
+    end
+
+    -- Read back a value that was just set.
+    local value = filter_state:get("my.custom.key")
+    if value then
+      request_handle:headers():add("x-custom-value", value)
+    end
+  end
+
 .. _config_http_filters_lua_connection_wrapper:
 
 Connection object API
@@ -1199,6 +1409,20 @@ Connection object API
 
 ``ssl()``
 ^^^^^^^^^
+
+.. warning::
+
+  **DEPRECATED**: This method is deprecated and will be removed in a future release.
+  Use ``streamInfo():downstreamSslConnection()`` instead:
+
+  .. code-block:: lua
+
+    -- Preferred approach:
+    if handle:streamInfo():downstreamSslConnection() == nil then
+      print("plain")
+    else
+      print("secure")
+    end
 
 .. code-block:: lua
 
@@ -1296,6 +1520,35 @@ certificate, or no serial number.
 Returns the issuer field of the peer certificate in RFC 2253 format. Returns ``""`` if there is no
 peer certificate, or no issuer.
 
+``sha256PeerCertificateIssuerDigest()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:sha256PeerCertificateIssuerDigest()
+
+Returns the hex-encoded SHA-256 fingerprint of the direct issuer certificate from the
+validated peer certificate chain. The issuer is the second certificate in the validated chain
+(i.e., the certificate that directly signed the peer leaf certificate), as determined by
+BoringSSL during the TLS handshake. Requires the peer certificate chain to have been
+successfully validated (e.g., mTLS with ``require_client_certificate: true`` and a
+``validation_context``). Returns ``""`` if there is no validated peer certificate chain or
+the validated chain contains fewer than two certificates.
+
+``serialNumberPeerCertificateIssuer()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:serialNumberPeerCertificateIssuer()
+
+Returns the serial number of the direct issuer certificate from the validated peer certificate
+chain. The issuer is the second certificate in the validated chain (i.e., the certificate that
+directly signed the peer leaf certificate), as determined by BoringSSL during the TLS handshake.
+Requires the peer certificate chain to have been successfully validated (e.g., mTLS with
+``require_client_certificate: true`` and a ``validation_context``). Returns ``""`` if there is
+no validated peer certificate chain or the validated chain contains fewer than two certificates.
+
 ``subjectPeerCertificate()``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -1360,7 +1613,9 @@ is no peer certificate or encoding fails.
   downstreamSslConnection:urlEncodedPemEncodedPeerCertificateChain()
 
 Returns the URL-encoded PEM-encoded representation of the full peer certificate chain including the
-leaf certificate. Returns ``""`` if there is no peer certificate or encoding fails.
+leaf certificate. Returns ``""`` if there is no peer certificate or encoding fails. Note that this
+is not the validated chain; it is the original chain provided by the client which may include
+certificates not in the validated chain.
 
 ``dnsSansPeerCertificate()``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1492,3 +1747,216 @@ field or if the field can't be converted to a UTF8 string.
 
 Returns the string representation of O fields (as a table) from the X.509 name. Returns an empty
 table if there is no such field or if the field can't be converted to a UTF8 string.
+
+.. _config_http_filters_lua_virtual_host_wrapper:
+
+Virtual host object API
+-----------------------
+
+.. include:: ../../../_include/lua_common.rst
+
+``metadata()``
+^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local metadata = virtual_host:metadata()
+
+Returns the virtual host metadata. Note that the metadata should be specified
+under the :ref:`filter config name
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
+
+Below is an example of a ``metadata`` in a :ref:`route entry <envoy_v3_api_msg_config.route.v3.VirtualHost>`.
+
+.. literalinclude:: _include/lua-filter.yaml
+    :language: yaml
+    :lines: 20-26
+    :lineno-start: 20
+    :linenos:
+    :caption: :download:`lua-filter.yaml <_include/lua-filter.yaml>`
+
+Returns a :ref:`metadata object <config_http_filters_lua_metadata_wrapper>`.
+
+.. _config_http_filters_lua_route_wrapper:
+
+Route object API
+----------------
+
+.. include:: ../../../_include/lua_common.rst
+
+.. _config_http_filters_lua_route_wrapper_metadata:
+
+``metadata()``
+^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local metadata = route:metadata()
+
+Returns the route metadata. Note that the metadata should be specified
+under the :ref:`filter config name
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
+
+Below is an example of a ``metadata`` in a :ref:`route entry <envoy_v3_api_msg_config.route.v3.Route>`.
+
+.. literalinclude:: _include/lua-filter.yaml
+    :language: yaml
+    :lines: 33-39
+    :lineno-start: 33
+    :linenos:
+    :caption: :download:`lua-filter.yaml <_include/lua-filter.yaml>`
+
+Returns a :ref:`metadata object <config_http_filters_lua_metadata_wrapper>`.
+
+.. _config_http_filters_lua_stats_scope_wrapper:
+
+Stats scope object API
+----------------------
+
+.. code-block:: lua
+
+  local stats = handle:stats()
+
+``handle:stats()`` returns a stats scope object that can be used to create and
+modify stats (counters, gauges, and histograms). Stats created through this API
+are prefixed with ``lua.`` followed by the optional ``stat_prefix`` from the Lua
+filter configuration.
+
+counter()
+^^^^^^^^^
+
+.. code-block:: lua
+
+  local counter = stats:counter("my_counter")
+
+Returns a :ref:`counter object <config_http_filters_lua_counter_wrapper>` with
+the given name. The counter is created if it doesn't exist.
+
+gauge()
+^^^^^^^
+
+.. code-block:: lua
+
+  local gauge = stats:gauge("my_gauge")
+
+Returns a :ref:`gauge object <config_http_filters_lua_gauge_wrapper>` with
+the given name. The gauge is created if it doesn't exist. Gauges created through
+Lua use ``NeverImport`` mode, meaning they track local process state and are not
+aggregated across the cluster during hot restart.
+
+histogram()
+^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local histogram = stats:histogram("my_histogram", "ms")
+
+Returns a :ref:`histogram object <config_http_filters_lua_histogram_wrapper>`
+with the given name and unit. The second argument specifies the unit and must be
+one of: ``"unspecified"``, ``"bytes"``, ``"microseconds"``, ``"milliseconds"``, or ``"ms"``
+(shorthand for milliseconds).
+
+.. _config_http_filters_lua_counter_wrapper:
+
+Counter object API
+------------------
+
+inc()
+^^^^^
+
+.. code-block:: lua
+
+  counter:inc()
+
+Increments the counter by 1.
+
+add()
+^^^^^
+
+.. code-block:: lua
+
+  counter:add(5)
+
+Adds the specified value to the counter. The value must be a non-negative integer.
+
+value()
+^^^^^^^
+
+.. code-block:: lua
+
+  local val = counter:value()
+
+Returns the current value of the counter.
+
+.. _config_http_filters_lua_gauge_wrapper:
+
+Gauge object API
+----------------
+
+inc()
+^^^^^
+
+.. code-block:: lua
+
+  gauge:inc()
+
+Increments the gauge by 1.
+
+dec()
+^^^^^
+
+.. code-block:: lua
+
+  gauge:dec()
+
+Decrements the gauge by 1.
+
+add()
+^^^^^
+
+.. code-block:: lua
+
+  gauge:add(5)
+
+Adds the specified value to the gauge. The value must be a non-negative integer.
+
+sub()
+^^^^^
+
+.. code-block:: lua
+
+  gauge:sub(3)
+
+Subtracts the specified value from the gauge. The value must be a non-negative integer.
+
+set()
+^^^^^
+
+.. code-block:: lua
+
+  gauge:set(10)
+
+Sets the gauge to the specified value. The value must be a non-negative integer (zero is valid).
+
+value()
+^^^^^^^
+
+.. code-block:: lua
+
+  local val = gauge:value()
+
+Returns the current value of the gauge.
+
+.. _config_http_filters_lua_histogram_wrapper:
+
+Histogram object API
+--------------------
+
+recordValue()
+^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  histogram:recordValue(42)
+
+Records a value in the histogram. The value must be a non-negative integer.

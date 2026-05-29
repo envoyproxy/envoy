@@ -22,7 +22,7 @@ TEST_F(CommandFormatterExtensionIntegrationTest, BasicExtension) {
   Registry::InjectFactory<CommandParserFactory> command_register(factory);
   std::vector<envoy::config::core::v3::TypedExtensionConfig> formatters;
   envoy::config::core::v3::TypedExtensionConfig typed_config;
-  ProtobufWkt::StringValue config;
+  Protobuf::StringValue config;
 
   typed_config.set_name("envoy.formatter.TestFormatter");
   typed_config.mutable_typed_config()->PackFrom(config);

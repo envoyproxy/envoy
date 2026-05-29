@@ -3,20 +3,34 @@ load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("@envoy_api//bazel:repository_locations.bzl", API_REPOSITORY_LOCATIONS_SPEC = "REPOSITORY_LOCATIONS_SPEC")
 load("@envoy_api//bazel:repository_locations_utils.bzl", "load_repository_locations_spec", "merge_dicts")
 load("@envoy_toolshed//:macros.bzl", "json_data")
+load("@envoy_toolshed//:utils.bzl", "json_merge")
 load("@envoy_toolshed//dependency:macros.bzl", "updater")
+load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_java//toolchains:default_java_toolchain.bzl", "default_java_toolchain")
+load("@rules_shell//shell:sh_library.bzl", "sh_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
+load(":deprecated_features.bzl", "check_removed_fips_define")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+# TODO(jwendell): Remove after https://github.com/protocolbuffers/protobuf/issues/20760 is fixed.
+default_java_toolchain(
+    name = "envoy_java_toolchain",
+    java_runtime = "@rules_java//toolchains:remotejdk_25",
+    javabuilder_jvm_opts = ["--sun-misc-unsafe-memory-access=allow"],
+    source_version = "11",
+    target_version = "11",
+)
+
 exports_files([
     "gen_sh_test_runner.sh",
     "sh_test_wrapper.sh",
     "test_for_benchmark_wrapper.sh",
     "repository_locations.bzl",
+    "deps.yaml",
     "exported_symbols.txt",
     "exported_symbols_apple.txt",
 ])
@@ -160,6 +174,14 @@ config_setting(
 )
 
 config_setting(
+    name = "local_asan_build",
+    flag_values = {
+        "@envoy_repo//:use_local_llvm_flag": "True",
+    },
+    values = {"define": "ENVOY_CONFIG_ASAN=1"},
+)
+
+config_setting(
     name = "tsan_build",
     values = {"define": "ENVOY_CONFIG_TSAN=1"},
 )
@@ -187,34 +209,10 @@ config_setting(
 )
 
 config_setting(
-    name = "gcc_build_gcc",
+    name = "gcc_build",
     flag_values = {
         "@bazel_tools//tools/cpp:compiler": "gcc",
     },
-)
-
-# This is needed due to a Bazel bug (https://github.com/bazelbuild/bazel/issues/12707)
-config_setting(
-    name = "gcc_build_compiler",
-    flag_values = {
-        "@bazel_tools//tools/cpp:compiler": "compiler",
-    },
-)
-
-selects.config_setting_group(
-    name = "gcc_build_compiler_on_linux",
-    match_all = [
-        ":gcc_build_compiler",
-        ":linux",
-    ],
-)
-
-selects.config_setting_group(
-    name = "gcc_build",
-    match_any = [
-        ":gcc_build_gcc",
-        ":gcc_build_compiler_on_linux",
-    ],
 )
 
 config_setting(
@@ -237,6 +235,16 @@ config_setting(
 config_setting(
     name = "gperftools_tcmalloc",
     values = {"define": "tcmalloc=gperftools"},
+)
+
+bool_flag(
+    name = "jemalloc",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "jemalloc_enabled",
+    flag_values = {":jemalloc": "True"},
 )
 
 config_setting(
@@ -307,6 +315,14 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "disable_http3_on_linux_x86_64",
+    match_all = [
+        ":disable_http3",
+        ":linux_x86_64",
+    ],
+)
+
+selects.config_setting_group(
     name = "disable_http3_on_not_x86_ppc",
     match_all = [
         ":disable_http3",
@@ -349,6 +365,14 @@ config_setting(
 )
 
 selects.config_setting_group(
+    name = "http3_enabled_and_linux",
+    match_all = [
+        "//bazel:linux",
+        "//bazel:enable_http3",
+    ],
+)
+
+selects.config_setting_group(
     name = "enable_http3_on_linux_ppc",
     match_all = [
         ":enable_http3",
@@ -380,6 +404,11 @@ config_setting(
 config_setting(
     name = "disable_static_extension_registration",
     values = {"define": "static_extension_registration=disabled"},
+)
+
+config_setting(
+    name = "disable_envoy_mobile_xds",
+    values = {"define": "envoy_mobile_xds=disabled"},
 )
 
 config_setting(
@@ -449,11 +478,6 @@ config_setting(
     values = {"define": "path_normalization_by_default=true"},
 )
 
-cc_proto_library(
-    name = "grpc_health_proto",
-    deps = ["@com_github_grpc_grpc//src/proto/grpc/health/v1:_health_proto_only"],
-)
-
 config_setting(
     name = "enable_exported_symbols",
     values = {"define": "exported_symbols=enabled"},
@@ -494,49 +518,70 @@ config_setting(
     values = {"define": "force_libcpp=enabled"},
 )
 
-config_setting(
-    name = "boringssl_fips",
-    constraint_values = [
-        "@platforms//os:linux",
-    ],
-    values = {"define": "boringssl=fips"},
+# SSL library selection using label_flag and bool_flag
+label_flag(
+    name = "ssl",
+    build_setting_default = "@boringssl//:ssl",
+)
+
+label_flag(
+    name = "crypto",
+    build_setting_default = "@boringssl//:crypto",
+)
+
+bool_flag(
+    name = "fips",
+    build_setting_default = False,
+)
+
+bool_flag(
+    name = "openssl",
+    build_setting_default = False,
 )
 
 config_setting(
-    name = "boringssl_disabled",
-    values = {"define": "boringssl=disabled"},
-)
-
-selects.config_setting_group(
-    name = "boringssl_fips_x86",
-    match_all = [
-        ":boringssl_fips",
-        "@platforms//cpu:x86_64",
-    ],
-)
-
-selects.config_setting_group(
-    name = "boringssl_fips_ppc",
-    match_all = [
-        ":boringssl_fips",
-        ":linux_ppc64le",
-    ],
-)
-
-selects.config_setting_group(
-    name = "boringssl_fips_not_ppc",
-    match_all = [
-        ":boringssl_fips",
-        ":not_ppc",
-    ],
+    name = "fips_build",
+    flag_values = {":fips": "True"},
 )
 
 config_setting(
-    name = "zlib_ng",
-    constraint_values = [
-        "@platforms//os:linux",
+    name = "using_boringssl",
+    flag_values = {":ssl": "@boringssl//:ssl"},
+)
+
+config_setting(
+    name = "using_boringssl_fips",
+    flag_values = {":ssl": "@boringssl_fips//:ssl"},
+)
+
+config_setting(
+    name = "using_aws_lc",
+    flag_values = {":ssl": "@aws_lc//:ssl"},
+)
+
+config_setting(
+    name = "using_openssl",
+    flag_values = {":openssl": "True"},
+)
+
+# Convenience grouping for any FIPS SSL library
+selects.config_setting_group(
+    name = "using_fips_ssl",
+    match_any = [
+        ":using_boringssl_fips",
+        ":using_aws_lc",
     ],
-    values = {"define": "zlib=ng"},
+)
+
+check_removed_fips_define(
+    name = "check_removed_fips_define",
+    build_setting_default = "",
+    visibility = ["//visibility:public"],
+)
+
+label_flag(
+    name = "zlib",
+    build_setting_default = "@zlib-ng",
 )
 
 config_setting(
@@ -567,28 +612,6 @@ config_setting(
 config_setting(
     name = "uhv_enabled",
     values = {"define": "uhv=enabled"},
-)
-
-# Alias pointing to the selected version of BoringSSL:
-# - BoringSSL FIPS from @boringssl_fips//:ssl,
-# - non-FIPS BoringSSL from @boringssl//:ssl.
-# - aws-lc from @aws_lc//:ssl
-alias(
-    name = "boringssl",
-    actual = select({
-        "//bazel:boringssl_fips_ppc": "@aws_lc//:ssl",
-        "//bazel:boringssl_fips_not_ppc": "@boringssl_fips//:ssl",
-        "//conditions:default": "@boringssl//:ssl",
-    }),
-)
-
-alias(
-    name = "boringcrypto",
-    actual = select({
-        "//bazel:boringssl_fips_ppc": "@aws_lc//:crypto",
-        "//bazel:boringssl_fips_not_ppc": "@boringssl_fips//:crypto",
-        "//conditions:default": "@boringssl//:crypto",
-    }),
 )
 
 config_setting(
@@ -909,90 +932,71 @@ alias(
 )
 
 json_data(
-    name = "repository_locations",
+    name = "repository_locations_version_info",
     data = load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),
 )
 
+json_merge(
+    name = "repository_locations",
+    srcs = [":repository_locations_version_info"],
+    filter = """
+    .[0] as $versions
+    | .[1] as $metadata
+    | $versions
+    | keys
+    | reduce .[] as $k ({};
+        . + {($k): (
+          ($versions[$k] + ($metadata[$k] // {}))
+          | .version as $ver
+          | if .license_url and $ver then
+              .license_url |= (
+                gsub("{version}"; $ver)
+                | gsub("{dash_version}"; ($ver | gsub("[.]"; "-")))
+                | gsub("{underscore_version}"; ($ver | gsub("[.]"; "_")))
+              )
+            else . end
+        )}
+      )
+    """,
+    visibility = ["//visibility:public"],
+    yaml_srcs = [":deps.yaml"],
+)
+
 json_data(
-    name = "all_repository_locations",
+    name = "all_repository_locations_version_info",
     data = merge_dicts(
         load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),
         load_repository_locations_spec(API_REPOSITORY_LOCATIONS_SPEC),
     ),
 )
 
-platform(
-    name = "android_aarch64",
-    constraint_values = [
-        "@platforms//cpu:aarch64",
-        "@platforms//os:android",
-    ],
-)
-
-platform(
-    name = "android_armeabi",
-    constraint_values = [
-        "@platforms//cpu:armv7",
-        "@platforms//os:android",
-    ],
-)
-
-platform(
-    name = "android_x86",
-    constraint_values = [
-        "@platforms//cpu:x86_32",
-        "@platforms//os:android",
-    ],
-)
-
-platform(
-    name = "android_x86_64",
-    constraint_values = [
-        "@platforms//cpu:x86_64",
-        "@platforms//os:android",
-    ],
-)
-
-platform(
-    name = "macos_x86_64",
-    constraint_values = [
-        "@platforms//cpu:x86_64",
-        "@platforms//os:macos",
-    ],
-)
-
-platform(
-    name = "macos_arm64",
-    constraint_values = [
-        "@platforms//cpu:arm64",
-        "@platforms//os:macos",
-    ],
-)
-
-platform(
-    name = "ios_x86_64_platform",  # TODO(keith): Resolve duplicate name issue
-    constraint_values = [
-        "@platforms//cpu:x86_64",
-        "@platforms//os:ios",
-        "@build_bazel_apple_support//constraints:simulator",
-    ],
-)
-
-platform(
-    name = "ios_sim_arm64_platform",  # TODO(keith): Resolve duplicate name issue
-    constraint_values = [
-        "@platforms//cpu:arm64",
-        "@platforms//os:ios",
-        "@build_bazel_apple_support//constraints:simulator",
-    ],
-)
-
-platform(
-    name = "ios_arm64_platform",  # TODO(keith): Resolve duplicate name issue
-    constraint_values = [
-        "@platforms//cpu:arm64",
-        "@platforms//os:ios",
-        "@build_bazel_apple_support//constraints:device",
+json_merge(
+    name = "all_repository_locations",
+    srcs = [":all_repository_locations_version_info"],
+    filter = """
+    .[0] as $versions
+    | .[1] as $metadata1
+    | .[2] as $metadata2
+    | ($metadata1 * $metadata2) as $metadata
+    | $versions
+    | keys
+    | reduce .[] as $k ({};
+        . + {($k): (
+          ($versions[$k] + ($metadata[$k] // {}))
+          | .version as $ver
+          | if .license_url and $ver then
+              .license_url |= (
+                gsub("{version}"; $ver)
+                | gsub("{dash_version}"; ($ver | gsub("[.]"; "-")))
+                | gsub("{underscore_version}"; ($ver | gsub("[.]"; "_")))
+              )
+            else . end
+        )}
+      )
+    """,
+    yaml_srcs = [
+        ":deps.yaml",
+        "@envoy_api//bazel:deps.yaml",
     ],
 )
 
@@ -1035,11 +1039,11 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = selects.with_or({
         ("//bazel:linux_x86_64", "//bazel:linux_aarch64"): [
-            "@com_github_google_tcmalloc//tcmalloc",
-            "@com_github_google_tcmalloc//tcmalloc:profile_marshaler",
-            "@com_github_google_tcmalloc//tcmalloc:malloc_extension",
+            "@tcmalloc//tcmalloc",
+            "@tcmalloc//tcmalloc:profile_marshaler",
+            "@tcmalloc//tcmalloc:malloc_extension",
         ],
-        "//conditions:default": ["//bazel/foreign_cc:gperftools"],
+        "//conditions:default": ["//bazel/external:gperftools"],
     }),
 )
 
@@ -1050,8 +1054,8 @@ cc_library(
         (
             "//bazel:linux_x86_64",
             "//bazel:linux_aarch64",
-        ): ["@com_github_google_tcmalloc//tcmalloc"],
-        "//conditions:default": ["//bazel/foreign_cc:gperftools"],
+        ): ["@tcmalloc//tcmalloc"],
+        "//conditions:default": ["//bazel/external:gperftools"],
     }),
 )
 

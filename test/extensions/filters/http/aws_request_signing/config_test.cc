@@ -228,6 +228,39 @@ credential_provider:
   EXPECT_EQ(cb.status().code(), absl::StatusCode::kInvalidArgument);
 }
 
+TEST(AwsRequestSigningFilterConfigTest, ConfigWithIncludedHeaders) {
+  const std::string yaml = R"EOF(
+service_name: s3
+region: us-west-2
+match_included_headers:
+  - prefix: x-custom
+  - exact: user-agent
+  )EOF";
+
+  AwsRequestSigningProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  AwsRequestSigningProtoConfig expected_config;
+  expected_config.set_service_name("s3");
+  expected_config.set_region("us-west-2");
+  expected_config.add_match_included_headers()->set_prefix("x-custom");
+  expected_config.add_match_included_headers()->set_exact("user-agent");
+
+  Protobuf::util::MessageDifferencer differencer;
+  differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUAL);
+  differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
+  EXPECT_TRUE(differencer.Compare(expected_config, proto_config));
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  AwsRequestSigningFilterFactory factory;
+
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
+  cb(filter_callbacks);
+}
+
 TEST(AwsRequestSigningFilterConfigTest, SimpleConfigExplicitSigningAlgorithm) {
   const std::string yaml = R"EOF(
 service_name: s3
@@ -721,6 +754,30 @@ match_excluded_headers:
   EXPECT_THROW_WITH_REGEX(
       { TestUtility::loadFromYamlAndValidate(yaml, proto_config); }, EnvoyException,
       "Proto constraint validation failed");
+}
+
+TEST(AwsRequestSigningFilterConfigTest, SimpleConfigWithServerContext) {
+  const std::string yaml = R"EOF(
+service_name: s3
+region: us-west-2
+host_rewrite: new-host
+match_excluded_headers:
+  - prefix: x-envoy
+  - exact: foo
+  - exact: bar
+  )EOF";
+
+  AwsRequestSigningProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  AwsRequestSigningFilterFactory factory;
+
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
+  cb(filter_callbacks);
 }
 
 } // namespace AwsRequestSigningFilter

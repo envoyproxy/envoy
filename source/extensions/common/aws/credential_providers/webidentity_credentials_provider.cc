@@ -23,9 +23,10 @@ WebIdentityCredentialsProvider::WebIdentityCredentialsProvider(
       role_arn_(web_identity_config.role_arn()),
       role_session_name_(web_identity_config.role_session_name()) {
 
-  auto provider_or_error_ = Config::DataSource::DataSourceProvider::create(
+  auto provider_or_error_ = Config::DataSource::DataSourceProvider<std::string>::create(
       web_identity_config.web_identity_token_data_source(), context.mainThreadDispatcher(),
-      context.threadLocal(), context.api(), false, 4096);
+      context.threadLocal(), context.api(), false,
+      [](absl::string_view data) { return std::make_shared<std::string>(data); }, 4096);
   if (provider_or_error_.ok()) {
     web_identity_data_source_provider_ = std::move(provider_or_error_.value());
   } else {
@@ -39,13 +40,14 @@ void WebIdentityCredentialsProvider::refresh() {
   absl::string_view web_identity_data;
 
   // If we're unable to read from the configured data source, exit early.
-  if (!web_identity_data_source_provider_.has_value()) {
+  if (!web_identity_data_source_provider_.has_value() ||
+      web_identity_data_source_provider_.value()->data() == nullptr) {
     return;
   }
 
   ENVOY_LOG(debug, "Getting AWS web identity credentials from STS: {}",
             aws_cluster_manager_->getUriFromClusterName(cluster_name_).value());
-  web_identity_data = web_identity_data_source_provider_.value()->data();
+  web_identity_data = *web_identity_data_source_provider_.value()->data();
 
   Http::RequestMessageImpl message;
   message.headers().setScheme(Http::Headers::get().SchemeValues.Https);

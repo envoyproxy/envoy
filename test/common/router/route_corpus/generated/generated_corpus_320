@@ -1,0 +1,98 @@
+goo.gle/debugproto
+config {
+  virtual_hosts {
+    name: "direct"
+    domains: "example.com"
+    routes {
+      match {
+        prefix: "/html"
+      }
+      direct_response {
+        status: 200
+        body_format {
+          content_type: "text/html"
+          text_format_source {
+            inline_string: "Hello"
+          }
+        }
+      }
+    }
+    routes {
+      match {
+        prefix: "/json"
+      }
+      direct_response {
+        status: 200
+        body_format {
+          json_format {
+            fields {
+              key: "key"
+              value {
+                string_value: "value"
+              }
+            }
+          }
+        }
+      }
+    }
+    routes {
+      match {
+        prefix: "/text"
+      }
+      direct_response {
+        status: 200
+        body_format {
+          text_format_source {
+            inline_string: "Hello"
+          }
+        }
+      }
+    }
+    routes {
+      match {
+        prefix: "/nobody"
+      }
+      direct_response {
+        status: 200
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "example.com"
+  }
+  headers {
+    key: ":path"
+    value: "/nobody"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+  headers {
+    key: ":scheme"
+    value: "http"
+  }
+  headers {
+    key: "x-safe"
+    value: "safe"
+  }
+  headers {
+    key: "x-global-nope"
+    value: "global"
+  }
+  headers {
+    key: "x-vhost-nope"
+    value: "vhost"
+  }
+  headers {
+    key: "x-route-nope"
+    value: "route"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+}

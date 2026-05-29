@@ -1,0 +1,6 @@
+date: September 4, 2025
+
+bug_fixes:
+- area: release
+  change: |
+    Fix distroless image to ensure nonroot.

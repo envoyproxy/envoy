@@ -40,7 +40,7 @@ TEST_P(MetadataFromSQLTest, ParsingAndMetadataTest) {
 
   while (!test_queries.empty()) {
     std::string test_query = test_queries.back();
-    ProtobufWkt::Struct metadata;
+    Protobuf::Struct metadata;
 
     // Check if the parsing result is what expected.
     ASSERT_EQ(std::get<1>(GetParam()),

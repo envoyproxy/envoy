@@ -66,6 +66,7 @@ public:
       packer.pack_bin_body(record_bytes, data_.size());
     }
 
+    // NOLINTNEXTLINE(modernize-return-braced-init-list)
     return std::string(buffer.data(), buffer.size());
   }
 
@@ -485,8 +486,7 @@ public:
 class MockFluentdFormatter : public FluentdFormatter {
 public:
   MOCK_METHOD(std::vector<uint8_t>, format,
-              (const Formatter::HttpFormatterContext& context,
-               const StreamInfo::StreamInfo& stream_info),
+              (const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info),
               (const));
 };
 

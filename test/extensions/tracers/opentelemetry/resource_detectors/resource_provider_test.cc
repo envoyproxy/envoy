@@ -5,7 +5,7 @@
 #include "source/common/version/version.h"
 #include "source/extensions/tracers/opentelemetry/resource_detectors/resource_provider.h"
 
-#include "test/mocks/server/tracer_factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
@@ -30,10 +30,10 @@ class DetectorFactoryA : public ResourceDetectorFactory {
 public:
   MOCK_METHOD(ResourceDetectorPtr, createResourceDetector,
               (const Protobuf::Message& message,
-               Server::Configuration::TracerFactoryContext& context));
+               Server::Configuration::ServerFactoryContext& context));
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
 
   std::string name() const override { return "envoy.tracers.opentelemetry.resource_detectors.a"; }
@@ -43,10 +43,10 @@ class DetectorFactoryB : public ResourceDetectorFactory {
 public:
   MOCK_METHOD(ResourceDetectorPtr, createResourceDetector,
               (const Protobuf::Message& message,
-               Server::Configuration::TracerFactoryContext& context));
+               Server::Configuration::ServerFactoryContext& context));
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
+    return std::make_unique<Protobuf::StringValue>();
   }
 
   std::string name() const override { return "envoy.tracers.opentelemetry.resource_detectors.b"; }
@@ -60,7 +60,7 @@ public:
     resource_a_.attributes_.insert(std::pair<std::string, std::string>("key1", "val1"));
     resource_b_.attributes_.insert(std::pair<std::string, std::string>("key2", "val2"));
   }
-  NiceMock<Server::Configuration::MockTracerFactoryContext> context_;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   Resource resource_a_;
   Resource resource_b_;
 };
@@ -78,7 +78,9 @@ TEST_F(ResourceProviderTest, NoResourceDetectorsConfigured) {
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
   ResourceProviderImpl resource_provider;
-  Resource resource = resource_provider.getResource(opentelemetry_config, context_);
+  Resource resource = resource_provider.getResource(
+      opentelemetry_config.resource_detectors(), server_factory_context_,
+      opentelemetry_config.service_name(), ResourceProviderOptions{});
 
   EXPECT_EQ(resource.schema_url_, "");
 
@@ -99,27 +101,56 @@ TEST_F(ResourceProviderTest, NoResourceDetectorsConfigured) {
   }
 }
 
-// Verifies a resource with the default service name is returned when no detectors + static service
-// name are configured
-TEST_F(ResourceProviderTest, ServiceNameNotProvided) {
+// Verifies a resource with only service name is returned when telemetry SDK attributes are disabled
+TEST_F(ResourceProviderTest, NoResourceDetectorsConfiguredAttributesDisabled) {
   const std::string yaml_string = R"EOF(
     grpc_service:
       envoy_grpc:
         cluster_name: fake-cluster
       timeout: 0.250s
+    service_name: my-service
+    set_telemetry_sdk_resource_attributes: false
     )EOF";
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
   ResourceProviderImpl resource_provider;
-  Resource resource = resource_provider.getResource(opentelemetry_config, context_);
+  ResourceProviderOptions options;
+  options.set_telemetry_sdk_resource_attributes = false;
+  Resource resource = resource_provider.getResource(opentelemetry_config.resource_detectors(),
+                                                    server_factory_context_,
+                                                    opentelemetry_config.service_name(), options);
 
-  EXPECT_EQ(resource.schema_url_, "");
+  // Verify that telemetry SDK attributes are NOT present
+  EXPECT_TRUE(resource.attributes_.find("telemetry.sdk.language") == resource.attributes_.end());
+  EXPECT_TRUE(resource.attributes_.find("telemetry.sdk.name") == resource.attributes_.end());
+  EXPECT_TRUE(resource.attributes_.find("telemetry.sdk.version") == resource.attributes_.end());
+}
 
-  // service.name receives the unknown value when not configured
-  EXPECT_EQ(4, resource.attributes_.size());
-  auto service_name = resource.attributes_.find("service.name");
-  EXPECT_EQ("unknown_service:envoy", service_name->second);
+// Verifies a resource without service name is returned when service name attribute is disabled
+TEST_F(ResourceProviderTest, NoResourceDetectorsConfiguredServiceNameDisabled) {
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    service_name: my-service
+    set_service_name_resource_attribute: false
+    )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+  ResourceProviderImpl resource_provider;
+  ResourceProviderOptions options;
+  options.set_service_name_resource_attribute = false;
+  Resource resource = resource_provider.getResource(opentelemetry_config.resource_detectors(),
+                                                    server_factory_context_,
+                                                    opentelemetry_config.service_name(), options);
+
+  // Verify that service.name attribute is NOT present
+  EXPECT_TRUE(resource.attributes_.find("service.name") == resource.attributes_.end());
+  // Verify other attributes are still present since only service.name was disabled
+  EXPECT_TRUE(resource.attributes_.find("telemetry.sdk.language") != resource.attributes_.end());
 }
 
 // Verifies it is possible to configure multiple resource detectors
@@ -168,7 +199,9 @@ TEST_F(ResourceProviderTest, MultipleResourceDetectorsConfigured) {
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
   ResourceProviderImpl resource_provider;
-  Resource resource = resource_provider.getResource(opentelemetry_config, context_);
+  Resource resource = resource_provider.getResource(
+      opentelemetry_config.resource_detectors(), server_factory_context_,
+      opentelemetry_config.service_name(), ResourceProviderOptions{});
 
   EXPECT_EQ(resource.schema_url_, "");
 
@@ -202,7 +235,10 @@ TEST_F(ResourceProviderTest, UnknownResourceDetectors) {
 
   ResourceProviderImpl resource_provider;
   EXPECT_THROW_WITH_MESSAGE(
-      resource_provider.getResource(opentelemetry_config, context_), EnvoyException,
+      resource_provider.getResource(opentelemetry_config.resource_detectors(),
+                                    server_factory_context_, opentelemetry_config.service_name(),
+                                    ResourceProviderOptions{}),
+      EnvoyException,
       "Resource detector factory not found: "
       "'envoy.tracers.opentelemetry.resource_detectors.UnkownResourceDetector'");
 }
@@ -231,7 +267,9 @@ TEST_F(ResourceProviderTest, ProblemCreatingResourceDetector) {
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
   ResourceProviderImpl resource_provider;
-  EXPECT_THROW_WITH_MESSAGE(resource_provider.getResource(opentelemetry_config, context_),
+  EXPECT_THROW_WITH_MESSAGE(resource_provider.getResource(
+                                opentelemetry_config.resource_detectors(), server_factory_context_,
+                                opentelemetry_config.service_name(), ResourceProviderOptions{}),
                             EnvoyException,
                             "Resource detector could not be created: "
                             "'envoy.tracers.opentelemetry.resource_detectors.a'");
@@ -281,7 +319,9 @@ TEST_F(ResourceProviderTest, OldSchemaEmptyUpdatingSet) {
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
   ResourceProviderImpl resource_provider;
-  Resource resource = resource_provider.getResource(opentelemetry_config, context_);
+  Resource resource = resource_provider.getResource(
+      opentelemetry_config.resource_detectors(), server_factory_context_,
+      opentelemetry_config.service_name(), ResourceProviderOptions{});
 
   // OTel spec says the updating schema should be used
   EXPECT_EQ(expected_schema_url, resource.schema_url_);
@@ -331,7 +371,9 @@ TEST_F(ResourceProviderTest, OldSchemaSetUpdatingEmpty) {
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
   ResourceProviderImpl resource_provider;
-  Resource resource = resource_provider.getResource(opentelemetry_config, context_);
+  Resource resource = resource_provider.getResource(
+      opentelemetry_config.resource_detectors(), server_factory_context_,
+      opentelemetry_config.service_name(), ResourceProviderOptions{});
 
   // OTel spec says the updating schema should be used
   EXPECT_EQ(expected_schema_url, resource.schema_url_);
@@ -381,7 +423,9 @@ TEST_F(ResourceProviderTest, OldAndUpdatingSchemaAreEqual) {
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
   ResourceProviderImpl resource_provider;
-  Resource resource = resource_provider.getResource(opentelemetry_config, context_);
+  Resource resource = resource_provider.getResource(
+      opentelemetry_config.resource_detectors(), server_factory_context_,
+      opentelemetry_config.service_name(), ResourceProviderOptions{});
 
   EXPECT_EQ(expected_schema_url, resource.schema_url_);
 }
@@ -430,7 +474,9 @@ TEST_F(ResourceProviderTest, OldAndUpdatingSchemaAreDifferent) {
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
   ResourceProviderImpl resource_provider;
-  Resource resource = resource_provider.getResource(opentelemetry_config, context_);
+  Resource resource = resource_provider.getResource(
+      opentelemetry_config.resource_detectors(), server_factory_context_,
+      opentelemetry_config.service_name(), ResourceProviderOptions{});
 
   // OTel spec says Old schema should be used
   EXPECT_EQ(expected_schema_url, resource.schema_url_);

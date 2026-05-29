@@ -28,7 +28,6 @@
 #include "test/integration/server.h"
 #include "test/integration/utility.h"
 #include "test/mocks/server/server_factory_context.h"
-
 #include "test/test_common/network_utility.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
@@ -332,6 +331,8 @@ public:
 
     config_helper_.prependFilter(R"EOF(
     name: decode-dynamic-metadata-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.DecodeDynamicMetadataFilterConfig
     )EOF");
 
     HttpIntegrationTest::initialize();

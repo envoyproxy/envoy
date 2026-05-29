@@ -27,10 +27,6 @@ x-llvm-setup: &llvm-setup |
   add-apt-repository -y ppa:ubuntu-toolchain-r/test
   apt-get update --error-on=any
   apt-get -qq install -y libtinfo5 wget xz-utils libgcc-s1 libgcc-13-dev
-  mkdir -p /opt/llvm
-  cd /opt/llvm
-  wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04.tar.xz
-  tar -xf clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04.tar.xz --strip-components 1
 
 services:
   gcc:
@@ -42,10 +38,10 @@ services:
         MATRIX_SETUP: *gcc-setup
     environment:
       <<: *common-env
-      EXPECTED_NO_ARGS: gcc-libstdc++
+      EXPECTED_NO_ARGS: fail
       EXPECTED_GCC: gcc-libstdc++
       EXPECTED_CLANG: fail
-      EXPECTED_GCC_ENV: gcc-libstdc++
+      EXPECTED_GCC_ENV: fail
       EXPECTED_CLANG_ENV: fail
     command:
     - bash
@@ -63,19 +59,16 @@ services:
         MATRIX_SETUP: *llvm-setup
     environment:
       <<: *common-env
-      EXPECTED_NO_ARGS: fail
+      EXPECTED_NO_ARGS: clang-libc++
       EXPECTED_GCC: fail
       EXPECTED_CLANG: clang-libc++
-      EXPECTED_GCC_ENV: fail
-      EXPECTED_CLANG_ENV: fail
+      EXPECTED_GCC_ENV: clang-libc++
+      EXPECTED_CLANG_ENV: clang-libc++
     command:
     - bash
     - -c
     - |
       ! which gcc || (echo "ERROR: gcc found when it shouldn't be" && exit 1)
-      bazel/setup_clang.sh /opt/llvm
-      export PATH=/opt/llvm/bin:$PATH
-      clang --version
       /usr/local/bin/test.sh
 
   all:
@@ -88,22 +81,20 @@ services:
         MATRIX_SETUP_EXTRA: *gcc-setup
     environment:
       <<: *common-env
-      EXPECTED_NO_ARGS: gcc-libstdc++
+      EXPECTED_NO_ARGS: clang-libc++
       EXPECTED_GCC: gcc-libstdc++
       EXPECTED_CLANG: clang-libc++
-      EXPECTED_GCC_ENV: gcc-libstdc++
-      EXPECTED_CLANG_ENV: clang-libstdc++
+      EXPECTED_GCC_ENV: clang-libc++
+      EXPECTED_CLANG_ENV: clang-libc++
     command:
     - bash
     - -c
     - |
-      bazel/setup_clang.sh /opt/llvm
-      export PATH=/opt/llvm/bin:$PATH
       gcc --version
-      clang --version
       /usr/local/bin/test.sh
 
-  # this fails all now, but should start working with hermetic toolchains
+  # this fails due to llvm's dep on shared libtinfo, it
+  # tries to pick the clang toolchain otherwise
   none:
     <<: *common-base
     build:
@@ -120,6 +111,5 @@ services:
     - bash
     - -c
     - |
-      ! which clang || (echo "ERROR: clang found when it shouldn't be" && exit 1)
       ! which gcc || (echo "ERROR: gcc found when it shouldn't be" && exit 1)
       /usr/local/bin/test.sh

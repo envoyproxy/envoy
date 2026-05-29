@@ -5,7 +5,6 @@
 #include "source/extensions/filters/http/buffer/config.h"
 
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/server/instance.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -113,6 +112,19 @@ TEST(BufferFilterFactoryTest, BufferFilterRouteSpecificConfig) {
 
   const auto* inflated = dynamic_cast<const BufferFilterSettings*>(route_config.get());
   EXPECT_TRUE(inflated);
+}
+
+TEST(BufferFilterFactoryTest, BufferFilterCorrectProtoWithServerContext) {
+  envoy::extensions::filters::http::buffer::v3::Buffer config;
+  config.mutable_max_request_bytes()->set_value(1028);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  BufferFilterFactory factory;
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProtoWithServerContext(config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
 }
 
 } // namespace

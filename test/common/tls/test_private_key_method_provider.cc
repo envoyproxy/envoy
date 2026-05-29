@@ -314,43 +314,43 @@ int TestPrivateKeyMethodProvider::ecdsaConnectionIndex() {
 }
 
 TestPrivateKeyMethodProvider::TestPrivateKeyMethodProvider(
-    const ProtobufWkt::Any& typed_config,
+    const Protobuf::Any& typed_config,
     Server::Configuration::TransportSocketFactoryContext& factory_context) {
   std::string private_key_path;
 
-  auto config = MessageUtil::anyConvert<ProtobufWkt::Struct>(typed_config);
+  auto config = MessageUtil::anyConvert<Protobuf::Struct>(typed_config);
 
   for (auto& value_it : config.fields()) {
     auto& value = value_it.second;
     if (value_it.first == "private_key_file" &&
-        value.kind_case() == ProtobufWkt::Value::kStringValue) {
+        value.kind_case() == Protobuf::Value::kStringValue) {
       private_key_path = value.string_value();
     }
-    if (value_it.first == "sync_mode" && value.kind_case() == ProtobufWkt::Value::kBoolValue) {
+    if (value_it.first == "sync_mode" && value.kind_case() == Protobuf::Value::kBoolValue) {
       test_options_.sync_mode_ = value.bool_value();
     }
-    if (value_it.first == "crypto_error" && value.kind_case() == ProtobufWkt::Value::kBoolValue) {
+    if (value_it.first == "crypto_error" && value.kind_case() == Protobuf::Value::kBoolValue) {
       test_options_.crypto_error_ = value.bool_value();
     }
-    if (value_it.first == "method_error" && value.kind_case() == ProtobufWkt::Value::kBoolValue) {
+    if (value_it.first == "method_error" && value.kind_case() == Protobuf::Value::kBoolValue) {
       test_options_.method_error_ = value.bool_value();
     }
-    if (value_it.first == "is_available" && value.kind_case() == ProtobufWkt::Value::kBoolValue) {
+    if (value_it.first == "is_available" && value.kind_case() == Protobuf::Value::kBoolValue) {
       test_options_.is_available_ = value.bool_value();
     }
     if (value_it.first == "async_method_error" &&
-        value.kind_case() == ProtobufWkt::Value::kBoolValue) {
+        value.kind_case() == Protobuf::Value::kBoolValue) {
       test_options_.async_method_error_ = value.bool_value();
     }
     if (value_it.first == "expected_operation" &&
-        value.kind_case() == ProtobufWkt::Value::kStringValue) {
+        value.kind_case() == Protobuf::Value::kStringValue) {
       if (value.string_value() == "decrypt") {
         test_options_.decrypt_expected_ = true;
       } else if (value.string_value() == "sign") {
         test_options_.sign_expected_ = true;
       }
     }
-    if (value_it.first == "mode" && value.kind_case() == ProtobufWkt::Value::kStringValue) {
+    if (value_it.first == "mode" && value.kind_case() == Protobuf::Value::kStringValue) {
       mode_ = value.string_value();
     }
   }

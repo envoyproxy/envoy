@@ -14,14 +14,15 @@ namespace Generic {
  */
 class GenericCredentialInjector : public Common::CredentialInjector {
 public:
-  GenericCredentialInjector(const std::string& header,
+  GenericCredentialInjector(const std::string& header, const std::string& header_value_prefix,
                             Common::SecretReaderConstSharedPtr secret_reader)
-      : header_(header), secret_reader_(secret_reader) {};
+      : header_(header), header_value_prefix_(header_value_prefix), secret_reader_(secret_reader) {}
 
   absl::Status inject(Envoy::Http::RequestHeaderMap& headers, bool overwrite) override;
 
 private:
   const Envoy::Http::LowerCaseString header_;
+  const std::string header_value_prefix_;
   const Common::SecretReaderConstSharedPtr secret_reader_;
 };
 

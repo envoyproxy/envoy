@@ -151,8 +151,8 @@ public:
   }
 
   void verifyMetadataMatchCriteriaFromRequest(bool route_entry_has_match) {
-    ProtobufWkt::Struct request_struct;
-    ProtobufWkt::Value val;
+    Protobuf::Struct request_struct;
+    Protobuf::Value val;
 
     // Populate metadata like StreamInfo.setDynamicMetadata() would.
     auto& fields_map = *request_struct.mutable_fields();
@@ -202,8 +202,8 @@ public:
   }
 
   void verifyMetadataMatchCriteriaFromRoute(bool route_entry_has_match) {
-    ProtobufWkt::Struct route_struct;
-    ProtobufWkt::Value val;
+    Protobuf::Struct route_struct;
+    Protobuf::Value val;
 
     auto& fields_map = *route_struct.mutable_fields();
     val.set_string_value("v3.1");
@@ -641,8 +641,8 @@ public:
   Registry::InjectFactory<NamedTransportConfigFactory> transport_register_;
   Registry::InjectFactory<NamedProtocolConfigFactory> protocol_register_;
 
-  std::function<void(MockTransport*)> mock_transport_cb_{};
-  std::function<void(MockProtocol*)> mock_protocol_cb_{};
+  std::function<void(MockTransport*)> mock_transport_cb_;
+  std::function<void(MockProtocol*)> mock_protocol_cb_;
 
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
@@ -657,8 +657,8 @@ public:
   NiceMock<ThriftFilters::MockDecoderFilterCallbacks> callbacks_;
   NiceMock<MockTransport>* transport_{};
   NiceMock<MockProtocol>* protocol_{};
-  std::vector<NiceMock<MockTransport>*> all_transports_{};
-  std::vector<NiceMock<MockProtocol>*> all_protocols_{};
+  std::vector<NiceMock<MockTransport>*> all_transports_;
+  std::vector<NiceMock<MockProtocol>*> all_protocols_;
   int32_t transports_requested_{};
   int32_t protocols_requested_{};
   NiceMock<MockRoute>* route_{};

@@ -566,8 +566,8 @@ TEST(TypedLeastRequestLbConfigTest, TypedLeastRequestLbConfig) {
     envoy::config::cluster::v3::Cluster::CommonLbConfig common;
     envoy::config::cluster::v3::Cluster::LeastRequestLbConfig legacy;
 
-    Extensions::LoadBalancingPolices::LeastRequest::TypedLeastRequestLbConfig typed_config(common,
-                                                                                           legacy);
+    Extensions::LoadBalancingPolicies::LeastRequest::TypedLeastRequestLbConfig typed_config(common,
+                                                                                            legacy);
 
     EXPECT_FALSE(typed_config.lb_config_.has_locality_lb_config());
     EXPECT_FALSE(typed_config.lb_config_.has_slow_start_config());
@@ -591,8 +591,8 @@ TEST(TypedLeastRequestLbConfigTest, TypedLeastRequestLbConfig) {
 
     common.mutable_locality_weighted_lb_config();
 
-    Extensions::LoadBalancingPolices::LeastRequest::TypedLeastRequestLbConfig typed_config(common,
-                                                                                           legacy);
+    Extensions::LoadBalancingPolicies::LeastRequest::TypedLeastRequestLbConfig typed_config(common,
+                                                                                            legacy);
 
     EXPECT_TRUE(typed_config.lb_config_.has_locality_lb_config());
     EXPECT_TRUE(typed_config.lb_config_.has_slow_start_config());
@@ -621,8 +621,8 @@ TEST(TypedLeastRequestLbConfigTest, TypedLeastRequestLbConfig) {
     common.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(23.0);
     common.mutable_zone_aware_lb_config()->set_fail_traffic_on_panic(true);
 
-    Extensions::LoadBalancingPolices::LeastRequest::TypedLeastRequestLbConfig typed_config(common,
-                                                                                           legacy);
+    Extensions::LoadBalancingPolicies::LeastRequest::TypedLeastRequestLbConfig typed_config(common,
+                                                                                            legacy);
 
     EXPECT_TRUE(typed_config.lb_config_.has_locality_lb_config());
     EXPECT_FALSE(typed_config.lb_config_.has_slow_start_config());
@@ -635,6 +635,66 @@ TEST(TypedLeastRequestLbConfigTest, TypedLeastRequestLbConfig) {
     EXPECT_DOUBLE_EQ(zone_aware_lb_config.routing_enabled().value(), 23.0);
     EXPECT_TRUE(zone_aware_lb_config.fail_traffic_on_panic());
   }
+}
+
+TEST(EdfLbCoalesceDisabledTest, FallbackPathExercised) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update", "false"}});
+
+  Stats::IsolatedStoreImpl stats_store;
+  ClusterLbStatNames stat_names(stats_store.symbolTable());
+  ClusterLbStats stats(stat_names, *stats_store.rootScope());
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<MockPrioritySet> priority_set;
+  auto info = std::make_shared<NiceMock<MockClusterInfo>>();
+
+  envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest config;
+  config.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(60);
+  Event::SimulatedTimeSystem time_system;
+  LeastRequestLoadBalancer lb(priority_set, nullptr, stats, runtime, random, 50, config,
+                              time_system);
+
+  MockHostSet& host_set = *priority_set.getMockHostSet(0);
+  host_set.hosts_ = {makeTestHost(info, "tcp://127.0.0.1:80")};
+  host_set.healthy_hosts_ = host_set.hosts_;
+  host_set.runCallbacks({}, {});
+
+  auto result = lb.chooseHost(nullptr);
+  EXPECT_NE(nullptr, result.host);
+}
+
+// Exercises the coalescing change in `EdfLoadBalancerBase` where `PriorityUpdateCb` stages dirty
+// priorities and `MemberUpdateCb` refreshes each dirty priority's scheduler before reapplying
+// slow start. Slow start is configured so the post-flush `recalculateHostsInSlowStart` change
+// is also covered.
+TEST(EdfLbCoalesceEnabledTest, CoalescedPathExercised) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update", "true"}});
+
+  Stats::IsolatedStoreImpl stats_store;
+  ClusterLbStatNames stat_names(stats_store.symbolTable());
+  ClusterLbStats stats(stat_names, *stats_store.rootScope());
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<MockPrioritySet> priority_set;
+  auto info = std::make_shared<NiceMock<MockClusterInfo>>();
+
+  envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest config;
+  config.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(60);
+  Event::SimulatedTimeSystem time_system;
+  LeastRequestLoadBalancer lb(priority_set, nullptr, stats, runtime, random, 50, config,
+                              time_system);
+
+  MockHostSet& host_set = *priority_set.getMockHostSet(0);
+  host_set.hosts_ = {makeTestHost(info, "tcp://127.0.0.1:80")};
+  host_set.healthy_hosts_ = host_set.hosts_;
+  host_set.runCallbacks(host_set.hosts_, {});
+
+  auto result = lb.chooseHost(nullptr);
+  EXPECT_NE(nullptr, result.host);
 }
 
 } // namespace

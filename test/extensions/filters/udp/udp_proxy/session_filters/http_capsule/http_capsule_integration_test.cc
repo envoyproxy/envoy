@@ -7,8 +7,8 @@
 
 #include "test/integration/integration.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/registry.h"
 
+using testing::Eq;
 namespace Envoy {
 namespace Extensions {
 namespace UdpFilters {
@@ -133,7 +133,7 @@ TEST_P(HttpCapsuleIntegrationTest, SendSplitCapsule) {
                                       request_datagram.addresses_.peer_);
   // Make sure that only one payload received, but none sent downstream because it's not a complete
   // capsule.
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_rx_datagrams", 1);
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_rx_datagrams", Eq(1));
   EXPECT_EQ(0, test_server_->counter("udp.foo.downstream_sess_tx_datagrams")->value());
 
   // Sending the rest of the capsule, so we expect a datagram flushed downstream.
@@ -142,8 +142,8 @@ TEST_P(HttpCapsuleIntegrationTest, SendSplitCapsule) {
   Network::UdpRecvData response_datagram;
   client.recv(response_datagram);
   EXPECT_EQ(expected_response, response_datagram.buffer_->toString());
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_rx_datagrams", 2);
-  test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_datagrams", 1);
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_rx_datagrams", Eq(2));
+  test_server_->waitForCounter("udp.foo.downstream_sess_tx_datagrams", Eq(1));
 }
 
 TEST_P(HttpCapsuleIntegrationTest, SendMultipleCapsules) {
@@ -186,8 +186,8 @@ TEST_P(HttpCapsuleIntegrationTest, SendMultipleCapsules) {
   Network::UdpRecvData response_datagram;
   client.recv(response_datagram);
   EXPECT_EQ("response1", response_datagram.buffer_->toString());
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_rx_datagrams", 1);
-  test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_datagrams", 2);
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_rx_datagrams", Eq(1));
+  test_server_->waitForCounter("udp.foo.downstream_sess_tx_datagrams", Eq(2));
 }
 
 } // namespace

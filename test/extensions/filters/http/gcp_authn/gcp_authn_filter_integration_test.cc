@@ -204,8 +204,8 @@ public:
 
   IntegrationStreamDecoderPtr response_;
   IntegrationStreamDecoderPtr gcp_response_;
-  FakeHttpConnectionPtr fake_gcp_authn_connection_{};
-  FakeStreamPtr request_{};
+  FakeHttpConnectionPtr fake_gcp_authn_connection_;
+  FakeStreamPtr request_;
   const std::string default_config_ = R"EOF(
     http_uri:
       uri: "gcp_authn:9000"
@@ -223,36 +223,13 @@ public:
     cache_config:
       cache_size: 100
   )EOF";
-  envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig proto_config_{};
+  envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig proto_config_;
   bool use_new_config_ = true;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GcpAuthnFilterIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
-
-TEST_P(GcpAuthnFilterIntegrationTest, DEPRECATED_FEATURE_TEST(Basicflow)) {
-  use_new_config_ = false;
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.gcp_authn_use_fixed_url", "false"}});
-  initializeConfig(/*add_audience=*/true);
-  HttpIntegrationTest::initialize();
-  int num = 2;
-  // Send multiple requests.
-  for (int i = 0; i < num; ++i) {
-    initiateClientConnection();
-    // Send the request to cluster `gcp_authn`.
-    waitForGcpAuthnServerResponse();
-    // Send the request to cluster `cluster_0` and validate the response.
-    sendRequestToDestinationAndValidateResponse(/*with_audience=*/true);
-    // Clean up the codec and connections.
-    cleanup();
-  }
-
-  // Verify request has been routed to both upstream clusters.
-  EXPECT_GE(test_server_->counter("cluster.gcp_authn.upstream_cx_total")->value(), num);
-  EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), num);
-}
 
 TEST_P(GcpAuthnFilterIntegrationTest, BasicflowWithNewConfig) {
   initializeConfig(/*add_audience=*/true);

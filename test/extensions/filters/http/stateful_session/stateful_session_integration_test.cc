@@ -73,7 +73,7 @@ public:
     // Update per route config of default route.
     if (!per_route_config_yaml.empty()) {
       auto* route = virtual_host.mutable_routes(0);
-      ProtobufWkt::Any per_route_config;
+      Protobuf::Any per_route_config;
       TestUtility::loadFromYaml(per_route_config_yaml, per_route_config);
 
       route->mutable_typed_per_filter_config()->insert(

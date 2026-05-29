@@ -59,7 +59,7 @@ void ActiveInternalListener::onAccept(Network::ConnectionSocketPtr&& socket) {
 
   auto* io_handle = dynamic_cast<Extensions::IoSocket::UserSpace::IoHandle*>(&socket->ioHandle());
   auto active_socket = std::make_unique<Server::ActiveTcpSocket>(
-      *this, std::move(socket), false /* do not hand off at internal listener */);
+      *this, std::move(socket), false /* do not hand off at internal listener */, absl::nullopt);
   // Transfer internal passthrough state to the active socket from downstream.
   if (io_handle != nullptr && io_handle->passthroughState()) {
     io_handle->passthroughState()->mergeInto(active_socket->dynamicMetadata(),

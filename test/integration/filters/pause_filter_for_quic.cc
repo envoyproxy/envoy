@@ -6,6 +6,7 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 namespace Envoy {
 
@@ -24,7 +25,7 @@ public:
 
   Http::FilterDataStatus decodeData(Buffer::Instance& buf, bool end_stream) override {
     if (end_stream) {
-      absl::WriterMutexLock m(&encode_lock_);
+      absl::WriterMutexLock m(encode_lock_);
       number_of_decode_calls_ref_++;
       // If this is the second stream to decode headers and we're at high watermark. force low
       // watermark state
@@ -42,7 +43,7 @@ public:
 
   Http::FilterDataStatus encodeData(Buffer::Instance& buf, bool end_stream) override {
     if (end_stream) {
-      absl::WriterMutexLock m(&encode_lock_);
+      absl::WriterMutexLock m(encode_lock_);
       number_of_encode_calls_ref_++;
       // If this is the first stream to encode headers and we're not at high watermark, force high
       // watermark state.
@@ -63,16 +64,20 @@ public:
   uint32_t& number_of_decode_calls_ref_;
 };
 
-class TestPauseFilterConfigForQuic : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class TestPauseFilterConfigForQuic
+    : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<
+          test::integration::filters::PauseFilterForQuicConfig> {
 public:
-  TestPauseFilterConfigForQuic() : EmptyHttpFilterConfig("pause-filter-for-quic") {}
+  TestPauseFilterConfigForQuic()
+      : UniqueEmptyHttpFilterConfig<test::integration::filters::PauseFilterForQuicConfig>(
+            "pause-filter-for-quic") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
     return [&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       // ABSL_GUARDED_BY insists the lock be held when the guarded variables are passed by
       // reference.
-      absl::WriterMutexLock m(&encode_lock_);
+      absl::WriterMutexLock m(encode_lock_);
       callbacks.addStreamFilter(std::make_shared<::Envoy::TestPauseFilterForQuic>(
           encode_lock_, number_of_encode_calls_, number_of_decode_calls_));
     };

@@ -6,7 +6,6 @@
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 
-#include "test/mocks/common.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -15,6 +14,8 @@
 namespace Envoy {
 namespace Event {
 namespace {
+
+using ::testing::MockFunction;
 
 class FileEventImplTest : public testing::Test {
 public:
@@ -61,10 +62,10 @@ class FileEventImplActivateTest : public testing::TestWithParam<Network::Address
 public:
   FileEventImplActivateTest() : os_sys_calls_(Api::OsSysCallsSingleton::get()) {}
 
-  static void onWatcherReady(evwatch*, const evwatch_prepare_cb_info*, void* arg) {
-    // `arg` contains the ReadyWatcher passed in from evwatch_prepare_new.
-    auto watcher = static_cast<ReadyWatcher*>(arg);
-    watcher->ready();
+  static void callPrepareCallback(evwatch*, const evwatch_prepare_cb_info*, void* arg) {
+    // `arg` contains the MockFunction passed in from evwatch_prepare_new.
+    auto callback = static_cast<MockFunction<void()>*>(arg);
+    callback->Call();
   }
 
   int domain() { return GetParam() == Network::Address::IpVersion::v4 ? AF_INET : AF_INET6; }
@@ -82,10 +83,9 @@ TEST_P(FileEventImplActivateTest, Activate) {
 
   Api::ApiPtr api = Api::createApiForTest();
   DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
-  ReadyWatcher read_event;
-  EXPECT_CALL(read_event, ready());
-  ReadyWatcher write_event;
-  EXPECT_CALL(write_event, ready());
+  MockFunction<void()> read_callback, write_callback;
+  EXPECT_CALL(read_callback, Call);
+  EXPECT_CALL(write_callback, Call);
 
   const FileTriggerType trigger = Event::PlatformDefaultTriggerType;
 
@@ -93,11 +93,11 @@ TEST_P(FileEventImplActivateTest, Activate) {
       fd,
       [&](uint32_t events) {
         if (events & FileReadyType::Read) {
-          read_event.ready();
+          read_callback.Call();
         }
 
         if (events & FileReadyType::Write) {
-          write_event.ready();
+          write_callback.Call();
         }
         return absl::OkStatus();
       },
@@ -115,27 +115,24 @@ TEST_P(FileEventImplActivateTest, ActivateChaining) {
 
   Api::ApiPtr api = Api::createApiForTest();
   DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
-  ReadyWatcher fd_event;
-  ReadyWatcher read_event;
-  ReadyWatcher write_event;
+  MockFunction<void()> fd_callback, read_callback, write_callback, prepare_callback;
 
-  ReadyWatcher prepare_watcher;
-  evwatch_prepare_new(&static_cast<DispatcherImpl*>(dispatcher.get())->base(), onWatcherReady,
-                      &prepare_watcher);
+  evwatch_prepare_new(&static_cast<DispatcherImpl*>(dispatcher.get())->base(), callPrepareCallback,
+                      &prepare_callback);
 
   const FileTriggerType trigger = Event::PlatformDefaultTriggerType;
 
   Event::FileEventPtr file_event = dispatcher->createFileEvent(
       fd,
       [&](uint32_t events) {
-        fd_event.ready();
+        fd_callback.Call();
         if (events & FileReadyType::Read) {
-          read_event.ready();
+          read_callback.Call();
           file_event->activate(FileReadyType::Write);
         }
 
         if (events & FileReadyType::Write) {
-          write_event.ready();
+          write_callback.Call();
         }
         return absl::OkStatus();
       },
@@ -145,17 +142,17 @@ TEST_P(FileEventImplActivateTest, ActivateChaining) {
   // First loop iteration: handle scheduled read event and the real write event produced by poll.
   // Note that the real and injected events are combined and delivered in a single call to the fd
   // callback.
-  EXPECT_CALL(prepare_watcher, ready());
-  EXPECT_CALL(fd_event, ready());
-  EXPECT_CALL(read_event, ready());
-  EXPECT_CALL(write_event, ready());
+  EXPECT_CALL(prepare_callback, Call);
+  EXPECT_CALL(fd_callback, Call);
+  EXPECT_CALL(read_callback, Call);
+  EXPECT_CALL(write_callback, Call);
   // Second loop iteration: handle write and close events scheduled while handling read.
-  EXPECT_CALL(prepare_watcher, ready());
-  EXPECT_CALL(fd_event, ready());
-  EXPECT_CALL(write_event, ready());
+  EXPECT_CALL(prepare_callback, Call);
+  EXPECT_CALL(fd_callback, Call);
+  EXPECT_CALL(write_callback, Call);
   if constexpr (Event::PlatformDefaultTriggerType != Event::FileTriggerType::EmulatedEdge) {
     // Third loop iteration: poll returned no new real events.
-    EXPECT_CALL(prepare_watcher, ready());
+    EXPECT_CALL(prepare_callback, Call);
   }
 
   file_event->activate(FileReadyType::Read);
@@ -170,28 +167,25 @@ TEST_P(FileEventImplActivateTest, SetEnableCancelsActivate) {
 
   Api::ApiPtr api = Api::createApiForTest();
   DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
-  ReadyWatcher fd_event;
-  ReadyWatcher read_event;
-  ReadyWatcher write_event;
+  MockFunction<void()> fd_callback, read_callback, write_callback, prepare_callback;
 
-  ReadyWatcher prepare_watcher;
-  evwatch_prepare_new(&static_cast<DispatcherImpl*>(dispatcher.get())->base(), onWatcherReady,
-                      &prepare_watcher);
+  evwatch_prepare_new(&static_cast<DispatcherImpl*>(dispatcher.get())->base(), callPrepareCallback,
+                      &prepare_callback);
 
   const FileTriggerType trigger = Event::PlatformDefaultTriggerType;
 
   Event::FileEventPtr file_event = dispatcher->createFileEvent(
       fd,
       [&](uint32_t events) {
-        fd_event.ready();
+        fd_callback.Call();
         if (events & FileReadyType::Read) {
-          read_event.ready();
+          read_callback.Call();
           file_event->activate(FileReadyType::Closed);
           file_event->setEnabled(FileReadyType::Write | FileReadyType::Closed);
         }
 
         if (events & FileReadyType::Write) {
-          write_event.ready();
+          write_callback.Call();
         }
         return absl::OkStatus();
       },
@@ -201,17 +195,17 @@ TEST_P(FileEventImplActivateTest, SetEnableCancelsActivate) {
   // First loop iteration: handle scheduled read event and the real write event produced by poll.
   // Note that the real and injected events are combined and delivered in a single call to the fd
   // callback.
-  EXPECT_CALL(prepare_watcher, ready());
-  EXPECT_CALL(fd_event, ready());
-  EXPECT_CALL(read_event, ready());
-  EXPECT_CALL(write_event, ready());
+  EXPECT_CALL(prepare_callback, Call);
+  EXPECT_CALL(fd_callback, Call);
+  EXPECT_CALL(read_callback, Call);
+  EXPECT_CALL(write_callback, Call);
   // Second loop iteration: handle real write event after resetting event mask via setEnabled. Close
   // injected event is discarded by the setEnable call.
-  EXPECT_CALL(prepare_watcher, ready());
-  EXPECT_CALL(fd_event, ready());
-  EXPECT_CALL(write_event, ready());
+  EXPECT_CALL(prepare_callback, Call);
+  EXPECT_CALL(fd_callback, Call);
+  EXPECT_CALL(write_callback, Call);
   // Third loop iteration: poll returned no new real events.
-  EXPECT_CALL(prepare_watcher, ready());
+  EXPECT_CALL(prepare_callback, Call);
 
   file_event->activate(FileReadyType::Read);
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
@@ -221,20 +215,19 @@ TEST_P(FileEventImplActivateTest, SetEnableCancelsActivate) {
 
 #ifndef WIN32 // Libevent on Windows doesn't support edge trigger.
 TEST_F(FileEventImplTest, EdgeTrigger) {
-  ReadyWatcher read_event;
-  EXPECT_CALL(read_event, ready());
-  ReadyWatcher write_event;
-  EXPECT_CALL(write_event, ready());
+  MockFunction<void()> read_callback, write_callback;
+  EXPECT_CALL(read_callback, Call);
+  EXPECT_CALL(write_callback, Call);
 
   Event::FileEventPtr file_event = dispatcher_->createFileEvent(
       fds_[0],
       [&](uint32_t events) {
         if (events & FileReadyType::Read) {
-          read_event.ready();
+          read_callback.Call();
         }
 
         if (events & FileReadyType::Write) {
-          write_event.ready();
+          write_callback.Call();
         }
         return absl::OkStatus();
       },
@@ -246,8 +239,7 @@ TEST_F(FileEventImplTest, EdgeTrigger) {
 
 TEST_F(FileEventImplTest, LevelTrigger) {
   testing::InSequence s;
-  ReadyWatcher read_event;
-  ReadyWatcher write_event;
+  MockFunction<void()> read_callback, write_callback;
 
   int count = 0;
   Event::FileEventPtr file_event = dispatcher_->createFileEvent(
@@ -258,11 +250,11 @@ TEST_F(FileEventImplTest, LevelTrigger) {
           dispatcher_->exit();
         }
         if (events & FileReadyType::Read) {
-          read_event.ready();
+          read_callback.Call();
         }
 
         if (events & FileReadyType::Write) {
-          write_event.ready();
+          write_callback.Call();
         }
         return absl::OkStatus();
       },
@@ -270,31 +262,31 @@ TEST_F(FileEventImplTest, LevelTrigger) {
 
   // Expect events to be delivered twice since count=2 and level events are delivered on each
   // iteration until the fd state changes.
-  EXPECT_CALL(read_event, ready());
-  EXPECT_CALL(write_event, ready());
-  EXPECT_CALL(read_event, ready());
-  EXPECT_CALL(write_event, ready());
+  EXPECT_CALL(read_callback, Call);
+  EXPECT_CALL(write_callback, Call);
+  EXPECT_CALL(read_callback, Call);
+  EXPECT_CALL(write_callback, Call);
   count = 2;
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Change the event mask to just Write and verify that only that event is delivered.
-  EXPECT_CALL(read_event, ready()).Times(0);
-  EXPECT_CALL(write_event, ready());
+  EXPECT_CALL(read_callback, Call).Times(0);
+  EXPECT_CALL(write_callback, Call);
   file_event->setEnabled(FileReadyType::Write);
   count = 1;
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Activate read, and verify it is delivered despite not being part of the enabled event mask.
-  EXPECT_CALL(read_event, ready());
-  EXPECT_CALL(write_event, ready());
+  EXPECT_CALL(read_callback, Call);
+  EXPECT_CALL(write_callback, Call);
   file_event->activate(FileReadyType::Read);
   count = 1;
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Activate read and then call setEnabled. Verify that the read event is not delivered; setEnabled
   // clears events from explicit calls to activate.
-  EXPECT_CALL(read_event, ready()).Times(0);
-  EXPECT_CALL(write_event, ready());
+  EXPECT_CALL(read_callback, Call).Times(0);
+  EXPECT_CALL(write_callback, Call);
   file_event->activate(FileReadyType::Read);
   file_event->setEnabled(FileReadyType::Write);
   count = 1;
@@ -303,8 +295,7 @@ TEST_F(FileEventImplTest, LevelTrigger) {
 
 TEST_F(FileEventImplTest, SetEnabled) {
   testing::InSequence s;
-  ReadyWatcher read_event;
-  ReadyWatcher write_event;
+  MockFunction<void()> read_callback, write_callback;
 
   const FileTriggerType trigger = Event::PlatformDefaultTriggerType;
 
@@ -312,73 +303,72 @@ TEST_F(FileEventImplTest, SetEnabled) {
       fds_[0],
       [&](uint32_t events) {
         if (events & FileReadyType::Read) {
-          read_event.ready();
+          read_callback.Call();
         }
 
         if (events & FileReadyType::Write) {
-          write_event.ready();
+          write_callback.Call();
         }
         return absl::OkStatus();
       },
       trigger, FileReadyType::Read | FileReadyType::Write);
 
-  EXPECT_CALL(read_event, ready());
+  EXPECT_CALL(read_callback, Call);
   file_event->setEnabled(FileReadyType::Read);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  EXPECT_CALL(write_event, ready());
+  EXPECT_CALL(write_callback, Call);
   file_event->setEnabled(FileReadyType::Write);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   file_event->setEnabled(0);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  EXPECT_CALL(read_event, ready());
-  EXPECT_CALL(write_event, ready());
+  EXPECT_CALL(read_callback, Call);
+  EXPECT_CALL(write_callback, Call);
   file_event->setEnabled(FileReadyType::Read | FileReadyType::Write);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  // Run a manual event to ensure that previous expectations are satisfied before moving on.
-  ReadyWatcher manual_event;
-  EXPECT_CALL(manual_event, ready());
-  manual_event.ready();
+  // Ensure that previous expectations are satisfied before moving on.
+  testing::Mock::VerifyAndClearExpectations(&read_callback);
+  testing::Mock::VerifyAndClearExpectations(&write_callback);
 
   clearReadable();
 
   file_event->setEnabled(FileReadyType::Read);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  EXPECT_CALL(write_event, ready());
+  EXPECT_CALL(write_callback, Call);
   file_event->setEnabled(FileReadyType::Write);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  EXPECT_CALL(write_event, ready());
+  EXPECT_CALL(write_callback, Call);
   file_event->setEnabled(FileReadyType::Read | FileReadyType::Write);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   // Repeat the previous registration, verify that write event is delivered again.
-  EXPECT_CALL(write_event, ready());
+  EXPECT_CALL(write_callback, Call);
   file_event->setEnabled(FileReadyType::Read | FileReadyType::Write);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   // Synthetic read events are delivered even if the active registration doesn't contain them.
-  EXPECT_CALL(read_event, ready());
+  EXPECT_CALL(read_callback, Call);
   file_event->activate(FileReadyType::Read);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  // Run a manual event to ensure that previous expectations are satisfied before moving on.
-  EXPECT_CALL(manual_event, ready());
-  manual_event.ready();
+  // Ensure that previous expectations are satisfied before moving on.
+  testing::Mock::VerifyAndClearExpectations(&read_callback);
+  testing::Mock::VerifyAndClearExpectations(&write_callback);
 
   // Do a read activation followed setEnabled to verify that the activation is cleared.
-  EXPECT_CALL(write_event, ready());
+  EXPECT_CALL(write_callback, Call);
   file_event->activate(FileReadyType::Read);
   file_event->setEnabled(FileReadyType::Read | FileReadyType::Write);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   // Repeat the previous steps but with the same input to setEnabled to verify that the activation
   // is cleared even in cases where the setEnable mask hasn't changed.
-  EXPECT_CALL(write_event, ready());
+  EXPECT_CALL(write_callback, Call);
   file_event->activate(FileReadyType::Read);
   file_event->setEnabled(FileReadyType::Read | FileReadyType::Write);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -391,8 +381,7 @@ TEST_F(FileEventImplTest, RegisterIfEmulatedEdge) {
   }
 
   testing::InSequence s;
-  ReadyWatcher read_event;
-  ReadyWatcher write_event;
+  MockFunction<void()> read_callback, write_callback;
 
   const FileTriggerType trigger = Event::PlatformDefaultTriggerType;
 
@@ -400,47 +389,47 @@ TEST_F(FileEventImplTest, RegisterIfEmulatedEdge) {
       fds_[0],
       [&](uint32_t events) {
         if (events & FileReadyType::Read) {
-          read_event.ready();
+          read_callback.Call();
         }
 
         if (events & FileReadyType::Write) {
-          write_event.ready();
+          write_callback.Call();
         }
         return absl::OkStatus();
       },
       trigger, FileReadyType::Read | FileReadyType::Write);
 
-  EXPECT_CALL(read_event, ready()).Times(0);
-  EXPECT_CALL(write_event, ready()).Times(0);
+  EXPECT_CALL(read_callback, Call).Times(0);
+  EXPECT_CALL(write_callback, Call).Times(0);
   file_event->unregisterEventIfEmulatedEdge(FileReadyType::Read | FileReadyType::Write);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  EXPECT_CALL(read_event, ready());
+  EXPECT_CALL(read_callback, Call);
   file_event->registerEventIfEmulatedEdge(FileReadyType::Read);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  EXPECT_CALL(write_event, ready());
+  EXPECT_CALL(write_callback, Call);
   file_event->registerEventIfEmulatedEdge(FileReadyType::Write);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  EXPECT_CALL(read_event, ready());
+  EXPECT_CALL(read_callback, Call);
   file_event->registerEventIfEmulatedEdge(FileReadyType::Read | FileReadyType::Write);
   file_event->unregisterEventIfEmulatedEdge(FileReadyType::Write);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  EXPECT_CALL(read_event, ready()).Times(0);
-  EXPECT_CALL(write_event, ready()).Times(0);
+  EXPECT_CALL(read_callback, Call).Times(0);
+  EXPECT_CALL(write_callback, Call).Times(0);
   file_event->unregisterEventIfEmulatedEdge(FileReadyType::Read);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  EXPECT_CALL(read_event, ready());
-  EXPECT_CALL(write_event, ready());
+  EXPECT_CALL(read_callback, Call);
+  EXPECT_CALL(write_callback, Call);
   file_event->registerEventIfEmulatedEdge(FileReadyType::Read | FileReadyType::Write);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   // Events are delivered once due to auto unregistration after they are delivered.
-  EXPECT_CALL(read_event, ready()).Times(0);
-  EXPECT_CALL(write_event, ready()).Times(0);
+  EXPECT_CALL(read_callback, Call).Times(0);
+  EXPECT_CALL(write_callback, Call).Times(0);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 

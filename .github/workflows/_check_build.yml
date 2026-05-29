@@ -6,13 +6,9 @@ permissions:
 on:
   workflow_call:
     secrets:
-      gcs-cache-key:
-        required: true
-
+      dockerhub-token:
+      slack-bot-token:
     inputs:
-      gcs-cache-bucket:
-        type: string
-        required: true
       request:
         type: string
         required: true
@@ -28,24 +24,29 @@ concurrency:
 jobs:
   build:
     secrets:
-      gcs-cache-key: ${{ secrets.gcs-cache-key }}
+      dockerhub-token: ${{ secrets.dockerhub-token }}
+      slack-bot-token: ${{ secrets.slack-bot-token }}
     permissions:
+      actions: read
       contents: read
       packages: read
     uses: ./.github/workflows/_run.yml
     name: ${{ matrix.name ||matrix.target }}
     with:
-      bazel-extra: '--config=remote-envoy-engflow'
+      bazel-cache: true
+      bazel-extra: '--config=rbe'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
-      diskspace-hack: ${{ matrix.diskspace-hack || false }}
+      docker-ci: ${{ matrix.docker-ci || false }}
       error-match: |
         ERROR
         error:
         Error:
-      gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       rbe: true
       request: ${{ inputs.request }}
+      catch-errors: ${{ matrix.catch-errors || false }}
+      skip: ${{ matrix.skip != false && true || false }}
+      slack-channel: ${{ matrix.slack-channel || '' }}
       target: ${{ matrix.target }}
       timeout-minutes: 180
       trusted: ${{ inputs.trusted }}
@@ -57,6 +58,11 @@ jobs:
           name: API
         - target: compile_time_options
           name: Compile time options
+          docker-ci: true
         - target: gcc
           name: GCC
-          diskspace-hack: true
+        - target: openssl
+          name: OpenSSL
+          skip: ${{ ! fromJSON(inputs.request).run.check-build-openssl }}
+          catch-errors: true
+          slack-channel: '#envoy-openssl'

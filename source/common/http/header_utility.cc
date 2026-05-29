@@ -144,7 +144,7 @@ bool HeaderUtility::headerNameIsValid(absl::string_view header_key) {
   // TODO(yanavlasov): make validation in HTTP/2 case stricter.
   bool is_valid = true;
   for (auto iter = header_key.begin(); iter != header_key.end() && is_valid; ++iter) {
-    is_valid &= testCharInTable(kGenericHeaderNameCharTable, *iter);
+    is_valid &= CharTables::kGenericHeaderName.hasChar(*iter);
   }
   return is_valid;
 }
@@ -236,12 +236,9 @@ bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
 }
 
 bool HeaderUtility::isSpecial1xx(const ResponseHeaderMap& response_headers) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.proxy_104") &&
-      response_headers.Status()->value() == "104") {
-    return true;
-  }
   return response_headers.Status()->value() == "100" ||
-         response_headers.Status()->value() == "102" || response_headers.Status()->value() == "103";
+         response_headers.Status()->value() == "102" ||
+         response_headers.Status()->value() == "103" || response_headers.Status()->value() == "104";
 }
 
 bool HeaderUtility::isConnect(const RequestHeaderMap& headers) {

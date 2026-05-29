@@ -39,7 +39,8 @@ static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
   envoy::config::core::v3::Locality locality;
   locality.set_zone(zone);
   return HostSharedPtr{*HostImpl::create(
-      cluster, "", *Network::Utility::resolveUrl(url), nullptr, nullptr, weight, locality,
+      cluster, "", *Network::Utility::resolveUrl(url), nullptr, nullptr, weight,
+      std::make_shared<const envoy::config::core::v3::Locality>(locality),
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
       envoy::config::core::v3::UNKNOWN)};
 }
@@ -101,7 +102,7 @@ void leastRequestLBWeightTest(LRLBTestParams params) {
       updateHostsParams(updated_hosts, updated_locality_hosts,
                         std::make_shared<const HealthyHostVector>(*updated_hosts),
                         updated_locality_hosts),
-      {}, hosts, {}, random.random(), absl::nullopt);
+      {}, hosts, {}, absl::nullopt);
 
   Stats::IsolatedStoreImpl stats_store;
   ClusterLbStatNames stat_names(stats_store.symbolTable());
@@ -264,7 +265,7 @@ public:
           updateHostsParams(originating_hosts, per_zone_local_shared,
                             std::make_shared<const HealthyHostVector>(*originating_hosts),
                             per_zone_local_shared),
-          {}, empty_vector_, empty_vector_, random_.random(), absl::nullopt);
+          {}, empty_vector_, empty_vector_, absl::nullopt);
 
       HostConstSharedPtr selected = lb.chooseHost(nullptr).host;
       hits[selected->address()->asString()]++;

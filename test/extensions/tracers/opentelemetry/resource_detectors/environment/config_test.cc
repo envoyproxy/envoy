@@ -2,7 +2,7 @@
 
 #include "source/extensions/tracers/opentelemetry/resource_detectors/environment/config.h"
 
-#include "test/mocks/server/tracer_factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -26,8 +26,10 @@ TEST(EnvironmentResourceDetectorFactoryTest, Basic) {
   )EOF";
   TestUtility::loadFromYaml(yaml, typed_config);
 
-  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
-  EXPECT_NE(factory->createResourceDetector(typed_config.typed_config(), context), nullptr);
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+
+  EXPECT_NE(factory->createResourceDetector(typed_config.typed_config(), server_factory_context),
+            nullptr);
 }
 
 } // namespace OpenTelemetry

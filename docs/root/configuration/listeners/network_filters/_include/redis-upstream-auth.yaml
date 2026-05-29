@@ -1,0 +1,73 @@
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 6379
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.redis_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy
+          stat_prefix: egress_redis
+          settings:
+            op_timeout: 5s
+          prefix_routes:
+            catch_all_route:
+              cluster: redis_cluster
+  clusters:
+  - name: redis_cluster
+    connect_timeout: 1s
+    type: STRICT_DNS
+    load_assignment:
+      cluster_name: redis_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: endpoint_1
+                port_value: 6380
+        - endpoint:
+            address:
+              socket_address:
+                address: endpoint_2
+                port_value: 6381
+        - endpoint:
+            address:
+              socket_address:
+                address: endpoint_3
+                port_value: 6382
+    typed_extension_protocol_options:
+      envoy.filters.network.redis_proxy:
+        "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProtocolOptions
+        auth_username:
+          inline_string: default_username
+        auth_password:
+          inline_string: default_password
+        credentials:
+        - address:
+            socket_address:
+              address: endpoint_1
+              port_value: 6380
+          auth_username:
+            inline_string: endpoint_1_username
+          auth_password:
+            inline_string: endpoint_1_password
+        - address:
+            socket_address:
+              address: endpoint_2
+              port_value: 6381
+          auth_username:
+            inline_string: endpoint_2_username
+          auth_password:
+            inline_string: endpoint_2_password
+        - address:
+            socket_address:
+              address: endpoint_3
+              port_value: 6382
+          auth_username:
+            inline_string: endpoint_3_username
+          auth_password:
+            inline_string: endpoint_3_password

@@ -15,14 +15,12 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
+#include "envoy/server/overload/overload_manager.h"
 
 #include "source/common/buffer/buffer_impl.h"
-#include "source/common/buffer/watermark_buffer.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
-#include "source/common/common/statusor.h"
-#include "source/common/common/thread.h"
 #include "source/common/http/codec_helper.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/http2/codec_stats.h"
@@ -30,7 +28,6 @@
 #include "source/common/http/http2/metadata_encoder.h"
 #include "source/common/http/http2/protocol_constraints.h"
 #include "source/common/http/status.h"
-#include "source/common/http/utility.h"
 
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
@@ -47,6 +44,7 @@ namespace Http {
 namespace Http2 {
 
 // Types inherited from nghttp2 and preserved in oghttp2
+// NOLINTBEGIN(readability-identifier-naming)
 enum ErrorType {
   OGHTTP2_NO_ERROR,
   OGHTTP2_PROTOCOL_ERROR,
@@ -63,6 +61,7 @@ enum ErrorType {
   OGHTTP2_INADEQUATE_SECURITY,
   OGHTTP2_HTTP_1_1_REQUIRED,
 };
+// NOLINTEND(readability-identifier-naming)
 
 class Http2CodecImplTestFixture;
 
@@ -81,7 +80,7 @@ public:
   }
 
 private:
-  absl::optional<uint32_t> concurrent_stream_limit_{};
+  absl::optional<uint32_t> concurrent_stream_limit_;
 };
 
 class Utility {
@@ -347,6 +346,12 @@ protected:
     absl::string_view responseDetails() override { return details_; }
     Buffer::BufferMemoryAccountSharedPtr account() const override { return buffer_memory_account_; }
     void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override;
+    absl::optional<uint32_t> codecStreamId() const override {
+      if (stream_id_ == -1) {
+        return absl::nullopt;
+      }
+      return stream_id_;
+    }
 
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level) const override;
@@ -406,7 +411,13 @@ protected:
     }
     void onResetEncoded(uint32_t error_code) {
       if (codec_callbacks_ && error_code != 0) {
-        codec_callbacks_->onCodecLowLevelReset();
+        // TODO(wbpcode): this ensure that onCodecLowLevelReset is only called once. But
+        // we should replace this with a better design later.
+        // See https://github.com/envoyproxy/envoy/issues/42264 for why we need this.
+        if (!codec_low_level_reset_is_called_) {
+          codec_low_level_reset_is_called_ = true;
+          codec_callbacks_->onCodecLowLevelReset();
+        }
       }
     }
 
@@ -430,16 +441,16 @@ protected:
     // to determine whether we should continue processing that data.
     absl::optional<StreamResetReason> reset_reason_;
     HeaderString cookies_;
-    bool local_end_stream_sent_ : 1;
-    bool remote_end_stream_ : 1;
-    bool remote_rst_ : 1;
-    bool data_deferred_ : 1;
-    bool received_noninformational_headers_ : 1;
-    bool pending_receive_buffer_high_watermark_called_ : 1;
-    bool pending_send_buffer_high_watermark_called_ : 1;
-    bool reset_due_to_messaging_error_ : 1;
+    bool local_end_stream_sent_ : 1 = false;
+    bool remote_end_stream_ : 1 = false;
+    bool remote_rst_ : 1 = false;
+    bool data_deferred_ : 1 = false;
+    bool received_noninformational_headers_ : 1 = false;
+    bool pending_receive_buffer_high_watermark_called_ : 1 = false;
+    bool pending_send_buffer_high_watermark_called_ : 1 = false;
+    bool reset_due_to_messaging_error_ : 1 = false;
     // Latch whether this stream is operating with this flag.
-    bool extend_stream_lifetime_flag_ : 1;
+    bool extend_stream_lifetime_flag_ : 1 = false;
     absl::string_view details_;
 
     /**
@@ -799,11 +810,11 @@ private:
   // remove streams from the map when they are closed in order to avoid calls to resetStreamWorker
   // after the stream has been removed from the active list.
   std::map<int32_t, StreamImpl*> pending_deferred_reset_streams_;
-  bool dispatching_ : 1;
-  bool raised_goaway_ : 1;
+  bool dispatching_ : 1 = false;
+  bool raised_goaway_ : 1 = false;
   Event::SchedulableCallbackPtr protocol_constraint_violation_callback_;
   Random::RandomGenerator& random_;
-  MonotonicTime last_received_data_time_{};
+  MonotonicTime last_received_data_time_;
   Event::TimerPtr keepalive_send_timer_;
   Event::TimerPtr keepalive_timeout_timer_;
   std::chrono::milliseconds keepalive_interval_;
@@ -876,7 +887,9 @@ private:
   // The action to take when a request header name contains underscore characters.
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
+  // Remove when removing runtime feature `http2_fix_goaway_loadshed_point`.
   Server::LoadShedPoint* should_send_go_away_on_dispatch_{nullptr};
+  Server::LoadShedPoint* should_send_go_away_and_close_on_dispatch_{nullptr};
   bool sent_go_away_on_dispatch_{false};
 };
 

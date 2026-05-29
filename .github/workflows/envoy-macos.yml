@@ -39,7 +39,10 @@ jobs:
       check-name: macos
 
   macos:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
+      actions: read
       contents: read
       packages: read
     if: ${{ fromJSON(needs.load.outputs.request).run.build-macos }}
@@ -48,16 +51,17 @@ jobs:
     uses: ./.github/workflows/_run.yml
     name: CI ${{ matrix.name || matrix.target }}
     with:
+      bind-mount: false
       command:
       container-command:
       docker-ipv6: false
       request: ${{ needs.load.outputs.request }}
       # TODO: Remove these hardcoded branches when no longer supported
       runs-on: >-
-        ${{ (contains(fromJSON(needs.load.outputs.request).request.target-branch, 'v1.31')
-             || contains(fromJSON(needs.load.outputs.request).request.target-branch, 'v1.32')
-             || contains(fromJSON(needs.load.outputs.request).request.target-branch, 'v1.33')
-             || contains(fromJSON(needs.load.outputs.request).request.target-branch, 'v1.34'))
+        ${{ (contains(fromJSON(needs.load.outputs.request).request.target-branch, '1.31')
+             || contains(fromJSON(needs.load.outputs.request).request.target-branch, '1.32')
+             || contains(fromJSON(needs.load.outputs.request).request.target-branch, '1.33')
+             || contains(fromJSON(needs.load.outputs.request).request.target-branch, '1.34'))
             && 'macos-14-xlarge'
             || 'macos-15-xlarge' }}
       source: ${{ matrix.source }}
@@ -79,7 +83,7 @@ jobs:
             _BAZEL_BUILD_EXTRA_OPTIONS=(
               --remote_download_toplevel
               --flaky_test_attempts=2
-              --config=remote-cache-envoy-engflow
+              --config=remote-cache
               --config=ci)
             export BAZEL_BUILD_EXTRA_OPTIONS=${_BAZEL_BUILD_EXTRA_OPTIONS[*]}
 

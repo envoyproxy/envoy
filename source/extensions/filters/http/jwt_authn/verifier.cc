@@ -2,20 +2,22 @@
 
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
-#include "jwt_verify_lib/check_audience.h"
+#include "source/common/jwt/check_audience.h"
+#include "source/common/runtime/runtime_features.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtProvider;
 using envoy::extensions::filters::http::jwt_authn::v3::JwtRequirement;
 using envoy::extensions::filters::http::jwt_authn::v3::JwtRequirementAndList;
 using envoy::extensions::filters::http::jwt_authn::v3::JwtRequirementOrList;
-using ::google::jwt_verify::CheckAudience;
-using ::google::jwt_verify::Status;
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
+
+using JwtVerify::CheckAudience;
+using JwtVerify::Status;
 
 /**
  * Struct to keep track of verifier completed and responded state for a request.
@@ -56,7 +58,7 @@ public:
   void storeAuth(AuthenticatorPtr&& auth) { auths_.emplace_back(std::move(auth)); }
 
   // Add a pair of (name, payload), called by Authenticator. It can be either JWT header or payload.
-  void addExtractedData(const std::string& name, const ProtobufWkt::Struct& extracted_data) {
+  void addExtractedData(const std::string& name, const Protobuf::Struct& extracted_data) {
     *(*extracted_data_.mutable_fields())[name].mutable_struct_value() = extracted_data;
   }
 
@@ -72,7 +74,7 @@ private:
   Verifier::Callbacks& callback_;
   absl::node_hash_map<const Verifier*, CompletionState> completion_states_;
   std::vector<AuthenticatorPtr> auths_;
-  ProtobufWkt::Struct extracted_data_;
+  Protobuf::Struct extracted_data_;
 };
 
 // base verifier for provider_name, provider_and_audiences, and allow_missing_or_failed.
@@ -120,7 +122,7 @@ public:
     extractor_->sanitizeHeaders(ctximpl.headers());
     auth->verify(
         ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
-        [&ctximpl](const std::string& name, const ProtobufWkt::Struct& extracted_data) {
+        [&ctximpl](const std::string& name, const Protobuf::Struct& extracted_data) {
           ctximpl.addExtractedData(name, extracted_data);
         },
         [this, &ctximpl](const Status& status) { onComplete(status, ctximpl); },
@@ -153,7 +155,7 @@ private:
   const CheckAudience* getAudienceChecker() const override { return check_audience_.get(); }
 
   // Check audience object
-  ::google::jwt_verify::CheckAudiencePtr check_audience_;
+  JwtVerify::CheckAudiencePtr check_audience_;
 };
 
 // Allow missing or failed verifier
@@ -170,7 +172,7 @@ public:
     extractor_->sanitizeHeaders(ctximpl.headers());
     auth->verify(
         ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
-        [&ctximpl](const std::string& name, const ProtobufWkt::Struct& extracted_data) {
+        [&ctximpl](const std::string& name, const Protobuf::Struct& extracted_data) {
           ctximpl.addExtractedData(name, extracted_data);
         },
         [this, &ctximpl](const Status& status) { onComplete(status, ctximpl); },
@@ -203,7 +205,7 @@ public:
     extractor_->sanitizeHeaders(ctximpl.headers());
     auth->verify(
         ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
-        [&ctximpl](const std::string& name, const ProtobufWkt::Struct& extracted_data) {
+        [&ctximpl](const std::string& name, const Protobuf::Struct& extracted_data) {
           ctximpl.addExtractedData(name, extracted_data);
         },
         [this, &ctximpl](const Status& status) { onComplete(status, ctximpl); },
@@ -367,6 +369,78 @@ JwtProviderList getAllProvidersAsList(const Protobuf::Map<std::string, JwtProvid
   return list;
 }
 
+namespace {
+constexpr absl::string_view kDefaultVerificationStatusHeader = "x-jwt-signature-verified";
+constexpr absl::string_view kVerificationStatusValue = "false";
+} // namespace
+
+class ExtractOnlyWithoutValidationVerifierImpl : public BaseVerifierImpl {
+public:
+  ExtractOnlyWithoutValidationVerifierImpl(
+      const AuthFactory& factory, const JwtProviderList& providers,
+      const envoy::extensions::filters::http::jwt_authn::v3::ExtractOnlyWithoutValidation&
+          extract_config,
+      const BaseVerifierImpl* parent)
+      : BaseVerifierImpl(parent), auth_factory_(factory), extractor_(Extractor::create(providers)),
+        verification_status_header_(
+            Http::LowerCaseString(extract_config.verification_status_header().empty()
+                                      ? std::string(kDefaultVerificationStatusHeader)
+                                      : extract_config.verification_status_header())) {
+    ENVOY_LOG(info,
+              "JWT filter configured for claim extraction only. "
+              "Header '{}' will be set to 'false' when JWT verification fails.",
+              verification_status_header_.get());
+  }
+
+  void verify(ContextSharedPtr context) const override {
+    ENVOY_LOG(debug, "Extracting JWT claims without signature validation");
+
+    auto& ctximpl = static_cast<ContextImpl&>(*context);
+
+    // Use allow_failed=false so the authenticator surfaces the original
+    // verification status (e.g. JwtExpired) instead of collapsing it to Ok.
+    // allow_missing=true keeps "no token" reported as Ok via the missing
+    // path. The verifier itself collapses any remaining failure into Ok
+    // below, since extract-only mode never fails the request.
+    auto auth = auth_factory_.create(nullptr, absl::nullopt,
+                                     /*=allow failed*/ false,
+                                     /*=allow missing*/ true);
+
+    extractor_->sanitizeHeaders(ctximpl.headers());
+    auth->verify(
+        ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
+        [&ctximpl](const std::string& name, const Protobuf::Struct& extracted_data) {
+          ctximpl.addExtractedData(name, extracted_data);
+        },
+        [this, &ctximpl](const Status& status) {
+          ENVOY_LOG(debug, "JWT extraction completed with status: {}, treating as success",
+                    static_cast<int>(status));
+          // Status::Ok means verification succeeded; Status::JwtMissed means
+          // no token was present (collapsed by allow_missing). Any other
+          // status is a real verification failure — signal downstream that
+          // the forwarded claims are unverified.
+          if (status != Status::Ok && status != Status::JwtMissed &&
+              Runtime::runtimeFeatureEnabled(
+                  "envoy.reloadable_features.jwt_authn_add_verification_status_header")) {
+            ctximpl.headers().setCopy(verification_status_header_, kVerificationStatusValue);
+          }
+          onComplete(Status::Ok, ctximpl);
+        },
+        [&ctximpl]() { ctximpl.callback()->clearRouteCache(); });
+
+    if (!ctximpl.getCompletionState(this).is_completed_) {
+      ctximpl.storeAuth(std::move(auth));
+    } else {
+      auth->onDestroy();
+    }
+  }
+
+private:
+  const AuthFactory& auth_factory_;
+  const ExtractorConstPtr extractor_;
+  Http::LowerCaseString verification_status_header_;
+};
+
 VerifierConstPtr innerCreate(const JwtRequirement& requirement,
                              const Protobuf::Map<std::string, JwtProvider>& providers,
                              const AuthFactory& factory, const BaseVerifierImpl* parent) {
@@ -394,6 +468,10 @@ VerifierConstPtr innerCreate(const JwtRequirement& requirement,
   case JwtRequirement::RequiresTypeCase::kAllowMissing:
     return std::make_unique<AllowMissingVerifierImpl>(factory, getAllProvidersAsList(providers),
                                                       parent);
+  case JwtRequirement::RequiresTypeCase::kExtractOnlyWithoutValidation:
+    return std::make_unique<ExtractOnlyWithoutValidationVerifierImpl>(
+        factory, getAllProvidersAsList(providers), requirement.extract_only_without_validation(),
+        parent);
   case JwtRequirement::RequiresTypeCase::REQUIRES_TYPE_NOT_SET:
     return std::make_unique<AllowAllVerifierImpl>(parent);
   }

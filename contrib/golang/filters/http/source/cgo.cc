@@ -113,7 +113,7 @@ CAPIStatus envoyGoFilterHttpSendLocalReply(void* s, int response_code, void* bod
           for (size_t i = 0; i < header_values.size(); i += 2) {
             const auto& key = header_values[i];
             const auto& value = header_values[i + 1];
-            if (value.length() > 0) {
+            if (!value.empty()) {
               headers.addCopy(Http::LowerCaseString(key), value);
             }
           }
@@ -368,6 +368,12 @@ CAPIStatus envoyGoFilterHttpGetStringSecret(void* r, void* key_data, int key_len
         auto key_str = stringViewFromGoPointer(key_data, key_len);
         return filter->getSecret(key_str, value_data, value_len);
       });
+}
+
+CAPIStatus envoyGoFilterHttpSetDrainConnectionUponCompletion(void* r) {
+  return envoyGoFilterHandlerWrapper(r, [](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+    return filter->setDrainConnectionUponCompletion();
+  });
 }
 
 CAPIStatus envoyGoFilterHttpDefineMetric(void* c, uint32_t metric_type, void* name_data,

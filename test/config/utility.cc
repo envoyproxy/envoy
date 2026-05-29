@@ -32,6 +32,7 @@
 #include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace {
 envoy::config::bootstrap::v3::Bootstrap&
@@ -695,6 +696,50 @@ ConfigHelper::buildRouteConfig(const std::string& name, const std::string& clust
 #endif
 }
 
+envoy::config::route::v3::RouteConfiguration
+ConfigHelper::buildRouteConfigWithVhdsOverAds(const std::string& name) {
+  API_NO_BOOST(envoy::config::route::v3::RouteConfiguration) route;
+#ifdef ENVOY_ENABLE_YAML
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+      name: "{}"
+      vhds:
+        config_source:
+          ads: {{}}
+    )EOF",
+                                        name),
+                            route);
+  return route;
+#else
+  UNREFERENCED_PARAMETER(name);
+  PANIC("YAML support compiled out");
+#endif
+}
+
+envoy::config::route::v3::VirtualHost ConfigHelper::buildVirtualHost(const std::string& name,
+                                                                     const std::string& domain,
+                                                                     const std::string& prefix,
+                                                                     const std::string& cluster) {
+  API_NO_BOOST(envoy::config::route::v3::VirtualHost) vhost;
+#ifdef ENVOY_ENABLE_YAML
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+        name: {}
+        domains: [{}]
+        routes:
+        - match: {{ prefix: {} }}
+          route: {{ cluster: {} }}
+      )EOF",
+                                        name, domain, prefix, cluster),
+                            vhost);
+  return vhost;
+#else
+  UNREFERENCED_PARAMETER(name);
+  UNREFERENCED_PARAMETER(domain);
+  UNREFERENCED_PARAMETER(prefix);
+  UNREFERENCED_PARAMETER(cluster);
+  PANIC("YAML support compiled out");
+#endif
+}
+
 envoy::config::endpoint::v3::Endpoint ConfigHelper::buildEndpoint(const std::string& address) {
   envoy::config::endpoint::v3::Endpoint endpoint;
   endpoint.mutable_address()->mutable_socket_address()->set_address(address);
@@ -773,7 +818,7 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version,
   }
 }
 
-void ConfigHelper::addListenerTypedMetadata(absl::string_view key, ProtobufWkt::Any& packed_value) {
+void ConfigHelper::addListenerTypedMetadata(absl::string_view key, Protobuf::Any& packed_value) {
   RELEASE_ASSERT(!finalized_, "");
   auto* static_resources = bootstrap_.mutable_static_resources();
   ASSERT_TRUE(static_resources->listeners_size() > 0);
@@ -786,7 +831,7 @@ void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
                                             absl::string_view cluster_name) {
 #ifdef ENVOY_ENABLE_YAML
   RELEASE_ASSERT(!finalized_, "");
-  ProtobufWkt::Struct cluster_metadata;
+  Protobuf::Struct cluster_metadata;
   TestUtility::loadFromYaml(std::string(metadata_yaml), cluster_metadata);
 
   auto* static_resources = bootstrap_.mutable_static_resources();
@@ -796,7 +841,7 @@ void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
       continue;
     }
     for (const auto& kvp : cluster_metadata.fields()) {
-      ASSERT_TRUE(kvp.second.kind_case() == ProtobufWkt::Value::KindCase::kStructValue);
+      ASSERT_TRUE(kvp.second.kind_case() == Protobuf::Value::KindCase::kStructValue);
       cluster->mutable_metadata()->mutable_filter_metadata()->insert(
           {kvp.first, kvp.second.struct_value()});
     }
@@ -1728,7 +1773,7 @@ void ConfigHelper::setLds(absl::string_view version_info) {
   envoy::service::discovery::v3::DiscoveryResponse lds;
   lds.set_version_info(std::string(version_info));
   for (auto& listener : bootstrap_.static_resources().listeners()) {
-    ProtobufWkt::Any* resource = lds.add_resources();
+    Protobuf::Any* resource = lds.add_resources();
     resource->PackFrom(listener);
   }
 
@@ -1773,6 +1818,62 @@ void ConfigHelper::setUpstreamOutboundFramesLimits(uint32_t max_all_frames,
         ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
                                          protocol_options);
       });
+}
+
+void ConfigHelper::setDownstreamHttp2MaxConcurrentStreams(uint32_t max_streams) {
+  auto filter = getFilterFromListener("http");
+  if (filter) {
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
+        hcm_config;
+    loadHttpConnectionManager(hcm_config);
+    if (hcm_config.codec_type() == envoy::extensions::filters::network::http_connection_manager::
+                                       v3::HttpConnectionManager::HTTP2) {
+      auto* options = hcm_config.mutable_http2_protocol_options();
+      options->mutable_max_concurrent_streams()->set_value(max_streams);
+      storeHttpConnectionManager(hcm_config);
+    }
+  }
+}
+
+void ConfigHelper::setUpstreamHttp2MaxConcurrentStreams(uint32_t max_streams) {
+  addConfigModifier([max_streams](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    auto* http_protocol_options =
+        protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+    http_protocol_options->mutable_max_concurrent_streams()->set_value(max_streams);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+}
+
+void ConfigHelper::setDownstreamHttp2WindowSize(uint32_t stream_window,
+                                                uint32_t connection_window) {
+  auto filter = getFilterFromListener("http");
+  if (filter) {
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
+        hcm_config;
+    loadHttpConnectionManager(hcm_config);
+    if (hcm_config.codec_type() == envoy::extensions::filters::network::http_connection_manager::
+                                       v3::HttpConnectionManager::HTTP2) {
+      auto* options = hcm_config.mutable_http2_protocol_options();
+      options->mutable_initial_stream_window_size()->set_value(stream_window);
+      options->mutable_initial_connection_window_size()->set_value(connection_window);
+      storeHttpConnectionManager(hcm_config);
+    }
+  }
+}
+
+void ConfigHelper::setUpstreamHttp2WindowSize(uint32_t stream_window, uint32_t connection_window) {
+  addConfigModifier([stream_window,
+                     connection_window](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    auto* http_protocol_options =
+        protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+    http_protocol_options->mutable_initial_stream_window_size()->set_value(stream_window);
+    http_protocol_options->mutable_initial_connection_window_size()->set_value(connection_window);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
 }
 
 void ConfigHelper::setLocalReply(
@@ -1823,7 +1924,7 @@ void CdsHelper::setCds(const std::vector<envoy::config::cluster::v3::Cluster>& c
   // Write to file the DiscoveryResponse and trigger inotify watch.
   envoy::service::discovery::v3::DiscoveryResponse cds_response;
   cds_response.set_version_info(std::to_string(cds_version_++));
-  cds_response.set_type_url(Config::TypeUrl::get().Cluster);
+  cds_response.set_type_url(Config::TestTypeUrl::get().Cluster);
   for (const auto& cluster : clusters) {
     cds_response.add_resources()->PackFrom(cluster);
   }
@@ -1845,7 +1946,7 @@ void EdsHelper::setEds(const std::vector<envoy::config::endpoint::v3::ClusterLoa
   // Write to file the DiscoveryResponse and trigger inotify watch.
   envoy::service::discovery::v3::DiscoveryResponse eds_response;
   eds_response.set_version_info(std::to_string(eds_version_++));
-  eds_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
+  eds_response.set_type_url(Config::TestTypeUrl::get().ClusterLoadAssignment);
   for (const auto& cluster_load_assignment : cluster_load_assignments) {
     eds_response.add_resources()->PackFrom(cluster_load_assignment);
   }
@@ -1860,11 +1961,11 @@ void EdsHelper::setEdsAndWait(
     const std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment>& cluster_load_assignments,
     IntegrationTestServerStats& server_stats) {
   // Make sure the last version has been accepted before setting a new one.
-  server_stats.waitForCounterGe("cluster.cluster_0.update_success", update_successes_);
+  server_stats.waitForCounter("cluster.cluster_0.update_success", Ge(update_successes_));
   setEds(cluster_load_assignments);
   // Make sure Envoy has consumed the update now that it is running.
   ++update_successes_;
-  server_stats.waitForCounterGe("cluster.cluster_0.update_success", update_successes_);
+  server_stats.waitForCounter("cluster.cluster_0.update_success", Ge(update_successes_));
   RELEASE_ASSERT(
       update_successes_ == server_stats.counter("cluster.cluster_0.update_success")->value(), "");
 }

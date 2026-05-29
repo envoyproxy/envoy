@@ -11,7 +11,7 @@ namespace RocketmqProxy {
 
 TEST(TopicRouteTest, Serialization) {
   QueueData queue_data("broker-a", 8, 8, 6);
-  ProtobufWkt::Struct doc;
+  Protobuf::Struct doc;
   queue_data.encode(doc);
 
   const auto& members = doc.fields();
@@ -33,7 +33,7 @@ TEST(BrokerDataTest, Serialization) {
   std::string broker_name("broker-a");
   BrokerData broker_data(cluster, broker_name, std::move(broker_addrs));
 
-  ProtobufWkt::Struct doc;
+  Protobuf::Struct doc;
   broker_data.encode(doc);
 
   const auto& members = doc.fields();
@@ -61,7 +61,7 @@ TEST(TopicRouteDataTest, Serialization) {
     topic_route_data.brokerData().emplace_back(
         BrokerData(cluster, broker_name, std::move(broker_addrs)));
   }
-  ProtobufWkt::Struct doc;
+  Protobuf::Struct doc;
   EXPECT_NO_THROW(topic_route_data.encode(doc));
   MessageUtil::getJsonStringFromMessageOrError(doc);
 }

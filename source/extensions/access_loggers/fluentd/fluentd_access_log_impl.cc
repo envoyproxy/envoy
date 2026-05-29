@@ -66,7 +66,7 @@ FluentdAccessLog::FluentdAccessLog(AccessLog::FilterPtr&& filter, FluentdFormatt
   });
 }
 
-void FluentdAccessLog::emitLog(const Formatter::HttpFormatterContext& context,
+void FluentdAccessLog::emitLog(const Formatter::Context& context,
                                const StreamInfo::StreamInfo& stream_info) {
   auto msgpack = formatter_->format(context, stream_info);
   uint64_t time = std::chrono::duration_cast<std::chrono::seconds>(

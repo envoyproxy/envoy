@@ -48,7 +48,7 @@ ExtractorImpl::processRequest(Protobuf::field_extraction::MessageData& message) 
 
   ExtractionResult result;
   for (const auto& it : per_field_extractors_) {
-    absl::StatusOr<ProtobufWkt::Value> extracted_value = it.second->ExtractValue(message);
+    absl::StatusOr<Protobuf::Value> extracted_value = it.second->ExtractValue(message);
     if (!extracted_value.ok()) {
       return extracted_value.status();
     }

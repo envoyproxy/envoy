@@ -6,9 +6,7 @@
 #include "source/extensions/health_check/event_sinks/file/file_sink_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/server/health_checker_factory_context.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -26,7 +24,7 @@ TEST(HealthCheckEventFileSinkFactory, createHealthCheckEventSink) {
 
   envoy::extensions::health_check::event_sinks::file::v3::HealthCheckEventFileSink config;
   config.set_event_log_path("test_path");
-  Envoy::ProtobufWkt::Any typed_config;
+  Envoy::Protobuf::Any typed_config;
   typed_config.PackFrom(config);
 
   NiceMock<Server::Configuration::MockHealthCheckerFactoryContext> context;

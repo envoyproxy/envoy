@@ -52,7 +52,7 @@ private:
   const xds::core::v3::ContextParams node_context_;
   // Map from resource type URL to dynamic context parameters.
   absl::flat_hash_map<std::string, xds::core::v3::ContextParams> dynamic_context_;
-  mutable Common::CallbackManager<absl::string_view> update_cb_helper_;
+  mutable Common::CallbackManager<absl::Status, absl::string_view> update_cb_helper_;
 };
 
 } // namespace Config

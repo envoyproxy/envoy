@@ -54,6 +54,20 @@ Http::Code ServerInfoHandler::handlerMemory(Http::ResponseHeaderMap& response_he
   return Http::Code::OK;
 }
 
+Http::Code ServerInfoHandler::handleMemoryTcmallocStats(Http::ResponseHeaderMap& response_headers,
+                                                        Buffer::Instance& response, AdminStream&) {
+  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Text);
+  auto stats = Memory::Stats::dumpStats();
+
+  if (stats.has_value()) {
+    response.add(stats.value());
+    return Http::Code::OK;
+  }
+
+  response.add("Envoy was not built with tcmalloc.\n");
+  return Http::Code::NotImplemented;
+}
+
 Http::Code ServerInfoHandler::handlerReady(Http::ResponseHeaderMap&, Buffer::Instance& response,
                                            AdminStream&) {
   const envoy::admin::v3::ServerInfo::State state =
@@ -80,6 +94,7 @@ Http::Code ServerInfoHandler::handlerServerInfo(Http::ResponseHeaderMap& headers
   server_info.set_hot_restart_version(server_.hotRestart().version());
   server_info.set_state(
       Utility::serverState(server_.initManager().state(), server_.healthCheckFailed()));
+  server_info.set_hot_restart_initializing(server_.hotRestart().isInitializing());
 
   server_info.mutable_uptime_current_epoch()->set_seconds(uptime_current_epoch);
   server_info.mutable_uptime_all_epochs()->set_seconds(uptime_all_epochs);

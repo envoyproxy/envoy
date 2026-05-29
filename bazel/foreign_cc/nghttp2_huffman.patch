@@ -1,0 +1,305 @@
+diff --git a/lib/includes/nghttp2/nghttp2.h b/lib/includes/nghttp2/nghttp2.h
+index 2ef49b8d..9bcd3ca9 100644
+--- a/lib/includes/nghttp2/nghttp2.h
++++ b/lib/includes/nghttp2/nghttp2.h
+@@ -3156,6 +3156,15 @@ NGHTTP2_EXTERN void nghttp2_option_set_no_closed_streams(nghttp2_option *option,
+ NGHTTP2_EXTERN void nghttp2_option_set_max_outbound_ack(nghttp2_option *option,
+                                                         size_t val);
+
++/**
++ * @function
++ *
++ * This option sets whether nghttp2 will disable huffman encoding of headers
++ * to the receiver.
++*/
++NGHTTP2_EXTERN void
++nghttp2_option_set_disable_huffman_encoding(nghttp2_option *option, int val);
++
+ /**
+  * @function
+  *
+diff --git a/lib/nghttp2_hd.c b/lib/nghttp2_hd.c
+index 55fc2cc6..04f3d411 100644
+--- a/lib/nghttp2_hd.c
++++ b/lib/nghttp2_hd.c
+@@ -719,10 +719,23 @@ int nghttp2_hd_deflate_init2(nghttp2_hd_deflater *deflater,
+
+   deflater->deflate_hd_table_bufsize_max = max_deflate_dynamic_table_size;
+   deflater->min_hd_table_bufsize_max = UINT32_MAX;
++  deflater->disable_huffman = 0;
+
+   return 0;
+ }
+
++int nghttp2_hd_deflate_init3(nghttp2_hd_deflater *deflater,
++                             size_t max_deflate_dynamic_table_size,
++                             nghttp2_mem *mem) {
++  int rv = nghttp2_hd_deflate_init2(
++      deflater, NGHTTP2_HD_DEFAULT_MAX_DEFLATE_BUFFER_SIZE, mem);
++  if (rv == 0) {
++    deflater->disable_huffman = 1;
++  }
++  return rv;
++}
++
++
+ int nghttp2_hd_inflate_init(nghttp2_hd_inflater *inflater, nghttp2_mem *mem) {
+   int rv;
+
+@@ -1015,6 +1028,51 @@ static int emit_string(nghttp2_bufs *bufs, const uint8_t *str, size_t len) {
+   return rv;
+ }
+
++/*
++ * Effectively the same as emit_string but with huffman pieces clobbered.
++ *
++ * While the code could be further hand optimized, the expectation is that
++ * the compiler will do constant propagation, dead code elimination, etc.
++ */
++static int emit_string_nohuffman(nghttp2_bufs *bufs, const uint8_t *str,
++                                 size_t len) {
++  int rv;
++  uint8_t sb[16];
++  uint8_t *bufp;
++  size_t blocklen;
++  const size_t enclen = len;
++  const int huffman = 0;
++
++  blocklen = count_encoded_length(enclen, 7);
++
++  DEBUGF("deflatehd: emit string str=%.*s, length=%zu, huffman=%d, "
++         "encoded_length=%zu\n",
++         (int)len, (const char *)str, len, huffman, enclen);
++
++  if (sizeof(sb) < blocklen) {
++    return NGHTTP2_ERR_HEADER_COMP;
++  }
++
++  bufp = sb;
++  *bufp = huffman ? 1 << 7 : 0;
++  encode_length(bufp, enclen, 7);
++
++  rv = nghttp2_bufs_add(bufs, sb, blocklen);
++  if (rv != 0) {
++    return rv;
++  }
++
++  if (huffman) {
++    rv = nghttp2_hd_huff_encode(bufs, str, len);
++  } else {
++    assert(enclen == len);
++    rv = nghttp2_bufs_add(bufs, str, len);
++  }
++
++  return rv;
++}
++
++
+ static uint8_t pack_first_byte(int indexing_mode) {
+   switch (indexing_mode) {
+   case NGHTTP2_HD_WITH_INDEXING:
+@@ -1099,6 +1157,77 @@ static int emit_newname_block(nghttp2_bufs *bufs, const nghttp2_nv *nv,
+   return 0;
+ }
+
++static int emit_indname_block_nohuffman(nghttp2_bufs *bufs, size_t idx,
++                                        const nghttp2_nv *nv,
++                                        int indexing_mode) {
++  int rv;
++  uint8_t *bufp;
++  size_t blocklen;
++  uint8_t sb[16];
++  size_t prefixlen;
++
++  if (indexing_mode == NGHTTP2_HD_WITH_INDEXING) {
++    prefixlen = 6;
++  } else {
++    prefixlen = 4;
++  }
++
++  DEBUGF("deflatehd: emit indname index=%zu, valuelen=%zu, indexing_mode=%d\n",
++         idx, nv->valuelen, indexing_mode);
++
++  blocklen = count_encoded_length(idx + 1, prefixlen);
++
++  if (sizeof(sb) < blocklen) {
++    return NGHTTP2_ERR_HEADER_COMP;
++  }
++
++  bufp = sb;
++
++  *bufp = pack_first_byte(indexing_mode);
++
++  encode_length(bufp, idx + 1, prefixlen);
++
++  rv = nghttp2_bufs_add(bufs, sb, blocklen);
++  if (rv != 0) {
++    return rv;
++  }
++
++  rv = emit_string_nohuffman(bufs, nv->value, nv->valuelen);
++  if (rv != 0) {
++    return rv;
++  }
++
++  return 0;
++}
++
++static int emit_newname_block_nohuffman(nghttp2_bufs *bufs,
++                                        const nghttp2_nv *nv,
++                                        int indexing_mode) {
++  int rv;
++
++  DEBUGF(
++      "deflatehd: emit newname namelen=%zu, valuelen=%zu, indexing_mode=%d\n",
++      nv->namelen, nv->valuelen, indexing_mode);
++
++  rv = nghttp2_bufs_addb(bufs, pack_first_byte(indexing_mode));
++  if (rv != 0) {
++    return rv;
++  }
++
++  rv = emit_string_nohuffman(bufs, nv->name, nv->namelen);
++  if (rv != 0) {
++    return rv;
++  }
++
++  rv = emit_string_nohuffman(bufs, nv->value, nv->valuelen);
++  if (rv != 0) {
++    return rv;
++  }
++
++  return 0;
++}
++
++
+ static int add_hd_table_incremental(nghttp2_hd_context *context,
+                                     nghttp2_hd_nv *nv, nghttp2_hd_map *map,
+                                     uint32_t hash) {
+@@ -1424,10 +1553,19 @@ static int deflate_nv(nghttp2_hd_deflater *deflater, nghttp2_bufs *bufs,
+       return NGHTTP2_ERR_HEADER_COMP;
+     }
+   }
+-  if (idx == -1) {
+-    rv = emit_newname_block(bufs, nv, indexing_mode);
++
++  if (deflater->disable_huffman) {
++    if (idx == -1) {
++      rv = emit_newname_block_nohuffman(bufs, nv, indexing_mode);
++    } else {
++      rv = emit_indname_block_nohuffman(bufs, (size_t)idx, nv, indexing_mode);
++    }
+   } else {
+-    rv = emit_indname_block(bufs, (size_t)idx, nv, indexing_mode);
++    if (idx == -1) {
++      rv = emit_newname_block(bufs, nv, indexing_mode);
++    } else {
++      rv = emit_indname_block(bufs, (size_t)idx, nv, indexing_mode);
++    }
+   }
+   if (rv != 0) {
+     return rv;
+diff --git a/lib/nghttp2_hd.h b/lib/nghttp2_hd.h
+index 38a31a83..27b0f722 100644
+--- a/lib/nghttp2_hd.h
++++ b/lib/nghttp2_hd.h
+@@ -227,6 +227,8 @@ struct nghttp2_hd_deflater {
+   /* If nonzero, send header table size using encoding context update
+      in the next deflate process */
+   uint8_t notify_table_size_change;
++  /* Whether the deflater should not huffman encode header */
++  uint8_t disable_huffman;
+ };
+
+ struct nghttp2_hd_inflater {
+@@ -306,6 +308,16 @@ int nghttp2_hd_deflate_init2(nghttp2_hd_deflater *deflater,
+                              size_t max_deflate_dynamic_table_size,
+                              nghttp2_mem *mem);
+
++/*
++ * Initializes |deflater| for deflating name/values pairs.
++ *
++ * This is `nghttp2_hd_deflate_init2` with the addition of tracking that
++ * huffman encoding should be disabled for this deflater.
++ */
++int nghttp2_hd_deflate_init3(nghttp2_hd_deflater *deflater,
++                             size_t max_deflate_dynamic_table_size,
++                             nghttp2_mem *mem);
++
+ /*
+  * Deallocates any resources allocated for |deflater|.
+  */
+diff --git a/lib/nghttp2_option.c b/lib/nghttp2_option.c
+index 02a24eee..38ed503e 100644
+--- a/lib/nghttp2_option.c
++++ b/lib/nghttp2_option.c
+@@ -116,6 +116,12 @@ void nghttp2_option_set_max_deflate_dynamic_table_size(nghttp2_option *option,
+   option->max_deflate_dynamic_table_size = val;
+ }
+ 
++void nghttp2_option_set_disable_huffman_encoding(nghttp2_option *option,
++                                                 int val) {
++  option->opt_set_mask |= NGHTTP2_OPT_DISABLE_HUFFMAN;
++  option->disable_huffman = val;
++}
++
+ void nghttp2_option_set_no_closed_streams(nghttp2_option *option, int val) {
+   option->opt_set_mask |= NGHTTP2_OPT_NO_CLOSED_STREAMS;
+   option->no_closed_streams = val;
+diff --git a/lib/nghttp2_option.h b/lib/nghttp2_option.h
+index c89cb97f..74141d89 100644
+--- a/lib/nghttp2_option.h
++++ b/lib/nghttp2_option.h
+@@ -72,6 +72,7 @@ typedef enum {
+   NGHTTP2_OPT_NO_RFC9113_LEADING_AND_TRAILING_WS_VALIDATION = 1 << 14,
+   NGHTTP2_OPT_STREAM_RESET_RATE_LIMIT = 1 << 15,
+   NGHTTP2_OPT_MAX_CONTINUATIONS = 1 << 16,
++  NGHTTP2_OPT_DISABLE_HUFFMAN = 1 << 30,
+ } nghttp2_option_flag;
+
+ /**
+@@ -91,6 +92,10 @@ struct nghttp2_option {
+    * NGHTTP2_OPT_MAX_DEFLATE_DYNAMIC_TABLE_SIZE
+    */
+   size_t max_deflate_dynamic_table_size;
++  /**
++   * NGHTTP2_OPT_DISABLE_HUFFMAN
++   */
++  int disable_huffman;
+   /**
+    * NGHTTP2_OPT_MAX_OUTBOUND_ACK
+    */
+diff --git a/lib/nghttp2_session.c b/lib/nghttp2_session.c
+index df33a89e..48e17f6c 100644
+--- a/lib/nghttp2_session.c
++++ b/lib/nghttp2_session.c
+@@ -441,6 +441,7 @@ static int session_new(nghttp2_session **session_ptr,
+   size_t max_deflate_dynamic_table_size =
+     NGHTTP2_HD_DEFAULT_MAX_DEFLATE_BUFFER_SIZE;
+   size_t i;
++  int deflater_inited = 0;
+
+   if (mem == NULL) {
+     mem = nghttp2_mem_default();
+@@ -585,10 +586,19 @@ static int session_new(nghttp2_session **session_ptr,
+     if (option->opt_set_mask & NGHTTP2_OPT_MAX_CONTINUATIONS) {
+       (*session_ptr)->max_continuations = option->max_continuations;
+     }
++
++    if (option->opt_set_mask & NGHTTP2_OPT_DISABLE_HUFFMAN && option->disable_huffman) {
++      rv = nghttp2_hd_deflate_init3(&(*session_ptr)->hd_deflater,
++                                    max_deflate_dynamic_table_size, mem);
++      deflater_inited = 1;
++    }
++  }
++
++  if (!deflater_inited) {
++    rv = nghttp2_hd_deflate_init2(&(*session_ptr)->hd_deflater,
++                                  max_deflate_dynamic_table_size, mem);
+   }
+
+-  rv = nghttp2_hd_deflate_init2(&(*session_ptr)->hd_deflater,
+-                                max_deflate_dynamic_table_size, mem);
+   if (rv != 0) {
+     goto fail_hd_deflater;
+   }

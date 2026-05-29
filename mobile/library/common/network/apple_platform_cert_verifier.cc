@@ -51,10 +51,12 @@ CFMutableArrayRef CreateSecCertificateArray(const std::vector<std::string>& cert
     }
     SecCertificateRef sec_cert = SecCertificateCreateWithData(NULL, cert_data);
     if (!sec_cert) {
+      CFRelease(cert_data);
       CFRelease(cert_array);
       return NULL;
     }
     CFArrayAppendValue(cert_array, sec_cert);
+    CFRelease(sec_cert);
     CFRelease(cert_data);
   }
   return cert_array;
@@ -80,6 +82,7 @@ envoy_cert_validation_result verify_cert(const std::vector<std::string>& certs,
 
   CFMutableArrayRef cert_array = CreateSecCertificateArray(certs);
   if (!cert_array) {
+    CFRelease(trust_policies);
     return make_result(ENVOY_FAILURE, SSL_AD_CERTIFICATE_UNKNOWN,
                        "validation couldn't be conducted.");
   }
@@ -87,19 +90,24 @@ envoy_cert_validation_result verify_cert(const std::vector<std::string>& certs,
   SecTrustRef trust = NULL;
   OSStatus status = SecTrustCreateWithCertificates(cert_array, trust_policies, &trust);
   if (status) {
+    CFRelease(cert_array);
+    CFRelease(trust_policies);
     return make_result(ENVOY_FAILURE, SSL_AD_CERTIFICATE_UNKNOWN,
                        "validation couldn't be conducted.");
   }
 
-  CFErrorRef error;
+  CFErrorRef error = NULL;
   bool verified = SecTrustEvaluateWithError(trust, &error);
 
-  CFRelease(cert_array);
   CFRelease(trust);
+  CFRelease(cert_array);
+  CFRelease(trust_policies);
+  if (error) {
+    CFRelease(error);
+  }
 
   if (!verified) {
-    return make_result(ENVOY_FAILURE, SSL_AD_CERTIFICATE_UNKNOWN,
-                       "validation couldn't be conducted.");
+    return make_result(ENVOY_FAILURE, SSL_AD_CERTIFICATE_UNKNOWN, "cert verification error.");
   }
   return make_result(ENVOY_SUCCESS, 0, "");
 }

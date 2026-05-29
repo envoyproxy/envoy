@@ -31,6 +31,8 @@ public:
     return SpanPtr{new NullSpan()};
   }
   void setSampled(bool) override {}
+  bool exportedSpan() const override { return false; }
+  bool useLocalDecision() const override { return false; }
 };
 
 } // namespace Tracing

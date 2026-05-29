@@ -18,7 +18,7 @@ public:
     };
   }
 
-  ProtobufTypes::MessagePtr testMsg() { return std::make_unique<ProtobufWkt::Any>(); }
+  ProtobufTypes::MessagePtr testMsg() { return std::make_unique<Protobuf::Any>(); }
 
   ~ConfigTrackerImplTest() override = default;
 

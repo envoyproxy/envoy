@@ -10,7 +10,7 @@
 #include "source/extensions/filters/http/custom_response/policy.h"
 #include "source/extensions/http/custom_response/redirect_policy/redirect_policy.h"
 
-// #include "test/integration/filters/common.h"
+#include "test/extensions/filters/http/custom_response/custom_response_test_filters.pb.h"
 
 #include "absl/strings/string_view.h"
 
@@ -268,7 +268,7 @@ public:
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     // Using Struct instead of a custom filter config proto. This is only allowed in tests.
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
   }
 
   std::string name() const override { return "modify-request-headers-action"; }

@@ -1,0 +1,120 @@
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
+
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/tls/ssl_handshaker.h"
+
+#include "absl/strings/str_cat.h"
+#include "openssl/ssl.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace Bootstrap {
+namespace ReverseConnection {
+
+bool ReverseConnectionUtility::isPingMessage(absl::string_view data) {
+  if (data.size() != PING_MESSAGE.size()) {
+    return false;
+  }
+  return ::memcmp(data.data(), PING_MESSAGE.data(), PING_MESSAGE.size()) == 0;
+}
+
+Buffer::InstancePtr ReverseConnectionUtility::createPingResponse() {
+  return std::make_unique<Buffer::OwnedImpl>(PING_MESSAGE);
+}
+
+bool ReverseConnectionUtility::sendPingResponse(Network::Connection& connection) {
+  auto ping_buffer = createPingResponse();
+  connection.write(*ping_buffer, false);
+  ENVOY_LOG(trace, "Reverse connection utility: sent RPING response on connection {}.",
+            connection.id());
+  return true;
+}
+
+Api::IoCallUint64Result ReverseConnectionUtility::sendPingResponse(Network::IoHandle& io_handle) {
+  auto ping_buffer = createPingResponse();
+  Api::IoCallUint64Result result = io_handle.write(*ping_buffer);
+  if (result.ok()) {
+    ENVOY_LOG(trace, "Reverse connection utility: sent RPING response. bytes: {}.",
+              result.return_value_);
+  } else {
+    ENVOY_LOG(trace, "Reverse connection utility: failed to send RPING response. error: {}.",
+              result.err_->getErrorDetails());
+  }
+  return result;
+}
+
+bool ReverseConnectionUtility::handlePingMessage(absl::string_view data,
+                                                 Network::Connection& connection) {
+  if (!isPingMessage(data)) {
+    return false;
+  }
+  ENVOY_LOG(trace, "Reverse connection utility: received RPING on connection {}; echoing back.",
+            connection.id());
+  return sendPingResponse(connection);
+}
+
+bool ReverseConnectionUtility::extractPingFromHttpData(absl::string_view http_data) {
+  if (http_data.find(PING_MESSAGE) != absl::string_view::npos) {
+    ENVOY_LOG(trace, "Reverse connection utility: found RPING in HTTP data.");
+    return true;
+  }
+  return false;
+}
+
+ReverseConnectionUtility::TenantScopedIdentifierView
+ReverseConnectionUtility::splitTenantScopedIdentifier(absl::string_view value) {
+  const size_t pos = value.find(TENANT_SCOPE_DELIMITER);
+  if (pos == absl::string_view::npos) {
+    return {absl::string_view(), value};
+  }
+  return {value.substr(0, pos), value.substr(pos + TENANT_SCOPE_DELIMITER.size())};
+}
+
+std::string ReverseConnectionUtility::buildTenantScopedIdentifier(absl::string_view tenant,
+                                                                  absl::string_view identifier) {
+  if (tenant.empty()) {
+    return std::string(identifier);
+  }
+  return std::string(absl::StrCat(tenant, TENANT_SCOPE_DELIMITER, identifier));
+}
+
+std::shared_ptr<PingMessageHandler> ReverseConnectionMessageHandlerFactory::createPingHandler() {
+  return std::make_shared<PingMessageHandler>();
+}
+
+bool PingMessageHandler::processPingMessage(absl::string_view data,
+                                            Network::Connection& connection) {
+  if (ReverseConnectionUtility::isPingMessage(data)) {
+    ++ping_count_;
+    ENVOY_LOG(debug, "reverse_tunnel: processing ping #{} on connection {}", ping_count_,
+              connection.id());
+    return ReverseConnectionUtility::sendPingResponse(connection);
+  }
+  return false;
+}
+
+void ReverseConnectionUtility::applySslQuietClose(Network::Connection& connection) {
+  auto ssl_conn = connection.ssl();
+
+  if (ssl_conn) {
+    ENVOY_CONN_LOG(
+        trace,
+        "reverse_tunnel: Setting quiet shutdown on SSL connection to prevent close_notify alert",
+        connection);
+    const auto* ssl_handshaker =
+        dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(ssl_conn.get());
+    if (ssl_handshaker && ssl_handshaker->ssl()) {
+      SSL_set_quiet_shutdown(ssl_handshaker->ssl(), 1);
+      ENVOY_CONN_LOG(trace, "reverse_tunnel: Quiet shutdown enabled for connection", connection);
+    } else {
+      ENVOY_LOG(warn, "reverse_tunnel: Failed to cast to SslHandshakerImpl or ssl() returned null");
+    }
+  }
+}
+
+} // namespace ReverseConnection
+} // namespace Bootstrap
+} // namespace Extensions
+} // namespace Envoy

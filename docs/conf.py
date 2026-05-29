@@ -145,7 +145,7 @@ extensions = [
     'sphinx.ext.extlinks',
     'sphinx.ext.ifconfig',
     'sphinx.ext.intersphinx',
-    'envoy.docs.sphinx_runner.sphinx_tabs.tabs',
+    'sphinx_tabs.tabs',
     'sphinx_copybutton',
     'envoy.docs.sphinx_runner.ext.validating_code_block',
     'sphinxext.rediraffe',

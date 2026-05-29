@@ -78,6 +78,32 @@ public:
       OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) PURE;
 
   /**
+   * Pause discovery requests for a given API type on all ADS types (both xdstp-based and "old"
+   * ADS). This is useful, for example, when we're processing an update for LDS or CDS and don't
+   * want a flood of updates for RDS or EDS respectively. Discovery requests may later be resumed
+   * with after the returned ScopedResume object is destroyed.
+   * @param type_url type URL corresponding to xDS API, e.g.
+   * type.googleapis.com/envoy.config.cluster.v3.Cluster.
+   *
+   * @return a ScopedResume object, which when destructed, resumes the paused discovery requests.
+   * A discovery request will be sent if one would have been sent during the pause.
+   */
+  ABSL_MUST_USE_RESULT virtual ScopedResume pause(const std::string& type_url) PURE;
+
+  /**
+   * Pause discovery requests for given API types on all ADS types (both xdstp-based and "old" ADS).
+   * This is useful, for example, when we're processing an update for LDS or CDS and don't want a
+   * flood of updates for RDS or EDS respectively. Discovery requests may later be resumed with
+   * after the returned ScopedResume object is destroyed.
+   * @param type_urls type URLs corresponding to xDS API, e.g.
+   * type.googleapis.com/envoy.config.cluster.v3.Cluster.
+   *
+   * @return a ScopedResume object, which when destructed, resumes the paused discovery requests.
+   * A discovery request will be sent if one would have been sent during the pause.
+   */
+  ABSL_MUST_USE_RESULT virtual ScopedResume pause(const std::vector<std::string>& type_urls) PURE;
+
+  /**
    * Shuts down the xDS-Manager and all the configured connections to the config
    * servers.
    */

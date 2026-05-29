@@ -63,16 +63,13 @@ public:
   Type type() const override { return type_; }
 
   const SocketInterface& socketInterface() const override { return socket_interface_; }
-  absl::optional<std::string> networkNamespace() const override { return network_namespace_; }
 
 protected:
-  InstanceBase(Type type, const SocketInterface* sock_interface,
-               absl::optional<std::string> network_namespace)
-      : socket_interface_(*sock_interface), network_namespace_(network_namespace), type_(type) {}
+  InstanceBase(Type type, const SocketInterface* sock_interface)
+      : socket_interface_(*sock_interface), type_(type) {}
 
   std::string friendly_name_;
   const SocketInterface& socket_interface_;
-  absl::optional<std::string> network_namespace_;
 
 private:
   const Type type_;
@@ -125,6 +122,12 @@ public:
   explicit Ipv4Instance(uint32_t port, const SocketInterface* sock_interface = nullptr,
                         absl::optional<std::string> network_namespace = absl::nullopt);
 
+  /**
+   * Copy and override the network namespace.
+   */
+  explicit Ipv4Instance(const Ipv4Instance& that,
+                        const absl::optional<std::string>& network_namespace);
+
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
   const Ip* ip() const override { return &ip_; }
@@ -135,6 +138,14 @@ public:
   }
   socklen_t sockAddrLen() const override { return sizeof(sockaddr_in); }
   absl::string_view addressType() const override { return "default"; }
+  absl::optional<std::string> networkNamespace() const override { return network_namespace_; }
+  InstanceConstSharedPtr withNetworkNamespace(absl::string_view network_namespace) const override {
+    absl::optional<std::string> namespace_override;
+    if (!network_namespace.empty()) {
+      namespace_override = network_namespace;
+    }
+    return std::make_shared<const Ipv4Instance>(*this, namespace_override);
+  }
 
   /**
    * Convenience function to convert an IPv4 address to canonical string format.
@@ -179,6 +190,22 @@ private:
              // inlined IN_MULTICAST() to avoid byte swapping
              !((ipv4_.address_.sin_addr.s_addr & htonl(0xf0000000)) == htonl(0xe0000000));
     }
+    bool isLinkLocalAddress() const override {
+      // Check if the address is in the link-local range: 169.254.0.0/16.
+      return (ipv4_.address_.sin_addr.s_addr & htonl(0xffff0000)) == htonl(0xa9fe0000);
+    }
+    bool isUniqueLocalAddress() const override {
+      // Unique Local Addresses (ULA) are not applicable to IPv4.
+      return false;
+    }
+    bool isSiteLocalAddress() const override {
+      // Site-Local Addresses are not applicable to IPv4.
+      return false;
+    }
+    bool isTeredoAddress() const override {
+      // Teredo addresses are not applicable to IPv4.
+      return false;
+    }
     const Ipv4* ipv4() const override { return &ipv4_; }
     const Ipv6* ipv6() const override { return nullptr; }
     uint32_t port() const override { return ntohs(ipv4_.address_.sin_port); }
@@ -191,6 +218,7 @@ private:
   void initHelper(const sockaddr_in* address);
 
   IpHelper ip_;
+  const absl::optional<std::string> network_namespace_;
   friend class InstanceFactory;
 };
 
@@ -226,6 +254,12 @@ public:
   explicit Ipv6Instance(uint32_t port, const SocketInterface* sock_interface = nullptr,
                         absl::optional<std::string> network_namespace = absl::nullopt);
 
+  /**
+   * Copy and override the network namespace.
+   */
+  explicit Ipv6Instance(const Ipv6Instance& that,
+                        const absl::optional<std::string>& network_namespace);
+
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
   const Ip* ip() const override { return &ip_; }
@@ -236,6 +270,14 @@ public:
   }
   socklen_t sockAddrLen() const override { return sizeof(sockaddr_in6); }
   absl::string_view addressType() const override { return "default"; }
+  absl::optional<std::string> networkNamespace() const override { return network_namespace_; }
+  InstanceConstSharedPtr withNetworkNamespace(absl::string_view network_namespace) const override {
+    absl::optional<std::string> namespace_override;
+    if (!network_namespace.empty()) {
+      namespace_override = network_namespace;
+    }
+    return std::make_shared<const Ipv6Instance>(*this, namespace_override);
+  }
 
   /**
    * Convenience function to convert an IPv6 address to canonical string format.
@@ -291,6 +333,29 @@ private:
     bool isUnicastAddress() const override {
       return !isAnyAddress() && !IN6_IS_ADDR_MULTICAST(&ipv6_.address_.sin6_addr);
     }
+    bool isLinkLocalAddress() const override {
+      // Check if the address is in the link-local range: fe80::/10 or in the v4 mapped link-local
+      // range: [::ffff:169.254.0.0].
+      return IN6_IS_ADDR_LINKLOCAL(&ipv6_.address_.sin6_addr) ||
+             (IN6_IS_ADDR_V4MAPPED(&ipv6_.address_.sin6_addr) &&
+              (ipv6_.address_.sin6_addr.s6_addr[12] == 0xa9 &&
+               ipv6_.address_.sin6_addr.s6_addr[13] == 0xfe));
+    }
+    bool isUniqueLocalAddress() const override {
+      // Unique Local Addresses (ULA) are in the range fc00::/7.
+      return (ipv6_.address_.sin6_addr.s6_addr[0] & 0xfe) == 0xfc;
+    }
+    bool isSiteLocalAddress() const override {
+      // Site-Local Addresses are in the range fec0::/10.
+      return IN6_IS_ADDR_SITELOCAL(&ipv6_.address_.sin6_addr);
+    }
+    bool isTeredoAddress() const override {
+      // Teredo addresses have the prefix 2001:0000::/32.
+      return ipv6_.address_.sin6_addr.s6_addr[0] == 0x20 &&
+             ipv6_.address_.sin6_addr.s6_addr[1] == 0x01 &&
+             ipv6_.address_.sin6_addr.s6_addr[2] == 0x00 &&
+             ipv6_.address_.sin6_addr.s6_addr[3] == 0x00;
+    }
     const Ipv4* ipv4() const override { return nullptr; }
     const Ipv6* ipv6() const override { return &ipv6_; }
     uint32_t port() const override { return ipv6_.port(); }
@@ -303,6 +368,7 @@ private:
   void initHelper(const sockaddr_in6& address, bool v6only);
 
   IpHelper ip_;
+  const absl::optional<std::string> network_namespace_;
   friend class InstanceFactory;
 };
 
@@ -343,6 +409,8 @@ public:
     return sizeof(pipe_.address_);
   }
   absl::string_view addressType() const override { return "default"; }
+  absl::optional<std::string> networkNamespace() const override { return {}; }
+  InstanceConstSharedPtr withNetworkNamespace(absl::string_view) const override { return nullptr; }
 
 private:
   explicit PipeInstance(const std::string& pipe_path, mode_t mode,
@@ -391,6 +459,8 @@ public:
   const sockaddr* sockAddr() const override { return nullptr; }
   socklen_t sockAddrLen() const override { return 0; }
   absl::string_view addressType() const override { return "envoy_internal"; }
+  absl::optional<std::string> networkNamespace() const override { return {}; }
+  InstanceConstSharedPtr withNetworkNamespace(absl::string_view) const override { return nullptr; }
 
 private:
   struct EnvoyInternalAddressImpl : public EnvoyInternalAddress {

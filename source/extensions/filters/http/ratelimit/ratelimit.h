@@ -37,6 +37,8 @@ enum class FilterRequestType { Internal, External, Both };
  */
 enum class VhRateLimitOptions { Override, Include, Ignore };
 
+using RateLimitConfig = Extensions::Filters::Common::RateLimit::RateLimitConfig;
+
 /**
  * Global configuration for the HTTP rate limit filter.
  */
@@ -44,7 +46,8 @@ class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::ratelimit::v3::RateLimit& config,
                const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-               Runtime::Loader& runtime, Http::Context& http_context, absl::Status& creation_status)
+               Runtime::Loader& runtime, Server::Configuration::ServerFactoryContext& context,
+               absl::Status& creation_status)
       : domain_(config.domain()), stage_(static_cast<uint64_t>(config.stage())),
         request_type_(config.request_type().empty() ? stringToType("both")
                                                     : stringToType(config.request_type())),
@@ -58,7 +61,8 @@ public:
             config.rate_limited_as_resource_exhausted()
                 ? absl::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)
                 : absl::nullopt),
-        http_context_(http_context), stat_names_(scope.symbolTable(), config.stat_prefix()),
+        http_context_(context.httpContext()),
+        stat_names_(scope.symbolTable(), config.stat_prefix()),
         rate_limited_status_(toErrorCode(config.rate_limited_status().code())),
         status_on_error_(toRatelimitServerErrorCode(config.status_on_error().code())),
         filter_enabled_(
@@ -75,14 +79,19 @@ public:
                                        ? absl::optional<Envoy::Runtime::FractionalPercent>(
                                              Envoy::Runtime::FractionalPercent(
                                                  config.failure_mode_deny_percent(), runtime_))
-                                       : absl::nullopt) {
+                                       : absl::nullopt),
+        metadata_namespace_(config.metadata_namespace().empty() ? "envoy.filters.http.ratelimit"
+                                                                : config.metadata_namespace()) {
     absl::StatusOr<Router::HeaderParserPtr> response_headers_parser_or_ =
         Envoy::Router::HeaderParser::configure(config.response_headers_to_add());
     SET_AND_RETURN_IF_NOT_OK(response_headers_parser_or_.status(), creation_status);
     response_headers_parser_ = std::move(response_headers_parser_or_.value());
+    rate_limit_config_ = std::make_unique<Filters::Common::RateLimit::RateLimitConfig>(
+        config.rate_limits(), context, creation_status);
   }
 
   const std::string& domain() const { return domain_; }
+  const std::string& metadataNamespace() const { return metadata_namespace_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   uint64_t stage() const { return stage_; }
   Runtime::Loader& runtime() { return runtime_; }
@@ -106,6 +115,18 @@ public:
   Http::Code statusOnError() const { return status_on_error_; }
   bool enabled() const;
   bool enforced() const;
+  bool hasRateLimitConfigs() const {
+    ASSERT(rate_limit_config_ != nullptr);
+    return !rate_limit_config_->empty();
+  }
+  void populateDescriptors(const Http::RequestHeaderMap& headers,
+                           const StreamInfo::StreamInfo& info,
+                           Filters::Common::RateLimit::RateLimitDescriptors& descriptors,
+                           bool on_stream_done) const {
+    ASSERT(rate_limit_config_ != nullptr);
+    rate_limit_config_->populateDescriptors(headers, info, local_info_.clusterName(), descriptors,
+                                            on_stream_done);
+  }
 
 private:
   static FilterRequestType stringToType(const std::string& request_type) {
@@ -153,6 +174,8 @@ private:
   const absl::optional<Envoy::Runtime::FractionalPercent> filter_enabled_;
   const absl::optional<Envoy::Runtime::FractionalPercent> filter_enforced_;
   const absl::optional<Envoy::Runtime::FractionalPercent> failure_mode_deny_percent_;
+  std::unique_ptr<RateLimitConfig> rate_limit_config_;
+  const std::string metadata_namespace_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -195,7 +218,7 @@ private:
   const envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::VhRateLimitsOptions
       vh_rate_limits_;
   const std::string domain_;
-  std::unique_ptr<Extensions::Filters::Common::RateLimit::RateLimitConfig> rate_limit_config_;
+  std::unique_ptr<RateLimitConfig> rate_limit_config_;
 };
 
 using FilterConfigPerRouteSharedPtr = std::shared_ptr<FilterConfigPerRoute>;
@@ -204,7 +227,9 @@ using FilterConfigPerRouteSharedPtr = std::shared_ptr<FilterConfigPerRoute>;
  * HTTP rate limit filter. Depending on the route configuration, this filter calls the global
  * rate limiting service before allowing further filter iteration.
  */
-class Filter : public Http::StreamFilter, public Filters::Common::RateLimit::RequestCallbacks {
+class Filter : public Http::StreamFilter,
+               public Filters::Common::RateLimit::RequestCallbacks,
+               public Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(FilterConfigSharedPtr config, Filters::Common::RateLimit::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
@@ -265,15 +290,18 @@ private:
   bool initiating_call_{};
   Http::ResponseHeaderMapPtr response_headers_to_add_;
   Http::RequestHeaderMap* request_headers_{};
+  std::vector<Envoy::RateLimit::Descriptor> descriptors_;
 };
 
 /**
  * This implements the rate limit callback that outlives the filter holding the client.
- * On completion, it deletes itself.
+ * On completion, it breaks the circular reference to itself and gets deleted.
  */
-class OnStreamDoneCallBack : public Filters::Common::RateLimit::RequestCallbacks {
+class OnStreamDoneCallBack : public Filters::Common::RateLimit::RequestCallbacks,
+                             public std::enable_shared_from_this<OnStreamDoneCallBack> {
 public:
-  OnStreamDoneCallBack(Filters::Common::RateLimit::ClientPtr client) : client_(std::move(client)) {}
+  OnStreamDoneCallBack(std::shared_ptr<Filters::Common::RateLimit::Client> client)
+      : client_(std::move(client)) {}
   ~OnStreamDoneCallBack() override = default;
 
   // RateLimit::RequestCallbacks
@@ -284,8 +312,13 @@ public:
 
   Filters::Common::RateLimit::Client& client() { return *client_; }
 
+  // Initialize self_ to keep the callback alive until complete() is called.
+  void keepAlive() { self_ = shared_from_this(); }
+
 private:
-  Filters::Common::RateLimit::ClientPtr client_;
+  std::shared_ptr<Filters::Common::RateLimit::Client> client_;
+  // This is used to keep the callback alive until complete() is called.
+  std::shared_ptr<OnStreamDoneCallBack> self_;
 };
 
 } // namespace RateLimitFilter

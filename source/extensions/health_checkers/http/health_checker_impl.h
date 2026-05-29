@@ -17,6 +17,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/grpc/codec.h"
 #include "source/common/http/codec_client.h"
+#include "source/common/http/response_decoder_impl_base.h"
 #include "source/common/router/header_parser.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/upstream/health_checker_impl.h"
@@ -77,7 +78,7 @@ public:
 
 private:
   struct HttpActiveHealthCheckSession : public ActiveHealthCheckSession,
-                                        public Http::ResponseDecoder,
+                                        public Http::ResponseDecoderImplBase,
                                         public Http::StreamCallbacks {
     HttpActiveHealthCheckSession(HttpHealthCheckerImpl& parent, const HostSharedPtr& host);
     ~HttpActiveHealthCheckSession() override;
@@ -145,9 +146,9 @@ private:
     Network::ConnectionInfoProviderSharedPtr local_connection_info_provider_;
     // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
     const Http::Protocol protocol_;
-    bool expect_reset_ : 1;
-    bool reuse_connection_ : 1;
-    bool request_in_flight_ : 1;
+    bool expect_reset_ : 1 = false;
+    bool reuse_connection_ : 1 = false;
+    bool request_in_flight_ : 1 = false;
   };
 
   using HttpActiveHealthCheckSessionPtr = std::unique_ptr<HttpActiveHealthCheckSession>;
@@ -166,6 +167,7 @@ private:
 
   const std::string path_;
   const std::string host_value_;
+  Buffer::OwnedImpl request_payload_;
   PayloadMatcher::MatchSegments receive_bytes_;
   const envoy::config::core::v3::RequestMethod method_;
   uint64_t response_buffer_size_;

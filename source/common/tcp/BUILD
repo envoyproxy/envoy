@@ -32,7 +32,7 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/upstream:upstream_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
