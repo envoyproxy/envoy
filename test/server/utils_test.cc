@@ -1,6 +1,7 @@
 #include "source/server/utils.h"
 
 #include "test/mocks/server/options.h"
+#include "test/test_common/enum_test_utils.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -15,7 +16,7 @@ namespace Utility {
 // of special cases to get remaining coverage.
 TEST(UtilsTest, BadServerState) {
   Utility::serverState(Init::Manager::State::Uninitialized, true);
-  EXPECT_ENVOY_BUG(Utility::serverState(static_cast<Init::Manager::State>(123), true),
+  EXPECT_ENVOY_BUG(Utility::serverState(uncheckedEnumCastForTest<Init::Manager::State>(123), true),
                    "unexpected server state");
 }
 

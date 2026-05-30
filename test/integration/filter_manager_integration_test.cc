@@ -49,7 +49,7 @@ public:
 private:
   void onTimerTick();
 
-  Buffer::OwnedImpl buffer_{};
+  Buffer::OwnedImpl buffer_;
   bool end_stream_{};
 
   const Event::TimerPtr timer_;

@@ -52,7 +52,7 @@ absl::StatusOr<std::unique_ptr<Filter>> ReusableFuzzerUtil::setup(
     Filters::Common::ExtAuthz::ClientPtr client) {
 
   // Prepare filter.
-  const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config = input.config();
+  const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config = input.config();
   FilterConfigSharedPtr config;
 
   try {

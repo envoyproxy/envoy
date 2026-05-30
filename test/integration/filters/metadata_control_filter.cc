@@ -6,6 +6,7 @@
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 namespace Envoy {
 class MetadataControlFilter : public Http::PassThroughFilter {
@@ -55,11 +56,15 @@ public:
 };
 
 constexpr char MetadataControlFilter::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<MetadataControlFilter>,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<MetadataControlFilter,
+                             test::integration::filters::MetadataControlFilterConfig>,
+    Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
-static Registry::RegisterFactory<SimpleFilterConfig<MetadataControlFilter>,
-                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<MetadataControlFilter,
+                             test::integration::filters::MetadataControlFilterConfig>,
+    Server::Configuration::UpstreamHttpFilterConfigFactory>
     register_upstream_;
 
 } // namespace Envoy

@@ -9,6 +9,7 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/integration/filters/common.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 namespace Envoy {
 
@@ -93,7 +94,9 @@ private:
   Envoy::Buffer::OwnedImpl response_buffer_;
 };
 
-static Registry::RegisterFactory<SimpleFilterConfig<AsyncInjectBodyAtEndStreamFilter>,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<AsyncInjectBodyAtEndStreamFilter,
+                             test::integration::filters::AsyncInjectBodyAtEndStreamFilterConfig>,
+    Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 } // namespace Envoy

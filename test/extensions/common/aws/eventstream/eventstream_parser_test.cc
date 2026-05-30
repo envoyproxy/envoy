@@ -59,6 +59,7 @@ std::string createEventstreamMessage(const std::string& headers_data, const std:
   message[total_length - 2] = (message_crc >> 8) & 0xFF;
   message[total_length - 1] = message_crc & 0xFF;
 
+  // NOLINTNEXTLINE(modernize-return-braced-init-list)
   return std::string(reinterpret_cast<char*>(message.data()), total_length);
 }
 
@@ -157,14 +158,16 @@ TEST_F(EventstreamParserTest, ParseMessageWithHeadersAndPayload) {
   std::vector<uint8_t> header_bytes;
   std::string header_name = ":message-type";
   header_bytes.push_back(static_cast<uint8_t>(header_name.size()));
-  for (char c : header_name)
+  for (char c : header_name) {
     header_bytes.push_back(c);
+  }
   header_bytes.push_back(7); // type = string
   std::string header_value = "event";
   header_bytes.push_back(0);
   header_bytes.push_back(static_cast<uint8_t>(header_value.size()));
-  for (char c : header_value)
+  for (char c : header_value) {
     header_bytes.push_back(c);
+  }
 
   std::string headers_data(reinterpret_cast<char*>(header_bytes.data()), header_bytes.size());
   std::string payload = "test payload";
@@ -262,8 +265,9 @@ TEST_F(EventstreamParserTest, ParseMessageAllHeaderTypes) {
   header_bytes.push_back(1);
   header_bytes.push_back('u');
   header_bytes.push_back(9); // UUID
-  for (int i = 0; i < 16; i++)
+  for (int i = 0; i < 16; i++) {
     header_bytes.push_back(i);
+  }
 
   std::string headers_data(reinterpret_cast<char*>(header_bytes.data()), header_bytes.size());
   std::string msg = createEventstreamMessage(headers_data, "");

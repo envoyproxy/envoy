@@ -46,8 +46,8 @@ public:
             "@type": type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip
     )EOF"};
 
-  Envoy::Compression::Compressor::CompressorPtr request_compressor_{};
-  Envoy::Compression::Compressor::CompressorPtr response_compressor_{};
+  Envoy::Compression::Compressor::CompressorPtr request_compressor_;
+  Envoy::Compression::Compressor::CompressorPtr response_compressor_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, DecompressorIntegrationTest,
@@ -290,7 +290,11 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
 // Buffer the request after it's been decompressed.
 TEST_P(DecompressorIntegrationTest, DecompressAndBuffer) {
 
-  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter }");
+  config_helper_.prependFilter(R"EOF(
+    name: encoder-decoder-buffer-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.EncoderDecoderBufferFilterConfig
+  )EOF");
 
   config_helper_.prependFilter(R"EOF(
   name: envoy.filters.http.decompressor

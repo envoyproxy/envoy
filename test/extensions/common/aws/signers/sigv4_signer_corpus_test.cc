@@ -22,8 +22,8 @@ namespace Aws {
 std::vector<std::string> directoryListing() {
   std::vector<std::string> directories;
   for (auto const& entry : std::filesystem::directory_iterator(
-           TestEnvironment::runfilesDirectory() +
-           "/external/aws-c-auth-testdata/tests/aws-signing-test-suite/v4/")) {
+           TestEnvironment::runfilesDirectory("aws-c-auth-testdata") +
+           "/tests/aws-signing-test-suite/v4/")) {
     directories.push_back(entry.path().string());
   }
   return directories;

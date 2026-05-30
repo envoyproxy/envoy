@@ -50,10 +50,14 @@ public:
     return proto_config_.request_storage_mode();
   }
 
+  bool textContentStreamingEnabled(absl::string_view tool_name) const;
+
 private:
-  absl::flat_hash_map<std::string,
-                      envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
-      tool_to_http_rule_;
+  struct ToolEntry {
+    envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule http_rule;
+    bool text_content_streaming_enabled;
+  };
+  absl::flat_hash_map<std::string, ToolEntry> tool_entries_;
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config_;
   std::string fallback_protocol_version_;
   uint32_t max_request_body_size_;
@@ -103,6 +107,9 @@ private:
   // Sets dynamic metadata for the filter based on the MCP request method and parameters.
   void setDynamicMetadata(absl::string_view method, const nlohmann::json& json_rpc);
 
+  // Builds streaming_json_prefix_ and streaming_json_suffix_ for the tools/call streaming path.
+  void buildStreamingPrefixAndSuffix(bool is_error);
+
   enum class McpOperation {
     Unspecified = 0,
     // Received the "/mcp" URL but has not parsed the request body yet.
@@ -125,6 +132,16 @@ private:
   std::string request_body_str_;
   Buffer::OwnedImpl response_body_;
   std::string response_body_str_;
+
+  // Per-request streaming flag, set during tool lookup in mapMcpToolToApiBackend.
+  bool text_content_streaming_enabled_ = false;
+
+  // Streaming state for text_content_streaming_enabled.
+  // prefix/suffix are pre-built once in encodeHeaders; an empty prefix signals
+  // that the non-streaming (buffered) path is active.
+  std::string streaming_json_prefix_;
+  std::string streaming_json_suffix_;
+  bool is_first_streaming_chunk_ = true;
 
   McpJsonRestBridgeFilterConfigSharedPtr config_;
 };

@@ -120,7 +120,7 @@ public:
   MOCK_METHOD(bool, autoHostServerNameIndication, (), (const));
   MOCK_METHOD(bool, autoSniSanMatch, (), (const));
   MOCK_METHOD(bool, allowRenegotiation, (), (const));
-  MOCK_METHOD(bool, enforceRsaKeyUsage, (), (const));
+
   MOCK_METHOD(size_t, maxSessionKeys, (), (const));
   MOCK_METHOD(const Network::Address::IpList&, tlsKeyLogLocal, (), (const));
   MOCK_METHOD(const Network::Address::IpList&, tlsKeyLogRemote, (), (const));
@@ -137,7 +137,7 @@ public:
   std::string alpn_{""};
   std::string sigalgs_{""};
   Network::Address::IpList iplist_;
-  std::string path_{};
+  std::string path_;
 };
 
 class MockServerContextConfig : public ServerContextConfig {

@@ -70,7 +70,7 @@ public:
   }
 
   const std::vector<std::string>& errors() const { return errors_; }
-  const std::vector<std::string>& startup_messages() const { return startup_messages_; }
+  const std::vector<std::string>& startupMessages() const { return startup_messages_; }
 
 private:
   std::vector<std::string> errors_;
@@ -157,7 +157,7 @@ public:
       validated_config = datadog::tracing::finalize_config(config);
       EXPECT_TRUE(validated_config);
     }
-    return datadog::tracing::Tracer(*validated_config, id_generator_);
+    return {*validated_config, id_generator_};
   }
 
 protected:

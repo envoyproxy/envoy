@@ -31,7 +31,10 @@ TEST_P(ListenerTypedMetadataIntegrationTest, Hello) {
 
   // Add the filter that reads the listener typed metadata.
   config_helper_.addFilter(R"EOF({
-    name: listener-typed-metadata-filter
+    name: listener-typed-metadata-filter,
+    typed_config: {
+      "@type": "type.googleapis.com/test.integration.filters.ListenerTypedMetadataFilterConfig"
+    }
   })EOF");
 
   initialize();
