@@ -15,6 +15,7 @@
 #include "test/common/stats/make_elements_helper.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/synchronization/blocking_counter.h"
 #include "benchmark/benchmark.h"
 
@@ -287,6 +288,113 @@ static void bmSetStrings(benchmark::State& state) {
   }
 }
 BENCHMARK(bmSetStrings);
+
+// ---------------------------------------------------------------------------
+// Kubernetes / Istio cluster stats serialization
+//
+// Models the stat names Envoy emits per upstream cluster in a service-mesh
+// deployment. Istio names clusters
+// "outbound|<port>||<service>.<namespace>.svc.cluster.local", so the per-cluster
+// stat "cluster.<that>.<stat_suffix>" splits on '.' into mostly well-known
+// tokens -- "cluster", the namespace (often "default"), "svc", "cluster",
+// "local", and the stat suffix -- plus a single dynamic
+// "outbound|<port>||<service>" token. Serializing these names back to strings
+// (SymbolTable::toString) is the hot path on every stats flush (admin /stats,
+// Prometheus, stats sinks), and it is exactly what the well-known token table is
+// meant to accelerate: well-known tokens decode straight from the static array
+// without taking the symbol-table lock.
+// ---------------------------------------------------------------------------
+
+static std::vector<Envoy::Stats::StatName>
+prepareK8sClusterStatNames(Envoy::Stats::StatNamePool& pool, uint32_t num_services) {
+  // A representative slice of ALL_CLUSTER_STATS plus per-response-code counters.
+  // Every suffix here is a well-known token.
+  const std::vector<absl::string_view> stat_suffixes = {
+      "upstream_cx_total",
+      "upstream_cx_active",
+      "upstream_cx_connect_fail",
+      "upstream_cx_connect_timeout",
+      "upstream_cx_rx_bytes_total",
+      "upstream_cx_tx_bytes_total",
+      "upstream_cx_destroy",
+      "upstream_cx_destroy_local",
+      "upstream_cx_destroy_remote",
+      "upstream_rq_total",
+      "upstream_rq_active",
+      "upstream_rq_pending_total",
+      "upstream_rq_pending_active",
+      "upstream_rq_timeout",
+      "upstream_rq_retry",
+      "upstream_rq_2xx",
+      "upstream_rq_4xx",
+      "upstream_rq_5xx",
+      "upstream_rq_200",
+      "upstream_rq_404",
+      "upstream_rq_503",
+      "membership_healthy",
+      "membership_total",
+  };
+  // "default" is well-known; the others are dynamic, like most real namespaces.
+  const std::vector<absl::string_view> namespaces = {"default", "kube-system", "production",
+                                                     "staging"};
+  // A few realistic service names; uniqueness comes from the appended index so
+  // that each cluster gets a distinct dynamic token.
+  const std::vector<absl::string_view> services = {"reviews", "ratings", "productpage", "details"};
+
+  std::vector<Envoy::Stats::StatName> names;
+  names.reserve(static_cast<size_t>(num_services) * stat_suffixes.size());
+  for (uint32_t i = 0; i < num_services; ++i) {
+    const absl::string_view ns = namespaces[i % namespaces.size()];
+    const absl::string_view svc = services[i % services.size()];
+    // The single dynamic token is "outbound|9080||<service>-<i>".
+    const std::string cluster_scope =
+        absl::StrCat("cluster.outbound|9080||", svc, "-", i, ".", ns, ".svc.cluster.local");
+    for (absl::string_view suffix : stat_suffixes) {
+      names.push_back(pool.add(absl::StrCat(cluster_scope, ".", suffix)));
+    }
+  }
+  return names;
+}
+
+// Serialize (decode to string) the stats of a fleet of mesh clusters.
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmK8sClusterStatsToString(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::StatNamePool pool(symbol_table);
+  const std::vector<Envoy::Stats::StatName> names = prepareK8sClusterStatNames(pool, 200);
+
+  uint32_t index = 0;
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    benchmark::DoNotOptimize(symbol_table.toString(names[index++ % names.size()]));
+  }
+}
+BENCHMARK(bmK8sClusterStatsToString);
+
+// Encode (string -> StatName) the same mesh-cluster stat names. This exercises
+// the well-known encode-map fast path in addTokensToEncoding, where well-known
+// tokens are resolved without taking the symbol-table lock.
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmK8sClusterStatsEncode(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::StatNamePool pool(symbol_table);
+  // Pre-build the names once to capture their string forms, then re-encode those
+  // strings on each iteration.
+  const std::vector<Envoy::Stats::StatName> names = prepareK8sClusterStatNames(pool, 200);
+  std::vector<std::string> strings;
+  strings.reserve(names.size());
+  for (Envoy::Stats::StatName name : names) {
+    strings.emplace_back(symbol_table.toString(name));
+  }
+
+  uint32_t index = 0;
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    Envoy::Stats::StatNameStorage storage(strings[index++ % strings.size()], symbol_table);
+    storage.free(symbol_table);
+  }
+}
+BENCHMARK(bmK8sClusterStatsEncode);
 
 // ---------------------------------------------------------------------------
 // decodeNumber micro-benchmarks
