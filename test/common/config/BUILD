@@ -258,6 +258,7 @@ envoy_cc_test(
         "//source/common/config:watched_directory_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/filesystem:filesystem_mocks",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 

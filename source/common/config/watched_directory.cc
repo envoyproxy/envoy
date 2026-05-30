@@ -1,4 +1,5 @@
 #include "source/common/config/watched_directory.h"
+
 #include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
