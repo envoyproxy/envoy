@@ -219,19 +219,18 @@ public:
   /**
    * Create a dedicated connection for ORCA out-of-band load reporting per gRFC A51
    * (xds.service.orca.v3.OpenRcaService), separate from request and health-check pools.
-   * Dials the address returned by orcaReportingAddress().
    * @param dispatcher supplies the owning dispatcher.
    * @param transport_socket_options supplies the transport options that will be set on the new
    * connection.
    * @param metadata when non-null drives transport socket factory resolution.
-   * @param address_override when non-null, dials this address instead of orcaReportingAddress().
+   * @param orca_address the resolved address to dial; the caller applies any port override.
    * @return the connection data.
    */
   virtual CreateConnectionData createOrcaReportingConnection(
       Event::Dispatcher& dispatcher,
       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
       const envoy::config::core::v3::Metadata* metadata,
-      Network::Address::InstanceConstSharedPtr address_override = nullptr) const PURE;
+      Network::Address::InstanceConstSharedPtr orca_address) const PURE;
 
   /**
    * @return host specific gauges.

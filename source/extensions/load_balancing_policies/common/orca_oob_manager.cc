@@ -36,7 +36,7 @@ constexpr uint64_t kInactivityWatchdogMultiplier = 3;
 constexpr uint32_t kMaxOrcaReportFrameBytes = 64 * 1024;
 } // namespace
 
-void mergeOrcaOobConnectionOverrides(
+void applyOrcaOobConnectionOverrides(
     const envoy::extensions::load_balancing_policies::common::v3::OrcaOobReportingConfig& proto,
     OrcaOobManagerConfig& config) {
   config.port_value = proto.port_value();
@@ -142,13 +142,6 @@ OrcaOobManager::OobSession::OobSession(OrcaOobManager& parent, Upstream::HostCon
   attempt_timer_->enableTimer(initial_delay);
   inactivity_timer_ =
       parent_.dispatcher_.createTimer([this]() { handleTransientFailure("inactivity timeout"); });
-  // Hosts in a priority set always have a resolved address.
-  const Network::Address::InstanceConstSharedPtr orca_address = host_->orcaReportingAddress();
-  ASSERT(orca_address != nullptr);
-  if (parent_.config_.port_value != 0 && orca_address->ip() == nullptr) {
-    ENVOY_LOG(warn, "ORCA OOB port_value override ({}) ignored for host {} with non-IP address",
-              parent_.config_.port_value, orca_address->asString());
-  }
 }
 
 OrcaOobManager::OobSession::~OobSession() { ASSERT(codec_client_ == nullptr); }
@@ -256,18 +249,24 @@ void OrcaOobManager::OobSession::connectAndStream() {
   ASSERT(codec_client_ == nullptr);
   resetState();
 
-  // Apply port override; skip for non-IP (pipe/UDS) hosts.
-  const Network::Address::InstanceConstSharedPtr orca_address = host_->orcaReportingAddress();
-  ASSERT(orca_address != nullptr);
-  Network::Address::InstanceConstSharedPtr address_override;
-  if (parent_.config_.port_value != 0 && orca_address->ip() != nullptr) {
-    address_override =
-        Network::Utility::getAddressWithPort(*orca_address, parent_.config_.port_value);
+  // Resolve the dial address: apply port override; skip (warn once) for non-IP (pipe/UDS) hosts.
+  // Hosts in a priority set always have a resolved address.
+  Network::Address::InstanceConstSharedPtr dial_address = host_->orcaReportingAddress();
+  ASSERT(dial_address != nullptr);
+  if (parent_.config_.port_value != 0) {
+    if (dial_address->ip() != nullptr) {
+      dial_address =
+          Network::Utility::getAddressWithPort(*dial_address, parent_.config_.port_value);
+    } else {
+      ENVOY_LOG_ONCE(warn,
+                     "ORCA OOB port_value override ({}) ignored for host {} with non-IP address",
+                     parent_.config_.port_value, dial_address->asString());
+    }
   }
 
   Upstream::Host::CreateConnectionData connection_data = host_->createOrcaReportingConnection(
       parent_.dispatcher_, parent_.alpn_options_,
-      parent_.config_.transport_socket_match_metadata.get(), address_override);
+      parent_.config_.transport_socket_match_metadata.get(), dial_address);
   // Derive :scheme from the actual OOB connection, which may differ from the
   // cluster default via transport_socket_match_criteria. Reads ssl() at
   // construction; post-connect TLS upgrades (e.g. STARTTLS) not supported.

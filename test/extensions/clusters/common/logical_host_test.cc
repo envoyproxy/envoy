@@ -199,8 +199,8 @@ TEST_F(LogicalHostOrcaReportingConnectionTest, DialsHostDataAddress) {
   EXPECT_CALL(*connection, setBufferLimits(_)).Times(AnyNumber());
   EXPECT_CALL(*connection, connectionInfoSetter()).Times(AnyNumber());
   EXPECT_CALL(*connection, streamInfo()).Times(AnyNumber());
-  Upstream::Host::CreateConnectionData data =
-      host_->createOrcaReportingConnection(dispatcher, nullptr, nullptr);
+  Upstream::Host::CreateConnectionData data = host_->createOrcaReportingConnection(
+      dispatcher, nullptr, nullptr, host_->orcaReportingAddress());
   EXPECT_EQ(data.host_description_->address(), address_);
 }
 
@@ -219,7 +219,7 @@ TEST_F(LogicalHostOrcaReportingConnectionTest, MetadataRoutesThroughMatcher) {
   EXPECT_CALL(*connection, setBufferLimits(_)).Times(AnyNumber());
   EXPECT_CALL(*connection, connectionInfoSetter()).Times(AnyNumber());
   EXPECT_CALL(*connection, streamInfo()).Times(AnyNumber());
-  host_->createOrcaReportingConnection(dispatcher, nullptr, &md);
+  host_->createOrcaReportingConnection(dispatcher, nullptr, &md, host_->orcaReportingAddress());
 }
 
 } // namespace Clusters

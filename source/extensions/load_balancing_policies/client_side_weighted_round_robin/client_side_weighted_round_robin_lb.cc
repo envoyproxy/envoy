@@ -44,15 +44,14 @@ ClientSideWeightedRoundRobinLbConfig::ClientSideWeightedRoundRobinLbConfig(
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(lb_proto, weight_update_period, 1000));
 
   oob_enabled = lb_proto.enable_oob_load_report().value();
-  // oob_reporting_period has no proto validation; clamp non-positive to default.
-  const int64_t period_ms = PROTOBUF_GET_MS_OR_DEFAULT(
-      lb_proto, oob_reporting_period,
-      Extensions::LoadBalancingPolicies::Common::kDefaultOobReportingPeriodMs);
-  oob_manager_config.reporting_period = std::chrono::milliseconds(
-      period_ms > 0 ? period_ms
-                    : Extensions::LoadBalancingPolicies::Common::kDefaultOobReportingPeriodMs);
+  // oob_reporting_period has no proto validation; a non-positive value falls back
+  // to OrcaOobManagerConfig's default.
+  if (const int64_t period_ms = PROTOBUF_GET_MS_OR_DEFAULT(lb_proto, oob_reporting_period, 0);
+      period_ms > 0) {
+    oob_manager_config.reporting_period = std::chrono::milliseconds(period_ms);
+  }
   if (lb_proto.has_oob_reporting_config()) {
-    Extensions::LoadBalancingPolicies::Common::mergeOrcaOobConnectionOverrides(
+    Extensions::LoadBalancingPolicies::Common::applyOrcaOobConnectionOverrides(
         lb_proto.oob_reporting_config(), oob_manager_config);
   }
 

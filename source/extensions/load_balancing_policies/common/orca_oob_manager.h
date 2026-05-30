@@ -57,7 +57,7 @@ struct OrcaOobManagerConfig {
 };
 
 // Populates the connection-override fields of `config` from `proto`.
-void mergeOrcaOobConnectionOverrides(
+void applyOrcaOobConnectionOverrides(
     const envoy::extensions::load_balancing_policies::common::v3::OrcaOobReportingConfig& proto,
     OrcaOobManagerConfig& config);
 

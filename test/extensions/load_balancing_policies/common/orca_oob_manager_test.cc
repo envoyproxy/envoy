@@ -59,20 +59,20 @@ public:
       Event::Dispatcher& dispatcher,
       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
       const envoy::config::core::v3::Metadata* metadata,
-      Network::Address::InstanceConstSharedPtr address_override = nullptr) const override {
+      Network::Address::InstanceConstSharedPtr orca_address) const override {
     last_transport_socket_options_ = transport_socket_options;
-    last_address_override_ = address_override;
+    last_orca_address_ = orca_address;
     if (metadata != nullptr) {
       last_metadata_ = std::make_unique<envoy::config::core::v3::Metadata>(*metadata);
     } else {
       last_metadata_.reset();
     }
     return Upstream::MockHostLight::createOrcaReportingConnection(
-        dispatcher, transport_socket_options, metadata, address_override);
+        dispatcher, transport_socket_options, metadata, orca_address);
   }
 
   mutable Network::TransportSocketOptionsConstSharedPtr last_transport_socket_options_;
-  mutable Network::Address::InstanceConstSharedPtr last_address_override_;
+  mutable Network::Address::InstanceConstSharedPtr last_orca_address_;
   mutable std::unique_ptr<envoy::config::core::v3::Metadata> last_metadata_;
 };
 
@@ -852,8 +852,8 @@ TEST_F(OrcaOobManagerWireTest, PortOverrideAppliedToOrcaReportingAddress) {
 
   attempt_timer->invokeCallback();
 
-  ASSERT_NE(host->last_address_override_, nullptr);
-  EXPECT_EQ(host->last_address_override_->asString(), "2.2.2.2:9001");
+  ASSERT_NE(host->last_orca_address_, nullptr);
+  EXPECT_EQ(host->last_orca_address_->asString(), "2.2.2.2:9001");
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
   manager.reset();
@@ -865,7 +865,7 @@ TEST_F(OrcaOobManagerWireTest, TransportSocketMatchCriteriaPassedAsMetadata) {
   (*proto.mutable_transport_socket_match_criteria()->mutable_fields())["useMTLS"].set_bool_value(
       true);
   OrcaOobManagerConfig config;
-  mergeOrcaOobConnectionOverrides(proto, config);
+  applyOrcaOobConnectionOverrides(proto, config);
   auto manager = makeManager(config);
   ASSERT_OK(manager->initialize());
 
@@ -888,7 +888,7 @@ TEST_F(OrcaOobManagerWireTest, AuthorityOverrideUsedInRequestHeaders) {
   envoy::extensions::load_balancing_policies::common::v3::OrcaOobReportingConfig proto;
   proto.set_authority("orca.example.com");
   OrcaOobManagerConfig config;
-  mergeOrcaOobConnectionOverrides(proto, config);
+  applyOrcaOobConnectionOverrides(proto, config);
   auto manager = makeManager(config);
   ASSERT_OK(manager->initialize());
 
@@ -954,16 +954,16 @@ TEST_F(OrcaOobManagerWireTest, SchemeIsHttpsForTlsConnection) {
   manager.reset();
 }
 
-TEST(MergeOrcaOobConnectionOverridesTest, EmptyProtoLeavesDefaults) {
+TEST(ApplyOrcaOobConnectionOverridesTest, EmptyProtoLeavesDefaults) {
   envoy::extensions::load_balancing_policies::common::v3::OrcaOobReportingConfig proto;
   OrcaOobManagerConfig config;
-  mergeOrcaOobConnectionOverrides(proto, config);
+  applyOrcaOobConnectionOverrides(proto, config);
   EXPECT_EQ(config.port_value, 0u);
   EXPECT_TRUE(config.authority.empty());
   EXPECT_EQ(config.transport_socket_match_metadata, nullptr);
 }
 
-TEST(MergeOrcaOobConnectionOverridesTest, PopulatedProtoIsMerged) {
+TEST(ApplyOrcaOobConnectionOverridesTest, PopulatedProtoIsMerged) {
   envoy::extensions::load_balancing_policies::common::v3::OrcaOobReportingConfig proto;
   proto.set_port_value(9001);
   proto.set_authority("backend.example.com");
@@ -971,7 +971,7 @@ TEST(MergeOrcaOobConnectionOverridesTest, PopulatedProtoIsMerged) {
       true);
 
   OrcaOobManagerConfig config;
-  mergeOrcaOobConnectionOverrides(proto, config);
+  applyOrcaOobConnectionOverrides(proto, config);
   EXPECT_EQ(config.port_value, 9001u);
   EXPECT_EQ(config.authority, "backend.example.com");
   ASSERT_NE(config.transport_socket_match_metadata, nullptr);

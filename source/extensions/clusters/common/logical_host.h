@@ -50,7 +50,7 @@ public:
       Event::Dispatcher& dispatcher,
       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
       const envoy::config::core::v3::Metadata* metadata,
-      Network::Address::InstanceConstSharedPtr address_override = nullptr) const override;
+      Network::Address::InstanceConstSharedPtr orca_address) const override;
 
   // Upstream::HostDescription
   SharedConstAddressVector addressListOrNull() const override;

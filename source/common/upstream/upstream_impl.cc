@@ -607,8 +607,7 @@ Host::CreateConnectionData HostImplBase::createOrcaReportingConnection(
     Event::Dispatcher& dispatcher,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
     const envoy::config::core::v3::Metadata* metadata,
-    Network::Address::InstanceConstSharedPtr address_override) const {
-  const auto orca_address = address_override != nullptr ? address_override : orcaReportingAddress();
+    Network::Address::InstanceConstSharedPtr orca_address) const {
   Network::UpstreamTransportSocketFactory& factory =
       (metadata != nullptr)
           ? resolveTransportSocketFactory(orca_address, metadata, transport_socket_options)
