@@ -10,6 +10,7 @@
 #include "test/integration/filters/add_header_filter.pb.h"
 #include "test/integration/filters/add_header_filter.pb.validate.h"
 #include "test/integration/filters/common.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 namespace Envoy {
 
@@ -23,9 +24,13 @@ public:
   }
 };
 
-class AddHeaderFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpDualFilterConfig {
+class AddHeaderFilterConfig
+    : public Extensions::HttpFilters::Common::UniqueEmptyHttpDualFilterConfig<
+          test::integration::filters::AddHeaderEmptyFilterConfig> {
 public:
-  AddHeaderFilterConfig() : EmptyHttpDualFilterConfig("add-header-filter") {}
+  AddHeaderFilterConfig()
+      : UniqueEmptyHttpDualFilterConfig<test::integration::filters::AddHeaderEmptyFilterConfig>(
+            "add-header-filter") {}
   absl::StatusOr<Http::FilterFactoryCb>
   createDualFilter(const std::string&, Server::Configuration::ServerFactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {

@@ -82,6 +82,8 @@ static_resources:
           stat_prefix: config_test
           http_filters:
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           codec_type: HTTP2
           rds:
             route_config_name: my_route
