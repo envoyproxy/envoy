@@ -45,6 +45,8 @@ TEST(WatchedDirectory, CallbackNotSetDoesNotCrash) {
   EXPECT_CALL(*watcher, addWatch("foo/bar/", Filesystem::Watcher::Events::MovedTo, _))
       .WillOnce(DoAll(SaveArg<2>(&cb), Return(absl::OkStatus())));
   auto wd = *WatchedDirectory::create(config, dispatcher);
+  // We are not calling setCallback() to simulate the case where file loading fails
+  // before the callback can be set. The watch callback checks for null and returns OkStatus.
   EXPECT_TRUE(cb(Filesystem::Watcher::Events::MovedTo).ok());
 }
 

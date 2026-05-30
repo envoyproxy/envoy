@@ -1,5 +1,4 @@
 #include "source/common/config/watched_directory.h"
-
 #include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
@@ -25,6 +24,8 @@ WatchedDirectory::WatchedDirectory(const envoy::config::core::v3::WatchedDirecto
   }
   SET_AND_RETURN_IF_NOT_OK(watcher_->addWatch(absl::StrCat(config.path(), "/"), events,
                                               [this](uint32_t) {
+                                                // Check if callback is set before invoking to avoid
+                                                // crash if watch triggers before setCallback().
                                                 if (cb_) {
                                                   return cb_();
                                                 }
