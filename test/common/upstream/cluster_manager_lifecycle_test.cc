@@ -2507,6 +2507,73 @@ TEST_P(ClusterManagerLifecycleTest, DrainConnectionsPredicate) {
   });
 }
 
+// Covers the three-argument drainConnections overload that forwards a caller-specified
+// DrainBehavior (e.g. NotifyPeerAndDrainExisting) to every matching host's pool.
+TEST_P(ClusterManagerLifecycleTest, DrainConnectionsWithDrainBehavior) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+  )EOF";
+
+  create(parseBootstrapFromV3Yaml(yaml));
+
+  Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
+  HostSharedPtr host1 = makeTestHost(cluster.info(), "tcp://127.0.0.1:80");
+  HostSharedPtr host2 = makeTestHost(cluster.info(), "tcp://127.0.0.1:81");
+
+  HostVector hosts{host1, host2};
+  auto hosts_ptr = std::make_shared<HostVector>(hosts);
+
+  cluster.prioritySet().updateHosts(
+      0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
+      absl::nullopt, 100);
+
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _))
+      .Times(2)
+      .WillRepeatedly(ReturnNew<NiceMock<Http::ConnectionPool::MockInstance>>());
+  Http::ConnectionPool::MockInstance* cp1 = HttpPoolDataPeer::getPool(
+      cluster_manager_->getThreadLocalCluster("cluster_1")
+          ->httpConnPool(
+              cluster_manager_->getThreadLocalCluster("cluster_1")->chooseHost(nullptr).host,
+              ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+  Http::ConnectionPool::MockInstance* cp2 = HttpPoolDataPeer::getPool(
+      cluster_manager_->getThreadLocalCluster("cluster_1")
+          ->httpConnPool(
+              cluster_manager_->getThreadLocalCluster("cluster_1")->chooseHost(nullptr).host,
+              ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+  EXPECT_NE(cp1, cp2);
+
+  // Predicate selects only host1; behavior is the new NotifyPeerAndDrainExisting value. The
+  // three-arg overload must forward the caller-specified behavior to the selected pool.
+  EXPECT_CALL(
+      *cp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::NotifyPeerAndDrainExisting));
+  EXPECT_CALL(*cp2, drainConnections(_)).Times(0);
+  cluster_manager_->drainConnections(
+      "cluster_1",
+      [](const Upstream::Host& host) { return host.address()->asString() == "127.0.0.1:80"; },
+      Envoy::ConnectionPool::DrainBehavior::NotifyPeerAndDrainExisting);
+
+  // Nullptr predicate drains every host's pool with the caller-specified behavior.
+  EXPECT_CALL(
+      *cp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::NotifyPeerAndDrainExisting));
+  EXPECT_CALL(
+      *cp2, drainConnections(Envoy::ConnectionPool::DrainBehavior::NotifyPeerAndDrainExisting));
+  cluster_manager_->drainConnections(
+      "cluster_1", /*predicate=*/nullptr,
+      Envoy::ConnectionPool::DrainBehavior::NotifyPeerAndDrainExisting);
+
+  // Unknown cluster name: the overload short-circuits (no pools touched, no crash).
+  EXPECT_CALL(*cp1, drainConnections(_)).Times(0);
+  EXPECT_CALL(*cp2, drainConnections(_)).Times(0);
+  cluster_manager_->drainConnections(
+      "nonexistent_cluster", /*predicate=*/nullptr,
+      Envoy::ConnectionPool::DrainBehavior::NotifyPeerAndDrainExisting);
+}
+
 TEST_P(ClusterManagerLifecycleTest, ConnPoolsDrainedOnHostSetChange) {
   const std::string yaml = R"EOF(
   static_resources:
