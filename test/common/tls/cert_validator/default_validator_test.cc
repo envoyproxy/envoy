@@ -968,6 +968,58 @@ TEST(DefaultCertValidatorTest, SuppressClientCaListDisabled) {
   EXPECT_GT(sk_X509_NAME_num(ca_list), 0);
 }
 
+// Test that when suppress_client_ca_list is enabled but require_client_cert is false,
+// SSL_VERIFY_FAIL_IF_NO_PEER_CERT is not set.
+TEST(DefaultCertValidatorTest, SuppressClientCaListWithoutRequireClientCert) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+
+  std::string ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+
+  auto config = makeSuppressConfig(ca_cert, true);
+  auto validator = std::make_unique<DefaultCertValidator>(config.get(), stats, context);
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ssl_ctx, nullptr);
+  ASSERT_TRUE(validator->addClientValidationContext(ssl_ctx.get(), false).ok());
+
+  STACK_OF(X509_NAME)* ca_list = SSL_CTX_get_client_CA_list(ssl_ctx.get());
+  if (ca_list != nullptr) {
+    EXPECT_EQ(sk_X509_NAME_num(ca_list), 0);
+  }
+  EXPECT_EQ(SSL_CTX_get_verify_mode(ssl_ctx.get()) & SSL_VERIFY_FAIL_IF_NO_PEER_CERT, 0);
+}
+
+// Test that when suppress_client_ca_list is enabled with max_verify_depth set,
+// the verify depth is correctly applied.
+TEST(DefaultCertValidatorTest, SuppressClientCaListWithMaxVerifyDepth) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+
+  std::string ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+
+  envoy::config::core::v3::TypedExtensionConfig typed_conf;
+  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers{};
+  auto config = std::make_unique<TestCertificateValidationContextConfig>(
+      typed_conf, /*allow_expired_certificate=*/false, san_matchers, ca_cert,
+      /*verify_depth=*/absl::optional<uint32_t>(10), /*suppress_client_ca_list=*/true);
+  auto validator = std::make_unique<DefaultCertValidator>(config.get(), stats, context);
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ssl_ctx, nullptr);
+  ASSERT_TRUE(validator->addClientValidationContext(ssl_ctx.get(), true).ok());
+
+  STACK_OF(X509_NAME)* ca_list = SSL_CTX_get_client_CA_list(ssl_ctx.get());
+  if (ca_list != nullptr) {
+    EXPECT_EQ(sk_X509_NAME_num(ca_list), 0);
+  }
+  EXPECT_EQ(SSL_CTX_get_verify_depth(ssl_ctx.get()), 9);
+}
+
 // Test that session ID hash differs when suppress_client_ca_list differs.
 // This prevents session resumption across contexts with different security settings.
 TEST(DefaultCertValidatorTest, SuppressClientCaListSessionIdDiffers) {
