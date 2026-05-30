@@ -56,6 +56,8 @@ go_library(
     srcs = [
         "sdk/go/shared/http.go",
         "sdk/go/shared/http_api.go",
+        "sdk/go/shared/listener_api.go",
+        "sdk/go/shared/listener_base.go",
         "sdk/go/shared/network_api.go",
         "sdk/go/shared/network_base.go",
         "sdk/go/shared/types.go",
@@ -80,6 +82,7 @@ go_library(
     name = "go_sdk_abi",
     srcs = [
         "sdk/go/abi/internal.go",
+        "sdk/go/abi/listener.go",
         "sdk/go/abi/network.go",
         "//source/extensions/dynamic_modules/abi:abi.h",
     ],

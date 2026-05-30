@@ -21,6 +21,11 @@ envoy_proto_library(
 )
 
 envoy_proto_library(
+    name = "test_filters_proto",
+    srcs = ["test_filters.proto"],
+)
+
+envoy_proto_library(
     name = "async_upstream_filter_proto",
     srcs = ["async_upstream_filter.proto"],
 )
@@ -71,6 +76,7 @@ envoy_cc_test_library(
     deps = [
         ":add_header_filter_proto_cc_proto",
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -102,6 +108,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -118,6 +125,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -133,6 +141,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -148,6 +157,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -165,6 +175,7 @@ envoy_cc_test_library(
         "tee_filter.h",
     ],
     deps = [
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -184,6 +195,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -199,6 +211,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -254,6 +267,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -269,6 +283,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -284,6 +299,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -300,6 +316,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -316,6 +333,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -331,6 +349,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -347,6 +366,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -362,6 +382,7 @@ envoy_cc_test_library(
         "add_trailers_filter.cc",
     ],
     deps = [
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -376,6 +397,7 @@ envoy_cc_test_library(
         "backpressure_filter.cc",
     ],
     deps = [
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -391,6 +413,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -406,6 +429,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -420,6 +444,7 @@ envoy_cc_test_library(
         "eds_ready_filter.cc",
     ],
     deps = [
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/http:header_map_interface",
         "//envoy/registry",
@@ -437,6 +462,7 @@ envoy_cc_test_library(
         "modify_buffer_filter.cc",
     ],
     deps = [
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -451,6 +477,7 @@ envoy_cc_test_library(
         "on_local_reply_filter.cc",
     ],
     deps = [
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -465,6 +492,7 @@ envoy_cc_test_library(
         "reset_stream_filter.cc",
     ],
     deps = [
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -480,6 +508,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -494,6 +523,7 @@ envoy_cc_test_library(
         "pause_filter.cc",
     ],
     deps = [
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//source/common/network:connection_lib",
@@ -508,6 +538,7 @@ envoy_cc_test_library(
         "pause_filter_for_quic.cc",
     ]),
     deps = envoy_select_enable_http3([
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//source/common/quic:quic_filter_manager_connection_lib",
@@ -525,6 +556,7 @@ envoy_cc_test_library(
         "process_context_filter.h",
     ],
     deps = [
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:process_context_interface",
@@ -540,6 +572,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -655,6 +688,7 @@ envoy_cc_test_library(
         "request_metadata_filter.cc",
     ],
     deps = [
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -669,6 +703,7 @@ envoy_cc_test_library(
         "random_pause_filter.cc",
     ],
     deps = [
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//source/common/network:connection_lib",
@@ -684,6 +719,7 @@ envoy_cc_test_library(
         "response_metadata_filter.cc",
     ],
     deps = [
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -698,6 +734,7 @@ envoy_cc_test_library(
         "encode1xx_local_reply_filter.cc",
     ],
     deps = [
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -713,6 +750,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/event:timer_interface",
         "//envoy/http:filter_interface",
         "//envoy/registry",
@@ -729,6 +767,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/event:timer_interface",
         "//envoy/http:filter_interface",
         "//envoy/registry",
@@ -745,6 +784,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -760,6 +800,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/event:timer_interface",
         "//envoy/http:filter_interface",
         "//envoy/registry",
@@ -776,6 +817,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
 )
@@ -785,6 +827,7 @@ envoy_cc_test_library(
     srcs = ["metadata_control_filter.cc"],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/server:filter_config_interface",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
@@ -799,6 +842,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/event:timer_interface",
         "//envoy/http:filter_interface",
         "//envoy/registry",
@@ -814,6 +858,7 @@ envoy_cc_test_library(
         "encoder_decoder_buffer_filter.cc",
     ],
     deps = [
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -828,6 +873,7 @@ envoy_cc_test_library(
         "buffer_continue_filter.cc",
     ],
     deps = [
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -863,6 +909,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -942,6 +989,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -957,6 +1005,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -975,6 +1024,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -990,6 +1040,7 @@ envoy_cc_test_library(
         "listener_typed_metadata_filter.cc",
     ],
     deps = [
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/network:listener_interface",
         "//envoy/registry",
@@ -1007,6 +1058,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -1084,6 +1136,7 @@ envoy_cc_test_library(
     srcs = ["stop_in_headers_continue_in_data_filter.cc"],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -1100,6 +1153,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/event:timer_interface",
         "//envoy/http:filter_interface",
         "//envoy/registry",
@@ -1116,6 +1170,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/event:timer_interface",
         "//envoy/http:filter_interface",
         "//envoy/registry",

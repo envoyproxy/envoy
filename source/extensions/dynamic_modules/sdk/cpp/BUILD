@@ -7,10 +7,12 @@ cc_library(
     name = "sdk",
     srcs = [
         "sdk.cc",
+        "sdk_listener.cc",
         "sdk_network.cc",
     ],
     hdrs = [
         "sdk.h",
+        "sdk_listener.h",
         "sdk_network.h",
     ],
     visibility = ["//visibility:public"],
@@ -27,6 +29,7 @@ cc_library(
     name = "sdk_abi",
     srcs = [
         "sdk_internal.cc",
+        "sdk_internal_listener.cc",
         "sdk_internal_network.cc",
     ],
     hdrs = [
