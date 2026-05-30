@@ -26,14 +26,14 @@ protected:
 };
 
 TEST_F(ProtocolConstraintsTest, DefaultStatusOk) {
-  ProtocolConstraints constraints(http2CodecStats(), options_);
+  ProtocolConstraints constraints(http2CodecStats(), options_, true);
   EXPECT_TRUE(constraints.status().ok());
 }
 
 TEST_F(ProtocolConstraintsTest, OutboundControlFrameFlood) {
   options_.mutable_max_outbound_frames()->set_value(20);
   options_.mutable_max_outbound_control_frames()->set_value(2);
-  ProtocolConstraints constraints(http2CodecStats(), options_);
+  ProtocolConstraints constraints(http2CodecStats(), options_, true);
   constraints.incrementOutboundFrameCount(true);
   constraints.incrementOutboundFrameCount(true);
   EXPECT_TRUE(constraints.checkOutboundFrameLimits().ok());
@@ -51,7 +51,7 @@ TEST_F(ProtocolConstraintsTest, OutboundControlFrameFlood) {
 TEST_F(ProtocolConstraintsTest, OutboundFrameFlood) {
   options_.mutable_max_outbound_frames()->set_value(5);
   options_.mutable_max_outbound_control_frames()->set_value(2);
-  ProtocolConstraints constraints(http2CodecStats(), options_);
+  ProtocolConstraints constraints(http2CodecStats(), options_, true);
   constraints.incrementOutboundFrameCount(false);
   constraints.incrementOutboundFrameCount(false);
   constraints.incrementOutboundFrameCount(false);
@@ -73,7 +73,7 @@ TEST_F(ProtocolConstraintsTest, OutboundFrameFlood) {
 TEST_F(ProtocolConstraintsTest, OutboundFrameFloodStatusIsIdempotent) {
   options_.mutable_max_outbound_frames()->set_value(5);
   options_.mutable_max_outbound_control_frames()->set_value(2);
-  ProtocolConstraints constraints(http2CodecStats(), options_);
+  ProtocolConstraints constraints(http2CodecStats(), options_, true);
   // First trigger control frame flood
   constraints.incrementOutboundFrameCount(true);
   constraints.incrementOutboundFrameCount(true);
@@ -94,7 +94,7 @@ TEST_F(ProtocolConstraintsTest, OutboundFrameFloodStatusIsIdempotent) {
 
 TEST_F(ProtocolConstraintsTest, InboundZeroLenData) {
   options_.mutable_max_consecutive_inbound_frames_with_empty_payload()->set_value(2);
-  ProtocolConstraints constraints(http2CodecStats(), options_);
+  ProtocolConstraints constraints(http2CodecStats(), options_, true);
   const uint8_t type = NGHTTP2_DATA;
   const bool end_stream = false;
   const bool is_empty = true;
@@ -112,7 +112,7 @@ TEST_F(ProtocolConstraintsTest, OutboundAndInboundFrameFloodStatusIsIdempotent) 
   options_.mutable_max_outbound_frames()->set_value(5);
   options_.mutable_max_outbound_control_frames()->set_value(2);
   options_.mutable_max_consecutive_inbound_frames_with_empty_payload()->set_value(2);
-  ProtocolConstraints constraints(http2CodecStats(), options_);
+  ProtocolConstraints constraints(http2CodecStats(), options_, true);
   // First trigger inbound frame flood
   const uint8_t type = NGHTTP2_DATA;
   const bool end_stream = false;
@@ -133,7 +133,7 @@ TEST_F(ProtocolConstraintsTest, OutboundAndInboundFrameFloodStatusIsIdempotent) 
 
 TEST_F(ProtocolConstraintsTest, InboundZeroLenDataWithPadding) {
   options_.mutable_max_consecutive_inbound_frames_with_empty_payload()->set_value(2);
-  ProtocolConstraints constraints(http2CodecStats(), options_);
+  ProtocolConstraints constraints(http2CodecStats(), options_, true);
   const uint8_t type = NGHTTP2_DATA;
   const bool end_stream = false;
   const bool is_empty = true;
@@ -147,7 +147,7 @@ TEST_F(ProtocolConstraintsTest, InboundZeroLenDataWithPadding) {
 
 TEST_F(ProtocolConstraintsTest, InboundZeroLenDataEndStreamResetCounter) {
   options_.mutable_max_consecutive_inbound_frames_with_empty_payload()->set_value(2);
-  ProtocolConstraints constraints(http2CodecStats(), options_);
+  ProtocolConstraints constraints(http2CodecStats(), options_, true);
   const uint8_t type = NGHTTP2_DATA;
   const bool is_empty = true;
   bool end_stream = false;
@@ -166,7 +166,7 @@ TEST_F(ProtocolConstraintsTest, InboundZeroLenDataEndStreamResetCounter) {
 
 TEST_F(ProtocolConstraintsTest, Priority) {
   options_.mutable_max_inbound_priority_frames_per_stream()->set_value(2);
-  ProtocolConstraints constraints(http2CodecStats(), options_);
+  ProtocolConstraints constraints(http2CodecStats(), options_, true);
   // Create one stream
   constraints.incrementOpenedStreamCount();
 
@@ -185,7 +185,7 @@ TEST_F(ProtocolConstraintsTest, Priority) {
 
 TEST_F(ProtocolConstraintsTest, WindowUpdate) {
   options_.mutable_max_inbound_window_update_frames_per_data_frame_sent()->set_value(2);
-  ProtocolConstraints constraints(http2CodecStats(), options_);
+  ProtocolConstraints constraints(http2CodecStats(), options_, true);
   // Create one stream
   constraints.incrementOpenedStreamCount();
   // Send 2 DATA frames
@@ -211,7 +211,7 @@ TEST_F(ProtocolConstraintsTest, WindowUpdate) {
 TEST_F(ProtocolConstraintsTest, DumpsStateWithoutAllocatingMemory) {
   std::array<char, 1024> buffer;
   OutputBufferStream ostream{buffer.data(), buffer.size()};
-  ProtocolConstraints constraints(http2CodecStats(), options_);
+  ProtocolConstraints constraints(http2CodecStats(), options_, true);
 
   Memory::TestUtil::MemoryTest memory_test;
   constraints.dumpState(ostream, 0);
