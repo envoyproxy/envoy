@@ -23,7 +23,7 @@ void HeaderValidatorUtils::validateAllCharactersInUrlPath(
     ::Envoy::Http::TestRequestHeaderMapImpl headers{
         {":scheme", "https"}, {":authority", "envoy.com"}, {":method", "GET"}};
     headers.addViaMove(HeaderString(absl::string_view(":path")), std::move(invalid_value));
-    if (::Envoy::Http::testCharInTable(kPathHeaderCharTable, static_cast<char>(ascii)) ||
+    if (kPathHeaderCharTable.hasChar(static_cast<char>(ascii)) ||
         absl::StrContains(additionally_allowed_characters, static_cast<char>(ascii))) {
       EXPECT_ACCEPT(validator.validateRequestHeaders(headers))
           << " for character " << static_cast<char>(ascii) << " " << ascii;

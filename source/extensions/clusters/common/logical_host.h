@@ -56,6 +56,7 @@ public:
   SharedConstAddressVector addressListOrNull() const override;
   Network::Address::InstanceConstSharedPtr address() const override;
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override;
+  absl::string_view observabilityName() const override { return {}; }
   Network::Address::InstanceConstSharedPtr orcaReportingAddress() const override;
 
 protected:
@@ -113,6 +114,7 @@ public:
     return logical_host_->hostnameForHealthChecks();
   }
   const std::string& hostname() const override { return logical_host_->hostname(); }
+  absl::string_view observabilityName() const override { return {}; }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
   SharedConstAddressVector addressListOrNull() const override {
     return logical_host_->addressListOrNull();

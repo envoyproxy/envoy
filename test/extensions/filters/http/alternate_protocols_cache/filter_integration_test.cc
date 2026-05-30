@@ -373,7 +373,11 @@ TEST_P(FilterIntegrationTest, DISABLED_AltSvcCachedH2Slow) {
 }
 
 TEST_P(FilterIntegrationTest, AltSvcIgnoredWithProxyConfig) {
-  config_helper_.addFilter("{ name: header-to-proxy-filter }");
+  config_helper_.addFilter(R"EOF(
+    name: header-to-proxy-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.HeaderToProxyFilterConfig
+  )EOF");
   const uint64_t request_size = 0;
   const uint64_t response_size = 0;
   const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;

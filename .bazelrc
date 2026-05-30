@@ -36,6 +36,8 @@ build --java_runtime_version=remotejdk_11
 build --tool_java_runtime_version=remotejdk_11
 build --java_language_version=11
 build --tool_java_language_version=11
+# TODO(jwendell): Remove after https://github.com/protocolbuffers/protobuf/issues/20760 is fixed.
+build --extra_toolchains=@envoy//bazel:envoy_java_toolchain_definition
 # silence absl logspam.
 build --copt=-DABSL_MIN_LOG_LEVEL=4
 # Global C++ standard and common warning suppressions
@@ -239,8 +241,9 @@ common:aws-lc-fips --@envoy//bazel:crypto=@aws_lc//:crypto
 common:aws-lc-fips --@envoy//bazel:http3=False
 
 # OpenSSL
-common:openssl --//bazel:ssl=//compat/openssl:ssl
-common:openssl --//bazel:crypto=//compat/openssl:crypto
+common:openssl --@envoy//bazel:openssl=True
+common:openssl --@envoy//bazel:ssl=@envoy//compat/openssl:ssl
+common:openssl --@envoy//bazel:crypto=@envoy//compat/openssl:crypto
 common:openssl --copt=-DENVOY_SSL_OPENSSL
 common:openssl --host_copt=-DENVOY_SSL_OPENSSL
 common:openssl --@envoy//bazel:http3=False
@@ -357,7 +360,7 @@ build:fuzz-coverage --test_tag_filters=-nocoverage
 # resources required to build and run the tests.
 build:fuzz-coverage --define=wasm=disabled
 build:fuzz-coverage --config=fuzz-coverage-config
-build:fuzz-coverage-config --//tools/coverage:config=@envoy//test:fuzz_coverage_config
+build:fuzz-coverage-config --@envoy//tools/coverage:config=@envoy//test:fuzz_coverage_config
 
 build:oss-fuzz --config=fuzzing
 build:oss-fuzz --config=libc++
@@ -405,7 +408,7 @@ build:clang-tidy --build_tag_filters=-notidy
 # Compile database generation config
 build:compdb --build_tag_filters=-nocompdb
 
-common:cves --//tools/dependency:cve-data=//tools/dependency:cve-data-dir
+common:cves --@envoy//tools/dependency:cve-data=@envoy//tools/dependency:cve-data-dir
 
 build:docs-ci --action_env=DOCS_RST_CHECK=1 --host_action_env=DOCS_RST_CHECK=1
 

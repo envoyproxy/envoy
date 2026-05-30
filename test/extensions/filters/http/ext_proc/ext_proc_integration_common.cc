@@ -159,22 +159,25 @@ void ExtProcIntegrationTest::initializeConfig(
 
       // Add filter that dumps streamInfo into headers so we can check our receiving
       // namespaces
-      config_helper_.prependFilter(fmt::format(R"EOF(
-name: stream-info-to-headers-filter
-    )EOF"));
+      config_helper_.prependFilter(R"EOF(
+        name: stream-info-to-headers-filter
+        typed_config:
+          "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+      )EOF");
     }
 
     // Add dynamic_metadata_to_headers filter to inject dynamic metadata used for testing
     if (config_option.add_response_processor) {
-      simple_filter_config_ =
-          std::make_unique<SimpleFilterConfig<DynamicMetadataToHeadersFilter>>();
+      simple_filter_config_ = std::make_unique<UniqueSimpleFilterConfig<
+          DynamicMetadataToHeadersFilter,
+          test::extensions::filters::http::ext_proc::DynamicMetadataToHeadersFilterConfig>>();
       registration_ = std::make_unique<
           Envoy::Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory>>(
           *simple_filter_config_);
       config_helper_.prependFilter(R"EOF(
         name: dynamic-metadata-to-headers-filter
         typed_config:
-          "@type": type.googleapis.com/google.protobuf.Struct
+          "@type": type.googleapis.com/test.extensions.filters.http.ext_proc.DynamicMetadataToHeadersFilterConfig
     )EOF");
     }
 
