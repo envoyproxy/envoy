@@ -636,6 +636,8 @@ private:
 
   // Membership update callback handle.
   Envoy::Common::CallbackHandlePtr member_update_cb_;
+
+  friend class DynamicModuleClusterTestPeer;
 };
 
 /**

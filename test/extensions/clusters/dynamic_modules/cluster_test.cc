@@ -50,6 +50,20 @@ public:
   static void clearInModuleCluster(DynamicModuleCluster& cluster) {
     cluster.in_module_cluster_ = nullptr;
   }
+
+  // Injects a pre-populated HttpCalloutCallback into the cluster's pending-callouts map under the
+  // given id, so the destructor's cancellation loop sees a pending entry.
+  static void injectPendingHttpCallout(DynamicModuleCluster& cluster, uint64_t callout_id,
+                                       Http::AsyncClient::Request* request) {
+    auto callback = std::make_unique<DynamicModuleCluster::HttpCalloutCallback>(
+        /*cluster=*/nullptr, callout_id);
+    callback->request_ = request;
+    cluster.http_callouts_.emplace(callout_id, std::move(callback));
+  }
+
+  // Simulates the module's on_cluster_lb_new returning nullptr after the LB has already been
+  // constructed: clears in_module_lb_ so chooseHost exercises the early-return path.
+  static void clearInModuleLb(DynamicModuleLoadBalancer& lb) { lb.in_module_lb_ = nullptr; }
 };
 
 using ::testing::_;
@@ -3686,6 +3700,111 @@ TEST_F(DynamicModuleClusterTest, MetricsConcurrentIncrementCounterVecNoRace) {
   for (auto& th : threads) {
     th.join();
   }
+}
+
+// setHostData / getHostData return false when the priority is out of range.
+TEST_F(DynamicModuleClusterTest, SetGetHostDataPriorityOutOfRange) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+
+  // No priority has been populated, so any priority is out of range.
+  EXPECT_FALSE(lb_instance->setHostData(/*priority=*/5, /*index=*/0, /*data=*/123));
+
+  uintptr_t data = 0xAAA;
+  EXPECT_FALSE(lb_instance->getHostData(/*priority=*/5, /*index=*/0, &data));
+  // Output unchanged on the priority-out-of-range early return.
+  EXPECT_EQ(0xAAAu, data);
+}
+
+// updateHostHealth returns false when the supplied host is not present in any priority set.
+TEST_F(DynamicModuleClusterTest, UpdateHostHealthHostNotInAnyPriority) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // Build a real host that is *not* part of any priority set. Reuse the cluster's own info object
+  // so the host is well-formed.
+  auto foreign_host = Upstream::makeTestHost(cluster->info(), "tcp://127.0.0.1:55555");
+  EXPECT_FALSE(
+      cluster->updateHostHealth(foreign_host, envoy_dynamic_module_type_host_health_Unhealthy));
+}
+
+// sendHttpCallout returns CannotCreateRequest synchronously when the module did not export
+// on_cluster_http_callout_done, since there is no path for the response to be delivered.
+TEST_F(DynamicModuleClusterTest, HttpCalloutRequestedWithoutDoneHook) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // Strip the done hook to simulate a module that didn't implement it.
+  cluster->config()->on_cluster_http_callout_done_ = nullptr;
+
+  // No call to cluster_manager_.getThreadLocalCluster should occur — the early return fires first.
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster(_)).Times(0);
+
+  uint64_t callout_id = 0;
+  envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {":method", 7, "GET", 3},
+      {":path", 5, "/test", 5},
+      {"host", 4, "example.com", 11},
+  };
+  envoy_dynamic_module_type_module_buffer body = {nullptr, 0};
+  auto callout_result = envoy_dynamic_module_callback_cluster_http_callout(
+      cluster.get(), &callout_id, cluster_name, headers.data(), headers.size(), body, 5000);
+  EXPECT_EQ(callout_result, envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
+}
+
+// chooseHost returns {nullptr} synchronously when the LB has no in-module instance (i.e. the
+// module's on_cluster_lb_new returned null and in_module_lb_ remains unset).
+TEST_F(DynamicModuleClusterTest, ChooseHostShortCircuitsWhenInModuleLbIsNull) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+  DynamicModuleClusterTestPeer::clearInModuleLb(*lb_instance);
+
+  auto response = lb_instance->chooseHost(nullptr);
+  EXPECT_EQ(nullptr, response.host);
+  EXPECT_EQ(nullptr, response.cancelable);
+}
+
+// DynamicModuleClusterHandle destruction is a no-op when the wrapped cluster pointer is already
+// null (e.g. the handle was constructed from an empty shared_ptr).
+TEST_F(DynamicModuleClusterTest, HandleDestructorIsNoOpWhenClusterIsNull) {
+  // No dispatcher.post call should occur because the destructor returns early.
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).Times(0);
+  { DynamicModuleClusterHandle handle(nullptr); }
+}
+
+// The cluster destructor cancels any pending HTTP callouts before clearing them.
+TEST_F(DynamicModuleClusterTest, DestructorCancelsPendingHttpCallouts) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // Mock request whose cancel() we expect to be invoked when the cluster is destroyed.
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
+  EXPECT_CALL(request, cancel());
+
+  DynamicModuleClusterTestPeer::injectPendingHttpCallout(*cluster, /*callout_id=*/42, &request);
+
+  cluster.reset();
+  // The thread-aware LB inside `result` still holds an internal handle to the cluster; reset it so
+  // the cluster is actually destroyed inside this test body, where the EXPECT_CALL is in scope.
+  result = absl::InternalError("cleanup");
 }
 
 } // namespace
