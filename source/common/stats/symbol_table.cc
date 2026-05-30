@@ -8,11 +8,17 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
+#include "source/common/stats/well_known_tokens.h"
 
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Stats {
+namespace {
+
+// The well-known token table lives in well_known_tokens.h. WellKnownTokensNum is
+// the number of reserved symbol slots (including the unused index-0 sentinel).
+static constexpr Symbol WellKnownTokensNum = sizeof(kWellKnownTokens) / sizeof(kWellKnownTokens[0]);
 
 // When storing Symbol arrays, we disallow Symbol 0, which is the only Symbol
 // that will decode into uint8_t array starting (and ending) with {0}. Thus we
@@ -21,8 +27,24 @@ namespace Stats {
 // used for dynamically discovered stat-name tokens where you don't want to take
 // a symbol table lock, and would rather pay extra memory overhead to store the
 // tokens as fully elaborated strings.
-static constexpr Symbol FirstValidSymbol = 1;
+static constexpr Symbol FirstValidSymbol = WellKnownTokensNum;
 static constexpr uint8_t LiteralStringIndicator = 0;
+
+// Lock-free encode-side lookup: token string -> symbol ID. Built once at first
+// access; safe for concurrent readers afterward.
+const absl::flat_hash_map<absl::string_view, Symbol>& wellKnownEncodeMap() {
+  static const auto* m = []() {
+    auto* m = new absl::flat_hash_map<absl::string_view, Symbol>();
+    m->reserve(WellKnownTokensNum);
+    for (Symbol i = 1; i < WellKnownTokensNum; ++i) {
+      (*m)[kWellKnownTokens[i]] = i;
+    }
+    return m;
+  }();
+  return *m;
+}
+
+} // namespace
 
 #ifndef ENVOY_CONFIG_COVERAGE
 void StatName::debugPrint() {
@@ -166,6 +188,29 @@ public:
     return TokenType::Symbol;
   }
 
+  // Quick scan of the remaining tokens to count how many there are without decoding them or
+  // output them.
+  size_t remainingTokens() const {
+    const uint8_t* array = array_;
+    size_t size = size_;
+
+    size_t count = 0;
+    for (size_t i = 0; i < size;) {
+      if (array[i] == LiteralStringIndicator) {
+        // Skip the literal string indicator.
+        ++i;
+        std::pair<uint64_t, size_t> length_consumed = decodeNumber(array + i);
+        i += length_consumed.second; // Skip the varint-encoded length.
+        i += length_consumed.first;  // Skip the literal string data.
+      } else {
+        std::pair<uint64_t, size_t> symbol_consumed = decodeNumber(array + i);
+        i += symbol_consumed.second; // Skip the varint-encoded symbol.
+      }
+      ++count;
+    }
+    return count;
+  }
+
   /** @return the current string_view -- only valid to call if next()==TokenType::StringView */
   absl::string_view stringView() const {
 #ifndef NDEBUG
@@ -236,12 +281,35 @@ bool StatName::startsWith(StatName prefix) const {
 
 std::vector<absl::string_view> SymbolTable::decodeStrings(StatName stat_name) const {
   std::vector<absl::string_view> strings;
-  Thread::LockGuard lock(lock_);
-  Encoding::decodeTokens(
-      stat_name,
-      [this, &strings](Symbol symbol)
-          ABSL_NO_THREAD_SAFETY_ANALYSIS { strings.push_back(fromSymbol(symbol)); },
-      [&strings](absl::string_view str) { strings.push_back(str); });
+  absl::InlinedVector<std::pair<Symbol, size_t>, 8> symbol_positions;
+  Encoding::TokenIter iter(stat_name);
+  strings.reserve(iter.remainingTokens());
+
+  for (Encoding::TokenIter::TokenType type = iter.next();
+       type != Encoding::TokenIter::TokenType::End; type = iter.next()) {
+    if (type == Encoding::TokenIter::TokenType::Symbol) {
+      const Symbol symbol = iter.symbol();
+      if (symbol < WellKnownTokensNum) {
+        strings.push_back(kWellKnownTokens[symbol]);
+      } else {
+        symbol_positions.emplace_back(symbol, strings.size());
+        strings.push_back(absl::string_view()); // placeholder to be filled in later.
+      }
+    } else {
+      ASSERT(type == Encoding::TokenIter::TokenType::StringView);
+      strings.push_back(iter.stringView());
+    }
+  }
+
+  if (!symbol_positions.empty()) {
+    // Only take the lock if we have dynamic symbols to decode. We have already decoded the
+    // well-known symbols and the literal string symbols.
+    Thread::LockGuard lock(lock_);
+    for (const auto& symbol_position : symbol_positions) {
+      strings[symbol_position.second] = fromSymbol(symbol_position.first);
+    }
+  }
+
   return strings;
 }
 
@@ -285,19 +353,34 @@ void SymbolTable::addTokensToEncoding(const absl::string_view name, Encoding& en
   // string-splitting and prepare a temp vector of Symbol first.
   const std::vector<absl::string_view> tokens = absl::StrSplit(name, '.');
   std::vector<Symbol> symbols;
-  symbols.reserve(tokens.size());
+  symbols.resize(tokens.size());
+  absl::InlinedVector<std::pair<size_t, size_t>, 8> un_well_known_token_positions;
+  const auto& well_known_encode_map = wellKnownEncodeMap();
+
+  for (size_t i = 0; i < tokens.size(); ++i) {
+    const absl::string_view token = tokens[i];
+    const size_t hash = absl::Hash<std::string_view>{}(token);
+    auto well_known_search = well_known_encode_map.find(token, hash);
+    if (well_known_search != well_known_encode_map.end()) {
+      symbols[i] = well_known_search->second;
+    } else {
+      un_well_known_token_positions.emplace_back(i, hash);
+    }
+  }
 
   // Now take the lock and populate the Symbol objects, which involves bumping
   // ref-counts in this.
   {
     Thread::LockGuard lock(lock_);
     recent_lookups_.lookup(name);
-    for (auto& token : tokens) {
+    for (const auto& token_position : un_well_known_token_positions) {
+      const size_t i = token_position.first;
+      const size_t hash = token_position.second;
       // TODO(jmarantz): consider using StatNameDynamicStorage for tokens with
       // length below some threshold, say 4 bytes. It might be preferable not to
       // reserve Symbols for every 3 digit number found (for example) in ipv4
       // addresses.
-      symbols.push_back(toSymbol(token));
+      symbols[i] = toUnWellKnownSymbol(tokens[i], hash);
     }
   }
 
@@ -319,8 +402,24 @@ void SymbolTable::incRefCount(const StatName& stat_name) {
   // Before taking the lock, decode the array of symbols from the SymbolTable::Storage.
   const SymbolVec symbols = Encoding::decodeSymbols(stat_name);
 
+  // Well-known symbols are statically allocated and have no ref count. If the
+  // StatName only references well-known symbols, skip the lock entirely.
+  bool any_dynamic = false;
+  for (Symbol s : symbols) {
+    if (s >= FirstValidSymbol) {
+      any_dynamic = true;
+      break;
+    }
+  }
+  if (!any_dynamic) {
+    return;
+  }
+
   Thread::LockGuard lock(lock_);
   for (Symbol symbol : symbols) {
+    if (symbol < FirstValidSymbol) {
+      continue;
+    }
     auto decode_search = decode_map_.find(symbol);
 
     ASSERT(decode_search != decode_map_.end(),
@@ -341,8 +440,24 @@ void SymbolTable::free(const StatName& stat_name) {
   // Before taking the lock, decode the array of symbols from the SymbolTable::Storage.
   const SymbolVec symbols = Encoding::decodeSymbols(stat_name);
 
+  // Well-known symbols are statically allocated and have no ref count. If the
+  // StatName only references well-known symbols, skip the lock entirely.
+  bool any_dynamic = false;
+  for (Symbol s : symbols) {
+    if (s >= FirstValidSymbol) {
+      any_dynamic = true;
+      break;
+    }
+  }
+  if (!any_dynamic) {
+    return;
+  }
+
   Thread::LockGuard lock(lock_);
   for (Symbol symbol : symbols) {
+    if (symbol < FirstValidSymbol) {
+      continue;
+    }
     auto decode_search = decode_map_.find(symbol);
     ASSERT(decode_search != decode_map_.end());
 
@@ -439,9 +554,9 @@ StatNameSetPtr SymbolTable::makeSet(absl::string_view name) {
   return stat_name_set;
 }
 
-Symbol SymbolTable::toSymbol(absl::string_view sv) {
+Symbol SymbolTable::toUnWellKnownSymbol(absl::string_view sv, size_t hash) {
   Symbol result;
-  auto encode_find = encode_map_.find(sv);
+  auto encode_find = encode_map_.find(sv, hash);
   // If the string segment doesn't already exist,
   if (encode_find == encode_map_.end()) {
     // We create the actual string, place it in the decode_map_, and then insert
@@ -467,6 +582,12 @@ Symbol SymbolTable::toSymbol(absl::string_view sv) {
 
 absl::string_view SymbolTable::fromSymbol(const Symbol symbol) const
     ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
+  if (symbol < WellKnownTokensNum) {
+    // Well-known symbols are resolved without consulting decode_map_. The
+    // caller still holds the lock per the contract, but this skips the hash
+    // lookup entirely.
+    return kWellKnownTokens[symbol];
+  }
   auto search = decode_map_.find(symbol);
   RELEASE_ASSERT(search != decode_map_.end(), "no such symbol");
   return search->second->toStringView();

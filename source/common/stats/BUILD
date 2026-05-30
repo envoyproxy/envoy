@@ -195,7 +195,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "symbol_table_lib",
     srcs = ["symbol_table.cc"],
-    hdrs = ["symbol_table.h"],
+    hdrs = [
+        "symbol_table.h",
+        "well_known_tokens.h",
+    ],
     deps = [
         ":recent_lookups_lib",
         "//source/common/common:assert_lib",

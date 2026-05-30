@@ -446,10 +446,13 @@ private:
   /**
    * Convenience function for encode(), symbolizing one string segment at a time.
    *
-   * @param sv the individual string to be encoded as a symbol.
+   * @param sv the individual string to be encoded as a symbol. This should not contains the
+   * well-known tokens.
+   * @param hash the precomputed hash of the string.
    * @return Symbol the encoded string.
    */
-  Symbol toSymbol(absl::string_view sv) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  Symbol toUnWellKnownSymbol(absl::string_view sv, size_t hash)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   /**
    * Convenience function for decode(), decoding one symbol at a time.

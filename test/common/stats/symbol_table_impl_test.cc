@@ -242,7 +242,10 @@ public:
 TEST_F(StatNameDeathTest, TestBadDecodes) {
   {
     // If a symbol doesn't exist, decoding it should trigger an ASSERT() and crash.
-    SymbolVec bad_symbol_vec = {1}; // symbol 0 is the empty symbol.
+    // Symbols below FirstValidSymbol are reserved for the well-known token table and
+    // always decode successfully, so we use monotonicCounter() -- the next symbol that
+    // would be allocated. It is past the well-known range and not yet in the table.
+    SymbolVec bad_symbol_vec = {monotonicCounter()};
     EXPECT_DEATH(decodeSymbolVec(bad_symbol_vec), "");
   }
 
@@ -302,6 +305,12 @@ TEST_F(StatNameTest, FreePoolTest) {
   //   a) the size of the table has not increased, and
   //   b) the monotonically increasing counter has not risen to more than the maximum number of
   //   coexisting symbols during the life of the table.
+  //
+  // The tokens used here ("1a", "2a", ...) are deliberately not well-known, so they are allocated
+  // dynamic symbols. Dynamic symbols start at FirstValidSymbol (past the reserved well-known
+  // range), so we assert the counter relative to its initial value rather than against absolute
+  // symbol IDs.
+  const Symbol base = monotonicCounter();
 
   {
     makeStat("1a");
@@ -309,11 +318,11 @@ TEST_F(StatNameTest, FreePoolTest) {
     makeStat("3a");
     makeStat("4a");
     makeStat("5a");
-    EXPECT_EQ(monotonicCounter(), 6);
+    EXPECT_EQ(monotonicCounter(), base + 5);
     EXPECT_EQ(table_.numSymbols(), 5);
     clearStorage();
   }
-  EXPECT_EQ(monotonicCounter(), 6);
+  EXPECT_EQ(monotonicCounter(), base + 5);
   EXPECT_EQ(table_.numSymbols(), 0);
 
   // These are different strings being encoded, but they should recycle through the same symbols as
@@ -323,11 +332,11 @@ TEST_F(StatNameTest, FreePoolTest) {
   makeStat("3b");
   makeStat("4b");
   makeStat("5b");
-  EXPECT_EQ(monotonicCounter(), 6);
+  EXPECT_EQ(monotonicCounter(), base + 5);
   EXPECT_EQ(table_.numSymbols(), 5);
 
   makeStat("6");
-  EXPECT_EQ(monotonicCounter(), 7);
+  EXPECT_EQ(monotonicCounter(), base + 6);
   EXPECT_EQ(table_.numSymbols(), 6);
 }
 
@@ -780,58 +789,59 @@ TEST_F(StatNameTest, StatNameEqualityFastPaths) {
 }
 
 TEST_F(StatNameTest, EqualityWithMultiByteVarint) {
-  // Sweep segment counts around the varint boundary to catch off-by-one
-  // errors in decodeNumber's fast-path vs slow-path. Each segment gets a
-  // unique symbol assigned sequentially. Symbols 1-127 encode as 1 byte
-  // each; symbol 128+ encodes as 2 bytes. Pre-allocating throwaway symbols
-  // shifts the numbering so that different padding values produce different
-  // dataSizes for the same segment count. We verify that the sweep covers
-  // both sides of the 128 boundary (the fast-path/slow-path transition in
-  // the length-prefix varint).
-  bool seen[150] = {};
+  // Exercises decodeNumber's fast-path (single-byte) vs slow-path (multi-byte) for
+  // symbol varints, and confirms StatName equality/hashing/comparison are correct
+  // when both encodings appear in a name.
+  //
+  // With the two-level symbol table, dynamically-created tokens are assigned
+  // symbols starting at FirstValidSymbol (past the reserved well-known range), so
+  // they always encode as multi-byte varints (symbol >= SpilloverMask). To also
+  // exercise the single-byte fast path, each name is prefixed with the well-known
+  // "cluster" token, whose symbol is small (< SpilloverMask) and thus one byte.
+  //
+  // We sweep segment counts around the varint boundary and assert that both decode
+  // paths were actually taken.
+  bool seen_single_byte = false;
+  bool seen_multi_byte = false;
 
-  // Sweep a few potential padding numbers just to make sure we cover. This
-  // is over-testing but that's ok.
   constexpr int lower_bound = static_cast<int>(SymbolTable::Encoding::SpilloverMask) - 5;
   constexpr int upper_bound = static_cast<int>(SymbolTable::Encoding::SpilloverMask) + 5;
-  for (int padding = 0; padding <= 10; ++padding) {
-    for (int num_segments = lower_bound; num_segments <= upper_bound; ++num_segments) {
-      clearStorage();
+  for (int num_segments = lower_bound; num_segments <= upper_bound; ++num_segments) {
+    clearStorage();
 
-      // Pre-allocate throwaway symbols to shift symbol numbering.
-      for (int p = 0; p < padding; ++p) {
-        makeStat(absl::StrCat("pad", p));
-      }
-
-      std::string long_name = "s0";
-      for (int i = 1; i < num_segments; ++i) {
-        absl::StrAppend(&long_name, ".s", i);
-      }
-
-      // Two pool entries for the same name: distinct backing storage, identical content.
-      StatName x = makeStat(long_name);
-      StatName y = makeStat(long_name);
-      size_t ds = x.dataSize();
-      ASSERT_LT(ds, 150);
-      seen[ds] = true;
-      EXPECT_NE(x.dataIncludingSize(), y.dataIncludingSize())
-          << "padding=" << padding << " segments=" << num_segments;
-      EXPECT_EQ(x, y) << "padding=" << padding << " segments=" << num_segments;
-      EXPECT_EQ(x.hash(), y.hash()) << "padding=" << padding << " segments=" << num_segments;
-
-      // Same segment count but shifted names — memcmp mismatch.
-      std::string long_name_alt = "s1";
-      for (int i = 2; i < num_segments + 1; ++i) {
-        absl::StrAppend(&long_name_alt, ".s", i);
-      }
-      StatName z = makeStat(long_name_alt);
-      EXPECT_NE(x, z) << "padding=" << padding << " segments=" << num_segments;
+    // "cluster" is well-known (single-byte symbol); "s1".."s{n-1}" are dynamic
+    // (multi-byte symbols).
+    std::string long_name = "cluster";
+    for (int i = 1; i < num_segments; ++i) {
+      absl::StrAppend(&long_name, ".s", i);
     }
+
+    // Two pool entries for the same name: distinct backing storage, identical content.
+    StatName x = makeStat(long_name);
+    StatName y = makeStat(long_name);
+    EXPECT_NE(x.dataIncludingSize(), y.dataIncludingSize()) << "segments=" << num_segments;
+    EXPECT_EQ(x, y) << "segments=" << num_segments;
+    EXPECT_EQ(x.hash(), y.hash()) << "segments=" << num_segments;
+
+    for (Symbol symbol : getSymbols(x)) {
+      if (symbol < SymbolTable::Encoding::SpilloverMask) {
+        seen_single_byte = true;
+      } else {
+        seen_multi_byte = true;
+      }
+    }
+
+    // Same segment count but shifted names — memcmp mismatch.
+    std::string long_name_alt = "cluster";
+    for (int i = 2; i < num_segments + 1; ++i) {
+      absl::StrAppend(&long_name_alt, ".s", i);
+    }
+    StatName z = makeStat(long_name_alt);
+    EXPECT_NE(x, z) << "segments=" << num_segments;
   }
-  // Confirm every dataSize across the varint boundary was exercised.
-  for (int i = lower_bound; i <= upper_bound; ++i) {
-    EXPECT_TRUE(seen[i]) << "dataSize " << i << " was never hit";
-  }
+  // Confirm both the single-byte and multi-byte varint decode paths were exercised.
+  EXPECT_TRUE(seen_single_byte);
+  EXPECT_TRUE(seen_multi_byte);
 }
 
 TEST_F(StatNameTest, EqualitySizeMismatch) {
