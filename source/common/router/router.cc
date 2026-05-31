@@ -2190,6 +2190,84 @@ bool Filter::convertRequestHeadersForInternalRedirect(
     return false;
   }
 
+  // SSRF Protection: Block redirects to internal/private IP addresses and cloud metadata endpoints.
+  // This prevents malicious upstream servers from redirecting Envoy to steal cloud credentials
+  // or access internal services. See CVE-XXXX-XXXX.
+  {
+    absl::string_view target_host = absolute_url.hostAndPort();
+    // Remove port if present for IP validation
+    std::string host_only(target_host);
+    auto bracket_pos = host_only.find('[');
+    if (bracket_pos != std::string::npos) {
+      // IPv6 with brackets: [::1]:8080
+      auto bracket_end = host_only.find(']');
+      if (bracket_end != std::string::npos) {
+        host_only = host_only.substr(bracket_pos + 1, bracket_end - bracket_pos - 1);
+      }
+    } else {
+      auto colon_pos = host_only.rfind(':');
+      if (colon_pos != std::string::npos && host_only.find('.') != std::string::npos) {
+        // IPv4 with port: 1.2.3.4:8080
+        host_only = host_only.substr(0, colon_pos);
+      }
+    }
+
+    // Check for known dangerous hostnames (case-insensitive)
+    std::string host_lower = absl::AsciiStrToLower(host_only);
+    if (host_lower == "metadata.google.internal" || host_lower == "metadata.goog" ||
+        host_lower == "kubernetes.default.svc" || host_lower == "kubernetes.default") {
+      stats_.passthrough_internal_redirect_unsafe_target_.inc();
+      ENVOY_STREAM_LOG(trace, "Internal redirect blocked: dangerous hostname {}", 
+                       *callbacks_, target_host);
+      return false;
+    }
+
+    // Try to parse as IP address and check for dangerous ranges
+    auto address = Network::Utility::parseInternetAddressNoThrow(host_only);
+    if (address != nullptr && address->ip() != nullptr) {
+      // Block loopback addresses (127.0.0.0/8, ::1)
+      if (Network::Utility::isLoopbackAddress(*address)) {
+        stats_.passthrough_internal_redirect_unsafe_target_.inc();
+        ENVOY_STREAM_LOG(trace, "Internal redirect blocked: loopback address {}",
+                         *callbacks_, target_host);
+        return false;
+      }
+
+      // Block link-local addresses (169.254.0.0/16, fe80::/10)
+      // CRITICAL: Cloud metadata services (AWS, GCP, Azure) live at 169.254.169.254
+      if (address->ip()->isLinkLocalAddress()) {
+        stats_.passthrough_internal_redirect_unsafe_target_.inc();
+        ENVOY_STREAM_LOG(trace, "Internal redirect blocked: link-local/metadata address {}",
+                         *callbacks_, target_host);
+        return false;
+      }
+
+      // Block RFC1918 private ranges
+      if (address->ip()->version() == Network::Address::IpVersion::v4) {
+        uint32_t addr = ntohl(address->ip()->ipv4()->address());
+        bool is_private = ((addr & 0xFF000000) == 0x0A000000) ||  // 10.0.0.0/8
+                          ((addr & 0xFFF00000) == 0xAC100000) ||  // 172.16.0.0/12
+                          ((addr & 0xFFFF0000) == 0xC0A80000);    // 192.168.0.0/16
+        if (is_private) {
+          stats_.passthrough_internal_redirect_unsafe_target_.inc();
+          ENVOY_STREAM_LOG(trace, "Internal redirect blocked: private address {}",
+                           *callbacks_, target_host);
+          return false;
+        }
+      } else if (address->ip()->version() == Network::Address::IpVersion::v6) {
+        // Block IPv6 unique local addresses (fc00::/7)
+        absl::uint128 addr = address->ip()->ipv6()->address();
+        uint8_t first_byte = static_cast<uint8_t>(addr >> 120);
+        if ((first_byte & 0xFE) == 0xFC) {
+          stats_.passthrough_internal_redirect_unsafe_target_.inc();
+          ENVOY_STREAM_LOG(trace, "Internal redirect blocked: IPv6 unique local address {}",
+                           *callbacks_, target_host);
+          return false;
+        }
+      }
+    }
+  }
+
   const auto& policy = route_entry_->internalRedirectPolicy();
   // Don't change the scheme from the original request
   const bool scheme_is_http = schemeIsHttp(downstream_headers, callbacks_->connection());
@@ -2200,9 +2278,6 @@ bool Filter::convertRequestHeadersForInternalRedirect(
     stats_.passthrough_internal_redirect_unsafe_scheme_.inc();
     return false;
   }
-
-  const StreamInfo::FilterStateSharedPtr& filter_state = callbacks_->streamInfo().filterState();
-  // Make sure that performing the redirect won't result in exceeding the configured number of
   // redirects allowed for this route.
   StreamInfo::UInt32Accessor* num_internal_redirect{};
 
