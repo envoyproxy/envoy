@@ -1274,16 +1274,16 @@ params:
 class McpJsonRestBridgeStreamingFilterTest : public testing::Test {
 public:
   void SetUp() override {
-    envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config =
-        ParseTextProtoOrDie(R"pb(
-      tool_config {
-        tools {
-          name: "get_api_key"
-          http_rule: { get: "/v1/apiKeys" }
-          text_content_streaming_enabled: true
-        }
-      }
-    )pb");
+    envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
+    TestUtility::loadFromYaml(R"yaml(
+tool_config:
+  tools:
+    - name: get_api_key
+      http_rule:
+        get: "/v1/apiKeys"
+      text_content_streaming_enabled: true
+)yaml",
+                              proto_config);
     config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
     filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
