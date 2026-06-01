@@ -19,6 +19,7 @@ envoy_cc_library(
         "substitution_formatter.h",
     ],
     deps = [
+        ":builtin_command_parser_factory_helper_lib",
         "//envoy/api:api_interface",
         "//envoy/formatter:substitution_formatter_interface",
         "//envoy/stream_info:stream_info_interface",
@@ -68,6 +69,7 @@ envoy_cc_library(
     srcs = ["coalesce_formatter.cc"],
     hdrs = ["coalesce_formatter.h"],
     deps = [
+        ":builtin_command_parser_factory_helper_lib",
         ":substitution_format_utility_lib",
         "//envoy/formatter:substitution_formatter_interface",
         "//envoy/json:json_object_interface",
@@ -122,6 +124,7 @@ envoy_cc_library(
         "//source/common/json:json_utility_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/stream_info:utility_lib",
+        "@abseil-cpp//absl/status:statusor",
     ],
     alwayslink = 1,  # has factory registration
 )
@@ -131,6 +134,19 @@ envoy_cc_library(
     deps = [
         ":http_speicific_formatter_extension_lib",
         ":stream_info_formatter_extension_lib",
+    ],
+    alwayslink = 1,  # has factory registration
+)
+
+envoy_cc_library(
+    name = "builtin_command_parser_factory_helper_lib",
+    srcs = ["builtin_command_parser_factory_helper.cc"],
+    hdrs = ["builtin_command_parser_factory_helper.h"],
+    deps = [
+        "//envoy/formatter:substitution_formatter_interface",
+        "//envoy/registry",
+        "//source/common/common:assert_lib",
+        "//source/common/common:macros",
     ],
     alwayslink = 1,  # has factory registration
 )

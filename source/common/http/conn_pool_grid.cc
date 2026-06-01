@@ -210,6 +210,11 @@ ConnectivityGrid::StreamCreationResult
 ConnectivityGrid::WrapperCallbacks::newStream(ConnectionPool::Instance& pool) {
   ENVOY_LOG(trace, "{} pool attempting to create a new stream to host '{}'.", describePool(pool),
             grid_.origin_.hostname_);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.connectivity_grid_prevent_double_h2_scheduled") &&
+      grid_.http2_pool_ != nullptr && &pool == grid_.http2_pool_.get()) {
+    has_attempted_http2_ = true;
+  }
   auto attempt = std::make_unique<ConnectionAttemptCallbacks>(*this, pool);
   LinkedList::moveIntoList(std::move(attempt), connection_attempts_);
   if (!next_attempt_timer_->enabled()) {
