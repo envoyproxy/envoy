@@ -18,6 +18,8 @@ test_program(name = "no_op")
 
 test_program(name = "network_no_op")
 
+test_program(name = "listener_no_op")
+
 test_program(name = "no_program_init")
 
 test_program(name = "program_init_fail")
