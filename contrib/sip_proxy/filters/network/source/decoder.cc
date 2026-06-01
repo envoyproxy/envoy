@@ -111,23 +111,40 @@ int Decoder::reassemble(Buffer::Instance& data) {
 
       ssize_t content_length_end = remaining_data.search(
           "\r\n", strlen("\r\n"), content_length_start + strlen("Content-Length:"), content_pos);
+      if (content_length_end == -1) {
+        // No CRLF terminates the Content-Length header; wait for more data.
+        break;
+      }
 
-      // The "\n\r\n" is always included in remaining_data, so could not return -1
-      // if (content_length_end == -1) {
-      //   break;
-      // }
+      // The number of bytes occupied by the Content-Length value field (everything between the
+      // "Content-Length:" header name and its terminating CRLF) is fully attacker-controlled. It
+      // must be validated against the size of the fixed destination buffer below before copying,
+      // otherwise copyOut() (which is bounded only by the source buffer) overflows the stack.
+      char len[32]{}; // temporary storage for the decimal Content-Length value
+      const ssize_t name_len = static_cast<ssize_t>(strlen("Content-Length:"));
+      const ssize_t value_start = content_length_start + name_len;
+      const ssize_t value_len = content_length_end - value_start;
+      if (value_len <= 0 || static_cast<size_t>(value_len) >= sizeof(len)) {
+        // The value field is empty or implausibly long for a decimal length. The message is
+        // malformed and cannot be recovered. Exceptions must not be thrown on the request-processing
+        // path, so stop reassembly without dispatching the message rather than raising an error.
+        ENVOY_LOG(debug, "sip: invalid Content-Length value field width ({}); dropping message",
+                  value_len);
+        break;
+      }
 
-      char len[10]{}; // temporary storage
-      remaining_data.copyOut(content_length_start + strlen("Content-Length:"),
-                             content_length_end - content_length_start - strlen("Content-Length:"),
-                             len);
+      remaining_data.copyOut(value_start, value_len, len);
+      // Explicitly NUL-terminate before std::atoi(). The bound above guarantees
+      // value_len <= sizeof(len) - 1, so len[value_len] is always in range and leaves room for the
+      // terminator (rather than relying on the buffer's zero-initialization).
+      len[value_len] = '\0';
 
-      clen = std::atoi(len);
-
-      // atoi return value >= 0, could not < 0
-      // if (clen < static_cast<size_t>(0)) {
-      //   break;
-      // }
+      const int parsed_clen = std::atoi(len);
+      if (parsed_clen < 0) {
+        ENVOY_LOG(debug, "sip: negative Content-Length value ({}); dropping message", parsed_clen);
+        break;
+      }
+      clen = static_cast<size_t>(parsed_clen);
 
       full_msg_len = content_pos + clen;
     }
