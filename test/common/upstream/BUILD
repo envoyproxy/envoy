@@ -506,6 +506,7 @@ envoy_cc_test(
     deps = [
         "//envoy/upstream:upstream_interface",
         "//source/common/upstream:resource_manager_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
     ],

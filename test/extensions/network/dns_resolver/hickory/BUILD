@@ -31,6 +31,15 @@ HICKORY_ABI_IMPL_DEPS = [
 envoy_extension_cc_test(
     name = "hickory_dns_impl_test",
     srcs = ["hickory_dns_impl_test.cc"],
+    data = [
+        # Failure-path stubs loaded via ENVOY_DYNAMIC_MODULES_SEARCH_PATH:
+        #   - ``dns_resolver_config_new_fail``: exports all 7 DNS resolver ABI symbols, returns null
+        #     from ``on_dns_resolver_config_new`` to exercise the Rust-rejection path.
+        #   - ``matcher_no_op``: exports ``program_init`` but no DNS resolver symbols, exercising the
+        #     ABI-symbol-resolution failure path.
+        "//test/extensions/dynamic_modules/test_data/c:dns_resolver_config_new_fail",
+        "//test/extensions/dynamic_modules/test_data/c:matcher_no_op",
+    ],
     extension_names = ["envoy.network.dns_resolver.hickory"],
     rbe_pool = "6gig",
     tags = [
@@ -47,6 +56,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/network/dns_resolver/hickory:config",
         "//test/common/stats:stat_test_utility_lib",
+        "//test/extensions/dynamic_modules:util",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/network/dns_resolver/hickory/v3:pkg_cc_proto",
     ] + HICKORY_ABI_IMPL_DEPS,

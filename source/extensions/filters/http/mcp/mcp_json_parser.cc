@@ -649,7 +649,7 @@ void McpFieldExtractor::copySelectedFields() {
   }
 }
 
-void McpFieldExtractor::copyFieldByPath(const std::string& path) {
+void McpFieldExtractor::copyFieldByPath(absl::string_view path) {
   std::vector<absl::string_view> segments = absl::StrSplit(path, '.');
 
   // Navigate source to find value
@@ -692,7 +692,7 @@ void McpFieldExtractor::copyFieldByPath(const std::string& path) {
 
   // Copy the final value
   (*current_dest->mutable_fields())[segments.back()] = *value;
-  extracted_fields_.insert(path);
+  extracted_fields_.emplace(std::string(path));
 }
 
 void McpFieldExtractor::validateRequiredFields() {
@@ -748,7 +748,7 @@ const std::string& McpJsonParser::getMethod() const {
   return extractor_ ? extractor_->getMethod() : empty;
 }
 
-const Protobuf::Value* McpJsonParser::getNestedValue(const std::string& dotted_path) const {
+const Protobuf::Value* McpJsonParser::getNestedValue(absl::string_view dotted_path) const {
   if (dotted_path.empty()) {
     return nullptr;
   }

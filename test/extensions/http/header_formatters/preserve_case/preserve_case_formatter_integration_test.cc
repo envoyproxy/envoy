@@ -2,6 +2,7 @@
 
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
+#include "test/extensions/http/header_formatters/preserve_case/preserve_case_filter.pb.h"
 #include "test/integration/filters/common.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/registry.h"
@@ -104,7 +105,10 @@ public:
     HttpIntegrationTest::initialize();
   }
 
-  SimpleFilterConfig<PreserveCaseFilter> factory_;
+  UniqueSimpleFilterConfig<
+      PreserveCaseFilter,
+      test::extensions::http::header_formatters::preserve_case::PreserveCaseFilterConfig>
+      factory_;
   Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration_;
 };
 
@@ -115,7 +119,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, PreserveCaseIntegrationTest,
 // Verify that we preserve case in both directions.
 TEST_P(PreserveCaseIntegrationTest, EndToEnd) {
   config_helper_.prependFilter(R"EOF(
-  name: preserve-case-filter
+    name: preserve-case-filter
+    typed_config:
+      "@type": type.googleapis.com/test.extensions.http.header_formatters.preserve_case.PreserveCaseFilterConfig
   )EOF");
   initialize();
 

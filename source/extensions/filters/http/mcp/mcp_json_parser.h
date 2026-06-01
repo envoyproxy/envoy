@@ -150,7 +150,7 @@ private:
 
   // Copy selected fields from temp to final
   void copySelectedFields();
-  void copyFieldByPath(const std::string& path);
+  void copyFieldByPath(absl::string_view path);
 
   // Validate required fields
   void validateRequiredFields();
@@ -237,7 +237,7 @@ public:
   const Protobuf::Struct& metadata() const { return metadata_; }
 
   // Helper to get nested value from metadata
-  const Protobuf::Value* getNestedValue(const std::string& dotted_path) const;
+  const Protobuf::Value* getNestedValue(absl::string_view dotted_path) const;
 
   // Reset parser for reuse
   void reset();

@@ -4,6 +4,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/http/router/v3/router.pb.h"
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
@@ -125,6 +126,8 @@ TEST_P(UpstreamAccessLogTest, UpstreamFilterState) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     envoy::config::core::v3::TransportSocket inner_socket;
     inner_socket.set_name("envoy.transport_sockets.raw_buffer");
+    envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer_config;
+    inner_socket.mutable_typed_config()->PackFrom(raw_buffer_config);
     test::integration::upstream_socket::v3::Config proto_config;
     proto_config.mutable_transport_socket()->MergeFrom(inner_socket);
 

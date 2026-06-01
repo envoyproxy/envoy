@@ -14,6 +14,8 @@ namespace NetworkFilters {
 namespace Common {
 namespace Redis {
 
+constexpr int MaxArrayNestingDepth = 128;
+
 /**
  * Decoder implementation of https://redis.io/topics/protocol
  *

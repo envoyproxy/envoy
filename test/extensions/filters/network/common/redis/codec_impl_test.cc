@@ -845,6 +845,18 @@ TEST_F(RedisEncoderDecoderImplTest, InvalidInterjectedInlineCommand) {
   EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
 }
 
+TEST_F(RedisEncoderDecoderImplTest, NestedArrayDepthLimitExceeded) {
+  // Nesting depth of MaxArrayNestingDepth + 1 arrays
+  std::string payload = "";
+  for (int i = 0; i < MaxArrayNestingDepth + 1; ++i) {
+    payload += "*1\r\n";
+  }
+  payload += "+foo\r\n";
+
+  buffer_.add(payload);
+  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+}
+
 } // namespace Redis
 } // namespace Common
 } // namespace NetworkFilters

@@ -1172,6 +1172,33 @@ TEST_F(ConnectivityGridTest, NewStreamWithAltSvcDisabledFail) {
   EXPECT_FALSE(grid_->isHttp3Broken());
 }
 
+// Test that when starting with HTTP/2 (e.g. H3 disabled) and TCP connection fails,
+// we do not schedule a redundant second TCP attempt.
+TEST_F(ConnectivityGridTest, NewStreamWithHttp3DisabledTcpFailsNoDoubleAttempt) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.connectivity_grid_prevent_double_h2_scheduled", "true"}});
+
+  addHttp3AlternateProtocol();
+  initialize();
+
+  // 1. Start the stream. It will attempt H2.
+  auto cancel = grid_->newStream(decoder_, callbacks_,
+                                 {/*can_send_early_data_=*/false,
+                                  /*can_use_http3_=*/false});
+  EXPECT_NE(cancel, nullptr);
+  EXPECT_NE(grid_->http2Pool(), nullptr);
+
+  // 2. Expect no further newStream calls on the H2 pool.
+  EXPECT_CALL(*grid_->http2Pool(), newStream(_, _, _)).Times(0);
+
+  // 3. Trigger the failure of the first H2 attempt asynchronously.
+  // We expect the failure to be propagated to the original caller.
+  EXPECT_CALL(callbacks_.pool_failure_, ready());
+  grid_->callbacks(0)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                     "reason", host_);
+}
+
 // Test that after the first pool fails, subsequent connections will
 // successfully fail over to the second pool (the iterators work as intended)
 TEST_F(ConnectivityGridTest, FailureThenSuccessForMultipleConnectionsSerial) {
