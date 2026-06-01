@@ -170,6 +170,8 @@ public:
   const HttpUri& oauthTokenEndpoint() const { return oauth_token_endpoint_; }
   const Http::Utility::Url& authorizationEndpointUrl() const { return authorization_endpoint_url_; }
   const std::string& endSessionEndpoint() const { return end_session_endpoint_; }
+  const std::string& postLogoutRedirectUri() const { return post_logout_redirect_uri_; }
+  bool disablePostLogoutRedirectUri() const { return disable_post_logout_redirect_uri_; }
   const Http::Utility::QueryParamsMulti& authorizationQueryParams() const {
     return authorization_query_params_;
   }
@@ -242,6 +244,8 @@ private:
   const std::string authorization_endpoint_;
   Http::Utility::Url authorization_endpoint_url_;
   const std::string end_session_endpoint_;
+  const std::string post_logout_redirect_uri_;
+  const bool disable_post_logout_redirect_uri_ : 1;
   const Http::Utility::QueryParamsMulti authorization_query_params_;
   const std::string client_id_;
   const std::string redirect_uri_;
