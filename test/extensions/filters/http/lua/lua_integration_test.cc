@@ -5,6 +5,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 
+#include "test/extensions/filters/http/lua/lua_test_filter.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/registry.h"
@@ -1706,11 +1707,13 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<Protobuf::Any>();
+    return std::make_unique<test::extensions::filters::http::lua::TestTypedMetadataFilterConfig>();
   }
 
   std::string name() const override { return "envoy.test.typed_metadata"; }
-  std::set<std::string> configTypes() override { return {}; };
+  std::set<std::string> configTypes() override {
+    return {"test.extensions.filters.http.lua.TestTypedMetadataFilterConfig"};
+  }
 };
 
 // ``PPV2`` typed metadata filter that mimics the real proxy protocol behavior
@@ -1782,11 +1785,13 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<Protobuf::Any>();
+    return std::make_unique<test::extensions::filters::http::lua::PPV2TypedMetadataFilterConfig>();
   }
 
   std::string name() const override { return "envoy.test.ppv2.typed_metadata"; }
-  std::set<std::string> configTypes() override { return {}; };
+  std::set<std::string> configTypes() override {
+    return {"test.extensions.filters.http.lua.PPV2TypedMetadataFilterConfig"};
+  }
 };
 
 TEST_P(LuaIntegrationTest, ConnectionTypedMetadata) {
@@ -1798,7 +1803,7 @@ TEST_P(LuaIntegrationTest, ConnectionTypedMetadata) {
   const std::string FILTER_CONFIG = R"EOF(
 name: envoy.test.typed_metadata
 typed_config:
-  "@type": type.googleapis.com/google.protobuf.Any
+  "@type": type.googleapis.com/test.extensions.filters.http.lua.TestTypedMetadataFilterConfig
 )EOF";
 
   config_helper_.addNetworkFilter(FILTER_CONFIG);
@@ -1913,7 +1918,7 @@ TEST_P(LuaIntegrationTest, ProxyProtocolTypedMetadata) {
   const std::string FILTER_CONFIG = R"EOF(
 name: envoy.test.ppv2.typed_metadata
 typed_config:
-  "@type": type.googleapis.com/google.protobuf.Any
+  "@type": type.googleapis.com/test.extensions.filters.http.lua.PPV2TypedMetadataFilterConfig
 )EOF";
 
   config_helper_.addNetworkFilter(FILTER_CONFIG);

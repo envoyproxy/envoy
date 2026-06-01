@@ -1,5 +1,6 @@
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
@@ -42,6 +43,8 @@ public:
     transport_socket->set_name("envoy.transport_sockets.tap");
     envoy::config::core::v3::TransportSocket raw_transport_socket;
     raw_transport_socket.set_name("envoy.transport_sockets.raw_buffer");
+    envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer_config;
+    raw_transport_socket.mutable_typed_config()->PackFrom(raw_buffer_config);
     envoy::extensions::transport_sockets::tap::v3::Tap tap_config =
         createTapConfig(raw_transport_socket);
     tap_config.mutable_transport_socket()->MergeFrom(raw_transport_socket);

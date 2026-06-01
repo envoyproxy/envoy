@@ -10,6 +10,7 @@
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
+#include "test/extensions/filters/http/wasm/wasm_test_filters.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/registry.h"
@@ -361,11 +362,12 @@ private:
 };
 
 class WasmDeferredDataSetupFilterConfig
-    : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+    : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<
+          test::extensions::filters::http::wasm::WasmDeferredDataSetupFilterConfig> {
 public:
   explicit WasmDeferredDataSetupFilterConfig(
       std::shared_ptr<WasmDeferredDataSetupFilterState> state)
-      : EmptyHttpFilterConfig("setup-filter"), state_(std::move(state)) {}
+      : UniqueEmptyHttpFilterConfig("setup-filter"), state_(std::move(state)) {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
@@ -416,8 +418,10 @@ TEST_P(WasmDeferredDataTest, InvalidContextIdPanicOnDeferredData) {
 
   // Prepend the setup filter (will end up second in chain).
   config_helper_.prependFilter(R"EOF(
-name: setup-filter
-)EOF");
+    name: setup-filter
+    typed_config:
+      "@type": type.googleapis.com/test.extensions.filters.http.wasm.WasmDeferredDataSetupFilterConfig
+  )EOF");
 
   // Prepend the Wasm filter (will end up first in chain — hit by deferred data).
   // Use FAIL_RELOAD so that any Wasm panic during the test (i.e. the bug

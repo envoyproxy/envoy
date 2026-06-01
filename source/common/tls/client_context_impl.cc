@@ -64,7 +64,6 @@ ClientContextImpl::ClientContextImpl(
       server_name_indication_(config.serverNameIndication()),
       auto_host_sni_(config.autoHostServerNameIndication()),
       allow_renegotiation_(config.allowRenegotiation()),
-      enforce_rsa_key_usage_(config.enforceRsaKeyUsage()),
       max_session_keys_(config.maxSessionKeys()) {
   if (!creation_status.ok()) {
     return;
@@ -175,8 +174,6 @@ ClientContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& o
   if (allow_renegotiation_) {
     SSL_set_renegotiate_mode(ssl_con.get(), ssl_renegotiate_freely);
   }
-
-  SSL_set_enforce_rsa_key_usage(ssl_con.get(), enforce_rsa_key_usage_);
 
   if (max_session_keys_ > 0) {
     if (session_keys_single_use_) {

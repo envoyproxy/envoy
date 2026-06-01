@@ -46,12 +46,16 @@ areas:
     title: attributes
   build:
     title: build
+  circuit_breaker:
+    title: circuit_breaker
   composite:
     title: composite
   dns_resolver:
     title: dns_resolver
   dynamic_modules:
     title: dynamic_modules
+  gcp_authn:
+    title: gcp_authn
   golang:
     title: golang
   http:
