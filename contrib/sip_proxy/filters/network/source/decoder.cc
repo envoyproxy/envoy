@@ -1,5 +1,11 @@
 #include "contrib/sip_proxy/filters/network/source/decoder.h"
 
+#include <algorithm>
+#include <cstdint>
+
+#include "absl/strings/ascii.h"
+#include "absl/strings/numbers.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -112,22 +118,55 @@ int Decoder::reassemble(Buffer::Instance& data) {
       ssize_t content_length_end = remaining_data.search(
           "\r\n", strlen("\r\n"), content_length_start + strlen("Content-Length:"), content_pos);
 
-      // The "\n\r\n" is always included in remaining_data, so could not return -1
-      // if (content_length_end == -1) {
-      //   break;
-      // }
+      // Security: the trailing "\r\n" of the Content-Length header is NOT
+      // guaranteed to exist within the searched window for a malformed or
+      // truncated message (the previous code wrongly assumed it always did and
+      // removed this check). If it is missing, search() returns -1 and the
+      // length arithmetic below would underflow into a huge unsigned value that
+      // is then handed to copyOut(). Bail out and wait for more data instead.
+      if (content_length_end == -1) {
+        break;
+      }
 
-      char len[10]{}; // temporary storage
-      remaining_data.copyOut(content_length_start + strlen("Content-Length:"),
-                             content_length_end - content_length_start - strlen("Content-Length:"),
-                             len);
+      // Length of the Content-Length header value (may include surrounding
+      // whitespace). This span is fully attacker controlled.
+      const ssize_t value_len = content_length_end - content_length_start -
+                                static_cast<ssize_t>(strlen("Content-Length:"));
+      if (value_len <= 0) {
+        // Malformed header such as "Content-Length:\r\n"; skip the message.
+        break;
+      }
 
-      clen = std::atoi(len);
+      // Security fix (CWE-121 stack buffer overflow / CWE-787 out-of-bounds
+      // write): Buffer::copyOut() performs a raw memcpy bounded only by the
+      // *source* buffer length, never by the destination. The previous code
+      // passed the full, attacker-controlled `value_len` as the copy size into a
+      // fixed 10-byte stack buffer, so a Content-Length whose value was longer
+      // than the buffer (e.g. "Content-Length: 99999999999999999999") wrote
+      // attacker-controlled bytes past `len` on the stack. That is a remote
+      // stack-write primitive and a reliable DoS (stack-smashing detection
+      // aborts the process). Clamp the copy to the destination size and always
+      // keep room for the NUL terminator. A SIP Content-Length is only ever a
+      // handful of digits, so clamping cannot turn a legitimate value into a
+      // smaller-but-valid number (an over-long value is rejected by the parse
+      // below as out of range).
+      char len[16] = {}; // zero-initialized, so always NUL terminated after copy
+      const size_t copy_len = std::min(static_cast<size_t>(value_len), sizeof(len) - 1);
+      remaining_data.copyOut(content_length_start + strlen("Content-Length:"), copy_len, len);
 
-      // atoi return value >= 0, could not < 0
-      // if (clen < static_cast<size_t>(0)) {
-      //   break;
-      // }
+      // Parse defensively. std::atoi() has undefined behaviour on overflow and
+      // silently turns a negative value (e.g. "Content-Length: -1") into an
+      // enormous size_t, corrupting the full-message-length computation below.
+      // absl::SimpleAtoi() rejects non-numeric, negative and out-of-range input,
+      // returning false instead.
+      uint32_t parsed_clen = 0;
+      if (!absl::SimpleAtoi(absl::StripAsciiWhitespace(absl::string_view(len, copy_len)),
+                            &parsed_clen)) {
+        // Non-numeric, negative or overflowing Content-Length: drop the message
+        // rather than trusting an attacker-supplied length.
+        break;
+      }
+      clen = parsed_clen;
 
       full_msg_len = content_pos + clen;
     }
