@@ -4325,6 +4325,27 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_scheduler_commit(
 ) {
 }
 
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_run_on_all_workers(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  _event_id: u64,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_worker_slot_set(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  _data_module_ptr: abi::envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_worker_slot_get(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr {
+  std::ptr::null_mut()
+}
+
 // Cluster config metrics FFI stubs for testing.
 
 #[no_mangle]
