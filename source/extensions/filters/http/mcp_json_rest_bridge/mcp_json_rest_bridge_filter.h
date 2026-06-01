@@ -12,6 +12,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/mcp_json_rest_bridge/sse_response_extractor.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/statusor.h"
@@ -142,6 +143,11 @@ private:
   std::string streaming_json_prefix_;
   std::string streaming_json_suffix_;
   bool is_first_streaming_chunk_ = true;
+
+  // Whether the response is SSE.
+  bool is_sse_response_ = false;
+  bool is_first_sse_event_ = true;
+  SseResponseExtractor sse_response_extractor_;
 
   McpJsonRestBridgeFilterConfigSharedPtr config_;
 };

@@ -1435,6 +1435,29 @@ TEST_F(McpJsonRestBridgeStreamingFilterTest, ErrorResponseSetsIsErrorTrue) {
           R"json({"id":123,"jsonrpc":"2.0","result":{"content":[{"text":"Internal Server Error","type":"text"}],"isError":true}})json"));
 }
 
+TEST_F(McpJsonRestBridgeStreamingFilterTest, SseResponseStreaming) {
+  sendToolsCallRequest();
+
+  response_headers_ = {{":status", "200"}, {"content-type", "text/event-stream"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::Continue);
+  EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
+
+  Buffer::OwnedImpl chunk1("data: {\"a\": 1}\n\n");
+  EXPECT_EQ(filter_->encodeData(chunk1, /*end_stream=*/false), Http::FilterDataStatus::Continue);
+  EXPECT_THAT(chunk1.toString(), testing::StartsWith("{\"id\":123,"));
+
+  Buffer::OwnedImpl chunk2("data: {\"b\": 2}\n\n");
+  EXPECT_EQ(filter_->encodeData(chunk2, /*end_stream=*/true), Http::FilterDataStatus::Continue);
+  EXPECT_THAT(chunk2.toString(), testing::EndsWith("}}"));
+
+  const std::string full = chunk1.toString() + chunk2.toString();
+  EXPECT_EQ(
+      nlohmann::json::parse(full),
+      nlohmann::json::parse(
+          R"json({"id":123,"jsonrpc":"2.0","result":{"content":[{"text":"{\"a\": 1}","type":"text"},{"text":"{\"b\": 2}","type":"text"}],"isError":false}})json"));
+}
+
 class McpHttpMethodFilterTest : public testing::TestWithParam<std::string> {
 public:
   void SetUp() override {

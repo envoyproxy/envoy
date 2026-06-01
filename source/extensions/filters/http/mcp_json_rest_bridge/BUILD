@@ -15,6 +15,7 @@ envoy_cc_library(
     hdrs = ["mcp_json_rest_bridge_filter.h"],
     deps = [
         ":http_request_builder_lib",
+        ":sse_response_extractor_lib",
         "//envoy/http:filter_interface",
         "//envoy/server:filter_config_interface",
         "//source/common/common:logger_lib",
@@ -49,5 +50,15 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/json:json_loader_lib",
         "@envoy_api//envoy/extensions/filters/http/mcp_json_rest_bridge/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "sse_response_extractor_lib",
+    srcs = ["sse_response_extractor.cc"],
+    hdrs = ["sse_response_extractor.h"],
+    deps = [
+        "//source/common/http/sse:sse_parser_lib",
+        "@abseil-cpp//absl/strings",
     ],
 )

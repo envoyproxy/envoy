@@ -12,6 +12,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/common/mcp/constants.h"
 #include "source/extensions/filters/http/mcp_json_rest_bridge/http_request_builder.h"
+#include "source/extensions/filters/http/mcp_json_rest_bridge/sse_response_extractor.h"
 
 #include "absl/base/no_destructor.h"
 #include "absl/container/flat_hash_set.h"
@@ -34,6 +35,13 @@ namespace McpConstants = Envoy::Extensions::Filters::Common::Mcp::McpConstants;
 
 constexpr uint32_t DEFAULT_MAX_REQUEST_BODY_SIZE = 1024 * 64;    // 64KB
 constexpr uint32_t DEFAULT_MAX_RESPONSE_BODY_SIZE = 1024 * 1024; // 1MB
+
+// Check if content type is text/event-stream, ignoring parameters like charset.
+// HTTP Content-Type is case-insensitive.
+bool isSseContentType(absl::string_view content_type) {
+  absl::string_view normalized = StringUtil::trim(StringUtil::cropRight(content_type, ";"));
+  return absl::EqualsIgnoreCase(normalized, Http::Headers::get().ContentTypeValues.TextEventStream);
+}
 
 bool isMcpProtocolVersionSupported(absl::string_view protocol_version) {
   static const absl::NoDestructor<absl::flat_hash_set<absl::string_view>> supported_mcp_versions({
@@ -276,6 +284,7 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
   // (final size is unknown), and let the headers flow through immediately so
   // the client can start receiving data without waiting for the full body.
   if (mcp_operation_ == McpOperation::ToolsCall && text_content_streaming_enabled_) {
+    is_sse_response_ = isSseContentType(response_headers.getContentTypeValue());
     buildStreamingPrefixAndSuffix(getResponseCode(response_headers) >=
                                   static_cast<int>(Http::Code::BadRequest));
     response_headers.removeContentLength();
@@ -309,9 +318,26 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& dat
     // is false on the last data frame). It is a no-op here; the suffix will be appended in
     // encodeTrailers.
     absl::string_view chunk(static_cast<const char*>(data.linearize(len)), len);
-    // TODO(guoyilin42): Consider adding text/event-stream backend response support and explore if
-    // it needs buffering.
-    std::string escaped_chunk = JsonEscaper::escapeString(chunk, JsonEscaper::extraSpace(chunk));
+
+    std::string output_to_add;
+    if (is_sse_response_) {
+      std::vector<std::string> event_payloads =
+          sse_response_extractor_.processChunk(chunk, end_stream);
+      for (const auto& event_payload : event_payloads) {
+        json content_item;
+        content_item[McpConstants::TYPE_FIELD] = McpConstants::TEXT_FIELD;
+        content_item[McpConstants::TEXT_FIELD] = event_payload;
+        std::string serialized_item = content_item.dump();
+        if (!is_first_sse_event_) {
+          absl::StrAppend(&output_to_add, ",");
+        } else {
+          is_first_sse_event_ = false;
+        }
+        absl::StrAppend(&output_to_add, serialized_item);
+      }
+    } else {
+      output_to_add = JsonEscaper::escapeString(chunk, JsonEscaper::extraSpace(chunk));
+    }
 
     data.drain(len);
     // Note: UTF-8 structural validation (i.e., utf8_range::IsStructurallyValid) is omitted
@@ -322,14 +348,16 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& dat
     if (is_first_streaming_chunk_) {
       ENVOY_STREAM_LOG(debug,
                        "Streaming: emitting prefix + first chunk ({} raw bytes, {} escaped bytes).",
-                       *encoder_callbacks_, len, escaped_chunk.size());
+                       *encoder_callbacks_, len, output_to_add.size());
       data.add(streaming_json_prefix_);
       is_first_streaming_chunk_ = false;
     } else {
       ENVOY_STREAM_LOG(debug, "Streaming: forwarding chunk ({} raw bytes, {} escaped bytes).",
-                       *encoder_callbacks_, len, escaped_chunk.size());
+                       *encoder_callbacks_, len, output_to_add.size());
     }
-    data.add(escaped_chunk);
+
+    data.add(output_to_add);
+
     // TODO(guoyilin42): There will be a case that end_stream is not set in the encodeData call.
     // This is body + trailer case where encodeTrailer call represents the end of response body.
     // In that case, we should add the streaming_json_suffix at encodeTrailer call.
@@ -382,6 +410,28 @@ Http::FilterTrailersStatus McpJsonRestBridgeFilter::encodeTrailers(Http::Respons
 }
 
 void McpJsonRestBridgeFilter::buildStreamingPrefixAndSuffix(bool is_error) {
+  if (is_sse_response_) {
+    json ref = {
+        {McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
+        {McpConstants::ID_FIELD, *session_id_},
+        {McpConstants::RESULT_FIELD,
+         {
+             {McpConstants::CONTENT_FIELD, json::array()},
+             {McpConstants::IS_ERROR_FIELD, is_error},
+         }},
+    };
+    std::string ref_json = ref.dump();
+    std::string marker = absl::StrCat("\"", McpConstants::CONTENT_FIELD, "\":[]");
+    size_t pos = ref_json.find(marker);
+    if (pos == std::string::npos) {
+      IS_ENVOY_BUG("JSON-RPC streaming marker not found in serialized envelope");
+      return;
+    }
+    streaming_json_prefix_ = ref_json.substr(0, pos + marker.size() - 1);
+    streaming_json_suffix_ = ref_json.substr(pos + marker.size() - 1);
+    return;
+  }
+
   // Build a reference JSON-RPC envelope with an empty text placeholder.
   json ref = {
       {McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
