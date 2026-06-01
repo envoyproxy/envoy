@@ -1,7 +1,6 @@
 #include "source/extensions/filters/http/mcp_json_rest_bridge/http_request_builder.h"
 
 #include "test/test_common/status_utility.h"
-
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -22,7 +21,8 @@ TEST(HttpRequestBuilderTest, WildCardHttpRuleBodyContainsAllArgumentsNotInPath) 
   TestUtility::loadFromYaml(R"yaml(
 get: "/v1/{parent=projects/*}"
 body: "*"
-)yaml", http_rule);
+)yaml",
+                            http_rule);
 
   json arguments = json::parse(R"json({
     "shelf": {
@@ -66,7 +66,8 @@ TEST(HttpRequestBuilderTest, ExtractHttpRuleBody) {
   TestUtility::loadFromYaml(R"yaml(
 post: "/v1/{parent=projects/*}"
 body: "shelf"
-)yaml", http_rule);
+)yaml",
+                            http_rule);
 
   json arguments = json::parse(R"json({
     "shelf": {
@@ -106,7 +107,8 @@ TEST(HttpRequestBuilderTest, PrimitiveArrayInQueryParameters) {
   HttpRule http_rule;
   TestUtility::loadFromYaml(R"yaml(
 put: "/v1/{parent=projects/*}/shelves/{shelf.name}"
-)yaml", http_rule);
+)yaml",
+                            http_rule);
   json arguments = json::parse(R"json({
     "shelf": {
       "name": "science-fiction",
@@ -131,7 +133,8 @@ TEST(HttpRequestBuilderTest, ObjectArrayInQueryParameters) {
   HttpRule http_rule;
   TestUtility::loadFromYaml(R"yaml(
 patch: "/v1/{parent=projects/*}/shelves/{shelf.name}"
-)yaml", http_rule);
+)yaml",
+                            http_rule);
   json arguments = json::parse(R"json({
     "shelf": {
       "name": "science-fiction",
@@ -157,7 +160,8 @@ TEST(HttpRequestBuilderTest, PrimitiveTypeInQueryParameters) {
   HttpRule http_rule;
   TestUtility::loadFromYaml(R"yaml(
 delete: "/v1/{parent=projects/*}"
-)yaml", http_rule);
+)yaml",
+                            http_rule);
   json arguments = json::parse(R"json({
     "integer": 123,
     "float": 123.456,
@@ -181,7 +185,8 @@ TEST(HttpRequestBuilderTest, NestedPathInPathTemplate) {
   TestUtility::loadFromYaml(R"yaml(
 get: "/v1/{parent=projects/*}/shelves/{shelf.name}"
 body: "*"
-)yaml", http_rule);
+)yaml",
+                            http_rule);
   json arguments = json::parse(R"json({
     "shelf": {
       "name": "science-fiction",
@@ -208,7 +213,8 @@ TEST(HttpRequestBuilderTest, PathTemplateNotInArgumentsReturnError) {
   HttpRule http_rule;
   TestUtility::loadFromYaml(R"yaml(
 get: "/v1/{parent=projects/*}"
-)yaml", http_rule);
+)yaml",
+                            http_rule);
   json arguments = json::parse(R"json({
     "string": "test string"
   })json");
@@ -221,7 +227,8 @@ TEST(HttpRequestBuilderTest, FailToExtractBodyReturnError) {
   TestUtility::loadFromYaml(R"yaml(
 get: "/v1"
 body: "foo"
-)yaml", http_rule);
+)yaml",
+                            http_rule);
   json arguments = json::parse(R"json({})json");
 
   EXPECT_THAT(buildHttpRequest(http_rule, arguments), StatusIs(absl::StatusCode::kInvalidArgument));

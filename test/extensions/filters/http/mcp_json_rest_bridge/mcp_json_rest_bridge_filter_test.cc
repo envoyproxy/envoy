@@ -43,7 +43,8 @@ tool_config:
         get: "/v1/apiKeys"
   tool_list_http_rule:
     get: "/discovery/v1/service/foo.googleapis.com/mcptools"
-)yaml", proto_config);
+)yaml",
+                              proto_config);
     config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
     filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -1156,7 +1157,8 @@ TEST_F(McpJsonRestBridgeFilterTest, RequestBodyExceedsLimitReturnsError) {
   TestUtility::loadFromYaml(R"yaml(
 max_request_body_size:
   value: 10
-)yaml", proto_config);
+)yaml",
+                            proto_config);
   config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
   filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -1185,7 +1187,8 @@ tool_config:
       http_rule:
         post: "/v1/{parent=projects/*}/apiKeys"
         body: key
-)yaml", proto_config);
+)yaml",
+                            proto_config);
   config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
   filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -1226,7 +1229,8 @@ tool_config:
       http_rule:
         post: "/v1/{parent=projects/*}/apiKeys"
         body: key
-)yaml", proto_config);
+)yaml",
+                            proto_config);
   config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
   filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -1248,7 +1252,8 @@ params:
     parent: projects/test
     key:
       displayName: display-key
-)yaml", expected_metadata);
+)yaml",
+                            expected_metadata);
 
   ON_CALL(decoder_callbacks_, filterConfigName())
       .WillByDefault(Return("envoy.filters.http.mcp_json_rest_bridge"));
