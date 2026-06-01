@@ -232,8 +232,6 @@ TEST_F(GcpAuthnClientImplTest, AccessTokenExpiresInMissing) {
   client_callback_->onSuccess(client_request_, std::move(response));
 }
 
-
-
 TEST_F(GcpAuthnClientImplTest, AccessTokenEmptyInResponse) {
   setupMockObjects();
   createClient();

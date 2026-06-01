@@ -12,13 +12,13 @@
 #include "envoy/ssl/tls_certificate_config.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
-#include "source/extensions/filters/http/gcp_authn/crypto_utils.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/logger.h"
 #include "source/common/jwt/jwt.h"
 #include "source/common/jwt/status.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/gcp_authn/crypto_utils.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -131,7 +131,8 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
   if (audience_.has_bound_jwt()) {
     client_cert_fingerprint_ = getClientCertFingerprint(cluster);
     if (!client_cert_fingerprint_.has_value()) {
-      ENVOY_LOG(warn, "Failed to fetch bound token: client certificate fingerprint is unavailable.");
+      ENVOY_LOG(warn,
+                "Failed to fetch bound token: client certificate fingerprint is unavailable.");
       state_ = State::Complete;
       decoder_callbacks_->sendLocalReply(
           Http::Code::InternalServerError,

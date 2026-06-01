@@ -29,11 +29,11 @@ public:
 
   void fetchUnboundJwt(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
                        GcpAuthnClient::Callbacks& callbacks) override;
-  void fetchUnboundAccessToken(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-                               GcpAuthnClient::Callbacks& callbacks) override;
+  void
+  fetchUnboundAccessToken(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+                          GcpAuthnClient::Callbacks& callbacks) override;
   void fetchBoundJwt(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-                     const std::string& fingerprint,
-                     GcpAuthnClient::Callbacks& callbacks) override;
+                     const std::string& fingerprint, GcpAuthnClient::Callbacks& callbacks) override;
   void cancel() override;
 
   // Http::AsyncClient::Callbacks implemented by this class.

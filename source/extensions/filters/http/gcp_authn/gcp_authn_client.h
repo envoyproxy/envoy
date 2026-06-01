@@ -55,14 +55,16 @@ public:
   /**
    * Fetch an unbound identity token (JWT).
    */
-  virtual void fetchUnboundJwt(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-                               Callbacks& callbacks) PURE;
+  virtual void
+  fetchUnboundJwt(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+                  Callbacks& callbacks) PURE;
 
   /**
    * Fetch an unbound Access Token.
    */
-  virtual void fetchUnboundAccessToken(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-                                       Callbacks& callbacks) PURE;
+  virtual void
+  fetchUnboundAccessToken(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+                          Callbacks& callbacks) PURE;
 
   /**
    * Fetch a bound identity token (Bound JWT).
@@ -71,9 +73,9 @@ public:
    * @param fingerprint the client certificate fingerprint, strictly required.
    * @param callbacks the callbacks to be notified when the token fetch completes.
    */
-  virtual void fetchBoundJwt(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-                             const std::string& fingerprint,
-                             Callbacks& callbacks) PURE;
+  virtual void
+  fetchBoundJwt(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+                const std::string& fingerprint, Callbacks& callbacks) PURE;
 
   /**
    * Cancel the active request.

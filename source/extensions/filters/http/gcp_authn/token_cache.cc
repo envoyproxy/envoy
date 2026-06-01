@@ -26,7 +26,8 @@ TokenCacheImpl::lookUp(const envoy::extensions::filters::http::gcp_authn::v3::Au
   typename LRUCache::ScopedLookup lookup(&lru_cache_, key);
   if (lookup.found()) {
     GcpToken* const found_token = lookup.value();
-    // Verify that there is no hash collision by doing a deep comparison on both Audience and fingerprint.
+    // Verify that there is no hash collision by doing a deep comparison on both Audience and
+    // fingerprint.
     if (found_token->fingerprint != fingerprint ||
         !Protobuf::util::MessageDifferencer::Equals(found_token->audience, audience)) {
       return absl::nullopt;

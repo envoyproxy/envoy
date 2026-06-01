@@ -6,9 +6,9 @@
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.validate.h"
 
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/gcp_authn/crypto_utils.h"
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_client.h"
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_client_impl.h"
-#include "source/extensions/filters/http/gcp_authn/crypto_utils.h"
 #include "source/extensions/filters/http/gcp_authn/token_cache.h"
 
 namespace Envoy {
@@ -23,9 +23,9 @@ inline const Envoy::Http::LowerCaseString& authorizationHeaderKey() {
 /**
  * All stats for the gcp authentication filter. @see stats_macros.h
  */
-#define ALL_GCP_AUTHN_FILTER_STATS(COUNTER) \
-  COUNTER(retrieve_audience_failed) \
-  COUNTER(empty_audience) \
+#define ALL_GCP_AUTHN_FILTER_STATS(COUNTER)                                                        \
+  COUNTER(retrieve_audience_failed)                                                                \
+  COUNTER(empty_audience)                                                                          \
   COUNTER(client_cert_fingerprint_calculated)
 
 /**
@@ -53,8 +53,7 @@ public:
       : filter_config_(std::move(filter_config)), context_(context),
         client_(std::make_unique<GcpAuthnClientImpl>(*filter_config_, context_)),
         stats_(generateStats(stats_prefix, context_.scope())),
-        cert_fingerprinter_(std::move(fingerprinter)),
-        jwt_token_cache_(token_cache) {}
+        cert_fingerprinter_(std::move(fingerprinter)), jwt_token_cache_(token_cache) {}
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;

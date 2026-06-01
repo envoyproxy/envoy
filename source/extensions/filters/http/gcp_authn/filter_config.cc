@@ -36,12 +36,11 @@ Http::FilterFactoryCb GcpAuthnFilterFactory::createFilterFactoryFromProtoTyped(
   auto fingerprinter = std::make_shared<CertFingerprinterImpl>();
 
   return [config, stats_prefix, &context, token_cache = std::move(token_cache),
-          filter_config = std::move(filter_config),
-          fingerprinter = std::move(fingerprinter)](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+          filter_config = std::move(filter_config), fingerprinter = std::move(fingerprinter)](
+             Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<GcpAuthnFilter>(
         filter_config, context, stats_prefix,
-        (token_cache != nullptr) ? &token_cache->tls.get()->cache() : nullptr,
-        fingerprinter));
+        (token_cache != nullptr) ? &token_cache->tls.get()->cache() : nullptr, fingerprinter));
   };
 }
 

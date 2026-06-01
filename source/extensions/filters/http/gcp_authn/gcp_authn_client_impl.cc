@@ -96,8 +96,7 @@ void GcpAuthnClientImpl::fetchUnboundAccessToken(
 
 void GcpAuthnClientImpl::fetchBoundJwt(
     const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-    const std::string& fingerprint,
-    GcpAuthnClient::Callbacks& callbacks) {
+    const std::string& fingerprint, GcpAuthnClient::Callbacks& callbacks) {
   Http::Utility::QueryParamsMulti query_params;
   query_params.add(AudienceQueryKey, audience.bound_jwt().url());
   query_params.add(ClientCertificateSha256Key, fingerprint);
@@ -107,8 +106,7 @@ void GcpAuthnClientImpl::fetchBoundJwt(
 }
 
 void GcpAuthnClientImpl::fetchTokenHelper(
-    TokenType token_type,
-    const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+    TokenType token_type, const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
     const std::string& final_url, GcpAuthnClient::Callbacks& callbacks) {
   // Cancel any active requests.
   cancel();

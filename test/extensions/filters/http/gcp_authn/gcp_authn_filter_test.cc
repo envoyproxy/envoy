@@ -1,6 +1,6 @@
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.h"
-
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+
 #include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_client_impl.h"
@@ -10,8 +10,8 @@
 #include "test/extensions/filters/http/gcp_authn/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/transport_socket.h"
-#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
 
 #include "gmock/gmock.h"
@@ -25,7 +25,8 @@ namespace {
 
 class MockCertFingerprinter : public CertFingerprinter {
 public:
-  MOCK_METHOD(absl::StatusOr<std::string>, getFingerprintFromPem, (const std::string& pem), (const, override));
+  MOCK_METHOD(absl::StatusOr<std::string>, getFingerprintFromPem, (const std::string& pem),
+              (const, override));
 };
 
 using ::envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig;
@@ -90,7 +91,8 @@ public:
   }
 
   void setupFilterAndCallback(TokenCacheImpl* cache = nullptr) {
-    filter_ = std::make_unique<GcpAuthnFilter>(filter_config_, context_, "stats", cache, fingerprinter_);
+    filter_ =
+        std::make_unique<GcpAuthnFilter>(filter_config_, context_, "stats", cache, fingerprinter_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
@@ -344,16 +346,17 @@ TEST_F(GcpAuthnFilterTest, CacheMissAndInsert) {
 TEST_F(GcpAuthnFilterTest, mTLSClusterFingerprint) {
   setupMockObjects();
   setupFilterAndCallback();
-  
+
   cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_));
 
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.mutable_bound_jwt()->set_url("test");
 
-  (*metadata_.mutable_typed_filter_metadata())
-      [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-          .PackFrom(audience);
+  (*metadata_
+        .mutable_typed_filter_metadata())[std::string(
+                                              Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+      .PackFrom(audience);
   ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
 
   const std::string dummy_pem = "dummy cert PEM";
@@ -370,7 +373,8 @@ TEST_F(GcpAuthnFilterTest, mTLSClusterFingerprint) {
   ON_CALL(*client_context_config, tlsCertificates()).WillByDefault(testing::Return(tls_certs));
 
   ON_CALL(*socket_factory, clientContextConfig())
-      .WillByDefault(testing::Return(OptRef<const Ssl::ClientContextConfig>(*client_context_config)));
+      .WillByDefault(
+          testing::Return(OptRef<const Ssl::ClientContextConfig>(*client_context_config)));
 
   auto transport_socket_matcher =
       std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(std::move(socket_factory));
@@ -399,9 +403,10 @@ TEST_F(GcpAuthnFilterTest, BoundJwtWithoutFingerprintFails) {
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.mutable_bound_jwt()->set_url("http://bound_audience");
 
-  (*metadata_.mutable_typed_filter_metadata())
-      [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-          .PackFrom(audience);
+  (*metadata_
+        .mutable_typed_filter_metadata())[std::string(
+                                              Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+      .PackFrom(audience);
   ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
 
   auto socket_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
@@ -436,19 +441,22 @@ TEST_F(GcpAuthnFilterTest, BoundJwtWithEmptyTlsCertificatesFails) {
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.mutable_bound_jwt()->set_url("http://bound_audience");
 
-  (*metadata_.mutable_typed_filter_metadata())
-      [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-          .PackFrom(audience);
+  (*metadata_
+        .mutable_typed_filter_metadata())[std::string(
+                                              Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+      .PackFrom(audience);
   ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
 
   auto socket_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
   auto client_context_config = std::make_unique<NiceMock<Ssl::MockClientContextConfig>>();
 
   std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>> empty_tls_certs;
-  ON_CALL(*client_context_config, tlsCertificates()).WillByDefault(testing::Return(empty_tls_certs));
+  ON_CALL(*client_context_config, tlsCertificates())
+      .WillByDefault(testing::Return(empty_tls_certs));
 
   ON_CALL(*socket_factory, clientContextConfig())
-      .WillByDefault(testing::Return(OptRef<const Ssl::ClientContextConfig>(*client_context_config)));
+      .WillByDefault(
+          testing::Return(OptRef<const Ssl::ClientContextConfig>(*client_context_config)));
 
   auto transport_socket_matcher =
       std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(std::move(socket_factory));
@@ -472,9 +480,10 @@ TEST_F(GcpAuthnFilterTest, BoundJwtWithEmptyCertChainFails) {
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.mutable_bound_jwt()->set_url("http://bound_audience");
 
-  (*metadata_.mutable_typed_filter_metadata())
-      [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-          .PackFrom(audience);
+  (*metadata_
+        .mutable_typed_filter_metadata())[std::string(
+                                              Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+      .PackFrom(audience);
   ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
 
   auto socket_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
@@ -489,7 +498,8 @@ TEST_F(GcpAuthnFilterTest, BoundJwtWithEmptyCertChainFails) {
   ON_CALL(*client_context_config, tlsCertificates()).WillByDefault(testing::Return(tls_certs));
 
   ON_CALL(*socket_factory, clientContextConfig())
-      .WillByDefault(testing::Return(OptRef<const Ssl::ClientContextConfig>(*client_context_config)));
+      .WillByDefault(
+          testing::Return(OptRef<const Ssl::ClientContextConfig>(*client_context_config)));
 
   auto transport_socket_matcher =
       std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(std::move(socket_factory));
@@ -513,9 +523,10 @@ TEST_F(GcpAuthnFilterTest, BoundJwtWithFingerprinterErrorFails) {
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.mutable_bound_jwt()->set_url("http://bound_audience");
 
-  (*metadata_.mutable_typed_filter_metadata())
-      [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-          .PackFrom(audience);
+  (*metadata_
+        .mutable_typed_filter_metadata())[std::string(
+                                              Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+      .PackFrom(audience);
   ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
 
   auto socket_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
@@ -530,7 +541,8 @@ TEST_F(GcpAuthnFilterTest, BoundJwtWithFingerprinterErrorFails) {
   ON_CALL(*client_context_config, tlsCertificates()).WillByDefault(testing::Return(tls_certs));
 
   ON_CALL(*socket_factory, clientContextConfig())
-      .WillByDefault(testing::Return(OptRef<const Ssl::ClientContextConfig>(*client_context_config)));
+      .WillByDefault(
+          testing::Return(OptRef<const Ssl::ClientContextConfig>(*client_context_config)));
 
   auto transport_socket_matcher =
       std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(std::move(socket_factory));
@@ -556,9 +568,10 @@ TEST_F(GcpAuthnFilterTest, BoundJwtCacheHit) {
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.mutable_bound_jwt()->set_url("test");
 
-  (*metadata_.mutable_typed_filter_metadata())
-      [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-          .PackFrom(audience);
+  (*metadata_
+        .mutable_typed_filter_metadata())[std::string(
+                                              Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+      .PackFrom(audience);
   ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
 
   const std::string dummy_pem = "dummy cert PEM";
@@ -575,7 +588,8 @@ TEST_F(GcpAuthnFilterTest, BoundJwtCacheHit) {
   ON_CALL(*client_context_config, tlsCertificates()).WillByDefault(testing::Return(tls_certs));
 
   ON_CALL(*socket_factory, clientContextConfig())
-      .WillByDefault(testing::Return(OptRef<const Ssl::ClientContextConfig>(*client_context_config)));
+      .WillByDefault(
+          testing::Return(OptRef<const Ssl::ClientContextConfig>(*client_context_config)));
 
   auto transport_socket_matcher =
       std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(std::move(socket_factory));
@@ -591,7 +605,8 @@ TEST_F(GcpAuthnFilterTest, BoundJwtCacheHit) {
 
   uint64_t far_future_exp =
       DateUtil::nowToSeconds(context_.serverFactoryContext().timeSource()) + 1000;
-  auto token = std::make_unique<GcpToken>("cached_bound_token", far_future_exp, audience, expected_fingerprint);
+  auto token = std::make_unique<GcpToken>("cached_bound_token", far_future_exp, audience,
+                                          expected_fingerprint);
   cache.insert(std::move(token));
 
   setupFilterAndCallback(&cache);
@@ -611,9 +626,10 @@ TEST_F(GcpAuthnFilterTest, EmptyAudienceProto) {
 
   envoy::extensions::filters::http::gcp_authn::v3::Audience empty_audience;
 
-  (*metadata_.mutable_typed_filter_metadata())
-      [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-          .PackFrom(empty_audience);
+  (*metadata_
+        .mutable_typed_filter_metadata())[std::string(
+                                              Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+      .PackFrom(empty_audience);
   ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
 
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true), Http::FilterHeadersStatus::Continue);
