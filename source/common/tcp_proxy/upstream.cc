@@ -255,6 +255,7 @@ void HttpUpstream::onResetStream(Http::StreamResetReason reason, absl::string_vi
     case Http::StreamResetReason::RemoteRefusedStreamReset:
     case Http::StreamResetReason::RemoteConnectionFailure:
     case Http::StreamResetReason::RemoteResetNoError:
+    case Http::StreamResetReason::CleanRemoteHalfClose:
       event = Network::ConnectionEvent::RemoteClose;
       detected_close_type_ = StreamInfo::DetectedCloseType::RemoteReset;
       break;

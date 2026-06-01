@@ -375,6 +375,8 @@ void ConnectionImpl::StreamImpl::encodeHeadersBase(const HeaderMap& headers, boo
 Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& headers,
                                                        bool end_stream) {
   parent_.updateActiveStreamsOnEncode(*this);
+  is_tunnel_stream_ = Http::Utility::isUpgrade(headers) ||
+                      (headers.Method() && headers.Method()->value() == "CONNECT");
 #ifndef ENVOY_ENABLE_UHV
   // Headers are now validated by UHV before encoding by the codec. Two checks below are not needed
   // when UHV is enabled.
@@ -1523,17 +1525,40 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
     // We only do so currently for server side streams by checking for
     // extend_stream_lifetime_flag_ as its observers all unregisters stream
     // callbacks.
+    //
+    // DATA(END_STREAM=true) + RST(NO_ERROR) on a CONNECT tunnel is benign cleanup, not an abort.
+    // Emit CleanRemoteHalfClose so the router unwires without truncating the downstream response.
+    // Filter::onUpstreamReset reads the same flag.
+    const bool benign_tunnel_cleanup =
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.handle_clean_tunnel_remote_half_close") &&
+        stream->is_tunnel_stream_ && stream->remote_end_stream_ && stream->remote_rst_ &&
+        error_code == OGHTTP2_NO_ERROR;
+
     bool should_reset_stream = !stream->remote_end_stream_ || !stream->local_end_stream_;
     if (stream->extend_stream_lifetime_flag_) {
       should_reset_stream = should_reset_stream || stream->remote_rst_;
     }
 
+    const bool defer_drain =
+        !stream->reset_reason_.has_value() && stream->stream_manager_.hasBufferedBodyOrTrailers();
+    if (benign_tunnel_cleanup) {
+      should_reset_stream = !defer_drain;
+    }
+
     if (should_reset_stream) {
-      // RFC 9113 Section 8.1: A server MAY send RST_STREAM(NO_ERROR) after sending
-      // a complete response. The complete response MUST NOT be discarded.
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_preserve_rst_no_error") &&
-          stream->remote_end_stream_ && error_code == OGHTTP2_NO_ERROR &&
-          !stream->reset_reason_.has_value()) {
+      if (benign_tunnel_cleanup) {
+        // Tunnel-scoped refinement of RemoteResetNoError below: the router-side short-circuit
+        // for CleanRemoteHalfClose leaves the downstream stream intact so the tunnel's request
+        // side can keep flowing, whereas RemoteResetNoError resets the downstream stream
+        // (translated by the codec into a benign NO_ERROR on the wire).
+        stream->runResetCallbacks(StreamResetReason::CleanRemoteHalfClose, absl::string_view());
+      } else if (Runtime::runtimeFeatureEnabled(
+                     "envoy.reloadable_features.http_preserve_rst_no_error") &&
+                 stream->remote_end_stream_ && error_code == OGHTTP2_NO_ERROR &&
+                 !stream->reset_reason_.has_value()) {
+        // RFC 9113 Section 8.1: A server MAY send RST_STREAM(NO_ERROR) after sending
+        // a complete response. The complete response MUST NOT be discarded.
         if (stream->stream_manager_.hasBufferedBodyOrTrailers()) {
           ENVOY_CONN_LOG(debug, "buffered onStreamClose for stream: {}", connection_, stream_id);
           stream->stream_manager_.buffered_on_stream_close_ = true;
@@ -1580,8 +1605,7 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
         stream->runResetCallbacks(reason, absl::string_view());
       }
 
-    } else if (!stream->reset_reason_.has_value() &&
-               stream->stream_manager_.hasBufferedBodyOrTrailers()) {
+    } else if (defer_drain) {
       ENVOY_CONN_LOG(debug, "buffered onStreamClose for stream: {}", connection_, stream_id);
       // Buffer the call, rely on the stream->process_buffered_data_callback_
       // to end up invoking.

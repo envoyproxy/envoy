@@ -1608,6 +1608,21 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
                    *callbacks_, Http::Utility::resetReasonToString(reset_reason),
                    transport_failure_reason);
 
+  // Tunnel peer closed its half cleanly. The response is already delivered; just unlink the
+  // UpstreamRequest without aborting the downstream, and intentionally leave the downstream
+  // stream alone so the tunnel's request side can keep flowing (in contrast to
+  // RemoteResetNoError below, which resets the downstream stream).
+  if (reset_reason == Http::StreamResetReason::CleanRemoteHalfClose &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.handle_clean_tunnel_remote_half_close")) {
+    auto request_ptr = upstream_request.removeFromList(upstream_requests_);
+    callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
+    if (upstream_requests_.empty() && pending_retries_ == 0) {
+      cleanup();
+    }
+    return;
+  }
+
   if (reset_reason == Http::StreamResetReason::RemoteResetNoError) {
     auto request_ptr = upstream_request.removeFromList(upstream_requests_);
     callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
@@ -1726,6 +1741,7 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
   case Http::StreamResetReason::LocalReset:
   case Http::StreamResetReason::LocalRefusedStreamReset:
   case Http::StreamResetReason::Http1PrematureUpstreamHalfClose:
+  case Http::StreamResetReason::CleanRemoteHalfClose:
     return StreamInfo::CoreResponseFlag::LocalReset;
   case Http::StreamResetReason::Overflow:
     return StreamInfo::CoreResponseFlag::UpstreamOverflow;

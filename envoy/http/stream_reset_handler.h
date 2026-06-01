@@ -43,6 +43,11 @@ enum class StreamResetReason {
   // Per RFC 9113 Section 8.1 (HTTP/2) and RFC 9114 Section 4.1 (HTTP/3), this is not an error, and
   // the client should not discard the response.
   RemoteResetNoError,
+  // Peer cleanly closed its half of a CONNECT tunnel (DATA(END_STREAM=true) + RST(NO_ERROR)).
+  // Handlers should treat this like a clean upstream completion: no abort, no retry. This is the
+  // tunnel-scoped refinement of RemoteResetNoError where the downstream stream is left intact
+  // (no resetStream propagation) so the request side of the tunnel can keep flowing.
+  CleanRemoteHalfClose,
 };
 
 /**

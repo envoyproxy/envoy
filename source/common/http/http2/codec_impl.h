@@ -451,6 +451,8 @@ protected:
     bool reset_due_to_messaging_error_ : 1 = false;
     // Latch whether this stream is operating with this flag.
     bool extend_stream_lifetime_flag_ : 1 = false;
+    // True if this stream holds a CONNECT tunnel.
+    bool is_tunnel_stream_ : 1 = false;
     absl::string_view details_;
 
     /**

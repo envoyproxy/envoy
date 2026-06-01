@@ -149,6 +149,9 @@ quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetRea
     break;
   case Http::StreamResetReason::RemoteResetNoError:
     return quic::QUIC_STREAM_NO_ERROR;
+  case Http::StreamResetReason::CleanRemoteHalfClose:
+    IS_ENVOY_BUG("HTTP/2 clean remote half close is not applicable to H/3.");
+    break;
   }
 
   ENVOY_LOG_MISC(error, absl::StrCat("Unknown reset reason: ", reason));

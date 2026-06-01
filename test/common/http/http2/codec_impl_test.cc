@@ -1913,6 +1913,58 @@ TEST_P(Http2CodecImplDeferredResetTest, LargeDataDeferredResetServerIfLocalEndSt
   EXPECT_TRUE(client_wrapper_->status_.ok());
 }
 
+// Peer DATA(END_STREAM=true) + RST(NO_ERROR) on a CONNECT tunnel must drain the buffered
+// response body to the decoder before the stream is torn down.
+TEST_P(Http2CodecImplDeferredResetTest, TunnelCleanRemoteHalfCloseDeliversBufferedBody) {
+  initialize();
+  ON_CALL(client_connection_.dispatcher_, trackedObjectStackIsEmpty()).WillByDefault(Return(true));
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  request_headers.setMethod("CONNECT");
+  request_headers.removePath();
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  MockStreamCallbacks client_stream_callbacks;
+  request_encoder_->getStream().addCallbacks(client_stream_callbacks);
+  EXPECT_CALL(client_stream_callbacks, onResetStream(_, _)).Times(AnyNumber());
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(AnyNumber());
+
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, false);
+  driveToCompletion();
+
+  // Read-disable so the next DATA frame buffers; keep a pointer because nghttp2 clears its
+  // user-data after the RST and getStream(1) would then trip a debug ASSERT.
+  auto* client_stream = client_->getStream(1);
+  ASSERT_NE(client_stream, nullptr);
+  client_stream->readDisable(true);
+
+  Buffer::OwnedImpl response_body("tunnel-body");
+  response_encoder_->encodeData(response_body, true);
+  server_->adapter()->SubmitRst(1, http2::adapter::Http2ErrorCode::HTTP2_NO_ERROR);
+  driveToCompletion();
+
+  NiceMock<Event::MockSchedulableCallback>* process_buffered_data_callback{nullptr};
+  if (Http2CodecImplTestFixture::slowContainsStreamId(1, *client_)) {
+    process_buffered_data_callback =
+        new NiceMock<Event::MockSchedulableCallback>(&client_connection_.dispatcher_);
+    client_stream->readDisable(false);
+  }
+
+  EXPECT_CALL(response_decoder_, decodeData(_, true));
+  if (process_buffered_data_callback != nullptr) {
+    process_buffered_data_callback->invokeCallback();
+  }
+  driveToCompletion();
+
+  EXPECT_TRUE(client_wrapper_->status_.ok());
+  EXPECT_TRUE(server_wrapper_->status_.ok());
+}
+
 TEST_P(Http2CodecImplDeferredResetTest, NoDeferredResetServerIfResetBeforeLocalEndStream) {
   initialize();
 
