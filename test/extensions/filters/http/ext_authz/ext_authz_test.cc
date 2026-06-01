@@ -7072,6 +7072,183 @@ TEST_F(HttpFilterCacheTest, CacheHitOkSync) {
             request_headers_.get(LowerCaseString("x-cached-header"))[0]->value().getStringView());
 }
 
+TEST_F(HttpFilterCacheTest, CacheHitDenied) {
+  initializeFilter();
+
+  request_headers_.addCopy(Http::Headers::get().Host, "example.com");
+  request_headers_.addCopy(Http::Headers::get().Method, "GET");
+  request_headers_.addCopy(Http::Headers::get().Path, "/");
+
+  prepareCheck();
+
+  AuthCache::LookupCallback lookup_cb;
+  EXPECT_CALL(*mock_cache_, lookup(_, _, _, _))
+      .WillOnce(Invoke([&](const envoy::service::auth::v3::CheckRequest&,
+                           AuthCache::LookupCallback&& cb, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) { lookup_cb = std::move(cb); }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+
+  auto cached_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+  cached_response->status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+  cached_response->status_code = Http::Code::Forbidden;
+  cached_response->body = "Access Denied by Cache";
+
+  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(Http::Code::Forbidden, "Access Denied by Cache", _, _, _));
+
+  lookup_cb(std::move(cached_response));
+
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+}
+
+TEST_F(HttpFilterCacheTest, CacheHitDeniedSync) {
+  initializeFilter();
+
+  request_headers_.addCopy(Http::Headers::get().Host, "example.com");
+  request_headers_.addCopy(Http::Headers::get().Method, "GET");
+  request_headers_.addCopy(Http::Headers::get().Path, "/");
+
+  prepareCheck();
+
+  EXPECT_CALL(*mock_cache_, lookup(_, _, _, _))
+      .WillOnce(Invoke([&](const envoy::service::auth::v3::CheckRequest&,
+                           AuthCache::LookupCallback&& cb, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) {
+        auto cached_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+        cached_response->status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+        cached_response->status_code = Http::Code::Forbidden;
+        cached_response->body = "Access Denied by Cache";
+        cb(std::move(cached_response));
+      }));
+
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+
+  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(Http::Code::Forbidden, "Access Denied by Cache", _, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark, filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+}
+
+TEST_F(HttpFilterCacheTest, CacheHitErrorFailOpen) {
+  initializeFilter(true /* failure_mode_allow */);
+
+  request_headers_.addCopy(Http::Headers::get().Host, "example.com");
+  request_headers_.addCopy(Http::Headers::get().Method, "GET");
+  request_headers_.addCopy(Http::Headers::get().Path, "/");
+
+  prepareCheck();
+
+  AuthCache::LookupCallback lookup_cb;
+  EXPECT_CALL(*mock_cache_, lookup(_, _, _, _))
+      .WillOnce(Invoke([&](const envoy::service::auth::v3::CheckRequest&,
+                           AuthCache::LookupCallback&& cb, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) { lookup_cb = std::move(cb); }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+
+  auto cached_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+  cached_response->status = Filters::Common::ExtAuthz::CheckStatus::Error;
+
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+
+  lookup_cb(std::move(cached_response));
+
+  EXPECT_EQ(1U, config_->stats().error_.value());
+  EXPECT_EQ(1U, config_->stats().failure_mode_allowed_.value());
+}
+
+TEST_F(HttpFilterCacheTest, CacheHitErrorFailOpenSync) {
+  initializeFilter(true /* failure_mode_allow */);
+
+  request_headers_.addCopy(Http::Headers::get().Host, "example.com");
+  request_headers_.addCopy(Http::Headers::get().Method, "GET");
+  request_headers_.addCopy(Http::Headers::get().Path, "/");
+
+  prepareCheck();
+
+  EXPECT_CALL(*mock_cache_, lookup(_, _, _, _))
+      .WillOnce(Invoke([&](const envoy::service::auth::v3::CheckRequest&,
+                           AuthCache::LookupCallback&& cb, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) {
+        auto cached_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+        cached_response->status = Filters::Common::ExtAuthz::CheckStatus::Error;
+        cb(std::move(cached_response));
+      }));
+
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_EQ(1U, config_->stats().error_.value());
+  EXPECT_EQ(1U, config_->stats().failure_mode_allowed_.value());
+}
+
+TEST_F(HttpFilterCacheTest, CacheHitErrorFailClosed) {
+  initializeFilter(false /* failure_mode_allow */);
+
+  request_headers_.addCopy(Http::Headers::get().Host, "example.com");
+  request_headers_.addCopy(Http::Headers::get().Method, "GET");
+  request_headers_.addCopy(Http::Headers::get().Path, "/");
+
+  prepareCheck();
+
+  AuthCache::LookupCallback lookup_cb;
+  EXPECT_CALL(*mock_cache_, lookup(_, _, _, _))
+      .WillOnce(Invoke([&](const envoy::service::auth::v3::CheckRequest&,
+                           AuthCache::LookupCallback&& cb, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) { lookup_cb = std::move(cb); }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+
+  auto cached_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+  cached_response->status = Filters::Common::ExtAuthz::CheckStatus::Error;
+  cached_response->status_code = Http::Code::Forbidden;
+
+  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(Http::Code::Forbidden, _, _, _, _));
+
+  lookup_cb(std::move(cached_response));
+
+  EXPECT_EQ(1U, config_->stats().error_.value());
+  EXPECT_EQ(0U, config_->stats().failure_mode_allowed_.value());
+}
+
+TEST_F(HttpFilterCacheTest, CacheHitErrorFailClosedSync) {
+  initializeFilter(false /* failure_mode_allow */);
+
+  request_headers_.addCopy(Http::Headers::get().Host, "example.com");
+  request_headers_.addCopy(Http::Headers::get().Method, "GET");
+  request_headers_.addCopy(Http::Headers::get().Path, "/");
+
+  prepareCheck();
+
+  EXPECT_CALL(*mock_cache_, lookup(_, _, _, _))
+      .WillOnce(Invoke([&](const envoy::service::auth::v3::CheckRequest&,
+                           AuthCache::LookupCallback&& cb, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) {
+        auto cached_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+        cached_response->status = Filters::Common::ExtAuthz::CheckStatus::Error;
+        cached_response->status_code = Http::Code::Forbidden;
+        cb(std::move(cached_response));
+      }));
+
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+
+  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(Http::Code::Forbidden, _, _, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark, filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_EQ(1U, config_->stats().error_.value());
+  EXPECT_EQ(0U, config_->stats().failure_mode_allowed_.value());
+}
+
 TEST_F(HttpFilterCacheTest, CacheMiss) {
   initializeFilter();
 
