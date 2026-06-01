@@ -25,6 +25,7 @@ inline const Envoy::Http::LowerCaseString& authorizationHeaderKey() {
  */
 #define ALL_GCP_AUTHN_FILTER_STATS(COUNTER) \
   COUNTER(retrieve_audience_failed) \
+  COUNTER(empty_audience) \
   COUNTER(client_cert_fingerprint_calculated)
 
 /**
@@ -68,6 +69,8 @@ public:
   ~GcpAuthnFilter() override = default;
 
 private:
+  friend class GcpAuthnFilterTest;
+
   absl::optional<std::string> getClientCertFingerprint(Upstream::ThreadLocalCluster* cluster);
 
   GcpAuthnFilterStats generateStats(const std::string& stats_prefix, Stats::Scope& scope) {

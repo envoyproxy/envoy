@@ -118,67 +118,57 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
           route->routeEntry()->clusterName());
 
   auto audience_opt = retrieveAudience(cluster);
-
-  if (audience_opt.has_value()) {
-    audience_ = audience_opt.value();
-
-    if (audience_.has_bound_jwt()) {
-      client_cert_fingerprint_ = getClientCertFingerprint(cluster);
-      if (!client_cert_fingerprint_.has_value()) {
-        ENVOY_LOG(warn, "Failed to fetch bound token: client certificate fingerprint is unavailable.");
-        state_ = State::Complete;
-        decoder_callbacks_->sendLocalReply(
-            Http::Code::InternalServerError,
-            "Failed to fetch bound token: client certificate fingerprint is unavailable.", nullptr,
-            absl::nullopt, "bound_jwt_fingerprint_unavailable");
-        return FilterHeadersStatus::StopAllIterationAndWatermark;
-      }
-      if (jwt_token_cache_ != nullptr) {
-        auto token = jwt_token_cache_->lookUp(audience_, client_cert_fingerprint_);
-        if (token.has_value()) {
-          addTokenToRequest(hdrs, token.value(), filter_config_->token_header());
-          return FilterHeadersStatus::Continue;
-        }
-      }
-      request_header_map_ = &hdrs;
-      client_->fetchBoundJwt(audience_, client_cert_fingerprint_.value(), *this);
-      initiating_call_ = false;
-    } else if (audience_.has_access_token()) {
-      if (jwt_token_cache_ != nullptr) {
-        auto token = jwt_token_cache_->lookUp(audience_, absl::nullopt);
-        if (token.has_value()) {
-          addTokenToRequest(hdrs, token.value(), filter_config_->token_header());
-          return FilterHeadersStatus::Continue;
-        }
-      }
-      request_header_map_ = &hdrs;
-      client_->fetchUnboundAccessToken(audience_, *this);
-      initiating_call_ = false;
-    } else if (!audience_.url().empty()) {
-      if (jwt_token_cache_ != nullptr) {
-        auto token = jwt_token_cache_->lookUp(audience_, absl::nullopt);
-        if (token.has_value()) {
-          addTokenToRequest(hdrs, token.value(), filter_config_->token_header());
-          return FilterHeadersStatus::Continue;
-        }
-      }
-      request_header_map_ = &hdrs;
-      client_->fetchUnboundJwt(audience_, *this);
-      initiating_call_ = false;
-    } else {
-      state_ = State::Complete;
-    }
-  } else {
-    // There is no need to fetch the token if no audience is specified because no
-    // authentication will be performed. So, we just continue the filter chain iteration.
+  if (!audience_opt.has_value()) {
     stats_.retrieve_audience_failed_.inc();
     state_ = State::Complete;
+    return FilterHeadersStatus::Continue;
   }
 
-  // Stop the iteration for headers as well as data and trailers for the current filter and the
-  // filters following.
-  return state_ == State::Complete ? FilterHeadersStatus::Continue
-                                   : Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+  audience_ = audience_opt.value();
+
+  // Resolve fingerprint if bound token is requested. Note client_cert_fingerprint_ remains
+  // absl::nullopt by default for unbound tokens.
+  if (audience_.has_bound_jwt()) {
+    client_cert_fingerprint_ = getClientCertFingerprint(cluster);
+    if (!client_cert_fingerprint_.has_value()) {
+      ENVOY_LOG(warn, "Failed to fetch bound token: client certificate fingerprint is unavailable.");
+      state_ = State::Complete;
+      decoder_callbacks_->sendLocalReply(
+          Http::Code::InternalServerError,
+          "Failed to fetch bound token: client certificate fingerprint is unavailable.", nullptr,
+          absl::nullopt, "bound_jwt_fingerprint_unavailable");
+      return FilterHeadersStatus::StopAllIterationAndWatermark;
+    }
+  }
+
+  // Check cache first and reuse previously fetched token if possible.
+  if (jwt_token_cache_ != nullptr) {
+    auto token = jwt_token_cache_->lookUp(audience_, client_cert_fingerprint_);
+    if (token.has_value()) {
+      addTokenToRequest(hdrs, token.value(), filter_config_->token_header());
+      state_ = State::Complete;
+      return FilterHeadersStatus::Continue;
+    }
+  }
+
+  request_header_map_ = &hdrs;
+  initiating_call_ = false;
+
+  // Execute token-type specific fetch calls.
+  if (audience_.has_bound_jwt()) {
+    client_->fetchBoundJwt(audience_, client_cert_fingerprint_.value(), *this);
+  } else if (audience_.has_access_token()) {
+    client_->fetchUnboundAccessToken(audience_, *this);
+  } else if (!audience_.url().empty()) {
+    client_->fetchUnboundJwt(audience_, *this);
+  } else {
+    ENVOY_LOG(warn, "Audience is configured but no token is specified, continuing without token.");
+    stats_.empty_audience_.inc();
+    state_ = State::Complete;
+    return FilterHeadersStatus::Continue;
+  }
+
+  return FilterHeadersStatus::StopAllIterationAndWatermark;
 }
 
 void GcpAuthnFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
