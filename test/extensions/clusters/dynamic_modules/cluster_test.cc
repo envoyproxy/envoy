@@ -2180,8 +2180,7 @@ TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateBytesNotFound) {
 TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateBytesFound) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  stream_info.filter_state_->setData("k", std::make_unique<Router::StringAccessorImpl>("v"),
-                                     StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info.filter_state_->setData("k", std::make_unique<Router::StringAccessorImpl>("v"));
   ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
   std::string key = "k";
@@ -2240,8 +2239,7 @@ TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedNotFound) {
 TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedNotSerializable) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  stream_info.filter_state_->setData("k", std::make_unique<UnserializableFilterStateObject>(),
-                                     StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info.filter_state_->setData("k", std::make_unique<UnserializableFilterStateObject>());
   ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
   std::string key = "k";
@@ -2255,8 +2253,7 @@ TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedNotSerializable) {
 TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedFound) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  stream_info.filter_state_->setData("k", std::make_unique<Router::StringAccessorImpl>("typed-v"),
-                                     StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info.filter_state_->setData("k", std::make_unique<Router::StringAccessorImpl>("typed-v"));
   ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
   std::string key = "k";
@@ -2265,6 +2262,48 @@ TEST_F(DynamicModuleClusterTest, LbContextGetFilterStateTypedFound) {
   EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
       context_ptr, key_buf, &result));
   EXPECT_EQ("typed-v", absl::string_view(result.ptr, result.length));
+}
+
+// Test get_host_stat reads counters and gauges from the host's HostStats.
+TEST_F(DynamicModuleClusterTest, LbContextGetHostStat) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+
+  NiceMock<Upstream::MockHost> host;
+  host.stats_.rq_active_.add(7);
+  host.stats_.cx_active_.add(3);
+  host.stats_.rq_total_.add(42);
+  ON_CALL(host, stats()).WillByDefault(testing::ReturnRef(host.stats_));
+  auto* host_ptr = static_cast<envoy_dynamic_module_type_cluster_host_envoy_ptr>(&host);
+
+  EXPECT_EQ(7, envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+                   context_ptr, host_ptr, envoy_dynamic_module_type_host_stat_RqActive));
+  EXPECT_EQ(3, envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+                   context_ptr, host_ptr, envoy_dynamic_module_type_host_stat_CxActive));
+  EXPECT_EQ(42, envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+                    context_ptr, host_ptr, envoy_dynamic_module_type_host_stat_RqTotal));
+
+  // Other counters/gauges weren't touched; they should read as 0.
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+                   context_ptr, host_ptr, envoy_dynamic_module_type_host_stat_RqError));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+                   context_ptr, host_ptr, envoy_dynamic_module_type_host_stat_CxConnectFail));
+}
+
+// Test get_host_stat with nullptr context or host returns 0.
+TEST_F(DynamicModuleClusterTest, LbContextGetHostStatNullPointers) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+
+  NiceMock<Upstream::MockHost> host;
+  auto* host_ptr = static_cast<envoy_dynamic_module_type_cluster_host_envoy_ptr>(&host);
+
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+                   nullptr, host_ptr, envoy_dynamic_module_type_host_stat_RqActive));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+                   context_ptr, nullptr, envoy_dynamic_module_type_host_stat_RqActive));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+                   nullptr, nullptr, envoy_dynamic_module_type_host_stat_RqActive));
 }
 
 // =================================================================================================

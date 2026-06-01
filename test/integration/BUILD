@@ -348,6 +348,7 @@ envoy_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
     ],
 )
 
@@ -903,6 +904,7 @@ envoy_cc_test(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
         "@xds//xds/type/matcher/v3:pkg_cc_proto",
@@ -2037,6 +2039,7 @@ envoy_cc_test(
         "//envoy/registry",
         "//source/common/grpc:common_lib",
         "//test/config:v2_link_hacks",
+        "//test/integration/filters:test_filters_proto_cc_proto",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -3014,7 +3017,9 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "ads_lrs_grpc_client_cache_integration_test",
+    size = "large",
     srcs = ["ads_lrs_grpc_client_cache_integration_test.cc"],
+    rbe_pool = "linux_x64_small",
     deps = [
         ":http_integration_lib",
         "//test/test_common:test_runtime_lib",

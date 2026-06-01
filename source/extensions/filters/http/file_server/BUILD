@@ -34,6 +34,7 @@ envoy_cc_library(
         ":absl_status_to_http_status",
         "//envoy/buffer:buffer_interface",
         "//envoy/server:instance_interface",
+        "//source/common/common:cancel_wrapper_lib",
         "//source/common/common:enum_to_int",
         "//source/common/common:radix_tree_lib",
         "//source/common/http:codes_lib",

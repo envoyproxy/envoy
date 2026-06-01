@@ -103,7 +103,7 @@ void TestEnvironment::createPath(const std::string& path) {
   }
   const Filesystem::PathSplitResult parent =
       Filesystem::fileSystemForTest().splitPathFromFilename(path).value();
-  if (parent.file_.length() > 0) {
+  if (!parent.file_.empty()) {
     TestEnvironment::createPath(std::string(parent.directory_));
   }
 #ifndef WIN32

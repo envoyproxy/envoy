@@ -18,13 +18,16 @@ def patched_bssl_filegroup(name, srcs):
             srcs = [src_file, "//compat/openssl/patch:all"],
             outs = [dst_file],
             cmd = """
-                # Set up paths - all paths need to be relative to bssl-compat package
+                # Set up paths
                 SRC_FILE="$(location {src_file})"
                 DST_FILE="$(location {dst_file})"
                 BASENAME="$$(basename $$SRC_FILE)"
-                # Patch files are in the package, so use relative paths from execroot
-                PATCH_SCRIPT="compat/openssl/patch/{dst_file}.sh"
-                PATCH_FILE="compat/openssl/patch/{dst_file}.patch"
+                # Derive base directory from the resolved tool path to handle
+                # both in-repo and external-repo builds
+                TOOLS_DIR="$$(dirname "$(location //compat/openssl/tools:uncomment.sh)")"
+                BASE_DIR="$$(dirname "$$TOOLS_DIR")"
+                PATCH_SCRIPT="$$BASE_DIR/patch/{dst_file}.sh"
+                PATCH_FILE="$$BASE_DIR/patch/{dst_file}.patch"
 
                 # Create output directory
                 mkdir -p "$$(dirname $$DST_FILE)"
@@ -49,7 +52,6 @@ def patched_bssl_filegroup(name, srcs):
                 # Apply patch script if it exists, otherwise comment out the whole file
                 if [ -f "$$PATCH_SCRIPT" ]; then
                     cp "$$PATCH_SCRIPT" "$$TMP_DIR/03.$$(basename $$PATCH_SCRIPT)"
-                    TOOLS_DIR="$$(dirname "$(location //compat/openssl/tools:uncomment.sh)")"
                     PATH="$$TOOLS_DIR:$$PATH" bash "$$PATCH_SCRIPT" "$$WORKING"
                     cp "$$WORKING" "$$TMP_DIR/04.$$BASENAME.applied.sh"
                 else

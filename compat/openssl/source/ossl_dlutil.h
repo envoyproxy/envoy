@@ -11,7 +11,7 @@
  *
  * 1. **Bazel build/test environment** (When RUNFILES_DIR & TEST_WORKSPACE are set):
  *    - OpenSSL libraries are built by Bazel and put in the runfiles directory as data dependencies
- *    - Libraries are loaded from: $RUNFILES_DIR/$TEST_WORKSPACE/external/openssl/openssl/lib/
+ *    - Libraries are loaded from the runfiles directory (trying both Bazel 7 and 8 layouts)
  *    - Ensures the tests always use the correct Bazel-built libs, rather than libs from elsewhere
  *
  * 2. **Production/system environment** (When RUNFILES_DIR & TEST_WORKSPACE are not set):

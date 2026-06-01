@@ -96,8 +96,8 @@ class HttpFilterTest : public testing::Test {
 protected:
   enum DoStartOption {
     DEFAULT = 1,
-    ON_GRPC_ERROR = 2,
-    ON_GRPC_CLOSE = 3,
+    OnGrpcError = 2,
+    OnGrpcClose = 3,
   };
   void initialize(std::string&& yaml, bool is_upstream_filter = false) {
     scoped_runtime_.mergeValues(
@@ -212,12 +212,12 @@ protected:
                                      const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                                      const Envoy::Http::AsyncClient::StreamOptions&,
                                      Envoy::Http::StreamFilterSidestreamWatermarkCallbacks&) {
-    if (do_start_option_ == ON_GRPC_ERROR) {
+    if (do_start_option_ == OnGrpcError) {
       callbacks.onGrpcError(Grpc::Status::Internal, "foo");
       return nullptr;
     }
 
-    if (do_start_option_ == ON_GRPC_CLOSE) {
+    if (do_start_option_ == OnGrpcClose) {
       callbacks.onGrpcClose();
       return nullptr;
     }
@@ -5990,7 +5990,7 @@ TEST_F(HttpFilterTest, GrpcErrorOnOpenStream) {
       cluster_name: "ext_proc_server"
   )EOF");
 
-  do_start_option_ = ON_GRPC_ERROR;
+  do_start_option_ = OnGrpcError;
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
   filter_->onDestroy();
   EXPECT_EQ(Grpc::Status::Internal, getExtProcLoggingInfo()->getGrpcStatusBeforeFirstCall());
@@ -6003,7 +6003,7 @@ TEST_F(HttpFilterTest, GrpcCloseOnOpenStream) {
       cluster_name: "ext_proc_server"
   )EOF");
 
-  do_start_option_ = ON_GRPC_CLOSE;
+  do_start_option_ = OnGrpcClose;
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   filter_->onDestroy();
   EXPECT_EQ(Grpc::Status::Aborted, getExtProcLoggingInfo()->getGrpcStatusBeforeFirstCall());

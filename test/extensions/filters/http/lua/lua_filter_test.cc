@@ -1087,9 +1087,14 @@ TEST_F(LuaHttpFilterTest, HttpCallMultiSliceBody) {
   Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
   // Add body in multiple parts to create multiple buffer slices.
-  response_message->body().add("first");
-  response_message->body().add("second");
-  response_message->body().add("third");
+
+  auto& response_body = static_cast<Buffer::OwnedImpl&>(response_message->body());
+  response_body.appendSliceForTest("first");
+  response_body.appendSliceForTest("second");
+  response_body.appendSliceForTest("third");
+
+  ASSERT_EQ(3, response_message->body().getRawSlices().size());
+
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
                                  {"trace", "16"},

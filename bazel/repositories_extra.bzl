@@ -5,6 +5,7 @@ load("@envoy_toolshed//compile:libcxx_libs.bzl", "setup_libcxx_libs")
 load("@envoy_toolshed//sysroot:sysroot.bzl", "setup_sysroots")
 load("@proxy_wasm_cpp_host//bazel/cargo/wasmtime/remote:crates.bzl", "crate_repositories")
 load("@rules_cc//cc:extensions.bzl", "compatibility_proxy_repo")
+load("@rules_java//java:rules_java_deps.bzl", java_compatibility_proxy_repo = "compatibility_proxy_repo")
 load("@rules_python//python:repositories.bzl", "py_repositories", "python_register_toolchains")
 load("@toolchains_llvm//toolchain:deps.bzl", "bazel_toolchain_dependencies")
 load("//bazel/external/cargo:crates.bzl", "raze_fetch_remote_crates")
@@ -24,6 +25,7 @@ def envoy_dependencies_extra(
         python_version = PYTHON_VERSION,
         ignore_root_user_error = False):
     compatibility_proxy_repo()
+    java_compatibility_proxy_repo()
     bazel_toolchain_dependencies()
     setup_libcxx_libs()
     setup_sysroots(glibc_version = glibc_version)

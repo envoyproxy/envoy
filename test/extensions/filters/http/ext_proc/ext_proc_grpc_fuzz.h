@@ -208,7 +208,7 @@ public:
     }
   }
 
-  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_;
   TestProcessor test_processor_;
   Network::Address::IpVersion ip_version_;
   Grpc::ClientType client_type_;

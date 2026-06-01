@@ -190,7 +190,6 @@ public:
       // tls_inspector by using the LifeSpan::Connection
       stream_info.filterState()->setData(Network::UpstreamServerName::key(),
                                          std::make_unique<Network::UpstreamServerName>(pre_set_sni),
-                                         StreamInfo::FilterState::StateType::Mutable,
                                          pre_set_life_span);
     }
     expectResponseTimerCreate();
@@ -1572,7 +1571,6 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponseWithRetries) {
 TEST_F(RouterTest, AllDebugConfig) {
   auto debug_config = DebugConfigFactory().createFromBytes("true");
   callbacks_.streamInfo().filterState()->setData(DebugConfig::key(), std::move(debug_config),
-                                                 StreamInfo::FilterState::StateType::ReadOnly,
                                                  StreamInfo::FilterState::LifeSpan::FilterChain);
   cm_.thread_local_cluster_.conn_pool_.host_->hostname_ = "scooby.doo";
 
@@ -6616,7 +6614,7 @@ TEST_F(RouterTest, PropagatesUpstreamFilterState) {
 
   upstream_stream_info_.filterState()->setData(
       "upstream data", std::make_unique<StreamInfo::UInt32AccessorImpl>(123),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
   expectResponseTimerCreate();
   expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
 
@@ -7694,7 +7692,7 @@ TEST_F(RouterTest, RedirectRecords) {
   router_->downstream_connection_.stream_info_.filterState()->setData(
       Network::UpstreamSocketOptionsFilterState::key(),
       std::make_unique<Network::UpstreamSocketOptionsFilterState>(),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
   router_->downstream_connection_.stream_info_.filterState()
       ->getDataMutable<Network::UpstreamSocketOptionsFilterState>(
           Network::UpstreamSocketOptionsFilterState::key())
@@ -7721,7 +7719,7 @@ TEST_F(RouterTest, ApplicationProtocols) {
   callbacks_.streamInfo().filterState()->setData(
       Network::ApplicationProtocols::key(),
       std::make_unique<Network::ApplicationProtocols>(std::vector<std::string>{"foo", "bar"}),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+      StreamInfo::FilterState::LifeSpan::FilterChain);
 
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
       .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
@@ -7958,7 +7956,7 @@ TEST_F(RouterTest, Http3DisabledForHttp11Proxies) {
   callbacks_.stream_info_.filterState()->setData(
       Network::Http11ProxyInfoFilterState::key(),
       std::make_unique<Network::Http11ProxyInfoFilterState>(hostname, address),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+      StreamInfo::FilterState::LifeSpan::FilterChain);
   testRequestResponse(true, false);
 }
 
@@ -8574,6 +8572,67 @@ TEST_F(RouterTest, OrcaLoadReportSkipsEntriesNotInterestedInOrca) {
   Http::ResponseHeaderMapPtr response_headers(new Http::TestResponseHeaderMapImpl{
       {":status", "200"}, {"endpoint-load-metrics-bin", orca_load_report_header_bin}});
   response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+// Verify that RemoteResetNoError after response headers have been sent downstream
+// (downstream_response_started_ = true) resets the downstream stream without error flags.
+TEST_F(RouterTest, RemoteResetNoErrorAfterResponseStarted) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  EXPECT_CALL(callbacks_, removeDownstreamWatermarkCallbacks(_));
+  EXPECT_CALL(callbacks_, addDownstreamWatermarkCallbacks(_));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
+                        absl::optional<uint64_t>(absl::nullopt)));
+  router_->decodeHeaders(headers, false);
+
+  // Upstream sends response headers (not end_stream), setting downstream_response_started_.
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, absl::optional<uint64_t>(200)));
+  response_decoder->decodeHeaders(std::move(response_headers), false);
+
+  // RemoteResetNoError arrives — should reset downstream stream, no error.
+  EXPECT_CALL(callbacks_, resetStream(Http::StreamResetReason::RemoteResetNoError, _));
+  encoder.stream_.resetStream(Http::StreamResetReason::RemoteResetNoError);
+
+  // No error response flags should be set.
+  EXPECT_FALSE(
+      callbacks_.stream_info_.hasResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRemoteReset));
+
+  router_->onDestroy();
+}
+
+// Verify that RemoteResetNoError before the downstream response has started (defensive case)
+// sends a local reply instead of silently dropping the request.
+TEST_F(RouterTest, RemoteResetNoErrorBeforeResponseStarted) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  EXPECT_CALL(callbacks_, removeDownstreamWatermarkCallbacks(_));
+  EXPECT_CALL(callbacks_, addDownstreamWatermarkCallbacks(_));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
+                        absl::optional<uint64_t>(absl::nullopt)));
+  router_->decodeHeaders(headers, true);
+
+  // RemoteResetNoError arrives before any response headers — should trigger IS_ENVOY_BUG
+  // and send a local reply to avoid a downstream request hang.
+  EXPECT_ENVOY_BUG(encoder.stream_.resetStream(Http::StreamResetReason::RemoteResetNoError),
+                   "RemoteResetNoError should not be raised unless the entire "
+                   "response was received already.");
+
+  router_->onDestroy();
 }
 
 } // namespace Router

@@ -467,8 +467,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/{version}.tar.gz"],
     ),
     rules_java = dict(
-        version = "7.12.5",
-        sha256 = "17b18cb4f92ab7b94aa343ce78531b73960b1bed2ba166e5b02c9fdf0b0ac270",
+        version = "9.6.1",
+        sha256 = "9de4e178c2c4f98d32aafe5194c3f2b717ae10405caa11bdcb460ac2a6f61516",
         urls = ["https://github.com/bazelbuild/rules_java/releases/download/{version}/rules_java-{version}.tar.gz"],
     ),
     rules_python = dict(
@@ -553,8 +553,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     quiche = dict(
-        version = "f129e801d183fd095620d3bd68f8119ca9d5c0ea",
-        sha256 = "f70ab89a950bb46f239c29e7e9757b3ce3082403a65e9e1920ccd2cf3fcedbeb",
+        version = "cc76be8d43b3841d9ce53b2b24015202a132654e",
+        sha256 = "233b212154119c0b96c27bafcda271bb2befe3c716ea4598d58892a56b40ac29",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
     ),

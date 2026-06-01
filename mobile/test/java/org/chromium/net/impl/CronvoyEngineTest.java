@@ -104,9 +104,9 @@ public class CronvoyEngineTest {
     // Do some basic stats accounting.
     String stats = cronvoyEngine.getEnvoyEngine().dumpStats();
     Map<String, String> statsMap = StatsUtils.statsToList(stats);
-    assertThat(statsMap.containsKey("http.hcm.downstream_rq_2xx"));
-    assertThat(statsMap.containsKey("http.hcm.downstream_total"));
-    assertThat(statsMap.containsKey("runtime.load_success"));
+    assertThat(statsMap).containsKey("http.hcm.downstream_rq_2xx");
+    assertThat(statsMap).containsKey("http.hcm.downstream_rq_total");
+    assertThat(statsMap).containsKey("runtime.load_success");
     assertThat(statsMap.get("runtime.load_success")).isEqualTo("2");
   }
 

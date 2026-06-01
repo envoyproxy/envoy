@@ -142,8 +142,7 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
                          ? std::chrono::milliseconds(
                                DurationUtil::durationToMilliseconds(proto_config.ping_interval()))
                          : std::chrono::milliseconds(2000)),
-      auto_close_connections_(
-          proto_config.auto_close_connections() ? proto_config.auto_close_connections() : false),
+      auto_close_connections_(proto_config.auto_close_connections()),
       request_path_(
           proto_config.request_path().empty()
               ? std::string(::Envoy::Extensions::Bootstrap::ReverseConnection::
@@ -167,7 +166,8 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
               ? proto_config.validation().dynamic_metadata_namespace()
               : "envoy.filters.network.reverse_tunnel"),
       required_cluster_name_(proto_config.required_cluster_name()),
-      use_http_upgrade_(proto_config.use_http_upgrade()) {}
+      use_http_upgrade_(proto_config.use_http_upgrade()),
+      skip_rebalancing_(proto_config.skip_rebalancing()) {}
 
 bool ReverseTunnelFilterConfig::validateIdentifiers(
     absl::string_view node_id, absl::string_view cluster_id, absl::string_view tenant_id,
@@ -587,7 +587,7 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
   ENVOY_CONN_LOG(trace, "reverse_tunnel: registering wrapped socket for reuse", connection);
   socket_manager->addConnectionSocket(std::string(node_id), std::string(cluster_id),
                                       std::move(wrapped_socket), ping_seconds,
-                                      false /* rebalanced */, tenant_id);
+                                      /* rebalanced= */ config_->skipRebalancing(), tenant_id);
   ENVOY_CONN_LOG(debug, "reverse_tunnel: successfully registered wrapped socket for reuse",
                  connection);
 
