@@ -2549,8 +2549,8 @@ TEST_P(ClusterManagerLifecycleTest, DrainConnectionsWithDrainBehavior) {
 
   // Predicate selects only host1; behavior is the new NotifyPeerAndDrainExisting value. The
   // three-arg overload must forward the caller-specified behavior to the selected pool.
-  EXPECT_CALL(
-      *cp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::NotifyPeerAndDrainExisting));
+  EXPECT_CALL(*cp1,
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::NotifyPeerAndDrainExisting));
   EXPECT_CALL(*cp2, drainConnections(_)).Times(0);
   cluster_manager_->drainConnections(
       "cluster_1",
@@ -2558,10 +2558,10 @@ TEST_P(ClusterManagerLifecycleTest, DrainConnectionsWithDrainBehavior) {
       Envoy::ConnectionPool::DrainBehavior::NotifyPeerAndDrainExisting);
 
   // Nullptr predicate drains every host's pool with the caller-specified behavior.
-  EXPECT_CALL(
-      *cp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::NotifyPeerAndDrainExisting));
-  EXPECT_CALL(
-      *cp2, drainConnections(Envoy::ConnectionPool::DrainBehavior::NotifyPeerAndDrainExisting));
+  EXPECT_CALL(*cp1,
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::NotifyPeerAndDrainExisting));
+  EXPECT_CALL(*cp2,
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::NotifyPeerAndDrainExisting));
   cluster_manager_->drainConnections(
       "cluster_1", /*predicate=*/nullptr,
       Envoy::ConnectionPool::DrainBehavior::NotifyPeerAndDrainExisting);
