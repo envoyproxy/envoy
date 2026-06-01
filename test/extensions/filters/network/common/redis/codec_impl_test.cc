@@ -1,7 +1,5 @@
 #include <vector>
 
-#include "absl/strings/str_cat.h"
-
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/extensions/filters/network/common/redis/codec_impl.h"
@@ -10,6 +8,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 
 using testing::ContainerEq;
