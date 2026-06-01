@@ -77,6 +77,7 @@ class FastMockHost : public testing::StrictMock<Upstream::MockHostLight> {
 public:
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
   const std::string& hostname() const override { return hostname_; }
+  absl::string_view observabilityName() const override { return address_->asStringView(); }
 
   std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>>
   counters() const override {

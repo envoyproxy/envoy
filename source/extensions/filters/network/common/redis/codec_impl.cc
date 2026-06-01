@@ -1,6 +1,7 @@
 #include "source/extensions/filters/network/common/redis/codec_impl.h"
 
 #include <cstdint>
+#include <iterator>
 #include <memory>
 #include <string>
 #include <vector>
@@ -632,6 +633,10 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
         } else if (pending_integer_.integer_ == 0) {
           state_ = State::ValueComplete;
         } else {
+          if (std::distance(pending_value_stack_.begin(), pending_value_stack_.end()) >
+              MaxArrayNestingDepth) {
+            throw ProtocolError("array nesting depth exceeds limit");
+          }
           if (pending_integer_.integer_ > MaxArraySize) {
             throw ProtocolError("array size exceeds limit");
           }

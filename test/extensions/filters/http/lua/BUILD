@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
+    "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -10,6 +11,11 @@ load(
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_proto_library(
+    name = "lua_test_filter_proto",
+    srcs = ["lua_test_filter.proto"],
+)
 
 envoy_extension_cc_test(
     name = "lua_filter_test",
@@ -62,6 +68,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.lua"],
     rbe_pool = "4core",
     deps = [
+        ":lua_test_filter_proto_cc_proto",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/http/lua:config",

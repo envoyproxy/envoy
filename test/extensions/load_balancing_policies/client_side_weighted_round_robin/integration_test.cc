@@ -462,7 +462,9 @@ static_resources:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: config_test
           http_filters:
-            name: envoy.filters.http.router
+            - name: envoy.filters.http.router
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           codec_type: HTTP1
           route_config:
             name: route_config_0
@@ -826,7 +828,9 @@ public:
               "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
               stat_prefix: config_test
               http_filters:
-                name: envoy.filters.http.router
+                - name: envoy.filters.http.router
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
               codec_type: HTTP1
               route_config:
                 name: route_config_0

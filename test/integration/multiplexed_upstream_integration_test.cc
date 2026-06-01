@@ -144,9 +144,11 @@ TEST_P(MultiplexedUpstreamIntegrationTest, TestSchemeAndXFP) {
 
 // Ensure Envoy handles streaming requests and responses simultaneously.
 void MultiplexedUpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) {
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+  config_helper_.prependFilter(R"EOF(
+    name: stream-info-to-headers-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StreamInfoToHeadersFilterConfig
+  )EOF");
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -384,7 +386,9 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DISABLED_ManyLargeSimultaneousRequest
 
   config_helper_.prependFilter(R"EOF(
   name: random-pause-filter
-)EOF");
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.RandomPauseFilterConfig
+  )EOF");
 
   // TODO(kbaichoo): either change the ordering of how the responses wait on end stream or increase
   // the timeout since there will be delays added by the pause filter.
@@ -479,7 +483,11 @@ typed_config:
   // As with ProtocolIntegrationTest.HittingEncoderFilterLimit use a filter
   // which buffers response data but in this case, make sure the sendLocalReply
   // is gRPC.
-  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter }");
+  config_helper_.prependFilter(R"EOF(
+    name: encoder-decoder-buffer-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.EncoderDecoderBufferFilterConfig
+  )EOF");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -662,9 +670,11 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamFilterSendLocalReply) {
   envoy::config::core::v3::Http2ProtocolOptions config;
   config.mutable_max_concurrent_streams()->set_value(20000);
   mergeOptions(config);
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: local-reply-during-decode
-)EOF"),
+  config_helper_.prependFilter(R"EOF(
+    name: local-reply-during-decode
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.LocalReplyDuringDecodeConfig
+  )EOF",
                                false);
 
   initialize();

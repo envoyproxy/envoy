@@ -2573,6 +2573,36 @@ TEST_F(StaticClusterImplTest, LoadAssignmentNonEmptyHostnameWithHealthChecks) {
   EXPECT_FALSE(cluster->info()->addedViaApi());
 }
 
+TEST_F(StaticClusterImplTest, LoadAssignmentEndpointStatName) {
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            observability_name: shared.backend/a
+            address:
+              socket_address:
+                address: 10.0.0.1
+                port_value: 443
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
+
+  cluster->initialize([] { return absl::OkStatus(); });
+
+  ASSERT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ("shared.backend/a",
+            cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->observabilityName());
+}
+
 TEST_F(StaticClusterImplTest, LoadAssignmentMultiplePriorities) {
   const std::string yaml = R"EOF(
     name: staticcluster
@@ -4424,7 +4454,8 @@ public:
 
   class RetryBudgetTestClusterInfo : public ClusterInfoImpl {
   public:
-    static std::pair<absl::optional<double>, absl::optional<uint32_t>> getRetryBudgetParams(
+    static std::tuple<absl::optional<double>, absl::optional<uint64_t>, absl::optional<uint32_t>>
+    getRetryBudgetParams(
         const envoy::config::cluster::v3::CircuitBreakers::Thresholds& thresholds) {
       return ClusterInfoImpl::getRetryBudgetParams(thresholds);
     }
@@ -4584,37 +4615,53 @@ TEST_P(ParametrizedClusterInfoImplTest, RetryBudgetDefaultPopulation) {
       - priority: DEFAULT
         retry_budget:
           min_retry_concurrency: 123
+      # 5 - Budget interval set, expect budget default.
+      - priority: DEFAULT
+        retry_budget:
+          budget_interval: 0.2s
   )EOF";
 
   makeCluster(yaml);
   absl::optional<double> budget_percent;
+  absl::optional<uint64_t> budget_interval;
   absl::optional<uint32_t> min_retry_concurrency;
   auto threshold = cluster_config_.circuit_breakers().thresholds();
 
-  std::tie(budget_percent, min_retry_concurrency) =
+  std::tie(budget_percent, budget_interval, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[0]);
   EXPECT_EQ(budget_percent, absl::nullopt);
+  EXPECT_EQ(budget_interval, absl::nullopt);
   EXPECT_EQ(min_retry_concurrency, absl::nullopt);
 
-  std::tie(budget_percent, min_retry_concurrency) =
+  std::tie(budget_percent, budget_interval, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[1]);
   EXPECT_EQ(budget_percent, 20.0);
+  EXPECT_EQ(budget_interval, 0UL);
   EXPECT_EQ(min_retry_concurrency, 3UL);
 
-  std::tie(budget_percent, min_retry_concurrency) =
+  std::tie(budget_percent, budget_interval, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[2]);
   EXPECT_EQ(budget_percent, 20.0);
+  EXPECT_EQ(budget_interval, 0UL);
   EXPECT_EQ(min_retry_concurrency, 3UL);
 
-  std::tie(budget_percent, min_retry_concurrency) =
+  std::tie(budget_percent, budget_interval, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[3]);
   EXPECT_EQ(budget_percent, 42.0);
+  EXPECT_EQ(budget_interval, 0UL);
   EXPECT_EQ(min_retry_concurrency, 3UL);
 
-  std::tie(budget_percent, min_retry_concurrency) =
+  std::tie(budget_percent, budget_interval, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[4]);
   EXPECT_EQ(budget_percent, 20.0);
+  EXPECT_EQ(budget_interval, 0UL);
   EXPECT_EQ(min_retry_concurrency, 123UL);
+
+  std::tie(budget_percent, budget_interval, min_retry_concurrency) =
+      RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[5]);
+  EXPECT_EQ(budget_percent, 20.0);
+  EXPECT_EQ(budget_interval, 200UL);
+  EXPECT_EQ(min_retry_concurrency, 3UL);
 }
 
 TEST_P(ParametrizedClusterInfoImplTest, LoadStatsConflictWithPerEndpointStats) {

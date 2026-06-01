@@ -9,6 +9,7 @@
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/clusters/dynamic_modules/cluster.h"
+#include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/extensions/dynamic_modules/util.h"
@@ -49,6 +50,20 @@ public:
   static void clearInModuleCluster(DynamicModuleCluster& cluster) {
     cluster.in_module_cluster_ = nullptr;
   }
+
+  // Injects a pre-populated HttpCalloutCallback into the cluster's pending-callouts map under the
+  // given id, so the destructor's cancellation loop sees a pending entry.
+  static void injectPendingHttpCallout(DynamicModuleCluster& cluster, uint64_t callout_id,
+                                       Http::AsyncClient::Request* request) {
+    auto callback = std::make_unique<DynamicModuleCluster::HttpCalloutCallback>(
+        /*cluster=*/nullptr, callout_id);
+    callback->request_ = request;
+    cluster.http_callouts_.emplace(callout_id, std::move(callback));
+  }
+
+  // Simulates the module's on_cluster_lb_new returning nullptr after the LB has already been
+  // constructed: clears in_module_lb_ so chooseHost exercises the early-return path.
+  static void clearInModuleLb(DynamicModuleLoadBalancer& lb) { lb.in_module_lb_ = nullptr; }
 };
 
 using ::testing::_;
@@ -1182,6 +1197,104 @@ TEST_F(DynamicModuleClusterTest, OnScheduledDirect) {
 
   // Call onScheduled directly - this should call the in-module hook.
   cluster->onScheduled(789);
+}
+
+// Test run_on_all_workers is safe to call with no payload published and allocates the slot
+// lazily.
+TEST_F(DynamicModuleClusterTest, RunOnAllWorkersIsSafeOnUnpopulatedSlot) {
+  auto result = createCluster(makeYamlConfig("cluster_run_on_all_workers"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  envoy_dynamic_module_callback_cluster_run_on_all_workers(cluster.get(), /*event_id=*/42);
+  envoy_dynamic_module_callback_cluster_run_on_all_workers(cluster.get(), /*event_id=*/7);
+
+  cluster.reset();
+  result = absl::InternalError("cleanup");
+}
+
+// Test worker_slot_set / worker_slot_get round-trip and destroy on overwrite and teardown.
+TEST_F(DynamicModuleClusterTest, WorkerSlotSetGetAndDestroy) {
+  auto result = createCluster(makeYamlConfig("cluster_run_on_all_workers"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  auto module_handle = Envoy::Extensions::DynamicModules::newDynamicModule(
+      Envoy::Extensions::DynamicModules::testSharedObjectPath("cluster_run_on_all_workers", "c"),
+      /*do_not_close=*/true);
+  ASSERT_TRUE(module_handle.ok()) << module_handle.status().message();
+  using GetCountFn = size_t (*)();
+  auto get_destroy_count = module_handle.value()->getFunctionPointer<GetCountFn>(
+      "cluster_run_on_all_workers_test_get_destroy_count");
+  ASSERT_TRUE(get_destroy_count.ok()) << get_destroy_count.status().message();
+
+  // Publish payload1; the module's destroy hook will free() it.
+  uint64_t* payload1 = static_cast<uint64_t*>(std::malloc(sizeof(uint64_t)));
+  *payload1 = 0xABCD;
+  envoy_dynamic_module_callback_cluster_worker_slot_set(cluster.get(), payload1);
+  EXPECT_EQ(0u, (*get_destroy_count.value())());
+
+  void* observed = envoy_dynamic_module_callback_cluster_worker_slot_get(cluster.get());
+  ASSERT_NE(nullptr, observed);
+  EXPECT_EQ(0xABCDu, *static_cast<uint64_t*>(observed));
+
+  // Overwrite fires the destroy hook for payload1.
+  uint64_t* payload2 = static_cast<uint64_t*>(std::malloc(sizeof(uint64_t)));
+  *payload2 = 0xBEEF;
+  envoy_dynamic_module_callback_cluster_worker_slot_set(cluster.get(), payload2);
+  EXPECT_EQ(1u, (*get_destroy_count.value())());
+
+  observed = envoy_dynamic_module_callback_cluster_worker_slot_get(cluster.get());
+  ASSERT_NE(nullptr, observed);
+  EXPECT_EQ(0xBEEFu, *static_cast<uint64_t*>(observed));
+
+  // Teardown fires the destroy hook for payload2.
+  cluster.reset();
+  result = absl::InternalError("cleanup");
+  EXPECT_EQ(2u, (*get_destroy_count.value())());
+}
+
+// Test run_on_all_workers is a no-op when the module does not implement the worker event hook.
+// The cluster_no_op fixture intentionally omits envoy_dynamic_module_on_cluster_worker_event, so
+// on_cluster_worker_event_ is nullptr and the fan-out must early-return without allocating the
+// slot or scheduling any work.
+TEST_F(DynamicModuleClusterTest, RunOnAllWorkersIsNoOpWithoutWorkerEventHook) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  envoy_dynamic_module_callback_cluster_run_on_all_workers(cluster.get(), /*event_id=*/42);
+
+  // Slot must remain unallocated when no worker event hook was registered.
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_worker_slot_get(cluster.get()));
+}
+
+// Test worker_slot_get returns nullptr when the slot has never been allocated (no prior
+// worker_slot_set or run_on_all_workers call).
+TEST_F(DynamicModuleClusterTest, WorkerSlotGetReturnsNullptrBeforeAllocation) {
+  auto result = createCluster(makeYamlConfig("cluster_run_on_all_workers"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_worker_slot_get(cluster.get()));
+}
+
+// Test worker_slot_get returns nullptr when the slot has been allocated (by run_on_all_workers)
+// but no payload has been published via worker_slot_set.
+TEST_F(DynamicModuleClusterTest, WorkerSlotGetReturnsNullptrWhenSlotAllocatedButEmpty) {
+  auto result = createCluster(makeYamlConfig("cluster_run_on_all_workers"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // Allocates the slot via ensureWorkerSlot() but seeds it with a null-payload factory.
+  envoy_dynamic_module_callback_cluster_run_on_all_workers(cluster.get(), /*event_id=*/1);
+
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_worker_slot_get(cluster.get()));
 }
 
 // Test the DynamicModuleClusterHandle destructor dispatches to main thread.
@@ -3626,6 +3739,111 @@ TEST_F(DynamicModuleClusterTest, MetricsConcurrentIncrementCounterVecNoRace) {
   for (auto& th : threads) {
     th.join();
   }
+}
+
+// setHostData / getHostData return false when the priority is out of range.
+TEST_F(DynamicModuleClusterTest, SetGetHostDataPriorityOutOfRange) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+
+  // No priority has been populated, so any priority is out of range.
+  EXPECT_FALSE(lb_instance->setHostData(/*priority=*/5, /*index=*/0, /*data=*/123));
+
+  uintptr_t data = 0xAAA;
+  EXPECT_FALSE(lb_instance->getHostData(/*priority=*/5, /*index=*/0, &data));
+  // Output unchanged on the priority-out-of-range early return.
+  EXPECT_EQ(0xAAAu, data);
+}
+
+// updateHostHealth returns false when the supplied host is not present in any priority set.
+TEST_F(DynamicModuleClusterTest, UpdateHostHealthHostNotInAnyPriority) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // Build a real host that is *not* part of any priority set. Reuse the cluster's own info object
+  // so the host is well-formed.
+  auto foreign_host = Upstream::makeTestHost(cluster->info(), "tcp://127.0.0.1:55555");
+  EXPECT_FALSE(
+      cluster->updateHostHealth(foreign_host, envoy_dynamic_module_type_host_health_Unhealthy));
+}
+
+// sendHttpCallout returns CannotCreateRequest synchronously when the module did not export
+// on_cluster_http_callout_done, since there is no path for the response to be delivered.
+TEST_F(DynamicModuleClusterTest, HttpCalloutRequestedWithoutDoneHook) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // Strip the done hook to simulate a module that didn't implement it.
+  cluster->config()->on_cluster_http_callout_done_ = nullptr;
+
+  // No call to cluster_manager_.getThreadLocalCluster should occur — the early return fires first.
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster(_)).Times(0);
+
+  uint64_t callout_id = 0;
+  envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {":method", 7, "GET", 3},
+      {":path", 5, "/test", 5},
+      {"host", 4, "example.com", 11},
+  };
+  envoy_dynamic_module_type_module_buffer body = {nullptr, 0};
+  auto callout_result = envoy_dynamic_module_callback_cluster_http_callout(
+      cluster.get(), &callout_id, cluster_name, headers.data(), headers.size(), body, 5000);
+  EXPECT_EQ(callout_result, envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
+}
+
+// chooseHost returns {nullptr} synchronously when the LB has no in-module instance (i.e. the
+// module's on_cluster_lb_new returned null and in_module_lb_ remains unset).
+TEST_F(DynamicModuleClusterTest, ChooseHostShortCircuitsWhenInModuleLbIsNull) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+  DynamicModuleClusterTestPeer::clearInModuleLb(*lb_instance);
+
+  auto response = lb_instance->chooseHost(nullptr);
+  EXPECT_EQ(nullptr, response.host);
+  EXPECT_EQ(nullptr, response.cancelable);
+}
+
+// DynamicModuleClusterHandle destruction is a no-op when the wrapped cluster pointer is already
+// null (e.g. the handle was constructed from an empty shared_ptr).
+TEST_F(DynamicModuleClusterTest, HandleDestructorIsNoOpWhenClusterIsNull) {
+  // No dispatcher.post call should occur because the destructor returns early.
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).Times(0);
+  { DynamicModuleClusterHandle handle(nullptr); }
+}
+
+// The cluster destructor cancels any pending HTTP callouts before clearing them.
+TEST_F(DynamicModuleClusterTest, DestructorCancelsPendingHttpCallouts) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // Mock request whose cancel() we expect to be invoked when the cluster is destroyed.
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
+  EXPECT_CALL(request, cancel());
+
+  DynamicModuleClusterTestPeer::injectPendingHttpCallout(*cluster, /*callout_id=*/42, &request);
+
+  cluster.reset();
+  // The thread-aware LB inside `result` still holds an internal handle to the cluster; reset it so
+  // the cluster is actually destroyed inside this test body, where the EXPECT_CALL is in scope.
+  result = absl::InternalError("cleanup");
 }
 
 } // namespace

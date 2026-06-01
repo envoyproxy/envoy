@@ -6,6 +6,8 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/json_escape_string.h"
 #include "source/common/http/headers.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/common/mcp/constants.h"
@@ -61,7 +63,7 @@ json translateJsonRestResponseToJsonRpc(absl::string_view tool_call_response,
       {McpConstants::RESULT_FIELD,
        {
            {McpConstants::CONTENT_FIELD,
-            json::array({{{McpConstants::TYPE_FIELD, "text"},
+            json::array({{{McpConstants::TYPE_FIELD, McpConstants::TEXT_FIELD},
                           {McpConstants::TEXT_FIELD, tool_call_response}}})},
            {McpConstants::IS_ERROR_FIELD, is_error},
        }},
@@ -142,19 +144,27 @@ McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
       max_response_body_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config_, max_response_body_size,
                                                               DEFAULT_MAX_RESPONSE_BODY_SIZE)) {
   for (const auto& tool : proto_config.tool_config().tools()) {
-    tool_to_http_rule_[tool.name()] = tool.http_rule();
+    tool_entries_[tool.name()] = {tool.http_rule(), tool.text_content_streaming_enabled()};
   }
   ENVOY_LOG(debug, "Received MCP JSON REST Bridge config: {}", proto_config_.DebugString());
 }
 
 absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
 McpJsonRestBridgeFilterConfig::getHttpRule(absl::string_view tool_name) const {
-  auto it = tool_to_http_rule_.find(tool_name);
-  if (it == tool_to_http_rule_.end()) {
+  auto it = tool_entries_.find(tool_name);
+  if (it == tool_entries_.end()) {
     return absl::InvalidArgumentError(
         fmt::format("Failed to find http rule for tool_name: {}", tool_name));
   }
-  return it->second;
+  return it->second.http_rule;
+}
+
+bool McpJsonRestBridgeFilterConfig::textContentStreamingEnabled(absl::string_view tool_name) const {
+  auto it = tool_entries_.find(tool_name);
+  if (it == tool_entries_.end()) {
+    return false;
+  }
+  return it->second.text_content_streaming_enabled;
 }
 
 absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
@@ -248,8 +258,8 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::decodeData(Buffer::Instance& dat
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterHeadersStatus McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap&,
-                                                                 bool end_stream) {
+Http::FilterHeadersStatus
+McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers, bool end_stream) {
   switch (mcp_operation_) {
   case McpOperation::Unspecified:
   case McpOperation::Undecided:
@@ -260,6 +270,17 @@ Http::FilterHeadersStatus McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseH
     return Http::FilterHeadersStatus::Continue;
   default:
     break;
+  }
+
+  // Streaming mode: pre-build the JSON-RPC prefix/suffix, strip Content-Length
+  // (final size is unknown), and let the headers flow through immediately so
+  // the client can start receiving data without waiting for the full body.
+  if (mcp_operation_ == McpOperation::ToolsCall && text_content_streaming_enabled_) {
+    buildStreamingPrefixAndSuffix(getResponseCode(response_headers) >=
+                                  static_cast<int>(Http::Code::BadRequest));
+    response_headers.removeContentLength();
+    response_headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
+    return Http::FilterHeadersStatus::Continue;
   }
 
   // TODO(guoyilin42): Handle headers-only upstream responses (e.g., 204 No Content).
@@ -277,6 +298,45 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& dat
   if (mcp_operation_ == McpOperation::Unspecified ||
       mcp_operation_ == McpOperation::Initialization ||
       mcp_operation_ == McpOperation::InitializationAck) {
+    return Http::FilterDataStatus::Continue;
+  }
+
+  // Streaming fast-path for tools/call: JSON-escape each chunk on-the-fly without
+  // buffering the full response body.
+  if (!streaming_json_prefix_.empty()) {
+    uint64_t len = data.length();
+    // Note: An empty chunk can arrive when the upstream uses the body + trailer pattern (end_stream
+    // is false on the last data frame). It is a no-op here; the suffix will be appended in
+    // encodeTrailers.
+    absl::string_view chunk(static_cast<const char*>(data.linearize(len)), len);
+    // TODO(guoyilin42): Consider adding text/event-stream backend response support and explore if
+    // it needs buffering.
+    std::string escaped_chunk = JsonEscaper::escapeString(chunk, JsonEscaper::extraSpace(chunk));
+
+    data.drain(len);
+    // Note: UTF-8 structural validation (i.e., utf8_range::IsStructurallyValid) is omitted
+    // in the streaming fast-path due to the stateless nature of chunk processing (which lacks
+    // a stateful UTF-8 validator to track multi-byte character boundaries across chunk limits).
+    // If the upstream backend returns invalid UTF-8, it will be streamed to the client as-is,
+    // which may cause the client to fail parsing the final JSON.
+    if (is_first_streaming_chunk_) {
+      ENVOY_STREAM_LOG(debug,
+                       "Streaming: emitting prefix + first chunk ({} raw bytes, {} escaped bytes).",
+                       *encoder_callbacks_, len, escaped_chunk.size());
+      data.add(streaming_json_prefix_);
+      is_first_streaming_chunk_ = false;
+    } else {
+      ENVOY_STREAM_LOG(debug, "Streaming: forwarding chunk ({} raw bytes, {} escaped bytes).",
+                       *encoder_callbacks_, len, escaped_chunk.size());
+    }
+    data.add(escaped_chunk);
+    // TODO(guoyilin42): There will be a case that end_stream is not set in the encodeData call.
+    // This is body + trailer case where encodeTrailer call represents the end of response body.
+    // In that case, we should add the streaming_json_suffix at encodeTrailer call.
+    if (end_stream) {
+      ENVOY_STREAM_LOG(debug, "Streaming: appending suffix, stream complete.", *encoder_callbacks_);
+      data.add(streaming_json_suffix_);
+    }
     return Http::FilterDataStatus::Continue;
   }
 
@@ -319,6 +379,32 @@ Http::FilterTrailersStatus McpJsonRestBridgeFilter::encodeTrailers(Http::Respons
   // standard REST/JSON APIs, trailers are a native part of the HTTP spec and need to be
   // handled properly.
   return Http::FilterTrailersStatus::Continue;
+}
+
+void McpJsonRestBridgeFilter::buildStreamingPrefixAndSuffix(bool is_error) {
+  // Build a reference JSON-RPC envelope with an empty text placeholder.
+  json ref = {
+      {McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
+      {McpConstants::ID_FIELD, *session_id_},
+      {McpConstants::RESULT_FIELD,
+       {
+           {McpConstants::CONTENT_FIELD,
+            json::array({{{McpConstants::TYPE_FIELD, McpConstants::TEXT_FIELD},
+                          {McpConstants::TEXT_FIELD, ""}}})},
+           {McpConstants::IS_ERROR_FIELD, is_error},
+       }},
+  };
+  std::string ref_json = ref.dump();
+
+  // Locate the empty-string placeholder for the text value: `"text":""`.
+  std::string marker = absl::StrCat("\"", McpConstants::TEXT_FIELD, "\":\"\"");
+  size_t pos = ref_json.find(marker);
+  if (pos == std::string::npos) {
+    IS_ENVOY_BUG("JSON-RPC streaming marker not found in serialized envelope");
+    return;
+  }
+  streaming_json_prefix_ = ref_json.substr(0, pos + marker.size() - 1);
+  streaming_json_suffix_ = ref_json.substr(pos + marker.size() - 1);
 }
 
 void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc,
@@ -525,6 +611,9 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_
                       generateErrorJsonResponse(-32602, "Unknown tool").dump());
     return;
   }
+
+  // Set the per-request streaming flag based on the tool's config.
+  text_content_streaming_enabled_ = config_->textContentStreamingEnabled(tool_name);
 
   const auto arguments_it = params.find(McpConstants::ARGUMENTS_FIELD);
   if (arguments_it != params.end() && !arguments_it->is_object()) {

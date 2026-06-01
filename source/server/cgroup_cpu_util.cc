@@ -107,7 +107,7 @@ absl::optional<CgroupPathInfo> CgroupCpuUtil::getCurrentCgroupPath(Filesystem::I
     return absl::nullopt;
   }
 
-  const std::string& content = result.value();
+  absl::string_view content = result.value();
   const std::vector<absl::string_view> lines = absl::StrSplit(content, '\n');
 
   std::string v2_path;   // Save v2 path in case no v1 found
@@ -299,7 +299,7 @@ absl::optional<double> CgroupCpuUtil::readActualLimitsV1(const CpuFiles& cpu_fil
 // Reads actual CPU limits from cgroup v2 files with "quota period" parsing.
 absl::optional<double> CgroupCpuUtil::readActualLimitsV2(const CpuFiles& cpu_files) {
   // v2: Use cached cpu.max content (no re-reading)
-  const std::string content = std::string(absl::StripAsciiWhitespace(cpu_files.quota_content));
+  absl::string_view content = absl::StripAsciiWhitespace(cpu_files.quota_content);
 
   // Parse "quota period" format
   const std::vector<absl::string_view> parts = absl::StrSplit(content, ' ');
@@ -381,7 +381,7 @@ absl::optional<std::string> CgroupCpuUtil::discoverCgroupMount(Filesystem::Insta
     return absl::nullopt;
   }
 
-  const std::string& content = result.value();
+  absl::string_view content = result.value();
   const std::vector<absl::string_view> lines = absl::StrSplit(content, '\n');
 
   std::string v2_mount_point; // Save v2 mount in case no v1 found
@@ -581,7 +581,7 @@ std::string CgroupCpuUtil::unescapePath(absl::string_view path) {
 //
 // NOTE: Mount points may contain escaped characters (\040 for space, \134 for backslash, etc.)
 // and must be unescaped before use.
-absl::optional<std::string> CgroupCpuUtil::parseMountInfoLine(const std::string& line) {
+absl::optional<std::string> CgroupCpuUtil::parseMountInfoLine(absl::string_view line) {
   const std::vector<absl::string_view> fields = absl::StrSplit(line, ' ');
 
   // Find the separator "-" to locate filesystem type field

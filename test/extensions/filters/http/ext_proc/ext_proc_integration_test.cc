@@ -8,6 +8,7 @@
 #include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.h"
 #include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3/mapped_attribute_builder.pb.h"
+#include "envoy/extensions/retry/host/previous_hosts/v3/previous_hosts.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "envoy/type/v3/http_status.pb.h"
@@ -4262,7 +4263,10 @@ TEST_P(ExtProcIntegrationTest, RetryOnDifferentHost) {
   retry_policy->mutable_num_retries()->set_value(2);
   retry_policy->set_retry_on("resource-exhausted"); // resource-exhausted: 8
   // Retry on new host only.
-  retry_policy->add_retry_host_predicate()->set_name("envoy.retry_host_predicates.previous_hosts");
+  auto* host_predicate = retry_policy->add_retry_host_predicate();
+  host_predicate->set_name("envoy.retry_host_predicates.previous_hosts");
+  envoy::extensions::retry::host::previous_hosts::v3::PreviousHostsPredicate previous_hosts_config;
+  host_predicate->mutable_typed_config()->PackFrom(previous_hosts_config);
   // First cluster has 2 endpoints now.
   grpc_upstream_count_ = 3;
   initializeConfig({}, {{0, 2}, {1, 1}});
