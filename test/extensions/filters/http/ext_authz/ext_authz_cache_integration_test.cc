@@ -8,64 +8,95 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/base64.h"
-#include "source/common/common/enum_to_int.h"
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/ext_authz/auth_cache.h"
 
-#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
+#include "test/test_common/registry.h"
 
 #include "gtest/gtest.h"
+#include "google/protobuf/struct.pb.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace ExtAuthz {
 
-// A simple test-only HTTP filter that acts as the "Fake Cache" caching layer in our integration
-// test. It intercepts requests with 'x-simulate-cache' header, Base64-decodes and deserializes it
-// into a strongly-typed CheckResponse proto, and writes it directly to dynamic typed metadata under
-// the configured cache namespace before stripping the header.
-class CacheSimulatorFilter : public Http::PassThroughFilter {
+// Shared storage for our simple cache.
+struct SimpleInMemoryCacheStorage {
+  absl::Mutex mutex;
+  // Map path -> Response.
+  std::unordered_map<std::string, Filters::Common::ExtAuthz::Response> map ABSL_GUARDED_BY(mutex);
+};
+
+class SimpleInMemoryCache : public AuthCache {
 public:
-  CacheSimulatorFilter() = default;
+  SimpleInMemoryCache(std::shared_ptr<SimpleInMemoryCacheStorage> storage) : storage_(storage) {}
 
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
-    const auto simulate_header = headers.get(Http::LowerCaseString("x-simulate-cache"));
-    if (!simulate_header.empty()) {
-      std::string base64_response = std::string(simulate_header[0]->value().getStringView());
-      std::string decoded = Base64::decode(base64_response);
-      if (!decoded.empty()) {
-        envoy::service::auth::v3::CheckResponse check_response;
-        if (check_response.ParseFromString(decoded)) {
-          Protobuf::Any typed_metadata;
-          typed_metadata.PackFrom(check_response);
-
-          // Store direct CheckResponse Any under the configured typed metadata cache namespace
-          decoder_callbacks_->streamInfo().setDynamicTypedMetadata(
-              "envoy.filters.http.ext_authz.cache", typed_metadata);
-        }
-      }
-      headers.remove(Http::LowerCaseString("x-simulate-cache"));
+  void lookup(const envoy::service::auth::v3::CheckRequest& request, LookupCallback&& cb,
+              Tracing::Span&, const StreamInfo::StreamInfo&) override {
+    if (request.has_attributes() && request.attributes().has_request() &&
+        request.attributes().request().has_http()) {
+      current_key_ = request.attributes().request().http().path();
     }
-    return Http::FilterHeadersStatus::Continue;
+
+    if (current_key_.empty()) {
+      cb(nullptr);
+      return;
+    }
+
+    absl::ReaderMutexLock lock(&storage_->mutex);
+    auto it = storage_->map.find(current_key_);
+    if (it != storage_->map.end()) {
+      // Hit! Copy the response.
+      auto copy = std::make_unique<Filters::Common::ExtAuthz::Response>(it->second);
+      cb(std::move(copy));
+      return;
+    }
+    cb(nullptr);
   }
+
+  void insert(const Filters::Common::ExtAuthz::Response& response,
+              Tracing::Span&, const StreamInfo::StreamInfo&) override {
+    if (current_key_.empty()) {
+      return;
+    }
+
+    absl::WriterMutexLock lock(&storage_->mutex);
+    storage_->map[current_key_] = response;
+  }
+
+  void onDestroy() override {}
+
+private:
+  std::shared_ptr<SimpleInMemoryCacheStorage> storage_;
+  std::string current_key_;
 };
 
-class CacheSimulatorFilterConfig
-    : public Extensions::HttpFilters::Common::EmptyHttpDualFilterConfig {
+class SimpleInMemoryCacheFactory : public AuthCacheFactory {
 public:
-  CacheSimulatorFilterConfig() : EmptyHttpDualFilterConfig("cache-simulator-filter") {}
-  absl::StatusOr<Http::FilterFactoryCb>
-  createDualFilter(const std::string&, Server::Configuration::ServerFactoryContext&) override {
-    return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamFilter(std::make_shared<CacheSimulatorFilter>());
-    };
-  }
-};
+  SimpleInMemoryCacheFactory() : storage_(std::make_shared<SimpleInMemoryCacheStorage>()) {}
 
-// Perform static registration so Envoy's bootstrap configuration can resolve it
-static Registry::RegisterFactory<CacheSimulatorFilterConfig,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_cache_simulator_filter_;
+  AuthCachePtr createAuthCache(const Protobuf::Message&,
+                               Server::Configuration::ServerFactoryContext&) override {
+    return std::make_unique<SimpleInMemoryCache>(storage_);
+  }
+
+  std::string name() const override { return "envoy.filters.http.ext_authz.cache.simple_in_memory"; }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<google::protobuf::Struct>();
+  }
+
+  void clear() {
+    absl::WriterMutexLock lock(&storage_->mutex);
+    storage_->map.clear();
+  }
+
+private:
+  std::shared_ptr<SimpleInMemoryCacheStorage> storage_;
+};
 
 class ExtAuthzCacheIntegrationTest : public HttpIntegrationTest, public testing::Test {
 public:
@@ -74,124 +105,145 @@ public:
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    // Allocate secondary dynamic ports to satisfy ConfigHelper configuration finalize
+    // Add fake upstream for ext_authz (gRPC)
     addFakeUpstream(Http::CodecType::HTTP2);
   }
 
   void initialize() override {
+    cache_factory_.clear();
+    inject_cache_factory_ = std::make_unique<Registry::InjectFactory<AuthCacheFactory>>(cache_factory_);
+
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      // Add ext_authz cluster, dynamic endpoint will be mapped automatically by ConfigHelper
+      // Add ext_authz cluster by merging from cluster_0 (backend)
       auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       ext_authz_cluster->set_name("ext_authz_cluster");
       ConfigHelper::setHttp2(*ext_authz_cluster);
 
-      // 1. Set up CacheSimulatorFilter (Fake Cache) using empty config
-      envoy::config::core::v3::TypedExtensionConfig cache_simulator_config;
-      cache_simulator_config.set_name("cache-simulator-filter");
-      cache_simulator_config.mutable_typed_config()->PackFrom(Protobuf::Struct());
-
-      // 2. Set up ext_authz filter config, bypass namespace set
+      // Set up ext_authz filter config
       envoy::extensions::filters::http::ext_authz::v3::ExtAuthz ext_authz_proto;
       ext_authz_proto.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name(
           "ext_authz_cluster");
-      ext_authz_proto.set_check_response_typed_metadata_namespace(
-          "envoy.filters.http.ext_authz.cache");
       ext_authz_proto.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+
+      // Configure the cache
+      auto* cache_config = ext_authz_proto.mutable_cache();
+      cache_config->set_name("envoy.filters.http.ext_authz.cache.simple_in_memory");
+      cache_config->mutable_typed_config()->PackFrom(google::protobuf::Struct());
 
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
       ext_authz_filter.set_name("envoy.filters.http.ext_authz");
       ext_authz_filter.mutable_typed_config()->PackFrom(ext_authz_proto);
 
-      // Prepend filters to HCM (cache_simulator_filter first, then ext_authz)
+      // Prepend filter to HCM
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
-      config_helper_.prependFilter(
-          MessageUtil::getJsonStringFromMessageOrError(cache_simulator_config));
     });
 
     HttpIntegrationTest::initialize();
   }
 
-  std::string serializeAndEncode(const envoy::service::auth::v3::CheckResponse& response) {
-    std::string serialized;
-    RELEASE_ASSERT(response.SerializeToString(&serialized), "Failed to serialize CheckResponse");
-    return Base64::encode(serialized.data(), serialized.size());
+  void TearDown() override {
+    cleanup();
   }
+
+  void cleanup() {
+    if (fake_ext_authz_connection_ != nullptr) {
+      AssertionResult result = fake_ext_authz_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+    }
+    cleanupUpstreamAndDownstream();
+  }
+
+  SimpleInMemoryCacheFactory cache_factory_;
+  std::unique_ptr<Registry::InjectFactory<AuthCacheFactory>> inject_cache_factory_;
+
+  FakeHttpConnectionPtr fake_ext_authz_connection_;
+  FakeStreamPtr ext_authz_request_;
 };
 
-TEST_F(ExtAuthzCacheIntegrationTest, CacheHitOKBypassesRPC) {
+TEST_F(ExtAuthzCacheIntegrationTest, CacheMissThenHit) {
   initialize();
 
-  // 1. Prepare cached OK response with header mutations
-  envoy::service::auth::v3::CheckResponse cached_response;
-  cached_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
-  auto* header_to_add = cached_response.mutable_ok_response()->add_headers();
-  header_to_add->mutable_header()->set_key("x-cached-header");
-  header_to_add->mutable_header()->set_value("cache-value-ok");
-
-  std::string base64_cached_response = serializeAndEncode(cached_response);
-
-  // 2. Client connection and request
+  // --- Request 1: Cache Miss ---
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
-                                         {":path", "/test"},
+                                         {":path", "/cache-me"},
                                          {":scheme", "http"},
-                                         {":authority", "host"},
-                                         {"x-simulate-cache", base64_cached_response}};
+                                         {":authority", "host"}};
+  auto response1 = codec_client_->makeHeaderOnlyRequest(headers);
 
-  auto response = codec_client_->makeHeaderOnlyRequest(headers);
-
-  // 3. Verify request goes upstream with injected headers, and gRPC bypasses
+  // Wait for ext_authz check request on fake authz upstream (fake_upstreams_[1])
   AssertionResult result =
-      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
-  RELEASE_ASSERT(result, result.message());
+      fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_ext_authz_connection_);
+  ASSERT_TRUE(result) << result.message();
+  result = fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request_);
+  ASSERT_TRUE(result) << result.message();
+
+  // Verify it is a check request
+  envoy::service::auth::v3::CheckRequest check_request;
+  result = ext_authz_request_->waitForGrpcMessage(*dispatcher_, check_request);
+  ASSERT_TRUE(result) << result.message();
+  EXPECT_EQ("/cache-me", check_request.attributes().request().http().path());
+
+  // Send OK response from authz service
+  ext_authz_request_->startGrpcStream();
+  envoy::service::auth::v3::CheckResponse check_response;
+  check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+  auto* header_to_add = check_response.mutable_ok_response()->add_headers();
+  header_to_add->mutable_header()->set_key("x-authed-header");
+  header_to_add->mutable_header()->set_value("auth-value");
+
+  ext_authz_request_->sendGrpcMessage(check_response);
+  ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);
+
+  // Wait for request upstream on backend (fake_upstreams_[0])
+  result = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  ASSERT_TRUE(result) << result.message();
   result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
-  RELEASE_ASSERT(result, result.message());
+  ASSERT_TRUE(result) << result.message();
   result = upstream_request_->waitForEndStream(*dispatcher_);
-  RELEASE_ASSERT(result, result.message());
+  ASSERT_TRUE(result) << result.message();
 
-  // Verify mutated header is present upstream
-  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-cached-header", "cache-value-ok"));
-  // Verify simulation header was stripped
-  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("x-simulate-cache")).empty());
+  // Verify backend received the mutated header
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-authed-header", "auth-value"));
 
-  // Send response from upstream
+  // Send response from backend
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   // Client receives response
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
+  ASSERT_TRUE(response1->waitForEndStream());
+  EXPECT_TRUE(response1->complete());
+  EXPECT_EQ("200", response1->headers().getStatusValue());
+
+  // Clean up stream pointers for next request
+  upstream_request_.reset();
+
+  // --- Request 2: Cache Hit ---
+  auto response2 = codec_client_->makeHeaderOnlyRequest(headers);
+
+  // It should bypass authz and go straight to backend
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  ASSERT_TRUE(result) << result.message();
+  result = upstream_request_->waitForEndStream(*dispatcher_);
+  ASSERT_TRUE(result) << result.message();
+
+  // Verify backend received the mutated header (from cache!)
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-authed-header", "auth-value"));
+
+  // Send response from backend
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  // Client receives response
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_TRUE(response2->complete());
+  EXPECT_EQ("200", response2->headers().getStatusValue());
+
+  // Verify stats: 2 OKs total
+  uint64_t ok_counter = test_server_->counter("http.config_test.ext_authz.ok")->value();
+  EXPECT_EQ(2U, ok_counter);
 }
 
-TEST_F(ExtAuthzCacheIntegrationTest, CacheHitDeniedBypassesRPC) {
-  initialize();
-
-  // 1. Prepare cached Denied response (403 Forbidden)
-  envoy::service::auth::v3::CheckResponse cached_response;
-  cached_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
-  auto* denied_response = cached_response.mutable_denied_response();
-  denied_response->mutable_status()->set_code(
-      static_cast<envoy::type::v3::StatusCode>(enumToInt(Http::Code::Forbidden)));
-  denied_response->set_body("Cache Denied Body");
-
-  std::string base64_cached_response = serializeAndEncode(cached_response);
-
-  // 2. Client request
-  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
-                                         {":path", "/test"},
-                                         {":scheme", "http"},
-                                         {":authority", "host"},
-                                         {"x-simulate-cache", base64_cached_response}};
-
-  auto response = codec_client_->makeHeaderOnlyRequest(headers);
-
-  // 3. Verify client receives 403 local reply immediately, and upstream never sees request
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("403", response->headers().getStatusValue());
-  EXPECT_EQ("Cache Denied Body", response->body());
-}
-
+} // namespace ExtAuthz
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy
