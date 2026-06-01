@@ -343,7 +343,7 @@ TEST_F(GcpAuthnFilterTest, CacheMissAndInsert) {
   EXPECT_EQ(cached_val.value(), std::string(GoodTokenStr));
 }
 
-TEST_F(GcpAuthnFilterTest, mTLSClusterFingerprint) {
+TEST_F(GcpAuthnFilterTest, MtlsClusterFingerprint) {
   setupMockObjects();
   setupFilterAndCallback();
 
