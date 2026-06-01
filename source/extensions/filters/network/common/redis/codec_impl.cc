@@ -606,7 +606,13 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
         if (c < '0' || c > '9') {
           throw ProtocolError("invalid integer character");
         } else {
-          pending_integer_.integer_ = (pending_integer_.integer_ * 10) + (c - '0');
+          const uint64_t next_digit = c - '0';
+          if (pending_integer_.integer_ > std::numeric_limits<uint64_t>::max() / 10 ||
+              (pending_integer_.integer_ == std::numeric_limits<uint64_t>::max() / 10 &&
+               next_digit > std::numeric_limits<uint64_t>::max() % 10)) {
+            throw ProtocolError("integer overflow");
+          }
+          pending_integer_.integer_ = (pending_integer_.integer_ * 10) + next_digit;
         }
       }
 

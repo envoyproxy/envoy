@@ -864,6 +864,12 @@ TEST_F(RedisEncoderDecoderImplTest, ArraySizeLimitExceeded) {
   EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
 }
 
+TEST_F(RedisEncoderDecoderImplTest, IntegerOverflowTest) {
+  // Extremely large number of digits to trigger uint64_t overflow
+  buffer_.add("*99999999999999999999999999\r\n");
+  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+}
+
 } // namespace Redis
 } // namespace Common
 } // namespace NetworkFilters
