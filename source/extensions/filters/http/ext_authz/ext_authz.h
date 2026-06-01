@@ -29,6 +29,7 @@
 #include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 #include "source/extensions/filters/common/processing_effect/processing_effect.h"
+#include "source/extensions/filters/http/ext_authz/auth_cache.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -52,8 +53,7 @@ namespace ExtAuthz {
   COUNTER(request_header_limits_reached)                                                           \
   COUNTER(response_header_limits_reached)                                                          \
   COUNTER(shadow_denied)                                                                           \
-  COUNTER(shadow_error)                                                                            \
-  COUNTER(invalid_cached_response)
+  COUNTER(shadow_error)
 
 /**
  * Wrapper struct for ext_authz filter stats. @see stats_macros.h
@@ -280,10 +280,6 @@ public:
 
   bool chargeClusterResponseStats() const { return charge_cluster_response_stats_; }
 
-  const std::string& checkResponseTypedMetadataNamespace() const {
-    return check_response_typed_metadata_namespace_;
-  }
-
   const Filters::Common::ExtAuthz::MatcherSharedPtr& allowedHeadersMatcher() const {
     return allowed_headers_matcher_;
   }
@@ -353,7 +349,6 @@ private:
   const bool include_peer_certificate_;
   const bool include_tls_session_;
   const bool charge_cluster_response_stats_;
-  const std::string check_response_typed_metadata_namespace_;
 
   // The stats for the filter.
   ExtAuthzFilterStats stats_;
@@ -459,14 +454,17 @@ class Filter : public Logger::Loggable<Logger::Id::ext_authz>,
                public Http::StreamFilter,
                public Filters::Common::ExtAuthz::RequestCallbacks {
 public:
-  Filter(const FilterConfigSharedPtr& config, Filters::Common::ExtAuthz::ClientPtr&& client)
-      : config_(config), client_(std::move(client)), stats_(config->stats()) {}
+  Filter(const FilterConfigSharedPtr& config, Filters::Common::ExtAuthz::ClientPtr&& client,
+         AuthCachePtr&& cache = nullptr)
+      : config_(config), client_(std::move(client)), cache_(std::move(cache)),
+        stats_(config->stats()) {}
 
   // Constructor that includes server context for per-route service support.
   Filter(const FilterConfigSharedPtr& config, Filters::Common::ExtAuthz::ClientPtr&& client,
-         Server::Configuration::ServerFactoryContext& server_context)
-      : config_(config), client_(std::move(client)), server_context_(&server_context),
-        stats_(config->stats()) {}
+         Server::Configuration::ServerFactoryContext& server_context,
+         AuthCachePtr&& cache = nullptr)
+      : config_(config), client_(std::move(client)), cache_(std::move(cache)),
+        server_context_(&server_context), stats_(config->stats()) {}
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -532,14 +530,16 @@ private:
   absl::optional<MonotonicTime> start_time_;
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
   void initiateCall(const Http::RequestHeaderMap& headers);
+  void prepareCheck(const Http::RequestHeaderMap& headers);
+  void callAuthzService();
+  void onCacheLookupComplete(Filters::Common::ExtAuthz::ResponsePtr&& response);
+  void processResponse(Filters::Common::ExtAuthz::ResponsePtr&& response);
   void continueDecoding();
   // In shadow mode, writes the authorization decision and response attributes into
   // FilterState and increments the appropriate shadow stat counter. Takes the response
   // by non-const reference so we can std::move ``headers_to_set`` into the object instead
   // of copying.
   void setShadowFilterState(Filters::Common::ExtAuthz::Response& response);
-  void applyResponse(Filters::Common::ExtAuthz::ResponsePtr response);
-  bool tryCacheHit();
   bool isBufferFull(uint64_t num_bytes_processing) const;
   void updateLoggingInfo(const absl::optional<Grpc::Status::GrpcStatus>& grpc_status);
   void updateEffect(const Filters::Common::ProcessingEffect::Effect effect);
@@ -564,6 +564,7 @@ private:
   Http::HeaderMapPtr getHeaderMap(const Filters::Common::ExtAuthz::ResponsePtr& response);
   FilterConfigSharedPtr config_;
   Filters::Common::ExtAuthz::ClientPtr client_;
+  AuthCachePtr cache_;
   // Server context for creating per-route clients.
   Server::Configuration::ServerFactoryContext* server_context_{nullptr};
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};

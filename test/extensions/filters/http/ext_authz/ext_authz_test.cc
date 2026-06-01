@@ -17,14 +17,16 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/ext_authz/auth_cache.h"
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
-#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/printers.h"
@@ -51,6 +53,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 namespace {
+
+// Matcher to convert a Buffer::Instance to its string representation for composition.
+MATCHER_P(BufferString, m, "") {
+  return testing::ExplainMatchResult(m, arg->toString(), result_listener);
+}
 
 // Matcher to parse a buffer string into a CheckRequest proto.
 MATCHER_P(AsCheckRequest, m, "") {
@@ -120,6 +127,20 @@ public:
     client_ = new NiceMock<Filters::Common::ExtAuthz::MockClient>();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_},
                                        factory_context_);
+    ON_CALL(decoder_filter_callbacks_, filterConfigName()).WillByDefault(Return(FilterConfigName));
+    filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+    filter_->setEncoderFilterCallbacks(encoder_filter_callbacks_);
+    addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
+  }
+
+  void
+  initializeWithCache(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
+                      AuthCachePtr&& cache) {
+    config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope(),
+                                             "ext_authz_prefix", factory_context_);
+    client_ = new NiceMock<Filters::Common::ExtAuthz::MockClient>();
+    filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_},
+                                       factory_context_, std::move(cache));
     ON_CALL(decoder_filter_callbacks_, filterConfigName()).WillByDefault(Return(FilterConfigName));
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_filter_callbacks_);
@@ -5667,10 +5688,10 @@ TEST_P(HttpFilterTestParam, PerRouteConfigurationIntegrationTest) {
       .WillOnce(Return(absl::StatusOr<Grpc::RawAsyncClientSharedPtr>(mock_raw_grpc_client)));
 
   // Mock the sendRaw call with matcher-based validation for the gRPC authorization check.
-  EXPECT_CALL(
-      *mock_raw_grpc_client,
-      sendRaw(_, _, BufferPtrString(AsCheckRequest(HasContextExtension("test_key", "test_value"))),
-              _, _, _))
+  EXPECT_CALL(*mock_raw_grpc_client,
+              sendRaw(_, _,
+                      BufferString(AsCheckRequest(HasContextExtension("test_key", "test_value"))),
+                      _, _, _))
       .WillOnce([&](absl::string_view /*service_full_name*/, absl::string_view /*method_name*/,
                     Buffer::InstancePtr&& /*request*/, Grpc::RawAsyncRequestCallbacks& callbacks,
                     Tracing::Span& parent_span,
@@ -6964,6 +6985,115 @@ TEST_F(HttpFilterTest, ShadowModeWithRequestBody) {
             envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::DENIED);
   EXPECT_EQ(shadow->statusCode(), Http::Code::Forbidden);
   EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
+}
+
+class MockAuthCache : public AuthCache {
+public:
+  MockAuthCache() = default;
+  ~MockAuthCache() override = default;
+
+  MOCK_METHOD(void, lookup,
+              (const envoy::service::auth::v3::CheckRequest&, LookupCallback&&, Tracing::Span&,
+               const StreamInfo::StreamInfo&));
+  MOCK_METHOD(void, insert,
+              (const Filters::Common::ExtAuthz::Response&, Tracing::Span&,
+               const StreamInfo::StreamInfo&));
+  MOCK_METHOD(void, onDestroy, ());
+};
+
+class HttpFilterCacheTest : public HttpFilterTestBase<testing::Test> {
+public:
+  HttpFilterCacheTest() { mock_cache_ = new NiceMock<MockAuthCache>(); }
+
+  void initializeFilter(bool failure_mode_allow = false) {
+    auto proto_config = getFilterConfig(failure_mode_allow, false); // grpc config
+    initializeWithCache(proto_config, AuthCachePtr{mock_cache_});
+  }
+
+  MockAuthCache* mock_cache_;
+};
+
+TEST_F(HttpFilterCacheTest, CacheHitOk) {
+  initializeFilter();
+
+  request_headers_.addCopy(Http::Headers::get().Host, "example.com");
+  request_headers_.addCopy(Http::Headers::get().Method, "GET");
+  request_headers_.addCopy(Http::Headers::get().Path, "/");
+
+  prepareCheck();
+
+  AuthCache::LookupCallback lookup_cb;
+  EXPECT_CALL(*mock_cache_, lookup(_, _, _, _))
+      .WillOnce(Invoke([&](const envoy::service::auth::v3::CheckRequest&,
+                           AuthCache::LookupCallback&& cb, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) { lookup_cb = std::move(cb); }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+
+  auto cached_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+  cached_response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  cached_response->headers_to_add.push_back({"x-cached-header", "yes"});
+
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+
+  lookup_cb(std::move(cached_response));
+
+  EXPECT_EQ("yes",
+            request_headers_.get(LowerCaseString("x-cached-header"))[0]->value().getStringView());
+}
+
+TEST_F(HttpFilterCacheTest, CacheMiss) {
+  initializeFilter();
+
+  request_headers_.addCopy(Http::Headers::get().Host, "example.com");
+  request_headers_.addCopy(Http::Headers::get().Method, "GET");
+  request_headers_.addCopy(Http::Headers::get().Path, "/");
+
+  prepareCheck();
+
+  AuthCache::LookupCallback lookup_cb;
+  EXPECT_CALL(*mock_cache_, lookup(_, _, _, _))
+      .WillOnce(Invoke([&](const envoy::service::auth::v3::CheckRequest&,
+                           AuthCache::LookupCallback&& cb, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) { lookup_cb = std::move(cb); }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  Filters::Common::ExtAuthz::RequestCallbacks* authz_cb = nullptr;
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& cb,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) { authz_cb = &cb; }));
+
+  lookup_cb(nullptr);
+
+  auto authz_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+  authz_response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
+
+  EXPECT_CALL(*mock_cache_, insert(_, _, _));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+
+  authz_cb->onComplete(std::move(authz_response));
+}
+
+TEST_F(HttpFilterCacheTest, DestroyDuringLookup) {
+  initializeFilter();
+
+  request_headers_.addCopy(Http::Headers::get().Host, "example.com");
+  request_headers_.addCopy(Http::Headers::get().Method, "GET");
+  request_headers_.addCopy(Http::Headers::get().Path, "/");
+
+  prepareCheck();
+
+  EXPECT_CALL(*mock_cache_, lookup(_, _, _, _));
+  filter_->decodeHeaders(request_headers_, false);
+
+  EXPECT_CALL(*mock_cache_, onDestroy());
+  filter_->onDestroy();
 }
 
 } // namespace

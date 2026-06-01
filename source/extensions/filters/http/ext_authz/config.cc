@@ -13,6 +13,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
+#include "source/extensions/filters/http/ext_authz/auth_cache.h"
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
 namespace Envoy {
@@ -25,6 +26,18 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoWithServ
     const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context) {
   const auto filter_config = std::make_shared<FilterConfig>(proto_config, server_context.scope(),
                                                             stats_prefix, server_context);
+
+  AuthCacheFactory* const cache_factory =
+      proto_config.has_cache()
+          ? &Config::Utility::getAndCheckFactory<AuthCacheFactory>(proto_config.cache())
+          : nullptr;
+  const std::shared_ptr<Protobuf::Message> shared_cache_config =
+      cache_factory != nullptr
+          ? Config::Utility::translateAnyToFactoryConfig(proto_config.cache().typed_config(),
+                                                         server_context.messageValidationVisitor(),
+                                                         *cache_factory)
+          : nullptr;
+
   // The callback is created in main thread and executed in worker thread, variables except factory
   // context must be captured by value into the callback.
   Http::FilterFactoryCb callback;
@@ -36,12 +49,16 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoWithServ
     const auto client_config =
         std::make_shared<Extensions::Filters::Common::ExtAuthz::ClientConfig>(
             proto_config, timeout_ms, proto_config.http_service().path_prefix(), server_context);
-    callback = [filter_config = std::move(filter_config), client_config,
-                &server_context](Http::FilterChainFactoryCallbacks& callbacks) {
+    callback = [filter_config = std::move(filter_config), client_config, &server_context,
+                cache_factory, shared_cache_config](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<Extensions::Filters::Common::ExtAuthz::RawHttpClientImpl>(
           server_context.clusterManager(), client_config);
-      callbacks.addStreamFilter(
-          std::make_shared<Filter>(filter_config, std::move(client), server_context));
+      AuthCachePtr cache =
+          cache_factory != nullptr
+              ? cache_factory->createAuthCache(*shared_cache_config, server_context)
+              : nullptr;
+      callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client),
+                                                         server_context, std::move(cache)));
     };
   } else {
     // gRPC client.
@@ -56,7 +73,8 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoWithServ
     Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
         Envoy::Grpc::GrpcServiceConfigWithHashKey(proto_config.grpc_service());
     callback = [&server_context, filter_config = std::move(filter_config), timeout,
-                config_with_hash_key](Http::FilterChainFactoryCallbacks& callbacks) {
+                config_with_hash_key, cache_factory,
+                shared_cache_config](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client_or_error = server_context.clusterManager()
                                  .grpcAsyncClientManager()
                                  .getOrCreateRawAsyncClientWithHashKey(
@@ -64,8 +82,12 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoWithServ
       THROW_IF_NOT_OK_REF(client_or_error.status());
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
           client_or_error.value(), timeout);
-      callbacks.addStreamFilter(
-          std::make_shared<Filter>(filter_config, std::move(client), server_context));
+      AuthCachePtr cache =
+          cache_factory != nullptr
+              ? cache_factory->createAuthCache(*shared_cache_config, server_context)
+              : nullptr;
+      callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client),
+                                                         server_context, std::move(cache)));
     };
   }
   return callback;
