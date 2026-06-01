@@ -48,32 +48,6 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "ext_authz_cache_test",
-    srcs = ["ext_authz_cache_test.cc"],
-    extension_names = ["envoy.filters.http.ext_authz"],
-    rbe_pool = "6gig",
-    deps = [
-        "//envoy/http:codes_interface",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/common:empty_string",
-        "//source/common/http:headers_lib",
-        "//source/common/protobuf:utility_lib",
-        "//source/extensions/filters/http/ext_authz",
-        "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
-        "//test/mocks/http:http_mocks",
-        "//test/mocks/network:network_mocks",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:server_factory_context_mocks",
-        "//test/mocks/tracing:tracing_mocks",
-        "//test/mocks/upstream:cluster_manager_mocks",
-        "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.ext_authz"],
@@ -125,25 +99,6 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/matching/common_inputs/network/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/matching/input_matchers/metadata/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_extension_cc_test(
-    name = "ext_authz_cache_integration_test",
-    srcs = ["ext_authz_cache_integration_test.cc"],
-    extension_names = ["envoy.filters.http.ext_authz"],
-    rbe_pool = "linux_x64_small",
-    deps = [
-        "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "//source/extensions/filters/http/ext_authz:config",
-        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
-        "//test/integration:http_integration_lib",
-        "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
 )

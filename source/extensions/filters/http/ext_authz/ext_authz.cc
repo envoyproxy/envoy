@@ -405,13 +405,15 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
 
   if (cache_ != nullptr) {
     ENVOY_STREAM_LOG(trace, "ext_authz filter performing cache lookup.", *decoder_callbacks_);
+    initiating_lookup_ = true;
+    filter_return_ = FilterReturn::StopDecoding;
     cache_->lookup(
         check_request_,
         [this](Filters::Common::ExtAuthz::ResponsePtr&& response) {
           onCacheLookupComplete(std::move(response));
         },
         decoder_callbacks_->activeSpan(), decoder_callbacks_->streamInfo());
-    filter_return_ = FilterReturn::StopDecoding;
+    initiating_lookup_ = false;
     return;
   }
 
@@ -1227,7 +1229,7 @@ void Filter::continueDecoding() {
   buffer_data_ = false;
 
   filter_return_ = FilterReturn::ContinueDecoding;
-  if (!initiating_call_) {
+  if (!initiating_call_ && !initiating_lookup_) {
     decoder_callbacks_->continueDecoding();
   }
 }

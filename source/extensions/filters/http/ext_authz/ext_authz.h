@@ -587,6 +587,8 @@ private:
 
   // Used to identify if the callback to onComplete() is synchronous (on the stack) or asynchronous.
   bool initiating_call_{};
+  // Used to identify if the callback to onCacheLookupComplete() is synchronous (on the stack) or asynchronous.
+  bool initiating_lookup_{};
   bool buffer_data_{};
   bool skip_check_{false};
   envoy::service::auth::v3::CheckRequest check_request_{};

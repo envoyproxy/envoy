@@ -31,7 +31,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 35]
+// [#next-free-field: 34]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v3.ExtAuthz";
@@ -388,15 +388,10 @@ message ExtAuthz {
   // Defaults to ``false``.
   bool shadow_mode = 32;
 
-  // If set, enables bypassing the external authorization service call by retrieving
-  // a cached ExtAuthz::Response directly from dynamic typed metadata under this namespace.
-  // If this namespace is empty, the cooperative caching bypass feature is disabled.
-  string check_response_typed_metadata_namespace = 33;
-
   // Optional configuration for a cache extension. If specified, the filter will
   // attempt to lookup and populate the cache for authorization requests.
   // The extension must implement the "envoy.filters.http.ext_authz.cache" interface.
-  config.core.v3.TypedExtensionConfig cache = 34;
+  config.core.v3.TypedExtensionConfig cache = 33;
 }
 
 // Serialized form of the shadow-mode authorization decision written to FilterState

@@ -7045,6 +7045,33 @@ TEST_F(HttpFilterCacheTest, CacheHitOk) {
             request_headers_.get(LowerCaseString("x-cached-header"))[0]->value().getStringView());
 }
 
+TEST_F(HttpFilterCacheTest, CacheHitOkSync) {
+  initializeFilter();
+
+  request_headers_.addCopy(Http::Headers::get().Host, "example.com");
+  request_headers_.addCopy(Http::Headers::get().Method, "GET");
+  request_headers_.addCopy(Http::Headers::get().Path, "/");
+
+  prepareCheck();
+
+  EXPECT_CALL(*mock_cache_, lookup(_, _, _, _))
+      .WillOnce(Invoke([&](const envoy::service::auth::v3::CheckRequest&,
+                           AuthCache::LookupCallback&& cb, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) {
+        auto cached_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+        cached_response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
+        cached_response->headers_to_add.push_back({"x-cached-header", "yes"});
+        cb(std::move(cached_response));
+      }));
+
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_EQ("yes",
+            request_headers_.get(LowerCaseString("x-cached-header"))[0]->value().getStringView());
+}
+
 TEST_F(HttpFilterCacheTest, CacheMiss) {
   initializeFilter();
 
