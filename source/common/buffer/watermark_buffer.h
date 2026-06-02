@@ -9,6 +9,8 @@
 
 #include "source/common/buffer/buffer_impl.h"
 
+#include "absl/functional/any_invocable.h"
+
 namespace Envoy {
 namespace Buffer {
 
@@ -21,11 +23,12 @@ namespace Buffer {
 // It is only called on the first time the buffer overflows.
 class WatermarkBuffer : public OwnedImpl {
 public:
-  WatermarkBuffer(std::function<void()> below_low_watermark,
-                  std::function<void()> above_high_watermark,
-                  std::function<void()> above_overflow_watermark)
-      : below_low_watermark_(below_low_watermark), above_high_watermark_(above_high_watermark),
-        above_overflow_watermark_(above_overflow_watermark) {}
+  WatermarkBuffer(absl::AnyInvocable<void()> below_low_watermark,
+                  absl::AnyInvocable<void()> above_high_watermark,
+                  absl::AnyInvocable<void()> above_overflow_watermark)
+      : below_low_watermark_(std::move(below_low_watermark)),
+        above_high_watermark_(std::move(above_high_watermark)),
+        above_overflow_watermark_(std::move(above_overflow_watermark)) {}
 
   // Override all functions from Instance which can result in changing the size
   // of the underlying buffer.
@@ -61,9 +64,9 @@ private:
   void commit(uint64_t length, absl::Span<RawSlice> slices,
               ReservationSlicesOwnerPtr slices_owner) override;
 
-  std::function<void()> below_low_watermark_;
-  std::function<void()> above_high_watermark_;
-  std::function<void()> above_overflow_watermark_;
+  absl::AnyInvocable<void()> below_low_watermark_;
+  absl::AnyInvocable<void()> above_high_watermark_;
+  absl::AnyInvocable<void()> above_overflow_watermark_;
 
   // Used for enforcing buffer limits (off by default). If these are set to non-zero by a call to
   // setWatermarks() the watermark callbacks will be called as described above.
@@ -144,7 +147,7 @@ private:
 
   uint64_t buffer_memory_allocated_ = 0;
   // Current bucket index where the account is being tracked in.
-  absl::optional<uint32_t> current_bucket_idx_{};
+  absl::optional<uint32_t> current_bucket_idx_;
 
   WatermarkBufferFactory* factory_ = nullptr;
 
@@ -194,11 +197,12 @@ public:
 
   // Buffer::WatermarkFactory
   ~WatermarkBufferFactory() override;
-  InstancePtr createBuffer(std::function<void()> below_low_watermark,
-                           std::function<void()> above_high_watermark,
-                           std::function<void()> above_overflow_watermark) override {
-    return std::make_unique<WatermarkBuffer>(below_low_watermark, above_high_watermark,
-                                             above_overflow_watermark);
+  InstancePtr createBuffer(absl::AnyInvocable<void()> below_low_watermark,
+                           absl::AnyInvocable<void()> above_high_watermark,
+                           absl::AnyInvocable<void()> above_overflow_watermark) override {
+    return std::make_unique<WatermarkBuffer>(std::move(below_low_watermark),
+                                             std::move(above_high_watermark),
+                                             std::move(above_overflow_watermark));
   }
 
   BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler& reset_handler) override;

@@ -9,6 +9,7 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "absl/synchronization/mutex.h"
 
@@ -18,8 +19,8 @@ namespace Envoy {
 struct StreamTee {
   virtual ~StreamTee() = default;
   mutable absl::Mutex mutex_;
-  Buffer::OwnedImpl request_body_ ABSL_GUARDED_BY(mutex_){};
-  Buffer::OwnedImpl response_body_ ABSL_GUARDED_BY(mutex_){};
+  Buffer::OwnedImpl request_body_ ABSL_GUARDED_BY(mutex_);
+  Buffer::OwnedImpl response_body_ ABSL_GUARDED_BY(mutex_);
   bool decode_end_stream_ ABSL_GUARDED_BY(mutex_){false};
   bool encode_end_stream_ ABSL_GUARDED_BY(mutex_){false};
   Http::RequestHeaderMapPtr request_headers_ ABSL_GUARDED_BY(mutex_){nullptr};
@@ -37,9 +38,12 @@ using StreamTeeSharedPtr = std::shared_ptr<StreamTee>;
 
 // Inject a specific instance of this factory in order to leverage the same
 // instance used by Envoy to inspect internally.
-class StreamTeeFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class StreamTeeFilterConfig : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<
+                                  test::integration::filters::StreamTeeFilterConfig> {
 public:
-  StreamTeeFilterConfig() : EmptyHttpFilterConfig("stream-tee-filter") {}
+  StreamTeeFilterConfig()
+      : UniqueEmptyHttpFilterConfig<test::integration::filters::StreamTeeFilterConfig>(
+            "stream-tee-filter") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&, Server::Configuration::FactoryContext&) override;

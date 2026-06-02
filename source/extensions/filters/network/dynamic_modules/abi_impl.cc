@@ -442,9 +442,9 @@ bool envoy_dynamic_module_callback_network_set_filter_state_bytes(
   absl::string_view key_view(key.ptr, key.length);
   absl::string_view value_view(value.ptr, value.length);
 
-  stream_info.filterState()->setData(
-      key_view, std::make_unique<Router::StringAccessorImpl>(value_view),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+  stream_info.filterState()->setData(key_view,
+                                     std::make_unique<Router::StringAccessorImpl>(value_view),
+                                     StreamInfo::FilterState::LifeSpan::Connection);
   return true;
 }
 
@@ -493,7 +493,6 @@ bool envoy_dynamic_module_callback_network_set_filter_state_typed(
   }
 
   stream_info.filterState()->setData(key_view, std::move(object),
-                                     StreamInfo::FilterState::StateType::Mutable,
                                      StreamInfo::FilterState::LifeSpan::Connection);
   return true;
 }
@@ -720,7 +719,6 @@ ensureUpstreamSocketOptionsFilterState(DynamicModuleNetworkFilter& filter) {
   if (!has_options) {
     filter_state.setData(Network::UpstreamSocketOptionsFilterState::key(),
                          std::make_unique<Network::UpstreamSocketOptionsFilterState>(),
-                         StreamInfo::FilterState::StateType::Mutable,
                          StreamInfo::FilterState::LifeSpan::Connection);
   }
   return filter_state.getDataMutable<Network::UpstreamSocketOptionsFilterState>(

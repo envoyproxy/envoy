@@ -91,15 +91,15 @@ private:
   Server::Configuration::FactoryContext& context_;
   const FilterConfigSharedPtr config_;
   const uint64_t config_id_;
-  std::string plugin_name_{};
+  std::string plugin_name_;
   Dso::NetworkFilterDsoPtr dynamic_lib_{nullptr};
   FilterWrapper* wrapper_{nullptr};
   Event::Dispatcher* dispatcher_{nullptr};
 
   bool closed_{false};
   Network::ReadFilterCallbacks* read_callbacks_{};
-  std::string local_addr_{};
-  std::string addr_{};
+  std::string local_addr_;
+  std::string addr_;
 
   Thread::MutexBasicLockable mutex_{};
 };
@@ -112,7 +112,7 @@ public:
   FilterWrapper(FilterWeakPtr ptr) : filter_ptr_(ptr) {}
   ~FilterWrapper() = default;
 
-  FilterWeakPtr filter_ptr_{};
+  FilterWeakPtr filter_ptr_;
   // anchor a string temporarily, make sure it won't be freed before copied to Go.
   std::string str_value_;
 };

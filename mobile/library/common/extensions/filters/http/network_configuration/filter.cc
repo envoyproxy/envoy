@@ -30,7 +30,7 @@ void NetworkConfigurationFilter::setDecoderFilterCallbacks(
   decoder_callbacks_ = &callbacks;
   decoder_callbacks_->streamInfo().filterState()->setData(
       StreamInfo::ExtraStreamInfo::key(), std::move(new_extra_stream_info),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Request);
+      StreamInfo::FilterState::LifeSpan::Request);
 
   auto options = std::make_shared<Network::Socket::Options>();
   connectivity_manager_->setInterfaceBindingEnabled(enable_interface_binding_);
@@ -196,7 +196,7 @@ void NetworkConfigurationFilter::setInfo(absl::string_view authority,
   decoder_callbacks_->streamInfo().filterState()->setData(
       Network::Http11ProxyInfoFilterState::key(),
       std::make_unique<Network::Http11ProxyInfoFilterState>(authority, address),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+      StreamInfo::FilterState::LifeSpan::FilterChain);
 }
 
 Http::FilterHeadersStatus NetworkConfigurationFilter::encodeHeaders(Http::ResponseHeaderMap&,

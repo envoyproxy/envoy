@@ -89,6 +89,7 @@ TEST(Base64Test, DecodeFailure) {
   EXPECT_EQ("", Base64::decode("A==="));
   EXPECT_EQ("", Base64::decode("===="));
   EXPECT_EQ("", Base64::decode("123"));
+  EXPECT_EQ("", Base64::decode("u\nUU"));
 }
 
 TEST(Base64Test, DecodeWithoutPadding) {
@@ -112,8 +113,8 @@ TEST(Base64Test, DecodeWithoutPadding) {
 
 TEST(Base64Test, MultiSlicesBufferEncode) {
   Buffer::OwnedImpl buffer;
-  buffer.add("foob", 4);
-  buffer.add("ar", 2);
+  buffer.appendSliceForTest("foob", 4);
+  buffer.appendSliceForTest("ar", 2);
   EXPECT_EQ("Zm9vYg==", Base64::encode(buffer, 4));
   EXPECT_EQ("Zm9vYmE=", Base64::encode(buffer, 5));
   EXPECT_EQ("Zm9vYmFy", Base64::encode(buffer, 6));
@@ -226,5 +227,6 @@ TEST(Base64UrlTest, DecodeFailure) {
   EXPECT_EQ("", Base64Url::decode("Zh"));  // 011001 100001 <- unused bit at tail
   EXPECT_EQ("", Base64Url::decode("Zm9")); // 011001 100110 111101 <- unused bit at tail
   EXPECT_EQ("", Base64Url::decode("A"));
+  EXPECT_EQ("", Base64Url::decode("ygg="));
 }
 } // namespace Envoy

@@ -358,7 +358,12 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
         auto* foo_upgrade = hcm.add_upgrade_configs();
         foo_upgrade->set_upgrade_type("foo");
         auto* filter_list_back = foo_upgrade->add_filters();
-        TestUtility::loadFromYaml("name: envoy.filters.http.router", *filter_list_back);
+        TestUtility::loadFromYaml(R"EOF(
+          name: envoy.filters.http.router
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+        )EOF",
+                                  *filter_list_back);
       });
   initialize();
 
@@ -371,7 +376,7 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
     codec_client_->sendData(encoder_decoder.first, large_req_str, false);
     ASSERT_TRUE(response_->waitForEndStream());
     EXPECT_EQ("413", response_->headers().getStatusValue());
-    waitForClientDisconnectOrReset();
+    waitForClientDisconnectOrReset(Http::StreamResetReason::RemoteResetNoError);
     codec_client_->close();
   }
 
@@ -389,7 +394,7 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
     ASSERT_TRUE(response_->waitForEndStream());
     EXPECT_EQ("413", response_->headers().getStatusValue());
     if (downstreamProtocol() != Http::CodecType::HTTP3) {
-      waitForClientDisconnectOrReset();
+      waitForClientDisconnectOrReset(Http::StreamResetReason::RemoteResetNoError);
     }
     codec_client_->close();
   }

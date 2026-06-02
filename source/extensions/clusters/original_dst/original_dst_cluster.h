@@ -88,11 +88,16 @@ public:
    */
   class LoadBalancer : public Upstream::LoadBalancer {
   public:
-    LoadBalancer(const OriginalDstClusterHandleSharedPtr& parent)
+    LoadBalancer(const OriginalDstClusterHandleSharedPtr& parent, const PrioritySet& priority_set)
         : parent_(parent), http_header_name_(parent->cluster_->httpHeaderName()),
           metadata_key_(parent->cluster_->metadataKey()),
           port_override_(parent->cluster_->portOverride()),
-          host_map_(parent->cluster_->getCurrentHostMap()) {}
+          host_map_(parent->cluster_->getCurrentHostMap()) {
+      member_update_cb_ =
+          priority_set.addMemberUpdateCb([this](const HostVector&, const HostVector&) {
+            host_map_ = parent_->cluster_->getCurrentHostMap();
+          });
+    }
 
     // Upstream::LoadBalancer
     HostSelectionResponse chooseHost(LoadBalancerContext* context) override;
@@ -121,6 +126,7 @@ public:
     const absl::optional<Config::MetadataKey>& metadata_key_;
     const absl::optional<uint32_t> port_override_;
     HostMultiMapConstSharedPtr host_map_;
+    Common::CallbackHandlePtr member_update_cb_;
   };
 
   const absl::optional<Http::LowerCaseString>& httpHeaderName() { return http_header_name_; }
@@ -139,9 +145,10 @@ private:
     LoadBalancerFactory(const OriginalDstClusterHandleSharedPtr& cluster) : cluster_(cluster) {}
 
     // Upstream::LoadBalancerFactory
-    Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
-      return std::make_unique<LoadBalancer>(cluster_);
+    Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams params) override {
+      return std::make_unique<LoadBalancer>(cluster_, params.priority_set);
     }
+    bool recreateOnHostChange() const override { return false; }
 
     const OriginalDstClusterHandleSharedPtr cluster_;
   };

@@ -70,7 +70,7 @@ protected:
   }
 
 public:
-  ReverseTunnelFilterUnitTest() : stats_store_(), overload_manager_() {
+  ReverseTunnelFilterUnitTest() {
     // Prepare proto config with defaults.
     proto_config_.set_request_path("/reverse_connections/request");
     proto_config_.set_request_method(envoy::config::core::v3::GET);
@@ -438,7 +438,8 @@ TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderInterfaceCoverageViaNewStream)
   auto logs = decoder.accessLogHandlers();
   EXPECT_TRUE(logs.empty());
   auto handle = decoder.getRequestDecoderHandle();
-  EXPECT_EQ(nullptr, handle.get());
+  EXPECT_NE(nullptr, handle.get());
+  EXPECT_EQ(&decoder, handle->get().ptr());
 }
 
 // Test configuration with custom ping interval.
@@ -479,6 +480,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationDefaults) {
   EXPECT_FALSE(config->autoCloseConnections());
   EXPECT_EQ("/reverse_connections/request", config->requestPath());
   EXPECT_EQ("GET", config->requestMethod());
+  EXPECT_FALSE(config->skipRebalancing());
 }
 
 // Test RequestDecoder methods not fully covered.
@@ -1378,7 +1380,7 @@ TEST_F(ReverseTunnelFilterUnitTest, VariousHttpMalformations) {
       // Invalid characters in headers
       "GET /reverse_connections/request HTTP/1.1\r\nHo\x00st: test\r\n\r\n"};
 
-  for (size_t i = 0; i < malformed_requests.size(); ++i) {
+  for (const auto& malformed_request : malformed_requests) {
     // Create new filter for each test to avoid state issues
     auto test_filter = std::make_unique<ReverseTunnelFilter>(config_, *stats_store_.rootScope(),
                                                              overload_manager_);
@@ -1394,7 +1396,7 @@ TEST_F(ReverseTunnelFilterUnitTest, VariousHttpMalformations) {
 
     test_filter->initializeReadFilterCallbacks(test_callbacks);
 
-    Buffer::OwnedImpl request(malformed_requests[i]);
+    Buffer::OwnedImpl request(malformed_request);
     EXPECT_EQ(Network::FilterStatus::StopIteration, test_filter->onData(request, false));
   }
 }
@@ -1541,7 +1543,7 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest, ProcessAcceptedConnectionReportsConn
 TEST_F(ReverseTunnelFilterUnitTest, SystematicHttpErrorPatterns) {
   auto patterns = HttpErrorHelper::getHttpErrorPatterns();
 
-  for (size_t i = 0; i < patterns.size(); ++i) {
+  for (const auto& pattern : patterns) {
     // Create new filter for each test to avoid state pollution
     auto error_filter = std::make_unique<ReverseTunnelFilter>(config_, *stats_store_.rootScope(),
                                                               overload_manager_);
@@ -1563,7 +1565,7 @@ TEST_F(ReverseTunnelFilterUnitTest, SystematicHttpErrorPatterns) {
     error_filter->initializeReadFilterCallbacks(error_callbacks);
 
     // Test this error pattern
-    Buffer::OwnedImpl error_request(patterns[i]);
+    Buffer::OwnedImpl error_request(pattern);
     EXPECT_EQ(Network::FilterStatus::StopIteration, error_filter->onData(error_request, false));
   }
 }
@@ -2180,6 +2182,15 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest, UpgradeMode_MissingUpgradeRejected) 
   auto parse_error = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.parse_error");
   ASSERT_NE(nullptr, parse_error);
   EXPECT_EQ(1, parse_error->value());
+}
+
+TEST_F(ReverseTunnelFilterUnitTest, FilterConfigLoadsSkipRebalancing) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  cfg.set_skip_rebalancing(true);
+
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  EXPECT_TRUE(config_or_error.value()->skipRebalancing());
 }
 
 } // namespace

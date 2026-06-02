@@ -1,5 +1,7 @@
 #include "source/common/formatter/substitution_formatter.h"
 
+#include "source/common/formatter/builtin_command_parser_factory_helper.h"
+
 namespace Envoy {
 namespace Formatter {
 

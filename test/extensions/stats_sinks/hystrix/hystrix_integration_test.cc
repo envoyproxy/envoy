@@ -1,3 +1,5 @@
+#include "envoy/config/metrics/v3/stats.pb.h"
+
 #include "test/integration/http_protocol_integration.h"
 
 using testing::HasSubstr;
@@ -18,6 +20,8 @@ TEST_P(HystrixIntegrationTest, NoChunkEncoding) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* metrics_sink = bootstrap.add_stats_sinks();
     metrics_sink->set_name("envoy.stat_sinks.hystrix");
+    envoy::config::metrics::v3::HystrixSink config;
+    metrics_sink->mutable_typed_config()->PackFrom(config);
     bootstrap.mutable_stats_flush_interval()->CopyFrom(
         Protobuf::util::TimeUtil::MillisecondsToDuration(100));
   });

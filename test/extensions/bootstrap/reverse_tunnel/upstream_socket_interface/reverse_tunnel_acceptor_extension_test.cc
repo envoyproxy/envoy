@@ -475,7 +475,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, MissThresholdOneMarksDeadOnFirstInval
       UpstreamReverseConnectionSocketInterface cfg;
   cfg.set_stat_prefix("test_prefix");
   cfg.mutable_ping_failure_threshold()->set_value(1);
-  extension_.reset(new ReverseTunnelAcceptorExtension(*socket_interface_, context_, cfg));
+  extension_ = std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, cfg);
 
   // Provide dispatcher to thread local and set expectations for timers/file events.
   thread_local_.setDispatcher(&dispatcher_);

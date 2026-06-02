@@ -638,7 +638,7 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigDump) {
   Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body()).value();
   size_t index = 0;
   auto array = json->getObjectArray("configs").value();
-  for (Json::ObjectSharedPtr obj_ptr : array) {
+  for (const Json::ObjectSharedPtr& obj_ptr : array) {
     EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type").value()) == 0);
     index++;
   }

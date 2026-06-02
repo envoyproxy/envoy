@@ -20,6 +20,7 @@
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/load_balancing_policies/round_robin/round_robin_lb.h"
 
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/transport_socket_match.h"
@@ -88,16 +89,18 @@ public:
                             uint64_t conn_pool, uint64_t conn_per_host = 100) {
     resource_manager_ = std::make_unique<ResourceManagerImpl>(
         runtime_, name_, cx, rq_pending, rq, rq_retry, conn_pool, conn_per_host,
-        circuit_breakers_stats_, absl::nullopt, absl::nullopt);
+        circuit_breakers_stats_, absl::nullopt, absl::nullopt, absl::nullopt, dispatcher_);
   }
 
   void resetResourceManagerWithRetryBudget(uint64_t cx, uint64_t rq_pending, uint64_t rq,
                                            uint64_t rq_retry, uint64_t conn_pool,
-                                           double budget_percent, uint32_t min_retry_concurrency,
+                                           double budget_percent, uint64_t budget_interval,
+                                           uint32_t min_retry_concurrency,
                                            uint64_t conn_per_host = 100) {
     resource_manager_ = std::make_unique<ResourceManagerImpl>(
         runtime_, name_, cx, rq_pending, rq, rq_retry, conn_pool, conn_per_host,
-        circuit_breakers_stats_, budget_percent, min_retry_concurrency);
+        circuit_breakers_stats_, budget_percent, budget_interval, min_retry_concurrency,
+        dispatcher_);
   }
 
   // Upstream::ClusterInfo
@@ -241,6 +244,7 @@ public:
   ClusterTimeoutBudgetStatsPtr timeout_budget_stats_;
   ClusterCircuitBreakersStats circuit_breakers_stats_;
   NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
   std::unique_ptr<Upstream::ResourceManager> resource_manager_;
   Network::Address::InstanceConstSharedPtr source_address_;
   std::shared_ptr<MockUpstreamLocalAddressSelector> upstream_local_address_selector_;

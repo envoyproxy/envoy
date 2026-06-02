@@ -10,6 +10,9 @@
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/ssl_utility.h"
 #include "test/test_common/test_runtime.h"
+#ifdef ENVOY_ENABLE_QUIC
+#include "test/extensions/quic/proof_source/pending_proof_source.pb.h"
+#endif
 
 #include "absl/strings/str_cat.h"
 
@@ -24,14 +27,15 @@ using testing::HasSubstr;
 class OverloadIntegrationTest : public BaseOverloadIntegrationTest,
                                 public HttpProtocolIntegrationTest {
 protected:
-  void initializeOverloadManager(const envoy::config::overload::v3::OverloadAction& overload_action,
-                                 absl::optional<bool> appendLocalOverloadHeader = absl::nullopt) {
+  void
+  initializeOverloadManager(const envoy::config::overload::v3::OverloadAction& overload_action,
+                            absl::optional<bool> append_local_overload_header = absl::nullopt) {
     setupOverloadManagerConfig(overload_action);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
     });
 
-    if (appendLocalOverloadHeader.has_value() && appendLocalOverloadHeader.value()) {
+    if (append_local_overload_header.has_value() && append_local_overload_header.value()) {
       config_helper_.addConfigModifier(
           [=](envoy::extensions::filters::network::http_connection_manager::v3::
                   HttpConnectionManager& cm) -> void { cm.set_append_local_overload(true); });
@@ -621,6 +625,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseIdleHttpConnectionsDuringHa
   }
   TestScopedRuntime scoped_runtime;
 
+#ifdef ENVOY_ENABLE_QUIC
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* proof_source_config = bootstrap.mutable_static_resources()
                                     ->mutable_listeners(0)
@@ -628,8 +633,13 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseIdleHttpConnectionsDuringHa
                                     ->mutable_quic_options()
                                     ->mutable_proof_source_config();
     proof_source_config->set_name("envoy.quic.proof_source.pending_signing");
-    proof_source_config->mutable_typed_config();
+    test::extensions::quic::proof_source::PendingProofSourceConfig config;
+    proof_source_config->mutable_typed_config()->PackFrom(config);
   });
+#else
+  FAIL() << "This test is not expected to run with quic disabled.";
+#endif
+
   initializeOverloadManager(
       TestUtility::parseYaml<envoy::config::overload::v3::ScaleTimersOverloadActionConfig>(R"EOF(
       timer_scale_factors:
@@ -686,6 +696,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseMaxDurationHttpConnectionsD
             ProtobufUtil::TimeUtil::SecondsToDuration(20));
       });
 
+#ifdef ENVOY_ENABLE_QUIC
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* proof_source_config = bootstrap.mutable_static_resources()
                                     ->mutable_listeners(0)
@@ -693,8 +704,13 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseMaxDurationHttpConnectionsD
                                     ->mutable_quic_options()
                                     ->mutable_proof_source_config();
     proof_source_config->set_name("envoy.quic.proof_source.pending_signing");
-    proof_source_config->mutable_typed_config();
+    test::extensions::quic::proof_source::PendingProofSourceConfig config;
+    proof_source_config->mutable_typed_config()->PackFrom(config);
   });
+#else
+  FAIL() << "This test is not expected to run with quic disabled.";
+#endif
+
   initializeOverloadManager(
       TestUtility::parseYaml<envoy::config::overload::v3::ScaleTimersOverloadActionConfig>(R"EOF(
       timer_scale_factors:
@@ -1208,6 +1224,11 @@ TEST_P(LoadShedPointIntegrationTest, Http2ServerDispatchSendsGoAwayCompletingPen
   if (downstreamProtocol() != Http::CodecClient::Type::HTTP2) {
     return;
   }
+  config_helper_.addConfigModifier(
+      [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              cm) -> void {
+        cm.mutable_drain_timeout()->MergeFrom(ProtobufUtil::TimeUtil::SecondsToDuration(7));
+      });
   autonomous_upstream_ = true;
   initializeOverloadManager(
       TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
@@ -1236,13 +1257,24 @@ TEST_P(LoadShedPointIntegrationTest, Http2ServerDispatchSendsGoAwayCompletingPen
   first_request_encoder.encodeData(first_request_body, true);
   ASSERT_TRUE(first_request_decoder->waitForEndStream());
 
+  // This is the initial GOAWAY, with max stream ID.
   EXPECT_TRUE(codec_client_->sawGoAway());
+
+  // This waits for the final GOAWAY, with a real stream ID.
   test_server_->waitForCounter("http2.goaway_sent", Eq(1));
 
-  // The GOAWAY gets submitted with the first created stream as the last stream
-  // that will be processed on this connection, so the second stream's frames
-  // are ignored.
-  EXPECT_FALSE(second_request_decoder->complete());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_fix_goaway_loadshed_point")) {
+    // Because the load shed operation uses a two-phase GOAWAY, a request initiated before the drain
+    // timer fires will be processed as usual.
+    EXPECT_TRUE(second_request_decoder->waitForEndStream());
+
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    // The GOAWAY gets submitted with the first created stream as the last stream
+    // that will be processed on this connection, so the second stream's frames
+    // are ignored.
+    EXPECT_FALSE(second_request_decoder->complete());
+  }
 
   updateResource(0.80);
   test_server_->waitForGauge(
@@ -1282,9 +1314,9 @@ TEST_P(LoadShedPointIntegrationTest, Http2ServerDispatchSendsGoAwayAndClosesConn
   ASSERT_TRUE(codec_client_->waitForDisconnect());
   EXPECT_TRUE(codec_client_->sawGoAway());
   test_server_->waitForCounter("http2.goaway_sent", Eq(1));
-  test_server_->waitForCounter("http.config_test.downstream_rq_overload_close", Eq(1));
 
-  // The second request will not complete.
+  // The second request is ignored and will not complete, since the connection manager stops network
+  // filter iteration.
   EXPECT_FALSE(second_request_decoder->complete());
 }
 

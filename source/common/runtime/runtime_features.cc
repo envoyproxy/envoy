@@ -36,14 +36,16 @@
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
 RUNTIME_GUARD(envoy_reloadable_features_cel_message_serialize_text_format);
-RUNTIME_GUARD(envoy_reloadable_features_coalesce_lb_rebuilds_on_batch_update);
 RUNTIME_GUARD(envoy_reloadable_features_codec_client_enable_idle_timer_only_when_connected);
+RUNTIME_GUARD(envoy_reloadable_features_conn_pool_grid_early_return_on_teardown);
+RUNTIME_GUARD(envoy_reloadable_features_connectivity_grid_prevent_double_h2_scheduled);
 RUNTIME_GUARD(envoy_reloadable_features_decouple_explicit_drain_pools_and_dns_refresh);
 RUNTIME_GUARD(envoy_reloadable_features_dfp_cluster_resolves_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
 RUNTIME_GUARD(envoy_reloadable_features_enable_cel_regex_precompilation);
 RUNTIME_GUARD(envoy_reloadable_features_enable_cel_response_path_matching);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
+RUNTIME_GUARD(envoy_reloadable_features_enable_new_dns_implementation);
 // TODO(adisuissa): enable once the LRS server-self-ads support is fully
 // implemented, and tested.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_lrs_server_self_ads);
@@ -66,7 +68,10 @@ RUNTIME_GUARD(envoy_reloadable_features_hide_transport_failure_reason_in_respons
 RUNTIME_GUARD(envoy_reloadable_features_http1_close_connection_on_zombie_stream_complete);
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_http2_flood_protection_active_streams);
+RUNTIME_GUARD(envoy_reloadable_features_http2_fix_goaway_loadshed_point);
 RUNTIME_GUARD(envoy_reloadable_features_http_async_client_retry_respect_buffer_limits);
+RUNTIME_GUARD(envoy_reloadable_features_http_inspector_use_balsa_parser);
+RUNTIME_GUARD(envoy_reloadable_features_http_preserve_rst_no_error);
 // Delay deprecation and decommission until UHV is enabled.
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_add_verification_status_header);
@@ -119,13 +124,10 @@ RUNTIME_GUARD(envoy_reloadable_features_websocket_allow_4xx_5xx_through_filter_c
 RUNTIME_GUARD(envoy_reloadable_features_websocket_enable_timeout_on_upgrade_response);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_xds_legacy_delta_skip_subsequent_node);
-
 RUNTIME_GUARD(envoy_restart_features_move_locality_schedulers_to_lb);
 RUNTIME_GUARD(envoy_restart_features_raise_file_limits);
-RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 RUNTIME_GUARD(envoy_restart_features_validate_http3_pseudo_headers);
 RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
-
 // Begin false flags. Most of them should come with a TODO to flip true.
 
 // Sentinel and test flag.
@@ -165,8 +167,6 @@ FALSE_RUNTIME_GUARD(envoy_restart_features_xds_failover_support);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_dns_cache_set_ip_version_to_remove);
 // TODO(fredyw): evaluate and either make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_no_tcp_delay);
-// Adding runtime flag to use balsa_parser for http_inspector.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_http_inspector_use_balsa_parser);
 // TODO(danzh) re-enable it when the issue of preferring TCP over v6 rather than QUIC over v4 is
 // fixed.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http3_happy_eyeballs);
@@ -206,16 +206,13 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_ext_proc_graceful_grpc_close);
 
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_getaddrinfo_no_ai_flags);
 
+// See: `https://github.com/envoyproxy/envoy/issues/45212` for more details.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_coalesce_lb_rebuilds_on_batch_update);
+
 // Flag to remove legacy route formatter support in header parser
 // Flip to true after two release periods.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_remove_legacy_route_formatter);
 
-// TODO(grnmeira):
-// Enables the new DNS implementation, a merged implementation of
-// strict and logical DNS clusters. This new implementation will
-// take over the split ones, and will be used as a base for the
-// implementation of on-demand DNS.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_new_dns_implementation);
 // Force a local reply from upstream envoy for reverse connections.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_reverse_conn_force_local_reply);
 // RELEASE_ASSERT when upstream stream detects UAF of downstream response decoder instance.
@@ -240,6 +237,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_dynamic_modules_strip_custom_stat_
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_disable_data_read_immediately);
 // TODO(yavlasov): Flip to true after prod testing.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_strict_chunk_parsing);
+
+// Delay route selection in tcp_proxy until just before the upstream connection is established
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_delay_route_selection);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

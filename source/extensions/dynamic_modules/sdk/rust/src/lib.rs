@@ -903,16 +903,14 @@ pub static NEW_NETWORK_FILTER_CONFIG_FUNCTION: OnceLock<
 macro_rules! declare_listener_filter_init_functions {
   ($f:ident, $new_listener_filter_config_fn:expr) => {
     #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_program_init(
-      server_factory_context_ptr: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr,
-    ) -> *const ::std::os::raw::c_char {
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
         envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
           envoy_proxy_dynamic_modules_rust_sdk::NEW_LISTENER_FILTER_CONFIG_FUNCTION,
           $new_listener_filter_config_fn,
           "NEW_LISTENER_FILTER_CONFIG_FUNCTION"
         );
-        if ($f(server_factory_context_ptr)) {
+        if ($f()) {
           envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
             as *const ::std::os::raw::c_char
         } else {

@@ -724,6 +724,8 @@ def _abseil_cpp():
 def _com_google_protobuf():
     external_http_archive(
         name = "rules_python",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:rules_python.patch"],
     )
     external_http_archive(
         name = "rules_java",

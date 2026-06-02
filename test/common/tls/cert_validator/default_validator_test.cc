@@ -734,7 +734,7 @@ TEST(DefaultCertValidatorTest, TestUnexpectedSanMatcherType) {
       std::make_unique<DefaultCertValidator>(mock_context_config.get(), ssl_stats, context);
   auto ctx = std::vector<SSL_CTX*>();
   EXPECT_THAT(validator->initializeSslContexts(ctx, false, *store.rootScope()).status().message(),
-              testing::ContainsRegex("Failed to create string SAN matcher of type.*"));
+              testing::ContainsRegex("Unhandled case in createStringSanMatcher.*"));
 }
 
 TEST(DefaultCertValidatorTest, TestInitializeSslContextFailure) {

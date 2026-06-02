@@ -16,7 +16,7 @@ envoy_cc_test(
         "//envoy/registry",
         "//source/common/version:version_lib",
         "//source/extensions/tracers/opentelemetry/resource_detectors:resource_detector_lib",
-        "//test/mocks/server:tracer_factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ],

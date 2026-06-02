@@ -139,7 +139,7 @@ public:
   void reset() { client_.reset(); }
 
 private:
-  RawAsyncClientSharedPtr client_{};
+  RawAsyncClientSharedPtr client_;
 };
 
 } // namespace Grpc
