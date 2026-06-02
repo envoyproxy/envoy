@@ -11,7 +11,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "nlohmann/json.hpp" // IWYU pragma: keep
-#include "ocpdiag/core/testing/parse_text_proto.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,7 +18,6 @@ namespace HttpFilters {
 namespace McpJsonRestBridge {
 namespace {
 
-using ::ocpdiag::testing::ParseTextProtoOrDie;
 using testing::_;
 using testing::Eq;
 using testing::Return;
@@ -29,33 +27,24 @@ using testing::StrEq;
 class McpJsonRestBridgeFilterTest : public testing::Test {
 public:
   void SetUp() override {
-    envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config =
-        ParseTextProtoOrDie(R"pb(
-      tool_config {
-        tools {
-          name: "create_api_key"
-          http_rule: {
-            post: "/v1/{parent=projects/*}/apiKeys"
-            body: "key"
-          }
-        }
-        tools {
-          name: "list_api_keys"
-          http_rule: {
-            get: "/v1/{parent=projects/*}/apiKeys"
-          }
-        }
-        tools {
-          name: "get_api_key"
-          http_rule: {
-            get: "/v1/apiKeys"
-          }
-        }
-        tool_list_http_rule {
-          get: "/discovery/v1/service/foo.googleapis.com/mcptools"
-        }
-      }
-    )pb");
+    envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
+    TestUtility::loadFromYaml(R"yaml(
+tool_config:
+  tools:
+    - name: create_api_key
+      http_rule:
+        post: "/v1/{parent=projects/*}/apiKeys"
+        body: key
+    - name: list_api_keys
+      http_rule:
+        get: "/v1/{parent=projects/*}/apiKeys"
+    - name: get_api_key
+      http_rule:
+        get: "/v1/apiKeys"
+  tool_list_http_rule:
+    get: "/discovery/v1/service/foo.googleapis.com/mcptools"
+)yaml",
+                              proto_config);
     config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
     filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -1164,10 +1153,12 @@ TEST_F(McpJsonRestBridgeFilterTest, InitializeRequestIgnoreProtocolVersionHeader
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, RequestBodyExceedsLimitReturnsError) {
-  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config =
-      ParseTextProtoOrDie(R"pb(
-    max_request_body_size { value: 10 }
-  )pb");
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
+  TestUtility::loadFromYaml(R"yaml(
+max_request_body_size:
+  value: 10
+)yaml",
+                            proto_config);
   config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
   filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -1186,19 +1177,18 @@ TEST_F(McpJsonRestBridgeFilterTest, RequestBodyExceedsLimitReturnsError) {
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ResponseBodyExceedsLimitReturnsError) {
-  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config =
-      ParseTextProtoOrDie(R"pb(
-    max_response_body_size { value: 10 }
-    tool_config {
-      tools {
-        name: "create_api_key"
-        http_rule: {
-          post: "/v1/{parent=projects/*}/apiKeys"
-          body: "key"
-        }
-      }
-    }
-  )pb");
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
+  TestUtility::loadFromYaml(R"yaml(
+max_response_body_size:
+  value: 10
+tool_config:
+  tools:
+    - name: create_api_key
+      http_rule:
+        post: "/v1/{parent=projects/*}/apiKeys"
+        body: key
+)yaml",
+                            proto_config);
   config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
   filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -1230,19 +1220,17 @@ TEST_F(McpJsonRestBridgeFilterTest, ResponseBodyExceedsLimitReturnsError) {
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, DynamicMetadataStoredWhenConfigured) {
-  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config =
-      ParseTextProtoOrDie(R"pb(
-    request_storage_mode: DYNAMIC_METADATA
-    tool_config {
-      tools {
-        name: "create_api_key"
-        http_rule: {
-          post: "/v1/{parent=projects/*}/apiKeys"
-          body: "key"
-        }
-      }
-    }
-  )pb");
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
+  TestUtility::loadFromYaml(R"yaml(
+request_storage_mode: DYNAMIC_METADATA
+tool_config:
+  tools:
+    - name: create_api_key
+      http_rule:
+        post: "/v1/{parent=projects/*}/apiKeys"
+        body: key
+)yaml",
+                            proto_config);
   config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
   filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -1255,45 +1243,17 @@ TEST_F(McpJsonRestBridgeFilterTest, DynamicMetadataStoredWhenConfigured) {
 
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
 
-  Protobuf::Struct expected_metadata = ParseTextProtoOrDie(R"pb(
-    fields {
-      key: "method"
-      value { string_value: "tools/call" }
-    }
-    fields {
-      key: "params"
-      value {
-        struct_value {
-          fields {
-            key: "name"
-            value { string_value: "create_api_key" }
-          }
-          fields {
-            key: "arguments"
-            value {
-              struct_value {
-                fields {
-                  key: "parent"
-                  value { string_value: "projects/test" }
-                }
-                fields {
-                  key: "key"
-                  value {
-                    struct_value {
-                      fields {
-                        key: "displayName"
-                        value { string_value: "display-key" }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  )pb");
+  Protobuf::Struct expected_metadata;
+  TestUtility::loadFromYaml(R"yaml(
+method: tools/call
+params:
+  name: create_api_key
+  arguments:
+    parent: projects/test
+    key:
+      displayName: display-key
+)yaml",
+                            expected_metadata);
 
   ON_CALL(decoder_callbacks_, filterConfigName())
       .WillByDefault(Return("envoy.filters.http.mcp_json_rest_bridge"));
@@ -1314,16 +1274,16 @@ TEST_F(McpJsonRestBridgeFilterTest, DynamicMetadataStoredWhenConfigured) {
 class McpJsonRestBridgeStreamingFilterTest : public testing::Test {
 public:
   void SetUp() override {
-    envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config =
-        ParseTextProtoOrDie(R"pb(
-      tool_config {
-        tools {
-          name: "get_api_key"
-          http_rule: { get: "/v1/apiKeys" }
-          text_content_streaming_enabled: true
-        }
-      }
-    )pb");
+    envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
+    TestUtility::loadFromYaml(R"yaml(
+tool_config:
+  tools:
+    - name: get_api_key
+      http_rule:
+        get: "/v1/apiKeys"
+      text_content_streaming_enabled: true
+)yaml",
+                              proto_config);
     config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
     filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
