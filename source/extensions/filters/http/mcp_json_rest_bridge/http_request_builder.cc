@@ -80,16 +80,15 @@ absl::Status constructQueryParams(std::vector<QueryParam>& query_params, const H
 
   if (arguments.is_object()) {
     for (auto it = arguments.begin(); it != arguments.end(); ++it) {
-      RETURN_IF_NOT_OK(constructQueryParams(
-          query_params, http_rule, it.value(), templates,
-          path.empty() ? it.key() : absl::StrCat(path, ".", it.key())));
+      RETURN_IF_NOT_OK(
+          constructQueryParams(query_params, http_rule, it.value(), templates,
+                               path.empty() ? it.key() : absl::StrCat(path, ".", it.key())));
     }
     return absl::OkStatus();
   }
   if (arguments.is_array()) {
     for (auto& array_item : arguments) {
-      RETURN_IF_NOT_OK(
-          constructQueryParams(query_params, http_rule, array_item, templates, path));
+      RETURN_IF_NOT_OK(constructQueryParams(query_params, http_rule, array_item, templates, path));
     }
     return absl::OkStatus();
   }
@@ -165,9 +164,9 @@ absl::StatusOr<json> constructRequestBody(const HttpRule& http_rule,
 }
 
 absl::Status
-populateParamsMap(const Protobuf::RepeatedPtrField<HttpRule::ParameterBinding>& bindings,
-                  const json& arguments,
-                  absl::flat_hash_map<std::string, std::string>& params_map) {
+populateHeadersParams(const Protobuf::RepeatedPtrField<HttpRule::ParameterBinding>& bindings,
+                      const json& arguments,
+                      absl::flat_hash_map<std::string, std::string>& params_map) {
   for (const auto& binding : bindings) {
     absl::StatusOr<json> value = getJsonValue(arguments, binding.argument_path());
     if (!value.ok()) {
@@ -297,7 +296,7 @@ absl::StatusOr<HttpRequest> buildHttpRequest(
 
   absl::flat_hash_map<std::string, std::string> headers_params;
   RETURN_IF_NOT_OK(
-      populateParamsMap(http_rule.header_parameter_bindings(), arguments, headers_params));
+      populateHeadersParams(http_rule.header_parameter_bindings(), arguments, headers_params));
   std::vector<std::pair<std::string, std::string>> cookies_params;
   RETURN_IF_NOT_OK(
       populateCookiesParams(http_rule.cookie_parameter_bindings(), arguments, cookies_params));

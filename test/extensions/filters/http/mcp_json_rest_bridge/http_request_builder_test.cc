@@ -486,24 +486,29 @@ TEST(HttpRequestBuilderTest, InvalidCookieValueRejection) {
                             http_rule);
 
   // CR/LF is invalid character.
-  EXPECT_THAT(buildHttpRequest(http_rule, json::parse(R"json({"session_id": "invalid\r\nvalue"})json")),
-              StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(
+      buildHttpRequest(http_rule, json::parse(R"json({"session_id": "invalid\r\nvalue"})json")),
+      StatusIs(absl::StatusCode::kInvalidArgument));
 
   // Space is invalid.
-  EXPECT_THAT(buildHttpRequest(http_rule, json::parse(R"json({"session_id": "invalid value"})json")),
-              StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(
+      buildHttpRequest(http_rule, json::parse(R"json({"session_id": "invalid value"})json")),
+      StatusIs(absl::StatusCode::kInvalidArgument));
 
   // Comma is invalid.
-  EXPECT_THAT(buildHttpRequest(http_rule, json::parse(R"json({"session_id": "invalid,value"})json")),
-              StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(
+      buildHttpRequest(http_rule, json::parse(R"json({"session_id": "invalid,value"})json")),
+      StatusIs(absl::StatusCode::kInvalidArgument));
 
   // Semicolon is invalid.
-  EXPECT_THAT(buildHttpRequest(http_rule, json::parse(R"json({"session_id": "invalid;value"})json")),
-              StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(
+      buildHttpRequest(http_rule, json::parse(R"json({"session_id": "invalid;value"})json")),
+      StatusIs(absl::StatusCode::kInvalidArgument));
 
   // Backslash is invalid.
-  EXPECT_THAT(buildHttpRequest(http_rule, json::parse(R"json({"session_id": "invalid\\value"})json")),
-              StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(
+      buildHttpRequest(http_rule, json::parse(R"json({"session_id": "invalid\\value"})json")),
+      StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST(HttpRequestBuilderTest, ValidQuotedCookieValueAllowed) {
