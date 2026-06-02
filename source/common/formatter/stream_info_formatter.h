@@ -254,9 +254,7 @@ private:
 class StartTimeFormatter : public SystemTimeFormatter {
 protected:
   StartTimeFormatter(absl::string_view format);
-  static absl::Status checkConstructPreconditions(absl::string_view format) {
-    return SystemTimeFormatter::checkConstructPreconditions(format);
-  }
+
   template <typename U>
   friend absl::StatusOr<std::unique_ptr<U>> makeTimeFormatter(absl::string_view format);
 };
@@ -268,9 +266,7 @@ protected:
 class DownstreamPeerCertVStartFormatter : public SystemTimeFormatter {
 protected:
   DownstreamPeerCertVStartFormatter(absl::string_view format);
-  static absl::Status checkConstructPreconditions(absl::string_view format) {
-    return SystemTimeFormatter::checkConstructPreconditions(format);
-  }
+
   template <typename U>
   friend absl::StatusOr<std::unique_ptr<U>> makeTimeFormatter(absl::string_view format);
 };
@@ -282,9 +278,7 @@ protected:
 class DownstreamPeerCertVEndFormatter : public SystemTimeFormatter {
 protected:
   DownstreamPeerCertVEndFormatter(absl::string_view format);
-  static absl::Status checkConstructPreconditions(absl::string_view format) {
-    return SystemTimeFormatter::checkConstructPreconditions(format);
-  }
+
   template <typename U>
   friend absl::StatusOr<std::unique_ptr<U>> makeTimeFormatter(absl::string_view format);
 };
@@ -296,9 +290,7 @@ protected:
 class UpstreamPeerCertVStartFormatter : public SystemTimeFormatter {
 protected:
   UpstreamPeerCertVStartFormatter(absl::string_view format);
-  static absl::Status checkConstructPreconditions(absl::string_view format) {
-    return SystemTimeFormatter::checkConstructPreconditions(format);
-  }
+
   template <typename U>
   friend absl::StatusOr<std::unique_ptr<U>> makeTimeFormatter(absl::string_view format);
 };
@@ -310,9 +302,7 @@ protected:
 class UpstreamPeerCertVEndFormatter : public SystemTimeFormatter {
 protected:
   UpstreamPeerCertVEndFormatter(absl::string_view format);
-  static absl::Status checkConstructPreconditions(absl::string_view format) {
-    return SystemTimeFormatter::checkConstructPreconditions(format);
-  }
+
   template <typename U>
   friend absl::StatusOr<std::unique_ptr<U>> makeTimeFormatter(absl::string_view format);
 };
