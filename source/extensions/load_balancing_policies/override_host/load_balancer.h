@@ -179,7 +179,7 @@ private:
     // into recreate-on-host-change.
     LoadBalancerPtr fallback_picker_lb_;
     const PrioritySet& priority_set_;
-    const PrioritySet* const local_priority_set_;
+    const PrioritySet* const local_priority_set_{};
     Common::CallbackHandlePtr member_update_cb_;
   };
 
