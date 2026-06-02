@@ -20,5 +20,6 @@ envoy_cc_test(
         "//test/mocks/server:overload_manager_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:test_runtime_lib",
     ],
 )

@@ -48,9 +48,9 @@ protected:
 };
 
 #ifndef __SANITIZE_ADDRESS__
-auto DynamicModulesListenerSdkIntegrationTestValues = testing::Values("go", "cpp");
+auto DynamicModulesListenerSdkIntegrationTestValues = testing::Values("rust", "go", "cpp");
 #else
-auto DynamicModulesListenerSdkIntegrationTestValues = testing::Values("go");
+auto DynamicModulesListenerSdkIntegrationTestValues = testing::Values("rust", "go");
 #endif
 
 INSTANTIATE_TEST_SUITE_P(SdkLanguages, DynamicModulesListenerSdkIntegrationTest,

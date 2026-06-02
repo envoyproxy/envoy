@@ -38,12 +38,15 @@ public:
                  Http::AsyncClient::FailureReason reason) override;
 
 private:
+  enum class TokenType { Jwt, AccessToken };
+
   void onError(absl::string_view error_msg);
   const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config_;
   Server::Configuration::FactoryContext& context_;
   Http::AsyncClient::Request* active_request_{};
   GcpAuthnClient::Callbacks* callbacks_{};
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience_;
+  TokenType token_type_{TokenType::Jwt};
 };
 
 } // namespace GcpAuthn

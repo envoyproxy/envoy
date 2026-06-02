@@ -167,6 +167,42 @@ TEST_F(GcpAuthnFilterTest, ResumeFilterChainIteration) {
   client_callback_->onSuccess(client_request_, std::move(response));
 }
 
+TEST_F(GcpAuthnFilterTest, ResumeFilterChainIterationWithAccessToken) {
+  setupMockObjects();
+  setupFilterAndCallback();
+
+  // Set up mock filter metadata with AccessToken instead of url.
+  cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_));
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.mutable_access_token();
+
+  (*metadata_
+        .mutable_typed_filter_metadata())[std::string(
+                                              Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+      .PackFrom(audience);
+  ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
+
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  response->body().add(
+      R"({"access_token": "mock_access_token", "expires_in": 3600, "token_type": "Bearer"})");
+
+  // continueDecoding() is expected to be called to resume the filter chain iteration after
+  // onSuccess().
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  client_callback_->onSuccess(client_request_, std::move(response));
+
+  // Also check that the authorization header has been added correctly.
+  EXPECT_EQ(default_headers_.get_("Authorization"), "Bearer mock_access_token");
+}
+
 TEST_F(GcpAuthnFilterTest, DestroyFilter) {
   setupMockObjects();
   setupFilterAndCallback();
