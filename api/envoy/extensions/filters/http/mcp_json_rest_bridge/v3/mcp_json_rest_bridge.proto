@@ -217,8 +217,10 @@ message ToolsListSpecificConfig {
 }
 
 message McpServerInfo {
+  // The path to the endpoint hosting this tool.
   string path = 1;
 
+  // The host hosting this tool.
   string host = 2;
 }
 
