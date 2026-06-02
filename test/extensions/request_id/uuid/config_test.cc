@@ -197,6 +197,14 @@ TEST(UUIDRequestIDExtensionTest, GetRequestIdAndModRequestIDBy) {
   EXPECT_EQ("fffffffz-0012-0110-00ff-0c00400600ff", uuid_utils.get(request_headers).value());
   EXPECT_FALSE(uuid_utils.getInteger(request_headers).has_value());
 
+  request_headers.setRequestId("-1aaaaaa-0012-0110-00ff-0c00400600ff");
+  EXPECT_EQ("-1aaaaaa-0012-0110-00ff-0c00400600ff", uuid_utils.get(request_headers).value());
+  EXPECT_FALSE(uuid_utils.getInteger(request_headers).has_value());
+
+  request_headers.setRequestId("+1aaaaaa-0012-0110-00ff-0c00400600ff");
+  EXPECT_EQ("+1aaaaaa-0012-0110-00ff-0c00400600ff", uuid_utils.get(request_headers).value());
+  EXPECT_FALSE(uuid_utils.getInteger(request_headers).has_value());
+
   request_headers.setRequestId("00000000-0000-0000-0000-000000000000");
   EXPECT_EQ("00000000-0000-0000-0000-000000000000", uuid_utils.get(request_headers).value());
   EXPECT_EQ(0, uuid_utils.getInteger(request_headers).value());

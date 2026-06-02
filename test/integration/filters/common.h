@@ -23,4 +23,19 @@ public:
   }
 };
 
+template <class T, class ProtoType>
+class UniqueSimpleFilterConfig
+    : public Extensions::HttpFilters::Common::UniqueEmptyHttpDualFilterConfig<ProtoType> {
+public:
+  UniqueSimpleFilterConfig()
+      : Extensions::HttpFilters::Common::UniqueEmptyHttpDualFilterConfig<ProtoType>(T::name) {}
+
+  absl::StatusOr<Http::FilterFactoryCb>
+  createDualFilter(const std::string&, Server::Configuration::ServerFactoryContext&) override {
+    return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+      callbacks.addStreamFilter(std::make_shared<T>());
+    };
+  }
+};
+
 } // namespace Envoy

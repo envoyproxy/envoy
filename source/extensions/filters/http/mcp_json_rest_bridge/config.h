@@ -4,6 +4,7 @@
 #include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.validate.h" // IWYU pragma: keep
 
 #include "source/extensions/filters/http/common/factory_base.h"
+#include "source/extensions/filters/http/mcp_json_rest_bridge/mcp_json_rest_bridge_filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,8 +18,7 @@ class McpJsonRestBridgeFilterConfigFactory
     : public Common::ExceptionFreeFactoryBase<
           envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge> {
 public:
-  McpJsonRestBridgeFilterConfigFactory()
-      : ExceptionFreeFactoryBase("envoy.filters.http.mcp_json_rest_bridge") {}
+  McpJsonRestBridgeFilterConfigFactory() : ExceptionFreeFactoryBase(FilterName) {}
 
 private:
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(

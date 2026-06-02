@@ -179,6 +179,8 @@ int reasonToReset(StreamResetReason reason, bool response_end_stream_sent) {
     return OGHTTP2_REFUSED_STREAM;
   case StreamResetReason::ConnectError:
     return OGHTTP2_CONNECT_ERROR;
+  case StreamResetReason::RemoteResetNoError:
+    return OGHTTP2_NO_ERROR;
   case StreamResetReason::ProtocolError:
     if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error")) {
       return OGHTTP2_NO_ERROR;
@@ -213,7 +215,7 @@ using OnHeaderResult = http2::adapter::Http2VisitorInterface::OnHeaderResult;
 enum Settings {
   // SETTINGS_HEADER_TABLE_SIZE = 0x01,
   // SETTINGS_ENABLE_PUSH = 0x02,
-  SETTINGS_MAX_CONCURRENT_STREAMS = 0x03,
+  SETTINGS_MAX_CONCURRENT_STREAMS = 0x03, // NOLINT(readability-identifier-naming)
   // SETTINGS_INITIAL_WINDOW_SIZE = 0x04,
   // SETTINGS_MAX_FRAME_SIZE = 0x05,
   // SETTINGS_MAX_HEADER_LIST_SIZE = 0x06,
@@ -223,9 +225,9 @@ enum Settings {
 
 enum Flags {
   // FLAG_NONE = 0,
-  FLAG_END_STREAM = 0x01,
+  FLAG_END_STREAM = 0x01, // NOLINT(readability-identifier-naming)
   // FLAG_END_HEADERS = 0x04,
-  FLAG_ACK = 0x01,
+  FLAG_ACK = 0x01, // NOLINT(readability-identifier-naming)
   // FLAG_PADDED = 0x08,
   // FLAG_PRIORITY = 0x20
 };
@@ -301,12 +303,7 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
       pending_send_data_(parent_.connection_.dispatcher().getWatermarkFactory().createBuffer(
           [this]() -> void { this->pendingSendBufferLowWatermark(); },
           [this]() -> void { this->pendingSendBufferHighWatermark(); },
-          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
-      local_end_stream_sent_(false), remote_end_stream_(false), remote_rst_(false),
-      data_deferred_(false), received_noninformational_headers_(false),
-      pending_receive_buffer_high_watermark_called_(false),
-      pending_send_buffer_high_watermark_called_(false), reset_due_to_messaging_error_(false),
-      extend_stream_lifetime_flag_(false) {
+          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })) {
   parent_.stats_.streams_active_.inc();
   if (buffer_limit > 0) {
     setWriteBufferWatermarks(buffer_limit);
@@ -983,8 +980,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       per_stream_buffer_limit_(http2_options.initial_stream_window_size().value()),
       stream_error_on_invalid_http_messaging_(
           http2_options.override_stream_error_on_invalid_http_message().value()),
-      protocol_constraints_(stats, http2_options), dispatching_(false), raised_goaway_(false),
-      random_(random_generator),
+      protocol_constraints_(stats, http2_options), random_(random_generator),
       last_received_data_time_(connection_.dispatcher().timeSource().monotonicTime()) {
   if (http2_options.has_use_oghttp2_codec()) {
     use_oghttp2_library_ = http2_options.use_oghttp2_codec().value();
@@ -1533,42 +1529,56 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
     }
 
     if (should_reset_stream) {
-      StreamResetReason reason;
-      if (stream->reset_due_to_messaging_error_) {
-        // Unfortunately, the nghttp2 API makes it incredibly difficult to clearly understand
-        // the flow of resets. I.e., did the reset originate locally? Was it remote? Here,
-        // we attempt to track cases in which we sent a reset locally due to an invalid frame
-        // received from the remote. We only do that in two cases currently (HTTP messaging layer
-        // errors from https://tools.ietf.org/html/rfc7540#section-8 which nghttp2 is very strict
-        // about). In other cases we treat invalid frames as a protocol error and just kill
-        // the connection.
-
-        // Get ClientConnectionImpl or ServerConnectionImpl specific stream reset reason,
-        // depending whether the connection is upstream or downstream.
-        reason = getMessagingErrorResetReason();
+      // RFC 9113 Section 8.1: A server MAY send RST_STREAM(NO_ERROR) after sending
+      // a complete response. The complete response MUST NOT be discarded.
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_preserve_rst_no_error") &&
+          stream->remote_end_stream_ && error_code == OGHTTP2_NO_ERROR &&
+          !stream->reset_reason_.has_value()) {
+        if (stream->stream_manager_.hasBufferedBodyOrTrailers()) {
+          ENVOY_CONN_LOG(debug, "buffered onStreamClose for stream: {}", connection_, stream_id);
+          stream->stream_manager_.buffered_on_stream_close_ = true;
+          stats_.deferred_stream_close_.inc();
+          return okStatus();
+        }
+        stream->runResetCallbacks(StreamResetReason::RemoteResetNoError, absl::string_view());
       } else {
-        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error")) {
-          reason = errorCodeToResetReason(error_code);
-          if (error_code == OGHTTP2_REFUSED_STREAM) {
-            stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
-          } else {
-            stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
-          }
+        StreamResetReason reason;
+        if (stream->reset_due_to_messaging_error_) {
+          // Unfortunately, the nghttp2 API makes it incredibly difficult to clearly understand
+          // the flow of resets. I.e., did the reset originate locally? Was it remote? Here,
+          // we attempt to track cases in which we sent a reset locally due to an invalid frame
+          // received from the remote. We only do that in two cases currently (HTTP messaging layer
+          // errors from https://tools.ietf.org/html/rfc7540#section-8 which nghttp2 is very strict
+          // about). In other cases we treat invalid frames as a protocol error and just kill
+          // the connection.
+
+          // Get ClientConnectionImpl or ServerConnectionImpl specific stream reset reason,
+          // depending whether the connection is upstream or downstream.
+          reason = getMessagingErrorResetReason();
         } else {
-          if (error_code == OGHTTP2_REFUSED_STREAM) {
-            reason = StreamResetReason::RemoteRefusedStreamReset;
-            stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
-          } else {
-            if (error_code == OGHTTP2_CONNECT_ERROR) {
-              reason = StreamResetReason::ConnectError;
+          if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error")) {
+            reason = errorCodeToResetReason(error_code);
+            if (error_code == OGHTTP2_REFUSED_STREAM) {
+              stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
             } else {
-              reason = StreamResetReason::RemoteReset;
+              stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
             }
-            stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
+          } else {
+            if (error_code == OGHTTP2_REFUSED_STREAM) {
+              reason = StreamResetReason::RemoteRefusedStreamReset;
+              stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
+            } else {
+              if (error_code == OGHTTP2_CONNECT_ERROR) {
+                reason = StreamResetReason::ConnectError;
+              } else {
+                reason = StreamResetReason::RemoteReset;
+              }
+              stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
+            }
           }
         }
+        stream->runResetCallbacks(reason, absl::string_view());
       }
-      stream->runResetCallbacks(reason, absl::string_view());
 
     } else if (!stream->reset_reason_.has_value() &&
                stream->stream_manager_.hasBufferedBodyOrTrailers()) {
@@ -1818,6 +1828,7 @@ void ConnectionImpl::onProtocolConstraintViolation() {
 
 void ConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
   // Notify the streams based on least recently encoding to the connection.
+  // NOLINTNEXTLINE(modernize-loop-convert)
   for (auto it = active_streams_.rbegin(); it != active_streams_.rend(); ++it) {
     (*it)->runLowWatermarkCallbacks();
   }
@@ -2452,17 +2463,20 @@ int ServerConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, Heade
 Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   // Make sure downstream outbound queue was not flooded by the upstream frames.
   RETURN_IF_ERROR(protocol_constraints_.checkOutboundFrameLimits());
-  if (should_send_go_away_and_close_on_dispatch_ != nullptr &&
-      should_send_go_away_and_close_on_dispatch_->shouldShedLoad()) {
-    ConnectionImpl::goAway();
-    sent_go_away_on_dispatch_ = true;
-    return envoyOverloadError(
-        "Load shed point http2_server_go_away_and_close_on_dispatch triggered");
-  }
-  if (should_send_go_away_on_dispatch_ != nullptr && !sent_go_away_on_dispatch_ &&
-      should_send_go_away_on_dispatch_->shouldShedLoad()) {
-    ConnectionImpl::goAway();
-    sent_go_away_on_dispatch_ = true;
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_fix_goaway_loadshed_point")) {
+    if (should_send_go_away_and_close_on_dispatch_ != nullptr &&
+        should_send_go_away_and_close_on_dispatch_->shouldShedLoad()) {
+      ConnectionImpl::goAway();
+      sent_go_away_on_dispatch_ = true;
+      return envoyOverloadError(
+          "Load shed point http2_server_go_away_and_close_on_dispatch triggered");
+    }
+    if (should_send_go_away_on_dispatch_ != nullptr && !sent_go_away_on_dispatch_ &&
+        should_send_go_away_on_dispatch_->shouldShedLoad()) {
+      ConnectionImpl::goAway();
+      sent_go_away_on_dispatch_ = true;
+    }
   }
   return ConnectionImpl::dispatch(data);
 }

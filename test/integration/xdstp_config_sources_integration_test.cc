@@ -24,6 +24,8 @@
 #include "gtest/gtest.h"
 
 using testing::AssertionResult;
+using testing::Eq;
+using testing::Ge;
 
 namespace Envoy {
 
@@ -99,7 +101,7 @@ TEST_P(XdsTpConfigsIntegrationTest, EdsOnlyConfigAuthority1) {
 
   initialize();
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   // Try to send a request and see that it reaches the backend (backend 3).
   testRouterHeaderOnlyRequestAndResponse(nullptr, 3);
   cleanupUpstreamAndDownstream();
@@ -163,12 +165,12 @@ TEST_P(XdsTpConfigsIntegrationTest, EdsOnlyConfigAuthority1Update) {
 
   initialize();
 
-  test_server_->waitForCounterEq(
+  test_server_->waitForCounter(
       "cluster.xdstp_authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/"
       "cluster1.update_success",
-      1);
+      Eq(1));
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   // Try to send a request and see that it reaches the backend (backend 3).
   testRouterHeaderOnlyRequestAndResponse(nullptr, 3);
   cleanupUpstreamAndDownstream();
@@ -190,10 +192,10 @@ TEST_P(XdsTpConfigsIntegrationTest, EdsOnlyConfigAuthority1Update) {
       {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1"},
       {}, {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
 
-  test_server_->waitForCounterEq(
+  test_server_->waitForCounter(
       "cluster.xdstp_authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/"
       "cluster1.update_success",
-      2);
+      Eq(2));
 }
 
 // Validate that a bootstrap cluster that has an xds-tp based config EDS source
@@ -260,7 +262,7 @@ TEST_P(XdsTpConfigsIntegrationTest, EdsOnlyConfigDefaultSource) {
 
   initialize();
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   // Try to send a request and see that it reaches the backend (backend 3).
   testRouterHeaderOnlyRequestAndResponse(nullptr, 3);
   cleanupUpstreamAndDownstream();
@@ -343,7 +345,7 @@ TEST_P(XdsTpConfigsIntegrationTest, TwoClustersWithEdsOnlyConfigAuthority1) {
 
   initialize();
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   EXPECT_EQ(5, test_server_->gauge("cluster_manager.active_clusters")->value());
   // Try to send a request and see that it reaches the backend (backend 3).
   testRouterHeaderOnlyRequestAndResponse(nullptr, 3);
@@ -388,7 +390,7 @@ TEST_P(XdsTpConfigsIntegrationTest, RdsOnlyConfigAuthority1) {
   };
   initialize();
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   // Try to send a request and see that it reaches the backend (backend 0).
   testRouterHeaderOnlyRequestAndResponse(nullptr);
   cleanupUpstreamAndDownstream();

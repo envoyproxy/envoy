@@ -372,6 +372,7 @@ envoy_extension_cc_test_library(
     extension_names = ["envoy.filters.http.ext_proc"],
     tags = ["skip_on_windows"],
     deps = [
+        ":ext_proc_test_filters_proto_cc_proto",
         ":logging_test_filter_lib",
         ":utils_lib",
         "//source/common/protobuf",
@@ -447,6 +448,7 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/http/set_metadata/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/retry/host/previous_hosts/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
         "@ocp-diag-core//ocpdiag/core/testing:status_matchers",
@@ -738,6 +740,11 @@ envoy_extension_cc_test_library(
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
+)
+
+envoy_proto_library(
+    name = "ext_proc_test_filters_proto",
+    srcs = ["ext_proc_test_filters.proto"],
 )
 
 envoy_proto_library(

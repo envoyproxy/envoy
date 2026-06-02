@@ -85,7 +85,7 @@ TEST_P(GenericSecretRotationIntegrationTest, SecretRotationReflectedInAccessLog)
 
   // Rotate the secret and wait for the SDS update to propagate.
   rotateSecret("rotated-token");
-  test_server_->waitForCounterGe("sds.api-token.update_success", 2);
+  test_server_->waitForCounter("sds.api-token.update_success", testing::Ge(2));
 
   // Trigger a second access log entry; the flush will use the rotated secret value.
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);

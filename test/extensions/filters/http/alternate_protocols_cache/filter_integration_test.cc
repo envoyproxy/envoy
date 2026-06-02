@@ -12,7 +12,9 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/ssl_utility.h"
+#include "test/test_common/logging.h"
 
+using testing::Eq;
 namespace Envoy {
 namespace {
 
@@ -144,9 +146,9 @@ TEST_P(FilterIntegrationTest, AltSvc) {
   checkSimpleRequestSuccess(request_size, response_size, response.get());
 
   // Close the connection so the HTTP/2 connection will not be used.
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http2_total", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_http2_total", Eq(1));
   ASSERT_TRUE(fake_upstream_connection_->close());
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
   fake_upstream_connection_.reset();
 
   // Second request should go out over HTTP/3 (upstream index 1) because of the Alt-Svc information.
@@ -155,7 +157,7 @@ TEST_P(FilterIntegrationTest, AltSvc) {
   auto response2 = sendRequestAndWaitForResponse(request_headers, request_size, response_headers,
                                                  response_size, 1, timeout);
   checkSimpleRequestSuccess(request_size, response_size, response2.get());
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http3_total", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_http3_total", Eq(1));
 }
 
 TEST_P(FilterIntegrationTest, AltSvcCached) {
@@ -181,7 +183,7 @@ TEST_P(FilterIntegrationTest, AltSvcCached) {
   auto response2 = sendRequestAndWaitForResponse(request_headers, request_size, response_headers,
                                                  response_size, 1, timeout);
   checkSimpleRequestSuccess(request_size, response_size, response2.get());
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http3_total", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_http3_total", Eq(1));
 }
 
 TEST_P(FilterIntegrationTest, AltSvcCachedH3Slow) {
@@ -214,7 +216,8 @@ TEST_P(FilterIntegrationTest, AltSvcCachedH3Slow) {
   waitForNextUpstreamConnection(std::vector<uint64_t>{1}, TestUtility::DefaultTimeout,
                                 h3_connection);
   // Of the 100 connection pools configured, the grid registers as taking up one.
-  test_server_->waitForGaugeEq("cluster.cluster_0.circuit_breakers.default.remaining_cx_pools", 99);
+  test_server_->waitForGauge("cluster.cluster_0.circuit_breakers.default.remaining_cx_pools",
+                             Eq(99));
 
   // The created stream will reset.
   FakeStreamPtr upstream_request2;
@@ -231,7 +234,7 @@ TEST_P(FilterIntegrationTest, AltSvcCachedH3Slow) {
   // Now close the connection to make sure it doesn't cause problems for the
   // downstream stream.
   ASSERT_TRUE(h3_connection->close());
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
 
   // Finish the response.
   upstream_request_->encodeHeaders(default_response_headers_, true);
@@ -239,12 +242,12 @@ TEST_P(FilterIntegrationTest, AltSvcCachedH3Slow) {
   ASSERT_TRUE(response->waitForEndStream(timeout));
 
   checkSimpleRequestSuccess(request_size, response_size, response.get());
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http3_total", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_http3_total", Eq(1));
 
   cleanupUpstreamAndDownstream();
   // Wait for the grid to be torn down to make sure it is not problematic.
-  test_server_->waitForGaugeEq("cluster.cluster_0.circuit_breakers.default.remaining_cx_pools",
-                               100);
+  test_server_->waitForGauge("cluster.cluster_0.circuit_breakers.default.remaining_cx_pools",
+                             Eq(100));
 }
 
 TEST_P(FilterIntegrationTest, AltSvcCachedH3SlowTillH2Finishes) {
@@ -282,8 +285,9 @@ TEST_P(FilterIntegrationTest, AltSvcCachedH3SlowTillH2Finishes) {
   waitForNextUpstreamConnection(std::vector<uint64_t>{1}, TestUtility::DefaultTimeout,
                                 h3_connection);
   // Of the 100 connection pools configured, the grid registers as taking up one.
-  test_server_->waitForGaugeEq("cluster.cluster_0.circuit_breakers.default.remaining_cx_pools", 99);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http3_total", 1);
+  test_server_->waitForGauge("cluster.cluster_0.circuit_breakers.default.remaining_cx_pools",
+                             Eq(99));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_http3_total", Eq(1));
 
   // An upstream HTTP/3 stream should be created without crash, and the created stream will be
   // reset.
@@ -294,12 +298,12 @@ TEST_P(FilterIntegrationTest, AltSvcCachedH3SlowTillH2Finishes) {
   // Now close the HTTP/3 connection to make sure it doesn't cause problems for the
   // downstream stream.
   ASSERT_TRUE(h3_connection->close());
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
 
   cleanupUpstreamAndDownstream();
   // Wait for the grid to be torn down to make sure it is not problematic.
-  test_server_->waitForGaugeEq("cluster.cluster_0.circuit_breakers.default.remaining_cx_pools",
-                               100);
+  test_server_->waitForGauge("cluster.cluster_0.circuit_breakers.default.remaining_cx_pools",
+                             Eq(100));
 }
 
 // TODO(32151): Figure out why it's flaky and re-enable.
@@ -345,9 +349,10 @@ TEST_P(FilterIntegrationTest, DISABLED_AltSvcCachedH2Slow) {
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
   // Wait for both connections to be attempted.
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 2);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Eq(2));
   // Of the 100 connection pools configured, the grid registers as taking up one.
-  test_server_->waitForGaugeEq("cluster.cluster_0.circuit_breakers.default.remaining_cx_pools", 99);
+  test_server_->waitForGauge("cluster.cluster_0.circuit_breakers.default.remaining_cx_pools",
+                             Eq(99));
 
   // Unblock Http3.
   block_http3.Notify();
@@ -364,12 +369,16 @@ TEST_P(FilterIntegrationTest, DISABLED_AltSvcCachedH2Slow) {
 
   cleanupUpstreamAndDownstream();
   // Wait for the grid to be torn down to make sure it is not problematic.
-  test_server_->waitForGaugeEq("cluster.cluster_0.circuit_breakers.default.remaining_cx_pools",
-                               100);
+  test_server_->waitForGauge("cluster.cluster_0.circuit_breakers.default.remaining_cx_pools",
+                             Eq(100));
 }
 
 TEST_P(FilterIntegrationTest, AltSvcIgnoredWithProxyConfig) {
-  config_helper_.addFilter("{ name: header-to-proxy-filter }");
+  config_helper_.addFilter(R"EOF(
+    name: header-to-proxy-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.HeaderToProxyFilterConfig
+  )EOF");
   const uint64_t request_size = 0;
   const uint64_t response_size = 0;
   const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
@@ -392,9 +401,9 @@ TEST_P(FilterIntegrationTest, AltSvcIgnoredWithProxyConfig) {
   checkSimpleRequestSuccess(request_size, response_size, response.get());
 
   // Close the connection so the HTTP/2 connection will not be used.
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http2_total", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_http2_total", Eq(1));
   ASSERT_TRUE(fake_upstream_connection_->close());
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
   fake_upstream_connection_.reset();
 
   absl::string_view upstream_address(fake_upstreams_[0]->localAddress()->asStringView());
@@ -405,8 +414,8 @@ TEST_P(FilterIntegrationTest, AltSvcIgnoredWithProxyConfig) {
   auto response2 = sendRequestAndWaitForResponse(request_headers, request_size, response_headers,
                                                  response_size, 0, timeout);
   checkSimpleRequestSuccess(request_size, response_size, response2.get());
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http2_total", 2);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http3_total", 0);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_http2_total", Eq(2));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_http3_total", Eq(0));
 }
 
 TEST_P(FilterIntegrationTest, RetryAfterHttp3ZeroRttHandshakeFailed) {
@@ -426,10 +435,10 @@ TEST_P(FilterIntegrationTest, RetryAfterHttp3ZeroRttHandshakeFailed) {
   auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, response_headers, 0,
                                                 /*upstream_index=*/0, timeout);
   checkSimpleRequestSuccess(0, response_size, response.get());
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http2_total", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_http2_total", Eq(1));
   // Close the connection so the HTTP/2 connection will not be used.
   ASSERT_TRUE(fake_upstream_connection_->close());
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
   fake_upstream_connection_.reset();
 
   // The 2nd request should go out over HTTP/3 because of the Alt-Svc information.
@@ -440,7 +449,7 @@ TEST_P(FilterIntegrationTest, RetryAfterHttp3ZeroRttHandshakeFailed) {
   EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_cx_http3_total")->value());
   // Close the h3 upstream connection so that the next request will create another connection.
   ASSERT_TRUE(fake_upstream_connection_->close());
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 2);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(2));
   fake_upstream_connection_.reset();
 
   // Stop the HTTP/3 fake upstream.
@@ -450,9 +459,9 @@ TEST_P(FilterIntegrationTest, RetryAfterHttp3ZeroRttHandshakeFailed) {
   // credentials.
   auto response3 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   // Wait for the upstream to connect timeout and the failed early data request to be retried.
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_retry", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_retry", Eq(1));
   EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 3);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(3));
 
   // The retry should attempt both HTTP/3 and HTTP/2. And the TCP connection will win the race.
   waitForNextUpstreamRequest(0);
@@ -461,7 +470,7 @@ TEST_P(FilterIntegrationTest, RetryAfterHttp3ZeroRttHandshakeFailed) {
   checkSimpleRequestSuccess(0, response_size, response3.get());
   EXPECT_EQ(2u, test_server_->counter("cluster.cluster_0.upstream_cx_http2_total")->value());
 
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_connect_fail", 2);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_connect_fail", Eq(2));
   EXPECT_EQ(3u, test_server_->counter("cluster.cluster_0.upstream_cx_http3_total")->value());
   EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_http3_broken")->value());
 
@@ -505,19 +514,19 @@ TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
   auto response = sendRequestAndWaitForResponse(request_headers, 2048, response_headers, 0,
                                                 /*upstream_index=*/0, timeout);
   checkSimpleRequestSuccess(2048, response_size, response.get());
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http2_total", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_http2_total", Eq(1));
 
   // Close the connection so the HTTP/2 connection will not be used.
   ASSERT_TRUE(fake_upstream_connection_->close());
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
   fake_upstream_connection_.reset();
   // Second request should go out over HTTP/3 because of the Alt-Svc information.
   auto response2 = codec_client_->makeRequestWithBody(request_headers, 2048);
   waitForNextUpstreamRequest(1);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http3_total", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_http3_total", Eq(1));
   // Close the HTTP/3 connection before sending back response. This would cause an upstream reset.
   ASSERT_TRUE(fake_upstream_connection_->close());
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 2);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(2));
   fake_upstream_connection_.reset();
   upstream_request_.reset();
 
@@ -528,7 +537,67 @@ TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
 
   checkSimpleRequestSuccess(2048, response_size, response2.get());
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http2_total", 2);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_http2_total", Eq(2));
+}
+
+TEST_P(FilterIntegrationTest, AltSvcH3BrokenH2FailedNoDoubleAttempt) {
+#ifdef WIN32
+  GTEST_SKIP() << "Skipping on Windows";
+#endif
+  // Start with the alt-svc entry in the cache.
+  write_alt_svc_to_file_ = true;
+
+  const uint64_t request_size = 0;
+  const uint64_t response_size = 0;
+  const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
+
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.connectivity_grid_prevent_double_h2_scheduled", "true");
+  config_helper_.setConnectTimeout(std::chrono::seconds(1));
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  // --- Step 1: Mark H3 broken automatically ---
+  // Stop the H3 fake upstream so the H3 connection attempt fails (hangs).
+  fake_upstreams_[1]->cleanUp();
+
+  // Send request 1. It should start H3 (hangs) and H2 (connects immediately).
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // Now accept H2.
+  waitForNextUpstreamRequest(0);
+
+  // Complete the response over H2 to make the request succeed.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream(timeout));
+  checkSimpleRequestSuccess(request_size, response_size, response.get());
+
+  // Verify H3 is marked broken now.
+  test_server_->waitForCounter("cluster.cluster_0.upstream_http3_broken", Eq(1));
+
+  // Close the H2 connection so it won't be reused for the next request.
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(2));
+  fake_upstream_connection_.reset();
+  upstream_request_.reset();
+
+  // --- Step 2: Test H2 immediate failure and no other failover ---
+  // Tear down H2 upstream completely so any connection attempt to it fails immediately.
+  fake_upstreams_[0]->cleanUp();
+
+  // Send request 2. It should start with H2 because H3 is broken.
+  // We assert that Envoy only attempts H2 stream creation EXACTLY ONCE!
+  // (Without the fix, the immediate failure would trigger a redundant second H2 attempt/failover).
+  IntegrationStreamDecoderPtr response2;
+  EXPECT_LOG_CONTAINS_N_TIMES(
+      "trace", "HTTP/1 HTTP/2 ALPN pool attempting to create a new stream", 1, {
+        response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+        ASSERT_TRUE(response2->waitForEndStream(timeout));
+      });
+
+  EXPECT_EQ("503", response2->headers().getStatusValue());
+
+  cleanupUpstreamAndDownstream();
 }
 
 INSTANTIATE_TEST_SUITE_P(Protocols, FilterIntegrationTest,

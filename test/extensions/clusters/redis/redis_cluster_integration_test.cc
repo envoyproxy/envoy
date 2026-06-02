@@ -11,6 +11,7 @@
 #include "test/integration/ads_integration.h"
 #include "test/integration/integration.h"
 
+using testing::Ge;
 using testing::Return;
 
 namespace Envoy {
@@ -71,12 +72,11 @@ const std::string& clusterConfig() {
       cluster_type:
         name: envoy.clusters.redis
         typed_config:
-          "@type": type.googleapis.com/google.protobuf.Struct
-          value:
-            cluster_refresh_rate: 60s
-            cluster_refresh_timeout: 4s
-            redirect_refresh_interval: 0s
-            redirect_refresh_threshold: 1
+          "@type": type.googleapis.com/envoy.extensions.clusters.redis.v3.RedisClusterConfig
+          cluster_refresh_rate: 60s
+          cluster_refresh_timeout: 4s
+          redirect_refresh_interval: 0s
+          redirect_refresh_threshold: 1
 )EOF");
 }
 
@@ -101,13 +101,12 @@ const std::string& testConfigWithRefresh() {
       cluster_type:
         name: envoy.clusters.redis
         typed_config:
-          "@type": type.googleapis.com/google.protobuf.Struct
-          value:
-            cluster_refresh_rate: 3600s
-            cluster_refresh_timeout: 4s
-            redirect_refresh_interval: 100s
-            redirect_refresh_threshold: 1
-            failure_refresh_threshold: 1
+          "@type": type.googleapis.com/envoy.extensions.clusters.redis.v3.RedisClusterConfig
+          cluster_refresh_rate: 3600s
+          cluster_refresh_timeout: 4s
+          redirect_refresh_interval: 100s
+          redirect_refresh_threshold: 1
+          failure_refresh_threshold: 1
 )EOF");
 }
 
@@ -709,7 +708,7 @@ TEST_P(RedisAdsIntegrationTest, RedisClusterRemoval) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "1", {}, {}, {}));
 
   // Validate that redis listener is successfully created.
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
 
   // Now send a CDS update, removing redis cluster added above.
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
@@ -717,7 +716,7 @@ TEST_P(RedisAdsIntegrationTest, RedisClusterRemoval) {
       {"redis_cluster"}, "2");
 
   // Validate that the cluster is removed successfully.
-  test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+  test_server_->waitForCounter("cluster_manager.cluster_removed", Ge(1));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, RedisAdsIntegrationTest,

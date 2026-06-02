@@ -237,6 +237,11 @@ public:
 
   const Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNamePool stat_name_pool_;
+  // We only allow the module to create stats during on_tracer_config_new, and not later from
+  // worker threads, so that we don't have to wrap stat_name_pool_ in a lock. Per-request label
+  // values use a stack-local Stats::StatNameDynamicPool in the increment callbacks (see
+  // abi_impl.cc).
+  bool stat_creation_frozen_ = false;
 
 private:
   friend absl::StatusOr<std::shared_ptr<DynamicModuleTracerConfig>> newDynamicModuleTracerConfig(
@@ -294,6 +299,7 @@ public:
                               SystemTime start_time) override;
   void setSampled(bool sampled) override;
   bool useLocalDecision() const override;
+  bool exportedSpan() const override;
   std::string getBaggage(absl::string_view key) override;
   void setBaggage(absl::string_view key, absl::string_view value) override;
   std::string getTraceId() const override;

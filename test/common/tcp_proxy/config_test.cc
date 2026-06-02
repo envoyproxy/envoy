@@ -713,7 +713,7 @@ TEST(ConfigTest, PerConnectionClusterWithTopLevelMetadataMatchConfig) {
   NiceMock<Network::MockConnection> connection;
   connection.stream_info_.filterState()->setData(
       "envoy.tcp_proxy.cluster", std::make_unique<PerConnectionCluster>("filter_state_cluster"),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   const auto route = config_obj.getRouteFromEntries(connection);
   EXPECT_NE(nullptr, route);
@@ -1003,7 +1003,6 @@ TEST_F(TcpProxyHashingTest, HashWithFilterState) {
   {
     initializeFilter();
     connection_.stream_info_.filter_state_->setData("foo", std::make_unique<HashableObj>(),
-                                                    StreamInfo::FilterState::StateType::ReadOnly,
                                                     StreamInfo::FilterState::LifeSpan::FilterChain);
     EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
                 tcpConnPool(_, _, _))

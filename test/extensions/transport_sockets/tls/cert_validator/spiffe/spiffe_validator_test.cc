@@ -106,7 +106,7 @@ public:
     config_ = std::make_unique<TestCertificateValidationContextConfig>(
         typed_conf, allow_expired_certificate_, san_matchers_);
 
-    if (trust_bundle_file != "") {
+    if (!trust_bundle_file.empty()) {
       EXPECT_CALL(factory_context_.dispatcher_, createFilesystemWatcher_())
           .WillRepeatedly(testing::Invoke([trust_bundle_file] {
             Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
@@ -163,6 +163,10 @@ public:
     }
   };
 
+  void addSanMatcher(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher matcher) {
+    san_matchers_.push_back(std::move(matcher));
+  }
+
   Api::ApiPtr api_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   NiceMock<Envoy::Event::MockDispatcher> dispatcher_;
@@ -170,7 +174,7 @@ public:
 private:
   bool allow_expired_certificate_{false};
   TestCertificateValidationContextConfigPtr config_;
-  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers_{};
+  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers_;
   Stats::TestUtil::TestStore store_;
   SslStats stats_;
   Event::TestRealTimeSystem time_system_;
@@ -523,7 +527,7 @@ typed_config:
   callbacks.connection().streamInfo().filterState()->setData(
       "envoy.tls.cert_validator.spiffe.workload_trust_domain",
       std::make_shared<Router::StringAccessorImpl>("mydomain.org"),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   {
     SCOPED_TRACE("Trust domain matches so should be accepted (server).");
@@ -557,7 +561,6 @@ typed_config:
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData("envoy.tls.cert_validator.spiffe.workload_trust_domain",
                        std::make_shared<Router::StringAccessorImpl>("mydomain.org"),
-                       StreamInfo::FilterState::StateType::ReadOnly,
                        StreamInfo::FilterState::LifeSpan::Connection,
                        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   auto socket_options = Network::TransportSocketOptionsUtility::fromFilterState(filter_state);
@@ -1242,6 +1245,29 @@ typed_config:
   auto gauge_opt = store().findGaugeByString(expected_metric_name);
   EXPECT_TRUE(gauge_opt.has_value());
   EXPECT_EQ(gauge_opt->get().value(), 1787339642);
+}
+
+// Verify that a URI SAN matcher with an unregistered custom string matcher extension
+// fails during SPIFFE validator construction.
+TEST_F(TestSPIFFEValidator, InvalidCustomMatcherInSanMatcher) {
+  envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher san_matcher;
+  san_matcher.set_san_type(
+      envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI);
+  auto* custom = san_matcher.mutable_matcher()->mutable_custom();
+  custom->set_name("unregistered_custom_matcher");
+  custom->mutable_typed_config()->set_type_url("type.googleapis.com/nonexistent.Type");
+  addSanMatcher(san_matcher);
+
+  EXPECT_THROW_WITH_REGEX((void)initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: hello.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+  )EOF")),
+                          EnvoyException, "Didn't find a registered implementation");
 }
 
 } // namespace Tls

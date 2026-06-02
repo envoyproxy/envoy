@@ -49,11 +49,8 @@ jobs:
       # head-sha: ${{ github.sha }}
 
   build:
-    permissions:
-      actions: read
-      contents: read
-      packages: read
     secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
       gpg-key: >-
         ${{ needs.load.outputs.trusted
             && fromJSON(needs.load.outputs.trusted)
@@ -64,6 +61,10 @@ jobs:
             && fromJSON(needs.load.outputs.trusted)
             && secrets.ENVOY_GPG_MAINTAINER_KEY_PASSWORD
             || secrets.ENVOY_GPG_SNAKEOIL_KEY_PASSWORD }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
     if: ${{ fromJSON(needs.load.outputs.request).run.release || fromJSON(needs.load.outputs.request).run.verify }}
     needs:
     - load
@@ -82,8 +83,8 @@ jobs:
 
   release:
     secrets:
-      dockerhub-password: ${{ secrets.DOCKERHUB_PASSWORD }}
-      dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+      dockerhub-write-token: ${{ secrets.DOCKERHUB_WRITE_TOKEN }}
       ENVOY_CI_SYNC_APP_ID: >-
         ${{ needs.load.outputs.trusted
             && fromJSON(needs.load.outputs.trusted)
@@ -125,10 +126,13 @@ jobs:
     uses: ./.github/workflows/_publish_release.yml
     name: Release
     with:
+      dockerhub-username: ${{ vars.DOCKERHUB_USERNAME }}
       request: ${{ needs.load.outputs.request }}
       trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 
   verify:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
       actions: read
       contents: read

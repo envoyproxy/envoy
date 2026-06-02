@@ -2317,6 +2317,23 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   }
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_GROUP");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, tlsGroupString).WillRepeatedly(Return("X25519MLKEM768"));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ("X25519MLKEM768", upstream_format.format({}, stream_info));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_GROUP");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, tlsGroupString).WillRepeatedly(Return(""));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_CIPHER");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, ciphersuiteString()).WillRepeatedly(Return(""));
@@ -2722,6 +2739,41 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   }
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_SERVER_NAME");
+    EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(Return(nullptr));
+
+    EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.upstreamInfo()->setUpstreamSslConnection(nullptr);
+    StreamInfoFormatter upstream_format("UPSTREAM_SERVER_NAME");
+    EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_SERVER_NAME");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    const std::string sni = "example.com";
+    EXPECT_CALL(*connection_info, sni()).WillRepeatedly(ReturnRef(sni));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_EQ("example.com", upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("example.com")));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_SERVER_NAME");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, sni()).WillRepeatedly(ReturnRef(EMPTY_STRING));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("UPSTREAM_TLS_CIPHER");
     EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(Return(nullptr));
 
@@ -2749,6 +2801,30 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     StreamInfoFormatter upstream_format("UPSTREAM_TLS_CIPHER");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, ciphersuiteString()).WillRepeatedly(Return(""));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.upstreamInfo()->setUpstreamSslConnection(nullptr);
+    StreamInfoFormatter upstream_format("UPSTREAM_TLS_GROUP");
+    EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_TLS_GROUP");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, tlsGroupString).WillRepeatedly(Return("X25519MLKEM768"));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_EQ("X25519MLKEM768", upstream_format.format({}, stream_info));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_TLS_GROUP");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, tlsGroupString).WillRepeatedly(Return(""));
     stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
     EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
     EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
@@ -3693,22 +3769,17 @@ TEST(SubstitutionFormatterTest, FilterStateFormatter) {
   StreamInfo::MockStreamInfo stream_info;
 
   stream_info.filter_state_->setData("key",
-                                     std::make_unique<Router::StringAccessorImpl>("test_value"),
-                                     StreamInfo::FilterState::StateType::ReadOnly);
+                                     std::make_unique<Router::StringAccessorImpl>("test_value"));
   stream_info.filter_state_->setData("key-struct",
-                                     std::make_unique<TestSerializedStructFilterState>(),
-                                     StreamInfo::FilterState::StateType::ReadOnly);
+                                     std::make_unique<TestSerializedStructFilterState>());
   stream_info.filter_state_->setData("key-no-serialization",
-                                     std::make_unique<StreamInfo::FilterState::Object>(),
-                                     StreamInfo::FilterState::StateType::ReadOnly);
+                                     std::make_unique<StreamInfo::FilterState::Object>());
 
   stream_info.filter_state_->setData(
       "key-serialization-error",
-      std::make_unique<TestSerializedStructFilterState>(std::chrono::seconds(-281474976710656)),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      std::make_unique<TestSerializedStructFilterState>(std::chrono::seconds(-281474976710656)));
   stream_info.filter_state_->setData(
-      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"));
   EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
 
   {
@@ -4752,11 +4823,9 @@ TEST(SubstitutionFormatterTest, JsonFormatterFilterStateTest) {
   StreamInfo::MockStreamInfo stream_info;
 
   stream_info.filter_state_->setData("test_key",
-                                     std::make_unique<Router::StringAccessorImpl>("test_value"),
-                                     StreamInfo::FilterState::StateType::ReadOnly);
+                                     std::make_unique<Router::StringAccessorImpl>("test_value"));
   stream_info.filter_state_->setData("test_obj",
-                                     std::make_unique<TestSerializedStructFilterState>(),
-                                     StreamInfo::FilterState::StateType::ReadOnly);
+                                     std::make_unique<TestSerializedStructFilterState>());
   EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
 
   const std::string expected_json_map = R"EOF(
@@ -4785,8 +4854,7 @@ TEST(SubstitutionFormatterTest, FilterStateSpeciferTest) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
   stream_info.filter_state_->setData(
-      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"));
   stream_info.upstream_info_->setUpstreamFilterState(
       stream_info.filter_state_); // Reuse the same filter state for test only.
   EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
@@ -4822,8 +4890,7 @@ TEST(SubstitutionFormatterTest, FilterStateErrorSpeciferTest) {
   StreamInfo::MockStreamInfo stream_info;
 
   stream_info.filter_state_->setData(
-      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"));
 
   // 'ABCDE' is error specifier.
   Protobuf::Struct key_mapping;
@@ -5091,11 +5158,9 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
     EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
     stream_info.filter_state_->setData("testing",
                                        std::make_unique<Router::StringAccessorImpl>("test_value"),
-                                       StreamInfo::FilterState::StateType::ReadOnly,
                                        StreamInfo::FilterState::LifeSpan::FilterChain);
     stream_info.filter_state_->setData("serialized",
                                        std::make_unique<TestSerializedUnknownFilterState>(),
-                                       StreamInfo::FilterState::StateType::ReadOnly,
                                        StreamInfo::FilterState::LifeSpan::FilterChain);
     const std::string format = "%FILTER_STATE(testing)%|%FILTER_STATE(serialized)%|"
                                "%FILTER_STATE(testing):8%|%FILTER_STATE(nonexisting)%";

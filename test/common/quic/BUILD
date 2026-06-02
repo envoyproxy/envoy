@@ -54,6 +54,14 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "envoy_tls_server_handshaker_test",
+    srcs = envoy_select_enable_http3(["envoy_tls_server_handshaker_test.cc"]),
+    deps = envoy_select_enable_http3([
+        "//source/common/quic:envoy_tls_server_handshaker",
+    ]),
+)
+
+envoy_cc_test(
     name = "envoy_quic_proof_source_test",
     srcs = envoy_select_enable_http3(["envoy_quic_proof_source_test.cc"]),
     rbe_pool = "6gig",

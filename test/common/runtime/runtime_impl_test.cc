@@ -98,7 +98,7 @@ public:
     absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader =
         Runtime::LoaderImpl::create(dispatcher_, tls_, layered_runtime, local_info_, store_,
                                     generator_, validation_visitor_, *api_);
-    THROW_IF_NOT_OK(loader.status());
+    THROW_IF_NOT_OK_REF(loader.status());
     loader_ = std::move(loader.value());
   }
 
@@ -545,7 +545,7 @@ protected:
     absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader =
         Runtime::LoaderImpl::create(dispatcher_, tls_, layered_runtime, local_info_, store_,
                                     generator_, validation_visitor_, *api_);
-    THROW_IF_NOT_OK(loader.status());
+    THROW_IF_NOT_OK_REF(loader.status());
     loader_ = std::move(loader.value());
   }
 
@@ -947,7 +947,7 @@ public:
             }));
     absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader = Runtime::LoaderImpl::create(
         dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_, *api_);
-    THROW_IF_NOT_OK(loader.status());
+    THROW_IF_NOT_OK_REF(loader.status());
     loader_ = std::move(loader.value());
     THROW_IF_NOT_OK(loader_->initialize(cm_));
     for (auto* sub : rtds_subscriptions_) {

@@ -28,6 +28,7 @@ DownstreamReverseConnectionIOHandle::~DownstreamReverseConnectionIOHandle() {
       debug,
       "DownstreamReverseConnectionIOHandle: destroying handle for FD: {} with connection key: {}",
       fd_, connection_key_);
+  SET_SOCKET_INVALID(fd_);
 }
 
 void DownstreamReverseConnectionIOHandle::onPingMessage() {
@@ -47,16 +48,6 @@ Api::IoCallUint64Result DownstreamReverseConnectionIOHandle::close() {
       debug,
       "DownstreamReverseConnectionIOHandle: closing handle for FD: {} with connection key: {}", fd_,
       connection_key_);
-
-  // If we're ignoring close calls during socket hand-off, just return success.
-  if (ignore_close_and_shutdown_) {
-    ENVOY_LOG(
-        debug,
-        "DownstreamReverseConnectionIOHandle: ignoring close() call during socket hand-off for "
-        "connection key: {}",
-        connection_key_);
-    return Api::ioCallUint64ResultNoError();
-  }
 
   // Prevent double-closing by checking if already closed.
   if (fd_ < 0) {
@@ -80,7 +71,8 @@ Api::IoCallUint64Result DownstreamReverseConnectionIOHandle::close() {
   if (owned_socket_) {
     owned_socket_.reset();
   }
-  return IoSocketHandleImpl::close();
+  SET_SOCKET_INVALID(fd_);
+  return Api::ioCallUint64ResultNoError();
 }
 
 Api::SysCallIntResult DownstreamReverseConnectionIOHandle::shutdown(int how) {
@@ -89,17 +81,11 @@ Api::SysCallIntResult DownstreamReverseConnectionIOHandle::shutdown(int how) {
             "key: {}",
             how, fd_, connection_key_);
 
-  // If shutdown is ignored during socket hand-off, return success.
-  if (ignore_close_and_shutdown_) {
-    ENVOY_LOG(
-        debug,
-        "DownstreamReverseConnectionIOHandle: ignoring shutdown() call during socket hand-off for "
-        "connection key: {}",
-        connection_key_);
-    return Api::SysCallIntResult{0, 0};
+  if (owned_socket_) {
+    return owned_socket_->ioHandle().shutdown(how);
   }
 
-  return IoSocketHandleImpl::shutdown(how);
+  return Api::SysCallIntResult{0, 0};
 }
 
 } // namespace ReverseConnection

@@ -1,0 +1,110 @@
+syntax = "proto3";
+
+package test.integration.filters;
+
+message EdsReadyFilterConfig {
+}
+message SdsGenericSecretTestConfig {
+}
+message RepickClusterFilterConfig {
+}
+message PauseFilterConfig {
+}
+message PauseFilterForQuicConfig {
+}
+message BackpressureFilterConfig {
+}
+message StreamTeeFilterConfig {
+}
+message ListenerTypedMetadataFilterConfig {
+}
+message StreamInfoToHeadersFilterConfig {
+}
+message BufferContinueFilterConfig {
+}
+message PassthroughFilterConfig {
+}
+message InvalidHeaderFilterConfig {
+}
+message AddInvalidDataFilterConfig {
+}
+message EncoderDecoderBufferFilterConfig {
+}
+message OnLocalReplyFilterConfig {
+}
+message RemoveResponseHeadersFilterConfig {
+}
+message WaitForWholeRequestAndResponseFilterConfig {
+}
+message ContinueHeadersOnlyInjectBodyFilterConfig {
+}
+message StopIterationHeadersInjectBodyFilterConfig {
+}
+message AddTrailersFilterConfig {
+}
+message LocalReplyDuringEncodeConfig {
+}
+message LocalReplyDuringEncodeDataConfig {
+}
+message CallDecodedataOnceFilterConfig {
+}
+message DecodeHeadersReturnStopAllFilterConfig {
+}
+message EncodeHeadersReturnStopAllFilterConfig {
+}
+message LocalReplyWithMetadataFilterConfig {
+}
+message ResetStreamFilterConfig {
+}
+message EncoderResetStreamFilterConfig {
+}
+message AssertNonReentrantFilterConfig {
+}
+message MetadataControlFilterConfig {
+}
+message AddMetadataEncodeHeadersFilterConfig {
+}
+message EncoderRecreateStreamFilterConfig {
+}
+message LocalReplyDuringDecodeConfig {
+}
+message AddEncodeMetadataFilterConfig {
+}
+message AsyncInjectBodyAtEndStreamFilterConfig {
+}
+message ContinueAfterLocalReplyFilterConfig {
+}
+message DecodeDynamicMetadataFilterConfig {
+}
+message EncodeHeadersReturnStopIterationFilterConfig {
+}
+message MetadataStopAllFilterConfig {
+}
+message RemoveResponseTrailersFilterConfig {
+}
+message SendGoawayFilterConfig {
+}
+message StopInHeadersContinueInBodyFilterConfig {
+}
+message ClearRouteCacheFilterConfig {
+}
+message Encode1xxLocalReplyFilterConfig {
+}
+message HeaderToProxyFilterConfig {
+}
+message ModifyBufferFilterConfig {
+}
+message ProcessContextFilterConfig {
+}
+message RandomPauseFilterConfig {
+}
+message RefreshRouteClusterConfig {
+}
+message RequestMetadataFilterConfig {
+}
+message ResetIdleTimerFilterConfig {
+}
+message ResponseMetadataFilterConfig {
+}
+message AddHeaderEmptyFilterConfig {
+}

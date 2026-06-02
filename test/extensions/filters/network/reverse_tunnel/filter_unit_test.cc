@@ -70,7 +70,7 @@ protected:
   }
 
 public:
-  ReverseTunnelFilterUnitTest() : stats_store_(), overload_manager_() {
+  ReverseTunnelFilterUnitTest() {
     // Prepare proto config with defaults.
     proto_config_.set_request_path("/reverse_connections/request");
     proto_config_.set_request_method(envoy::config::core::v3::GET);
@@ -438,7 +438,8 @@ TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderInterfaceCoverageViaNewStream)
   auto logs = decoder.accessLogHandlers();
   EXPECT_TRUE(logs.empty());
   auto handle = decoder.getRequestDecoderHandle();
-  EXPECT_EQ(nullptr, handle.get());
+  EXPECT_NE(nullptr, handle.get());
+  EXPECT_EQ(&decoder, handle->get().ptr());
 }
 
 // Test configuration with custom ping interval.
@@ -479,6 +480,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationDefaults) {
   EXPECT_FALSE(config->autoCloseConnections());
   EXPECT_EQ("/reverse_connections/request", config->requestPath());
   EXPECT_EQ("GET", config->requestMethod());
+  EXPECT_FALSE(config->skipRebalancing());
 }
 
 // Test RequestDecoder methods not fully covered.
@@ -1378,7 +1380,7 @@ TEST_F(ReverseTunnelFilterUnitTest, VariousHttpMalformations) {
       // Invalid characters in headers
       "GET /reverse_connections/request HTTP/1.1\r\nHo\x00st: test\r\n\r\n"};
 
-  for (size_t i = 0; i < malformed_requests.size(); ++i) {
+  for (const auto& malformed_request : malformed_requests) {
     // Create new filter for each test to avoid state issues
     auto test_filter = std::make_unique<ReverseTunnelFilter>(config_, *stats_store_.rootScope(),
                                                              overload_manager_);
@@ -1394,7 +1396,7 @@ TEST_F(ReverseTunnelFilterUnitTest, VariousHttpMalformations) {
 
     test_filter->initializeReadFilterCallbacks(test_callbacks);
 
-    Buffer::OwnedImpl request(malformed_requests[i]);
+    Buffer::OwnedImpl request(malformed_request);
     EXPECT_EQ(Network::FilterStatus::StopIteration, test_filter->onData(request, false));
   }
 }
@@ -1541,7 +1543,7 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest, ProcessAcceptedConnectionReportsConn
 TEST_F(ReverseTunnelFilterUnitTest, SystematicHttpErrorPatterns) {
   auto patterns = HttpErrorHelper::getHttpErrorPatterns();
 
-  for (size_t i = 0; i < patterns.size(); ++i) {
+  for (const auto& pattern : patterns) {
     // Create new filter for each test to avoid state pollution
     auto error_filter = std::make_unique<ReverseTunnelFilter>(config_, *stats_store_.rootScope(),
                                                               overload_manager_);
@@ -1563,7 +1565,7 @@ TEST_F(ReverseTunnelFilterUnitTest, SystematicHttpErrorPatterns) {
     error_filter->initializeReadFilterCallbacks(error_callbacks);
 
     // Test this error pattern
-    Buffer::OwnedImpl error_request(patterns[i]);
+    Buffer::OwnedImpl error_request(pattern);
     EXPECT_EQ(Network::FilterStatus::StopIteration, error_filter->onData(error_request, false));
   }
 }
@@ -2092,6 +2094,103 @@ TEST_F(ReverseTunnelFilterWithTenantIsolationTest, FilterReadsTenantIsolationFro
   auto parse_error = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.parse_error");
   ASSERT_NE(nullptr, parse_error);
   EXPECT_EQ(1, parse_error->value());
+}
+
+// Upgrade-mode handshake: `Upgrade: reverse-tunnel` request -> `101` with echoed headers.
+TEST_F(ReverseTunnelFilterWithUpstreamTest, UpgradeMode_RespondsWith101) {
+  // Reconfigure filter with upgrade enabled.
+  proto_config_.set_use_http_upgrade(true);
+  auto config_or_error = ReverseTunnelFilterConfig::create(proto_config_, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  config_ = config_or_error.value();
+  filter_ =
+      std::make_unique<ReverseTunnelFilter>(config_, *stats_store_.rootScope(), overload_manager_);
+  filter_->initializeReadFilterCallbacks(callbacks_);
+
+  // Build a socket whose io_handle.duplicate() returns a valid duped handle, since the
+  // success path in `processAcceptedConnection` registers the duped fd with the upstream
+  // socket manager. Pattern mirrors `SuccessfulSocketDuplication` above.
+  auto mock_socket = std::make_unique<Network::MockConnectionSocket>();
+  auto mock_io_handle = std::make_unique<Network::MockIoHandle>();
+  auto dup_handle = std::make_unique<Network::MockIoHandle>();
+  EXPECT_CALL(*dup_handle, isOpen()).WillRepeatedly(testing::Return(true));
+  EXPECT_CALL(*dup_handle, resetFileEvents());
+  EXPECT_CALL(*dup_handle, fdDoNotUse()).WillRepeatedly(testing::Return(123));
+  EXPECT_CALL(*mock_io_handle, duplicate())
+      .WillOnce(testing::Return(testing::ByMove(std::move(dup_handle))));
+  EXPECT_CALL(*mock_socket, ioHandle()).WillRepeatedly(testing::ReturnRef(*mock_io_handle));
+  EXPECT_CALL(*mock_socket, isOpen()).WillRepeatedly(testing::Return(true));
+  EXPECT_CALL(*mock_io_handle, fdDoNotUse()).WillRepeatedly(testing::Return(122));
+  static Network::ConnectionSocketPtr stored_socket;
+  static std::unique_ptr<Network::MockIoHandle> stored_handle;
+  stored_handle = std::move(mock_io_handle);
+  stored_socket = std::move(mock_socket);
+  EXPECT_CALL(callbacks_.connection_, getSocket())
+      .WillRepeatedly(testing::ReturnRef(stored_socket));
+
+  std::string written;
+  EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
+      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+        written.append(data.toString());
+        data.drain(data.length());
+      }));
+  // Upgrade mode forces the original connection to close after handshake.
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+
+  std::string req = "GET /reverse_connections/request HTTP/1.1\r\n"
+                    "Host: localhost\r\n"
+                    "Connection: Upgrade\r\n"
+                    "Upgrade: reverse-tunnel\r\n"
+                    "x-envoy-reverse-tunnel-node-id: n\r\n"
+                    "x-envoy-reverse-tunnel-cluster-id: c\r\n"
+                    "x-envoy-reverse-tunnel-tenant-id: t\r\n"
+                    "Content-Length: 0\r\n\r\n";
+  Buffer::OwnedImpl request(req);
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
+  EXPECT_THAT(written, testing::HasSubstr("101 Switching Protocols"));
+  EXPECT_THAT(written, testing::HasSubstr("upgrade: reverse-tunnel"));
+
+  auto accepted = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.accepted");
+  ASSERT_NE(nullptr, accepted);
+  EXPECT_EQ(1, accepted->value());
+}
+
+// When `use_http_upgrade=true` but the request does not advertise the upgrade,
+// the filter rejects with `426 Upgrade Required` and closes the connection.
+TEST_F(ReverseTunnelFilterWithUpstreamTest, UpgradeMode_MissingUpgradeRejected) {
+  proto_config_.set_use_http_upgrade(true);
+  auto config_or_error = ReverseTunnelFilterConfig::create(proto_config_, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  config_ = config_or_error.value();
+  filter_ =
+      std::make_unique<ReverseTunnelFilter>(config_, *stats_store_.rootScope(), overload_manager_);
+  filter_->initializeReadFilterCallbacks(callbacks_);
+
+  std::string written;
+  EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
+      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+        written.append(data.toString());
+        data.drain(data.length());
+      }));
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+
+  Buffer::OwnedImpl request(
+      makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
+  EXPECT_THAT(written, testing::HasSubstr("426 Upgrade Required"));
+
+  auto parse_error = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.parse_error");
+  ASSERT_NE(nullptr, parse_error);
+  EXPECT_EQ(1, parse_error->value());
+}
+
+TEST_F(ReverseTunnelFilterUnitTest, FilterConfigLoadsSkipRebalancing) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  cfg.set_skip_rebalancing(true);
+
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  EXPECT_TRUE(config_or_error.value()->skipRebalancing());
 }
 
 } // namespace

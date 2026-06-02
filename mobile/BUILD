@@ -58,16 +58,17 @@ aar_import(
     name = "envoy_mobile_android",
     aar = "//library/kotlin/io/envoyproxy/envoymobile:envoy_aar",
     visibility = ["//visibility:public"],
+    deps = [
+        "@maven//:androidx_annotation_annotation",
+        "@maven//:androidx_core_core",
+        "@maven//:org_jetbrains_annotations",
+        "@maven//:org_jetbrains_kotlin_kotlin_stdlib",
+    ],
 )
 
 alias(
     name = "android_dist",
     actual = "//library/kotlin/io/envoyproxy/envoymobile:envoy_aar_with_artifacts",
-)
-
-alias(
-    name = "android_xds_dist",
-    actual = "//library/kotlin/io/envoyproxy/envoymobile:envoy_xds_aar_with_artifacts",
 )
 
 define_kt_toolchain(

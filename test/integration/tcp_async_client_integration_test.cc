@@ -5,6 +5,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -67,23 +69,23 @@ TEST_P(TcpAsyncClientIntegrationTest, SingleRequest) {
   std::string response("response");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  test_server_->waitForCounterEq("test_network_async_tcp_filter.on_new_connection", 1);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 1);
+  test_server_->waitForCounter("test_network_async_tcp_filter.on_new_connection", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_cx_active", Eq(1));
   test_server_->waitForNumHistogramSamplesGe("cluster.cluster_0.upstream_cx_connect_ms", 1);
   ASSERT_TRUE(tcp_client->write(request, true));
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_tx_bytes_total", request.size());
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_tx_bytes_total", Eq(request.size()));
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->waitForData(request.size()));
   ASSERT_TRUE(fake_upstream_connection->write(response, true));
-  test_server_->waitForCounterGe("test_network_async_tcp_filter.on_receive_async_data", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_rx_bytes_total", response.size());
+  test_server_->waitForCounter("test_network_async_tcp_filter.on_receive_async_data", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_rx_bytes_total", Eq(response.size()));
   ASSERT_TRUE(tcp_client->waitForData(response.size()));
   tcp_client->close();
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy_local", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 1);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 0);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy_local", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_cx_active", Eq(0));
   test_server_->waitForNumHistogramSamplesGe("cluster.cluster_0.upstream_cx_length_ms", 1);
 }
 
@@ -113,9 +115,9 @@ TEST_P(TcpAsyncClientIntegrationTest, MultipleRequestFrames) {
   // client receives the first data frame. Sending them in a tight sequence also
   // works, but the onData calling times could be changed due to the event loop.
   ASSERT_TRUE(fake_upstream_connection->write(response_1, false));
-  test_server_->waitForCounterGe("test_network_async_tcp_filter.on_receive_async_data", 1);
+  test_server_->waitForCounter("test_network_async_tcp_filter.on_receive_async_data", Ge(1));
   ASSERT_TRUE(fake_upstream_connection->write(response_2, true));
-  test_server_->waitForCounterGe("test_network_async_tcp_filter.on_receive_async_data", 2);
+  test_server_->waitForCounter("test_network_async_tcp_filter.on_receive_async_data", Ge(2));
   tcp_client->waitForData(response_1 + response_2, true);
   tcp_client->close();
 }
@@ -139,9 +141,9 @@ TEST_P(TcpAsyncClientIntegrationTest, MultipleResponseFrames) {
 
   // get response 1
   ASSERT_TRUE(fake_upstream_connection->write(response_1, false));
-  test_server_->waitForCounterGe("test_network_async_tcp_filter.on_receive_async_data", 1);
+  test_server_->waitForCounter("test_network_async_tcp_filter.on_receive_async_data", Ge(1));
   ASSERT_TRUE(fake_upstream_connection->write(response_2, true));
-  test_server_->waitForCounterGe("test_network_async_tcp_filter.on_receive_async_data", 2);
+  test_server_->waitForCounter("test_network_async_tcp_filter.on_receive_async_data", Ge(2));
   tcp_client->waitForData(response_1 + response_2, true);
   tcp_client->close();
 }
@@ -155,26 +157,26 @@ TEST_P(TcpAsyncClientIntegrationTest, Reconnect) {
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(tcp_client->write("hello1", false));
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 1);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_cx_active", Eq(1));
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->waitForData(
       [&](const std::string& data) -> bool { return data == "hello1"; }));
   ASSERT_TRUE(fake_upstream_connection->close());
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 0);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_cx_active", Eq(0));
 
   // We use the same tcp_client to ensure that a new upstream connection is created.
   ASSERT_TRUE(tcp_client->write("hello2", false));
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 2);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Eq(2));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_cx_active", Eq(1));
   FakeRawConnectionPtr fake_upstream_connection2;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
   ASSERT_TRUE(fake_upstream_connection2->waitForData(
       [&](const std::string& data) -> bool { return data == "hello2"; }));
 
   tcp_client->close();
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 0);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_cx_active", Eq(0));
 }
 
 TEST_P(TcpAsyncClientIntegrationTest, ClientTearDown) {
@@ -200,25 +202,25 @@ TEST_P(TcpAsyncClientIntegrationTest, TestClientCloseRST) {
   std::string response("response");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  test_server_->waitForCounterEq("test_network_async_tcp_filter.on_new_connection", 1);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 1);
+  test_server_->waitForCounter("test_network_async_tcp_filter.on_new_connection", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_cx_active", Eq(1));
   test_server_->waitForNumHistogramSamplesGe("cluster.cluster_0.upstream_cx_connect_ms", 1);
   ASSERT_TRUE(tcp_client->write(request, false));
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_tx_bytes_total", request.size());
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_tx_bytes_total", Eq(request.size()));
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->waitForData(request.size()));
   ASSERT_TRUE(fake_upstream_connection->write(response, false));
-  test_server_->waitForCounterGe("test_network_async_tcp_filter.on_receive_async_data", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_rx_bytes_total", response.size());
+  test_server_->waitForCounter("test_network_async_tcp_filter.on_receive_async_data", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_rx_bytes_total", Eq(response.size()));
   ASSERT_TRUE(tcp_client->waitForData(response.size()));
 
   tcp_client->close(Network::ConnectionCloseType::AbortReset);
 
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy_local", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 1);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 0);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy_local", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_cx_active", Eq(0));
   test_server_->waitForNumHistogramSamplesGe("cluster.cluster_0.upstream_cx_length_ms", 1);
   EXPECT_EQ(waitForAccessLog(access_log_path_, 0, true),
             "DS_CLOSE_TYPE=RemoteReset US_CLOSE_TYPE=-");
@@ -233,25 +235,25 @@ TEST_P(TcpAsyncClientIntegrationTest, TestUpstreamCloseRST) {
   std::string response("response");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  test_server_->waitForCounterEq("test_network_async_tcp_filter.on_new_connection", 1);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 1);
+  test_server_->waitForCounter("test_network_async_tcp_filter.on_new_connection", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_cx_active", Eq(1));
   test_server_->waitForNumHistogramSamplesGe("cluster.cluster_0.upstream_cx_connect_ms", 1);
   ASSERT_TRUE(tcp_client->write(request, false));
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_tx_bytes_total", request.size());
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_tx_bytes_total", Eq(request.size()));
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->waitForData(request.size()));
   ASSERT_TRUE(fake_upstream_connection->write(response, false));
-  test_server_->waitForCounterGe("test_network_async_tcp_filter.on_receive_async_data", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_rx_bytes_total", response.size());
+  test_server_->waitForCounter("test_network_async_tcp_filter.on_receive_async_data", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_rx_bytes_total", Eq(response.size()));
   ASSERT_TRUE(tcp_client->waitForData(response.size()));
 
   ASSERT_TRUE(fake_upstream_connection->close(Network::ConnectionCloseType::AbortReset));
 
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy_remote", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 1);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 0);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy_remote", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_cx_active", Eq(0));
   test_server_->waitForNumHistogramSamplesGe("cluster.cluster_0.upstream_cx_length_ms", 1);
   EXPECT_EQ(waitForAccessLog(access_log_path_, 0, true),
             "DS_CLOSE_TYPE=LocalReset US_CLOSE_TYPE=-");
@@ -271,7 +273,7 @@ TEST_P(TcpAsyncClientIntegrationTest, TestDownstremHalfClosedThenRST) {
 
   // It is half-closed for downstream.
   ASSERT_TRUE(tcp_client->write(request, true));
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_tx_bytes_total", request.size());
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_tx_bytes_total", Eq(request.size()));
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->waitForData(request.size()));
@@ -284,10 +286,10 @@ TEST_P(TcpAsyncClientIntegrationTest, TestDownstremHalfClosedThenRST) {
   // RemoteClose event from downstream rather than RemoteReset.
   ASSERT_TRUE(fake_upstream_connection->write(response, false));
 
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy_local", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 1);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 0);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy_local", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_cx_active", Eq(0));
   test_server_->waitForNumHistogramSamplesGe("cluster.cluster_0.upstream_cx_length_ms", 1);
 
   // As a basic half close process, the connection is already half closed in Envoy before.

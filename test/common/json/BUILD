@@ -66,10 +66,23 @@ envoy_cc_benchmark_binary(
     ],
 )
 
+genrule(
+    name = "json_sanitizer_corpus_binary_file",
+    srcs = ["gen_binary_corpus.sh"],
+    outs = ["json_sanitizer_corpus/binary_file"],
+    cmd = "bash $(location gen_binary_corpus.sh) $@",
+)
+
+filegroup(
+    name = "json_sanitizer_corpus_files",
+    testonly = 1,
+    srcs = glob(["json_sanitizer_corpus/**"]) + [":json_sanitizer_corpus_binary_file"],
+)
+
 envoy_cc_fuzz_test(
     name = "json_sanitizer_fuzz_test",
     srcs = ["json_sanitizer_fuzz_test.cc"],
-    corpus = "json_sanitizer_corpus",
+    corpus = ":json_sanitizer_corpus_files",
     rbe_pool = "6gig",
     deps = [
         ":json_sanitizer_test_util_lib",

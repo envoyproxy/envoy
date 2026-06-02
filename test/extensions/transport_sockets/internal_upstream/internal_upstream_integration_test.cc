@@ -347,7 +347,8 @@ TEST_F(InternalUpstreamIntegrationTest, TcpProxyHalfCloseLeak) {
   // Verify that the connection does not leak by waiting for the active connection gauge to drop to
   // zero. If the server side of the internal connection fails to clean up the downstream connection
   // then this wait will time out because the connection is stuck in CloseAfterFlush indefinitely.
-  test_server_->waitForGaugeEq("listener.envoy_internal_internal_listener.downstream_cx_active", 0);
+  test_server_->waitForGauge("listener.envoy_internal_internal_listener.downstream_cx_active",
+                             testing::Eq(0));
 }
 
 } // namespace

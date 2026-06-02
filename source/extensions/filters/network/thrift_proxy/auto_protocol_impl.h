@@ -157,7 +157,7 @@ public:
   }
 
 private:
-  ProtocolPtr protocol_{};
+  ProtocolPtr protocol_;
   std::string name_;
 };
 

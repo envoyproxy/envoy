@@ -24,6 +24,7 @@ namespace Envoy {
 namespace {
 
 using OnDemandScopedRdsIntegrationTest = ScopedRdsIntegrationTest;
+using testing::Ge;
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, OnDemandScopedRdsIntegrationTest,
                          DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
@@ -32,6 +33,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, OnDemandScopedRdsIntegrationTes
 TEST_P(OnDemandScopedRdsIntegrationTest, OnDemandUpdateSuccess) {
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
     )EOF");
   const std::string scope_route1 = R"EOF(
 name: foo_scope1
@@ -67,7 +70,7 @@ key:
                                      {"Addr", "x-foo-key=foo"}});
   createRdsStream("foo_route1");
   sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+  test_server_->waitForCounter("http.config_test.rds.foo_route1.update_success", Ge(1));
 
   waitForNextUpstreamRequest();
   // Send response headers, and end_stream if there is no response body.
@@ -84,6 +87,8 @@ TEST_P(OnDemandScopedRdsIntegrationTest, OnDemandUpdateScopeNotMatch) {
 
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
     )EOF");
 
   constexpr absl::string_view scope_tmpl = R"EOF(
@@ -134,6 +139,8 @@ TEST_P(OnDemandScopedRdsIntegrationTest, OnDemandUpdatePrimaryVirtualHostNotMatc
 
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
     )EOF");
 
   constexpr absl::string_view scope_tmpl = R"EOF(
@@ -184,6 +191,8 @@ TEST_P(OnDemandScopedRdsIntegrationTest, OnDemandUpdateVirtualHostNotMatch) {
 
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
     )EOF");
 
   const std::string scope_route1 = R"EOF(
@@ -238,6 +247,8 @@ key:
 TEST_P(OnDemandScopedRdsIntegrationTest, DifferentPriorityScopeShareRoute) {
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
     )EOF");
 
   const std::string scope_route1 = R"EOF(
@@ -276,7 +287,7 @@ key:
   initialize();
   registerTestServerPorts({"http"});
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+  test_server_->waitForCounter("http.config_test.rds.foo_route1.update_success", Ge(1));
   cleanupUpstreamAndDownstream();
   // "foo" request should succeed because the foo scope is loaded eagerly by default.
   // "bar" request will initialize rds provider on demand and also succeed.
@@ -294,6 +305,8 @@ key:
 TEST_P(OnDemandScopedRdsIntegrationTest, OnDemandUpdateAfterActiveStreamDestroyed) {
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
     )EOF");
   const std::string scope_route1 = R"EOF(
 name: foo_scope1
@@ -327,7 +340,7 @@ key:
                                      {":authority", "sni.lyft.com"},
                                      {":scheme", "http"},
                                      {"Addr", "x-foo-key=foo"}});
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_attempt", 1);
+  test_server_->waitForCounter("http.config_test.rds.foo_route1.update_attempt", Ge(1));
   // Close the connection and destroy the active stream.
   cleanupUpstreamAndDownstream();
   // Push rds update, on demand updated callback is post to worker thread.
@@ -335,13 +348,15 @@ key:
   // locked.
   createRdsStream("foo_route1");
   sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+  test_server_->waitForCounter("http.config_test.rds.foo_route1.update_success", Ge(1));
 }
 
 class OnDemandVhdsIntegrationTest : public VhdsIntegrationTest {
   void initialize() override {
     config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
     )EOF");
     VhdsIntegrationTest::initialize();
   }
@@ -968,6 +983,8 @@ public:
                                       isUnified() ? "true" : "false");
     config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
     )EOF");
   }
 
