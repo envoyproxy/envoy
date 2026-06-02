@@ -82,8 +82,9 @@ private:
   // whenever a `HostSet` is updated.
   double active_request_bias_{};
 
-  // Whether to include pending requests in the per-host load value. Cached and refreshed similar
-  // to `active_request_bias_` above.
+  // Whether to include pending requests in the per-host load value. Cached for performance and
+  // consistency reasons and refreshed in `LeastRequestLoadBalancer::refresh(uint32_t priority)`
+  // whenever a `HostSet` is updated.
   bool count_pending_requests_{};
 
   const absl::optional<Runtime::Double> active_request_bias_runtime_;
