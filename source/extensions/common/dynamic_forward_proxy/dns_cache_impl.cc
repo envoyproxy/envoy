@@ -29,9 +29,9 @@ absl::StatusOr<std::shared_ptr<DnsCacheImpl>> DnsCacheImpl::createDnsCacheImpl(
                         context.serverFactoryContext());
   RETURN_IF_NOT_OK_REF(resolver_or_error.status());
 
-  Matcher::AddressMatcherPtr deny_address_matcher;
+  Envoy::Matcher::AddressMatcherPtr deny_address_matcher;
   if (config.has_deny_address_matcher()) {
-    auto matcher_or_error = Matcher::AddressMatcher::create(config.deny_address_matcher());
+    auto matcher_or_error = Envoy::Matcher::AddressMatcher::create(config.deny_address_matcher());
     RETURN_IF_NOT_OK_REF(matcher_or_error.status());
     deny_address_matcher = std::move(*matcher_or_error);
   }
@@ -43,7 +43,8 @@ absl::StatusOr<std::shared_ptr<DnsCacheImpl>> DnsCacheImpl::createDnsCacheImpl(
 DnsCacheImpl::DnsCacheImpl(
     Server::Configuration::GenericFactoryContext& context,
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
-    Network::DnsResolverSharedPtr&& resolver, Matcher::AddressMatcherPtr deny_address_matcher)
+    Network::DnsResolverSharedPtr&& resolver,
+    Envoy::Matcher::AddressMatcherPtr deny_address_matcher)
     : main_thread_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       config_(config), random_generator_(context.serverFactoryContext().api().randomGenerator()),
       dns_lookup_family_(DnsUtils::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),

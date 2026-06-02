@@ -79,7 +79,7 @@ private:
   DnsCacheImpl(Server::Configuration::GenericFactoryContext& context,
                const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
                Network::DnsResolverSharedPtr&& resolver,
-               Matcher::AddressMatcherPtr deny_address_matcher);
+               Envoy::Matcher::AddressMatcherPtr deny_address_matcher);
   struct LoadDnsCacheEntryHandleImpl
       : public LoadDnsCacheEntryHandle,
         RaiiMapOfListElement<std::string, LoadDnsCacheEntryHandleImpl*> {

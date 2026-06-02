@@ -27,7 +27,7 @@ public:
   bool match(const StreamInfo::FilterState::Object& object) const override;
 
 private:
-  const Matcher::AddressMatcher address_matcher_;
+  const Envoy::Matcher::AddressMatcher address_matcher_;
 };
 
 class FilterStateStringMatcher : public FilterStateObjectMatcher {
