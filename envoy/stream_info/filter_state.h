@@ -52,8 +52,6 @@ enum class StreamSharingMayImpactPooling {
  */
 class FilterState {
 public:
-  enum class StateType { ReadOnly, Mutable };
-
   // Objects stored in the FilterState may have different life span. Life span is what controls
   // how long an object stored in FilterState lives. Implementation of this interface actually
   // stores objects in a (reverse) tree manner - multiple FilterStateImpl with shorter life span may
@@ -136,7 +134,6 @@ public:
 
   struct FilterObject {
     std::shared_ptr<Object> data_;
-    StateType state_type_{StateType::ReadOnly};
     StreamSharingMayImpactPooling stream_sharing_{StreamSharingMayImpactPooling::None};
     std::string name_;
   };
@@ -149,24 +146,19 @@ public:
   /**
    * @param data_name the name of the data being set.
    * @param data an owning pointer to the data to be stored.
-   * @param state_type indicates whether the object is mutable or not.
    * @param life_span indicates the life span of the object: bound to the filter chain, a
    * request, or a connection.
    *
-   * Note that it is an error to call setData() twice with the same
-   * data_name, if the existing object is immutable. Similarly, it is an
-   * error to call setData() with same data_name but different state_types
-   * (mutable and readOnly, or readOnly and mutable) or different life_span.
-   * This is to enforce a single authoritative source for each piece of
-   * data stored in FilterState.
+   * Note that it is an error to call setData() twice with the same data_name, but different
+   * life_span.
    */
   virtual void
-  setData(absl::string_view data_name, std::shared_ptr<Object> data, StateType state_type,
+  setData(absl::string_view data_name, std::shared_ptr<Object> data,
           LifeSpan life_span = LifeSpan::FilterChain,
           StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) PURE;
 
   /**
-   * @param data_name the name of the data being looked up (mutable/readonly).
+   * @param data_name the name of the data being looked up.
    * @return a typed pointer to the stored data or nullptr if the data does not exist or the data
    * type does not match the expected type.
    */
@@ -175,13 +167,13 @@ public:
   }
 
   /**
-   * @param data_name the name of the data being looked up (mutable/readonly).
+   * @param data_name the name of the data being looked up.
    * @return a const pointer to the stored data or nullptr if the data does not exist.
    */
   virtual const Object* getDataReadOnlyGeneric(absl::string_view data_name) const PURE;
 
   /**
-   * @param data_name the name of the data being looked up (mutable/readonly).
+   * @param data_name the name of the data being looked up.
    * @return a typed pointer to the stored data or nullptr if the data does not exist or the data
    * type does not match the expected type.
    */
@@ -190,13 +182,13 @@ public:
   }
 
   /**
-   * @param data_name the name of the data being looked up (mutable/readonly).
+   * @param data_name the name of the data being looked up.
    * @return a pointer to the stored data or nullptr if the data does not exist.
    */
   virtual Object* getDataMutableGeneric(absl::string_view data_name) PURE;
 
   /**
-   * @param data_name the name of the data being looked up (mutable/readonly).
+   * @param data_name the name of the data being looked up.
    * @return a shared pointer to the stored data or nullptr if the data does not exist.
    */
   virtual std::shared_ptr<Object> getDataSharedMutableGeneric(absl::string_view data_name) PURE;

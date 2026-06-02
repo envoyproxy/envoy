@@ -138,8 +138,8 @@ private:
   bool fail_open_ = false;
   absl::optional<bool> allow_on_headers_stop_iteration_ = absl::nullopt;
   std::string plugin_configuration_ = "";
-  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities_ = {};
-  envoy::extensions::wasm::v3::EnvironmentVariables envs_ = {};
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities_;
+  envoy::extensions::wasm::v3::EnvironmentVariables envs_;
 };
 
 template <typename Base = testing::Test> class WasmHttpFilterTestBase : public WasmTestBase<Base> {

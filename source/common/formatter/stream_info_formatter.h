@@ -3,6 +3,7 @@
 #include <bitset>
 #include <functional>
 #include <list>
+#include <memory>
 #include <regex>
 #include <string>
 #include <vector>
@@ -14,6 +15,7 @@
 #include "source/common/formatter/substitution_format_utility.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/status/statusor.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -48,9 +50,10 @@ public:
 };
 
 using StreamInfoFormatterProviderPtr = std::unique_ptr<StreamInfoFormatterProvider>;
+using StreamInfoFormatterResult = absl::StatusOr<StreamInfoFormatterProviderPtr>;
 
 using StreamInfoFormatterProviderCreateFunc =
-    std::function<StreamInfoFormatterProviderPtr(absl::string_view, absl::optional<size_t>)>;
+    std::function<StreamInfoFormatterResult(absl::string_view, absl::optional<size_t>)>;
 
 enum class DurationPrecision { Milliseconds, Microseconds, Nanoseconds };
 

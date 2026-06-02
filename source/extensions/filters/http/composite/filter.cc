@@ -288,7 +288,6 @@ void Filter::updateFilterState(Http::StreamFilterCallbacks* callback,
   } else {
     callback->streamInfo().filterState()->setData(
         MatchedActionsFilterStateKey, std::make_shared<MatchedActionInfo>(filter_name, action_name),
-        StreamInfo::FilterState::StateType::Mutable,
         StreamInfo::FilterState::LifeSpan::FilterChain);
   }
 }

@@ -105,6 +105,8 @@ without further review.
 * Paul Ogilby ([paul-r-gall](https://github.com/paul-r-gall)) (pgal@google.com)
 * Peng Gao ([penguingao](https://github.com/penguingao)) (pengg@google.com)
 * Jonh Wendell ([jwendell](https://github.com/jwendell)) (jwendell@redhat.com)
+* Adi (Suissa) Peleg ([adisuissa](https://github.com/adisuissa)) (adip@google.com)
+* Ignasi Barrera ([nacx](https://github.com/nacx)) (nacx@apache.org)
 
 # Emeritus maintainers
 

@@ -18,6 +18,8 @@ test_program(name = "no_op")
 
 test_program(name = "network_no_op")
 
+test_program(name = "listener_no_op")
+
 test_program(name = "no_program_init")
 
 test_program(name = "program_init_fail")
@@ -59,3 +61,5 @@ test_program(name = "access_log_integration_test")
 test_program(name = "upstream_http_tcp_bridge")
 
 test_program(name = "cluster_integration_test")
+
+test_program(name = "cluster_filter_state_test")

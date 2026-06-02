@@ -39,7 +39,7 @@ private:
   std::set<std::string> config_audiences_;
 };
 
-typedef std::unique_ptr<CheckAudience> CheckAudiencePtr;
+using CheckAudiencePtr = std::unique_ptr<CheckAudience>;
 
 } // namespace JwtVerify
 } // namespace Envoy

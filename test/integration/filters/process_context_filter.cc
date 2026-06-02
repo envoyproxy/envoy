@@ -11,6 +11,7 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 namespace Envoy {
 
@@ -36,9 +37,13 @@ private:
   ProcessObjectForFilter& process_object_;
 };
 
-class ProcessContextFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class ProcessContextFilterConfig
+    : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<
+          test::integration::filters::ProcessContextFilterConfig> {
 public:
-  ProcessContextFilterConfig() : EmptyHttpFilterConfig("process-context-filter") {}
+  ProcessContextFilterConfig()
+      : UniqueEmptyHttpFilterConfig<test::integration::filters::ProcessContextFilterConfig>(
+            "process-context-filter") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&,

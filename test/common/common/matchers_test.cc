@@ -651,8 +651,7 @@ TEST_F(FilterStateMatcher, MatchFilterStateWithoutString) {
   matcher.set_key(key);
   matcher.mutable_string_match()->set_exact("exact");
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state.setData(key, std::make_shared<TestObject>(absl::nullopt),
-                       StreamInfo::FilterState::StateType::ReadOnly);
+  filter_state.setData(key, std::make_shared<TestObject>(absl::nullopt));
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
   ASSERT_TRUE(filter_state_matcher.ok());
   EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
@@ -666,8 +665,7 @@ TEST_F(FilterStateMatcher, MatchFilterStateDifferentString) {
   matcher.mutable_string_match()->set_exact(value);
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(key,
-                       std::make_shared<TestObject>(absl::make_optional<std::string>("different")),
-                       StreamInfo::FilterState::StateType::ReadOnly);
+                       std::make_shared<TestObject>(absl::make_optional<std::string>("different")));
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
   ASSERT_TRUE(filter_state_matcher.ok());
   EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
@@ -680,8 +678,7 @@ TEST_F(FilterStateMatcher, MatchFilterState) {
   matcher.set_key(key);
   matcher.mutable_string_match()->set_exact(value);
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state.setData(key, std::make_shared<TestObject>(absl::make_optional<std::string>(value)),
-                       StreamInfo::FilterState::StateType::ReadOnly);
+  filter_state.setData(key, std::make_shared<TestObject>(absl::make_optional<std::string>(value)));
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
   ASSERT_TRUE(filter_state_matcher.ok());
   EXPECT_TRUE((*filter_state_matcher)->match(filter_state));
@@ -701,10 +698,8 @@ TEST_F(FilterStateMatcher, MatchFilterStateAddressMatchIpv4) {
 
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(
-      key,
-      std::make_shared<Network::Address::InstanceAccessor>(
-          Envoy::Network::Utility::parseInternetAddressNoThrow("4.5.6.7", 456, false)),
-      StreamInfo::FilterState::StateType::Mutable);
+      key, std::make_shared<Network::Address::InstanceAccessor>(
+               Envoy::Network::Utility::parseInternetAddressNoThrow("4.5.6.7", 456, false)));
 
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
   ASSERT_TRUE(filter_state_matcher.ok());
@@ -725,10 +720,8 @@ TEST_F(FilterStateMatcher, NoMatchFilterStateAddressMatchIpv4) {
 
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(
-      key,
-      std::make_shared<Network::Address::InstanceAccessor>(
-          Envoy::Network::Utility::parseInternetAddressNoThrow("4.5.6.8", 456, false)),
-      StreamInfo::FilterState::StateType::Mutable);
+      key, std::make_shared<Network::Address::InstanceAccessor>(
+               Envoy::Network::Utility::parseInternetAddressNoThrow("4.5.6.8", 456, false)));
 
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
   ASSERT_TRUE(filter_state_matcher.ok());
@@ -749,10 +742,8 @@ TEST_F(FilterStateMatcher, MatchFilterStateAddressMatchIpv6) {
 
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(
-      key,
-      std::make_shared<Network::Address::InstanceAccessor>(
-          Envoy::Network::Utility::parseInternetAddressNoThrow("2001:db8::1", 8080, false)),
-      StreamInfo::FilterState::StateType::Mutable);
+      key, std::make_shared<Network::Address::InstanceAccessor>(
+               Envoy::Network::Utility::parseInternetAddressNoThrow("2001:db8::1", 8080, false)));
 
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
   ASSERT_TRUE(filter_state_matcher.ok());
@@ -773,10 +764,8 @@ TEST_F(FilterStateMatcher, NoMatchFilterStateAddressMatchIpv6) {
 
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(
-      key,
-      std::make_shared<Network::Address::InstanceAccessor>(
-          Envoy::Network::Utility::parseInternetAddressNoThrow("2001:db7::1", 8080, false)),
-      StreamInfo::FilterState::StateType::Mutable);
+      key, std::make_shared<Network::Address::InstanceAccessor>(
+               Envoy::Network::Utility::parseInternetAddressNoThrow("2001:db7::1", 8080, false)));
 
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
   ASSERT_TRUE(filter_state_matcher.ok());
@@ -859,11 +848,9 @@ TEST_F(FilterStateMatcher, AddressMatchWithInvertMatch) {
     matcher.mutable_address_match()->set_invert_match(test_case.invert_match);
 
     StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-    filter_state.setData(
-        key,
-        std::make_shared<Network::Address::InstanceAccessor>(
-            Envoy::Network::Utility::parseInternetAddressNoThrow(test_case.test_ip, 456, false)),
-        StreamInfo::FilterState::StateType::Mutable);
+    filter_state.setData(key, std::make_shared<Network::Address::InstanceAccessor>(
+                                  Envoy::Network::Utility::parseInternetAddressNoThrow(
+                                      test_case.test_ip, 456, false)));
 
     auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
     ASSERT_TRUE(filter_state_matcher.ok());

@@ -404,9 +404,15 @@ void ConnPoolImplBase::onUpstreamReady() {
     ActiveClientPtr& client = ready_clients_.front();
     ENVOY_CONN_LOG(debug, "attaching to next stream", *client);
     // Pending streams are pushed onto the front, so pull from the back.
-    attachStreamToClient(*client, pending_streams_.back()->context());
-    cluster_connectivity_state_.decrPendingStreams(1);
-    pending_streams_.pop_back();
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_fix_reentrancy")) {
+      PendingStreamPtr pending_stream = pending_streams_.back()->removeFromList(pending_streams_);
+      cluster_connectivity_state_.decrPendingStreams(1);
+      attachStreamToClient(*client, pending_stream->context());
+    } else {
+      attachStreamToClient(*client, pending_streams_.back()->context());
+      cluster_connectivity_state_.decrPendingStreams(1);
+      pending_streams_.pop_back();
+    }
   }
   if (!pending_streams_.empty()) {
     tryCreateNewConnections();
@@ -822,9 +828,15 @@ void ConnPoolImplBase::onUpstreamReadyForEarlyData(ActiveClient& client) {
 
     if (stream.can_send_early_data_) {
       ENVOY_CONN_LOG(debug, "creating stream for early data.", client);
-      attachStreamToClient(client, stream.context());
-      cluster_connectivity_state_.decrPendingStreams(1);
-      stream.removeFromList(pending_streams_);
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_fix_reentrancy")) {
+        PendingStreamPtr pending_stream = stream.removeFromList(pending_streams_);
+        cluster_connectivity_state_.decrPendingStreams(1);
+        attachStreamToClient(client, pending_stream->context());
+      } else {
+        attachStreamToClient(client, stream.context());
+        cluster_connectivity_state_.decrPendingStreams(1);
+        stream.removeFromList(pending_streams_);
+      }
     }
     if (stop_iteration) {
       return;

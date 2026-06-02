@@ -508,8 +508,7 @@ TEST_F(CELFormatterTest, TestFilterStateConditionalWithKey) {
 
   // Add the filter state key to simulate it being set by previous filters
   stream_info_.filter_state_->setData(
-      kFilterStateKey, std::make_unique<Router::StringAccessorImpl>("192.168.1.100:9443"),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      kFilterStateKey, std::make_unique<Router::StringAccessorImpl>("192.168.1.100:9443"));
 
   auto formatter =
       *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);

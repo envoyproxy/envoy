@@ -8405,6 +8405,16 @@ typedef void* envoy_dynamic_module_type_cluster_scheduler_module_ptr;
  */
 typedef void* envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr;
 
+/**
+ * envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr is a module-owned opaque pointer
+ * stored in the cluster's worker thread-local slot. Envoy treats the value as opaque and never
+ * dereferences it.
+ *
+ * OWNERSHIP: The module owns the allocation. Envoy retains a shared_ptr to a thin wrapper around
+ * the pointer and invokes the module's destroy hook on whichever thread drops the last reference.
+ */
+typedef void* envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr;
+
 // =============================================================================
 // Cluster Event Hooks
 // =============================================================================
@@ -8547,6 +8557,35 @@ void envoy_dynamic_module_on_cluster_lb_cancel_host_selection(
 void envoy_dynamic_module_on_cluster_scheduled(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
     envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr, uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_on_cluster_worker_event is called on every worker thread once per
+ * main-thread fan-out posted by the module. This is optional; modules that don't fan out events
+ * to workers need not implement it.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
+ * @param event_id is the module-defined identifier supplied at the main-thread fan-out call site.
+ */
+void envoy_dynamic_module_on_cluster_worker_event(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr, uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_on_cluster_worker_slot_data_destroy is invoked when a previously published
+ * worker-slot pointer is no longer referenced — that is, when the slot has been overwritten or
+ * the cluster has been torn down. The module is expected to release any allocation backing the
+ * pointer.
+ *
+ * This is optional but required for modules that publish payloads, otherwise the prior payload
+ * leaks. The hook fires on whichever thread drops the last reference, so the module must make
+ * the destructor thread-safe with respect to any shared state it touches.
+ *
+ * @param data_module_ptr is the opaque module pointer that was previously published. May be NULL
+ * if the module published NULL.
+ */
+void envoy_dynamic_module_on_cluster_worker_slot_data_destroy(
+    envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr data_module_ptr);
 
 /**
  * envoy_dynamic_module_on_cluster_server_initialized is called when the server initialization is
@@ -9144,6 +9183,46 @@ void envoy_dynamic_module_callback_cluster_scheduler_delete(
 void envoy_dynamic_module_callback_cluster_scheduler_commit(
     envoy_dynamic_module_type_cluster_scheduler_module_ptr scheduler_module_ptr, uint64_t event_id);
 
+/**
+ * envoy_dynamic_module_callback_cluster_run_on_all_workers posts the module's worker-event hook
+ * to every worker thread registered with the server's thread-local engine. The main thread is
+ * excluded. Must be called from the main thread.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @param event_id is a module-defined identifier delivered to each worker invocation.
+ */
+void envoy_dynamic_module_callback_cluster_run_on_all_workers(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_callback_cluster_worker_slot_set publishes an opaque module pointer to
+ * the cluster's worker thread-local slot. All registered threads observe the same pointer
+ * (single-pointer semantics — not a per-worker factory). Any previously published pointer is
+ * released through the module's destroy hook. Must be called from the main thread.
+ *
+ * Threads that are not yet registered with the TLS engine at the time of the call will not
+ * observe this update.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @param data_module_ptr is the opaque module pointer to publish. May be NULL to clear the slot.
+ */
+void envoy_dynamic_module_callback_cluster_worker_slot_set(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr data_module_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_worker_slot_get returns the pointer most recently
+ * delivered to the calling thread's slot, or NULL if the slot has not been populated on this
+ * thread. Callable from any thread that has a TLS registration (workers and main). The returned
+ * pointer is valid until the next slot update on this thread.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @return the opaque module pointer most recently published to this thread, or NULL.
+ */
+envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr
+envoy_dynamic_module_callback_cluster_worker_slot_get(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr);
+
 // =============================================================================
 // Cluster Dynamic Module Callbacks - Metrics
 // =============================================================================
@@ -9437,6 +9516,63 @@ bool envoy_dynamic_module_callback_cluster_lb_context_get_override_host(
 bool envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni(
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result_buffer);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes is called by the module
+ * to get the bytes value of the request's filter state with the given key. This lets a
+ * dynamic-module cluster consume filter state set by an upstream HTTP filter (or any other
+ * producer that stores a ``Router::StringAccessor``) when picking a host. If the filter state is
+ * not accessible, the key does not exist, or the value is not a ``Router::StringAccessor``, this
+ * returns false.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param key is the key of the filter state.
+ * @param result is the pointer to the pointer variable where the pointer to the buffer
+ * of the bytes value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note that the buffer pointed by the pointer stored in result is owned by Envoy, and
+ * is guaranteed to be valid for the duration of the current host-selection callback.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed is called by the module
+ * to get the serialized bytes value of a typed filter state object with the given key. It
+ * retrieves the object generically and calls serializeAsString to get the bytes representation,
+ * so it works with any filter state object type (e.g. one set by an upstream HTTP filter through
+ * a registered ``ObjectFactory``), not just ``Router::StringAccessor``.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param key is the key of the filter state.
+ * @param result is the pointer to the buffer where the serialized value will be stored.
+ * @return true if the operation is successful, false if the stream info is not available, the key
+ * does not exist, or the object does not support serialization.
+ *
+ * Note that the buffer pointed by the pointer stored in result is owned by Envoy, and is
+ * guaranteed to be valid until the next invocation of this callback on the same worker thread
+ * or until the end of the current host-selection callback, whichever comes first.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_host_stat returns the value of a per-host
+ * stat identified by the stat enum for the given host pointer. The module must ensure
+ * host_envoy_ptr still belongs to the cluster's host set.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param host_envoy_ptr is the host whose stat to read.
+ * @param stat is the host stat to query.
+ * @return the stat value, or 0 if the context or host is nullptr.
+ */
+uint64_t envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr host_envoy_ptr,
+    envoy_dynamic_module_type_host_stat stat);
 
 /**
  * envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete is called by the module

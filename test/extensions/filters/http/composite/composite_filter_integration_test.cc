@@ -38,6 +38,7 @@ using test::integration::filters::SetResponseCodeFilterConfig;
 using test::integration::filters::SetResponseCodeFilterConfigDual;
 using test::integration::filters::SetResponseCodePerRouteFilterConfig;
 using test::integration::filters::SetResponseCodePerRouteFilterConfigDual;
+using testing::Ge;
 using xds::type::matcher::v3::Matcher_OnMatch;
 
 // Returns the complete YAML for a composite filter config, wrapping the given matcher_yaml.
@@ -275,7 +276,7 @@ public:
                       typed_config:
                         name: local-reply-during-encode
                         typed_config:
-                          "@type": type.googleapis.com/google.protobuf.Struct
+                          "@type": type.googleapis.com/test.integration.filters.LocalReplyDuringEncodeConfig
 )EOF";
     config_helper_.prependFilter(
         buildCompositeFilterConfig(name, use_inline_matcher_, matcher_yaml), downstream_filter_);
@@ -494,14 +495,14 @@ TEST_P(CompositeFilterIntegrationTest, TestBasicDynamicFilter) {
   prependCompositeDynamicFilter("composite-dynamic");
   initialize();
   if (downstream_filter_) {
-    test_server_->waitForCounterGe(
-        "extension_config_discovery.http_filter.set-response-code.config_reload", 1);
+    test_server_->waitForCounter(
+        "extension_config_discovery.http_filter.set-response-code.config_reload", Ge(1));
   } else {
-    test_server_->waitForCounterGe(
-        "extension_config_discovery.upstream_http_filter.set-response-code.config_reload", 1);
+    test_server_->waitForCounter(
+        "extension_config_discovery.upstream_http_filter.set-response-code.config_reload", Ge(1));
   }
   test_server_->waitUntilListenersReady();
-  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
+  test_server_->waitForGauge("listener_manager.workers_started", Ge(1));
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -530,14 +531,14 @@ TEST_P(CompositeFilterIntegrationTest, TestBasicDynamicFilterNoSampling) {
   prependCompositeDynamicFilter("composite-dynamic", "set_response_code.yaml", false);
   initialize();
   if (downstream_filter_) {
-    test_server_->waitForCounterGe(
-        "extension_config_discovery.http_filter.set-response-code.config_reload", 1);
+    test_server_->waitForCounter(
+        "extension_config_discovery.http_filter.set-response-code.config_reload", Ge(1));
   } else {
-    test_server_->waitForCounterGe(
-        "extension_config_discovery.upstream_http_filter.set-response-code.config_reload", 1);
+    test_server_->waitForCounter(
+        "extension_config_discovery.upstream_http_filter.set-response-code.config_reload", Ge(1));
   }
   test_server_->waitUntilListenersReady();
-  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
+  test_server_->waitForGauge("listener_manager.workers_started", Ge(1));
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   {
@@ -570,14 +571,14 @@ TEST_P(CompositeFilterIntegrationTest, TestMissingDynamicFilter) {
   prependMissingCompositeDynamicFilter("composite-dynamic-missing");
   initialize();
   if (downstream_filter_) {
-    test_server_->waitForCounterGe(
-        "extension_config_discovery.http_filter.missing-config.config_fail", 1);
+    test_server_->waitForCounter(
+        "extension_config_discovery.http_filter.missing-config.config_fail", Ge(1));
   } else {
-    test_server_->waitForCounterGe(
-        "extension_config_discovery.upstream_http_filter.missing-config.config_fail", 1);
+    test_server_->waitForCounter(
+        "extension_config_discovery.upstream_http_filter.missing-config.config_fail", Ge(1));
   }
   test_server_->waitUntilListenersReady();
-  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
+  test_server_->waitForGauge("listener_manager.workers_started", Ge(1));
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
@@ -907,7 +908,7 @@ public:
                         typed_config:
                           - name: add-header-filter
                             typed_config:
-                              "@type": type.googleapis.com/google.protobuf.Struct
+                              "@type": type.googleapis.com/test.integration.filters.AddHeaderEmptyFilterConfig
                           - name: set-response-code
                             typed_config:
                               "@type": type.googleapis.com/test.integration.filters.%s
@@ -1069,7 +1070,7 @@ public:
             typed_config:
               - name: add-header-filter
                 typed_config:
-                  "@type": type.googleapis.com/google.protobuf.Struct
+                  "@type": type.googleapis.com/test.integration.filters.AddHeaderEmptyFilterConfig
               - name: set-response-code
                 typed_config:
                   "@type": type.googleapis.com/test.integration.filters.%s
@@ -1092,7 +1093,7 @@ public:
                 typed_config:
                   - name: add-header-filter
                     typed_config:
-                      "@type": type.googleapis.com/google.protobuf.Struct
+                      "@type": type.googleapis.com/test.integration.filters.AddHeaderEmptyFilterConfig
                   - name: set-response-code
                     typed_config:
                       "@type": type.googleapis.com/test.integration.filters.%s
@@ -1139,7 +1140,7 @@ public:
             typed_config:
               - name: add-header-filter
                 typed_config:
-                  "@type": type.googleapis.com/google.protobuf.Struct
+                  "@type": type.googleapis.com/test.integration.filters.AddHeaderEmptyFilterConfig
               - name: set-response-code
                 typed_config:
                   "@type": type.googleapis.com/test.integration.filters.%s
@@ -1168,7 +1169,7 @@ public:
                 typed_config:
                   - name: add-header-filter
                     typed_config:
-                      "@type": type.googleapis.com/google.protobuf.Struct
+                      "@type": type.googleapis.com/test.integration.filters.AddHeaderEmptyFilterConfig
                   - name: set-response-code
                     typed_config:
                       "@type": type.googleapis.com/test.integration.filters.%s
