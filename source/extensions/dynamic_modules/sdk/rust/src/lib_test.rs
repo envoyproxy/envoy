@@ -380,9 +380,14 @@ fn test_envoy_dynamic_module_on_listener_filter_callbacks() {
     fn on_data(
       &mut self,
       _envoy_filter: &mut ELF,
+      _data_length: usize,
     ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
       ON_DATA_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
       abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
+    }
+
+    fn max_read_bytes(&mut self, _envoy_filter: &mut ELF) -> usize {
+      128
     }
 
     fn on_close(&mut self, _envoy_filter: &mut ELF) {
@@ -403,8 +408,12 @@ fn test_envoy_dynamic_module_on_listener_filter_callbacks() {
     abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
   );
   assert_eq!(
-    envoy_dynamic_module_on_listener_filter_on_data(std::ptr::null_mut(), filter),
+    envoy_dynamic_module_on_listener_filter_on_data(std::ptr::null_mut(), filter, 0),
     abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
+  );
+  assert_eq!(
+    envoy_dynamic_module_on_listener_filter_get_max_read_bytes(std::ptr::null_mut(), filter),
+    128
   );
   envoy_dynamic_module_on_listener_filter_on_close(std::ptr::null_mut(), filter);
   envoy_dynamic_module_on_listener_filter_destroy(filter);
