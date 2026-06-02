@@ -6,4 +6,4 @@ certificate validation. This avoids ``CertificateRequest`` messages exceeding TL
 with very large CA sets, and sidesteps client-certificate picker bugs in clients that filter
 on the advertised intermediate CAs (notably iOS Safari, where valid certificates can be
 hidden from the user's picker). Honored by both the built-in validator and the SPIFFE
-validator. Addresses issue #14208.
+validator.
