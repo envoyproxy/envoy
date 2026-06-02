@@ -1,7 +1,9 @@
 #include "source/common/http/http1/balsa_parser.h"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
+#include <cstddef>
 #include <cstdint>
 
 #include "source/common/common/assert.h"
@@ -25,22 +27,42 @@ constexpr absl::string_view kColonSlashSlash = "://";
 constexpr char kResponseFirstByte = 'H';
 constexpr absl::string_view kHttpVersionPrefix = "HTTP/";
 
-// Allowed characters for field names according to Section 5.1
-// and for methods according to Section 9.1 of RFC 9110:
+// RFC 9110 Sections 5.1 and 9.1 define field names and methods as tokens:
 // https://www.rfc-editor.org/rfc/rfc9110.html
-constexpr absl::string_view kValidCharacters =
+constexpr char kValidCharacters[] =
     "!#$%&'*+-.0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ^_`abcdefghijklmnopqrstuvwxyz|~";
-constexpr absl::string_view::iterator kValidCharactersBegin = kValidCharacters.begin();
-constexpr absl::string_view::iterator kValidCharactersEnd = kValidCharacters.end();
+
+consteval std::array<uint64_t, 4> makeValidCharacterMask() {
+  std::array<uint64_t, 4> mask{};
+  for (size_t i = 0; i < sizeof(kValidCharacters) - 1; ++i) {
+    const uint8_t index = static_cast<uint8_t>(kValidCharacters[i]);
+    mask[index / 64] |= 1ULL << (index % 64);
+  }
+  return mask;
+}
+
+// This keeps the per-character hot path branch-light and avoids a binary search through the valid
+// character list for every byte in every HTTP/1 header name.
+constexpr std::array<uint64_t, 4> kValidCharacterMask = makeValidCharacterMask();
+
+constexpr bool isValidTokenCharacter(char c) {
+  const uint8_t index = static_cast<uint8_t>(c);
+  return (kValidCharacterMask[index / 64] & (1ULL << (index % 64))) != 0;
+}
+
+static_assert(isValidTokenCharacter('a'));
+static_assert(isValidTokenCharacter('Z'));
+static_assert(isValidTokenCharacter('-'));
+static_assert(!isValidTokenCharacter(':'));
+static_assert(!isValidTokenCharacter(' '));
 
 // TODO(#21245): Skip method validation altogether when UHV method validation is
 // enabled.
 bool isMethodValid(absl::string_view method, bool allow_custom_methods) {
   if (allow_custom_methods) {
     return !method.empty() &&
-           std::all_of(method.begin(), method.end(), [](absl::string_view::value_type c) {
-             return std::binary_search(kValidCharactersBegin, kValidCharactersEnd, c);
-           });
+           std::all_of(method.begin(), method.end(),
+                       [](absl::string_view::value_type c) { return isValidTokenCharacter(c); });
   }
 
   static constexpr absl::string_view kValidMethods[] = {
@@ -131,9 +153,8 @@ bool isVersionValid(absl::string_view version_input) {
 }
 
 bool isHeaderNameValid(absl::string_view name) {
-  return std::all_of(name.begin(), name.end(), [](absl::string_view::value_type c) {
-    return std::binary_search(kValidCharactersBegin, kValidCharactersEnd, c);
-  });
+  return std::all_of(name.begin(), name.end(),
+                     [](absl::string_view::value_type c) { return isValidTokenCharacter(c); });
 }
 
 } // anonymous namespace

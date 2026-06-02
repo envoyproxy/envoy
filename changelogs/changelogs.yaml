@@ -54,6 +54,8 @@ areas:
     title: dns_resolver
   dynamic_modules:
     title: dynamic_modules
+  gcp_authn:
+    title: gcp_authn
   golang:
     title: golang
   http:

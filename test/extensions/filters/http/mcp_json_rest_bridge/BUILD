@@ -28,7 +28,6 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/mcp_json_rest_bridge/v3:pkg_cc_proto",
         "@nlohmann_json//:json",
-        "@ocp-diag-core//ocpdiag/core/testing:parse_text_proto",
     ],
 )
 
@@ -39,7 +38,6 @@ envoy_cc_test(
         "//source/extensions/filters/http/mcp_json_rest_bridge:http_request_builder_lib",
         "//test/test_common:status_utility_lib",
         "@nlohmann_json//:json",
-        "@ocp-diag-core//ocpdiag/core/testing:parse_text_proto",
     ],
 )
 

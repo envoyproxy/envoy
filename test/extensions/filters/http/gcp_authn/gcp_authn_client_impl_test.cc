@@ -121,6 +121,187 @@ TEST_F(GcpAuthnClientImplTest, Success) {
   client_callback_->onSuccess(client_request_, std::move(response));
 }
 
+TEST_F(GcpAuthnClientImplTest, SuccessAccessToken) {
+  setupMockObjects();
+  createClient();
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.mutable_access_token();
+  client_->fetchToken(audience, request_callbacks_);
+  EXPECT_EQ(message_->headers().Method()->value().getStringView(), "GET");
+  EXPECT_EQ(message_->headers().Path()->value().getStringView(),
+            "/computeMetadata/v1/instance/service-accounts/default/token");
+
+  EXPECT_EQ(options_.retry_policy->num_retries().value(), 5);
+  EXPECT_EQ(options_.retry_policy->retry_back_off().base_interval().seconds(), 1);
+  EXPECT_EQ(options_.retry_policy->retry_back_off().max_interval().seconds(), 10);
+  EXPECT_EQ(options_.retry_policy->retry_on(), "5xx,gateway-error,connect-failure,reset");
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  response->body().add(
+      R"({"access_token": "mock_access_token", "expires_in": 3600, "token_type": "Bearer"})");
+
+  uint64_t current_time = DateUtil::nowToSeconds(context_.server_factory_context_.timeSource());
+  uint64_t expected_exp_time = current_time + 3600;
+  GcpToken expected_token{"mock_access_token", expected_exp_time, audience};
+  EXPECT_CALL(request_callbacks_, onComplete(absl::StatusOr<GcpToken>(expected_token)));
+  client_callback_->onSuccess(client_request_, std::move(response));
+}
+
+TEST_F(GcpAuthnClientImplTest, AccessTokenParsingFailure) {
+  setupMockObjects();
+  createClient();
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.mutable_access_token();
+  client_->fetchToken(audience, request_callbacks_);
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  // Set invalid JSON body
+  response->body().add("invalid_json_body");
+
+  // Assert that callbacks are notified with an error since JSON parsing failed.
+  EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
+      .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
+        EXPECT_FALSE(token.ok());
+        EXPECT_EQ(token.status().message(), "Failed to parse access token response as JSON.");
+      }));
+
+  client_callback_->onSuccess(client_request_, std::move(response));
+}
+
+TEST_F(GcpAuthnClientImplTest, AccessTokenMissing) {
+  setupMockObjects();
+  createClient();
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.mutable_access_token();
+  client_->fetchToken(audience, request_callbacks_);
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  // Missing access_token field
+  response->body().add(R"({"expires_in": 3600, "token_type": "Bearer"})");
+
+  // Assert that callbacks are notified with an error.
+  EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
+      .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
+        EXPECT_FALSE(token.ok());
+        EXPECT_EQ(token.status().message(),
+                  "Failed to extract access_token or expires_in from response.");
+      }));
+
+  client_callback_->onSuccess(client_request_, std::move(response));
+}
+
+TEST_F(GcpAuthnClientImplTest, AccessTokenExpiresInMissing) {
+  setupMockObjects();
+  createClient();
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.mutable_access_token();
+  client_->fetchToken(audience, request_callbacks_);
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  // Missing expires_in field
+  response->body().add(R"({"access_token": "mock_access_token", "token_type": "Bearer"})");
+
+  // Assert that callbacks are notified with an error.
+  EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
+      .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
+        EXPECT_FALSE(token.ok());
+        EXPECT_EQ(token.status().message(),
+                  "Failed to extract access_token or expires_in from response.");
+      }));
+
+  client_callback_->onSuccess(client_request_, std::move(response));
+}
+
+TEST_F(GcpAuthnClientImplTest, BothUrlAndAccessTokenEmpty) {
+  setupMockObjects();
+  createClient();
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  // Both url and access_token are unset/empty
+
+  EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
+      .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
+        EXPECT_FALSE(token.ok());
+        EXPECT_EQ(token.status().message(),
+                  "Failed to fetch the token: both url and access_token are empty.");
+      }));
+
+  client_->fetchToken(audience, request_callbacks_);
+}
+
+TEST_F(GcpAuthnClientImplTest, AccessTokenEmptyInResponse) {
+  setupMockObjects();
+  createClient();
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.mutable_access_token();
+  client_->fetchToken(audience, request_callbacks_);
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  // Empty access_token value
+  response->body().add(R"({"access_token": "", "expires_in": 3600, "token_type": "Bearer"})");
+
+  // Assert that callbacks are notified with an error.
+  EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
+      .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
+        EXPECT_FALSE(token.ok());
+        EXPECT_EQ(token.status().message(), "Extracted access_token is empty.");
+      }));
+
+  client_callback_->onSuccess(client_request_, std::move(response));
+}
+
+TEST_F(GcpAuthnClientImplTest, AccessTokenExpiresInNonPositive) {
+  setupMockObjects();
+  createClient();
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.mutable_access_token();
+  client_->fetchToken(audience, request_callbacks_);
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  // expires_in is 0
+  response->body().add(
+      R"({"access_token": "mock_access_token", "expires_in": 0, "token_type": "Bearer"})");
+
+  // Assert that callbacks are notified with an error.
+  EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
+      .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
+        EXPECT_FALSE(token.ok());
+        EXPECT_EQ(token.status().message(), "Extracted expires_in is non-positive.");
+      }));
+
+  client_callback_->onSuccess(client_request_, std::move(response));
+}
+
 TEST_F(GcpAuthnClientImplTest, NoCluster) {
   std::string no_cluster_config = R"EOF(
     http_uri:

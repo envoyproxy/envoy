@@ -358,6 +358,25 @@ validation:
   EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to parse tenant_id_format"));
 }
 
+// Tests that the ReverseTunnelFilterConfig is formed properly and the filter construction works.
+TEST(ReverseTunnelFilterConfigFactoryTest, ConfigurationSkipRebalancingEnabled) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config;
+  proto_config.set_skip_rebalancing(true);
+  proto_config.set_request_path("/request");
+  proto_config.set_request_method(envoy::config::core::v3::POST);
+
+  ReverseTunnelFilterConfigFactory factory;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto result = factory.createFilterFactoryFromProto(proto_config, context);
+  ASSERT_TRUE(result.ok());
+  Network::FilterFactoryCb cb = result.value();
+  EXPECT_TRUE(cb != nullptr);
+
+  Network::MockFilterManager filter_manager;
+  EXPECT_CALL(filter_manager, addReadFilter(_));
+  cb(filter_manager);
+}
+
 } // namespace
 } // namespace ReverseTunnel
 } // namespace NetworkFilters

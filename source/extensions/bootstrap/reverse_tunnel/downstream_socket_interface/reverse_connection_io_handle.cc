@@ -258,8 +258,10 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
         auto io_handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
             std::move(duplicated_socket), this, connection_key);
 
-        ENVOY_LOG(debug, "reverse_tunnel: RAII IoHandle created with duplicated socket "
-                         "and protection enabled.");
+        ENVOY_LOG(info,
+                  "reverse_tunnel: RAII IoHandle created with duplicated socket for node_id: {}"
+                  "and protection enabled.",
+                  config_.src_node_id);
 
         // Reset file events on the original socket to prevent any pending operations. The socket
         // fd has been duplicated, so we have an independent fd. Closing the original connection
@@ -552,10 +554,11 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
     uint32_t pending_connections = host_to_conn_info_map_[key].connecting_count;
 
     ENVOY_LOG(info,
-              "reverse_tunnel: Number of reverse connections to host {} of cluster {}: "
+              "reverse_tunnel: Number of reverse connections to host {} of cluster {} from source "
+              "node: {}: "
               "Current: {}, Pending: {}, Required: {}",
-              host_address, cluster_name, current_connections, pending_connections,
-              cluster_config.reverse_connection_count);
+              host_address, cluster_name, config_.src_node_id, current_connections,
+              pending_connections, cluster_config.reverse_connection_count);
     // Update with the pending connections also for checking against required.
     current_connections += pending_connections;
     if (current_connections >= cluster_config.reverse_connection_count) {
@@ -1036,8 +1039,9 @@ bool ReverseConnectionIOHandle::isTriggerPipeReady() const {
 
 void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
                                                  RCConnectionWrapper* wrapper, bool closed) {
-  ENVOY_LOG(debug, "reverse_tunnel: Connection wrapper done - error: '{}', closed: {}", error,
-            closed);
+  ENVOY_LOG(info,
+            "reverse_tunnel: Connection wrapper done - error: '{}', closed: {}, for node_id: {}",
+            error, closed, config_.src_node_id);
 
   // Validate wrapper pointer before any access.
   if (!wrapper) {
