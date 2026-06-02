@@ -871,6 +871,7 @@ TEST_F(CombinedUpstreamTest, DumpsResponseDecoderWithoutAllocatingMemory) {
 }
 TEST_F(CombinedUpstreamTest, UpstreamTrailersMarksDoneReading) {
   this->setup();
+  this->upstream_->doneWriting();
   Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
   this->upstream_->responseDecoder().decodeTrailers(std::move(trailers));
 }

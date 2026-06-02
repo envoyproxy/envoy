@@ -264,6 +264,7 @@ void HttpUpstream::onResetStream(Http::StreamResetReason reason, absl::string_vi
     default:
       event = Network::ConnectionEvent::LocalClose;
       detected_close_type_ = StreamInfo::DetectedCloseType::Normal;
+      break;
     }
   } else {
     event = Network::ConnectionEvent::LocalClose;
