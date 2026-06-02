@@ -551,72 +551,58 @@ absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
     return absl::OkStatus();
   }
 
-  // When the CA list is suppressed, skip building the name stack entirely. The
-  // trust anchors are already loaded into the X509_STORE in initializeSslContexts(),
-  // which also rejects malformed bundles. Verify mode and depth are still applied.
-  if (config_->suppressClientCaList()) {
-    if (require_client_cert) {
-      SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
-    }
-    if (config_->maxVerifyDepth().has_value()) {
-      uint32_t max_verify_depth = std::min(config_->maxVerifyDepth().value(), uint32_t{INT_MAX});
-      max_verify_depth = max_verify_depth > 0 ? max_verify_depth - 1 : 0;
-      SSL_CTX_set_verify_depth(ctx, static_cast<int>(max_verify_depth));
-    }
-    return absl::OkStatus();
-  }
+  // When the CA list is not suppressed, parse the trust bundle and advertise
+  // the CA names in the TLS CertificateRequest message.
+  if (!config_->suppressClientCaList()) {
+    bssl::UniquePtr<BIO> bio(
+        BIO_new_mem_buf(const_cast<char*>(config_->caCert().data()), config_->caCert().size()));
+    RELEASE_ASSERT(bio != nullptr, "");
+    // Based on BoringSSL's SSL_add_file_cert_subjects_to_stack().
+    // Use a generic lambda to be compatible with BoringSSL before and after
+    // https://boringssl-review.googlesource.com/c/boringssl/+/56190
+    bssl::UniquePtr<STACK_OF(X509_NAME)> list(
+        sk_X509_NAME_new([](auto* a, auto* b) -> int { return X509_NAME_cmp(*a, *b); }));
+    RELEASE_ASSERT(list != nullptr, "");
+    for (;;) {
+      bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
+      if (cert == nullptr) {
+        break;
+      }
+      const X509_NAME* name = X509_get_subject_name(cert.get());
+      if (name == nullptr) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Failed to load trusted client CA certificates from ", config_->caCertPath()));
+      }
+      // Check for duplicates.
+      if (sk_X509_NAME_find(list.get(), nullptr, name)) {
+        continue;
+      }
 
-  bssl::UniquePtr<BIO> bio(
-      BIO_new_mem_buf(const_cast<char*>(config_->caCert().data()), config_->caCert().size()));
-  RELEASE_ASSERT(bio != nullptr, "");
-  // Based on BoringSSL's SSL_add_file_cert_subjects_to_stack().
-  // Use a generic lambda to be compatible with BoringSSL before and after
-  // https://boringssl-review.googlesource.com/c/boringssl/+/56190
-  bssl::UniquePtr<STACK_OF(X509_NAME)> list(
-      sk_X509_NAME_new([](auto* a, auto* b) -> int { return X509_NAME_cmp(*a, *b); }));
-  RELEASE_ASSERT(list != nullptr, "");
-  for (;;) {
-    bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
-    if (cert == nullptr) {
-      break;
+      bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(name));
+      if (name_dup == nullptr || !sk_X509_NAME_push(list.get(), name_dup.release())) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Failed to load trusted client CA certificates from ", config_->caCertPath()));
+      }
     }
-    const X509_NAME* name = X509_get_subject_name(cert.get());
-    if (name == nullptr) {
+
+    // Check for EOF.
+    const uint32_t err = ERR_peek_last_error();
+    if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
+      ERR_clear_error();
+    } else {
       return absl::InvalidArgumentError(absl::StrCat(
           "Failed to load trusted client CA certificates from ", config_->caCertPath()));
     }
-    // Check for duplicates.
-    if (sk_X509_NAME_find(list.get(), nullptr, name)) {
-      continue;
-    }
-
-    bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(name));
-    if (name_dup == nullptr || !sk_X509_NAME_push(list.get(), name_dup.release())) {
-      return absl::InvalidArgumentError(absl::StrCat(
-          "Failed to load trusted client CA certificates from ", config_->caCertPath()));
-    }
+    SSL_CTX_set_client_CA_list(ctx, list.release());
   }
-
-  // Check for EOF.
-  const uint32_t err = ERR_peek_last_error();
-  if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
-    ERR_clear_error();
-  } else {
-    return absl::InvalidArgumentError(
-        absl::StrCat("Failed to load trusted client CA certificates from ", config_->caCertPath()));
-  }
-  SSL_CTX_set_client_CA_list(ctx, list.release());
 
   if (require_client_cert) {
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
   }
-  // Set the verify_depth
   if (config_->maxVerifyDepth().has_value()) {
     uint32_t max_verify_depth = std::min(config_->maxVerifyDepth().value(), uint32_t{INT_MAX});
-    // Older BoringSSLs behave like OpenSSL 1.0.x and exclude the leaf from the
-    // depth but include the trust anchor. Newer BoringSSLs match OpenSSL 1.1.x
-    // and later in excluding both the leaf and trust anchor. `maxVerifyDepth`
-    // documents the older behavior, so adjust the value to match.
+    // Adjust for BoringSSL semantics: maxVerifyDepth documents the older behavior
+    // (includes trust anchor), so subtract 1 to match newer BoringSSL.
     max_verify_depth = max_verify_depth > 0 ? max_verify_depth - 1 : 0;
     SSL_CTX_set_verify_depth(ctx, static_cast<int>(max_verify_depth));
   }
