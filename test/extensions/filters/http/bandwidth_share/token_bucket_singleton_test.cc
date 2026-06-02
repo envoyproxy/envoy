@@ -79,9 +79,7 @@ TEST_F(TokenBucketSingletonTest, ReturnsCachedBucketUntilRuntimeValueChanges) {
 TEST_F(TokenBucketSingletonTest, RuntimeValueZeroDisablesBucketAndCanReenable) {
   uint64_t runtime_kbps = 0;
   ON_CALL(runtime_.snapshot_, getInteger(_, _))
-      .WillByDefault[&runtime_kbps](absl::string_view, uint64_t) {
-    return runtime_kbps;
-  });
+      .WillByDefault([&runtime_kbps](absl::string_view, uint64_t) { return runtime_kbps; });
   TokenBucketSingleton singleton(time_system_, scope(), tls_);
 
   ASSERT_TRUE(
