@@ -590,8 +590,9 @@ absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
     if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
       ERR_clear_error();
     } else {
-      return absl::InvalidArgumentError(absl::StrCat(
-          "Failed to load trusted client CA certificates from ", config_->caCertPath()));
+      return absl::InvalidArgumentError(
+          absl::StrCat("Failed to load trusted client CA certificates from ",
+                       config_->caCertPath()));
     }
     SSL_CTX_set_client_CA_list(ctx, list.release());
   }
@@ -599,10 +600,13 @@ absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
   if (require_client_cert) {
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
   }
+  // Set the verify_depth
   if (config_->maxVerifyDepth().has_value()) {
     uint32_t max_verify_depth = std::min(config_->maxVerifyDepth().value(), uint32_t{INT_MAX});
-    // Adjust for BoringSSL semantics: maxVerifyDepth documents the older behavior
-    // (includes trust anchor), so subtract 1 to match newer BoringSSL.
+    // Older BoringSSLs behave like OpenSSL 1.0.x and exclude the leaf from the
+    // depth but include the trust anchor. Newer BoringSSLs match OpenSSL 1.1.x
+    // and later in excluding both the leaf and trust anchor. `maxVerifyDepth`
+    // documents the older behavior, so adjust the value to match.
     max_verify_depth = max_verify_depth > 0 ? max_verify_depth - 1 : 0;
     SSL_CTX_set_verify_depth(ctx, static_cast<int>(max_verify_depth));
   }

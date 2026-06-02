@@ -4323,17 +4323,14 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
 // When `suppress` is true the server must advertise an empty CA list even
 // though it still requires and verifies a client certificate; when false
 // (default) the list must be non-empty.
-void testSuppressClientCaListOnTheWire(bool suppress, Network::Address::IpVersion version,
-                                       Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                                       StreamInfo::StreamInfo& stream_info,
-                                       Server::Configuration::TransportSocketFactoryContext&
-                                           factory_context,
-                                       const std::function<Network::ListenerPtr(
-                                           Network::SocketSharedPtr&&,
-                                           Network::TcpListenerCallbacks&, Runtime::Loader&,
-                                           const Network::ListenerConfig&,
-                                           Server::ThreadLocalOverloadStateOptRef,
-                                           Event::Dispatcher&)>& listener_factory) {
+void testSuppressClientCaListOnTheWire(
+    bool suppress, Network::Address::IpVersion version, Event::Dispatcher& dispatcher,
+    Runtime::Loader& runtime, StreamInfo::StreamInfo& stream_info,
+    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    const std::function<Network::ListenerPtr(
+        Network::SocketSharedPtr&&, Network::TcpListenerCallbacks&, Runtime::Loader&,
+        const Network::ListenerConfig&, Server::ThreadLocalOverloadStateOptRef,
+        Event::Dispatcher&)>& listener_factory) {
   const std::string server_ctx_yaml = fmt::format(R"EOF(
   require_client_certificate: true
   common_tls_context:
@@ -4449,8 +4446,7 @@ TEST_P(SslSocketTest, SuppressClientCaListOnTheWireEnabled) {
       /*suppress=*/true, version_, *dispatcher_, runtime_, stream_info_, factory_context_,
       [this](Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb,
              Runtime::Loader& runtime, const Network::ListenerConfig& listener_config,
-             Server::ThreadLocalOverloadStateOptRef overload_state,
-             Event::Dispatcher& dispatcher) {
+             Server::ThreadLocalOverloadStateOptRef overload_state, Event::Dispatcher& dispatcher) {
         return createListener(std::move(socket), cb, runtime, listener_config, overload_state,
                               dispatcher);
       });
@@ -4461,8 +4457,7 @@ TEST_P(SslSocketTest, SuppressClientCaListOnTheWireDisabled) {
       /*suppress=*/false, version_, *dispatcher_, runtime_, stream_info_, factory_context_,
       [this](Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb,
              Runtime::Loader& runtime, const Network::ListenerConfig& listener_config,
-             Server::ThreadLocalOverloadStateOptRef overload_state,
-             Event::Dispatcher& dispatcher) {
+             Server::ThreadLocalOverloadStateOptRef overload_state, Event::Dispatcher& dispatcher) {
         return createListener(std::move(socket), cb, runtime, listener_config, overload_state,
                               dispatcher);
       });
