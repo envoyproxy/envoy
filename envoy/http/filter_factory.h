@@ -29,6 +29,8 @@ using FilterFactoryCb = std::function<void(FilterChainFactoryCallbacks& callback
  */
 struct FilterContext {
   FilterContext() = default;
+  // The name is expected to outlive any related filter instance, as it typically comes from
+  // the filter configuration.
   FilterContext(absl::string_view name) : config_name(name) {}
   // The name of the filter configuration that used to create related filter factory function.
   // This could be any legitimate non-empty string.

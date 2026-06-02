@@ -44,6 +44,8 @@ constexpr absl::string_view LocalReplyFilterStateKey =
     "envoy.filters.network.http_connection_manager.local_reply_owner";
 class LocalReplyOwnerObject : public StreamInfo::FilterState::Object {
 public:
+  // The filter_config_name is expected to outlive the LocalReplyOwnerObject, as it typically
+  // comes from the filter configuration.
   LocalReplyOwnerObject(absl::string_view filter_config_name)
       : filter_config_name_(filter_config_name) {}
 
