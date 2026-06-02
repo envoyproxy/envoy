@@ -709,7 +709,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallWithTraceContextExtraction) {
     name: envoy.filters.http.mcp_json_rest_bridge
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
-      trace_context_extraction: true
+      trace_context_extraction: {}
       tool_config:
         tools:
           - name: "create_api_key"

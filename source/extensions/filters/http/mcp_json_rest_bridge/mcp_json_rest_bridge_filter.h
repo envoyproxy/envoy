@@ -52,7 +52,7 @@ public:
 
   bool textContentStreamingEnabled(absl::string_view tool_name) const;
 
-  bool traceContextExtraction() const { return proto_config_.trace_context_extraction(); }
+  bool traceContextExtraction() const { return proto_config_.has_trace_context_extraction(); }
 
   bool toolsListChanged() const { return proto_config_.tool_config().list_changed(); }
 

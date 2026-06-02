@@ -137,9 +137,15 @@ message McpJsonRestBridge {
   // in the ``http_filters`` list) as the metadata namespace.
   RequestStorageMode request_storage_mode = 5 [(validate.rules).enum = {defined_only: true}];
 
-  // If true, extract trace context from MCP requests and propagate it to
-  // request headers.
-  bool trace_context_extraction = 6;
+  // If set, extract trace context from MCP requests and propagate it to
+  // request headers. The keys ``traceparent``, ``tracestate``, and ``baggage``
+  // will be extracted from ``_meta``.
+  // Ref: https://modelcontextprotocol.io/seps/414-request-meta
+  TraceContextExtractionOptions trace_context_extraction = 6;
+}
+
+// Options for trace context extraction.
+message TraceContextExtractionOptions {
 }
 
 // Configuration for the server metadata.
