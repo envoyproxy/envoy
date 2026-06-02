@@ -360,9 +360,9 @@ void MultiConnectionBaseImpl::removeConnectionCallbacks(ConnectionCallbacks& cb)
   IS_ENVOY_BUG("Failed to remove connection callbacks");
 }
 
-void MultiConnectionBaseImpl::drain() {
+void MultiConnectionBaseImpl::onDrain() {
   if (connect_finished_) {
-    connections_[0]->drain();
+    connections_[0]->onDrain();
     return;
   }
   // Notify all deferred callbacks directly since no underlying connection has been

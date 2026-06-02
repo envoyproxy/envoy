@@ -2364,10 +2364,10 @@ TEST_F(ConnectionHandlerTest, TcpListenerDrainFilterChainsNotifiesConnections) {
   EXPECT_EQ(1UL, handler_->numConnections());
 
   const std::list<const Network::FilterChain*> filter_chains{filter_chain_.get()};
-  // drainFilterChains must call drain() on every connection owned by the listed filter chains
+  // onFilterChainDrain must call onDrain() on every connection owned by the listed filter chains
   // without closing them.
-  EXPECT_CALL(*server_connection, drain());
-  handler_->drainFilterChains(listener_tag, filter_chains);
+  EXPECT_CALL(*server_connection, onDrain());
+  handler_->onFilterChainDrain(listener_tag, filter_chains);
   // Connection remains tracked; only when filter chains are actually removed does it close.
   EXPECT_EQ(1UL, handler_->numConnections());
 
@@ -2396,9 +2396,9 @@ TEST_F(ConnectionHandlerTest, TcpListenerDrainListenersNotifiesAllConnections) {
   EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{connection});
 
-  // drainListeners should fan out drain() to every connection in the listener.
-  EXPECT_CALL(*server_connection, drain());
-  handler_->drainListeners(listener_tag);
+  // onListenerDrain should fan out onDrain() to every connection in the listener.
+  EXPECT_CALL(*server_connection, onDrain());
+  handler_->onListenerDrain(listener_tag);
   EXPECT_EQ(1UL, handler_->numConnections());
 
   // Cleanup.

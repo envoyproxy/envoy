@@ -265,7 +265,7 @@ void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag,
   }
 }
 
-void ConnectionHandlerImpl::drainFilterChains(
+void ConnectionHandlerImpl::onFilterChainDrain(
     uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains) {
   if (auto listener_it = listener_map_by_tag_.find(listener_tag);
       listener_it != listener_map_by_tag_.end()) {
@@ -276,7 +276,7 @@ void ConnectionHandlerImpl::drainFilterChains(
   }
 }
 
-void ConnectionHandlerImpl::drainListeners(uint64_t listener_tag) {
+void ConnectionHandlerImpl::onListenerDrain(uint64_t listener_tag) {
   if (auto listener_it = listener_map_by_tag_.find(listener_tag);
       listener_it != listener_map_by_tag_.end()) {
     listener_it->second->invokeListenerMethod(

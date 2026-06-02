@@ -23,7 +23,7 @@ public:
   // Network::Connection
   void addConnectionCallbacks(ConnectionCallbacks& cb) override;
   void removeConnectionCallbacks(ConnectionCallbacks& cb) override;
-  void drain() override;
+  void onDrain() override;
 
   // Network::FilterManagerConnection
   void onFilterAboveHighWatermark() override;

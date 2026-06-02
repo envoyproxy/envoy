@@ -155,7 +155,7 @@ ActiveConnections& OwnedActiveStreamListenerBase::getOrCreateActiveConnections(
 void OwnedActiveStreamListenerBase::onFilterChainDrainStart(
     const std::list<const Network::FilterChain*>& draining_filter_chains) {
   // A drain callback may synchronously close the current connection, which removes it from
-  // `connections_` via removeConnection(). Capture `next` before invoking drain() so the
+  // `connections_` via removeConnection(). Capture `next` before invoking onDrain() so the
   // std::list iteration survives erasure of the current node. Pin `is_deleting_` while
   // iterating so removeConnection() does not also erase the map entry mid-loop if the
   // filter chain's last connection closes.
@@ -169,7 +169,7 @@ void OwnedActiveStreamListenerBase::onFilterChainDrainStart(
     auto& connections = map_iter->second->connections_;
     for (auto it = connections.begin(); it != connections.end();) {
       auto next = std::next(it);
-      (*it)->connection_->drain();
+      (*it)->connection_->onDrain();
       it = next;
     }
   }
@@ -184,7 +184,7 @@ void OwnedActiveStreamListenerBase::onListenerDrainStart() {
     auto& connections = entry.second->connections_;
     for (auto it = connections.begin(); it != connections.end();) {
       auto next = std::next(it);
-      (*it)->connection_->drain();
+      (*it)->connection_->onDrain();
       it = next;
     }
   }

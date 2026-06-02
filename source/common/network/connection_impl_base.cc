@@ -28,7 +28,7 @@ void ConnectionImplBase::removeConnectionCallbacks(ConnectionCallbacks& callback
   }
 }
 
-void ConnectionImplBase::drain() {
+void ConnectionImplBase::onDrain() {
   for (ConnectionCallbacks* callback : callbacks_) {
     if (callback != nullptr) {
       callback->onDrain();

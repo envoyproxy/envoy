@@ -52,7 +52,7 @@ public:
   /* Network::Connection */                                                                        \
   MOCK_METHOD(void, addConnectionCallbacks, (ConnectionCallbacks & cb));                           \
   MOCK_METHOD(void, removeConnectionCallbacks, (ConnectionCallbacks & cb));                        \
-  MOCK_METHOD(void, drain, ());                                                                    \
+  MOCK_METHOD(void, onDrain, ());                                                                  \
   MOCK_METHOD(void, addBytesSentCallback, (BytesSentCb cb));                                       \
   MOCK_METHOD(void, addWriteFilter, (WriteFilterSharedPtr filter));                                \
   MOCK_METHOD(void, addFilter, (FilterSharedPtr filter));                                          \
