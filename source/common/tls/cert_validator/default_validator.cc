@@ -590,9 +590,8 @@ absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
     if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
       ERR_clear_error();
     } else {
-      return absl::InvalidArgumentError(
-          absl::StrCat("Failed to load trusted client CA certificates from ",
-                       config_->caCertPath()));
+      return absl::InvalidArgumentError(absl::StrCat(
+          "Failed to load trusted client CA certificates from ", config_->caCertPath()));
     }
     SSL_CTX_set_client_CA_list(ctx, list.release());
   }
