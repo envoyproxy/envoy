@@ -22,7 +22,11 @@ public:
     autonomous_upstream_ = true;
 
     if (refresh_filter) {
-      config_helper_.prependFilter("{ name: refresh-route-cluster }");
+      config_helper_.prependFilter(R"EOF(
+        name: refresh-route-cluster
+        typed_config:
+          "@type": type.googleapis.com/test.integration.filters.RefreshRouteClusterConfig
+      )EOF");
     }
 
     config_helper_.addConfigModifier(

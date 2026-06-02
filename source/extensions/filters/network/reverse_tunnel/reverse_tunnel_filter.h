@@ -65,6 +65,9 @@ public:
   // Returns whether the handshake is negotiated as an HTTP/1.1 Upgrade exchange.
   bool useHttpUpgrade() const { return use_http_upgrade_; }
 
+  // Returns whether worker-thread rebalancing should be skipped for accepted connections.
+  bool skipRebalancing() const { return skip_rebalancing_; }
+
 private:
   ReverseTunnelFilterConfig(
       const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
@@ -89,6 +92,8 @@ private:
 
   // When true, expect `Connection: Upgrade` + `Upgrade: reverse-tunnel` and respond `101`.
   const bool use_http_upgrade_{false};
+
+  const bool skip_rebalancing_{false};
 };
 
 using ReverseTunnelFilterConfigSharedPtr = std::shared_ptr<ReverseTunnelFilterConfig>;

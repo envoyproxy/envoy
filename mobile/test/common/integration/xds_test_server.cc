@@ -51,8 +51,6 @@ XdsTestServer::XdsTestServer()
   ON_CALL(factory_context_.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
   ON_CALL(factory_context_, statsScope())
       .WillByDefault(testing::ReturnRef(*stats_store_.rootScope()));
-  Logger::Context logging_state(spdlog::level::level_enum::err,
-                                "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v", lock_, false, false);
   upstream_config_.upstream_protocol_ = Http::CodecType::HTTP2;
   Extensions::TransportSockets::Tls::forceRegisterServerContextFactoryImpl();
   Config::forceRegisterAdsConfigSubscriptionFactory();
