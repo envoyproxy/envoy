@@ -603,9 +603,7 @@ message CertificateValidationContext {
   //
   // This is useful when the configured CA set is large enough that the
   // ``CertificateRequest`` would exceed client-side TLS record limits, or when
-  // clients filter their client-certificate picker against the advertised CAs
-  // (notably iOS Safari, where valid certificates can be hidden from the user's
-  // picker). See https://github.com/envoyproxy/envoy/issues/14208.
+  // clients mishandle the CA set in some way.
   //
   // .. attention::
   //
