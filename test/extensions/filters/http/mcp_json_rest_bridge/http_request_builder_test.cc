@@ -262,24 +262,32 @@ TEST(HttpRequestBuilderTest, ConstructBaseUrlTest) {
 }
 
 TEST(HttpRequestBuilderTest, FailToExtractValueFromParameterBindingReturnOk) {
-  HttpRule http_rule = ParseTextProtoOrDie(
-      R"pb(
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
     get: "/v1"
-    header_parameter_bindings { name: "foo" argument_path: "foo_key" }
-    cookie_parameter_bindings { name: "bar" argument_path: "bar_key" }
-  )pb");
+    header_parameter_bindings:
+    - name: "foo"
+      argument_path: "foo_key"
+    cookie_parameter_bindings:
+    - name: "bar"
+      argument_path: "bar_key"
+  )yaml",
+                            http_rule);
   json arguments = json::parse(R"json({})json");
 
   EXPECT_OK(buildHttpRequest(http_rule, arguments));
 }
 
 TEST(HttpRequestBuilderTest, WildCardBodyAndParameterBindingPathNotFoundInEmptyObject) {
-  HttpRule http_rule = ParseTextProtoOrDie(
-      R"pb(
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
     get: "/v1/{parent=projects/*}"
     body: "*"
-    header_parameter_bindings { name: "X-Header-Key" argument_path: "nested.header_key" }
-  )pb");
+    header_parameter_bindings:
+    - name: "X-Header-Key"
+      argument_path: "nested.header_key"
+  )yaml",
+                            http_rule);
   json arguments = json::parse(R"json({
     "parent": "projects/123456789",
     "nested": {},
@@ -300,14 +308,21 @@ TEST(HttpRequestBuilderTest, WildCardBodyAndParameterBindingPathNotFoundInEmptyO
 }
 
 TEST(HttpRequestBuilderTest, HeaderAndCookieParamsPopulatedCorrectly) {
-  HttpRule http_rule = ParseTextProtoOrDie(
-      R"pb(
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
     get: "/v1/{parent=projects/*}/apiKeys"
-    header_parameter_bindings { name: "X-Api-Key" argument_path: "api_key" }
-    header_parameter_bindings { name: "Authorization" argument_path: "auth_token" }
-    cookie_parameter_bindings { name: "SESSION_ID" argument_path: "session_id" }
-    cookie_parameter_bindings { name: "PREF" argument_path: "pref" }
-  )pb");
+    header_parameter_bindings:
+    - name: "X-Api-Key"
+      argument_path: "api_key"
+    - name: "Authorization"
+      argument_path: "auth_token"
+    cookie_parameter_bindings:
+    - name: "SESSION_ID"
+      argument_path: "session_id"
+    - name: "PREF"
+      argument_path: "pref"
+  )yaml",
+                            http_rule);
 
   json arguments = json::parse(R"json({
     "parent": "projects/123456789",
@@ -328,7 +343,7 @@ TEST(HttpRequestBuilderTest, HeaderAndCookieParamsPopulatedCorrectly) {
   // Verify header params are populated correctly.
   EXPECT_THAT(
       http_request->headers_params,
-      UnorderedElementsAre(Pair("X-Api-Key", "my-key"), Pair("Authorization", "Bearer%20xyz")));
+      UnorderedElementsAre(Pair("X-Api-Key", "my-key"), Pair("Authorization", "Bearer xyz")));
 
   // Verify cookie params are populated correctly.
   EXPECT_THAT(http_request->cookies_params,
@@ -336,13 +351,18 @@ TEST(HttpRequestBuilderTest, HeaderAndCookieParamsPopulatedCorrectly) {
 }
 
 TEST(HttpRequestBuilderTest, WildCardBodyExcludesHeaderAndCookieBindings) {
-  HttpRule http_rule = ParseTextProtoOrDie(
-      R"pb(
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
     post: "/v1/{parent=projects/*}"
     body: "*"
-    header_parameter_bindings { name: "X-Api-Key" argument_path: "api_key" }
-    cookie_parameter_bindings { name: "SESSION_ID" argument_path: "session_id" }
-  )pb");
+    header_parameter_bindings:
+    - name: "X-Api-Key"
+      argument_path: "api_key"
+    cookie_parameter_bindings:
+    - name: "SESSION_ID"
+      argument_path: "session_id"
+  )yaml",
+                            http_rule);
 
   json arguments = json::parse(R"json({
     "parent": "projects/123456789",
@@ -366,12 +386,17 @@ TEST(HttpRequestBuilderTest, WildCardBodyExcludesHeaderAndCookieBindings) {
 }
 
 TEST(HttpRequestBuilderTest, NestedArgumentPathForBindings) {
-  HttpRule http_rule = ParseTextProtoOrDie(
-      R"pb(
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
     get: "/v1/resources"
-    header_parameter_bindings { name: "X-Auth-Token" argument_path: "user.auth_token" }
-    cookie_parameter_bindings { name: "SESSION" argument_path: "context.session_id" }
-  )pb");
+    header_parameter_bindings:
+    - name: "X-Auth-Token"
+      argument_path: "user.auth_token"
+    cookie_parameter_bindings:
+    - name: "SESSION"
+      argument_path: "context.session_id"
+  )yaml",
+                            http_rule);
 
   json arguments = json::parse(R"json({
     "user": {
@@ -399,13 +424,18 @@ TEST(HttpRequestBuilderTest, NestedArgumentPathForBindings) {
 }
 
 TEST(HttpRequestBuilderTest, SpecificBodyFieldWithHeaderCookieBindings) {
-  HttpRule http_rule = ParseTextProtoOrDie(
-      R"pb(
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
     put: "/v1/{parent=projects/*}"
     body: "payload"
-    header_parameter_bindings { name: "X-Request-Id" argument_path: "request_id" }
-    cookie_parameter_bindings { name: "TOKEN" argument_path: "token" }
-  )pb");
+    header_parameter_bindings:
+    - name: "X-Request-Id"
+      argument_path: "request_id"
+    cookie_parameter_bindings:
+    - name: "TOKEN"
+      argument_path: "token"
+  )yaml",
+                            http_rule);
 
   json arguments = json::parse(R"json({
     "parent": "projects/123",
@@ -425,6 +455,76 @@ TEST(HttpRequestBuilderTest, SpecificBodyFieldWithHeaderCookieBindings) {
 
   EXPECT_THAT(http_request->headers_params, UnorderedElementsAre(Pair("X-Request-Id", "req-001")));
   EXPECT_THAT(http_request->cookies_params, UnorderedElementsAre(Pair("TOKEN", "tok-abc")));
+}
+
+TEST(HttpRequestBuilderTest, InvalidHeaderValueRejection) {
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
+    get: "/v1"
+    header_parameter_bindings:
+    - name: "X-Header-Key"
+      argument_path: "header_key"
+  )yaml",
+                            http_rule);
+
+  // CR/LF is invalid character in header values.
+  json arguments = json::parse(R"json({
+    "header_key": "invalid\r\nvalue"
+  })json");
+
+  EXPECT_THAT(buildHttpRequest(http_rule, arguments), StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST(HttpRequestBuilderTest, InvalidCookieValueRejection) {
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
+    get: "/v1"
+    cookie_parameter_bindings:
+    - name: "SESSION"
+      argument_path: "session_id"
+  )yaml",
+                            http_rule);
+
+  // CR/LF is invalid character.
+  EXPECT_THAT(buildHttpRequest(http_rule, json::parse(R"json({"session_id": "invalid\r\nvalue"})json")),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+
+  // Space is invalid.
+  EXPECT_THAT(buildHttpRequest(http_rule, json::parse(R"json({"session_id": "invalid value"})json")),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+
+  // Comma is invalid.
+  EXPECT_THAT(buildHttpRequest(http_rule, json::parse(R"json({"session_id": "invalid,value"})json")),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+
+  // Semicolon is invalid.
+  EXPECT_THAT(buildHttpRequest(http_rule, json::parse(R"json({"session_id": "invalid;value"})json")),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+
+  // Backslash is invalid.
+  EXPECT_THAT(buildHttpRequest(http_rule, json::parse(R"json({"session_id": "invalid\\value"})json")),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST(HttpRequestBuilderTest, ValidQuotedCookieValueAllowed) {
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
+    get: "/v1"
+    cookie_parameter_bindings:
+    - name: "SESSION"
+      argument_path: "session_id"
+  )yaml",
+                            http_rule);
+
+  // Enclosed in DQUOTE is valid.
+  json arguments = json::parse(R"json({
+    "session_id": "\"valid-session-id\""
+  })json");
+
+  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments);
+  ASSERT_TRUE(http_request.ok());
+  EXPECT_THAT(http_request->cookies_params,
+              UnorderedElementsAre(Pair("SESSION", "\"valid-session-id\"")));
 }
 
 } // namespace

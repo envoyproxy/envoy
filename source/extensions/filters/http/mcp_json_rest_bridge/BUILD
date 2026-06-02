@@ -46,6 +46,7 @@ envoy_cc_library(
     deps = [
         "//source/common/common:regex_lib",
         "//source/common/common:utility_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
         "//source/common/json:json_loader_lib",
         "@envoy_api//envoy/extensions/filters/http/mcp_json_rest_bridge/v3:pkg_cc_proto",

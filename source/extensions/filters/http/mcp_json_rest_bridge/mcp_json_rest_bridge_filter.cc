@@ -667,7 +667,7 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_
     if (!http_request->cookies_params.empty()) {
       ENVOY_STREAM_LOG(debug, "Adding cookie: {}", *decoder_callbacks_,
                        absl::StrJoin(http_request->cookies_params, "; ", absl::PairFormatter("=")));
-      request_headers->setCopy(
+      request_headers->addCopy(
           Envoy::Http::Headers::get().Cookie,
           absl::StrJoin(http_request->cookies_params, "; ", absl::PairFormatter("=")));
     }
