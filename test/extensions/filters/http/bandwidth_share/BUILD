@@ -40,6 +40,21 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "token_bucket_singleton_test",
+    srcs = ["token_bucket_singleton_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/singleton:manager_impl_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//source/extensions/filters/http/bandwidth_share:token_bucket_singleton_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_extension_cc_test(
     name = "filter_integration_test",
     srcs = ["filter_integration_test.cc"],
