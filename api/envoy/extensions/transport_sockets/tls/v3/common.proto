@@ -611,6 +611,9 @@ message CertificateValidationContext {
   //   multiple client certificates may now send no certificate or the wrong one;
   //   validation will then fail with the standard TLS alert.
   //
+  // This option only affects downstream (server) TLS connections where Envoy sends a
+  // ``CertificateRequest`` to clients. It has no effect on upstream connections.
+  //
   // Honored by the built-in validator and the SPIFFE validator. Validators that do
   // not set a client CA list themselves (e.g., the dynamic-modules validator) are
   // unaffected. Defaults to false.
