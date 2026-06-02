@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/mcp_json_rest_bridge/sse_response_extractor.h"
 
+#include "test/test_common/status_utility.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -9,6 +11,7 @@ namespace HttpFilters {
 namespace McpJsonRestBridge {
 namespace {
 
+using ::Envoy::StatusHelpers::StatusIs;
 using ::testing::ElementsAre;
 using ::testing::IsEmpty;
 
@@ -18,73 +21,80 @@ protected:
 };
 
 TEST_F(SseResponseExtractorTest, ProcessSingleCompleteEvent) {
-  auto payloads = extractor_.processChunk("data: hello world\n\n");
-  EXPECT_THAT(payloads, ElementsAre("hello world"));
+  EXPECT_THAT(*extractor_.processChunk("data: hello world\n\n", /*end_stream=*/false),
+              ElementsAre("hello world"));
 }
 
 TEST_F(SseResponseExtractorTest, ProcessMultipleEvents) {
-  auto payloads = extractor_.processChunk("data: first event\n\ndata: second event\n\n");
-  EXPECT_THAT(payloads, ElementsAre("first event", "second event"));
+  EXPECT_THAT(
+      *extractor_.processChunk("data: first event\n\ndata: second event\n\n", /*end_stream=*/false),
+      ElementsAre("first event", "second event"));
 }
 
 TEST_F(SseResponseExtractorTest, ProcessIncompleteEvent) {
   // First chunk has incomplete event, should return nothing.
-  auto payloads1 = extractor_.processChunk("data: first");
-  EXPECT_THAT(payloads1, IsEmpty());
+  EXPECT_THAT(*extractor_.processChunk("data: first", /*end_stream=*/false), IsEmpty());
 
   // Second chunk completes the event.
-  auto payloads2 = extractor_.processChunk(" event\n\n");
-  EXPECT_THAT(payloads2, ElementsAre("first event"));
+  EXPECT_THAT(*extractor_.processChunk(" event\n\n", /*end_stream=*/false),
+              ElementsAre("first event"));
 }
 
 TEST_F(SseResponseExtractorTest, ProcessMultipleChunks) {
-  EXPECT_THAT(extractor_.processChunk("da"), IsEmpty());
-  EXPECT_THAT(extractor_.processChunk("ta: hello"), IsEmpty());
-  EXPECT_THAT(extractor_.processChunk(" world\n"), IsEmpty());
-  EXPECT_THAT(extractor_.processChunk("\n"), ElementsAre("hello world"));
+  EXPECT_THAT(*extractor_.processChunk("da", /*end_stream=*/false), IsEmpty());
+  EXPECT_THAT(*extractor_.processChunk("ta: hello", /*end_stream=*/false), IsEmpty());
+  EXPECT_THAT(*extractor_.processChunk(" world\n", /*end_stream=*/false), IsEmpty());
+  EXPECT_THAT(*extractor_.processChunk("\n", /*end_stream=*/false), ElementsAre("hello world"));
 }
 
 TEST_F(SseResponseExtractorTest, ProcessCommentsOnly) {
-  auto payloads = extractor_.processChunk(": this is a comment\n\n");
-  EXPECT_THAT(payloads, IsEmpty());
+  EXPECT_THAT(*extractor_.processChunk(": this is a comment\n\n", /*end_stream=*/false), IsEmpty());
 }
 
 TEST_F(SseResponseExtractorTest, ProcessNoDataEvent) {
-  auto payloads = extractor_.processChunk("event: ping\nid: 123\n\n");
-  EXPECT_THAT(payloads, IsEmpty());
+  EXPECT_THAT(*extractor_.processChunk("event: ping\nid: 123\n\n", /*end_stream=*/false),
+              IsEmpty());
 }
 
 TEST_F(SseResponseExtractorTest, ProcessCRLFLineEndings) {
-  auto payloads = extractor_.processChunk("data: crlf test\r\n\r\n");
-  EXPECT_THAT(payloads, ElementsAre("crlf test"));
+  EXPECT_THAT(*extractor_.processChunk("data: crlf test\r\n\r\n", /*end_stream=*/false),
+              ElementsAre("crlf test"));
 }
 
 TEST_F(SseResponseExtractorTest, ProcessEndStreamWithIncompleteEvent) {
   // Without end_stream, incomplete event is buffered.
-  EXPECT_THAT(extractor_.processChunk("data: last event"), IsEmpty());
-
-  EXPECT_THAT(extractor_.processChunk("", /*end_stream=*/true), IsEmpty());
+  EXPECT_THAT(*extractor_.processChunk("data: last event", /*end_stream=*/false), IsEmpty());
+  EXPECT_THAT(*extractor_.processChunk("", /*end_stream=*/true), IsEmpty());
 }
 
 TEST_F(SseResponseExtractorTest, ProcessMultilineData) {
-  auto payloads = extractor_.processChunk("data: line one\ndata: line two\n\n");
-  EXPECT_THAT(payloads, ElementsAre("line one\nline two"));
+  EXPECT_THAT(*extractor_.processChunk("data: line one\ndata: line two\n\n", /*end_stream=*/false),
+              ElementsAre("line one\nline two"));
 }
 
 TEST_F(SseResponseExtractorTest, ProcessJSONPayload) {
-  auto payloads = extractor_.processChunk("data: {\"foo\": \"bar\"}\n\n");
-  EXPECT_THAT(payloads, ElementsAre("{\"foo\": \"bar\"}"));
+  EXPECT_THAT(*extractor_.processChunk("data: {\"foo\": \"bar\"}\n\n", /*end_stream=*/false),
+              ElementsAre("{\"foo\": \"bar\"}"));
 }
 
 TEST_F(SseResponseExtractorTest, ProcessEmptyChunk) {
-  auto payloads = extractor_.processChunk("");
-  EXPECT_THAT(payloads, IsEmpty());
+  EXPECT_THAT(*extractor_.processChunk("", /*end_stream=*/false), IsEmpty());
 }
 
 TEST_F(SseResponseExtractorTest, ProcessMixedEvents) {
-  auto payloads =
-      extractor_.processChunk("event: ping\n\ndata: hello\n\n: comment\n\ndata: world\n\n");
-  EXPECT_THAT(payloads, ElementsAre("hello", "world"));
+  EXPECT_THAT(*extractor_.processChunk("event: ping\n\ndata: hello\n\n: comment\n\ndata: world\n\n",
+                                       /*end_stream=*/false),
+              ElementsAre("hello", "world"));
+}
+
+TEST(SseResponseExtractorLimitTest, EnforcesLimit) {
+  SseResponseExtractor limited_extractor(10);
+  // First chunk is fine (9 bytes)
+  EXPECT_THAT(*limited_extractor.processChunk("data: foo", /*end_stream=*/false), IsEmpty());
+
+  // Second chunk exceeds the limit (9 + 2 = 11 > 10)
+  EXPECT_THAT(limited_extractor.processChunk("\n\n", /*end_stream=*/false),
+              StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 } // namespace

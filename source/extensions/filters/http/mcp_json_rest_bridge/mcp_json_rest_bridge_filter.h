@@ -74,7 +74,7 @@ class McpJsonRestBridgeFilter : public Http::PassThroughFilter,
                                 public Logger::Loggable<Logger::Id::filter> {
 public:
   explicit McpJsonRestBridgeFilter(McpJsonRestBridgeFilterConfigSharedPtr config)
-      : config_(config) {}
+      : sse_response_extractor_(config->maxResponseBodySize()), config_(config) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -110,6 +110,15 @@ private:
 
   // Builds streaming_json_prefix_ and streaming_json_suffix_ for the tools/call streaming path.
   void buildStreamingPrefixAndSuffix(bool is_error);
+
+  // Encodes incoming data chunks for streaming MCP tool calls.
+  Http::FilterDataStatus encodeStreamingData(Buffer::Instance& data, bool end_stream);
+
+  // Processes an SSE response chunk and returns the serialized JSON event payloads.
+  absl::StatusOr<std::string> processSseResponse(absl::string_view chunk, bool end_stream);
+
+  // Prepares the escaped/formatted payload string for streaming.
+  absl::StatusOr<std::string> prepareStreamingPayload(absl::string_view chunk, bool end_stream);
 
   enum class McpOperation {
     Unspecified = 0,

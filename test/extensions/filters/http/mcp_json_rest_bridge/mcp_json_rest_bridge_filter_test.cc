@@ -1458,6 +1458,43 @@ TEST_F(McpJsonRestBridgeStreamingFilterTest, SseResponseStreaming) {
           R"json({"id":123,"jsonrpc":"2.0","result":{"content":[{"text":"{\"a\": 1}","type":"text"},{"text":"{\"b\": 2}","type":"text"}],"isError":false}})json"));
 }
 
+TEST_F(McpJsonRestBridgeStreamingFilterTest, SseResponseExceedsMaxResponseBodySize) {
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
+  TestUtility::loadFromYaml(R"yaml(
+    tool_config:
+      tools:
+        - name: "get_api_key"
+          http_rule:
+            get: "/v1/apiKeys"
+          text_content_streaming_enabled: true
+    max_response_body_size: 10
+  )yaml",
+                            proto_config);
+  config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
+  filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  sendToolsCallRequest();
+
+  response_headers_ = {{":status", "200"}, {"content-type", "text/event-stream"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::Continue);
+
+  EXPECT_CALL(
+      encoder_callbacks_,
+      sendLocalReply(
+          Eq(Http::Code::InternalServerError),
+          StrEq(
+              R"json({"error":{"code":-32000,"message":"Response body limit exceeded"},"id":123,"jsonrpc":"2.0"})json"),
+          _, Eq(Grpc::Status::WellKnownGrpcStatus::Internal),
+          StrEq("mcp_json_rest_bridge_filter_streaming_payload_preparation_error")));
+
+  Buffer::OwnedImpl chunk("data: too long payload\n\n");
+  EXPECT_EQ(filter_->encodeData(chunk, /*end_stream=*/false),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
 class McpHttpMethodFilterTest : public testing::TestWithParam<std::string> {
 public:
   void SetUp() override {

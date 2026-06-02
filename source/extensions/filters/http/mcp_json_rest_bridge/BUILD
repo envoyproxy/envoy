@@ -59,6 +59,8 @@ envoy_cc_library(
     hdrs = ["sse_response_extractor.h"],
     deps = [
         "//source/common/http/sse:sse_parser_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
     ],
 )

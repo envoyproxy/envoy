@@ -6,6 +6,8 @@
 
 #include "source/common/http/sse/sse_parser.h"
 
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -13,8 +15,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace McpJsonRestBridge {
 
-std::vector<std::string> SseResponseExtractor::processChunk(absl::string_view chunk,
-                                                            bool end_stream) {
+absl::StatusOr<std::vector<std::string>> SseResponseExtractor::processChunk(absl::string_view chunk,
+                                                                            bool end_stream) {
+  if (max_response_body_size_ > 0 && (buffer_.size() + chunk.size()) > max_response_body_size_) {
+    return absl::InvalidArgumentError("Response body limit exceeded");
+  }
   std::vector<std::string> event_payloads;
   buffer_.append(chunk.data(), chunk.size());
 
@@ -23,7 +28,8 @@ std::vector<std::string> SseResponseExtractor::processChunk(absl::string_view ch
 
   while (!buffer_view.empty()) {
     // Safely handles chunk boundaries and all line-ending formats
-    auto result = Http::Sse::SseParser::findEventEnd(buffer_view, end_stream);
+    Http::Sse::SseParser::FindEventEndResult result =
+        Http::Sse::SseParser::findEventEnd(buffer_view, end_stream);
 
     // npos means the event hasn't reached a double blank line yet
     if (result.event_start == absl::string_view::npos) {

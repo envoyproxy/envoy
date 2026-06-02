@@ -59,6 +59,7 @@ envoy_cc_test(
     srcs = ["sse_response_extractor_test.cc"],
     deps = [
         "//source/extensions/filters/http/mcp_json_rest_bridge:sse_response_extractor_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
