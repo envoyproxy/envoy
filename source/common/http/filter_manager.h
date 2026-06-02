@@ -676,6 +676,9 @@ public:
   OptRef<const Network::ListenerInfo> listenerInfo() const override {
     return StreamInfoImpl::downstreamAddressProvider().listenerInfo();
   }
+  std::shared_ptr<const Network::ListenerInfo> listenerInfoConstSharedPtr() const override {
+    return StreamInfoImpl::downstreamAddressProvider().listenerInfoConstSharedPtr();
+  }
 
 private:
   Network::Address::InstanceConstSharedPtr overridden_downstream_remote_address_;

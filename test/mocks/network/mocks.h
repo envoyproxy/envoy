@@ -799,6 +799,8 @@ public:
               (const, override));
   MOCK_METHOD(Envoy::OptRef<const Envoy::Network::ListenerInfo>, listenerInfo, (),
               (const, override));
+  MOCK_METHOD(std::shared_ptr<const Envoy::Network::ListenerInfo>, listenerInfoConstSharedPtr, (),
+              (const, override));
   MOCK_METHOD(absl::string_view, ja4Hash, (), (const, override));
 };
 
