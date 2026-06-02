@@ -3913,6 +3913,7 @@ fn test_catch_unwind_listener_on_data_panic() {
     fn on_data(
       &mut self,
       _envoy_filter: &mut ELF,
+      _data_length: usize,
     ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
       panic!("intentional panic in on_data");
     }
@@ -3925,7 +3926,7 @@ fn test_catch_unwind_listener_on_data_panic() {
   };
   let mut wrapper = CatchUnwind::new(PanicFilter);
 
-  let status = ListenerFilter::on_data(&mut wrapper, &mut envoy_filter);
+  let status = ListenerFilter::on_data(&mut wrapper, &mut envoy_filter, 256);
   assert_eq!(
     status,
     abi::envoy_dynamic_module_type_on_listener_filter_status::StopIteration,
