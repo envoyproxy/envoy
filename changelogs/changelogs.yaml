@@ -104,3 +104,5 @@ areas:
     title: wasm
   dns:
     title: dns
+  proxy_protocol:
+    title: proxy_protocol
