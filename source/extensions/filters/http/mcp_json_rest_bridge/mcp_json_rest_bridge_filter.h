@@ -64,6 +64,30 @@ private:
   uint32_t max_response_body_size_;
 };
 
+class McpJsonRestBridgePerRouteConfig : public Router::RouteSpecificFilterConfig,
+                                        public Logger::Loggable<Logger::Id::config> {
+public:
+  explicit McpJsonRestBridgePerRouteConfig(
+      const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
+          proto_config);
+
+  absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+  getHttpRule(absl::string_view tool_name) const;
+  absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+  getToolsListHttpRule() const;
+
+  bool textContentStreamingEnabled(absl::string_view tool_name) const;
+
+private:
+  struct ToolEntry {
+    envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule http_rule;
+    bool text_content_streaming_enabled;
+  };
+  absl::flat_hash_map<std::string, ToolEntry> tool_entries_;
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute
+      proto_config_;
+};
+
 using McpJsonRestBridgeFilterConfigSharedPtr = std::shared_ptr<McpJsonRestBridgeFilterConfig>;
 
 /**
@@ -83,6 +107,7 @@ public:
                                           bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
+  void onDestroy() override;
 
 private:
   // Handles "method" field in the MCP request.
@@ -143,7 +168,10 @@ private:
   std::string streaming_json_suffix_;
   bool is_first_streaming_chunk_ = true;
 
+  // Route and per-route config, latched on decodeData.
   McpJsonRestBridgeFilterConfigSharedPtr config_;
+  Router::RouteConstSharedPtr route_;
+  const McpJsonRestBridgePerRouteConfig* per_route_config_{nullptr};
 };
 
 } // namespace McpJsonRestBridge
