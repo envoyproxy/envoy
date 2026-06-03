@@ -1,7 +1,9 @@
 load("@rules_python//python:defs.bzl", "py_test")
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package"))
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
 
 licenses(["notice"])  # Apache 2
+
+envoy_mobile_package()
 
 py_test(
     name = "async_client_fetch_test",
