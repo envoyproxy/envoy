@@ -2,8 +2,10 @@
 
 #include <stdexcept>
 #include <string>
+#include <utility>
 
-#include "source/common/common/assert.h"
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 
 namespace Envoy {
 

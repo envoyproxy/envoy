@@ -73,6 +73,7 @@ envoy_cc_library(
         "//envoy/grpc:async_client_manager_interface",
         "//envoy/server:factory_context_interface",
         "//envoy/upstream:cluster_manager_interface",
+        "//source/common/common:assert_lib",
         "//source/common/grpc:typed_async_client_lib",
         "//source/common/http:async_client_utility_lib",
         "//source/common/http:header_map_lib",

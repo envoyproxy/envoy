@@ -24,6 +24,7 @@ envoy_cc_library(
     srcs = ["dns_cluster_backcompat.cc"],
     hdrs = ["dns_cluster_backcompat.h"],
     deps = [
+        "//source/common/common:assert_lib",
         "//source/common/upstream:cluster_factory_includes",
         "//source/common/upstream:upstream_includes",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
