@@ -24,41 +24,24 @@ namespace HttpConnectionManager {
 namespace {
 
 using envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
+using envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
 
-void addFilter(HttpConnectionManager& hcm, const std::string& name) {
-  auto* filter = hcm.add_http_filters();
-  filter->set_name(name);
-  if (name == "envoy.filters.http.router") {
-    envoy::extensions::filters::http::router::v3::Router config;
-    filter->mutable_typed_config()->PackFrom(config);
-  } else if (name == "test.pantry") {
-    test::http_connection_manager::PantryFilterConfig config;
-    filter->mutable_typed_config()->PackFrom(config);
-  } else if (name == "test.chef") {
-    test::http_connection_manager::ChefFilterConfig config;
-    filter->mutable_typed_config()->PackFrom(config);
-  } else {
-    test::http_connection_manager::FilterDependencyTestFilter config;
-    filter->mutable_typed_config()->PackFrom(config);
-  }
+void setRouterFilter(HttpFilter* filter) {
+  filter->set_name("envoy.filters.http.router");
+  envoy::extensions::filters::http::router::v3::Router config;
+  filter->mutable_typed_config()->PackFrom(config);
 }
 
-template <typename T> void addUpgradeFilter(T* upgrade, const std::string& name) {
-  auto* filter = upgrade->add_filters();
-  filter->set_name(name);
-  if (name == "envoy.filters.http.router") {
-    envoy::extensions::filters::http::router::v3::Router config;
-    filter->mutable_typed_config()->PackFrom(config);
-  } else if (name == "test.pantry") {
-    test::http_connection_manager::PantryFilterConfig config;
-    filter->mutable_typed_config()->PackFrom(config);
-  } else if (name == "test.chef") {
-    test::http_connection_manager::ChefFilterConfig config;
-    filter->mutable_typed_config()->PackFrom(config);
-  } else {
-    test::http_connection_manager::FilterDependencyTestFilter config;
-    filter->mutable_typed_config()->PackFrom(config);
-  }
+void setPantryFilter(HttpFilter* filter) {
+  filter->set_name("test.pantry");
+  test::http_connection_manager::PantryFilterConfig config;
+  filter->mutable_typed_config()->PackFrom(config);
+}
+
+void setChefFilter(HttpFilter* filter) {
+  filter->set_name("test.chef");
+  test::http_connection_manager::ChefFilterConfig config;
+  filter->mutable_typed_config()->PackFrom(config);
 }
 
 const std::string ConfigTemplate = R"EOF(
@@ -132,9 +115,9 @@ TEST_F(HttpConnectionManagerConfigTest, UnregisteredFilterException) {
 // ChefFilter requires a potato, and PantryFilter provides it.
 TEST_F(HttpConnectionManagerConfigTest, AllDependenciesSatisfiedOk) {
   auto hcm_config = parseHttpConnectionManagerFromYaml(ConfigTemplate);
-  addFilter(hcm_config, "test.pantry");
-  addFilter(hcm_config, "test.chef");
-  addFilter(hcm_config, "envoy.filters.http.router");
+  setPantryFilter(hcm_config.add_http_filters());
+  setChefFilter(hcm_config.add_http_filters());
+  setRouterFilter(hcm_config.add_http_filters());
 
   PantryFilterFactory pf;
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rf(pf);
@@ -151,8 +134,8 @@ TEST_F(HttpConnectionManagerConfigTest, AllDependenciesSatisfiedOk) {
 // PantryFilter provides a potato, which is not required by any other filter.
 TEST_F(HttpConnectionManagerConfigTest, UnusedProvidencyOk) {
   auto hcm_config = parseHttpConnectionManagerFromYaml(ConfigTemplate);
-  addFilter(hcm_config, "test.pantry");
-  addFilter(hcm_config, "envoy.filters.http.router");
+  setPantryFilter(hcm_config.add_http_filters());
+  setRouterFilter(hcm_config.add_http_filters());
 
   PantryFilterFactory pf;
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rf(pf);
@@ -167,8 +150,8 @@ TEST_F(HttpConnectionManagerConfigTest, UnusedProvidencyOk) {
 // ChefFilter requires a potato, but no filter provides it.
 TEST_F(HttpConnectionManagerConfigTest, UnmetDependencyError) {
   auto hcm_config = parseHttpConnectionManagerFromYaml(ConfigTemplate);
-  addFilter(hcm_config, "test.chef");
-  addFilter(hcm_config, "envoy.filters.http.router");
+  setChefFilter(hcm_config.add_http_filters());
+  setRouterFilter(hcm_config.add_http_filters());
 
   ChefFilterFactory cf;
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
@@ -184,9 +167,9 @@ TEST_F(HttpConnectionManagerConfigTest, UnmetDependencyError) {
 // ChefFilter requires a potato, but no preceding filter provides it.
 TEST_F(HttpConnectionManagerConfigTest, MisorderedDependenciesError) {
   auto hcm_config = parseHttpConnectionManagerFromYaml(ConfigTemplate);
-  addFilter(hcm_config, "test.chef");
-  addFilter(hcm_config, "test.pantry");
-  addFilter(hcm_config, "envoy.filters.http.router");
+  setChefFilter(hcm_config.add_http_filters());
+  setPantryFilter(hcm_config.add_http_filters());
+  setRouterFilter(hcm_config.add_http_filters());
 
   // Registration order does not matter.
   PantryFilterFactory pf;
@@ -207,8 +190,8 @@ TEST_F(HttpConnectionManagerConfigTest, UpgradeUnmetDependencyError) {
   auto upgrade_config = hcm_config.add_upgrade_configs();
   upgrade_config->set_upgrade_type("websocket");
 
-  addUpgradeFilter(upgrade_config, "test.chef");
-  addUpgradeFilter(upgrade_config, "envoy.filters.http.router");
+  setChefFilter(upgrade_config->add_filters());
+  setRouterFilter(upgrade_config->add_filters());
 
   ChefFilterFactory cf;
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
@@ -225,9 +208,9 @@ TEST_F(HttpConnectionManagerConfigTest, UpgradeDependencyOK) {
   auto hcm_config = parseHttpConnectionManagerFromYaml(ConfigTemplate);
   auto upgrade_config = hcm_config.add_upgrade_configs();
   upgrade_config->set_upgrade_type("websocket");
-  addUpgradeFilter(upgrade_config, "test.pantry");
-  addUpgradeFilter(upgrade_config, "test.chef");
-  addUpgradeFilter(upgrade_config, "envoy.filters.http.router");
+  setPantryFilter(upgrade_config->add_filters());
+  setChefFilter(upgrade_config->add_filters());
+  setRouterFilter(upgrade_config->add_filters());
 
   PantryFilterFactory pf;
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rf(pf);
@@ -245,13 +228,13 @@ TEST_F(HttpConnectionManagerConfigTest, UpgradeDependencyOK) {
 // requirements in the upgrade filter chain.
 TEST_F(HttpConnectionManagerConfigTest, UpgradeFilterChainDependenciesIsolatedFromHcmConfig) {
   auto hcm_config = parseHttpConnectionManagerFromYaml(ConfigTemplate);
-  addFilter(hcm_config, "test.pantry");
-  addFilter(hcm_config, "envoy.filters.http.router");
+  setPantryFilter(hcm_config.add_http_filters());
+  setRouterFilter(hcm_config.add_http_filters());
 
   auto upgrade_config = hcm_config.add_upgrade_configs();
   upgrade_config->set_upgrade_type("websocket");
-  addUpgradeFilter(upgrade_config, "test.chef");
-  addUpgradeFilter(upgrade_config, "envoy.filters.http.router");
+  setChefFilter(upgrade_config->add_filters());
+  setRouterFilter(upgrade_config->add_filters());
 
   PantryFilterFactory pf;
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rf(pf);
@@ -272,13 +255,13 @@ TEST_F(HttpConnectionManagerConfigTest, UpgradeFilterChainDependenciesIsolatedFr
   auto hcm_config = parseHttpConnectionManagerFromYaml(ConfigTemplate);
   auto upgrade_config1 = hcm_config.add_upgrade_configs();
   upgrade_config1->set_upgrade_type("websocket");
-  addUpgradeFilter(upgrade_config1, "test.pantry");
-  addUpgradeFilter(upgrade_config1, "envoy.filters.http.router");
+  setPantryFilter(upgrade_config1->add_filters());
+  setRouterFilter(upgrade_config1->add_filters());
 
   auto upgrade_config2 = hcm_config.add_upgrade_configs();
   upgrade_config2->set_upgrade_type("CONNECT");
-  addUpgradeFilter(upgrade_config2, "test.chef");
-  addUpgradeFilter(upgrade_config2, "envoy.filters.http.router");
+  setChefFilter(upgrade_config2->add_filters());
+  setRouterFilter(upgrade_config2->add_filters());
 
   PantryFilterFactory pf;
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rf(pf);
