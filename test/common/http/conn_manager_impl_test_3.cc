@@ -445,6 +445,49 @@ TEST_F(HttpConnectionManagerImplTest, CannotContinueEncodingAfterRecreateStream)
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Verify that recreateStream() does not crash when the buffered request body was above the high
+// watermark. Moving the buffer triggers readDisable(false) via the low watermark callback.
+TEST_F(HttpConnectionManagerImplTest, RecreateStreamWithWatermarkedBufferDoesNotCrash) {
+  setup();
+  decoder_filters_.push_back(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([this](FilterChainFactoryCallbacks& callbacks) -> bool {
+        callbacks.setFilterConfigName("");
+        bool applied_filters = false;
+        if (log_handler_ != nullptr) {
+          auto factory = createLogHandlerFactoryCb(log_handler_);
+          factory(callbacks);
+          applied_filters = true;
+        }
+        auto factory =
+            createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{decoder_filters_[0]});
+        factory(callbacks);
+        applied_filters = true;
+        return applied_filters;
+      }))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(response_encoder_.stream_, bufferLimit()).WillRepeatedly(Return(1));
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(InvokeWithoutArgs([this]() -> FilterHeadersStatus {
+        Buffer::OwnedImpl data("hello");
+        decoder_filters_[0]->callbacks_->addDecodedData(data, /*streaming=*/true);
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(response_encoder_.stream_, readDisable(true));
+
+  startRequest(true);
+
+  EXPECT_CALL(response_encoder_.stream_, readDisable(false));
+
+  EXPECT_TRUE(decoder_filters_[0]->callbacks_->recreateStream(nullptr));
+
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 // Use filter direct decode/encodeData() calls without trailers.
 TEST_F(HttpConnectionManagerImplTest, FilterDirectDecodeEncodeDataNoTrailers) {
   setup();
