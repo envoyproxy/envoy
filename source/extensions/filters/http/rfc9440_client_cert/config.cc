@@ -15,9 +15,6 @@ Http::FilterFactoryCb Rfc9440ClientCertFilterFactory::createFilterFactoryFromPro
   };
 }
 
-/**
- * Static registration to register the factory into the central Envoy registry
- */
 REGISTER_FACTORY(Rfc9440ClientCertFilterFactory,
                  Server::Configuration::NamedHttpFilterConfigFactory);
 
