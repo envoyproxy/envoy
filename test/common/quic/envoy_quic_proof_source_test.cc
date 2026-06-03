@@ -103,10 +103,9 @@ public:
     EXPECT_EQ(quic::QUIC_SUCCESS,
               verifier_->VerifyCertChain(
                   "www.example.org", 54321,
-                  std::vector<absl::string_view>(chain->certs.begin(),
-                                                 chain->certs.end()),
-                  /*ocsp_response=*/"", /*cert_sct=*/"Fake SCT",
-                  &verify_context_, &error, &verify_details,
+                  std::vector<absl::string_view>(chain->certs.begin(), chain->certs.end()),
+                  /*ocsp_response=*/"", /*cert_sct=*/"Fake SCT", &verify_context_, &error,
+                  &verify_details,
                   /*out_alert=*/nullptr,
                   /*callback=*/nullptr))
         << error;

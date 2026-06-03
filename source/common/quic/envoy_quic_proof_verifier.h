@@ -46,15 +46,15 @@ public:
   }
 
   // EnvoyQuicProofVerifierBase
-  quic::QuicAsyncStatus VerifyCertChain(
-      const std::string& hostname, const uint16_t port,
-      const std::vector<absl::string_view>& certs,
-      const std::string& ocsp_response, const std::string& cert_sct,
-      const quic::ProofVerifyContext* context, std::string* error_details,
-      std::unique_ptr<quic::ProofVerifyDetails>* details, uint8_t* out_alert,
-      std::unique_ptr<quic::ProofVerifierCallback> callback) override;
+  quic::QuicAsyncStatus
+  VerifyCertChain(const std::string& hostname, const uint16_t port,
+                  const std::vector<absl::string_view>& certs, const std::string& ocsp_response,
+                  const std::string& cert_sct, const quic::ProofVerifyContext* context,
+                  std::string* error_details, std::unique_ptr<quic::ProofVerifyDetails>* details,
+                  uint8_t* out_alert,
+                  std::unique_ptr<quic::ProofVerifierCallback> callback) override;
 
- private:
+private:
   Envoy::Ssl::ClientContextSharedPtr context_;
   // True if the verifier should accept untrusted certs (see documentation for
   // envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::ACCEPT_UNTRUSTED)

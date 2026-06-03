@@ -34,35 +34,29 @@ bool verifyLeafCertMatchesHostname(quic::CertificateView& cert_view, const std::
 
 class QuicValidateResultCallback : public Ssl::ValidateResultCallback {
 public:
- QuicValidateResultCallback(
-     Event::Dispatcher& dispatcher,
-     std::unique_ptr<quic::ProofVerifierCallback>&& quic_callback,
-     const std::string& hostname, absl::string_view leaf_cert,
-     bool accept_untrusted)
-     : dispatcher_(dispatcher),
-       quic_callback_(std::move(quic_callback)),
-       hostname_(hostname),
-       leaf_cert_(leaf_cert),
-       accept_untrusted_(accept_untrusted) {}
+  QuicValidateResultCallback(Event::Dispatcher& dispatcher,
+                             std::unique_ptr<quic::ProofVerifierCallback>&& quic_callback,
+                             const std::string& hostname, absl::string_view leaf_cert,
+                             bool accept_untrusted)
+      : dispatcher_(dispatcher), quic_callback_(std::move(quic_callback)), hostname_(hostname),
+        leaf_cert_(leaf_cert), accept_untrusted_(accept_untrusted) {}
 
- Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
- void onCertValidationResult(bool succeeded,
-                             Ssl::ClientValidationStatus /*detailed_status*/,
-                             const std::string& error_details,
-                             uint8_t /*tls_alert*/) override {
-   std::string error;
-   if (!succeeded) {
-     error = error_details;
-   } else if (!accept_untrusted_) {
-     std::unique_ptr<quic::CertificateView> cert_view =
-         quic::CertificateView::ParseSingleCertificate(leaf_cert_);
-     succeeded = verifyLeafCertMatchesHostname(*cert_view, hostname_, &error);
-   }
-   std::unique_ptr<quic::ProofVerifyDetails> details =
-       std::make_unique<CertVerifyResult>(succeeded);
-   quic_callback_->Run(succeeded, error, &details);
- }
+  void onCertValidationResult(bool succeeded, Ssl::ClientValidationStatus /*detailed_status*/,
+                              const std::string& error_details, uint8_t /*tls_alert*/) override {
+    std::string error;
+    if (!succeeded) {
+      error = error_details;
+    } else if (!accept_untrusted_) {
+      std::unique_ptr<quic::CertificateView> cert_view =
+          quic::CertificateView::ParseSingleCertificate(leaf_cert_);
+      succeeded = verifyLeafCertMatchesHostname(*cert_view, hostname_, &error);
+    }
+    std::unique_ptr<quic::ProofVerifyDetails> details =
+        std::make_unique<CertVerifyResult>(succeeded);
+    quic_callback_->Run(succeeded, error, &details);
+  }
 
 private:
   Event::Dispatcher& dispatcher_;
@@ -77,11 +71,10 @@ private:
 
 quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
     const std::string& hostname, const uint16_t /*port*/,
-    const std::vector<absl::string_view>& certs,
-    const std::string& /*ocsp_response*/, const std::string& /*cert_sct*/,
-    const quic::ProofVerifyContext* context, std::string* error_details,
-    std::unique_ptr<quic::ProofVerifyDetails>* details, uint8_t* out_alert,
-    std::unique_ptr<quic::ProofVerifierCallback> callback) {
+    const std::vector<absl::string_view>& certs, const std::string& /*ocsp_response*/,
+    const std::string& /*cert_sct*/, const quic::ProofVerifyContext* context,
+    std::string* error_details, std::unique_ptr<quic::ProofVerifyDetails>* details,
+    uint8_t* out_alert, std::unique_ptr<quic::ProofVerifierCallback> callback) {
   ASSERT(details != nullptr);
   ASSERT(!certs.empty());
   auto* verify_context = dynamic_cast<const EnvoyQuicProofVerifyContext*>(context);
@@ -110,8 +103,8 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
   }
 
   auto envoy_callback = std::make_unique<QuicValidateResultCallback>(
-      verify_context->dispatcher(), std::move(callback), hostname,
-      std::string(certs[0]), accept_untrusted_);
+      verify_context->dispatcher(), std::move(callback), hostname, std::string(certs[0]),
+      accept_untrusted_);
   ASSERT(dynamic_cast<Extensions::TransportSockets::Tls::ClientContextImpl*>(context_.get()) !=
          nullptr);
   // We down cast rather than add customVerifyCertChainForQuic to Envoy::Ssl::Context because

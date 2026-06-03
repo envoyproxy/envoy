@@ -306,11 +306,10 @@ VdGXMAjeXhnOnPvmDi5hUz/uvI+Pg6cNmUoCRwSCnK/DazhA
   ASSERT(cert_view);
   std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   EXPECT_EQ(quic::QUIC_FAILURE,
-            verifier_->VerifyCertChain(
-                "www.google.com", 54321,
-                std::vector<absl::string_view>(chain.begin(), chain.end()),
-                ocsp_response, cert_sct, &verify_context_, &error_details,
-                &verify_details, nullptr, nullptr));
+            verifier_->VerifyCertChain("www.google.com", 54321,
+                                       std::vector<absl::string_view>(chain.begin(), chain.end()),
+                                       ocsp_response, cert_sct, &verify_context_, &error_details,
+                                       &verify_details, nullptr, nullptr));
   EXPECT_EQ("Invalid leaf cert, only P-256 ECDSA certificates are supported", error_details);
 }
 
@@ -379,11 +378,10 @@ ZCFbredVxDBZuoVsfrKPSQa407Jj1Q==
   ASSERT(cert_view);
   std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   EXPECT_EQ(quic::QUIC_FAILURE,
-            verifier_->VerifyCertChain(
-                "lyft.com", 54321,
-                std::vector<absl::string_view>(chain.begin(), chain.end()),
-                ocsp_response, cert_sct, &verify_context_, &error_details,
-                &verify_details, nullptr, nullptr));
+            verifier_->VerifyCertChain("lyft.com", 54321,
+                                       std::vector<absl::string_view>(chain.begin(), chain.end()),
+                                       ocsp_response, cert_sct, &verify_context_, &error_details,
+                                       &verify_details, nullptr, nullptr));
   EXPECT_EQ("verify cert failed: X509_verify_cert: certificate verification error at depth 0: "
             "unsupported certificate "
             "purpose",
@@ -443,11 +441,10 @@ wYsML58R3P8=
   std::stringstream pem_stream(cert_v1);
   std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
   EXPECT_EQ(quic::QUIC_FAILURE,
-            verifier_->VerifyCertChain(
-                "localhost", 54321,
-                std::vector<absl::string_view>(chain.begin(), chain.end()),
-                ocsp_response, cert_sct, &verify_context_, &error_details,
-                &verify_details, nullptr, nullptr))
+            verifier_->VerifyCertChain("localhost", 54321,
+                                       std::vector<absl::string_view>(chain.begin(), chain.end()),
+                                       ocsp_response, cert_sct, &verify_context_, &error_details,
+                                       &verify_details, nullptr, nullptr))
       << error_details;
   EXPECT_EQ("unable to parse certificate", error_details);
   EXPECT_EQ(verify_details, nullptr);
