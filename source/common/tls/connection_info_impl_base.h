@@ -36,6 +36,8 @@ public:
   const std::string& pemEncodedPeerCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificateChain() const override;
   absl::Span<const std::string> pemEncodedPeerCertificateChain() const override;
+  const std::string& b64DerEncodedPeerCertificate() const override;
+  absl::Span<const std::string> b64DerEncodedPeerCertificateChain() const override;
   bool peerCertificateSanMatches(const Ssl::SanMatcher& matcher) const override;
   absl::Span<const std::string> uriSanPeerCertificate() const override;
   absl::Span<const std::string> uriSanLocalCertificate() const override;
@@ -102,6 +104,8 @@ private:
     IpSansPeerCertificate,
     OidsPeerCertificate,
     OidsLocalCertificate,
+    B64DerEncodedPeerCertificate,
+    B64DerEncodedPeerCertificateChain,
   };
 
   // Retrieve the given tag from the set of cached values, or create the value via the supplied

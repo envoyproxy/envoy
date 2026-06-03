@@ -5213,6 +5213,22 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
             dynamic_cast<const SslHandshakerImpl*>(client_connection->ssl().get());
         ssl_session = SSL_get1_session(ssl_socket->ssl());
         EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
+        auto rfc9440_ssl_info = server_connection->ssl();
+        ASSERT_NE(rfc9440_ssl_info, nullptr);
+
+        const std::string& leaf_b64 = rfc9440_ssl_info->b64DerEncodedPeerCertificate();
+        EXPECT_FALSE(leaf_b64.empty());
+
+        const auto& full_chain_digests = rfc9440_ssl_info->sha256PeerCertificateChainDigests();
+        const auto& rfc9440_chain = rfc9440_ssl_info->b64DerEncodedPeerCertificateChain();
+
+        if (!full_chain_digests.empty()) {
+          EXPECT_EQ(rfc9440_chain.size(), full_chain_digests.size() - 1);
+        }
+
+        if (!rfc9440_chain.empty()) {
+          EXPECT_NE(rfc9440_chain[0], leaf_b64);
+        }
         server_connection->close(Network::ConnectionCloseType::NoFlush);
         client_connection->close(Network::ConnectionCloseType::NoFlush);
         dispatcher_->exit();
@@ -8416,6 +8432,99 @@ TEST_P(SslSocketTest, TlsConnectionResetDetectionDisabledByRuntime) {
                   StreamInfo::DetectedCloseType::RemoteReset);
         dispatcher_->exit();
       }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(SslSocketTest, RealCertificateRfc9440ParsingIntegration) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+  require_client_certificate: true
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+)EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context_srv;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context_srv);
+  auto server_cfg = *ServerContextConfigImpl::create(tls_context_srv, factory_context_, {}, false);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context_clt;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), tls_context_clt);
+  auto client_cfg = *ClientContextConfigImpl::create(tls_context_clt, factory_context_);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  ContextManagerImpl manager(server_factory_context);
+  Stats::TestUtil::TestStore stats_store;
+
+  auto server_ssl_socket_factory =
+      *ServerSslSocketFactory::create(std::move(server_cfg), manager, *stats_store.rootScope());
+  auto client_ssl_socket_factory =
+      *ClientSslSocketFactory::create(std::move(client_cfg), manager, *stats_store.rootScope());
+
+  auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+      Network::Test::getCanonicalLoopbackAddress(version_));
+  Network::MockTcpListenerCallbacks callbacks;
+  NiceMock<Network::MockListenerConfig> listener_config;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Network::ListenerPtr listener =
+      createListener(socket, callbacks, runtime_, listener_config, overload_state, *dispatcher_);
+
+  Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
+      socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
+      client_ssl_socket_factory->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
+
+  Network::MockConnectionCallbacks client_connection_callbacks;
+  client_connection->addConnectionCallbacks(client_connection_callbacks);
+  client_connection->connect();
+
+  Network::ConnectionPtr server_connection;
+  Network::MockConnectionCallbacks server_connection_callbacks;
+
+  EXPECT_CALL(callbacks, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
+        server_connection = dispatcher_->createServerConnection(
+            std::move(accepted_socket),
+            server_ssl_socket_factory->createDownstreamTransportSocket(), stream_info_);
+        server_connection->addConnectionCallbacks(server_connection_callbacks);
+      }));
+  EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
+
+  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
+  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        auto live_ssl_info = server_connection->ssl();
+        ASSERT_NE(live_ssl_info, nullptr);
+
+        const std::string& leaf_b64 = live_ssl_info->b64DerEncodedPeerCertificate();
+        auto chain_b64 = live_ssl_info->b64DerEncodedPeerCertificateChain();
+
+        EXPECT_FALSE(leaf_b64.empty());
+
+        if (!chain_b64.empty()) {
+          EXPECT_NE(chain_b64[0], leaf_b64);
+        }
+
+        server_connection->close(Network::ConnectionCloseType::NoFlush);
+        client_connection->close(Network::ConnectionCloseType::NoFlush);
+        dispatcher_->exit();
+      }));
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }

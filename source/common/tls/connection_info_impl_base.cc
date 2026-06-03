@@ -2,6 +2,7 @@
 
 #include <openssl/stack.h>
 
+#include "source/common/common/base64.h"
 #include "source/common/common/hex.h"
 #include "source/common/http/utility.h"
 #include "source/common/tls/cert_validator/san_matcher.h"
@@ -23,6 +24,32 @@ bool shouldRecalculateCachedEntry(const std::vector<std::string>& vec) { return 
 bool shouldRecalculateCachedEntry(const Ssl::ParsedX509NamePtr& ptr) { return ptr == nullptr; }
 bool shouldRecalculateCachedEntry(const bssl::UniquePtr<GENERAL_NAMES>& ptr) {
   return ptr == nullptr;
+}
+
+// Convert a single X509 certificate to a Base64 encoded DER string.
+std::string certToBase64Der(X509& cert) {
+  int len = i2d_X509(&cert, nullptr);
+  if (len <= 0) {
+    return "";
+  }
+  std::vector<uint8_t> der(len);
+  uint8_t* p = der.data();
+  i2d_X509(&cert, &p);
+  return Envoy::Base64::encode(reinterpret_cast<const char*>(der.data()), der.size());
+}
+
+// Iterate the peer certificate chain, converting each certificate to Base64 DER and calling the
+// provided callback. Skips the leaf certificate at index 0 per RFC 9440 requirements.
+void forEachPeerCertBase64Der(SSL* ssl, std::function<void(const std::string&)> cb) {
+  STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl);
+  if (cert_chain == nullptr) {
+    return;
+  }
+
+  // START AT INDEX 1 TO SKIP THE LEAF CERTIFICATE
+  for (uint64_t i = 1; i < sk_X509_num(cert_chain); i++) {
+    cb(certToBase64Der(*sk_X509_value(cert_chain, i)));
+  }
 }
 
 // Convert a single X509 certificate to a PEM-encoded string.
@@ -207,6 +234,27 @@ const std::string& ConnectionInfoImplBase::pemEncodedPeerCertificate() const {
           return std::string{};
         }
         return certToPem(*cert);
+      });
+}
+
+const std::string& ConnectionInfoImplBase::b64DerEncodedPeerCertificate() const {
+  return getCachedValueOrCreate<std::string>(
+      CachedValueTag::B64DerEncodedPeerCertificate, [](SSL* ssl) {
+        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+        if (!cert) {
+          return std::string{};
+        }
+        return certToBase64Der(*cert);
+      });
+}
+
+absl::Span<const std::string> ConnectionInfoImplBase::b64DerEncodedPeerCertificateChain() const {
+  return getCachedValueOrCreate<std::vector<std::string>>(
+      CachedValueTag::B64DerEncodedPeerCertificateChain, [](SSL* ssl) {
+        std::vector<std::string> result;
+        forEachPeerCertBase64Der(
+            ssl, [&result](const std::string& b64_der) { result.emplace_back(b64_der); });
+        return result;
       });
 }
 
