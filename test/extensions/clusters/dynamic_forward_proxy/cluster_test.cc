@@ -62,7 +62,7 @@ public:
     cluster_.reset(new Cluster(cluster_config, std::move(cache), config, factory_context,
                                this->get(), creation_status));
     THROW_IF_NOT_OK_REF(creation_status);
-    thread_aware_lb_ = std::make_unique<Cluster::ThreadAwareLoadBalancer>(*cluster_);
+    thread_aware_lb_ = std::make_unique<Cluster::ThreadAwareLoadBalancer>(cluster_);
     lb_factory_ = thread_aware_lb_->factory();
     refreshLb();
 
@@ -234,6 +234,37 @@ TEST_F(ClusterTest, CreateSubClusterConfig) {
   EXPECT_EQ(false, sub_cluster_pair.second.has_value());
 }
 
+// Sub cluster does not exist and load balancer should return nullptr.
+TEST_F(ClusterTest, SubClusterNotExist) {
+  initialize(sub_cluster_yaml_config_, false);
+
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("DFPCluster:localhost:80"))
+      .WillOnce(Return(nullptr));
+
+  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("localhost")).host);
+}
+
+// Load balancer will return null host if the cluster is destroyed in the main thread.
+TEST_F(ClusterTest, ClusterDestroyedInMainThread) {
+  initialize(default_yaml_config_, false);
+  makeTestHost("host1:0", "1.2.3.4");
+  InSequence s;
+
+  // LB will immediately resolve host1.
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
+  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ("1.2.3.4:0",
+            cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
+  EXPECT_CALL(*host_map_["host1:0"], touch());
+  EXPECT_EQ("1.2.3.4:0",
+            lb_->chooseHost(setHostAndReturnContext("host1:0")).host->address()->asString());
+
+  // Destroy the cluster, LB will return nullptr without accessing the cluster.
+  cluster_.reset();
+  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1:0")).host);
+}
+
 // Basic flow of the cluster including adding hosts and removing them.
 TEST_F(ClusterTest, BasicFlow) {
   initialize(default_yaml_config_, false);
@@ -313,6 +344,40 @@ TEST_F(ClusterTest, InvalidLbContext) {
   ON_CALL(lb_context_, downstreamHeaders()).WillByDefault(Return(nullptr));
   EXPECT_EQ(nullptr, lb_->chooseHost(&lb_context_).host);
   EXPECT_EQ(nullptr, lb_->chooseHost(nullptr).host);
+}
+
+TEST_F(ClusterTest, LoadBalancer_CleansUpPendingAsyncHostSelectionOnDestroy) {
+  initialize(default_yaml_config_, false);
+
+  NiceMock<Upstream::MockBasicResourceLimit> resource_limit;
+  auto* dns_cache_handle =
+      new NiceMock<Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle>();
+
+  EXPECT_CALL(resource_limit, inc());
+  auto* dns_request = new Upstream::ResourceAutoIncDec(resource_limit);
+  EXPECT_CALL(resource_limit, dec());
+  EXPECT_CALL(*dns_cache_handle, onDestroy());
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
+      .WillOnce(Return(dns_request));
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_("host1", 80, _, _))
+      .WillOnce(Invoke([dns_cache_handle](absl::string_view, uint16_t, bool,
+                                          Extensions::Common::DynamicForwardProxy::DnsCache::
+                                              LoadDnsCacheEntryCallbacks&) {
+        return Extensions::Common::DynamicForwardProxy::MockDnsCache::MockLoadDnsCacheEntryResult{
+            Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Loading,
+            dns_cache_handle, absl::nullopt};
+      }));
+  EXPECT_CALL(lb_context_, onAsyncHostSelection(_, _))
+      .WillOnce([](Upstream::HostConstSharedPtr&& host, std::string&& details) {
+        EXPECT_EQ(host, nullptr);
+        EXPECT_EQ(details, "load_balancer_destroyed");
+      });
+
+  auto host_selection = lb_->chooseHost(setHostAndReturnContext("host1"));
+  ASSERT_EQ(nullptr, host_selection.host);
+  ASSERT_NE(nullptr, host_selection.cancelable);
+
+  lb_.reset();
 }
 
 TEST_F(ClusterTest, FilterStateHostOverride) {

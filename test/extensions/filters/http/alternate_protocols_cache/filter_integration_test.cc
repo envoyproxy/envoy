@@ -12,6 +12,7 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/ssl_utility.h"
+#include "test/test_common/logging.h"
 
 using testing::Eq;
 namespace Envoy {
@@ -537,6 +538,66 @@ TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
 
   checkSimpleRequestSuccess(2048, response_size, response2.get());
   test_server_->waitForCounter("cluster.cluster_0.upstream_cx_http2_total", Eq(2));
+}
+
+TEST_P(FilterIntegrationTest, AltSvcH3BrokenH2FailedNoDoubleAttempt) {
+#ifdef WIN32
+  GTEST_SKIP() << "Skipping on Windows";
+#endif
+  // Start with the alt-svc entry in the cache.
+  write_alt_svc_to_file_ = true;
+
+  const uint64_t request_size = 0;
+  const uint64_t response_size = 0;
+  const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
+
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.connectivity_grid_prevent_double_h2_scheduled", "true");
+  config_helper_.setConnectTimeout(std::chrono::seconds(1));
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  // --- Step 1: Mark H3 broken automatically ---
+  // Stop the H3 fake upstream so the H3 connection attempt fails (hangs).
+  fake_upstreams_[1]->cleanUp();
+
+  // Send request 1. It should start H3 (hangs) and H2 (connects immediately).
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // Now accept H2.
+  waitForNextUpstreamRequest(0);
+
+  // Complete the response over H2 to make the request succeed.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream(timeout));
+  checkSimpleRequestSuccess(request_size, response_size, response.get());
+
+  // Verify H3 is marked broken now.
+  test_server_->waitForCounter("cluster.cluster_0.upstream_http3_broken", Eq(1));
+
+  // Close the H2 connection so it won't be reused for the next request.
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(2));
+  fake_upstream_connection_.reset();
+  upstream_request_.reset();
+
+  // --- Step 2: Test H2 immediate failure and no other failover ---
+  // Tear down H2 upstream completely so any connection attempt to it fails immediately.
+  fake_upstreams_[0]->cleanUp();
+
+  // Send request 2. It should start with H2 because H3 is broken.
+  // We assert that Envoy only attempts H2 stream creation EXACTLY ONCE!
+  // (Without the fix, the immediate failure would trigger a redundant second H2 attempt/failover).
+  IntegrationStreamDecoderPtr response2;
+  EXPECT_LOG_CONTAINS_N_TIMES(
+      "trace", "HTTP/1 HTTP/2 ALPN pool attempting to create a new stream", 1, {
+        response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+        ASSERT_TRUE(response2->waitForEndStream(timeout));
+      });
+
+  EXPECT_EQ("503", response2->headers().getStatusValue());
+
+  cleanupUpstreamAndDownstream();
 }
 
 INSTANTIATE_TEST_SUITE_P(Protocols, FilterIntegrationTest,
