@@ -84,14 +84,14 @@ void GcpAuthnClientImpl::fetchUnboundJwt(
   query_params.add(AudienceQueryKey, audience.url());
   const std::string final_url =
       absl::StrCat(DefaultServiceAccountPrefix, IdentityUrlPath, query_params.toString());
-  fetchTokenHelper(TokenType::Jwt, audience, final_url, callbacks);
+  makeTokenRequest(TokenType::Jwt, audience, final_url, callbacks);
 }
 
 void GcpAuthnClientImpl::fetchUnboundAccessToken(
     const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
     GcpAuthnClient::Callbacks& callbacks) {
   const std::string final_url = absl::StrCat(DefaultServiceAccountPrefix, TokenUrlPath);
-  fetchTokenHelper(TokenType::AccessToken, audience, final_url, callbacks);
+  makeTokenRequest(TokenType::AccessToken, audience, final_url, callbacks);
 }
 
 void GcpAuthnClientImpl::fetchBoundJwt(
@@ -102,10 +102,10 @@ void GcpAuthnClientImpl::fetchBoundJwt(
   query_params.add(ClientCertificateSha256Key, fingerprint);
   const std::string final_url =
       absl::StrCat(DefaultServiceAccountPrefix, IdentityUrlPath, query_params.toString());
-  fetchTokenHelper(TokenType::BoundJwt, audience, final_url, callbacks);
+  makeTokenRequest(TokenType::BoundJwt, audience, final_url, callbacks);
 }
 
-void GcpAuthnClientImpl::fetchTokenHelper(
+void GcpAuthnClientImpl::makeTokenRequest(
     TokenType token_type, const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
     const std::string& final_url, GcpAuthnClient::Callbacks& callbacks) {
   // Cancel any active requests.

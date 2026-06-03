@@ -46,7 +46,7 @@ private:
   enum class TokenType { Jwt, AccessToken, BoundJwt };
 
   void onError(absl::string_view error_msg);
-  void fetchTokenHelper(TokenType token_type,
+  void makeTokenRequest(TokenType token_type,
                         const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
                         const std::string& final_url, GcpAuthnClient::Callbacks& callbacks);
   const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config_;
