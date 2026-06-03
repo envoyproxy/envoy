@@ -100,6 +100,9 @@ public:
   OptRef<const ListenerInfo> listenerInfo() const override {
     return makeOptRefFromPtr<const ListenerInfo>(listener_info_.get());
   }
+  std::shared_ptr<const ListenerInfo> listenerInfoConstSharedPtr() const override {
+    return listener_info_;
+  }
   void setListenerInfo(ListenerInfoConstSharedPtr listener_info) override {
     listener_info_ = std::move(listener_info);
   }

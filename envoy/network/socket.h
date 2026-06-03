@@ -302,6 +302,11 @@ public:
    * @return the listener info backing this socket.
    */
   virtual OptRef<const ListenerInfo> listenerInfo() const PURE;
+
+  /**
+   * @return the listener info backing this socket as a shared_ptr.
+   */
+  virtual std::shared_ptr<const ListenerInfo> listenerInfoConstSharedPtr() const PURE;
 };
 
 class ConnectionInfoSetter : public ConnectionInfoProvider {

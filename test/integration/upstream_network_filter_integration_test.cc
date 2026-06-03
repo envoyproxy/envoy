@@ -1,11 +1,16 @@
 #include "envoy/access_log/access_log.h"
+#include "envoy/config/core/v3/substitution_format_string.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/extension/v3/config_discovery.pb.h"
 
+#include "source/common/formatter/substitution_format_string.h"
+#include "source/extensions/formatter/metadata/metadata.h"
+
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/filters/test_network_filter.pb.h"
+#include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
@@ -693,11 +698,15 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest,
 
 class TestAccessLogFilterAndLogger : public Network::ReadFilter, public AccessLog::Instance {
 public:
-  TestAccessLogFilterAndLogger(Stats::Scope& scope) : scope_(scope) {}
+  TestAccessLogFilterAndLogger(Stats::Scope& scope, std::shared_ptr<Formatter::Formatter> formatter)
+      : scope_(scope), formatter_(std::move(formatter)) {}
 
   // AccessLog::Instance
-  void log(const AccessLog::LogContext&, const StreamInfo::StreamInfo&) override {
+  void log(const AccessLog::LogContext&, const StreamInfo::StreamInfo& stream_info) override {
     ENVOY_LOG_MISC(error, "TestAccessLogger::log called");
+    if (formatter_->format(Formatter::Context{}, stream_info) == "test_value") {
+      scope_.counterFromString("test_access_log_filter.listener_metadata_found").inc();
+    }
     scope_.counterFromString("test_access_log_filter.log_called").inc();
   }
 
@@ -713,17 +722,45 @@ public:
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks&) override {}
 
   Stats::Scope& scope_;
+  std::shared_ptr<Formatter::Formatter> formatter_;
 };
 
 class TestAccessLogFilterConfigFactory
     : public Server::Configuration::NamedUpstreamNetworkFilterConfigFactory {
 public:
+  class UpstreamGenericFactoryContext : public Server::Configuration::GenericFactoryContext {
+  public:
+    UpstreamGenericFactoryContext(Server::Configuration::UpstreamFactoryContext& context)
+        : context_(context) {}
+    Server::Configuration::ServerFactoryContext& serverFactoryContext() override {
+      return context_.serverFactoryContext();
+    }
+    ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+      return context_.serverFactoryContext().messageValidationVisitor();
+    }
+    Init::Manager& initManager() override { return context_.initManager(); }
+    Stats::Scope& scope() override { return context_.scope(); }
+
+  private:
+    Server::Configuration::UpstreamFactoryContext& context_;
+  };
+
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::UpstreamFactoryContext& context) override {
     Stats::Scope& scope = context.serverFactoryContext().scope();
-    return [&scope](Network::FilterManager& filter_manager) {
-      auto filter = std::make_shared<TestAccessLogFilterAndLogger>(scope);
+
+    envoy::config::core::v3::SubstitutionFormatString format;
+    format.mutable_text_format_source()->set_inline_string(
+        "%METADATA(LISTENER:test_key:test_value_key)%");
+    UpstreamGenericFactoryContext generic_context(context);
+    auto formatter =
+        Formatter::SubstitutionFormatStringUtils::fromProtoConfig(format, generic_context).value();
+
+    std::shared_ptr<Formatter::Formatter> shared_formatter = std::move(formatter);
+
+    return [&scope, shared_formatter](Network::FilterManager& filter_manager) {
+      auto filter = std::make_shared<TestAccessLogFilterAndLogger>(scope, shared_formatter);
       filter_manager.addReadFilter(filter);
       filter_manager.addAccessLogHandler(filter);
     };
@@ -758,6 +795,12 @@ public:
     // Setup generic tcp proxy downstream
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+
+      envoy::config::core::v3::Metadata metadata;
+      Envoy::Config::Metadata::mutableMetadataValue(metadata, "test_key", "test_value_key")
+          .set_string_value("test_value");
+      listener->mutable_metadata()->MergeFrom(metadata);
+
       auto* filter_chain = listener->add_filter_chains();
       auto* filter = filter_chain->add_filters();
       filter->set_name("envoy.filters.network.tcp_proxy");
@@ -775,6 +818,7 @@ public:
     test_server_->waitForCounter("test_access_log_filter.on_new_connection", Ge(1));
     test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Ge(1));
     test_server_->waitForCounter("test_access_log_filter.log_called", Ge(1));
+    test_server_->waitForCounter("test_access_log_filter.listener_metadata_found", Ge(1));
   }
 };
 
@@ -787,6 +831,62 @@ TEST_F(UpstreamNetworkFilterAccessLogIntegrationTest, LogCalled) {
   sendDataVerifyResults(0);
 
   verifyLog();
+}
+
+class HttpUpstreamNetworkFilterAccessLogIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  HttpUpstreamNetworkFilterAccessLogIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void initialize() override {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      auto* filter = cluster->add_filters();
+      filter->set_name("envoy.test.access_log_filter_custom");
+      test::integration::filters::TestNetworkFilterConfig config;
+      filter->mutable_typed_config()->PackFrom(config);
+    });
+
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+      envoy::config::core::v3::Metadata metadata;
+      Envoy::Config::Metadata::mutableMetadataValue(metadata, "test_key", "test_value_key")
+          .set_string_value("test_value");
+      listener->mutable_metadata()->MergeFrom(metadata);
+    });
+
+    HttpIntegrationTest::initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, HttpUpstreamNetworkFilterAccessLogIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(HttpUpstreamNetworkFilterAccessLogIntegrationTest, LogCalled) {
+  TestAccessLogFilterConfigFactory factory;
+  Registry::InjectFactory<Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>
+      register_factory(factory);
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // Verify log
+  test_server_->waitForCounter("test_access_log_filter.on_new_connection", Ge(1));
+  codec_client_->close();
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Ge(1));
+  test_server_->waitForCounter("test_access_log_filter.log_called", Ge(1));
+  test_server_->waitForCounter("test_access_log_filter.listener_metadata_found", Ge(1));
 }
 
 } // namespace

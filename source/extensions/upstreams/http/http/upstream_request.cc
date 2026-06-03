@@ -62,6 +62,21 @@ void HttpConnPool::onPoolReady(Envoy::Http::RequestEncoder& request_encoder,
   conn_pool_stream_handle_ = nullptr;
   auto upstream =
       std::make_unique<HttpUpstream>(callbacks_->upstreamToDownstream(), &request_encoder);
+
+  if (callbacks_->upstreamToDownstream().connection().has_value()) {
+    auto listener_info = callbacks_->upstreamToDownstream()
+                             .connection()
+                             ->connectionInfoProvider()
+                             .listenerInfoConstSharedPtr();
+    if (listener_info) {
+      if (auto* setter = const_cast<Network::ConnectionInfoSetter*>(
+              dynamic_cast<const Network::ConnectionInfoSetter*>(
+                  &request_encoder.getStream().connectionInfoProvider()))) {
+        setter->setListenerInfo(listener_info);
+      }
+    }
+  }
+
   callbacks_->onPoolReady(std::move(upstream), host,
                           request_encoder.getStream().connectionInfoProvider(), info, protocol);
 }

@@ -85,6 +85,8 @@ public:
     bool can_send_early_data_;
     // True if the request can be sent over HTTP/3.
     bool can_use_http3_;
+    // The downstream listener info, if any.
+    std::shared_ptr<const Network::ListenerInfo> listener_info_;
   };
 
   ~Instance() override = default;

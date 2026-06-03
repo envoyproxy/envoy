@@ -358,6 +358,11 @@ void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data
               connection_id, downstream_info_.downstreamAddressProvider().connectionID().value());
   }
 
+  if (downstream_info_.downstreamAddressProvider().listenerInfo()) {
+    conn_data->connection().connectionInfoSetter().setListenerInfo(
+        downstream_info_.downstreamAddressProvider().listenerInfoConstSharedPtr());
+  }
+
   upstream_handle_ = nullptr;
   Tcp::ConnectionPool::ConnectionData* latched_data = conn_data.get();
   Network::Connection& connection = conn_data->connection();
