@@ -64,6 +64,14 @@ HTTP filters
   rate_limit_filter
   rate_limit_quota_filter
   rbac_filter
+  proto_message_extraction_filter
+  rate_limit_filter
+  rate_limit_quota_filter
+  rbac_filter
+  rfc9440_client_cert_filter
+  router_filter
+  set_filter_state
+  set_metadata_filter
   router_filter
   set_filter_state
   set_metadata_filter
