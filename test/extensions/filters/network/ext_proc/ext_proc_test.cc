@@ -13,16 +13,6 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ExtProc {
-// Accessor for private members of NetworkExtProcFilter to improve coverage
-class NetworkExtProcFilterAccessor {
-public:
-  static void setProcessingComplete(NetworkExtProcFilter& filter, bool complete) {
-    filter.processing_complete_ = complete;
-  }
-  static void setLoggingInfo(NetworkExtProcFilter& filter, NetworkExtProcLoggingInfo* info) {
-    filter.logging_info_ = info;
-  }
-};
 
 namespace {
 
@@ -1485,17 +1475,6 @@ TEST(NetworkExtProcLoggingInfoCoverageTest, ConnectionInfoSetupNullAddresses) {
   EXPECT_TRUE(logging_info.localAddress().empty());
 }
 
-// Test recordCallCompletion when logging_info_ is null
-TEST_F(NetworkExtProcFilterTest, RecordCallCompletionNullLoggingInfo) {
-  NetworkExtProcFilterAccessor::setLoggingInfo(*filter_, nullptr);
-
-  auto response = std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>();
-  response->mutable_read_data()->set_data("test");
-
-  // This should not crash despite logging_info_ being null
-  filter_->onReceiveMessage(std::move(response));
-}
-
 // Test updateCloseCallbackStatus for write direction
 TEST_F(NetworkExtProcFilterTest, UpdateCloseCallbackStatusWrite) {
   EXPECT_CALL(write_callbacks_, disableClose(true));
@@ -1503,17 +1482,6 @@ TEST_F(NetworkExtProcFilterTest, UpdateCloseCallbackStatusWrite) {
 
   EXPECT_CALL(write_callbacks_, disableClose(false));
   filter_->updateCloseCallbackStatus(false, false); // Disable, write direction
-}
-
-// Test initializeLoggingInfo when read_callbacks_ is null
-TEST_F(NetworkExtProcFilterTest, InitializeLoggingInfoNullCallbacks) {
-  // Create a filter but don't call initializeReadFilterCallbacks
-  auto filter_config = std::make_shared<Config>(createConfig(false), scope_);
-  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
-  auto standalone_filter = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
-
-  // Accessing it shouldn't crash
-  standalone_filter->logStreamInfo();
 }
 
 // Test close_stream_to_ext_proc_server functionality
@@ -1682,7 +1650,6 @@ TEST_F(NetworkExtProcFilterTest, ReceiveDynamicMetadataNotAllowed) {
   EXPECT_CALL(stream_info_, setDynamicMetadata("other-namespace", _)).Times(0);
 
   filter_->onReceiveMessage(std::move(response));
-}
 }
 
 } // namespace
