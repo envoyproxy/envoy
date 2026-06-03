@@ -341,7 +341,7 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& dat
   if (!end_stream) {
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
-
+  // TODO(guoyilin42): Add SSE response support for non-streaming path using the buffered body.
   encodeJsonRpcData(encoder_callbacks_->responseHeaders());
   data.add(response_body_str_);
   response_body_str_.clear();
