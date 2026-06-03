@@ -140,7 +140,11 @@ void StaticRouteConfigProviderImpl::VhdsContext::requestVirtualHostsUpdate(
   // When a request for a VHDS update happens, Envoy needs to send the alias as
   // the resource name.
   auto alias = VhdsSubscription::domainNameToAlias(
-      config_update_info_->protobufConfigurationCast().name(), for_domain);
+      config_update_info_->protobufConfigurationCast().name(),
+      config_update_info_->protobufConfigurationCast()
+          .vhds()
+          .on_demand_virtual_host_resource_name(),
+      for_domain);
   // The StaticRouteConfigProviderImpl instance can go away before the dispatcher has a chance to
   // execute the callback. still_alive shared_ptr will be deallocated when the current instance of
   // the StaticRouteConfigProviderImpl is deallocated; we rely on a weak_ptr to still_alive flag to
