@@ -1237,6 +1237,10 @@ TEST_P(ClusterManagerLifecycleTest, CloseTcpConnectionsOnHealthFailure) {
     conn_info2 = cluster_manager_->getThreadLocalCluster("some_cluster")->tcpConn(nullptr);
   }
 
+  // Exercise the no-op watermark callbacks of the TCP connection container.
+  connection1->runHighWatermarkCallbacks();
+  connection1->runLowWatermarkCallbacks();
+
   // Order of these calls is implementation dependent, so can't sequence them!
   EXPECT_CALL(*connection1, close(Network::ConnectionCloseType::NoFlush, _));
   EXPECT_CALL(*connection2, close(Network::ConnectionCloseType::NoFlush, _));
