@@ -3330,7 +3330,7 @@ TEST_P(AdsIntegrationTest, MultipleXdstpVhdsCollectionsOverAds) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}));
 
   // The listeners should still be warming.
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 0);
+  test_server_->waitForCounter("listener_manager.listener_create_success", testing::Ge(0));
 
   // RDS response with xdstp VHDS.
   sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
@@ -3352,7 +3352,7 @@ TEST_P(AdsIntegrationTest, MultipleXdstpVhdsCollectionsOverAds) {
       compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "", {}, {}, {}));
   // The listeners should still be warming after the RDS response. They can only finish
   // initialization once the VHDS subscriptions receive their first response.
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 0);
+  test_server_->waitForCounter("listener_manager.listener_create_success", testing::Ge(0));
 
   // Respond with virtual hosts for both collections.
   sendDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
@@ -3366,8 +3366,8 @@ TEST_P(AdsIntegrationTest, MultipleXdstpVhdsCollectionsOverAds) {
       {}, "1");
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, "", {}, {}, {}));
 
-  test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", 0);
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  test_server_->waitForGauge("listener_manager.total_listeners_warming", testing::Eq(0));
+  test_server_->waitForCounter("listener_manager.listener_create_success", testing::Ge(2));
   registerTestServerPorts({"http0", "http1"});
 
   auto send_request_and_verify = [this](const std::string& port_name,
