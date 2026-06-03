@@ -860,6 +860,8 @@ public:
   void initialize() override {
     config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
     )EOF");
 
     if (routeConfigType() == RouteConfigType::Static) {
