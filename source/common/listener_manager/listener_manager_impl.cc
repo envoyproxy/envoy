@@ -745,7 +745,7 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
   // (e.g. HTTP/2 codecs) can react before the drain timer expires and connections are
   // forcibly closed.
   for (const auto& worker : workers_) {
-    worker->drainListener(*draining_it->listener_);
+    worker->onListenerDrain(*draining_it->listener_);
   }
 
   // Start the drain sequence which completes when the listener's drain manager has completed
@@ -943,8 +943,8 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& draining_listener,
   // callbacks (e.g. HTTP/2 codecs) can react before the drain timer expires and the
   // connections are forcibly closed.
   for (const auto& worker : workers_) {
-    worker->drainFilterChains(draining_group->getDrainingListenerTag(),
-                              draining_group->getDrainingFilterChains());
+    worker->onFilterChainDrain(draining_group->getDrainingListenerTag(),
+                               draining_group->getDrainingFilterChains());
   }
 
   // Start the drain sequence which completes when the listener's drain manager has completed

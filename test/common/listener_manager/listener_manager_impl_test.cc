@@ -3181,7 +3181,7 @@ filter_chains:
   checkStats(__LINE__, 1, 0, 1, 0, 0, 0, 0);
 }
 
-// Verify ListenerManagerImpl::drainListener fans out worker_->drainListener at the start
+// Verify ListenerManagerImpl::drainListener fans out worker_->onListenerDrain at the start
 // of the drain sequence, before connections are closed.
 TEST_P(ListenerManagerImplTest, DrainListenerFansOutToWorker) {
   InSequence s;
@@ -3205,11 +3205,11 @@ filter_chains:
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
   worker_->callAddCompletion();
 
-  // ListenerManagerImpl::drainListener orders: stopListener, worker->drainListener, then
+  // ListenerManagerImpl::drainListener orders: stopListener, worker->onListenerDrain, then
   // drain_manager->startDrainSequence. Override the AnyNumber() default from SetUp() so we
-  // assert worker->drainListener is invoked exactly once.
+  // assert worker->onListenerDrain is invoked exactly once.
   EXPECT_CALL(*worker_, stopListener(_, _, _));
-  EXPECT_CALL(*worker_, drainListener(_));
+  EXPECT_CALL(*worker_, onListenerDrain(_));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
 

@@ -163,17 +163,17 @@ TEST_F(WorkerImplTest, DrainPostsToWorkerThread) {
   worker_.start(guard_dog_, emptyCallback);
   ci.waitReady();
 
-  // drainListener posts to the worker dispatcher and invokes handler->onListenerDrain on
+  // onListenerDrain posts to the worker dispatcher and invokes handler->onListenerDrain on
   // the worker thread.
   EXPECT_CALL(*handler_, onListenerDrain(7UL))
       .WillOnce(InvokeWithoutArgs([current_thread_id, &ci]() {
         EXPECT_NE(current_thread_id, std::this_thread::get_id());
         ci.setReady();
       }));
-  worker_.drainListener(listener);
+  worker_.onListenerDrain(listener);
   ci.waitReady();
 
-  // drainFilterChains likewise posts and forwards on the worker thread.
+  // onFilterChainDrain likewise posts and forwards on the worker thread.
   const std::list<const Network::FilterChain*> filter_chains;
   EXPECT_CALL(*handler_, onFilterChainDrain(7UL, _))
       .WillOnce(
@@ -181,7 +181,7 @@ TEST_F(WorkerImplTest, DrainPostsToWorkerThread) {
             EXPECT_NE(current_thread_id, std::this_thread::get_id());
             ci.setReady();
           }));
-  worker_.drainFilterChains(7UL, filter_chains);
+  worker_.onFilterChainDrain(7UL, filter_chains);
   ci.waitReady();
 
   worker_.stop();

@@ -102,8 +102,8 @@ public:
    * @param listener_tag supplies the tag passed to addListener().
    * @param filter_chains supplies the filter chains whose connections should be notified.
    */
-  virtual void drainFilterChains(uint64_t listener_tag,
-                                 const std::list<const Network::FilterChain*>& filter_chains) PURE;
+  virtual void onFilterChainDrain(uint64_t listener_tag,
+                                  const std::list<const Network::FilterChain*>& filter_chains) PURE;
 
   /**
    * Notify all connections of the given listener that they are being drained. Connections
@@ -111,7 +111,7 @@ public:
    * dispatcher.
    * @param listener supplies the listener whose connections should be notified.
    */
-  virtual void drainListener(Network::ListenerConfig& listener) PURE;
+  virtual void onListenerDrain(Network::ListenerConfig& listener) PURE;
 };
 
 using WorkerPtr = std::unique_ptr<Worker>;

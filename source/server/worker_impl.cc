@@ -151,16 +151,14 @@ void WorkerImpl::stopListener(Network::ListenerConfig& listener,
   });
 }
 
-void WorkerImpl::drainFilterChains(uint64_t listener_tag,
-                                   const std::list<const Network::FilterChain*>& filter_chains) {
-  ASSERT(thread_);
+void WorkerImpl::onFilterChainDrain(uint64_t listener_tag,
+                                    const std::list<const Network::FilterChain*>& filter_chains) {
   dispatcher_->post([this, listener_tag, &filter_chains]() -> void {
     handler_->onFilterChainDrain(listener_tag, filter_chains);
   });
 }
 
-void WorkerImpl::drainListener(Network::ListenerConfig& listener) {
-  ASSERT(thread_);
+void WorkerImpl::onListenerDrain(Network::ListenerConfig& listener) {
   const uint64_t listener_tag = listener.listenerTag();
   dispatcher_->post([this, listener_tag]() -> void { handler_->onListenerDrain(listener_tag); });
 }
