@@ -495,13 +495,22 @@ impl<ELF: EnvoyListenerFilter, F: ListenerFilter<ELF>> ListenerFilter<ELF> for C
   fn on_data(
     &mut self,
     envoy_filter: &mut ELF,
+    data_length: usize,
   ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
     self
-      .catch("on_data", |f| f.on_data(envoy_filter))
+      .catch("on_data", |f| f.on_data(envoy_filter, data_length))
       .unwrap_or_else(|_| {
         envoy_filter.close_socket(Some("filter panic"));
         abi::envoy_dynamic_module_type_on_listener_filter_status::StopIteration
       })
+  }
+
+  // A panic here means we cannot know how many bytes the filter wants: return 0 so the
+  // filter does not receive any data.
+  fn max_read_bytes(&mut self, envoy_filter: &mut ELF) -> usize {
+    self
+      .catch("max_read_bytes", |f| f.max_read_bytes(envoy_filter))
+      .unwrap_or(0)
   }
 
   // Void callbacks: cleanup after the socket is already closed.

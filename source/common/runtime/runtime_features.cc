@@ -37,6 +37,9 @@
 RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
 RUNTIME_GUARD(envoy_reloadable_features_cel_message_serialize_text_format);
 RUNTIME_GUARD(envoy_reloadable_features_codec_client_enable_idle_timer_only_when_connected);
+RUNTIME_GUARD(envoy_reloadable_features_conn_pool_fix_reentrancy);
+RUNTIME_GUARD(envoy_reloadable_features_conn_pool_grid_early_return_on_teardown);
+RUNTIME_GUARD(envoy_reloadable_features_connectivity_grid_prevent_double_h2_scheduled);
 RUNTIME_GUARD(envoy_reloadable_features_decouple_explicit_drain_pools_and_dns_refresh);
 RUNTIME_GUARD(envoy_reloadable_features_dfp_cluster_resolves_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
@@ -49,7 +52,6 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_new_dns_implementation);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_lrs_server_self_ads);
 RUNTIME_GUARD(envoy_reloadable_features_enable_new_query_param_present_match_behavior);
 RUNTIME_GUARD(envoy_reloadable_features_ext_authz_http_client_retries_respect_user_retry_on);
-RUNTIME_GUARD(envoy_reloadable_features_ext_authz_respect_keep_empty_value);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
 // @yanjunxiang-google before removing.
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
@@ -67,6 +69,7 @@ RUNTIME_GUARD(envoy_reloadable_features_hide_transport_failure_reason_in_respons
 RUNTIME_GUARD(envoy_reloadable_features_http1_close_connection_on_zombie_stream_complete);
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_http2_fix_goaway_loadshed_point);
+RUNTIME_GUARD(envoy_reloadable_features_http2_include_cookies_in_limits);
 RUNTIME_GUARD(envoy_reloadable_features_http_async_client_retry_respect_buffer_limits);
 RUNTIME_GUARD(envoy_reloadable_features_http_inspector_use_balsa_parser);
 RUNTIME_GUARD(envoy_reloadable_features_http_preserve_rst_no_error);
@@ -225,6 +228,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_fixed_heap_use_allocated);
 // Flip back to true once performance aligns with nghttp2 and
 // https://github.com/envoyproxy/envoy/issues/40070 is resolved.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
+
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_least_request_lb_count_pending_requests);
 // When enabled, dynamic modules metrics will be registered as custom stat namespaces, causing
 // the namespace prefix to be stripped from prometheus output and no envoy_ prefix added.
 // This is the legacy behavior. When disabled which is the default, metrics appear with the

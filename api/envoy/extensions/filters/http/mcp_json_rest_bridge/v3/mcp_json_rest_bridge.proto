@@ -227,6 +227,21 @@ message ToolConfig {
   // Config for this tool's entry in a local tools/list response. Used when tool_list_local is set
   // in the ServerToolConfig.
   ToolsListSpecificConfig tool_list_config = 3;
+
+  // Enables streaming transcoding for unstructured text responses (``content`` field of a result).
+  //
+  // When enabled, the response body is streamed directly to the client without buffering. Each
+  // chunk is JSON escaped as it arrives and wrapped with a pre-built JSON-RPC prefix and suffix.
+  //
+  // Streaming flow:
+  //
+  // .. code-block:: text
+  //
+  //   input:  [chunk1] → [chunk2] → [chunk3]
+  //   output: [prefix+escaped_chunk1] → [escaped_chunk2] → [escaped_chunk3+suffix]
+  //
+  // Disabled by default.
+  bool text_content_streaming_enabled = 4;
 }
 
 // Defines the schema of the JSON-RPC to REST mapping. It specifies how the "arguments"
