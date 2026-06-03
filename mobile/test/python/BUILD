@@ -1,6 +1,6 @@
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
 load("@mobile_pip3//:requirements.bzl", "requirement")
 load("@rules_python//python:defs.bzl", "py_library", "py_test")
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
 
 licenses(["notice"])  # Apache 2
 

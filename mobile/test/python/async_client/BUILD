@@ -1,5 +1,5 @@
-load("@rules_python//python:defs.bzl", "py_test")
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
+load("@rules_python//python:defs.bzl", "py_test")
 
 licenses(["notice"])  # Apache 2
 
