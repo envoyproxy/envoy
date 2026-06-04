@@ -780,7 +780,7 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   // so a misbehaved module that fires completion after a sync return cannot deliver to the
   // wrong context.
   {
-    absl::MutexLock lock(&async_slots_mutex_);
+    absl::MutexLock lock(async_slots_mutex_);
     async_slots_[context] = slot;
   }
   handle_->cluster_->config()->on_cluster_lb_choose_host_(in_module_lb_, context, &host_ptr,
@@ -795,7 +795,7 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
 
   // Synchronous result: the slot we pre-published is unused. Erase it under the lock.
   {
-    absl::MutexLock lock(&async_slots_mutex_);
+    absl::MutexLock lock(async_slots_mutex_);
     async_slots_.erase(context);
   }
 
@@ -810,21 +810,21 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
 
 std::shared_ptr<AsyncHostSelectionSlot> DynamicModuleLoadBalancer::lookupAsyncSlot(
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context) const {
-  absl::MutexLock lock(&async_slots_mutex_);
+  absl::MutexLock lock(async_slots_mutex_);
   auto it = async_slots_.find(context);
   return it == async_slots_.end() ? nullptr : it->second;
 }
 
 void DynamicModuleLoadBalancer::removeAsyncSlot(
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context) const {
-  absl::MutexLock lock(&async_slots_mutex_);
+  absl::MutexLock lock(async_slots_mutex_);
   async_slots_.erase(context);
 }
 
 void DynamicModuleLoadBalancer::insertAsyncSlotForTest(
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context,
     std::shared_ptr<AsyncHostSelectionSlot> slot) const {
-  absl::MutexLock lock(&async_slots_mutex_);
+  absl::MutexLock lock(async_slots_mutex_);
   async_slots_[context] = std::move(slot);
 }
 
