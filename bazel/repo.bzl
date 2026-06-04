@@ -111,13 +111,13 @@ def _envoy_repo_impl(repository_ctx):
                 if "clang version" in line:
                     llvm_version_local = line.split("clang version ")[1].split(" ")[0].strip()
                     break
-        for d in ["lib64", "lib"]:
-            if repository_ctx.path(llvm_path + "/" + d + "/libclang-cpp.so").exists:
-                llvm_lib_dir = d
+        for directory in ["lib64", "lib"]:
+            if repository_ctx.path(llvm_path + "/" + directory + "/libclang-cpp.so").exists:
+                llvm_lib_dir = directory
                 break
-            entries = repository_ctx.execute(["ls", llvm_path + "/" + d + "/"])
+            entries = repository_ctx.execute(["ls", llvm_path + "/" + directory + "/"])
             if entries.return_code == 0 and "libclang-cpp.so" in entries.stdout:
-                llvm_lib_dir = d
+                llvm_lib_dir = directory
                 break
 
     # By default, even when local toolchain is used, we still use the hermetic
