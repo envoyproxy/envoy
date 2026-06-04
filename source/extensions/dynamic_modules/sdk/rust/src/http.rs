@@ -2421,28 +2421,20 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     if count == 0 {
       return None;
     }
-    let mut buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
-      abi::envoy_dynamic_module_type_envoy_buffer {
-        ptr: std::ptr::null(),
-        length: 0,
-      };
-      count
-    ];
+    let mut buffers: Vec<EnvoyBuffer> = Vec::with_capacity(count);
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_metadata_keys(
         self.raw_ptr,
         source,
         str_to_module_buffer(namespace),
-        buffers.as_mut_ptr() as *mut _,
+        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
     if success {
-      Some(
-        buffers
-          .into_iter()
-          .map(|b| unsafe { EnvoyBuffer::new_from_raw(b.ptr as *const _, b.length) })
-          .collect(),
-      )
+      unsafe {
+        buffers.set_len(count);
+      }
+      Some(buffers)
     } else {
       None
     }
@@ -2458,27 +2450,19 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     if count == 0 {
       return None;
     }
-    let mut buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
-      abi::envoy_dynamic_module_type_envoy_buffer {
-        ptr: std::ptr::null(),
-        length: 0,
-      };
-      count
-    ];
+    let mut buffers: Vec<EnvoyBuffer> = Vec::with_capacity(count);
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_metadata_namespaces(
         self.raw_ptr,
         source,
-        buffers.as_mut_ptr() as *mut _,
+        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
     if success {
-      Some(
-        buffers
-          .into_iter()
-          .map(|b| unsafe { EnvoyBuffer::new_from_raw(b.ptr as *const _, b.length) })
-          .collect(),
-      )
+      unsafe {
+        buffers.set_len(count);
+      }
+      Some(buffers)
     } else {
       None
     }
@@ -2687,15 +2671,18 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       return None;
     }
 
-    let buffers: Vec<EnvoyMutBuffer> = vec![EnvoyMutBuffer::default(); size];
+    let mut buffers: Vec<EnvoyMutBuffer> = Vec::with_capacity(size);
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_body_chunks(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_body_type::ReceivedRequestBody,
-        buffers.as_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
+        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
     if success {
+      unsafe {
+        buffers.set_len(size);
+      }
       Some(buffers)
     } else {
       None
@@ -2713,15 +2700,18 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       return None;
     }
 
-    let buffers: Vec<EnvoyMutBuffer> = vec![EnvoyMutBuffer::default(); size];
+    let mut buffers: Vec<EnvoyMutBuffer> = Vec::with_capacity(size);
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_body_chunks(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_body_type::BufferedRequestBody,
-        buffers.as_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
+        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
     if success {
+      unsafe {
+        buffers.set_len(size);
+      }
       Some(buffers)
     } else {
       None
@@ -2797,15 +2787,18 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       return None;
     }
 
-    let buffers: Vec<EnvoyMutBuffer> = vec![EnvoyMutBuffer::default(); size];
+    let mut buffers: Vec<EnvoyMutBuffer> = Vec::with_capacity(size);
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_body_chunks(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_body_type::ReceivedResponseBody,
-        buffers.as_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
+        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
     if success {
+      unsafe {
+        buffers.set_len(size);
+      }
       Some(buffers)
     } else {
       None
@@ -2823,15 +2816,18 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       return None;
     }
 
-    let buffers: Vec<EnvoyMutBuffer> = vec![EnvoyMutBuffer::default(); size];
+    let mut buffers: Vec<EnvoyMutBuffer> = Vec::with_capacity(size);
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_body_chunks(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_body_type::BufferedResponseBody,
-        buffers.as_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
+        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
     if success {
+      unsafe {
+        buffers.set_len(size);
+      }
       Some(buffers)
     } else {
       None
@@ -3642,14 +3638,13 @@ impl EnvoyHttpFilterImpl {
         headers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
       )
     };
+    if !success {
+      return Vec::default();
+    }
     unsafe {
       headers.set_len(count);
     }
-    if success {
-      headers
-    } else {
-      Vec::default()
-    }
+    headers
   }
 
   /// This implements the common logic for getting the header/trailer values.
