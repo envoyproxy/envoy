@@ -1,5 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("//bazel:toolchains.bzl", "LIBCLANG_CPP")
+load("//bazel:toolchains.bzl", "LIBCLANG_CPP", "LIBLLVM")
 load("//compat/openssl:bazel/rules.bzl", "mapping_func_filegroup", "patched_bssl_filegroup")
 
 licenses(["notice"])  # Apache 2
@@ -202,7 +202,7 @@ genrule(
     tools = [
         "//compat/openssl/prefixer",
         LIBCLANG_CPP,
-    ],
+    ] + ([LIBLLVM] if LIBLLVM else []),
     visibility = ["//visibility:private"],
 )
 
