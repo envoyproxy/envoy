@@ -896,6 +896,18 @@ pub trait EnvoyHttpFilter {
   /// Returns true if the operation is successful.
   fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str);
 
+  /// Set multiple string-typed dynamic metadata entries under `namespace` in a single call.
+  ///
+  /// Equivalent to calling [`Self::set_dynamic_metadata_string`] once per entry but resolves the
+  /// namespace and merges into the metadata struct only once. Existing entries with the same key
+  /// are overwritten. Within `entries`, a later entry overwrites an earlier one with the same key.
+  /// An empty `entries` is a no-op and does not create the namespace.
+  fn set_dynamic_metadata_string_batch<'a>(
+    &mut self,
+    namespace: &'a str,
+    entries: &'a [(&'a str, &'a str)],
+  );
+
   /// Get the bool-typed metadata value with the given key.
   /// Use the `source` parameter to specify which metadata to use.
   /// If the metadata is not found or is the wrong type, this returns `None`.
@@ -2332,6 +2344,30 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
         str_to_module_buffer(namespace),
         str_to_module_buffer(key),
         str_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn set_dynamic_metadata_string_batch(&mut self, namespace: &str, entries: &[(&str, &str)]) {
+    // `pairs` borrows the key/value bytes of `entries`, which outlive this call. Envoy copies the
+    // bytes into the metadata Struct synchronously, so the pointers never dangle. An empty
+    // `entries` yields an empty Vec paired with a zero length the callback treats as a no-op.
+    let mut pairs: Vec<abi::envoy_dynamic_module_type_module_key_value_pair> =
+      Vec::with_capacity(entries.len());
+    for (key, value) in entries {
+      pairs.push(abi::envoy_dynamic_module_type_module_key_value_pair {
+        key_ptr: key.as_ptr() as *const _,
+        key_length: key.len(),
+        value_ptr: value.as_ptr() as *const _,
+        value_length: value.len(),
+      });
+    }
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        pairs.as_ptr(),
+        pairs.len(),
       )
     }
   }
