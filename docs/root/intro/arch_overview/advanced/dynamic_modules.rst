@@ -85,9 +85,10 @@ and returns a fail-closed default:
 * Network filter callbacks close the connection and return ``StopIteration``.
 * Listener filter callbacks close the socket and return ``StopIteration``.
 
-When ``CatchUnwind`` is applied to a filter, this prevents a single panicking module
-from aborting the entire Envoy process. The affected request or connection is
-terminated; other traffic is unaffected.
+The SDK always guards each callback at the FFI boundary so a panic can never unwind into
+Envoy and corrupt the process, regardless of whether ``CatchUnwind`` is used. The wrapper
+adds graceful filter-level teardown on top of that guard. The affected request or
+connection is terminated. Other traffic is unaffected.
 
 Getting started
 --------------------------

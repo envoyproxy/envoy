@@ -1145,10 +1145,16 @@ WEAK_STUB(UpstreamBridgeGetRequestBuffer,
           envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer(nullptr,
                                                                                     nullptr,
                                                                                     nullptr))
+WEAK_STUB(
+    UpstreamBridgeGetRequestBufferChunksSize,
+    envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer_chunks_size(nullptr))
 WEAK_STUB(UpstreamBridgeGetResponseBuffer,
           envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer(nullptr,
                                                                                      nullptr,
                                                                                      nullptr))
+WEAK_STUB(
+    UpstreamBridgeGetResponseBufferChunksSize,
+    envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer_chunks_size(nullptr))
 WEAK_STUB(UpstreamBridgeSendUpstreamData,
           envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_upstream_data(nullptr,
                                                                                     {nullptr, 0},
@@ -1324,6 +1330,10 @@ WEAK_STUB(HttpFilterRecordHistogramValue,
 WEAK_STUB(HttpGetHeader, envoy_dynamic_module_callback_http_get_header(
                              nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader,
                              {nullptr, 0}, nullptr, 0, nullptr))
+WEAK_STUB(HttpGetHeaderValues,
+          envoy_dynamic_module_callback_http_get_header_values(
+              nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, {nullptr, 0},
+              nullptr))
 WEAK_STUB(HttpGetHeadersSize,
           envoy_dynamic_module_callback_http_get_headers_size(
               nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader))
