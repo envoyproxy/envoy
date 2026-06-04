@@ -17,6 +17,7 @@ namespace Http2 {
   COUNTER(dropped_headers_with_underscores)                                                        \
   COUNTER(goaway_sent)                                                                             \
   COUNTER(header_overflow)                                                                         \
+  COUNTER(header_list_size_too_large)                                                              \
   COUNTER(headers_cb_no_stream)                                                                    \
   COUNTER(inbound_empty_frames_flood)                                                              \
   COUNTER(inbound_priority_frames_flood)                                                           \

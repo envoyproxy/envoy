@@ -27,7 +27,8 @@ namespace Mcp {
 #define MCP_FILTER_STATS(COUNTER)                                                                  \
   COUNTER(requests_rejected)                                                                       \
   COUNTER(invalid_json)                                                                            \
-  COUNTER(body_too_large)
+  COUNTER(body_too_large)                                                                          \
+  COUNTER(duplicate_keys_rejected)
 
 /**
  * Struct definition for MCP filter stats. @see stats_macros.h
@@ -64,6 +65,7 @@ public:
     return propagate_baggage_;
   }
 
+  bool rejectDuplicateKeys() const { return parser_config_.rejectDuplicateKeys(); }
   uint32_t maxRequestBodySize() const { return max_request_body_size_; }
   const ParserConfig& parserConfig() const { return parser_config_; }
   bool shouldStoreToDynamicMetadata() const {
@@ -154,6 +156,7 @@ private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   uint32_t bytes_parsed_{0};
   bool parsing_complete_{false};
+  bool is_exceeding_limit_{false};
   std::unique_ptr<JsonPathParser> parser_;
   bool is_mcp_request_{false};
   bool is_json_post_request_{false};
