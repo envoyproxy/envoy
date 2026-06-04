@@ -343,6 +343,76 @@ TEST_F(GcpAuthnFilterTest, CacheMissAndInsert) {
   EXPECT_EQ(cached_val.value(), std::string(GoodTokenStr));
 }
 
+TEST_F(GcpAuthnFilterTest, BoundJwtCacheMissAndInsert) {
+  setupMockObjects();
+
+  cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_));
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.mutable_bound_jwt()->set_url("test");
+
+  (*metadata_
+        .mutable_typed_filter_metadata())[std::string(
+                                              Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+      .PackFrom(audience);
+  ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
+
+  const std::string dummy_pem = "dummy cert PEM";
+  const std::string expected_fingerprint = "mock_fingerprint_base64";
+
+  auto socket_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
+  auto client_context_config = std::make_unique<NiceMock<Ssl::MockClientContextConfig>>();
+  auto tls_cert_config = std::make_unique<NiceMock<Ssl::MockTlsCertificateConfig>>();
+
+  ON_CALL(*tls_cert_config, certificateChain()).WillByDefault(testing::ReturnRef(dummy_pem));
+
+  std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>> tls_certs;
+  tls_certs.push_back(*tls_cert_config);
+  ON_CALL(*client_context_config, tlsCertificates()).WillByDefault(testing::Return(tls_certs));
+
+  ON_CALL(*socket_factory, clientContextConfig())
+      .WillByDefault(
+          testing::Return(OptRef<const Ssl::ClientContextConfig>(*client_context_config)));
+
+  auto transport_socket_matcher =
+      std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(std::move(socket_factory));
+  EXPECT_CALL(*cluster_info_, transportSocketMatcher())
+      .WillRepeatedly(testing::ReturnRef(*transport_socket_matcher));
+
+  EXPECT_CALL(*fingerprinter_, getFingerprintFromPem(dummy_pem))
+      .WillOnce(testing::Return(expected_fingerprint));
+
+  // Instantiate real TokenCacheImpl.
+  envoy::extensions::filters::http::gcp_authn::v3::TokenCacheConfig cache_config;
+  cache_config.mutable_cache_size()->set_value(100);
+  TokenCacheImpl cache(cache_config, context_.serverFactoryContext().timeSource());
+
+  setupFilterAndCallback(&cache);
+
+  // The filter should fall back to calling the async client because of cache miss.
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+  // Mock successful async HTTP client response.
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  response->body().add(std::string(GoodTokenStr));
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+
+  client_callback_->onSuccess(client_request_, std::move(response));
+
+  // After fetch completes, the token must be automatically inserted into the cache with the
+  // fingerprint!
+  auto cached_val = cache.lookUp(audience, expected_fingerprint);
+  EXPECT_TRUE(cached_val.has_value());
+  EXPECT_EQ(cached_val.value(), std::string(GoodTokenStr));
+}
+
 TEST_F(GcpAuthnFilterTest, MtlsClusterFingerprint) {
   setupMockObjects();
   setupFilterAndCallback();

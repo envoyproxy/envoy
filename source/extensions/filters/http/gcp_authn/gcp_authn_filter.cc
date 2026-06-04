@@ -153,7 +153,6 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
   }
 
   request_header_map_ = &hdrs;
-  initiating_call_ = false;
 
   // Execute token-type specific fetch calls.
   if (audience_.has_bound_jwt()) {
@@ -169,7 +168,9 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
     return FilterHeadersStatus::Continue;
   }
 
-  return FilterHeadersStatus::StopAllIterationAndWatermark;
+  initiating_call_ = false;
+  return state_ == State::Complete ? FilterHeadersStatus::Continue
+                                   : Http::FilterHeadersStatus::StopAllIterationAndWatermark;
 }
 
 void GcpAuthnFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
