@@ -8,6 +8,8 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/router/router.h"
+#include "envoy/ssl/context_config.h"
+#include "envoy/ssl/tls_certificate_config.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
 #include "source/common/common/enum_to_int.h"
@@ -16,6 +18,7 @@
 #include "source/common/jwt/status.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/gcp_authn/crypto_utils.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -63,6 +66,42 @@ using ::Envoy::Router::RouteConstSharedPtr;
 using Http::FilterHeadersStatus;
 using JwtVerify::Status;
 
+absl::optional<std::string>
+GcpAuthnFilter::getClientCertFingerprint(Upstream::ThreadLocalCluster* cluster) {
+  if (cluster == nullptr) {
+    return absl::nullopt;
+  }
+
+  auto match_data = cluster->info()->transportSocketMatcher().resolve(nullptr, nullptr);
+  auto& factory = match_data.factory_;
+  auto client_context_config_opt = factory.clientContextConfig();
+  if (!client_context_config_opt.has_value()) {
+    return absl::nullopt;
+  }
+
+  const Ssl::ClientContextConfig& client_context_config = client_context_config_opt.value();
+  const auto tls_certs = client_context_config.tlsCertificates();
+  if (tls_certs.empty()) {
+    return absl::nullopt;
+  }
+
+  const auto& cert_config = tls_certs[0].get();
+  const std::string& cert_pem = cert_config.certificateChain();
+  if (cert_pem.empty()) {
+    return absl::nullopt;
+  }
+
+  auto fingerprint_or_error = cert_fingerprinter_->getFingerprintFromPem(cert_pem);
+  if (!fingerprint_or_error.ok()) {
+    ENVOY_LOG(warn, "Failed to calculate certificate fingerprint: {}",
+              fingerprint_or_error.status().message());
+    return absl::nullopt;
+  }
+
+  stats_.client_cert_fingerprint_calculated_.inc();
+  return fingerprint_or_error.value();
+}
+
 // TODO(tyxia) Handle the duplicated outstanding requests.
 Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& hdrs, bool) {
   const auto route = decoder_callbacks_->route();
@@ -79,33 +118,57 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
           route->routeEntry()->clusterName());
 
   auto audience_opt = retrieveAudience(cluster);
-
-  if (audience_opt.has_value()) {
-    audience_ = audience_opt.value();
-    if (jwt_token_cache_ != nullptr) {
-      auto token = jwt_token_cache_->lookUp(audience_);
-      if (token.has_value()) {
-        // If token is found in the cache, we add the token string to the request directly and
-        // continue the filter chain iteration.
-        addTokenToRequest(hdrs, token.value(), filter_config_->token_header());
-        return FilterHeadersStatus::Continue;
-      }
-    }
-
-    // Save the pointer to the request headers for header manipulation based on http response later.
-    request_header_map_ = &hdrs;
-
-    client_->fetchToken(audience_, *this);
-    initiating_call_ = false;
-  } else {
-    // There is no need to fetch the token if no audience is specified because no
-    // authentication will be performed. So, we just continue the filter chain iteration.
+  if (!audience_opt.has_value()) {
     stats_.retrieve_audience_failed_.inc();
     state_ = State::Complete;
+    return FilterHeadersStatus::Continue;
   }
 
-  // Stop the iteration for headers as well as data and trailers for the current filter and the
-  // filters following.
+  audience_ = audience_opt.value();
+
+  // Resolve fingerprint if bound token is requested. Note client_cert_fingerprint_ remains
+  // absl::nullopt by default for unbound tokens.
+  if (audience_.has_bound_jwt()) {
+    client_cert_fingerprint_ = getClientCertFingerprint(cluster);
+    if (!client_cert_fingerprint_.has_value()) {
+      ENVOY_LOG(warn,
+                "Failed to fetch bound token: client certificate fingerprint is unavailable.");
+      state_ = State::Complete;
+      decoder_callbacks_->sendLocalReply(
+          Http::Code::InternalServerError,
+          "Failed to fetch bound token: client certificate fingerprint is unavailable.", nullptr,
+          absl::nullopt, "bound_jwt_fingerprint_unavailable");
+      return FilterHeadersStatus::StopAllIterationAndWatermark;
+    }
+  }
+
+  // Check cache first and reuse previously fetched token if possible.
+  if (jwt_token_cache_ != nullptr) {
+    auto token = jwt_token_cache_->lookUp(audience_, client_cert_fingerprint_);
+    if (token.has_value()) {
+      addTokenToRequest(hdrs, token.value(), filter_config_->token_header());
+      state_ = State::Complete;
+      return FilterHeadersStatus::Continue;
+    }
+  }
+
+  request_header_map_ = &hdrs;
+
+  // Execute token-type specific fetch calls.
+  if (audience_.has_bound_jwt()) {
+    client_->fetchBoundJwt(audience_, client_cert_fingerprint_.value(), *this);
+  } else if (audience_.has_access_token()) {
+    client_->fetchUnboundAccessToken(audience_, *this);
+  } else if (!audience_.url().empty()) {
+    client_->fetchUnboundJwt(audience_, *this);
+  } else {
+    ENVOY_LOG(warn, "Audience is configured but no token is specified, continuing without token.");
+    stats_.empty_audience_.inc();
+    state_ = State::Complete;
+    return FilterHeadersStatus::Continue;
+  }
+
+  initiating_call_ = false;
   return state_ == State::Complete ? FilterHeadersStatus::Continue
                                    : Http::FilterHeadersStatus::StopAllIterationAndWatermark;
 }
