@@ -407,59 +407,29 @@ credentials:
 }
 
 // =============================================================================
-// Cluster-scoped RedisProtocolOptions.upstream_protocol accessor tests.
-//
-// Cover the ProtocolOptionsConfigImpl::upstreamProtocolVersion static
-// accessor: default (no options / UNSPECIFIED -> RESP2) and explicit RESP3.
+// Listener-level RedisProxy.protocol_version conversion tests.
 // =============================================================================
 
-namespace {
-
-// Build a minimal MockClusterInfo with the given RedisProtocolOptions attached
-// via the standard typed_extension_protocol_options surface. If `options` is
-// nullptr, no extension is registered so accessors must fall back to defaults.
-Upstream::ClusterInfoConstSharedPtr
-makeClusterInfoWithOptions(std::shared_ptr<ProtocolOptionsConfigImpl> options) {
-  auto cluster_info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  ON_CALL(*cluster_info, extensionProtocolOptions(NetworkFilterNames::get().RedisProxy))
-      .WillByDefault(Return(options));
-  return cluster_info;
+TEST(RedisProxyProtocolVersionTest, DefaultIsResp2) {
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config;
+  EXPECT_EQ(Common::Redis::RespProtocolVersion::Resp2,
+            toCodecRespVersion(proto_config.protocol_version()));
 }
 
-} // namespace
-
-TEST(RedisProxyFilterProtocolOptionsConfigImplTest, UpstreamVersionDefaultIsResp2) {
-  auto info = makeClusterInfoWithOptions(nullptr);
-  EXPECT_EQ(envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::
-                UpstreamProtocol::RESP2,
-            ProtocolOptionsConfigImpl::upstreamProtocolVersion(info));
+TEST(RedisProxyProtocolVersionTest, ExplicitResp2) {
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config;
+  proto_config.set_protocol_version(
+      envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::RESP2);
+  EXPECT_EQ(Common::Redis::RespProtocolVersion::Resp2,
+            toCodecRespVersion(proto_config.protocol_version()));
 }
 
-TEST(RedisProxyFilterProtocolOptionsConfigImplTest, UpstreamVersionUnspecifiedMapsToResp2) {
-  const std::string yaml = R"EOF(
-upstream_protocol: {}
-  )EOF";
-  envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions proto_config;
-  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-  auto options = std::make_shared<ProtocolOptionsConfigImpl>(proto_config);
-  auto info = makeClusterInfoWithOptions(options);
-  EXPECT_EQ(envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::
-                UpstreamProtocol::RESP2,
-            ProtocolOptionsConfigImpl::upstreamProtocolVersion(info));
-}
-
-TEST(RedisProxyFilterProtocolOptionsConfigImplTest, UpstreamVersionResp3) {
-  const std::string yaml = R"EOF(
-upstream_protocol:
-  version: RESP3
-  )EOF";
-  envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions proto_config;
-  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-  auto options = std::make_shared<ProtocolOptionsConfigImpl>(proto_config);
-  auto info = makeClusterInfoWithOptions(options);
-  EXPECT_EQ(envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::
-                UpstreamProtocol::RESP3,
-            ProtocolOptionsConfigImpl::upstreamProtocolVersion(info));
+TEST(RedisProxyProtocolVersionTest, ExplicitResp3) {
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config;
+  proto_config.set_protocol_version(
+      envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::RESP3);
+  EXPECT_EQ(Common::Redis::RespProtocolVersion::Resp3,
+            toCodecRespVersion(proto_config.protocol_version()));
 }
 
 } // namespace RedisProxy

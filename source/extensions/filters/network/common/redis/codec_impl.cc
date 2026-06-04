@@ -34,6 +34,24 @@ static constexpr uint64_t kMaxRespElements = 1048576; // 1M
 // single message.
 static constexpr uint64_t kMaxBulkStringLength = 512ULL * 1024 * 1024;
 
+namespace {
+
+// Synthesizing formatter for ``RespValue::setDouble``. ``{:.17g}`` round-trips back to the
+// same double. Byte shape coincides with Redis's ``d2string`` integer fast path for values
+// that emit as bare decimals (e.g. ``1.0`` → ``"1"``) but NOT for exponent form (e.g.
+// ``1e17`` → ``"1e+17"``) or non-integers.
+std::string formatDoubleForWire(double value) {
+  if (std::isinf(value)) {
+    return value > 0 ? "inf" : "-inf";
+  }
+  if (std::isnan(value)) {
+    return "nan";
+  }
+  return fmt::format("{:.17g}", value);
+}
+
+} // namespace
+
 bool isValidResp3BigNumber(const std::string& value) {
   if (value.empty()) {
     return false;
@@ -94,7 +112,7 @@ std::string RespValue::toString() const {
   case RespType::Boolean:
     return asBoolean() ? "true" : "false";
   case RespType::Double:
-    return fmt::format("{}", asDouble());
+    return asString();
   case RespType::BigNumber:
     return fmt::format("(big){}", asString());
   case RespType::BlobError:
@@ -156,14 +174,16 @@ const std::vector<RespValue>& RespValue::asArray() const {
 std::string& RespValue::asString() {
   ASSERT(type_ == RespType::BulkString || type_ == RespType::Error ||
          type_ == RespType::SimpleString || type_ == RespType::BlobError ||
-         type_ == RespType::VerbatimString || type_ == RespType::BigNumber);
+         type_ == RespType::VerbatimString || type_ == RespType::BigNumber ||
+         type_ == RespType::Double);
   return string_;
 }
 
 const std::string& RespValue::asString() const {
   ASSERT(type_ == RespType::BulkString || type_ == RespType::Error ||
          type_ == RespType::SimpleString || type_ == RespType::BlobError ||
-         type_ == RespType::VerbatimString || type_ == RespType::BigNumber);
+         type_ == RespType::VerbatimString || type_ == RespType::BigNumber ||
+         type_ == RespType::Double);
   return string_;
 }
 
@@ -187,14 +207,18 @@ const RespValue::CompositeArray& RespValue::asCompositeArray() const {
   return composite_array_;
 }
 
-double& RespValue::asDouble() {
-  ASSERT(type_ == RespType::Double);
-  return double_;
-}
-
 double RespValue::asDouble() const {
   ASSERT(type_ == RespType::Double);
-  return double_;
+  double result = 0.0;
+  if (!absl::SimpleAtod(string_, &result)) {
+    throw ProtocolError("invalid double value");
+  }
+  return result;
+}
+
+void RespValue::setDouble(double v) {
+  ASSERT(type_ == RespType::Double);
+  string_ = formatDoubleForWire(v);
 }
 
 bool RespValue::asBoolean() const {
@@ -221,14 +245,14 @@ void RespValue::cleanup() {
   case RespType::Error:
   case RespType::BlobError:
   case RespType::VerbatimString:
-  case RespType::BigNumber: {
+  case RespType::BigNumber:
+  case RespType::Double: {
     string_.~basic_string<char>();
     break;
   }
   case RespType::Null:
   case RespType::Integer:
-  case RespType::Boolean:
-  case RespType::Double: {
+  case RespType::Boolean: {
     break;
   }
   }
@@ -256,7 +280,8 @@ void RespValue::type(RespType type) {
   case RespType::Error:
   case RespType::BlobError:
   case RespType::VerbatimString:
-  case RespType::BigNumber: {
+  case RespType::BigNumber:
+  case RespType::Double: {
     new (&string_) std::string();
     break;
   }
@@ -265,10 +290,6 @@ void RespValue::type(RespType type) {
   case RespType::Integer:
   case RespType::Boolean: {
     integer_ = 0;
-    break;
-  }
-  case RespType::Double: {
-    double_ = 0.0;
     break;
   }
   }
@@ -293,17 +314,14 @@ RespValue::RespValue(const RespValue& other) : type_(RespType::Null) {
   case RespType::Error:
   case RespType::BlobError:
   case RespType::VerbatimString:
-  case RespType::BigNumber: {
+  case RespType::BigNumber:
+  case RespType::Double: {
     asString() = other.asString();
     break;
   }
   case RespType::Integer:
   case RespType::Boolean: {
     asInteger() = other.asInteger();
-    break;
-  }
-  case RespType::Double: {
-    double_ = other.double_;
     break;
   }
   case RespType::Null:
@@ -329,17 +347,14 @@ RespValue::RespValue(RespValue&& other) noexcept : type_(other.type_) {
   case RespType::Error:
   case RespType::BlobError:
   case RespType::VerbatimString:
-  case RespType::BigNumber: {
+  case RespType::BigNumber:
+  case RespType::Double: {
     new (&string_) std::string(std::move(other.string_));
     break;
   }
   case RespType::Integer:
   case RespType::Boolean: {
     integer_ = other.integer_;
-    break;
-  }
-  case RespType::Double: {
-    double_ = other.double_;
     break;
   }
   case RespType::Null:
@@ -369,17 +384,14 @@ RespValue& RespValue::operator=(const RespValue& other) {
   case RespType::Error:
   case RespType::BlobError:
   case RespType::VerbatimString:
-  case RespType::BigNumber: {
+  case RespType::BigNumber:
+  case RespType::Double: {
     asString() = other.asString();
     break;
   }
   case RespType::Integer:
   case RespType::Boolean: {
     asInteger() = other.asInteger();
-    break;
-  }
-  case RespType::Double: {
-    double_ = other.double_;
     break;
   }
   case RespType::Null:
@@ -411,17 +423,14 @@ RespValue& RespValue::operator=(RespValue&& other) noexcept {
   case RespType::Error:
   case RespType::BlobError:
   case RespType::VerbatimString:
-  case RespType::BigNumber: {
+  case RespType::BigNumber:
+  case RespType::Double: {
     string_ = std::move(other.string_);
     break;
   }
   case RespType::Integer:
   case RespType::Boolean: {
     integer_ = other.integer_;
-    break;
-  }
-  case RespType::Double: {
-    double_ = other.double_;
     break;
   }
   case RespType::Null:
@@ -453,22 +462,16 @@ bool RespValue::operator==(const RespValue& other) const {
   case RespType::Error:
   case RespType::BlobError:
   case RespType::VerbatimString:
-  case RespType::BigNumber: {
+  case RespType::BigNumber:
+  case RespType::Double: {
+    // Double compares byte-for-byte on the stored payload — stricter than IEEE double
+    // equality (two payloads representing the same numeric value compare unequal).
     result = (asString() == other.asString());
     break;
   }
   case RespType::Integer:
   case RespType::Boolean: {
     result = (asInteger() == other.asInteger());
-    break;
-  }
-  case RespType::Double: {
-    // IEEE comparison: +0.0 == -0.0, NaN != NaN. The previous std::memcmp
-    // form had both inverted (NaN compared equal to itself; +0/-0 compared
-    // unequal), which is a subtle bug in any test that round-trips
-    // doubles through operator==. Tests that need to assert bitwise NaN
-    // equality should use `std::isnan()` directly.
-    result = (double_ == other.double_);
     break;
   }
   case RespType::Null: {
@@ -588,7 +591,8 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
         pending_value_stack_.front().value_->type(RespType::Boolean);
         break;
       }
-      case ',': { // RESP3 Double - accumulate into pending_double_buf_, convert at ValueComplete
+      case ',': { // RESP3 Double - reuse SimpleString accumulator; payload validated and
+                  // moved into RespValue::asString() at ValueComplete (pass-through).
         state_ = State::SimpleString;
         pending_double_buf_.clear();
         pending_value_stack_.front().value_->type(RespType::Double);
@@ -1078,14 +1082,14 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
     case State::SimpleString: {
       ENVOY_LOG(trace, "parse slice: SimpleString: {}", buffer[0]);
       if (buffer[0] == '\r') {
-        // For Double type, convert the accumulated string to double before completing.
+        // For Double, validate as parseable and move into ``string_`` (pass-through).
         RespValue& current_value = *pending_value_stack_.front().value_;
         if (current_value.type() == RespType::Double) {
           double result;
           if (!absl::SimpleAtod(pending_double_buf_, &result)) {
             throw ProtocolError("invalid double value");
           }
-          current_value.asDouble() = result;
+          current_value.asString() = std::move(pending_double_buf_);
           pending_double_buf_.clear();
         } else if (current_value.type() == RespType::BigNumber &&
                    !isValidResp3BigNumber(current_value.asString())) {
@@ -1093,7 +1097,8 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
         }
         state_ = State::LF;
       } else {
-        // Double accumulates into pending_double_buf_; all other types use asString().
+        // Double accumulates into the cap-guarded scratch buffer; everything else appends
+        // directly to its asString().
         if (pending_value_stack_.front().value_->type() == RespType::Double) {
           if (pending_double_buf_.size() >= 64) {
             throw ProtocolError("double value too long");
@@ -1219,12 +1224,13 @@ void EncoderImpl::encode(const RespValue& value, Buffer::Instance& out) {
     break;
   }
   case RespType::Double: {
-    // RESP2 has no native double — emit a bulk string using the same
-    // decimal formatting as the RESP3 wire form, without the ',' prefix.
+    // Pass-through; RESP2 has no native Double so the payload is emitted as a bulk string.
     if (protocol_version_ == RespProtocolVersion::Resp3) {
-      encodeDouble(value.asDouble(), out);
+      out.add(",", 1);
+      out.add(value.asString());
+      out.add("\r\n", 2);
     } else {
-      encodeBulkString(formatDoubleForWire(value.asDouble()), out);
+      encodeBulkString(value.asString(), out);
     }
     break;
   }
@@ -1339,27 +1345,6 @@ std::string EncoderImpl::sanitizeErrorForResp2(absl::string_view input) {
   return out;
 }
 
-std::string EncoderImpl::formatDoubleForWire(double value) {
-  if (std::isinf(value)) {
-    return value > 0 ? "inf" : "-inf";
-  }
-  if (std::isnan(value)) {
-    return "nan";
-  }
-  std::string out = fmt::format("{:.17g}", value);
-  // {:.17g} drops trailing zeros, so 1.0 → "1". RESP3 syntax allows it (both
-  // integer and fractional parts are optional), but the canonical form across
-  // Redis itself, Go, Python, and JS is "N.0". Append ".0" when the result
-  // has no decimal/exponent so downstream parsers always see a Double-shaped
-  // payload — clients that pattern-match for a `.` before treating a value
-  // as floating-point would otherwise classify an integer-valued double as
-  // an integer.
-  if (out.find_first_of(".eE") == std::string::npos) {
-    out += ".0";
-  }
-  return out;
-}
-
 void EncoderImpl::encodeAggregate(char prefix, const std::vector<RespValue>& array,
                                   Buffer::Instance& out) {
   char buffer[32];
@@ -1444,12 +1429,6 @@ void EncoderImpl::encodeBoolean(bool value, Buffer::Instance& out) {
   } else {
     out.add("#f\r\n", 4);
   }
-}
-
-void EncoderImpl::encodeDouble(double value, Buffer::Instance& out) {
-  out.add(",", 1);
-  out.add(formatDoubleForWire(value));
-  out.add("\r\n", 2);
 }
 
 void EncoderImpl::encodeBigNumber(const std::string& value, Buffer::Instance& out) {

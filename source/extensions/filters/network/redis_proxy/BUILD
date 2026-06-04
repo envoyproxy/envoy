@@ -19,6 +19,7 @@ envoy_cc_library(
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/stream_info:stream_info_interface",
+        "//source/common/singleton:const_singleton",
         "//source/extensions/filters/network/common/redis:client_interface",
         "//source/extensions/filters/network/common/redis:codec_interface",
     ],
@@ -33,6 +34,7 @@ envoy_cc_library(
         "//source/common/network:resolver_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
+        "//source/extensions/filters/network/common/redis:codec_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],
@@ -136,6 +138,7 @@ envoy_cc_library(
     hdrs = ["proxy_filter.h"],
     deps = [
         ":command_splitter_interface",
+        ":command_splitter_lib",
         ":external_auth_lib",
         "//envoy/network:drain_decision_interface",
         "//envoy/network:filter_interface",
@@ -146,6 +149,9 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_interface",
         "//source/extensions/filters/network/common/redis:codec_interface",
+        "//source/extensions/filters/network/common/redis:supported_commands_lib",
+        "//source/extensions/filters/network/common/redis:utility_lib",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],
 )

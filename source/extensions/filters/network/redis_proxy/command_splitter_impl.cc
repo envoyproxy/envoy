@@ -1123,30 +1123,6 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     return nullptr;
   }
 
-  // RESP-cap mismatch guard for already-negotiated downstream connections.
-  // The cluster's RESP cap is dynamic — CDS can flip
-  // ``upstream_protocol.version`` from RESP3 to RESP2 under a downstream
-  // connection that already finished HELLO 3. The HELLO branch below would
-  // only re-validate the cap on a fresh HELLO; non-HELLO commands keep
-  // running under the old (now-invalid) negotiated contract — upstream RESP2
-  // cannot produce Map/Set/Push, so any client expectation tied to RESP3
-  // shapes (and any future Push-stateful RESP3 feature wired in later)
-  // would silently break. Force renegotiation: send -NOPROTO and close the
-  // downstream connection after the error flushes; the client reconnects
-  // and HELLO 3 will be rejected by the new (lower) cap, leading it to fall
-  // back to HELLO 2.
-  //
-  // Bypass list: HELLO IS the renegotiation; AUTH and QUIT do not depend on
-  // the wire protocol shape.
-  if (command_name != Common::Redis::SupportedCommands::hello() &&
-      command_name != Common::Redis::SupportedCommands::auth() &&
-      command_name != Common::Redis::SupportedCommands::quit() &&
-      callbacks.currentDownstreamRespVersion() > callbacks.clusterRespVersion()) {
-    callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().UnsupportedProtocol));
-    callbacks.closeDownstreamAfterResponse();
-    return nullptr;
-  }
-
   if (command_name == Common::Redis::SupportedCommands::auth()) {
     if (request->asArray().size() < 2) {
       onInvalidRequest(callbacks);
@@ -1167,15 +1143,12 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   // first command). Bare HELLO still respects the gate; only HELLO with AUTH options bypasses
   // it because the AUTH options are what authenticate the connection.
   //
-  // An explicit version N must satisfy 2 <= N <= clusterRespVersion(); the ceiling is the
-  // upstream cluster's ``upstream_protocol.version`` cap. HELLO is answered locally without
-  // an upstream round trip — synchronously, except when HELLO carries inline AUTH and the
-  // listener has external auth configured, in which case attemptDownstreamAuthInline returns
-  // Pending and ProxyFilter emits the deferred HELLO Map (or error) when the round trip
-  // resolves.
+  // ``HELLO N`` and bare HELLO (inherits ``currentDownstreamRespVersion()``) must match
+  // ``protocol_version`` exactly. Answered locally; the HELLO N AUTH + external auth path
+  // defers via ``attemptDownstreamAuthInline`` returning Pending.
   if (command_name == Common::Redis::SupportedCommands::hello()) {
     const auto& args = request->asArray();
-    const uint32_t cluster_cap = callbacks.clusterRespVersion();
+    const uint32_t required_version = Common::Redis::toWireRespVersion(callbacks.protocolVersion());
     uint32_t requested_version = callbacks.currentDownstreamRespVersion();
     bool explicit_version = false;
     std::string auth_user;
@@ -1193,24 +1166,14 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
             Common::Redis::Utility::makeError(Response::get().UnsupportedProtocol));
         return nullptr;
       }
-      if (static_cast<uint32_t>(proto_ver) > cluster_cap) {
-        callbacks.onResponse(
-            Common::Redis::Utility::makeError(Response::get().UnsupportedProtocol));
-        return nullptr;
-      }
       requested_version = static_cast<uint32_t>(proto_ver);
       explicit_version = true;
       ++i;
     }
 
-    // Bare HELLO inherits ``currentDownstreamRespVersion()``. If the cluster cap dropped
-    // below that under us (CDS RESP3 → RESP2 downgrade after the connection negotiated RESP3),
-    // re-affirming the prior version would leave the connection on a RESP version the
-    // upstream wire can no longer carry. ``-NOPROTO`` + close so the client reconnects and
-    // re-negotiates against the new (lower) cap.
-    if (!explicit_version && requested_version > cluster_cap) {
+    // Exact-match: explicit N from args[1], bare HELLO from currentDownstreamRespVersion().
+    if (requested_version != required_version) {
       callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().UnsupportedProtocol));
-      callbacks.closeDownstreamAfterResponse();
       return nullptr;
     }
 
@@ -1283,7 +1246,13 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     return nullptr;
   }
 
-  // Auth gate for non-HELLO commands. HELLO has its own gate above (with
+  // QUIT bypasses the auth gate (matches real Redis — clients can always close gracefully).
+  if (command_name == Common::Redis::SupportedCommands::quit()) {
+    callbacks.onQuit();
+    return nullptr;
+  }
+
+  // Auth gate for non-HELLO/QUIT commands. HELLO has its own gate above (with
   // inline-AUTH support); all other commands require prior authentication
   // when the listener is auth-required.
   if (!callbacks.connectionAllowed()) {
@@ -1373,11 +1342,6 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
           "ERR wrong number of arguments for '{}' command", request->asArray()[0].asString())));
       return nullptr;
     }
-  }
-
-  if (command_name == Common::Redis::SupportedCommands::quit()) {
-    callbacks.onQuit();
-    return nullptr;
   }
 
   if (request->asArray().size() < 2 &&

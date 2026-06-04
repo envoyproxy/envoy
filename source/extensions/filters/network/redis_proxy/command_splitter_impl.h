@@ -25,18 +25,6 @@ namespace NetworkFilters {
 namespace RedisProxy {
 namespace CommandSplitter {
 
-struct ResponseValues {
-  const std::string OK = "OK";
-  const std::string InvalidRequest = "invalid request";
-  const std::string NoUpstreamHost = "no upstream host";
-  const std::string UpstreamFailure = "upstream failure";
-  const std::string UpstreamProtocolError = "upstream protocol error";
-  const std::string AuthRequiredError = "NOAUTH Authentication required.";
-  const std::string UnsupportedProtocol = "NOPROTO unsupported protocol version";
-};
-
-using Response = ConstSingleton<ResponseValues>;
-
 /**
  * All command level stats. @see stats_macros.h
  */
@@ -161,7 +149,9 @@ public:
   void setDownstreamRespVersion(uint32_t version) override {
     callbacks_.setDownstreamRespVersion(version);
   }
-  uint32_t clusterRespVersion() const override { return callbacks_.clusterRespVersion(); }
+  Common::Redis::RespProtocolVersion protocolVersion() const override {
+    return callbacks_.protocolVersion();
+  }
   AuthAttempt attemptDownstreamAuthInline(const std::string& u, const std::string& p,
                                           uint32_t requested_version) override {
     return callbacks_.attemptDownstreamAuthInline(u, p, requested_version);
@@ -174,7 +164,6 @@ public:
   uint32_t currentDownstreamRespVersion() const override {
     return callbacks_.currentDownstreamRespVersion();
   }
-  void closeDownstreamAfterResponse() override { callbacks_.closeDownstreamAfterResponse(); }
 
   // RedisProxy::CommandSplitter::SplitRequest
   void cancel() override;

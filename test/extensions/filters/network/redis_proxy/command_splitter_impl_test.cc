@@ -139,6 +139,20 @@ TEST_F(RedisCommandSplitterImplTest, CommandWhenAuthStillNeeded) {
             splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_));
 }
 
+// QUIT bypasses the auth gate even on an auth-required listener — matches real Redis
+// (QUIT is always allowed without AUTH) and keeps the gate precedence consistent with
+// ``ProxyFilter::processRespValue``'s RESP3 pre-HELLO allowlist. Without this hoist, a
+// client that connects and immediately quits would get ``-NOAUTH`` instead of a graceful
+// close.
+TEST_F(RedisCommandSplitterImplTest, QuitBypassesAuthGate) {
+  EXPECT_CALL(callbacks_, connectionAllowed()).Times(0);
+  EXPECT_CALL(callbacks_, onQuit());
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"quit"});
+  EXPECT_EQ(nullptr,
+            splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_));
+}
+
 TEST_F(RedisCommandSplitterImplTest, InvalidRequestNotArray) {
   Common::Redis::RespValue response;
   response.type(Common::Redis::RespType::Error);
@@ -698,6 +712,7 @@ TEST_F(RedisSingleServerRequestTest, HelloWithAuthOptionAllowedEmitsHelloMap) {
 // Denied: splitter emits WRONGPASS without firing the connection-allowed gate.
 TEST_F(RedisSingleServerRequestTest, HelloWithAuthOptionDeniedEmitsWrongpass) {
   InSequence s;
+  callbacks_.protocol_version_ = Common::Redis::RespProtocolVersion::Resp3;
   callbacks_.inline_auth_attempt_ = CommandSplitter::SplitCallbacks::AuthAttempt::Denied;
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
@@ -719,6 +734,7 @@ TEST_F(RedisSingleServerRequestTest, HelloWithAuthOptionDeniedEmitsWrongpass) {
 // the deferred-reply emission contract is covered in proxy_filter_test.cc.
 TEST_F(RedisSingleServerRequestTest, HelloWithAuthOptionPendingEmitsNothing) {
   InSequence s;
+  callbacks_.protocol_version_ = Common::Redis::RespProtocolVersion::Resp3;
   callbacks_.inline_auth_attempt_ = CommandSplitter::SplitCallbacks::AuthAttempt::Pending;
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
@@ -839,23 +855,23 @@ TEST_F(RedisSingleServerRequestTest, HelloWithUnsupportedProtocolVersion) {
 }
 
 // =============================================================================
-// LOCAL HELLO policy (default) — proxy answers HELLO synchronously from its
-// own capability table, without fanning out to upstream. The encoder version
-// flips immediately when the client sent an explicit HELLO N.
+// HELLO branch — the proxy answers HELLO synchronously without fanning out to upstream;
+// version negotiation is exact-matched against the listener's ``protocol_version``.
 //
 // Covers:
-//   - Bare HELLO (preserves current downstream version)
-//   - Explicit HELLO 2 / HELLO 3 (flips version)
-//   - HELLO ceiling check against max_version
-//   - Shape of the reply (Map of 14 entries when stored)
+//   - Bare HELLO inherits ``currentDownstreamRespVersion()`` and exact-matches.
+//   - Explicit HELLO N is rejected ``-NOPROTO`` when N != listener required version.
+//   - Bare HELLO on a fresh RESP3 listener is rejected (default 2 != 3).
+//   - Shape of the reply (Map of 14 entries when stored).
 // =============================================================================
 
 TEST_F(RedisSingleServerRequestTest, HelloLocalBarePreservesVersion) {
   InSequence s;
-  // Client is currently on RESP2 and sends a bare HELLO: the proxy answers
-  // locally, no upstream round-trip, and does not flip the encoder.
+  // RESP2 listener: a bare HELLO from a fresh RESP2 connection exact-matches the
+  // listener-required RESP2; the proxy answers locally with proto=2 and the encoder
+  // version is unchanged.
   callbacks_.downstream_resp_version_ = 2;
-  callbacks_.cluster_resp_version_ = 3; // cap allows RESP3 upgrade
+  callbacks_.protocol_version_ = Common::Redis::RespProtocolVersion::Resp2;
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"hello"});
@@ -894,7 +910,7 @@ TEST_F(RedisSingleServerRequestTest, HelloLocalBarePreservesVersion) {
 TEST_F(RedisSingleServerRequestTest, HelloLocalExplicit3FlipsEncoder) {
   InSequence s;
   callbacks_.downstream_resp_version_ = 2;
-  callbacks_.cluster_resp_version_ = 3;
+  callbacks_.protocol_version_ = Common::Redis::RespProtocolVersion::Resp3;
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"hello", "3"});
@@ -932,10 +948,11 @@ TEST_F(RedisSingleServerRequestTest, HelloLocalExplicit3FlipsEncoder) {
   EXPECT_TRUE(saw_mode_standalone);
 }
 
-TEST_F(RedisSingleServerRequestTest, HelloLocalExplicit2FlipsEncoder) {
+// RESP2 listener accepts HELLO 2 and reaffirms the downstream encoder at version 2.
+TEST_F(RedisSingleServerRequestTest, HelloLocalExplicit2OnResp2Listener) {
   InSequence s;
-  callbacks_.downstream_resp_version_ = 3;
-  callbacks_.cluster_resp_version_ = 3;
+  callbacks_.downstream_resp_version_ = 2;
+  callbacks_.protocol_version_ = Common::Redis::RespProtocolVersion::Resp2;
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"hello", "2"});
@@ -948,35 +965,12 @@ TEST_F(RedisSingleServerRequestTest, HelloLocalExplicit2FlipsEncoder) {
   EXPECT_EQ(2U, callbacks_.downstream_resp_version_);
 }
 
-TEST_F(RedisSingleServerRequestTest, HelloLocalAboveMaxRejected) {
+// Bare HELLO on a RESP3 listener before any HELLO 3 negotiation is rejected -NOPROTO: the
+// connection's current version (default 2) does not exact-match the listener-required Resp3.
+TEST_F(RedisSingleServerRequestTest, BareHelloRejectsBeforeHello3OnResp3Listener) {
   InSequence s;
-  // max_version = 2 means HELLO 3 must be rejected with `-NOPROTO`. The version-cap check runs
-  // before the auth gate, so connectionAllowed is not consulted on the rejection path.
-  callbacks_.cluster_resp_version_ = 2;
-
-  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
-  makeBulkStringArray(*request, {"hello", "3"});
-
-  Common::Redis::RespValue response;
-  response.type(Common::Redis::RespType::Error);
-  response.asString() = "NOPROTO unsupported protocol version";
-
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
-  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
-  EXPECT_EQ(nullptr, handle_);
-}
-
-// Bare HELLO (no explicit version) inherits the connection's previously-negotiated downstream
-// RESP version. If the cluster cap dropped below that under us (CDS RESP3 -> RESP2 downgrade
-// after the connection negotiated RESP3), re-affirming the higher version would leave the
-// connection on a RESP version the upstream wire can no longer carry. Splitter must reply
-// -NOPROTO and schedule downstream close so the client reconnects and re-negotiates against
-// the new lower cap. The companion guard for non-HELLO commands lives in
-// NonHelloCommandClosesOnCapDowngrade below; this test pins the symmetric HELLO path.
-TEST_F(RedisSingleServerRequestTest, BareHelloRejectsWhenCurrentVersionExceedsCap) {
-  InSequence s;
-  callbacks_.cluster_resp_version_ = 2;
-  callbacks_.downstream_resp_version_ = 3;
+  callbacks_.protocol_version_ = Common::Redis::RespProtocolVersion::Resp3;
+  callbacks_.downstream_resp_version_ = 2;
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"hello"});
@@ -988,120 +982,41 @@ TEST_F(RedisSingleServerRequestTest, BareHelloRejectsWhenCurrentVersionExceedsCa
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
   EXPECT_EQ(nullptr, handle_);
-  EXPECT_TRUE(callbacks_.close_downstream_after_response_called_);
 }
 
-// Per-command guard for already-negotiated downstream connections. The
-// cluster's RESP cap is dynamic — CDS may flip a cluster from RESP3 to
-// RESP2 under a downstream connection that has already finished HELLO 3.
-// The HELLO branch only re-validates on a fresh HELLO; non-HELLO commands
-// arriving on the still-RESP3 connection would otherwise keep running
-// under a contract the upstream can no longer honor (no Map/Set/Push).
-// The splitter must respond with -NOPROTO and schedule the downstream
-// connection close so the client reconnects and renegotiates.
-TEST_F(RedisSingleServerRequestTest, NonHelloCommandClosesOnCapDowngrade) {
+// After a successful HELLO 3, bare HELLO on a RESP3 listener inherits the negotiated version 3
+// and exact-matches: the proxy answers locally with the HELLO Map.
+TEST_F(RedisSingleServerRequestTest, BareHelloAllowedAfterHello3OnResp3Listener) {
   InSequence s;
-  // Negotiated RESP3 downstream, but cluster has dropped to RESP2.
-  callbacks_.downstream_resp_version_ = 3;
-  callbacks_.cluster_resp_version_ = 2;
+  callbacks_.protocol_version_ = Common::Redis::RespProtocolVersion::Resp3;
+  callbacks_.downstream_resp_version_ = 3; // already negotiated
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
-  makeBulkStringArray(*request, {"get", "foo"});
-
-  Common::Redis::RespValue expected_err;
-  expected_err.type(Common::Redis::RespType::Error);
-  expected_err.asString() = "NOPROTO unsupported protocol version";
-
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_err)));
-  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
-  EXPECT_EQ(nullptr, handle_);
-  EXPECT_TRUE(callbacks_.close_downstream_after_response_called_);
-}
-
-// HELLO bypasses the per-command guard — HELLO IS the renegotiation path.
-// The HELLO branch downstream applies its own version check against the
-// (lower) cluster cap and rejects HELLO 3 with -NOPROTO.
-TEST_F(RedisSingleServerRequestTest, HelloBypassesPerCmdCapGuard) {
-  InSequence s;
-  callbacks_.downstream_resp_version_ = 3;
-  callbacks_.cluster_resp_version_ = 2;
-
-  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
-  makeBulkStringArray(*request, {"hello", "2"}); // requesting RESP2 — within cap
+  makeBulkStringArray(*request, {"hello"});
 
   EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_, onResponse_(_));
   handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
   EXPECT_EQ(nullptr, handle_);
-  // HELLO did NOT trigger the per-cmd close path.
-  EXPECT_FALSE(callbacks_.close_downstream_after_response_called_);
+  EXPECT_EQ(3U, callbacks_.downstream_resp_version_);
 }
 
-// AUTH bypasses the per-command guard — credentials are protocol-agnostic.
-TEST_F(RedisSingleServerRequestTest, AuthBypassesPerCmdCapGuard) {
+// RESP2 listener forces HELLO 2 only — HELLO 3 must be rejected with -NOPROTO so the proxy
+// never advertises a RESP version it cannot honor on the upstream wire. The version
+// exact-match runs before the auth gate, so connectionAllowed is not consulted on the
+// rejection path.
+TEST_F(RedisSingleServerRequestTest, Resp2ListenerRejectsHello3) {
   InSequence s;
-  callbacks_.downstream_resp_version_ = 3;
-  callbacks_.cluster_resp_version_ = 2;
-
-  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
-  makeBulkStringArray(*request, {"auth", "secret"});
-
-  EXPECT_CALL(callbacks_, onAuth(testing::TypedEq<const std::string&>("secret")));
-  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
-  EXPECT_EQ(nullptr, handle_);
-  EXPECT_FALSE(callbacks_.close_downstream_after_response_called_);
-}
-
-// QUIT bypasses the per-command guard — the client is leaving anyway.
-TEST_F(RedisSingleServerRequestTest, QuitBypassesPerCmdCapGuard) {
-  InSequence s;
-  callbacks_.downstream_resp_version_ = 3;
-  callbacks_.cluster_resp_version_ = 2;
-
-  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
-  makeBulkStringArray(*request, {"quit"});
-
-  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, onQuit());
-  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
-  EXPECT_EQ(nullptr, handle_);
-  EXPECT_FALSE(callbacks_.close_downstream_after_response_called_);
-}
-
-// Sanity: when downstream and cluster are both RESP3, the guard is not
-// triggered for normal commands (regression check on the boundary).
-TEST_F(RedisSingleServerRequestTest, NonHelloCommandNotClosedWhenCapMatches) {
-  InSequence s;
-  callbacks_.downstream_resp_version_ = 3;
-  callbacks_.cluster_resp_version_ = 3;
-
-  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
-  makeBulkStringArray(*request, {"get", "foo"});
-  // Normal request flow — splitter routes through to the conn pool.
-  makeRequest("foo", std::move(request));
-  EXPECT_NE(nullptr, handle_);
-  EXPECT_FALSE(callbacks_.close_downstream_after_response_called_);
-  // Cleanup the in-flight pool request.
-  EXPECT_CALL(pool_request_, cancel());
-  handle_->cancel();
-}
-
-// Cluster RESP cap of 2 (RESP2-only upstream) means HELLO 3 must be rejected
-// with -NOPROTO so the proxy never advertises a RESP version it cannot honor
-// on the upstream wire.
-TEST_F(RedisSingleServerRequestTest, HelloRejectedAboveClusterCap) {
-  InSequence s;
-  callbacks_.cluster_resp_version_ = 2;
+  callbacks_.protocol_version_ = Common::Redis::RespProtocolVersion::Resp2;
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"hello", "3"});
 
-  Common::Redis::RespValue expected_err;
-  expected_err.type(Common::Redis::RespType::Error);
-  expected_err.asString() = "NOPROTO unsupported protocol version";
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Error);
+  response.asString() = "NOPROTO unsupported protocol version";
 
-  // HELLO version check runs before connectionAllowed gate.
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_err)));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
   EXPECT_EQ(nullptr, handle_);
 }
@@ -1114,7 +1029,7 @@ TEST_F(RedisSingleServerRequestTest, HelloRejectedAboveClusterCap) {
 //   - emit a single Map reply (not an extra +OK from a separate AUTH).
 TEST_F(RedisSingleServerRequestTest, HelloAuthInlineAllowed) {
   InSequence s;
-  callbacks_.cluster_resp_version_ = 3;
+  callbacks_.protocol_version_ = Common::Redis::RespProtocolVersion::Resp3;
   callbacks_.inline_auth_attempt_ = CommandSplitter::SplitCallbacks::AuthAttempt::Allowed;
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
@@ -1139,7 +1054,7 @@ TEST_F(RedisSingleServerRequestTest, HelloAuthInlineAllowed) {
 // Wrong credentials over inline HELLO AUTH: -WRONGPASS.
 TEST_F(RedisSingleServerRequestTest, HelloAuthInlineDenied) {
   InSequence s;
-  callbacks_.cluster_resp_version_ = 3;
+  callbacks_.protocol_version_ = Common::Redis::RespProtocolVersion::Resp3;
   callbacks_.inline_auth_attempt_ = CommandSplitter::SplitCallbacks::AuthAttempt::Denied;
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
@@ -1161,7 +1076,7 @@ TEST_F(RedisSingleServerRequestTest, HelloAuthInlineDenied) {
 // handshake even though the proxy has no client-identity tracking.
 TEST_F(RedisSingleServerRequestTest, HelloSetnameAcceptedAndIgnored) {
   InSequence s;
-  callbacks_.cluster_resp_version_ = 3;
+  callbacks_.protocol_version_ = Common::Redis::RespProtocolVersion::Resp3;
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"hello", "3", "SETNAME", "my-app"});
@@ -1182,7 +1097,7 @@ TEST_F(RedisSingleServerRequestTest, HelloSetnameAcceptedAndIgnored) {
 // validated inline (Allowed); SETNAME is parsed and ignored. Single Map reply.
 TEST_F(RedisSingleServerRequestTest, HelloAuthAndSetnameTogether) {
   InSequence s;
-  callbacks_.cluster_resp_version_ = 3;
+  callbacks_.protocol_version_ = Common::Redis::RespProtocolVersion::Resp3;
   callbacks_.inline_auth_attempt_ = CommandSplitter::SplitCallbacks::AuthAttempt::Allowed;
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
@@ -1205,6 +1120,7 @@ TEST_F(RedisSingleServerRequestTest, HelloAuthAndSetnameTogether) {
 // passing (e.g. typo, future Redis option not yet supported).
 TEST_F(RedisSingleServerRequestTest, HelloUnknownOptionRejected) {
   InSequence s;
+  callbacks_.protocol_version_ = Common::Redis::RespProtocolVersion::Resp3;
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"hello", "3", "BOGUS", "x"});
 
@@ -1268,11 +1184,12 @@ TEST_F(RedisSingleServerRequestTest, ClientUnsupportedSubcommandRejected) {
   EXPECT_EQ(nullptr, handle_);
 }
 
-// Bare HELLO on an auth-required listener still requires prior auth — the
+// Bare HELLO on a RESP2 auth-required listener still requires prior auth — the
 // HELLO + connectionAllowed reorder must NOT have removed the gate for
 // non-AUTH HELLO calls.
 TEST_F(RedisSingleServerRequestTest, BareHelloStillRequiresAuthGate) {
   InSequence s;
+  callbacks_.protocol_version_ = Common::Redis::RespProtocolVersion::Resp2;
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"hello"});
 
@@ -1285,12 +1202,10 @@ TEST_F(RedisSingleServerRequestTest, BareHelloStillRequiresAuthGate) {
   EXPECT_EQ(nullptr, handle_);
 }
 
-// AUTO (the default) leaves min_version=2 so a bare HELLO and HELLO 2 are
-// both still valid. Lock the existing default behavior so the new floor
-// logic does not accidentally raise the floor for AUTO configs.
-TEST_F(RedisSingleServerRequestTest, HelloVersionAutoAcceptsHello2) {
+// RESP2 listener accepts HELLO 2; lock the default behavior.
+TEST_F(RedisSingleServerRequestTest, Resp2ListenerAcceptsHello2) {
   InSequence s;
-  callbacks_.cluster_resp_version_ = 3;
+  callbacks_.protocol_version_ = Common::Redis::RespProtocolVersion::Resp2;
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"hello", "2"});

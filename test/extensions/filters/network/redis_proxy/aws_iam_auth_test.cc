@@ -126,8 +126,7 @@ TEST_F(AwsIamAuthenticatorTest, CredentialPendingAuthentication) {
   Envoy::Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client =
       factory.create(host, dispatcher, config, redis_command_stats, *stats.rootScope(), "username",
                      "password", false, aws_iam_config, authenticator,
-                     envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::
-                         UpstreamProtocol::UNSPECIFIED);
+                     Envoy::Extensions::NetworkFilters::Common::Redis::RespProtocolVersion::Resp2);
 
   Common::Redis::RespValue request1;
   Client::MockClientCallbacks callbacks;

@@ -145,8 +145,7 @@ public:
   // (resolved against the test's IsolatedStoreImpl) so RESP3 negotiation-failure tests can
   // assert the increment.
   void enableResp3() {
-    upstream_protocol_version_ = envoy::extensions::filters::network::redis_proxy::v3::
-        RedisProtocolOptions::UpstreamProtocol::RESP3;
+    upstream_protocol_version_ = Common::Redis::RespProtocolVersion::Resp3;
     hello3_failure_counter_ = &stats_.counterFromString("redis.upstream_resp3_hello_failure_test");
   }
 
@@ -184,11 +183,10 @@ public:
   Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
   std::string auth_username_;
   std::string auth_password_;
-  // RESP3 plumbing for tests that exercise the new init pipeline. Default to UNSPECIFIED +
-  // nullptr so existing tests stay on the legacy RESP2 path.
-  envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::UpstreamProtocol::
-      Version upstream_protocol_version_{envoy::extensions::filters::network::redis_proxy::v3::
-                                             RedisProtocolOptions::UpstreamProtocol::UNSPECIFIED};
+  // RESP3 plumbing for tests that exercise the new init pipeline. Default to Resp2 + nullptr
+  // so existing tests stay on the legacy RESP2 path.
+  Common::Redis::RespProtocolVersion upstream_protocol_version_{
+      Common::Redis::RespProtocolVersion::Resp2};
   Stats::Counter* hello3_failure_counter_{nullptr};
   // AWS IAM plumbing — set via enableAwsIam() before setup() to engage the AWS IAM init path.
   absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;
@@ -2252,8 +2250,7 @@ TEST(RedisClientFactoryImplTest, Basic) {
   ClientPtr client =
       factory.create(host, dispatcher, config, redis_command_stats, *stats_.rootScope(),
                      auth_username, auth_password, false, absl::nullopt, absl::nullopt,
-                     envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::
-                         UpstreamProtocol::UNSPECIFIED);
+                     Common::Redis::RespProtocolVersion::Resp2);
   client->close();
 }
 } // namespace Client

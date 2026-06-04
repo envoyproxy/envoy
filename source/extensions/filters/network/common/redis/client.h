@@ -233,8 +233,8 @@ public:
    * @param aws_iam_config supplies the AWS IAM configuration from protobuf
    * @param aws_iam_authenticator supplies the AWS IAM authenticator created during config
    * @param upstream_protocol_version selects the upstream RESP protocol negotiated on the new
-   *        connection. RESP3 triggers a HELLO 3 handshake from ClientImpl::initialize; anything
-   *        else (RESP2 / UNSPECIFIED) keeps the legacy behavior.
+   *        connection. ``Resp3`` triggers a ``HELLO 3`` handshake from ``ClientImpl::initialize``;
+   *        ``Resp2`` keeps the legacy behavior (no HELLO).
    * @param upstream_resp3_hello_failure optional counter incremented on every HELLO 3 negotiation
    *        failure (error reply, wrong reply shape, redirection, network failure). Nullable so
    *        callers that do not own a per-cluster RedisClusterStats (e.g. the redis health checker)
@@ -250,8 +250,7 @@ public:
       absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
       absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
           aws_iam_authenticator,
-      envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::UpstreamProtocol::
-          Version upstream_protocol_version,
+      Common::Redis::RespProtocolVersion upstream_protocol_version,
       Stats::Counter* upstream_resp3_hello_failure = nullptr) PURE;
 };
 

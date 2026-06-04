@@ -71,7 +71,7 @@ public:
       absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
       absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
           aws_iam_authenticator,
-      const std::string& local_zone = "");
+      const std::string& local_zone, Common::Redis::RespProtocolVersion protocol_version);
   uint16_t shardSize() override;
   // RedisProxy::ConnPool::Instance
   Common::Redis::Client::PoolRequest*
@@ -227,13 +227,8 @@ private:
         aws_iam_authenticator_;
     absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;
     std::string client_zone_; // Zone from node.locality.zone
-    // Per-cluster upstream RESP version, refreshed on every cluster
-    // add/update in onClusterAddOrUpdateNonVirtual. Defaults to RESP2 so
-    // clusters without a RedisProtocolOptions extension (or with an
-    // UNSPECIFIED upstream_protocol) do not attempt HELLO 3.
-    envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::UpstreamProtocol::
-        Version upstream_protocol_version_{envoy::extensions::filters::network::redis_proxy::v3::
-                                               RedisProtocolOptions::UpstreamProtocol::RESP2};
+    // Mirrors InstanceImpl::protocol_version_; drives upstream HELLO 3 emission.
+    Common::Redis::RespProtocolVersion upstream_protocol_version_;
   };
 
   const std::string& localZone() const { return local_zone_; }
@@ -253,6 +248,8 @@ private:
       aws_iam_authenticator_;
   absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;
   const std::string local_zone_; // Zone from node.locality.zone
+  // Listener-level RESP version, mirrored into each ThreadLocalPool on slot creation.
+  const Common::Redis::RespProtocolVersion protocol_version_;
 };
 
 } // namespace ConnPool

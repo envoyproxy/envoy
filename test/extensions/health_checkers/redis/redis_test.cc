@@ -226,9 +226,7 @@ public:
          absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>,
          absl::optional<
              NetworkFilters::Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>,
-         envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::
-             UpstreamProtocol::Version,
-         Stats::Counter*) override {
+         Extensions::NetworkFilters::Common::Redis::RespProtocolVersion, Stats::Counter*) override {
     EXPECT_EQ(auth_username_, username);
     EXPECT_EQ(auth_password_, password);
     return Extensions::NetworkFilters::Common::Redis::Client::ClientPtr{create_()};

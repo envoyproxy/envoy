@@ -104,8 +104,7 @@ ClientPtr ClientImpl::create(
     absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
     absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator,
-    envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::UpstreamProtocol::
-        Version upstream_protocol_version,
+    Common::Redis::RespProtocolVersion upstream_protocol_version,
     Stats::Counter* upstream_resp3_hello_failure) {
 
   auto client = std::make_unique<ClientImpl>(
@@ -158,8 +157,7 @@ void ClientImpl::onAwsCredentialsReady(
   ASSERT(init_state_ == InitState::WaitingForAwsToken);
   const auto auth_password =
       aws_iam_authenticator_.value()->getAuthToken(auth_username, aws_iam_config);
-  if (upstream_protocol_version_ == envoy::extensions::filters::network::redis_proxy::v3::
-                                        RedisProtocolOptions::UpstreamProtocol::RESP3) {
+  if (upstream_protocol_version_ == Common::Redis::RespProtocolVersion::Resp3) {
     setInitState(InitState::AwaitingHello);
     sendResp3InitCommands(auth_username, auth_password);
   } else {
@@ -188,8 +186,7 @@ ClientImpl::ClientImpl(
     absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
     absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator,
-    envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::UpstreamProtocol::
-        Version upstream_protocol_version,
+    Common::Redis::RespProtocolVersion upstream_protocol_version,
     Stats::Counter* upstream_resp3_hello_failure)
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
       config_(config),
@@ -367,12 +364,8 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
 }
 
 void ClientImpl::onRespValue(RespValuePtr&& value) {
-  // RESP3 Push is server-initiated, not a reply. This PR does not route any Push-producing
-  // feature (no SUBSCRIBE forwarding, no CLIENT TRACKING), so a well-behaved upstream should
-  // not send Push frames on our connections in steady state. Drop unexpected Pushes rather
-  // than pop a pending request — popping would corrupt pending_requests_ FIFO ordering against
-  // the next genuine reply. Silent drop preserves the FIFO invariant and lets future
-  // Push-routing work add real handling without touching this hot path.
+  // RESP3 Push frames are server-initiated and not replies. Drop them; popping a pending
+  // request here would corrupt pending_requests_ FIFO against the next genuine reply.
   if (value && value->type() == RespType::Push) {
     ENVOY_LOG(debug, "redis: dropping unexpected upstream RESP3 Push frame");
     return;
@@ -464,9 +457,6 @@ void ClientImpl::PendingRequest::cancel() {
 }
 
 void ClientImpl::initialize(const std::string& auth_username, const std::string& auth_password) {
-  using ProtoVersion =
-      envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::UpstreamProtocol;
-
   // AWS IAM cases are routed first because they need to defer all init dispatch until the IAM
   // token arrives. The state transition to WaitingForAwsToken is what makes the held-user-queue
   // gate kick in for any user request the conn pool dispatches between this return and the
@@ -477,7 +467,7 @@ void ClientImpl::initialize(const std::string& auth_username, const std::string&
     return;
   }
 
-  if (upstream_protocol_version_ != ProtoVersion::RESP3) {
+  if (upstream_protocol_version_ != Common::Redis::RespProtocolVersion::Resp3) {
     // RESP2 + no IAM — legacy synchronous-init semantics: initialize() runs inside
     // ClientFactoryImpl::create() so user makeRequest cannot interleave between these calls and
     // the factory return. State stays NotStarted across the makeRequestInternal calls so the
@@ -761,8 +751,7 @@ ClientPtr ClientFactoryImpl::create(
     absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
     absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator,
-    envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::UpstreamProtocol::
-        Version upstream_protocol_version,
+    Common::Redis::RespProtocolVersion upstream_protocol_version,
     Stats::Counter* upstream_resp3_hello_failure) {
 
   ClientPtr client = ClientImpl::create(

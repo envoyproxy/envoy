@@ -37,6 +37,9 @@ public:
   void onResponse(Common::Redis::RespValuePtr&&) override {}
   Common::Redis::Client::Transaction& transaction() override { return transaction_; }
   void setDownstreamRespVersion(uint32_t) override {}
+  Common::Redis::RespProtocolVersion protocolVersion() const override {
+    return Common::Redis::RespProtocolVersion::Resp2;
+  }
   AuthAttempt attemptDownstreamAuthInline(const std::string&, const std::string&,
                                           uint32_t) override {
     return AuthAttempt::Denied;

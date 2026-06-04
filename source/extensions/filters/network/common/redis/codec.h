@@ -25,6 +25,10 @@ inline RespProtocolVersion toRespProtocolVersion(uint32_t version) {
   return version == 3 ? RespProtocolVersion::Resp3 : RespProtocolVersion::Resp2;
 }
 
+inline uint32_t toWireRespVersion(RespProtocolVersion version) {
+  return version == RespProtocolVersion::Resp3 ? 3u : 2u;
+}
+
 /**
  * All RESP types as defined here: https://redis.io/topics/protocol with the exception of
  * CompositeArray. CompositeArray is an internal type that behaves like an Array type. Its first
@@ -149,12 +153,22 @@ public:
    */
   std::vector<RespValue>& asArray();
   const std::vector<RespValue>& asArray() const;
+  // Backed by ``string_``. Stored payload by type (no wire framing):
+  //   SimpleString / BulkString / Error / BlobError: the bytes.
+  //   BigNumber:       digits.
+  //   VerbatimString:  ``xxx:data`` (encoder strips the ``xxx:`` prefix on RESP2).
+  //   Double:          raw RESP3 Double payload — decoder → encoder pass-through preserves
+  //                    upstream bytes verbatim (a non-canonical-but-parseable representation
+  //                    survives intact).
   std::string& asString();
   const std::string& asString() const;
   int64_t& asInteger();
   int64_t asInteger() const;
-  double& asDouble();
+  // Parses the Double payload via ``absl::SimpleAtod``; throws ``ProtocolError`` on failure.
   double asDouble() const;
+  // Synthesizing path: formats ``v`` (currently via ``{:.17g}``) and stores. NOT
+  // byte-identical to Redis's ``d2string`` for all inputs.
+  void setDouble(double v);
   bool asBoolean() const;
   CompositeArray& asCompositeArray();
   const CompositeArray& asCompositeArray() const;
@@ -167,11 +181,11 @@ public:
   void type(RespType type);
 
 private:
+  // Double shares ``string_`` with BigNumber/VerbatimString — see ``asString()``.
   union {
     std::vector<RespValue> array_;
     std::string string_;
     int64_t integer_;
-    double double_;
     CompositeArray composite_array_;
   };
 

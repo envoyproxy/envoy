@@ -1,11 +1,13 @@
 #pragma once
 
 #include <memory>
+#include <string>
 
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/stream_info/stream_info.h"
 
+#include "source/common/singleton/const_singleton.h"
 #include "source/extensions/filters/network/common/redis/client.h"
 #include "source/extensions/filters/network/common/redis/codec.h"
 
@@ -14,6 +16,18 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 namespace CommandSplitter {
+
+struct ResponseValues {
+  const std::string OK = "OK";
+  const std::string InvalidRequest = "invalid request";
+  const std::string NoUpstreamHost = "no upstream host";
+  const std::string UpstreamFailure = "upstream failure";
+  const std::string UpstreamProtocolError = "upstream protocol error";
+  const std::string AuthRequiredError = "NOAUTH Authentication required.";
+  const std::string UnsupportedProtocol = "NOPROTO unsupported protocol version";
+};
+
+using Response = ConstSingleton<ResponseValues>;
 
 /**
  * A handle to a split request.
@@ -123,33 +137,17 @@ public:
   virtual void setDownstreamRespVersion(uint32_t version) PURE;
 
   /**
-   * @return the maximum RESP version a downstream client may negotiate via
-   * ``HELLO N`` on this connection. ``HELLO N`` with ``N`` above this value
-   * is rejected with ``-NOPROTO``. The default of ``2`` matches a connection
-   * served by a RESP2-only backend; concrete implementations source the
-   * value from per-listener configuration (see
-   * ``ProxyFilterConfig::clusterRespVersion``).
+   * Listener-level RESP version. ``HELLO N`` is accepted only when N matches (wire 2 / 3);
+   * pre-HELLO data commands on a ``Resp3`` listener are rejected.
    */
-  virtual uint32_t clusterRespVersion() const { return 2; }
+  virtual Common::Redis::RespProtocolVersion protocolVersion() const PURE;
 
   /**
-   * Current downstream RESP version negotiated on this connection.
-   * Used by HELLO handling to synthesize a reply that matches the
-   * client's current view of the protocol (in case of bare HELLO) and then
-   * flip to the new version.
+   * Current downstream RESP version negotiated on this connection. The HELLO handler
+   * inherits this as the requested version on bare ``HELLO`` (no version arg). The actual
+   * version flip on a successful ``HELLO N`` is performed by ``setDownstreamRespVersion``.
    */
   virtual uint32_t currentDownstreamRespVersion() const { return 2; }
-
-  /**
-   * Schedule a downstream connection close after the in-flight response
-   * has flushed to the wire. Used when the upstream cluster's RESP cap has
-   * dropped below the connection's negotiated downstream version (e.g. CDS
-   * downgraded the cluster RESP3 → RESP2 under an already-negotiated
-   * downstream connection): the proxy can no longer honor the negotiated
-   * RESP3 contract, so the safe action is to send -NOPROTO and close so the
-   * client reconnects and renegotiates against the new (lower) cap.
-   */
-  virtual void closeDownstreamAfterResponse() {}
 };
 
 /**

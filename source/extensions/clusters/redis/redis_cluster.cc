@@ -387,8 +387,7 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
     client->client_ = client_factory_.create(
         host, dispatcher_, shared_from_this(), redis_command_stats_, parent_.info()->statsScope(),
         parent_.auth_username_, parent_.auth_password_, false, absl::nullopt, absl::nullopt,
-        envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::
-            UpstreamProtocol::UNSPECIFIED);
+        Extensions::NetworkFilters::Common::Redis::RespProtocolVersion::Resp2);
     client->client_->addConnectionCallbacks(*client);
   }
   ENVOY_LOG(debug, "executing redis cluster slot request for '{}'", parent_.info_->name());
@@ -749,8 +748,7 @@ void RedisCluster::RedisDiscoverySession::startZoneDiscovery(ClusterSlotsSharedP
       client->client_ = client_factory_.create(
           host, dispatcher_, shared_from_this(), redis_command_stats_, parent_.info()->statsScope(),
           parent_.auth_username_, parent_.auth_password_, false, absl::nullopt, absl::nullopt,
-          envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::
-              UpstreamProtocol::UNSPECIFIED);
+          Extensions::NetworkFilters::Common::Redis::RespProtocolVersion::Resp2);
       client->client_->addConnectionCallbacks(*client);
     }
 

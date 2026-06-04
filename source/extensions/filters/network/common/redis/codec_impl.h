@@ -83,9 +83,8 @@ private:
   PendingInteger pending_integer_;
   RespValuePtr pending_value_root_;
   std::forward_list<PendingValue> pending_value_stack_;
-  // Temporary buffer for accumulating RESP3 Double values during parsing.
-  // The `,` prefix uses SimpleString state to accumulate characters, then
-  // the buffer is parsed to double at ValueComplete.
+  // Scratch buffer for the RESP3 Double payload bytes (``,`` re-uses the SimpleString
+  // accumulator). Validated and moved into ``RespValue::asString()`` at ValueComplete.
   std::string pending_double_buf_;
   // Guard against DoS via chains of empty RESP3 Attributes (|0\r\n|0\r\n...).
   static constexpr uint32_t kMaxConsecutiveAttributes = 32;
@@ -135,7 +134,6 @@ private:
   void encodeSimpleString(const std::string& string, Buffer::Instance& out);
   // RESP3 encoders
   void encodeBoolean(bool value, Buffer::Instance& out);
-  void encodeDouble(double value, Buffer::Instance& out);
   void encodeBigNumber(const std::string& value, Buffer::Instance& out);
   void encodeBlobError(const std::string& error, Buffer::Instance& out);
   void encodeVerbatimString(const std::string& string, Buffer::Instance& out);
@@ -152,11 +150,6 @@ private:
   // replacing each with a space, before emitting via encodeError(). Not
   // needed for RESP3 wire forms because BlobError is length-prefixed.
   static std::string sanitizeErrorForResp2(absl::string_view input);
-
-  // Shared decimal formatting for RESP3 Double on both the native ',...\r\n'
-  // emit path and the RESP2 conversion path (bulk string of the same
-  // digits without the ',' prefix).
-  static std::string formatDoubleForWire(double value);
 };
 
 } // namespace Redis

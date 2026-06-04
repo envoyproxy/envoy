@@ -472,7 +472,7 @@ TEST_F(RedisEncoderDecoderImplTest, ToStringResp3Types) {
   {
     RespValue v;
     v.type(RespType::Double);
-    v.asDouble() = 0.5;
+    v.setDouble(0.5);
     EXPECT_EQ("0.5", v.toString());
   }
   // BigNumber
@@ -1027,25 +1027,48 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3BooleanInvalid) {
   EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
 }
 
-// RESP3 Double tests
+// RESP3 Double pass-through: payload stored as raw bytes; round-trip is byte-identical.
 TEST_F(RedisEncoderDecoderImplTest, Resp3Double) {
   buffer_.add(",3.14\r\n");
   decoder_.decode(buffer_);
   EXPECT_EQ(RespType::Double, decoded_values_[0]->type());
+  EXPECT_EQ("3.14", decoded_values_[0]->asString());
   EXPECT_DOUBLE_EQ(3.14, decoded_values_[0]->asDouble());
 
   encoder_.setProtocolVersion(RespProtocolVersion::Resp3);
   Buffer::OwnedImpl out;
   encoder_.encode(*decoded_values_[0], out);
-  // fmt::format may produce "3.14" or similar
-  EXPECT_THAT(out.toString(), testing::StartsWith(","));
-  EXPECT_THAT(out.toString(), testing::EndsWith("\r\n"));
+  EXPECT_EQ(",3.14\r\n", out.toString());
+}
+
+// Non-canonical-but-parseable representation survives intact.
+TEST_F(RedisEncoderDecoderImplTest, Resp3DoublePreservesUpstreamRepresentation) {
+  buffer_.add(",3.1400000000000001\r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ("3.1400000000000001", decoded_values_[0]->asString());
+
+  encoder_.setProtocolVersion(RespProtocolVersion::Resp3);
+  Buffer::OwnedImpl out;
+  encoder_.encode(*decoded_values_[0], out);
+  EXPECT_EQ(",3.1400000000000001\r\n", out.toString());
+}
+
+// RESP2 down-conversion wraps the raw payload as a bulk string (length = payload bytes).
+TEST_F(RedisEncoderDecoderImplTest, Resp3DoubleDownconvertsToBulkStringVerbatim) {
+  buffer_.add(",3.14\r\n");
+  decoder_.decode(buffer_);
+
+  encoder_.setProtocolVersion(RespProtocolVersion::Resp2);
+  Buffer::OwnedImpl out;
+  encoder_.encode(*decoded_values_[0], out);
+  EXPECT_EQ("$4\r\n3.14\r\n", out.toString());
 }
 
 TEST_F(RedisEncoderDecoderImplTest, Resp3DoubleNegative) {
   buffer_.add(",-1.5\r\n");
   decoder_.decode(buffer_);
   EXPECT_EQ(RespType::Double, decoded_values_[0]->type());
+  EXPECT_EQ("-1.5", decoded_values_[0]->asString());
   EXPECT_DOUBLE_EQ(-1.5, decoded_values_[0]->asDouble());
 }
 
@@ -1208,7 +1231,7 @@ TEST_F(RedisRespValueTest, Resp3TypeCopyMove) {
   // Double
   RespValue double_val;
   double_val.type(RespType::Double);
-  double_val.asDouble() = 3.14;
+  double_val.setDouble(3.14);
   verifyMoves(double_val);
 
   // BigNumber
@@ -1268,12 +1291,22 @@ TEST_F(RedisRespValueTest, Resp3TypeEquality) {
 
   RespValue double1, double2;
   double1.type(RespType::Double);
-  double1.asDouble() = 3.14;
+  double1.setDouble(3.14);
   double2.type(RespType::Double);
-  double2.asDouble() = 2.71;
+  double2.setDouble(2.71);
   EXPECT_NE(double1, double2);
-  double2.asDouble() = 3.14;
+  double2.setDouble(3.14);
   EXPECT_EQ(double1, double2);
+
+  // Byte-for-byte equality (stricter than IEEE): two payloads representing the same
+  // numeric value but with different decimal forms compare unequal.
+  RespValue d_short, d_long;
+  d_short.type(RespType::Double);
+  d_short.asString() = "3.14";
+  d_long.type(RespType::Double);
+  d_long.asString() = "3.1400000000000001";
+  EXPECT_DOUBLE_EQ(d_short.asDouble(), d_long.asDouble());
+  EXPECT_NE(d_short, d_long);
 
   // Cross-type inequality
   EXPECT_NE(bool1, double1);
@@ -1648,51 +1681,44 @@ TEST_F(RespEncoderDownconversionTest, BooleanFalseAsInteger) {
 TEST_F(RespEncoderDownconversionTest, DoubleAsBulkString) {
   RespValue v;
   v.type(RespType::Double);
-  v.asDouble() = 3.14;
+  v.setDouble(3.14);
+
+  // Pin the exact ``{:.17g}`` byte shape (17 sig digits, general format).
+  const std::string expected_digits = "3.1400000000000001";
+
   Buffer::OwnedImpl out;
   encodeResp2(v, out);
-  // fmt::format("{:.17g}", 3.14) -> "3.1400000000000001" (double precision).
-  // We test for structural shape rather than exact bytes to avoid coupling the
-  // test to fmt's formatting precision; the converted form is a bulk string
-  // containing whatever formatDoubleForWire produced.
-  const std::string s = out.toString();
-  EXPECT_TRUE(absl::StartsWith(s, "$"));
-  EXPECT_TRUE(absl::EndsWith(s, "\r\n"));
-  // BulkString payload must be the same decimal the native RESP3 emit uses.
+  EXPECT_EQ("$" + std::to_string(expected_digits.size()) + "\r\n" + expected_digits + "\r\n",
+            out.toString());
+
   Buffer::OwnedImpl resp3_out;
   encoder_.setProtocolVersion(RespProtocolVersion::Resp3);
   encoder_.encode(v, resp3_out);
-  const std::string resp3 = resp3_out.toString();
-  // RESP3 form is ",<digits>\r\n"; extract <digits> and confirm RESP2 form
-  // carries the same digits inside a bulk string.
-  ASSERT_GT(resp3.size(), 3U);
-  const std::string digits = resp3.substr(1, resp3.size() - 3);
-  EXPECT_NE(std::string::npos, s.find(digits));
+  EXPECT_EQ("," + expected_digits + "\r\n", resp3_out.toString());
 }
 
-// Integer-valued RESP3 doubles must still encode with a decimal marker (or exponent), otherwise
-// downstream clients that pattern-match for floating-point shape would classify the payload as
-// integer. {:.17g} alone produces "1" for 1.0, so the formatter explicitly appends ".0".
-TEST_F(RespEncoderDownconversionTest, DoubleIntegerValuedHasDecimal) {
+// Small integer-valued doubles emit the bare integer form (no ".0" pad), coinciding with
+// Redis's ``d2string`` integer fast path. Larger / non-integer values may diverge.
+TEST_F(RespEncoderDownconversionTest, DoubleIntegerValuedHasNoDecimal) {
   RespValue v;
   v.type(RespType::Double);
-  v.asDouble() = 1.0;
+  v.setDouble(1.0);
   Buffer::OwnedImpl out;
   encodeResp2(v, out);
-  // RESP2 form: bulk string carrying "1.0", not "1".
-  EXPECT_EQ("$3\r\n1.0\r\n", out.toString());
+  // RESP2 form: bulk string carrying "1", not "1.0".
+  EXPECT_EQ("$1\r\n1\r\n", out.toString());
 
   Buffer::OwnedImpl resp3_out;
   encoder_.setProtocolVersion(RespProtocolVersion::Resp3);
   encoder_.encode(v, resp3_out);
-  // RESP3 native form must carry the same digits with the ',' prefix.
-  EXPECT_EQ(",1.0\r\n", resp3_out.toString());
+  // RESP3 native form is ``,1\r\n`` — the bare digit form Redis itself emits.
+  EXPECT_EQ(",1\r\n", resp3_out.toString());
 }
 
 TEST_F(RespEncoderDownconversionTest, DoubleInfAsBulkString) {
   RespValue v;
   v.type(RespType::Double);
-  v.asDouble() = std::numeric_limits<double>::infinity();
+  v.setDouble(std::numeric_limits<double>::infinity());
   Buffer::OwnedImpl out;
   encodeResp2(v, out);
   EXPECT_EQ("$3\r\ninf\r\n", out.toString());
@@ -1701,7 +1727,7 @@ TEST_F(RespEncoderDownconversionTest, DoubleInfAsBulkString) {
 TEST_F(RespEncoderDownconversionTest, DoubleNegInfAsBulkString) {
   RespValue v;
   v.type(RespType::Double);
-  v.asDouble() = -std::numeric_limits<double>::infinity();
+  v.setDouble(-std::numeric_limits<double>::infinity());
   Buffer::OwnedImpl out;
   encodeResp2(v, out);
   EXPECT_EQ("$4\r\n-inf\r\n", out.toString());
@@ -1710,7 +1736,7 @@ TEST_F(RespEncoderDownconversionTest, DoubleNegInfAsBulkString) {
 TEST_F(RespEncoderDownconversionTest, DoubleNanAsBulkString) {
   RespValue v;
   v.type(RespType::Double);
-  v.asDouble() = std::nan("");
+  v.setDouble(std::nan(""));
   Buffer::OwnedImpl out;
   encodeResp2(v, out);
   EXPECT_EQ("$3\r\nnan\r\n", out.toString());
@@ -1955,8 +1981,11 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3NullDecodesToNull) {
 }
 
 TEST_F(RedisEncoderDecoderImplTest, NestingDepthRejected) {
-  // 32 nested *1 frames produce a stack depth of 33 after pushes (root + 32),
-  // which exceeds kMaxNestingDepth = 32. Reject.
+  // 32 nested ``*1`` frames: the pre-push check
+  // (``pending_value_stack_depth_ >= kMaxNestingDepth``) rejects the 32nd ``*1`` because
+  // the prior frames (root setup at depth=1 plus 30 successful nested-array pushes)
+  // already drove the depth counter to ``kMaxNestingDepth`` (= 32). No 33rd-level push
+  // happens; the counter is never incremented past 32.
   std::string deep;
   for (int i = 0; i < 32; ++i) {
     deep += "*1\r\n";

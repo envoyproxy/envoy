@@ -86,8 +86,7 @@ public:
       absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
       absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
           aws_iam_authenticator,
-      envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::UpstreamProtocol::
-          Version upstream_protocol_version,
+      Common::Redis::RespProtocolVersion upstream_protocol_version,
       Stats::Counter* upstream_resp3_hello_failure = nullptr);
 
   ClientImpl(
@@ -98,8 +97,7 @@ public:
       absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
       absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
           aws_iam_authenticator,
-      envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::UpstreamProtocol::
-          Version upstream_protocol_version,
+      Common::Redis::RespProtocolVersion upstream_protocol_version,
       Stats::Counter* upstream_resp3_hello_failure = nullptr);
   ~ClientImpl() override;
 
@@ -296,10 +294,8 @@ private:
   absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
       aws_iam_authenticator_;
   // Per-connection upstream RESP version, captured from the conn pool at create time. Drives the
-  // RESP3 branch in ClientImpl::initialize. Defaults to RESP2 / UNSPECIFIED behavior when set to
-  // anything other than RESP3.
-  const envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::
-      UpstreamProtocol::Version upstream_protocol_version_;
+  // RESP3 branch in ClientImpl::initialize. ``Resp2`` keeps the legacy no-HELLO behavior.
+  const Common::Redis::RespProtocolVersion upstream_protocol_version_;
   // Nullable HELLO 3 failure counter, owned by the conn pool's RedisClusterStats. Increment site
   // in Hello3InitCallbacks guards on nullptr so non-pool callers can pass nullptr.
   Stats::Counter* upstream_resp3_hello_failure_;
@@ -328,8 +324,7 @@ public:
       absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
       absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
           aws_iam_authenticator,
-      envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::UpstreamProtocol::
-          Version upstream_protocol_version,
+      Common::Redis::RespProtocolVersion upstream_protocol_version,
       Stats::Counter* upstream_resp3_hello_failure = nullptr) override;
 
   static ClientFactoryImpl instance_;

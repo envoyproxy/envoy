@@ -11,7 +11,12 @@
 #include "source/common/common/fmt.h"
 #include "source/common/config/datasource.h"
 #include "source/common/config/utility.h"
+#include "source/extensions/filters/network/common/redis/supported_commands.h"
+#include "source/extensions/filters/network/common/redis/utility.h"
+#include "source/extensions/filters/network/redis_proxy/command_splitter.h"
 #include "source/extensions/filters/network/redis_proxy/config.h"
+
+#include "absl/strings/ascii.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -22,8 +27,7 @@ ProxyFilterConfig::ProxyFilterConfig(
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config,
     Stats::Scope& scope, const Network::DrainDecision& drain_decision, Runtime::Loader& runtime,
     Api::Api& api, TimeSource& time_source,
-    Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
-    Upstream::ClusterManager& cluster_manager, std::vector<std::string> response_bearing_clusters)
+    Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory)
     : drain_decision_(drain_decision), runtime_(runtime),
       stat_prefix_(fmt::format("redis.{}.", config.stat_prefix())),
       stats_(generateStats(stat_prefix_, scope)),
@@ -33,8 +37,7 @@ ProxyFilterConfig::ProxyFilterConfig(
       external_auth_expiration_enabled_(external_auth_enabled_ &&
                                         config.external_auth_provider().enable_auth_expiration()),
       dns_cache_manager_(cache_manager_factory.get()), dns_cache_(getCache(config)),
-      time_source_(time_source), cluster_manager_(cluster_manager),
-      response_bearing_clusters_(std::move(response_bearing_clusters)) {
+      time_source_(time_source), protocol_version_(toCodecRespVersion(config.protocol_version())) {
 
   if (config.settings().enable_redirection() && !config.settings().has_dns_cache_config()) {
     ENVOY_LOG(warn, "redirections without DNS lookups enabled might cause client errors, set the "
@@ -74,32 +77,6 @@ Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr ProxyFilterConfig::ge
 ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
   return {
       ALL_REDIS_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix), POOL_GAUGE_PREFIX(scope, prefix))};
-}
-
-uint32_t ProxyFilterConfig::clusterRespVersion() const {
-  // Floor across response-bearing clusters, evaluated against the worker's
-  // live thread-local cluster view. Missing/unknown clusters cap at RESP2 —
-  // the conservative default that lets HELLO 3 be rejected with -NOPROTO
-  // until the cluster lands. The function is invoked on the HELLO command
-  // path (once per downstream connection) and the per-command RESP-cap
-  // guard in CommandSplitter::makeRequest (once per non-HELLO command); both
-  // run on the worker thread.
-  uint32_t cap = 3;
-  bool any_seen = false;
-  for (const auto& name : response_bearing_clusters_) {
-    auto* tlc = cluster_manager_.getThreadLocalCluster(name);
-    uint32_t v = 2;
-    if (tlc != nullptr) {
-      v = (ProtocolOptionsConfigImpl::upstreamProtocolVersion(tlc->info()) ==
-           envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::
-               UpstreamProtocol::RESP3)
-              ? 3
-              : 2;
-    }
-    cap = std::min(cap, v);
-    any_seen = true;
-  }
-  return any_seen ? cap : 2;
 }
 
 ProxyFilter::ProxyFilter(Common::Redis::DecoderFactory& factory,
@@ -151,6 +128,23 @@ void ProxyFilter::onRespValue(Common::Redis::RespValuePtr&& value) {
 }
 
 void ProxyFilter::processRespValue(Common::Redis::RespValuePtr&& value, PendingRequest& request) {
+  // Pre-HELLO gate on RESP3 listeners: only HELLO / AUTH / QUIT pass until HELLO 3 lands;
+  // any other well-formed command array returns -NOPROTO before the splitter. Malformed
+  // requests fall through to the splitter's invalid-request path.
+  if (config_->protocolVersion() == Common::Redis::RespProtocolVersion::Resp3 &&
+      downstream_resp_version_ < 3 && value->type() == Common::Redis::RespType::Array &&
+      !value->asArray().empty() &&
+      value->asArray()[0].type() == Common::Redis::RespType::BulkString) {
+    const std::string cmd = absl::AsciiStrToLower(value->asArray()[0].asString());
+    if (cmd != Common::Redis::SupportedCommands::hello() &&
+        cmd != Common::Redis::SupportedCommands::auth() &&
+        cmd != Common::Redis::SupportedCommands::quit()) {
+      request.onResponse(
+          Common::Redis::Utility::makeError(CommandSplitter::Response::get().UnsupportedProtocol));
+      return;
+    }
+  }
+
   CommandSplitter::SplitRequestPtr split =
       splitter_.makeRequest(std::move(value), request, callbacks_->connection().dispatcher(),
                             callbacks_->connection().streamInfo());
@@ -224,34 +218,11 @@ void ProxyFilter::onAuthenticateExternal(CommandSplitter::SplitCallbacks& reques
       external_auth_expiration_epoch_ = response->expiration.seconds() * 1000000;
     }
     if (is_hello_auth) {
-      // Flip the negotiated downstream RESP version BEFORE emitting the HELLO Map so the
-      // encoder serializes the Map natively (RESP3) or down-converts to a flat array (RESP2)
-      // matching what the client just negotiated. setDownstreamRespVersion also updates the
-      // stamp on the in-flight PendingRequest so ProxyFilter::onResponse does not flip the
-      // encoder back to the pre-HELLO version when sending this very reply.
+      // Flip downstream version BEFORE emitting the HELLO Map so the reply (and pipelined
+      // followers) encode in the negotiated version — see PendingRequest::setDownstreamRespVersion.
       const uint32_t version = *pending.pending_hello_auth_version_;
       pending.setDownstreamRespVersion(version);
       redis_response = CommandSplitter::buildHelloReply(version);
-
-      // Re-stamp queued pending_request_value_ entries that landed BEHIND this HELLO request
-      // while external_auth_call_status_ was Pending. They were created with
-      // resp_version_at_creation_ = the pre-HELLO downstream version (typically RESP2);
-      // without this re-stamp, ProxyFilter::onResponse's stamp-vs-current branch would
-      // setProtocolVersion(Resp2) → encode → setProtocolVersion(Resp3) for each one, sending
-      // RESP2 reply shapes on a freshly-negotiated RESP3 connection. The contract HELLO N
-      // AUTH establishes is "from this command forward, the connection speaks RESP N", so any
-      // command pipelined after the HELLO inherits the new version regardless of when the
-      // client put it on the wire.
-      bool past_hello = false;
-      for (auto& queued : pending_requests_) {
-        if (&queued == &pending) {
-          past_hello = true;
-          continue;
-        }
-        if (past_hello && queued.pending_request_value_) {
-          queued.resp_version_at_creation_ = version;
-        }
-      }
     } else {
       redis_response = std::make_unique<Common::Redis::RespValue>();
       redis_response->type(Common::Redis::RespType::SimpleString);
@@ -340,9 +311,11 @@ void ProxyFilter::onAuth(PendingRequest& request, const std::string& password) {
 void ProxyFilter::onAuth(PendingRequest& request, const std::string& username,
                          const std::string& password) {
   if (config_->external_auth_enabled_) {
+    // Set Pending before dispatch so a synchronously-resolving callback doesn't get the
+    // status flipped back to Pending after it ran.
+    external_auth_call_status_ = ExternalAuthCallStatus::Pending;
     auth_client_->authenticateExternal(*this, request, callbacks_->connection().streamInfo(),
                                        username, password);
-    external_auth_call_status_ = ExternalAuthCallStatus::Pending;
     return;
   }
 
@@ -486,6 +459,24 @@ ProxyFilter::PendingRequest::PendingRequest(ProxyFilter& parent)
 
 ProxyFilter::PendingRequest::~PendingRequest() {
   parent_.config_->stats_.downstream_rq_active_.dec();
+}
+
+void ProxyFilter::PendingRequest::setDownstreamRespVersion(uint32_t version) {
+  parent_.downstream_resp_version_ = version;
+  parent_.encoder_->setProtocolVersion(Common::Redis::toRespProtocolVersion(version));
+  // Re-stamp this HELLO and any auth-held followers; onResponse would otherwise encode
+  // their replies in the pre-HELLO version.
+  resp_version_at_creation_ = version;
+  bool past_this = false;
+  for (auto& queued : parent_.pending_requests_) {
+    if (&queued == this) {
+      past_this = true;
+      continue;
+    }
+    if (past_this && queued.pending_request_value_) {
+      queued.resp_version_at_creation_ = version;
+    }
+  }
 }
 
 } // namespace RedisProxy

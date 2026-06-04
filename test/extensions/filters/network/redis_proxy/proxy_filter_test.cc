@@ -82,7 +82,7 @@ TEST_F(RedisProxyFilterConfigTest, Normal) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this, cluster_manager_, {});
+                           time_source_, *this);
   EXPECT_EQ("redis.foo.", config.stat_prefix_);
   EXPECT_TRUE(config.downstream_auth_username_.empty());
   EXPECT_TRUE(config.downstream_auth_passwords_.empty());
@@ -112,7 +112,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthPasswordSet) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this, cluster_manager_, {});
+                           time_source_, *this);
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 1);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "somepassword");
 }
@@ -135,7 +135,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamMultipleAuthPasswordsSet) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this, cluster_manager_, {});
+                           time_source_, *this);
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 3);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "somepassword");
   EXPECT_EQ(config.downstream_auth_passwords_[1], "newpassword1");
@@ -158,7 +158,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamOnlyExraAuthPasswordsSet) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this, cluster_manager_, {});
+                           time_source_, *this);
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 2);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "newpassword1");
   EXPECT_EQ(config.downstream_auth_passwords_[1], "newpassword2");
@@ -181,7 +181,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthAclSet) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this, cluster_manager_, {});
+                           time_source_, *this);
   EXPECT_EQ(config.downstream_auth_username_, "someusername");
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 1);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "somepassword");
@@ -207,7 +207,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthAclSetWithMultiplePasswords) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this, cluster_manager_, {});
+                           time_source_, *this);
   EXPECT_EQ(config.downstream_auth_username_, "someusername");
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 3);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "somepassword");
@@ -233,7 +233,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthAclSetWithOnlyExtraPasswords) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this, cluster_manager_, {});
+                           time_source_, *this);
   EXPECT_EQ(config.downstream_auth_username_, "someusername");
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 2);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "newpassword1");
@@ -257,7 +257,7 @@ TEST_F(RedisProxyFilterConfigTest, ExternalAuthBasic) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this, cluster_manager_, {});
+                           time_source_, *this);
   EXPECT_TRUE(config.external_auth_enabled_);
   EXPECT_FALSE(config.external_auth_expiration_enabled_);
 }
@@ -280,171 +280,46 @@ TEST_F(RedisProxyFilterConfigTest, ExternalAuthWithExpiration) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this, cluster_manager_, {});
+                           time_source_, *this);
   EXPECT_TRUE(config.external_auth_enabled_);
   EXPECT_TRUE(config.external_auth_expiration_enabled_);
 }
 
-// Dynamic clusterRespVersion() tests. The cap is no longer captured at filter
-// load time; it is read live on each call from the worker's thread-local
-// cluster manager state. This block pins three properties:
-//   1. Unknown cluster (LDS-before-CDS) caps to RESP2 and self-heals when
-//      the cluster later arrives.
-//   2. Cluster RESP3 → RESP2 downgrade is reflected immediately.
-//   3. Mirror clusters are NOT in response_bearing_clusters_ and therefore
-//      do not constrain the cap.
-namespace {
-// Helper: install ON_CALL on the cluster manager's getThreadLocalCluster so
-// it returns either nullptr or a pre-built ThreadLocalCluster whose info
-// carries the requested upstream RESP version. Tests then call
-// clusterRespVersion() and assert the floor.
-void installCluster(Upstream::MockClusterManager& cm, const std::string& name,
-                    Upstream::ThreadLocalCluster* tlc) {
-  ON_CALL(cm, getThreadLocalCluster(absl::string_view(name))).WillByDefault(Return(tlc));
-}
-
-std::shared_ptr<NiceMock<Upstream::MockClusterInfo>>
-makeRespClusterInfo(envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::
-                        UpstreamProtocol::Version version) {
-  auto info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions proto_opts;
-  proto_opts.mutable_upstream_protocol()->set_version(version);
-  auto options = std::make_shared<ProtocolOptionsConfigImpl>(proto_opts);
-  ON_CALL(*info, extensionProtocolOptions(NetworkFilterNames::get().RedisProxy))
-      .WillByDefault(Return(options));
-  return info;
-}
-} // namespace
-
-TEST_F(RedisProxyFilterConfigTest, ClusterRespVersionUnknownClusterCapsToResp2) {
+// Listener-level RESP version tests. The ``protocol_version`` is fixed at
+// filter config load from the static ``RedisProxy.protocol_version`` field;
+// there is no live cluster lookup and no floor computation. Cluster manager
+// state cannot change it.
+TEST_F(RedisProxyFilterConfigTest, ProtocolVersionDefaultsToResp2) {
   const std::string yaml_string = R"EOF(
   prefix_routes:
     catch_all_route:
-      cluster: missing_cluster
+      cluster: fake_cluster
   stat_prefix: foo
   settings:
     op_timeout: 0.01s
   )EOF";
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
-  // No cluster installed → getThreadLocalCluster returns nullptr → cap == 2.
-  installCluster(cluster_manager_, "missing_cluster", nullptr);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this, cluster_manager_, {"missing_cluster"});
-  EXPECT_EQ(2U, config.clusterRespVersion());
+                           time_source_, *this);
+  EXPECT_EQ(Common::Redis::RespProtocolVersion::Resp2, config.protocolVersion());
 }
 
-TEST_F(RedisProxyFilterConfigTest, ClusterRespVersionSelfHealsWhenClusterArrives) {
+TEST_F(RedisProxyFilterConfigTest, ProtocolVersionResp3IsHonored) {
   const std::string yaml_string = R"EOF(
   prefix_routes:
     catch_all_route:
-      cluster: late_cluster
+      cluster: fake_cluster
   stat_prefix: foo
+  protocol_version: RESP3
   settings:
     op_timeout: 0.01s
   )EOF";
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
-  // Initially missing.
-  installCluster(cluster_manager_, "late_cluster", nullptr);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this, cluster_manager_, {"late_cluster"});
-  EXPECT_EQ(2U, config.clusterRespVersion());
-
-  // CDS arrives carrying RESP3 — next clusterRespVersion() reflects it.
-  NiceMock<Upstream::MockThreadLocalCluster> tlc;
-  auto info = makeRespClusterInfo(envoy::extensions::filters::network::redis_proxy::v3::
-                                      RedisProtocolOptions::UpstreamProtocol::RESP3);
-  ON_CALL(tlc, info()).WillByDefault(Return(info));
-  installCluster(cluster_manager_, "late_cluster", &tlc);
-  EXPECT_EQ(3U, config.clusterRespVersion());
-}
-
-TEST_F(RedisProxyFilterConfigTest, ClusterRespVersionReflectsDowngrade) {
-  const std::string yaml_string = R"EOF(
-  prefix_routes:
-    catch_all_route:
-      cluster: shifting_cluster
-  stat_prefix: foo
-  settings:
-    op_timeout: 0.01s
-  )EOF";
-  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
-      parseProtoFromYaml(yaml_string);
-  // Initially RESP3.
-  NiceMock<Upstream::MockThreadLocalCluster> tlc;
-  auto info_v3 = makeRespClusterInfo(envoy::extensions::filters::network::redis_proxy::v3::
-                                         RedisProtocolOptions::UpstreamProtocol::RESP3);
-  ON_CALL(tlc, info()).WillByDefault(Return(info_v3));
-  installCluster(cluster_manager_, "shifting_cluster", &tlc);
-  ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this, cluster_manager_, {"shifting_cluster"});
-  EXPECT_EQ(3U, config.clusterRespVersion());
-
-  // Cluster info flips to RESP2 (e.g. CDS update) — cap drops immediately.
-  auto info_v2 = makeRespClusterInfo(envoy::extensions::filters::network::redis_proxy::v3::
-                                         RedisProtocolOptions::UpstreamProtocol::RESP2);
-  ON_CALL(tlc, info()).WillByDefault(Return(info_v2));
-  EXPECT_EQ(2U, config.clusterRespVersion());
-}
-
-TEST_F(RedisProxyFilterConfigTest, ClusterRespVersionExcludesMirrorClusters) {
-  const std::string yaml_string = R"EOF(
-  prefix_routes:
-    catch_all_route:
-      cluster: primary_cluster
-  stat_prefix: foo
-  settings:
-    op_timeout: 0.01s
-  )EOF";
-  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
-      parseProtoFromYaml(yaml_string);
-  // Build response-bearing list with ONLY the primary (RESP3). A mirror
-  // cluster on RESP2 would NOT appear here — that is the contract pinned
-  // by addResponseBearingClusters() vs addAllReferencedClusters() in
-  // config.cc. Direct ProxyFilterConfig construction below mirrors what the
-  // factory hands in: response-bearing only.
-  NiceMock<Upstream::MockThreadLocalCluster> primary_tlc;
-  auto primary_info = makeRespClusterInfo(envoy::extensions::filters::network::redis_proxy::v3::
-                                              RedisProtocolOptions::UpstreamProtocol::RESP3);
-  ON_CALL(primary_tlc, info()).WillByDefault(Return(primary_info));
-  installCluster(cluster_manager_, "primary_cluster", &primary_tlc);
-
-  ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this, cluster_manager_, {"primary_cluster"});
-  // Cap is RESP3 — a hypothetical RESP2 mirror cluster is intentionally
-  // absent from the response_bearing_clusters_ list and cannot drag the
-  // cap down.
-  EXPECT_EQ(3U, config.clusterRespVersion());
-}
-
-TEST_F(RedisProxyFilterConfigTest, ClusterRespVersionFloorsAcrossResponseBearingClusters) {
-  const std::string yaml_string = R"EOF(
-  prefix_routes:
-    catch_all_route:
-      cluster: primary_cluster
-  stat_prefix: foo
-  settings:
-    op_timeout: 0.01s
-  )EOF";
-  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
-      parseProtoFromYaml(yaml_string);
-  // Two response-bearing clusters: primary RESP3, read policy RESP2 → floor 2.
-  NiceMock<Upstream::MockThreadLocalCluster> primary_tlc;
-  NiceMock<Upstream::MockThreadLocalCluster> read_tlc;
-  auto primary_info = makeRespClusterInfo(envoy::extensions::filters::network::redis_proxy::v3::
-                                              RedisProtocolOptions::UpstreamProtocol::RESP3);
-  auto read_info = makeRespClusterInfo(envoy::extensions::filters::network::redis_proxy::v3::
-                                           RedisProtocolOptions::UpstreamProtocol::RESP2);
-  ON_CALL(primary_tlc, info()).WillByDefault(Return(primary_info));
-  ON_CALL(read_tlc, info()).WillByDefault(Return(read_info));
-  installCluster(cluster_manager_, "primary_cluster", &primary_tlc);
-  installCluster(cluster_manager_, "read_cluster", &read_tlc);
-
-  ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this, cluster_manager_,
-                           {"primary_cluster", "read_cluster"});
-  EXPECT_EQ(2U, config.clusterRespVersion());
+                           time_source_, *this);
+  EXPECT_EQ(Common::Redis::RespProtocolVersion::Resp3, config.protocolVersion());
 }
 
 class RedisProxyFilterTest
@@ -468,30 +343,19 @@ public:
     op_timeout: 0.01s
   )EOF";
 
-  RedisProxyFilterTest(const std::string& yaml_string, bool defer_filter_construction = false) {
+  RedisProxyFilterTest(const std::string& yaml_string) {
     envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
         parseProtoFromYaml(yaml_string);
-    // Pass empty response_bearing_clusters: dynamic clusterRespVersion()
-    // returns RESP2 in that case. The proxy_filter unit tests use a mock
-    // splitter (MockInstance), so the splitter never reads the cap; the
-    // value here is inert for these tests.
     config_ = std::make_shared<ProxyFilterConfig>(
-        proto_config, *store_.rootScope(), drain_decision_, runtime_, api_, time_source_, *this,
-        cluster_manager_, std::vector<std::string>{});
+        proto_config, *store_.rootScope(), drain_decision_, runtime_, api_, time_source_, *this);
     time_source_.setSystemTime(std::chrono::seconds(0));
-    if (defer_filter_construction) {
-      // Caller will construct the filter explicitly via buildFilter() — used when a test needs
-      // to install EXPECT_CALL on encoder_ before the filter ctor runs setProtocolVersion.
-      return;
-    }
     buildFilter();
   }
 
   RedisProxyFilterTest() : RedisProxyFilterTest(DefaultConfig) {}
 
-  // Construct the ProxyFilter using the previously-built config_. Split
-  // out of the ctor so tests can wire EXPECT_CALL on encoder_ first when the
-  // ctor's setProtocolVersion flip is the property under test.
+  // Construct the ProxyFilter using the previously-built config_. Split out of the ctor so
+  // subclasses can build the filter after they have wired their own fixture state.
   void buildFilter() {
     if (config_->external_auth_enabled_) {
       external_auth_client_ = new ExternalAuth::MockExternalAuthClient();
@@ -526,12 +390,10 @@ public:
     return Common::Redis::DecoderPtr{decoder_};
   }
 
-  // NiceMock suppresses the "uninteresting call" warning for tests that do not specifically
-  // EXPECT_CALL on setProtocolVersion. The ProxyFilter ctor unconditionally calls
-  // setProtocolVersion(...) to apply the configured initial RESP version; without NiceMock,
-  // every existing test that did not opt in to encoder-version assertions would fail. ON_CALL
-  // inside MockEncoder::MockEncoder() still forwards the call to the real encoder, so wire-
-  // output tests are unaffected.
+  // NiceMock suppresses the "uninteresting call" warning for tests that drive request/response
+  // flows without explicitly asserting on encoder calls — every successful HELLO emits a Map
+  // reply through ``encode``, and any reply forwarded by ``onResponse`` likewise hits the
+  // encoder, so without NiceMock those tests would flood with uninteresting-call warnings.
   NiceMock<Common::Redis::MockEncoder>* encoder_{new NiceMock<Common::Redis::MockEncoder>()};
   Common::Redis::MockDecoder* decoder_{new Common::Redis::MockDecoder()};
   Common::Redis::DecoderCallbacks* decoder_callbacks_{};
@@ -727,6 +589,189 @@ TEST_F(RedisProxyFilterTest, AuthAclWhenNotRequired) {
         callbacks.onAuth("foo", "bar");
         // callbacks cannot be accessed now.
         EXPECT_TRUE(filter_->connectionAllowed());
+        return nullptr;
+      }));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+}
+
+// First-non-HELLO gate on a RESP3 listener (ProxyFilter::processRespValue).
+
+const std::string resp3_listener_config = R"EOF(
+prefix_routes:
+  catch_all_route:
+      cluster: fake_cluster
+stat_prefix: foo
+protocol_version: RESP3
+settings:
+  op_timeout: 0.01s
+)EOF";
+
+const std::string resp3_listener_with_auth_config = R"EOF(
+prefix_routes:
+  catch_all_route:
+      cluster: fake_cluster
+stat_prefix: foo
+protocol_version: RESP3
+settings:
+  op_timeout: 0.01s
+downstream_auth_password:
+  inline_string: somepassword
+)EOF";
+
+class RedisProxyFilterResp3Test : public RedisProxyFilterTest {
+public:
+  RedisProxyFilterResp3Test() : RedisProxyFilterTest(resp3_listener_config) {}
+
+  // Build a RespValue Array of BulkString command tokens (e.g. {"get", "foo"}).
+  static Common::Redis::RespValuePtr makeCommand(const std::vector<std::string>& tokens) {
+    auto value = std::make_unique<Common::Redis::RespValue>();
+    value->type(Common::Redis::RespType::Array);
+    std::vector<Common::Redis::RespValue> elements(tokens.size());
+    for (size_t i = 0; i < tokens.size(); ++i) {
+      elements[i].type(Common::Redis::RespType::BulkString);
+      elements[i].asString() = tokens[i];
+    }
+    value->asArray().swap(elements);
+    return value;
+  }
+};
+
+class RedisProxyFilterResp3WithAuthTest : public RedisProxyFilterTest {
+public:
+  RedisProxyFilterResp3WithAuthTest() : RedisProxyFilterTest(resp3_listener_with_auth_config) {}
+
+  static Common::Redis::RespValuePtr makeCommand(const std::vector<std::string>& tokens) {
+    return RedisProxyFilterResp3Test::makeCommand(tokens);
+  }
+};
+
+// RESP3 listener + fresh connection + ``GET foo`` → ``-NOPROTO``. The splitter must not be
+// invoked at all: the gate runs before ``splitter_.makeRequest`` so a strict ``EXPECT_CALL(0)``
+// pins that property.
+TEST_F(RedisProxyFilterResp3Test, GetBeforeHelloRejectedNoproto) {
+  InSequence s;
+  Buffer::OwnedImpl fake_data;
+  Common::Redis::RespValuePtr request = makeCommand({"get", "foo"});
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    decoder_callbacks_->onRespValue(std::move(request));
+  }));
+  EXPECT_CALL(splitter_, makeRequest_(_, _, _, _)).Times(0);
+
+  Common::Redis::RespValue expected_err;
+  expected_err.type(Common::Redis::RespType::Error);
+  expected_err.asString() = "NOPROTO unsupported protocol version";
+  EXPECT_CALL(*encoder_, encode(Eq(ByRef(expected_err)), _));
+  EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+}
+
+// RESP3 listener + ``BOGUSCMD`` before HELLO → ``-NOPROTO`` (NOT the splitter's
+// unsupported-command error). The protocol gate takes precedence over the splitter's
+// ``ERR unknown command`` path, so the operator-facing error always reads "client did not
+// handshake" rather than "client sent a typo".
+TEST_F(RedisProxyFilterResp3Test, UnknownCommandBeforeHelloReturnsNoproto) {
+  InSequence s;
+  Buffer::OwnedImpl fake_data;
+  Common::Redis::RespValuePtr request = makeCommand({"boguscmd"});
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    decoder_callbacks_->onRespValue(std::move(request));
+  }));
+  EXPECT_CALL(splitter_, makeRequest_(_, _, _, _)).Times(0);
+
+  Common::Redis::RespValue expected_err;
+  expected_err.type(Common::Redis::RespType::Error);
+  expected_err.asString() = "NOPROTO unsupported protocol version";
+  EXPECT_CALL(*encoder_, encode(Eq(ByRef(expected_err)), _));
+  EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+}
+
+// RESP3 listener: AUTH pre-HELLO is permitted; a following GET is still gated -NOPROTO
+// (AUTH does not promote the connection's RESP version).
+TEST_F(RedisProxyFilterResp3Test, AuthBeforeHelloAllowedThenGetStillNoproto) {
+  Buffer::OwnedImpl fake_data;
+  Common::Redis::RespValuePtr auth_request = makeCommand({"auth", "secret"});
+  Common::Redis::RespValuePtr get_request = makeCommand({"get", "foo"});
+  Common::Redis::RespValue* auth_ptr = auth_request.get();
+
+  Common::Redis::RespValue auth_reply;
+  auth_reply.type(Common::Redis::RespType::SimpleString);
+  auth_reply.asString() = "OK";
+
+  Common::Redis::RespValue expected_err;
+  expected_err.type(Common::Redis::RespType::Error);
+  expected_err.asString() = "NOPROTO unsupported protocol version";
+
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    decoder_callbacks_->onRespValue(std::move(auth_request));
+    decoder_callbacks_->onRespValue(std::move(get_request));
+  }));
+
+  // AUTH flows through the splitter (allowlisted by the gate); the splitter mock fabricates a
+  // ``+OK`` reply.
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*auth_ptr), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue(auth_reply));
+        callbacks.onResponse(std::move(reply));
+        return nullptr;
+      }));
+
+  EXPECT_CALL(*encoder_, encode(Eq(ByRef(auth_reply)), _));
+  EXPECT_CALL(*encoder_, encode(Eq(ByRef(expected_err)), _));
+  EXPECT_CALL(filter_callbacks_.connection_, write(_, _)).Times(2);
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+}
+
+// Auth-required RESP3 listener + ``GET foo`` before any HELLO → ``-NOPROTO``, NOT ``-NOAUTH``.
+// The gate runs ahead of the splitter, which is where the auth-required check lives, so the
+// gate precedence pins "operator sees handshake-missing, not bad-credentials".
+TEST_F(RedisProxyFilterResp3WithAuthTest, UnauthedGetBeforeHelloRejectedNoprotoNotNoauth) {
+  InSequence s;
+  Buffer::OwnedImpl fake_data;
+  Common::Redis::RespValuePtr request = makeCommand({"get", "foo"});
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    decoder_callbacks_->onRespValue(std::move(request));
+  }));
+  EXPECT_CALL(splitter_, makeRequest_(_, _, _, _)).Times(0);
+
+  Common::Redis::RespValue expected_err;
+  expected_err.type(Common::Redis::RespType::Error);
+  expected_err.asString() = "NOPROTO unsupported protocol version";
+  EXPECT_CALL(*encoder_, encode(Eq(ByRef(expected_err)), _));
+  EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+}
+
+// RESP2 listener + ``GET foo`` with no prior HELLO → normal splitter dispatch. The gate must
+// not engage on a RESP2 listener (no implicit HELLO 3 requirement). Lock the default behavior
+// against accidental gate-on-Resp2 regressions. The mock splitter responds immediately so the
+// filter's ``pending_requests_`` drains cleanly through ``onResponse`` (otherwise
+// ``ProxyFilter::~ProxyFilter`` asserts on a leaked PendingRequest).
+TEST_F(RedisProxyFilterTest, GetBeforeHelloOnResp2ListenerDispatchesNormally) {
+  InSequence s;
+  Buffer::OwnedImpl fake_data;
+  Common::Redis::RespValuePtr request = RedisProxyFilterResp3Test::makeCommand({"get", "foo"});
+  Common::Redis::RespValue* request_ptr = request.get();
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    decoder_callbacks_->onRespValue(std::move(request));
+  }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request_ptr), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::SimpleString);
+        reply->asString() = "OK";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onResponse(std::move(reply));
         return nullptr;
       }));
 
@@ -1325,10 +1370,30 @@ external_auth_provider:
   enable_auth_expiration: true
 )EOF";
 
+const std::string resp3_listener_external_auth_config = R"EOF(
+prefix_routes:
+  catch_all_route:
+      cluster: fake_cluster
+stat_prefix: foo
+protocol_version: RESP3
+settings:
+  op_timeout: 0.01s
+external_auth_provider:
+  grpc_service:
+    envoy_grpc:
+      cluster_name: fake_cluster
+)EOF";
+
 class RedisProxyFilterWithExternalAuthAndExpiration : public RedisProxyFilterTest {
 public:
   RedisProxyFilterWithExternalAuthAndExpiration()
       : RedisProxyFilterTest(external_auth_expiration_config) {}
+};
+
+class RedisProxyFilterResp3WithExternalAuth : public RedisProxyFilterTest {
+public:
+  RedisProxyFilterResp3WithExternalAuth()
+      : RedisProxyFilterTest(resp3_listener_external_auth_config) {}
 };
 
 TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthPasswordWrong) {
@@ -1558,6 +1623,104 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthWithPipelining
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
 
+// Pipelining stamp pin for ``AUTH ; HELLO 3 ; cmd`` with external auth: when HELLO 3 replays
+// after auth resolves, setDownstreamRespVersion must re-stamp the queued cmd or onResponse
+// would emit it as RESP2 (encoder flip on stamp-vs-current mismatch).
+TEST_F(RedisProxyFilterResp3WithExternalAuth,
+       AuthThenHello3ThenCommandKeepsResp3StampForQueuedCommand) {
+
+  Common::Redis::RespValuePtr auth_request = RedisProxyFilterResp3Test::makeCommand({"auth", "p"});
+  Common::Redis::RespValuePtr hello_request =
+      RedisProxyFilterResp3Test::makeCommand({"hello", "3"});
+  Common::Redis::RespValuePtr cmd_request =
+      RedisProxyFilterResp3Test::makeCommand({"hgetall", "k"});
+  Common::Redis::RespValue* hello_ptr = hello_request.get();
+  Common::Redis::RespValue* cmd_ptr = cmd_request.get();
+
+  Buffer::OwnedImpl fake_data;
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    decoder_callbacks_->onRespValue(std::move(auth_request));
+  }));
+
+  CommandSplitter::SplitCallbacks* cmd_callbacks_capture = nullptr;
+
+  EXPECT_CALL(splitter_, makeRequest_(_, _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_CALL(*external_auth_client_, authenticateExternal(_, _, _, EMPTY_STRING, "p"))
+            .WillOnce(
+                WithArgs<0, 1>(Invoke([&](ExternalAuth::AuthenticateCallback& callback,
+                                          CommandSplitter::SplitCallbacks& auth_pending) -> void {
+                  // HELLO 3 + ``HGETALL`` arrive while ``external_auth_call_status_`` is Pending —
+                  // they get stashed in pending_request_value_ with pre-HELLO stamp=2.
+                  decoder_callbacks_->onRespValue(std::move(hello_request));
+                  decoder_callbacks_->onRespValue(std::move(cmd_request));
+
+                  ExternalAuth::AuthenticateResponsePtr auth_response =
+                      std::make_unique<ExternalAuth::AuthenticateResponse>();
+                  auth_response->status = ExternalAuth::AuthenticationRequestStatus::Authorized;
+
+                  Common::Redis::RespValuePtr auth_ok(new Common::Redis::RespValue());
+                  auth_ok->type(Common::Redis::RespType::SimpleString);
+                  auth_ok->asString() = "OK";
+                  EXPECT_CALL(*encoder_, encode(Eq(ByRef(*auth_ok)), _));
+                  EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+
+                  // Held HELLO 3 replays via resumeAuthHeldRequests → splitter HELLO branch.
+                  // The splitter mock synthesizes setDownstreamRespVersion(3) + HELLO Map.
+                  EXPECT_CALL(splitter_, makeRequest_(Ref(*hello_ptr), _, _, _))
+                      .WillOnce(Invoke(
+                          [&](const Common::Redis::RespValue&,
+                              CommandSplitter::SplitCallbacks& hello_callbacks, Event::Dispatcher&,
+                              const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+                            EXPECT_CALL(*encoder_, setProtocolVersion(
+                                                       Common::Redis::RespProtocolVersion::Resp3));
+                            hello_callbacks.setDownstreamRespVersion(3);
+
+                            Common::Redis::RespValuePtr hello_map(new Common::Redis::RespValue());
+                            hello_map->type(Common::Redis::RespType::Map);
+                            EXPECT_CALL(*encoder_, encode(Eq(ByRef(*hello_map)), _));
+                            EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+                            hello_callbacks.onResponse(std::move(hello_map));
+                            return nullptr;
+                          }));
+
+                  // Held ``HGETALL`` replays last. The mock captures the splitter callbacks so
+                  // the upstream reply can be fired AFTER the splitter has already returned —
+                  // mirrors how a real upstream Map reply lands and is the branch where the
+                  // stamp drift would manifest.
+                  EXPECT_CALL(splitter_, makeRequest_(Ref(*cmd_ptr), _, _, _))
+                      .WillOnce(Invoke(
+                          [&cmd_callbacks_capture](
+                              const Common::Redis::RespValue&,
+                              CommandSplitter::SplitCallbacks& cmd_cb, Event::Dispatcher&,
+                              const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+                            cmd_callbacks_capture = &cmd_cb;
+                            return nullptr;
+                          }));
+
+                  callback.onAuthenticateExternal(auth_pending, std::move(auth_response));
+                })));
+
+        callbacks.onAuth("p");
+        return nullptr;
+      }));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+
+  // The ``HGETALL`` upstream reply arrives after onData returns. The wire-level assertion is the
+  // critical one: the encoder must NOT be flipped to Resp2 for this reply, because the queued
+  // ``HGETALL`` was re-stamped to 3 when HELLO 3 negotiated.
+  ASSERT_NE(nullptr, cmd_callbacks_capture);
+  Common::Redis::RespValuePtr hgetall_reply(new Common::Redis::RespValue());
+  hgetall_reply->type(Common::Redis::RespType::Map);
+  EXPECT_CALL(*encoder_, setProtocolVersion(Common::Redis::RespProtocolVersion::Resp2)).Times(0);
+  EXPECT_CALL(*encoder_, encode(Eq(ByRef(*hgetall_reply)), _));
+  EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+  cmd_callbacks_capture->onResponse(std::move(hgetall_reply));
+}
+
 TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthPasswordCorrectButThenExpires) {
   InSequence s;
 
@@ -1640,13 +1803,8 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthError) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
 
-// When HELLO 3 flips the downstream version mid-request, the HELLO reply itself must be
-// encoded in the newly negotiated version. The hazard guarded against is
-// PendingRequest::resp_version_at_creation_ being stamped at request construction (RESP2) and
-// never updated: ProxyFilter::onResponse's stamp-vs-current branch would then flip the encoder
-// back to RESP2 and emit the Map reply as a flat *2N array, which strict RESP3 clients
-// (Lettuce, redis-py protocol=3) reject. setDownstreamRespVersion updates the stamp so the
-// loop sees stamp==current and emits the Map natively.
+// HELLO 3 flips downstream version mid-request: the HELLO reply itself must encode in
+// RESP3. Pins setDownstreamRespVersion updating resp_version_at_creation_.
 TEST_F(RedisProxyFilterTest, HelloReplyEncodedInNegotiatedVersion) {
   Buffer::OwnedImpl fake_data;
   Common::Redis::RespValuePtr request(new Common::Redis::RespValue());
@@ -1656,10 +1814,8 @@ TEST_F(RedisProxyFilterTest, HelloReplyEncodedInNegotiatedVersion) {
   reply->type(Common::Redis::RespType::Map);
   Common::Redis::RespValue* reply_ptr = reply.get();
 
-  // Key assertion: the encoder must NEVER be flipped back to RESP2 during this test. A single
-  // Resp2 call signals the stale-stamp regression.
+  // No Resp2 flip; one Resp3 flip from setDownstreamRespVersion.
   EXPECT_CALL(*encoder_, setProtocolVersion(Common::Redis::RespProtocolVersion::Resp2)).Times(0);
-  // The initial flip to RESP3 (from setDownstreamRespVersion) must happen exactly once.
   EXPECT_CALL(*encoder_, setProtocolVersion(Common::Redis::RespProtocolVersion::Resp3));
   EXPECT_CALL(*encoder_, encode(Ref(*reply_ptr), _));
   EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
@@ -1671,12 +1827,7 @@ TEST_F(RedisProxyFilterTest, HelloReplyEncodedInNegotiatedVersion) {
       .WillOnce(Invoke([&reply](const Common::Redis::RespValue&,
                                 CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
                                 const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
-        // Simulate the HELLO 3 splitter sequence:
-        //   1. flip downstream version to RESP3
-        //   2. synthesize the Map reply and deliver it via onResponse
-        // The fix's update to resp_version_at_creation_ happens inside
-        // setDownstreamRespVersion; subsequent onResponse → encode loop
-        // sees stamp==current and skips the flip-encode-flip sandwich.
+        // Mimic the splitter's HELLO 3: flip version, then deliver the Map reply.
         callbacks.setDownstreamRespVersion(3);
         callbacks.onResponse(std::move(reply));
         return nullptr;
@@ -1685,12 +1836,7 @@ TEST_F(RedisProxyFilterTest, HelloReplyEncodedInNegotiatedVersion) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
 
-// HELLO N AUTH ... with external auth: the splitter delegates the inline-auth check via
-// attemptDownstreamAuthInline; ProxyFilter routes to authenticateExternal and stashes the
-// requested protocol version on the PendingRequest. On Authorized the deferred reply is the
-// HELLO Map (RESP3 native shape when version=3), encoded after setDownstreamRespVersion has
-// flipped the encoder. Verifies the end-to-end path that the splitter test only pins at the
-// no-emit / Pending boundary.
+// HELLO N AUTH ... with external auth Authorized → deferred HELLO Map encoded in RESP3.
 TEST_F(RedisProxyFilterWithExternalAuthAndExpiration,
        HelloAuthExternalAuthAuthorizedEmitsHelloMap) {
   InSequence s;
@@ -1780,18 +1926,8 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration,
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
 
-// Pipelined HELLO N AUTH ... + GET in the same TCP buffer: the GET must be held by the
-// existing pending_request_value_ queue (external_auth_call_status_ = Pending) until the auth
-// round trip completes, then dispatched. Otherwise the GET would land on the wire ahead of
-// the HELLO Map and the upstream / downstream RESP versions would mismatch. Mirrors the
-// ExternalAuthWithPipelining shape for the AUTH-command path: simulate the second decode
-// INSIDE the auth callback (so it lands while state=Pending) before firing the auth result.
-//
-// Also pins the version-stamping fix in onAuthenticateExternal: a request decoded while
-// auth was Pending was stamped with the pre-HELLO downstream version (RESP2). Without
-// re-stamping, ProxyFilter::onResponse would do setProtocolVersion(Resp2) → encode →
-// setProtocolVersion(Resp3) for the held GET, so the client would see a RESP2 reply on a
-// freshly-negotiated RESP3 connection. The Times(0) on Resp2 below catches that regression.
+// Pipelined ``HELLO N AUTH ... ; GET``: GET held until auth resolves, then re-stamped to
+// RESP3. setProtocolVersion(Resp2).Times(0) below pins the no-Resp2-flip invariant.
 TEST_F(RedisProxyFilterWithExternalAuthAndExpiration,
        HelloAuthPipelinedRequestHeldUntilAuthCompletes) {
   InSequence s;
@@ -1807,10 +1943,7 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration,
       .WillOnce(Invoke([&](const Common::Redis::RespValue&,
                            CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
                            const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
-        // The encoder must NEVER be flipped back to RESP2 anywhere in this test flow. The
-        // only legal flip is the single Resp3 transition driven by setDownstreamRespVersion
-        // when the deferred HELLO Map is built. Any Resp2 flip means the held GET inherited
-        // the stale RESP2 stamp and onResponse is doing the flip-encode-flip sandwich.
+        // Pin the no-Resp2-flip invariant: any flip means the held GET kept the stale stamp.
         EXPECT_CALL(*encoder_, setProtocolVersion(Common::Redis::RespProtocolVersion::Resp2))
             .Times(0);
 
@@ -1898,11 +2031,8 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, HelloAuthPendingCanceledOn
   filter_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-// HELLO 3 AUTH ... + GET k1 + GET k2 pipelined together. After external auth succeeds, BOTH
-// held GETs must be dispatched to the splitter. The earlier front-only drain loop dispatched
-// only the first held entry: GET k1 went upstream and became the new front (no
-// pending_request_value_), causing the loop to exit before reaching GET k2. resumeAuthHeldRequests
-// scans the full list and dispatches every held entry.
+// HELLO 3 AUTH ... + GET k1 + GET k2 pipelined: after auth, BOTH held GETs must be
+// dispatched. Pins resumeAuthHeldRequests scanning the full queue, not just the front.
 TEST_F(RedisProxyFilterWithExternalAuthAndExpiration,
        HelloAuthMultiplePipelinedRequestsAllResumed) {
   InSequence s;

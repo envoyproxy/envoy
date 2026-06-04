@@ -21,11 +21,10 @@ namespace NetworkFilters {
 namespace RedisProxy {
 
 namespace {
-// Response-bearing clusters: those whose responses reach the downstream
-// client. These constrain the listener-level RESP cap. Excludes mirror
-// clusters — their responses are fire-and-forget and cannot affect the
-// downstream protocol shape.
-inline void addResponseBearingClusters(
+// Collect every cluster name referenced by a route: the primary cluster, the
+// read-command-policy cluster, and every mirror cluster. Used to drive
+// upstream connection-pool creation.
+inline void addAllReferencedClusters(
     absl::flat_hash_set<std::string>& clusters,
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes::Route&
         route) {
@@ -33,16 +32,6 @@ inline void addResponseBearingClusters(
   if (route.has_read_command_policy()) {
     clusters.emplace(route.read_command_policy().cluster());
   }
-}
-
-// All referenced clusters (response-bearing + mirrors). Used to drive
-// upstream connection-pool creation; mirrors need pools too even though
-// they do not constrain the RESP cap.
-inline void addAllReferencedClusters(
-    absl::flat_hash_set<std::string>& clusters,
-    const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes::Route&
-        route) {
-  addResponseBearingClusters(clusters, route);
   for (auto& mirror : route.request_mirror_policy()) {
     clusters.emplace(mirror.cluster());
   }
@@ -75,10 +64,8 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   }
 
   absl::flat_hash_set<std::string> unique_clusters;
-  absl::flat_hash_set<std::string> response_bearing_set;
   for (auto& route : prefix_routes.routes()) {
     addAllReferencedClusters(unique_clusters, route);
-    addResponseBearingClusters(response_bearing_set, route);
   }
   // Only fold the catch-all route into the unique-cluster set when one is
   // actually configured. ``prefix_routes.catch_all_route()`` returns a
@@ -87,17 +74,11 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   // upstream pool keyed on the empty string.
   if (prefix_routes.has_catch_all_route()) {
     addAllReferencedClusters(unique_clusters, prefix_routes.catch_all_route());
-    addResponseBearingClusters(response_bearing_set, prefix_routes.catch_all_route());
   }
 
   // Resolve each cluster's info up front and capture the cluster ``OptRef``
   // (input to AWS IAM lookup below). One ClusterManager lookup per cluster —
   // the per-conn-pool loop reuses the captured ``OptRef`` instead of re-resolving.
-  // The listener-level RESP cap is no longer pre-computed here; it is read
-  // dynamically per HELLO and per command via
-  // ProxyFilterConfig::clusterRespVersion(), which consults the worker's live
-  // cluster manager state. This means cluster updates (LDS-before-CDS,
-  // RESP3→RESP2 downgrade) are reflected without listener reload.
   struct ResolvedCluster {
     std::string name;
     Upstream::ClusterConstOptRef optref;
@@ -109,15 +90,10 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
     resolved_clusters.push_back({cluster_name, cluster_optref});
   }
 
-  // Hand the response-bearing cluster names to the config so
-  // clusterRespVersion() can compute the floor at request time.
-  std::vector<std::string> response_bearing_clusters(response_bearing_set.begin(),
-                                                     response_bearing_set.end());
-
   auto filter_config = std::make_shared<ProxyFilterConfig>(
       proto_config, context.scope(), context.drainDecision(), server_context.runtime(),
-      server_context.api(), context.serverFactoryContext().timeSource(), cache_manager_factory,
-      server_context.clusterManager(), std::move(response_bearing_clusters));
+      server_context.api(), context.serverFactoryContext().timeSource(), cache_manager_factory);
+  const Common::Redis::RespProtocolVersion protocol_version = filter_config->protocolVersion();
 
   auto redis_command_stats =
       Common::Redis::RedisCommandStats::createRedisCommandStats(context.scope().symbolTable());
@@ -159,10 +135,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
         Common::Redis::Client::ClientFactoryImpl::instance_, server_context.threadLocal(),
         proto_config.settings(), server_context.api(), std::move(stats_scope), redis_command_stats,
         refresh_manager, filter_config->dns_cache_, aws_iam_config, aws_iam_authenticator,
-        local_zone);
-    // Upstream RESP version is read from the cluster's RedisProtocolOptions
-    // inside InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual,
-    // so no filter-level push is needed here.
+        local_zone, protocol_version);
     conn_pool_ptr->init();
     upstreams.emplace(cluster, conn_pool_ptr);
   }

@@ -85,8 +85,7 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onInterval() {
         host_, parent_.dispatcher_, redis_config_, redis_command_stats_,
         parent_.cluster_.info()->statsScope(), parent_.auth_username_, parent_.auth_password_,
         false, parent_.aws_iam_config_, parent_.aws_iam_authenticator_,
-        envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::
-            UpstreamProtocol::UNSPECIFIED);
+        Extensions::NetworkFilters::Common::Redis::RespProtocolVersion::Resp2);
     client_->addConnectionCallbacks(*this);
   }
 

@@ -53,14 +53,14 @@ InstanceImpl::InstanceImpl(
     absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
     absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator,
-    const std::string& local_zone)
+    const std::string& local_zone, Common::Redis::RespProtocolVersion protocol_version)
     : cluster_name_(cluster_name), cm_(cm), client_factory_(client_factory),
       tls_(tls.allocateSlot()), config_(new Common::Redis::Client::ConfigImpl(config)), api_(api),
       stats_scope_(std::move(stats_scope)), redis_command_stats_(redis_command_stats),
       redis_cluster_stats_{REDIS_CLUSTER_STATS(POOL_COUNTER(*stats_scope_))},
       refresh_manager_(std::move(refresh_manager)), dns_cache_(dns_cache),
       aws_iam_authenticator_(aws_iam_authenticator), aws_iam_config_(aws_iam_config),
-      local_zone_(local_zone) {}
+      local_zone_(local_zone), protocol_version_(protocol_version) {}
 
 void InstanceImpl::init() {
   // Note: `this` and `cluster_name` have a a lifetime of the filter.
@@ -122,7 +122,8 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(
       stats_scope_(parent->stats_scope_), redis_command_stats_(parent->redis_command_stats_),
       redis_cluster_stats_(parent->redis_cluster_stats_),
       refresh_manager_(parent->refresh_manager_), aws_iam_authenticator_(aws_iam_authenticator),
-      aws_iam_config_(aws_iam_config), client_zone_(parent->localZone()) {
+      aws_iam_config_(aws_iam_config), client_zone_(parent->localZone()),
+      upstream_protocol_version_(parent->protocol_version_) {
 
   cluster_update_handle_ = parent->cm_.addThreadLocalClusterUpdateCallbacks(*this);
   Upstream::ThreadLocalCluster* cluster = parent->cm_.getThreadLocalCluster(cluster_name_);
@@ -169,10 +170,8 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   // AWS IAM Authentication is enabled.
   auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster_->info(), api_);
   auth_password_ = ProtocolOptionsConfigImpl::authPassword(cluster_->info(), api_);
-  // Pick up the per-cluster upstream RESP configuration. This is read at every
-  // cluster add/update (including the initial add) so that a later cluster
-  // config change flips behavior on subsequent new connections.
-  upstream_protocol_version_ = ProtocolOptionsConfigImpl::upstreamProtocolVersion(cluster_->info());
+  // upstream_protocol_version_ is set once at ThreadLocalPool construction from
+  // the filter-level configuration; cluster updates do not flip it.
   ASSERT(host_set_member_update_cb_handle_ == nullptr);
   host_set_member_update_cb_handle_ = cluster_->prioritySet().addMemberUpdateCb(
       [this](const std::vector<Upstream::HostSharedPtr>& hosts_added,

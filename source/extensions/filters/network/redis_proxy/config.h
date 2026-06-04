@@ -15,7 +15,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/extensions/filters/network/common/factory_base.h"
-#include "source/extensions/filters/network/common/redis/client.h"
+#include "source/extensions/filters/network/common/redis/codec.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -115,25 +115,6 @@ public:
     return absl::nullopt;
   }
 
-  // Returns the cluster's configured upstream RESP protocol version.
-  // If the cluster has no RedisProtocolOptions extension or the upstream_protocol
-  // block is absent/UNSPECIFIED, returns RESP2 (backward-compat with pre-RESP3).
-  static envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::
-      UpstreamProtocol::Version
-      upstreamProtocolVersion(const Upstream::ClusterInfoConstSharedPtr info) {
-    using Proto = envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions;
-    auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
-        NetworkFilterNames::get().RedisProxy);
-    if (options && options->proto_config_.has_upstream_protocol()) {
-      const auto v = options->proto_config_.upstream_protocol().version();
-      if (v == Proto::UpstreamProtocol::UNSPECIFIED) {
-        return Proto::UpstreamProtocol::RESP2;
-      }
-      return v;
-    }
-    return Proto::UpstreamProtocol::RESP2;
-  }
-
 private:
   absl::StatusOr<
       std::pair<envoy::config::core::v3::DataSource, envoy::config::core::v3::DataSource>>
@@ -172,6 +153,15 @@ private:
       MessageUtil, MessageUtil>
       credentials_;
 };
+
+// Proto-to-codec conversion. The proto enum encodes RESP3 as 1; never pass it to
+// ``Common::Redis::toRespProtocolVersion(uint32_t)`` (which expects the wire integer 3).
+inline Common::Redis::RespProtocolVersion toCodecRespVersion(
+    envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ProtocolVersion v) {
+  return v == envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::RESP3
+             ? Common::Redis::RespProtocolVersion::Resp3
+             : Common::Redis::RespProtocolVersion::Resp2;
+}
 
 /**
  * Config registration for the redis proxy filter. @see NamedNetworkFilterConfigFactory.

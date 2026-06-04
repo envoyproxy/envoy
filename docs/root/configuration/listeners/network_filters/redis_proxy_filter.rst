@@ -109,6 +109,60 @@ Example configuration:
 This creates two faults- an error, applying only to GET commands at 10%, and a delay, applying to all
 commands at 10%. This means that 20% of GET commands will have a fault applied, as discussed earlier.
 
+.. _config_network_filters_redis_proxy_protocol_version:
+
+RESP protocol version
+---------------------
+
+The Redis proxy filter speaks one RESP protocol version on the listener, configured via the
+:ref:`protocol_version
+<envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.protocol_version>`
+field on :ref:`RedisProxy
+<envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy>`. The same value
+governs both downstream client connections and every routed upstream connection pool — there
+is no separate per-cluster RESP knob, and no implicit floor across clusters. On the
+upstream-routed data path, downstream and upstream speak the same RESP version (locally
+emitted replies — AUTH/QUIT/NOPROTO — are encoded in the downstream-negotiated version).
+
+When ``protocol_version`` is unset or ``RESP2`` (the default), the listener behaves end-to-end
+as pre-RESP3 Envoy: no ``HELLO 3`` is sent upstream, and a downstream ``HELLO 3`` is rejected
+with ``-NOPROTO``.
+
+When ``protocol_version`` is ``RESP3``:
+
+* Every routed upstream Redis-compatible backend must support ``HELLO 3`` / RESP3
+  (Redis 6.0+, where RESP3 was introduced). Misconfigured upstreams fail every connection's
+  HELLO 3 negotiation, surfaced as ``upstream_resp3_hello_failure`` counter increments on
+  the per-cluster scope.
+* The upstream client sends ``HELLO 3`` (combined with ``AUTH`` when static credentials or
+  AWS IAM authentication are configured) on every new upstream connection. User requests
+  submitted before negotiation completes are buffered and replayed in order once both
+  ``HELLO`` and any required ``READONLY`` (for non-Primary read policies) succeed. If the
+  upstream rejects RESP3, the connection is closed and the buffered requests fail upstream
+  so the caller can retry on a fresh connection that will re-attempt negotiation.
+* Downstream clients must perform an explicit ``HELLO 3`` handshake before any data command.
+  Any command other than ``HELLO``, ``AUTH``, or ``QUIT`` arriving on a connection that has
+  not yet negotiated RESP3 is rejected with ``-NOPROTO`` — including unknown commands, which
+  surface as ``-NOPROTO`` rather than the splitter's usual ``ERR unknown command`` so the
+  operator-facing error always points to "client failed to handshake" rather than masking
+  the missing handshake.
+* Both explicit ``HELLO N`` and bare ``HELLO`` are exact-matched against the listener's
+  ``protocol_version``: bare ``HELLO`` on a fresh ``RESP3`` listener is rejected because the
+  connection's current version (default ``2``) does not match the required ``3``. After a
+  successful ``HELLO 3``, bare ``HELLO`` reaffirms the negotiated version.
+
+Downstream ``HELLO N AUTH <user> <pass>`` is supported with both locally configured
+credentials (``downstream_auth_passwords`` / ``downstream_auth_username``) and an external
+auth provider; the latter defers the round trip and emits the deferred ``HELLO`` Map (or
+error) when the provider responds.
+
+The proxy does not cross-encode upstream responses between RESP2 and RESP3. Because the
+listener forces the upstream-routed data path to a single RESP version, an upstream reply
+is always emitted downstream in the same RESP version it arrived; no transparent reshaping
+(e.g. RESP3 Map → flat RESP2 array) is attempted, which avoids structural divergence such
+as ``ZRANGE WITHSCORES`` returning nested pair arrays under RESP3 vs flat arrays under
+RESP2.
+
 DNS lookups on redirections
 ---------------------------
 

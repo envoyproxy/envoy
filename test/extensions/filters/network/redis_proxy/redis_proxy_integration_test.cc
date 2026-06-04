@@ -102,6 +102,12 @@ const std::string CONFIG_WITH_BATCHING = CONFIG + R"EOF(
             buffer_flush_timeout: 0.003s
 )EOF";
 
+// RESP3 listener: protocol_version: RESP3 forces both downstream and routed-upstream onto
+// RESP3. Pre-HELLO data commands are gated -NOPROTO; HELLO 3 must precede any data command.
+const std::string CONFIG_RESP3_LISTENER = CONFIG + R"EOF(
+          protocol_version: RESP3
+)EOF";
+
 const std::string CONFIG_WITH_ROUTES_BASE = fmt::format(R"EOF(
 admin:
   access_log:
@@ -807,6 +813,11 @@ public:
   RedisProxyWithBatchingIntegrationTest() : RedisProxyIntegrationTest(CONFIG_WITH_BATCHING, 2) {}
 };
 
+class RedisProxyResp3ListenerIntegrationTest : public RedisProxyIntegrationTest {
+public:
+  RedisProxyResp3ListenerIntegrationTest() : RedisProxyIntegrationTest(CONFIG_RESP3_LISTENER, 2) {}
+};
+
 class RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest
     : public Event::TestUsingSimulatedTime,
       public RedisProxyIntegrationTest {
@@ -966,6 +977,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRedirectionAndDNSIntegrationT
                          TestUtility::ipTestParamsToString);
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithBatchingIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyResp3ListenerIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
@@ -1347,6 +1362,116 @@ TEST_P(RedisProxyIntegrationTest, HelloCommand) {
                  << "\r\n";
   initialize();
   simpleProxyResponse(makeBulkStringArray({"hello", "world"}), error_response.str());
+}
+
+// RESP2 listener (the default) rejects explicit ``HELLO 3`` with ``-NOPROTO`` — the proxy
+// only allows the listener-configured version. simpleProxyResponse confirms no upstream
+// connection is created since the response is generated locally before any dispatch.
+TEST_P(RedisProxyIntegrationTest, Resp2ListenerRejectsHello3) {
+  const std::string error_response = "-NOPROTO unsupported protocol version\r\n";
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"hello", "3"}), error_response);
+}
+
+// RESP3 listener rejects any data command sent before a successful ``HELLO 3`` handshake
+// with ``-NOPROTO``. The gate runs in ``ProxyFilter::processRespValue`` before reaching the
+// splitter or conn pool, so the response is generated locally. The proxy-filter unit suite
+// (``RedisProxyFilterResp3Test.GetBeforeHelloRejectedNoproto``) asserts ``Times(0)`` on the
+// splitter to pin "no upstream dispatch"; this integration covers the wire-level error
+// shape.
+TEST_P(RedisProxyResp3ListenerIntegrationTest, GetBeforeHelloRejectedNoproto) {
+  const std::string error_response = "-NOPROTO unsupported protocol version\r\n";
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"get", "foo"}), error_response);
+}
+
+// RESP3 listener positive path — full HELLO 3 + GET round trip:
+//   * downstream HELLO 3 → proxy answers locally with the HELLO Map (proto=3);
+//   * downstream GET foo → proxy opens an upstream connection and sends HELLO 3 first
+//     (the upstream init pipeline);
+//   * upstream replies with a HELLO Map containing proto=3, which the proxy's
+//     ``isHello3SuccessResponse`` check accepts;
+//   * proxy then ships the held GET foo to upstream;
+//   * upstream replies ``$5\r\nhello\r\n`` and the proxy forwards it to the downstream client.
+// The proxy HELLO Map bytes mirror ``buildHelloReply(3)`` in command_splitter_impl.cc; the
+// upstream HELLO Map only needs ``proto:3`` to be accepted by Hello3InitCallbacks.
+TEST_P(RedisProxyResp3ListenerIntegrationTest,
+       Hello3ThenGetFullRoundtripWithUpstreamHelloNegotiation) {
+  initialize();
+
+  // Proxy's local HELLO 3 reply — RESP3 Map of 7 KV pairs (see buildHelloReply in
+  // command_splitter_impl.cc). The literal layout is fixed by the kHello* constants;
+  // pinning the exact wire bytes here is intentional so any change to field order or
+  // values in buildHelloReply trips this integration alongside its splitter unit test,
+  // catching protocol-contract drift before it ships.
+  const std::string downstream_hello_reply = "%7\r\n"
+                                             "$6\r\nserver\r\n$17\r\nenvoy-redis-proxy\r\n"
+                                             "$7\r\nversion\r\n$5\r\n7.0.0\r\n"
+                                             "$5\r\nproto\r\n:3\r\n"
+                                             "$2\r\nid\r\n:0\r\n"
+                                             "$4\r\nmode\r\n$10\r\nstandalone\r\n"
+                                             "$4\r\nrole\r\n$6\r\nmaster\r\n"
+                                             "$7\r\nmodules\r\n*0\r\n";
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  // Step 1: downstream HELLO 3 -> proxy local Map reply.
+  ASSERT_TRUE(redis_client->write(makeBulkStringArray({"hello", "3"})));
+  redis_client->waitForData(downstream_hello_reply);
+  EXPECT_EQ(downstream_hello_reply, redis_client->data());
+  redis_client->clearData();
+
+  // Step 2: downstream GET foo -> opens upstream, which the proxy first hits with HELLO 3.
+  const std::string get_request = makeBulkStringArray({"get", "foo"});
+  ASSERT_TRUE(redis_client->write(get_request));
+
+  // Stage A: upstream sees HELLO 3 first (held-user-request gate behind HELLO).
+  const std::string upstream_hello_request = makeBulkStringArray({"HELLO", "3"});
+  FakeRawConnectionPtr fake_upstream_connection;
+  EXPECT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  std::string proxy_to_server;
+  EXPECT_TRUE(
+      fake_upstream_connection->waitForData(upstream_hello_request.size(), &proxy_to_server));
+  EXPECT_EQ(upstream_hello_request, proxy_to_server);
+
+  // Minimal valid HELLO 3 reply: a single-pair Map with proto=3 (proxy's
+  // isHello3SuccessResponse only looks for that key).
+  const std::string upstream_hello_reply = "%1\r\n$5\r\nproto\r\n:3\r\n";
+  EXPECT_TRUE(fake_upstream_connection->write(upstream_hello_reply));
+
+  // Stage B: held GET foo flushes to upstream after HELLO 3 succeeds.
+  proxy_to_server.clear();
+  EXPECT_TRUE(fake_upstream_connection->waitForData(
+      upstream_hello_request.size() + get_request.size(), &proxy_to_server));
+  EXPECT_EQ(upstream_hello_request + get_request, proxy_to_server);
+
+  // Stage C: upstream replies; proxy forwards to client.
+  const std::string get_reply = "$5\r\nhello\r\n";
+  EXPECT_TRUE(fake_upstream_connection->write(get_reply));
+  redis_client->waitForData(get_reply);
+  EXPECT_EQ(get_reply, redis_client->data());
+
+  EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client->close();
+}
+
+// RESP3 listener also rejects bare ``HELLO`` (no version argument) on a fresh connection.
+// Bare HELLO inherits the connection's current downstream RESP version (default 2 on a fresh
+// connection); the exact-match check against the listener's required RESP3 fails. After a
+// successful ``HELLO 3`` the connection would be on version 3 and bare HELLO would be
+// accepted — covered by the splitter unit tests.
+TEST_P(RedisProxyResp3ListenerIntegrationTest, BareHelloOnFreshConnectionRejectedNoproto) {
+  const std::string error_response = "-NOPROTO unsupported protocol version\r\n";
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"hello"}), error_response);
+}
+
+// RESP3 listener rejects an explicit ``HELLO 2`` (and any version that is not the listener's
+// required version) with ``-NOPROTO``. Symmetric to the RESP2-listener-rejects-HELLO3 test.
+TEST_P(RedisProxyResp3ListenerIntegrationTest, Hello2OnResp3ListenerRejectedNoproto) {
+  const std::string error_response = "-NOPROTO unsupported protocol version\r\n";
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"hello", "2"}), error_response);
 }
 
 // This test sends an invalid Redis command from a fake

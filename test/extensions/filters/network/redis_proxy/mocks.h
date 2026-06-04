@@ -127,7 +127,7 @@ public:
   void onResponse(Common::Redis::RespValuePtr&& value) override { onResponse_(value); }
   Common::Redis::Client::Transaction& transaction() override { return transaction_; }
   void setDownstreamRespVersion(uint32_t version) override { downstream_resp_version_ = version; }
-  uint32_t clusterRespVersion() const override { return cluster_resp_version_; }
+  Common::Redis::RespProtocolVersion protocolVersion() const override { return protocol_version_; }
 
   MOCK_METHOD(bool, connectionAllowed, ());
   MOCK_METHOD(void, onQuit, ());
@@ -136,7 +136,6 @@ public:
   MOCK_METHOD(void, onResponse_, (Common::Redis::RespValuePtr & value));
 
   uint32_t currentDownstreamRespVersion() const override { return downstream_resp_version_; }
-  void closeDownstreamAfterResponse() override { close_downstream_after_response_called_ = true; }
   // The mock returns whatever ``inline_auth_attempt_`` is set to. Tests that exercise
   // HELLO N AUTH ... must set inline_auth_attempt_ explicitly before driving the request —
   // the default ``Denied`` keeps tests that do not exercise HELLO AUTH safe (a stray
@@ -151,10 +150,10 @@ public:
   }
 
   uint32_t downstream_resp_version_{2};
-  // Default RESP3; tests covering the RESP2-cluster ceiling drive this to 2.
-  uint32_t cluster_resp_version_{3};
+  // Defaults to RESP2 listener — matches the proto default. Tests covering the RESP3-listener
+  // path drive this to Resp3.
+  Common::Redis::RespProtocolVersion protocol_version_{Common::Redis::RespProtocolVersion::Resp2};
   AuthAttempt inline_auth_attempt_{AuthAttempt::Denied};
-  bool close_downstream_after_response_called_{false};
   std::string last_inline_auth_username_;
   std::string last_inline_auth_password_;
   uint32_t last_inline_auth_requested_version_{0};
