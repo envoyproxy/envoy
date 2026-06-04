@@ -72,12 +72,11 @@ const std::string& clusterConfig() {
       cluster_type:
         name: envoy.clusters.redis
         typed_config:
-          "@type": type.googleapis.com/google.protobuf.Struct
-          value:
-            cluster_refresh_rate: 60s
-            cluster_refresh_timeout: 4s
-            redirect_refresh_interval: 0s
-            redirect_refresh_threshold: 1
+          "@type": type.googleapis.com/envoy.extensions.clusters.redis.v3.RedisClusterConfig
+          cluster_refresh_rate: 60s
+          cluster_refresh_timeout: 4s
+          redirect_refresh_interval: 0s
+          redirect_refresh_threshold: 1
 )EOF");
 }
 
@@ -102,13 +101,12 @@ const std::string& testConfigWithRefresh() {
       cluster_type:
         name: envoy.clusters.redis
         typed_config:
-          "@type": type.googleapis.com/google.protobuf.Struct
-          value:
-            cluster_refresh_rate: 3600s
-            cluster_refresh_timeout: 4s
-            redirect_refresh_interval: 100s
-            redirect_refresh_threshold: 1
-            failure_refresh_threshold: 1
+          "@type": type.googleapis.com/envoy.extensions.clusters.redis.v3.RedisClusterConfig
+          cluster_refresh_rate: 3600s
+          cluster_refresh_timeout: 4s
+          redirect_refresh_interval: 100s
+          redirect_refresh_threshold: 1
+          failure_refresh_threshold: 1
 )EOF");
 }
 

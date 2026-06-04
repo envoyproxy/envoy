@@ -43,7 +43,7 @@ INSTANTIATE_TEST_SUITE_P(QuicHttpMultiAddressesIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-static std::string SPATestParamsToString(
+static std::string spaTestParamsToString(
     const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool, bool>>& params) {
   return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(params.param)), "_",
                       std::get<1>(params.param) ? "all_clients_impl" : "quiche_client_impl", "_",
@@ -54,7 +54,7 @@ INSTANTIATE_TEST_SUITE_P(
     QuicHttpIntegrationSPATests, QuicHttpIntegrationSPATest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      testing::Values(true, false), testing::Values(true, false)),
-    SPATestParamsToString);
+    spaTestParamsToString);
 
 TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
   useAccessLog("%DOWNSTREAM_TLS_VERSION% %DOWNSTREAM_TLS_CIPHER% %DOWNSTREAM_TLS_SESSION_ID%");
@@ -370,7 +370,7 @@ public:
   }
 };
 
-static std::string PortMigrationTestParamsToString(
+static std::string portMigrationTestParamsToString(
     const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
   return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(params.param)), "_",
                       std::get<1>(params.param) ? "migration_by_quiche" : "migration_in_house");
@@ -380,7 +380,7 @@ INSTANTIATE_TEST_SUITE_P(
     QuicHttpIntegrationPortMigrationTest, QuicHttpIntegrationPortMigrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      testing::Values(true, false)),
-    PortMigrationTestParamsToString);
+    portMigrationTestParamsToString);
 
 TEST_P(QuicHttpIntegrationPortMigrationTest, PortMigrationOnPathDegrading) {
   setConcurrency(2);

@@ -100,7 +100,7 @@ struct BenchmarkSetup {
   std::vector<std::unique_ptr<testing::NiceMock<Stats::MockParentHistogram>>> histograms;
 };
 
-void BM_OpenTelemetrySinkFlush_NoLimit(benchmark::State& state) {
+void bmOpenTelemetrySinkFlushNoLimit(benchmark::State& state) {
   BenchmarkSetup setup;
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
@@ -117,9 +117,9 @@ void BM_OpenTelemetrySinkFlush_NoLimit(benchmark::State& state) {
     sink.flush(*setup.snapshot);
   }
 }
-BENCHMARK(BM_OpenTelemetrySinkFlush_NoLimit);
+BENCHMARK(bmOpenTelemetrySinkFlushNoLimit);
 
-void BM_OpenTelemetrySinkFlush_TrafficSplit_200(benchmark::State& state) {
+void bmOpenTelemetrySinkFlushTrafficSplit200(benchmark::State& state) {
   BenchmarkSetup setup;
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
@@ -137,7 +137,7 @@ void BM_OpenTelemetrySinkFlush_TrafficSplit_200(benchmark::State& state) {
     sink.flush(*setup.snapshot);
   }
 }
-BENCHMARK(BM_OpenTelemetrySinkFlush_TrafficSplit_200);
+BENCHMARK(bmOpenTelemetrySinkFlushTrafficSplit200);
 
 } // namespace
 } // namespace OpenTelemetry

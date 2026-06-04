@@ -97,6 +97,7 @@ std::string decrypt(absl::string_view encrypted, absl::string_view secret) {
   // Resize to actual plaintext length
   plaintext.resize(plaintext_len);
 
+  // NOLINTNEXTLINE(modernize-return-braced-init-list)
   return std::string(plaintext.begin(), plaintext.end());
 }
 
@@ -668,6 +669,8 @@ TEST_P(OauthIntegrationTest, LoadListenerAfterServerIsInitialized) {
                           cluster: cluster_0
               http_filters:
                 - name: envoy.filters.http.router
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
         )EOF");
 
     // dummy listener is being sent so that lds api gets marked as ready, which

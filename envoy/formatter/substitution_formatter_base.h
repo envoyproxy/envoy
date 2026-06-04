@@ -2,14 +2,19 @@
 
 #include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
-#include "envoy/access_log/access_log.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/formatter/http_formatter_context.h"
-#include "envoy/registry/registry.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/stream_info/stream_info.h"
+
+#include "source/common/protobuf/protobuf.h"
+
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Formatter {
@@ -110,34 +115,6 @@ public:
    * Creates a particular CommandParser implementation.
    */
   virtual CommandParserPtr createCommandParser() const PURE;
-};
-
-/**
- * Helper class to get all built-in command parsers for a given formatter context.
- */
-class BuiltInCommandParserFactoryHelper {
-public:
-  using Factory = BuiltInCommandParserFactory;
-  using Parsers = std::vector<CommandParserPtr>;
-
-  /**
-   * Get all built-in command parsers for a given formatter context.
-   * @return Parsers all built-in command parsers for a given formatter context.
-   */
-  static const Parsers& commandParsers() {
-    CONSTRUCT_ON_FIRST_USE(Parsers, []() {
-      Parsers parsers;
-      for (const auto& factory : Envoy::Registry::FactoryRegistry<Factory>::factories()) {
-        if (auto parser = factory.second->createCommandParser(); parser == nullptr) {
-          ENVOY_BUG(false, fmt::format("Null built-in command parser: {}", factory.first));
-          continue;
-        } else {
-          parsers.push_back(std::move(parser));
-        }
-      }
-      return parsers;
-    }());
-  }
 };
 
 } // namespace Formatter

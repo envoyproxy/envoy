@@ -245,6 +245,8 @@ public:
     autonomous_upstream_ = false;
     config_helper_.prependFilter(R"EOF(
 name: encode-headers-return-stop-iteration-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.EncodeHeadersReturnStopIterationFilterConfig
 )EOF",
                                  false);
 

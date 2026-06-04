@@ -4,6 +4,7 @@ set -euo pipefail
 
 uncomment.sh "$1" --comment -h \
   --uncomment-func-decl OPENSSL_malloc \
+  --uncomment-func-decl OPENSSL_cleanse \
   --uncomment-func-decl OPENSSL_free \
   --uncomment-func-decl OPENSSL_realloc \
   --uncomment-func-decl CRYPTO_memcmp \

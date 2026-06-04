@@ -71,7 +71,7 @@ TEST_P(TcpConnPoolTest, TestTunnelingDisabledByFilterState) {
   downstream_stream_info_.filterState()->setData(
       TcpProxy::DisableTunnelingFilterStateKey,
       std::make_shared<StreamInfo::BoolAccessorImpl>(true),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   EXPECT_CALL(thread_local_cluster_, tcpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
   EXPECT_EQ(nullptr,
@@ -88,7 +88,7 @@ TEST_P(TcpConnPoolTest, TestTunnelingNotDisabledIfFilterStateHasFalseValue) {
   downstream_stream_info_.filterState()->setData(
       TcpProxy::DisableTunnelingFilterStateKey,
       std::make_shared<StreamInfo::BoolAccessorImpl>(false),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   if (!useUpstreamFilters()) {
     EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _, _)).WillOnce(Return(absl::nullopt));

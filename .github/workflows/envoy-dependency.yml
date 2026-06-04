@@ -138,6 +138,23 @@ jobs:
       with:
         app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
         key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
+    - uses: envoyproxy/toolshed/actions/bind-mounts@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+      if: ! github.event.repository.private
+      with:
+        mounts: |
+          - src: /mnt/workspace
+            target: GITHUB_WORKSPACE
+            chown: "runner:runner"
+          - src: /mnt/runner-cache
+            target: /home/runner/.cache
+            chown: "runner:runner"
+    - name: Free disk space
+      if: github.event.repository.private
+      uses: envoyproxy/toolshed/actions/diskspace@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+      with:
+        to_remove: |
+          /usr/local/.ghcup
+          /usr/local/lib/android
     - uses: envoyproxy/toolshed/actions/github/checkout@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       id: checkout
       name: Checkout Envoy repository
@@ -168,7 +185,7 @@ jobs:
             # Source of truth: the latest `docker-v*` GitHub release in
             # envoyproxy/toolshed. Strip only the `docker-` prefix - the
             # published images keep the leading `v`, eg
-            # `envoyproxy/envoy-build:ci-v0.1.3`.
+            # `envoyproxy/envoy-build:ci-v0.1.5`.
             CONTAINER_TAG=$(
                 gh api -H "Accept: application/vnd.github+json" \
                     --paginate \
@@ -181,6 +198,9 @@ jobs:
             echo "ERROR: Could not determine build image tag from envoyproxy/toolshed releases" >&2
             exit 1
         fi
+        # Normalize: accept `docker-v0.1.5`, `v0.1.5` or `0.1.4` from inputs.version
+        CONTAINER_TAG="${CONTAINER_TAG#docker-}"
+        [[ "$CONTAINER_TAG" == v* ]] || CONTAINER_TAG="v${CONTAINER_TAG}"
         echo "tag=${CONTAINER_TAG}" >> "$GITHUB_OUTPUT"
         echo "tag_short=${CONTAINER_TAG}" >> "$GITHUB_OUTPUT"
       env:
