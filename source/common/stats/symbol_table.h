@@ -573,6 +573,8 @@ protected:
   StatNameStorage() = default;
 };
 
+constexpr uint8_t EmptyStatNameData[] = {0};
+
 /**
  * Efficiently represents a stat name using a variable-length array of uint8_t.
  * This class does not own the backing store for this array; the backing-store
@@ -590,7 +592,7 @@ public:
   explicit StatName(const SymbolTable::Storage size_and_data) : size_and_data_(size_and_data) {}
 
   // Constructs an empty StatName object.
-  StatName() = default;
+  StatName() : size_and_data_(EmptyStatNameData) {}
 
   /**
    * Defines default hash function so StatName can be used as a key in an absl
@@ -702,7 +704,7 @@ private:
    * this method so the decode happens in exactly one place.
    */
   absl::string_view dataAsStringView() const {
-    if (size_and_data_ == nullptr) {
+    if (empty()) {
       return {};
     }
     const auto [data_size, prefix_size] = SymbolTable::Encoding::decodeNumber(size_and_data_);
