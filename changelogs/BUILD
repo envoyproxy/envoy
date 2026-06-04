@@ -9,10 +9,7 @@ filegroup(
     srcs = glob([
         "*.*.*.yaml",
         "current/**/*.rst",
-    ]) + [
-        "changelogs.yaml",
-        "current.yaml",
-    ],
+    ]) + ["changelogs.yaml"],
     visibility = ["//visibility:public"],
 )
 
