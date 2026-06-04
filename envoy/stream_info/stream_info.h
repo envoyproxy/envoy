@@ -412,6 +412,9 @@ struct DownstreamTiming {
   absl::optional<MonotonicTime> lastDownstreamHeaderRxByteReceived() const {
     return last_downstream_header_rx_byte_received_;
   }
+  absl::optional<MonotonicTime> downstreamConnectionEnd() const {
+    return downstream_connection_end_;
+  }
 
   void onLastDownstreamRxByteReceived(TimeSource& time_source) {
     ASSERT(!last_downstream_rx_byte_received_);
@@ -437,6 +440,10 @@ struct DownstreamTiming {
     ASSERT(!last_downstream_header_rx_byte_received_);
     last_downstream_header_rx_byte_received_ = time_source.monotonicTime();
   }
+  void onDownstreamConnectionEnd(TimeSource& time_source) {
+    // Overwrite any existing value so the latest close time is recorded.
+    downstream_connection_end_ = time_source.monotonicTime();
+  }
 
   absl::flat_hash_map<std::string, MonotonicTime> timings_;
   // The time when the last byte of the request was received.
@@ -451,6 +458,8 @@ struct DownstreamTiming {
   absl::optional<MonotonicTime> last_downstream_ack_received_;
   // The time when the last header byte was received.
   absl::optional<MonotonicTime> last_downstream_header_rx_byte_received_;
+  // The time the downstream connection was closed.
+  absl::optional<MonotonicTime> downstream_connection_end_;
 };
 
 // Measure the number of bytes sent and received for a stream.

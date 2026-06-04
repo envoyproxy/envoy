@@ -1664,6 +1664,44 @@ TEST_P(TcpProxyTest, AccessLogUpstreamLocalAddress) {
   EXPECT_EQ(access_log_data_, "2.2.2.2:50000");
 }
 
+// Test that the COMMON_DURATION downstream and upstream connection time points are populated for
+// TCP connections and rendered by the access log.
+TEST_P(TcpProxyTest, AccessLogCommonDuration) {
+  // Put the downstream connection begin on the test clock so the DS_CX_* time points render
+  // deterministically.
+  filter_callbacks_.connection_.stream_info_.start_time_monotonic_ =
+      timeSystem().monotonicTime() - std::chrono::microseconds(10);
+
+  setup(1, accessLogConfig("%COMMON_DURATION(DS_CX_BEG:US_CX_BEG:us)% "
+                           "%COMMON_DURATION(US_CX_BEG:US_CX_END:us)% "
+                           "%COMMON_DURATION(DS_CX_BEG:DS_CX_END:us)%"));
+
+  timeSystem().advanceTimeWait(std::chrono::microseconds(40));
+  raiseEventUpstreamConnected(0);
+
+  timeSystem().advanceTimeWait(std::chrono::microseconds(60));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  filter_.reset();
+
+  EXPECT_EQ(access_log_data_, "10 40 110");
+}
+
+// Test that when the upstream connect never completes the US_CX_END time point is unset and its
+// COMMON_DURATION renders as "-", while the downstream time points are still logged.
+TEST_P(TcpProxyTest, AccessLogCommonDurationUpstreamConnectFailure) {
+  filter_callbacks_.connection_.stream_info_.start_time_monotonic_ =
+      timeSystem().monotonicTime() - std::chrono::microseconds(10);
+
+  setup(1, accessLogConfig("%COMMON_DURATION(DS_CX_BEG:US_CX_BEG:us)% "
+                           "%COMMON_DURATION(US_CX_BEG:US_CX_END:us)%"));
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::Timeout);
+
+  filter_.reset();
+  EXPECT_EQ(access_log_data_, "10 -");
+}
+
 // Test that access log fields %DOWNSTREAM_PEER_URI_SAN% is correctly logged.
 TEST_P(TcpProxyTest, AccessLogPeerUriSan) {
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(

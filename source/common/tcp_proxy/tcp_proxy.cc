@@ -685,8 +685,10 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
   ENVOY_CONN_LOG(debug, "Creating connection to cluster {}", read_callbacks_->connection(),
                  cluster_name);
   if (!initial_upstream_connection_start_time_.has_value()) {
-    initial_upstream_connection_start_time_.emplace(
-        read_callbacks_->connection().dispatcher().timeSource().monotonicTime());
+    auto& time_source = read_callbacks_->connection().dispatcher().timeSource();
+    initial_upstream_connection_start_time_.emplace(time_source.monotonicTime());
+    // Record the upstream connect begin time point for COMMON_DURATION access logging.
+    getStreamInfo().upstreamInfo()->upstreamTiming().onUpstreamConnectStart(time_source);
   }
 
   const Upstream::ClusterInfoConstSharedPtr& cluster = thread_local_cluster->info();
@@ -902,11 +904,13 @@ void Filter::onGenericPoolReady(StreamInfo::StreamInfo* info,
                                 const Network::ConnectionInfoProvider& address_provider,
                                 Ssl::ConnectionInfoConstSharedPtr ssl_info) {
   StreamInfo::UpstreamInfo& upstream_info = *getStreamInfo().upstreamInfo();
+  auto& time_source = read_callbacks_->connection().dispatcher().timeSource();
   if (!upstream_info.upstreamTiming().connectionPoolCallbackLatency()) {
     upstream_info.upstreamTiming().recordConnectionPoolCallbackLatency(
-        initial_upstream_connection_start_time_.value(),
-        read_callbacks_->connection().dispatcher().timeSource());
+        initial_upstream_connection_start_time_.value(), time_source);
   }
+  // Record the upstream connect end time point for COMMON_DURATION access logging.
+  upstream_info.upstreamTiming().onUpstreamConnectComplete(time_source);
   upstream_ = std::move(upstream);
   generic_conn_pool_.reset();
   read_callbacks_->upstreamHost(host);
@@ -1228,6 +1232,9 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::RemoteClose) {
     downstream_closed_ = true;
+    // Record the downstream connection end time point for COMMON_DURATION access logging.
+    getStreamInfo().downstreamTiming().onDownstreamConnectionEnd(
+        read_callbacks_->connection().dispatcher().timeSource());
     // Cancel the potential odcds callback.
     cluster_discovery_handle_ = nullptr;
   }
