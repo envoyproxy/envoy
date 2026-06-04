@@ -137,10 +137,10 @@ message McpJsonRestBridge {
   // in the ``http_filters`` list) as the metadata namespace.
   RequestStorageMode request_storage_mode = 5 [(validate.rules).enum = {defined_only: true}];
 
-  // If set, extract trace context from MCP requests and propagate it to
+  // If set, extract OpenTelemetry (OTel) trace context from MCP requests and propagate it to
   // request headers. The keys ``traceparent``, ``tracestate``, and ``baggage``
   // will be extracted from ``_meta``.
-  // Ref: https://modelcontextprotocol.io/seps/414-request-meta
+  // Ref: `Request Meta SEP <https://modelcontextprotocol.io/seps/414-request-meta>`_
   TraceContextExtractionOptions trace_context_extraction = 6;
 }
 
