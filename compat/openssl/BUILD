@@ -187,6 +187,17 @@ genrule(
             --include "$$CLANG_INCLUDE_DIR" \
             --output $(RULEDIR) \
             --prefix ossl 2>&1
+
+        # Some distros (e.g. Fedora) use multiarch OpenSSL headers where
+        # configuration.h dispatches to platform-specific files like
+        # configuration-x86_64.h. Flatten by replacing configuration.h
+        # with the platform-specific content, stripping the include guard.
+        OSSL_DIR=$(RULEDIR)/include/ossl/openssl
+        PLATFORM_CFG="$$OSSL_DIR/configuration-$$(uname -m).h"
+        if [ -f "$$PLATFORM_CFG" ]; then
+            sed '/openssl_conf_multilib_redirection_h/,/#endif/d;/#error/d' \
+                "$$PLATFORM_CFG" > "$$OSSL_DIR/configuration.h"
+        fi
     """,
     tools = [
         "//compat/openssl/prefixer",
