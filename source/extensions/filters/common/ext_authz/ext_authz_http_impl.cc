@@ -419,7 +419,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
   // codes. A Forbidden response is sent to the client if the filter has not been configured with
   // failure_mode_allow.
   if (Http::CodeUtility::is5xx(status_code)) {
-    auto response = std::make_unique<Response>(errorResponse());
+    auto response = errorResponse();
     response->raw_check_response.emplace();
     response->raw_check_response->mutable_status()->set_code(
         Grpc::Status::WellKnownGrpcStatus::Internal);
