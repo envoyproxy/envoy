@@ -128,6 +128,18 @@ typedef struct envoy_dynamic_module_type_module_http_header {
 } envoy_dynamic_module_type_module_http_header;
 
 /**
+ * envoy_dynamic_module_type_module_key_value_pair represents a string key-value pair owned by the
+ * module. It is used to set multiple dynamic metadata entries under a single namespace via
+ * envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch.
+ */
+typedef struct envoy_dynamic_module_type_module_key_value_pair {
+  envoy_dynamic_module_type_buffer_module_ptr key_ptr;
+  size_t key_length;
+  envoy_dynamic_module_type_buffer_module_ptr value_ptr;
+  size_t value_length;
+} envoy_dynamic_module_type_module_key_value_pair;
+
+/**
  * envoy_dynamic_module_type_envoy_http_header represents a key-value pair of an HTTP header owned
  * by Envoy's HeaderMap.
  */
@@ -1872,6 +1884,26 @@ void envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
     envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch is called by the module to
+ * set multiple string-valued dynamic metadata entries under a single namespace in one call. It is
+ * equivalent to calling envoy_dynamic_module_callback_http_set_dynamic_metadata_string once per
+ * entry but resolves the namespace and merges into the metadata struct only once. Existing entries
+ * with the same key are overwritten. Within a single call, a later entry overwrites an earlier
+ * entry with the same key. An empty array is a no-op and does not create the namespace.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param entries is the pointer to an array of key-value pairs whose values are set as strings. It
+ * may be null only when entries_size is zero.
+ * @param entries_size is the number of entries in the array.
+ */
+void envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
 
 /**
  * envoy_dynamic_module_callback_http_get_metadata_string is called by the module to get
