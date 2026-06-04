@@ -3552,7 +3552,7 @@ TEST_F(HttpFilterTest, StreamedBodyCallbackWithEmptyQueue) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   // Handle headers response to establish the gRPC stream and initialize stream_callbacks_.
-  processRequestHeaders(false, absl::nullopt);
+  processRequestHeaders(true, absl::nullopt);
 
   // Manually transition decoding_state_ to StreamedBodyCallback while the chunk_queue_ is empty.
   auto& decoding_state = const_cast<ProcessorState&>(filter_->decodingState());
@@ -5540,7 +5540,7 @@ TEST_F(HttpFilterTest, SaveResponseTrailers) {
   request_headers_.setMethod("POST");
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(false, absl::nullopt);
+  processRequestHeaders(true, absl::nullopt);
 
   const uint32_t chunk_number = 20;
   sendChunkRequestData(chunk_number, true);
