@@ -12478,21 +12478,27 @@ size_t envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_count(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr);
 
 /**
- * envoy_dynamic_module_callback_stat_sink_snapshot_get_counter returns the name and values of
- * a counter at the given index.
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_counter writes the name and returns the
+ * values of a counter at the given index. The name is written directly into a module-provided
+ * buffer, allowing the module to decode it straight into its own storage (for example a socket
+ * write buffer) without Envoy allocating an intermediate string.
  *
  * @param snapshot_envoy_ptr is the opaque snapshot handle.
  * @param index is the index of the counter (0-based).
- * @param name_out is the output buffer for the counter name. The buffer is owned by Envoy and
- *        is guaranteed to be valid until the end of the envoy_dynamic_module_on_stat_sink_flush
- *        event hook.
+ * @param name_buffer is the module-owned buffer that receives the counter name. No null
+ *        terminator is written. May be null only if name_buffer_capacity is 0.
+ * @param name_buffer_capacity is the capacity of name_buffer in bytes.
+ * @param name_size is set to the full length of the name. If it exceeds name_buffer_capacity the
+ *        name was truncated and the module should retry with a buffer of at least name_size bytes.
+ *        Must not be null.
  * @param value_out is the output for the current accumulated counter value.
  * @param delta_out is the output for the counter delta since the last flush.
- * @return true if the index is valid, false otherwise.
+ * @return true if the index is valid, false otherwise. When false, no outputs are written.
  */
 bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
-    envoy_dynamic_module_type_envoy_buffer* name_out, uint64_t* value_out, uint64_t* delta_out);
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size, uint64_t* value_out,
+    uint64_t* delta_out);
 
 /**
  * envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_count returns the number of
@@ -12505,20 +12511,24 @@ size_t envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_count(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr);
 
 /**
- * envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge returns the name and value of
- * a gauge at the given index.
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge writes the name and returns the
+ * value of a gauge at the given index. The name is written directly into a module-provided
+ * buffer, as described for the counter callback above.
  *
  * @param snapshot_envoy_ptr is the opaque snapshot handle.
  * @param index is the index of the gauge (0-based).
- * @param name_out is the output buffer for the gauge name. The buffer is owned by Envoy and
- *        is guaranteed to be valid until the end of the envoy_dynamic_module_on_stat_sink_flush
- *        event hook.
+ * @param name_buffer is the module-owned buffer that receives the gauge name. No null terminator
+ *        is written. May be null only if name_buffer_capacity is 0.
+ * @param name_buffer_capacity is the capacity of name_buffer in bytes.
+ * @param name_size is set to the full length of the name. If it exceeds name_buffer_capacity the
+ *        name was truncated and the module should retry with a buffer of at least name_size bytes.
+ *        Must not be null.
  * @param value_out is the output for the current gauge value.
- * @return true if the index is valid, false otherwise.
+ * @return true if the index is valid, false otherwise. When false, no outputs are written.
  */
 bool envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
-    envoy_dynamic_module_type_envoy_buffer* name_out, uint64_t* value_out);
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size, uint64_t* value_out);
 
 /**
  * envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_count returns the number
@@ -12531,23 +12541,28 @@ size_t envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_count(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr);
 
 /**
- * envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout returns the name and value
- * of a text readout at the given index.
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout writes the name and value
+ * of a text readout at the given index into module-provided buffers.
  *
  * @param snapshot_envoy_ptr is the opaque snapshot handle.
  * @param index is the index of the text readout (0-based).
- * @param name_out is the output buffer for the text readout name. The buffer is owned by Envoy
- *        and is guaranteed to be valid until the end of the
- *        envoy_dynamic_module_on_stat_sink_flush event hook.
- * @param value_out is the output buffer for the text readout value. The buffer is owned by Envoy
- *        and is guaranteed to be valid until the end of the
- *        envoy_dynamic_module_on_stat_sink_flush event hook.
- * @return true if the index is valid, false otherwise.
+ * @param name_buffer is the module-owned buffer that receives the text readout name. No null
+ *        terminator is written. May be null only if name_buffer_capacity is 0.
+ * @param name_buffer_capacity is the capacity of name_buffer in bytes.
+ * @param name_size is set to the full length of the name. If it exceeds name_buffer_capacity the
+ *        name was truncated and the module should retry with a buffer of at least name_size bytes.
+ *        Must not be null.
+ * @param value_buffer is the module-owned buffer that receives the text readout value. No null
+ *        terminator is written. May be null only if value_buffer_capacity is 0.
+ * @param value_buffer_capacity is the capacity of value_buffer in bytes.
+ * @param value_size is set to the full length of the value, with the same truncation contract as
+ *        name_size. Must not be null.
+ * @return true if the index is valid, false otherwise. When false, no outputs are written.
  */
 bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
-    envoy_dynamic_module_type_envoy_buffer* name_out,
-    envoy_dynamic_module_type_envoy_buffer* value_out);
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size, char* value_buffer,
+    size_t value_buffer_capacity, size_t* value_size);
 
 #ifdef __cplusplus
 }

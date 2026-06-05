@@ -22,16 +22,28 @@ struct TestStatSink {}
 
 impl StatSink for TestStatSink {
   fn on_flush(&self, snapshot: &MetricSnapshot<'_>) {
-    // Exercise the snapshot read-back callbacks to prove they are usable during flush. The specific
-    // counts depend on the test setup, so we just log them.
-    for counter in snapshot.counters() {
-      let _ = counter.name.as_slice();
+    // Exercise the buffer-based snapshot callbacks to prove names decode straight into a
+    // module-owned buffer during flush. A single buffer is reused across every entry, starting
+    // empty so the first decode exercises the SDK grow-and-retry path. This is the allocation-free
+    // pattern the API enables (for example writing each name to a socket).
+    let mut name = Vec::new();
+    let mut value = Vec::new();
+    for index in 0..snapshot.counter_count() {
+      let _ = snapshot.counter(index, &mut name);
     }
-    for gauge in snapshot.gauges() {
-      let _ = gauge.name.as_slice();
+    // Decode every gauge name and look for the always-present "server.uptime" gauge, which proves a
+    // name round-trips byte-for-byte through the buffer API end to end.
+    let mut found_uptime = false;
+    for index in 0..snapshot.gauge_count() {
+      if snapshot.gauge(index, &mut name).is_some() && name.as_slice() == b"server.uptime" {
+        found_uptime = true;
+      }
     }
-    for text_readout in snapshot.text_readouts() {
-      let _ = text_readout.value.as_slice();
+    for index in 0..snapshot.text_readout_count() {
+      let _ = snapshot.text_readout(index, &mut name, &mut value);
+    }
+    if found_uptime {
+      envoy_log_info!("stat sink integration test: found gauge server.uptime");
     }
     envoy_log_info!(
       "stat sink integration test: flush called counters={} gauges={}",
