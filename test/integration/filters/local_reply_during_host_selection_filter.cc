@@ -8,6 +8,7 @@
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 namespace Envoy {
 
@@ -34,8 +35,10 @@ public:
 };
 
 constexpr char LocalReplyDuringHostSelection::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<LocalReplyDuringHostSelection>,
-                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<LocalReplyDuringHostSelection,
+                             test::integration::filters::LocalReplyDuringHostSelectionConfig>,
+    Server::Configuration::UpstreamHttpFilterConfigFactory>
     register_upstream_;
 
 } // namespace Envoy

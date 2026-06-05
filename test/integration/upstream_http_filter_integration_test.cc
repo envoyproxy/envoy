@@ -10,6 +10,7 @@
 #include "test/config/utility.h"
 #include "test/integration/filters/add_header_filter.pb.h"
 #include "test/integration/filters/repick_cluster_filter.h"
+#include "test/integration/filters/test_filters.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"
 
@@ -152,6 +153,18 @@ public:
     }
   }
 
+  template <typename ProtoConfig>
+  void addStaticTypedConfigFilter(const std::string& name, const ProtoConfig& config) {
+    HttpFilterProto filter_config;
+    filter_config.set_name(name);
+    filter_config.mutable_typed_config()->PackFrom(config);
+    if (useRouterFilters()) {
+      addStaticRouterFilter(filter_config);
+    } else {
+      addStaticClusterFilter(filter_config);
+    }
+  }
+
   bool use_router_filters_{false};
   const std::string default_header_key_ = "header-key";
   const std::string default_header_value_ = "default-value";
@@ -246,7 +259,8 @@ TEST_P(StaticRouterOrClusterFiltersIntegrationTest, TwoFilters) {
 // corrupting the connection state. Two requests on the same HTTP/2 connection
 // (header-only + POST with body) prove the state machine handles early abort cleanly.
 TEST_P(StaticRouterOrClusterFiltersIntegrationTest, OnHostSelectedLocalReply) {
-  addStaticNoConfigFilter("local-reply-during-host-selection");
+  addStaticTypedConfigFilter("local-reply-during-host-selection",
+                             test::integration::filters::LocalReplyDuringHostSelectionConfig());
   addCodecFilter();
   initialize();
 
@@ -289,7 +303,8 @@ TEST_P(StaticRouterOrClusterFiltersIntegrationTest, OnHostSelectedLocalReplyNoRe
         retry_policy->mutable_num_retries()->set_value(3);
       });
 
-  addStaticNoConfigFilter("local-reply-during-host-selection");
+  addStaticTypedConfigFilter("local-reply-during-host-selection",
+                             test::integration::filters::LocalReplyDuringHostSelectionConfig());
   addCodecFilter();
   initialize();
 

@@ -157,6 +157,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
+        ":test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
