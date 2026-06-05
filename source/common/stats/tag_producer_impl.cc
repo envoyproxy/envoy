@@ -8,6 +8,8 @@
 #include "source/common/common/utility.h"
 #include "source/common/stats/tag_extractor_impl.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Stats {
 
@@ -152,16 +154,46 @@ void TagProducerImpl::reserveResources(const envoy::config::metrics::v3::StatsCo
   tag_extractors_without_prefix_.reserve(config.stats_tags().size());
 }
 
+namespace {
+
+// Returns the set of tag names whose default extractors are overwritten by a custom extractor.
+// Only custom extractors with a non-empty regex or a fixed value override the default Envoy
+// extractors; an empty/unset regex falls back to the default and overrides nothing.
+absl::flat_hash_set<absl::string_view>
+overriddenDefaultTagNames(const envoy::config::metrics::v3::StatsConfig& config) {
+  absl::flat_hash_set<absl::string_view> overridden_names;
+  if (config.allow_default_tag_overrides().value()) {
+    for (const auto& tag_specifier : config.stats_tags()) {
+      const auto tag_value_case = tag_specifier.tag_value_case();
+      if (tag_value_case == envoy::config::metrics::v3::TagSpecifier::TagValueCase::kFixedValue ||
+          (tag_value_case == envoy::config::metrics::v3::TagSpecifier::TagValueCase::kRegex &&
+           !tag_specifier.regex().empty())) {
+        overridden_names.insert(tag_specifier.tag_name());
+      }
+    }
+  }
+  return overridden_names;
+}
+
+} // namespace
+
 absl::Status
 TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v3::StatsConfig& config) {
+  const absl::flat_hash_set<absl::string_view> overridden_names = overriddenDefaultTagNames(config);
   if (!config.has_use_all_default_tags() || config.use_all_default_tags().value()) {
     for (const auto& desc : Config::TagNames::get().descriptorVec()) {
+      if (overridden_names.contains(desc.name_)) {
+        continue;
+      }
       auto extractor_or_error = TagExtractorImplBase::createTagExtractor(
           desc.name_, desc.regex_, desc.substr_, desc.negative_match_, desc.re_type_);
       RETURN_IF_NOT_OK_REF(extractor_or_error.status());
       addExtractor(std::move(extractor_or_error.value()));
     }
     for (const auto& desc : Config::TagNames::get().tokenizedDescriptorVec()) {
+      if (overridden_names.contains(desc.name_)) {
+        continue;
+      }
       addExtractor(std::make_unique<TagExtractorTokensImpl>(desc.name_, desc.pattern_));
     }
   }
