@@ -460,6 +460,7 @@ TEST_P(RtdsIntegrationTest, RtdsUpdate) {
 // This test uses health checking of the first cluster to make primary cluster initialization to
 // complete asynchronously.
 TEST_P(RtdsIntegrationTest, RtdsAfterAsyncPrimaryClusterInitialization) {
+  autonomous_upstream_ = true;
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     // Enable health checking for the first cluster.
     auto* dummy_cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
@@ -483,10 +484,8 @@ TEST_P(RtdsIntegrationTest, RtdsAfterAsyncPrimaryClusterInitialization) {
   EXPECT_EQ("yar", getRuntimeKey("bar"));
   EXPECT_EQ("", getRuntimeKey("baz"));
 
-  // Respond to the initial health check, which should complete initialization of primary clusters.
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-  test_server_->waitForGauge("cluster.dummy_cluster.membership_healthy", Eq(1));
+  // Wait for the initial health check, which should complete initialization of primary clusters.
+  test_server_->waitForCounter("cluster.dummy_cluster.health_check.success", Ge(1));
 
   // After this xDS connection should be established. Verify that dynamic runtime values are loaded.
   acceptXdsConnection();
