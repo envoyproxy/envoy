@@ -154,14 +154,17 @@ public:
                          bool is_bound) {
     setupMockObjects();
 
+    std::string dummy_pem;
+    std::string expected_fingerprint;
+
     std::unique_ptr<NiceMock<Network::MockTransportSocketFactory>> socket_factory;
     std::unique_ptr<NiceMock<Ssl::MockClientContextConfig>> client_context_config;
     std::unique_ptr<NiceMock<Ssl::MockTlsCertificateConfig>> tls_cert_config;
     std::unique_ptr<NiceMock<Upstream::MockTransportSocketMatcher>> transport_socket_matcher;
 
     if (is_bound) {
-      const std::string dummy_pem = "dummy cert PEM";
-      const std::string expected_fingerprint = "mock_fingerprint_base64";
+      dummy_pem = "dummy cert PEM";
+      expected_fingerprint = "mock_fingerprint_base64";
 
       socket_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
       client_context_config = std::make_unique<NiceMock<Ssl::MockClientContextConfig>>();
