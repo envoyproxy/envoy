@@ -41,8 +41,7 @@ public:
           std::stringstream pem_stream(cert_chain_);
           std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
           return chain[0];
-        }()),
-        leaf_certs_({leaf_cert_}) {
+        }()) {
     ON_CALL(client_context_config_, cipherSuites)
         .WillByDefault(ReturnRef(
             Extensions::TransportSockets::Tls::ClientContextConfigImpl::DEFAULT_CIPHER_SUITES));
@@ -103,7 +102,6 @@ protected:
   const std::string cert_chain_{quic::test::kTestCertificateChainPem};
   std::string root_ca_cert_;
   const std::string leaf_cert_;
-  std::vector<absl::string_view> leaf_certs_;
   absl::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_{
       absl::nullopt};
   NiceMock<Stats::MockStore> store_;
@@ -127,7 +125,7 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainSuccess) {
   std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   EXPECT_EQ(quic::QUIC_SUCCESS,
             verifier_->VerifyCertChain(std::string(cert_view->subject_alt_name_domains()[0]), 54321,
-                                       leaf_certs_, ocsp_response, cert_sct, &verify_context_,
+                                       {leaf_cert_}, ocsp_response, cert_sct, &verify_context_,
                                        &error_details, &verify_details, nullptr, nullptr))
       << error_details;
   EXPECT_NE(verify_details, nullptr);
@@ -156,7 +154,7 @@ typed_config:
   Event::MockTimer* verify_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
   EXPECT_EQ(quic::QUIC_PENDING,
             verifier_->VerifyCertChain(
-                std::string(cert_view->subject_alt_name_domains()[0]), 54321, leaf_certs_,
+                std::string(cert_view->subject_alt_name_domains()[0]), 54321, {leaf_cert_},
                 ocsp_response, cert_sct, &verify_context_, &error_details, &verify_details, nullptr,
                 std::unique_ptr<MockProofVerifierCallback>(quic_verify_callback)));
   EXPECT_EQ(verify_details, nullptr);
@@ -182,7 +180,7 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureFromSsl) {
   std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   EXPECT_EQ(quic::QUIC_FAILURE,
             verifier_->VerifyCertChain(std::string(cert_view->subject_alt_name_domains()[0]), 54321,
-                                       leaf_certs_, ocsp_response, cert_sct, &verify_context_,
+                                       {leaf_cert_}, ocsp_response, cert_sct, &verify_context_,
                                        &error_details, &verify_details, nullptr, nullptr))
       << error_details;
   EXPECT_EQ("verify cert failed: X509_verify_cert: certificate verification error at depth 1: "
@@ -203,7 +201,7 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidLeafCert) {
   const std::string ocsp_response;
   const std::string cert_sct;
   std::string error_details;
-  const std::vector<absl::string_view> certs{"invalid leaf cert"};
+  const std::vector<std::string> certs{"invalid leaf cert"};
   std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   EXPECT_EQ(quic::QUIC_FAILURE,
             verifier_->VerifyCertChain("www.google.com", 54321, certs, ocsp_response, cert_sct,
@@ -219,13 +217,13 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureLeafCertWithGarbage) {
   const std::string ocsp_response;
   const std::string cert_sct;
   std::string cert_with_trailing_garbage = absl::StrCat(leaf_cert_, "AAAAAA");
-  std::vector<absl::string_view> certs = {cert_with_trailing_garbage};
   std::string error_details;
   std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   EXPECT_EQ(quic::QUIC_FAILURE,
             verifier_->VerifyCertChain(std::string(cert_view->subject_alt_name_domains()[0]), 54321,
-                                       certs, ocsp_response, cert_sct, &verify_context_,
-                                       &error_details, &verify_details, nullptr, nullptr))
+                                       {cert_with_trailing_garbage}, ocsp_response, cert_sct,
+                                       &verify_context_, &error_details, &verify_details, nullptr,
+                                       nullptr))
       << error_details;
   EXPECT_EQ("There is trailing garbage in DER.", error_details);
 }
@@ -237,7 +235,7 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidHost) {
   std::string error_details;
   std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   EXPECT_EQ(quic::QUIC_FAILURE,
-            verifier_->VerifyCertChain("unknown.org", 54321, leaf_certs_, ocsp_response, cert_sct,
+            verifier_->VerifyCertChain("unknown.org", 54321, {leaf_cert_}, ocsp_response, cert_sct,
                                        &verify_context_, &error_details, &verify_details, nullptr,
                                        nullptr))
       << error_details;
@@ -262,7 +260,7 @@ typed_config:
   Event::MockTimer* verify_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
   EXPECT_EQ(
       quic::QUIC_PENDING,
-      verifier_->VerifyCertChain("unknown.org", 54321, leaf_certs_, ocsp_response, cert_sct,
+      verifier_->VerifyCertChain("unknown.org", 54321, {leaf_cert_}, ocsp_response, cert_sct,
                                  &verify_context_, &error_details, &verify_details, nullptr,
                                  std::unique_ptr<MockProofVerifierCallback>(quic_verify_callback)));
   EXPECT_EQ(verify_details, nullptr);
@@ -308,10 +306,9 @@ VdGXMAjeXhnOnPvmDi5hUz/uvI+Pg6cNmUoCRwSCnK/DazhA
   ASSERT(cert_view);
   std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   EXPECT_EQ(quic::QUIC_FAILURE,
-            verifier_->VerifyCertChain("www.google.com", 54321,
-                                       std::vector<absl::string_view>(chain.begin(), chain.end()),
-                                       ocsp_response, cert_sct, &verify_context_, &error_details,
-                                       &verify_details, nullptr, nullptr));
+            verifier_->VerifyCertChain("www.google.com", 54321, chain, ocsp_response, cert_sct,
+                                       &verify_context_, &error_details, &verify_details, nullptr,
+                                       nullptr));
   EXPECT_EQ("Invalid leaf cert, only P-256 ECDSA certificates are supported", error_details);
 }
 
@@ -380,10 +377,9 @@ ZCFbredVxDBZuoVsfrKPSQa407Jj1Q==
   ASSERT(cert_view);
   std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   EXPECT_EQ(quic::QUIC_FAILURE,
-            verifier_->VerifyCertChain("lyft.com", 54321,
-                                       std::vector<absl::string_view>(chain.begin(), chain.end()),
-                                       ocsp_response, cert_sct, &verify_context_, &error_details,
-                                       &verify_details, nullptr, nullptr));
+            verifier_->VerifyCertChain("lyft.com", 54321, chain, ocsp_response, cert_sct,
+                                       &verify_context_, &error_details, &verify_details, nullptr,
+                                       nullptr));
   EXPECT_EQ("verify cert failed: X509_verify_cert: certificate verification error at depth 0: "
             "unsupported certificate "
             "purpose",
@@ -402,7 +398,7 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifySubjectAltNameListOverrideFailure) {
   std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   EXPECT_EQ(quic::QUIC_FAILURE,
             verifier_->VerifyCertChain(std::string(cert_view->subject_alt_name_domains()[0]), 54321,
-                                       leaf_certs_, ocsp_response, cert_sct, &verify_context_,
+                                       {leaf_cert_}, ocsp_response, cert_sct, &verify_context_,
                                        &error_details, &verify_details, nullptr, nullptr))
       << error_details;
   EXPECT_EQ("verify cert failed: verify SAN list, expected SANs: [non-example.com], certificate "
@@ -443,10 +439,9 @@ wYsML58R3P8=
   std::stringstream pem_stream(cert_v1);
   std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
   EXPECT_EQ(quic::QUIC_FAILURE,
-            verifier_->VerifyCertChain("localhost", 54321,
-                                       std::vector<absl::string_view>(chain.begin(), chain.end()),
-                                       ocsp_response, cert_sct, &verify_context_, &error_details,
-                                       &verify_details, nullptr, nullptr))
+            verifier_->VerifyCertChain("localhost", 54321, chain, ocsp_response, cert_sct,
+                                       &verify_context_, &error_details, &verify_details, nullptr,
+                                       nullptr))
       << error_details;
   EXPECT_EQ("unable to parse certificate", error_details);
   EXPECT_EQ(verify_details, nullptr);
