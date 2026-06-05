@@ -601,9 +601,9 @@ dependatool==0.3.1 \
     --hash=sha256:265fc69e8b1605edb8e33872a36d3a2c2cc055743bec8e58d1ed3c72a17a9431 \
     --hash=sha256:6be19ce9fbdffccf639bad0393e454080b7bba8510a98edc78855a6a93895020
     # via -r requirements.in
-envoy-base-utils==0.6.5 \
-    --hash=sha256:9bb71c96741bb4ffeaae7b6c121418182afbb9791f8139a2e5569654a3d78068 \
-    --hash=sha256:ceb6b6afcf6443b20a127627456785b8c3b3baaa961b961da5734f83837e1470
+envoy-base-utils==0.6.7 \
+    --hash=sha256:cebe9b389bb0e6e924f8daddeb02306f3d9f2612ee3cd9cf6f87dba1ec57286a \
+    --hash=sha256:f1f9f9dffddc232f23f5d46c94d45a903ba2123b372b0b051e7264954a346ed9
     # via
     #   -r requirements.in
     #   envoy-code-check
