@@ -108,3 +108,5 @@ message ResponseMetadataFilterConfig {
 }
 message AddHeaderEmptyFilterConfig {
 }
+message LocalReplyDuringHostSelectionConfig {
+}

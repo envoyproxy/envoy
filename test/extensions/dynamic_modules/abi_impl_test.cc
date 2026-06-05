@@ -1300,6 +1300,21 @@ WEAK_STUB(TransportSocketSetIsReadable,
 WEAK_STUB(TransportSocketFlushWriteBuffer,
           envoy_dynamic_module_callback_transport_socket_flush_write_buffer(nullptr))
 
+WEAK_STUB(StatSinkSnapshotGetCounterCount,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_count(nullptr))
+WEAK_STUB(StatSinkSnapshotGetCounter,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_counter(nullptr, 0, nullptr, nullptr,
+                                                                       nullptr))
+WEAK_STUB(StatSinkSnapshotGetGaugeCount,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_count(nullptr))
+WEAK_STUB(StatSinkSnapshotGetGauge,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge(nullptr, 0, nullptr, nullptr))
+WEAK_STUB(StatSinkSnapshotGetTextReadoutCount,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_count(nullptr))
+WEAK_STUB(StatSinkSnapshotGetTextReadout,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(nullptr, 0, nullptr,
+                                                                            nullptr))
+
 // Tests for the additional weak stubs added for ABI declarations missing from abi_impl.cc.
 WEAK_STUB(HttpFilterConfigDefineCounter,
           envoy_dynamic_module_callback_http_filter_config_define_counter(nullptr, {nullptr, 0},
@@ -1374,6 +1389,10 @@ WEAK_STUB(HttpSetDynamicMetadataString,
           envoy_dynamic_module_callback_http_set_dynamic_metadata_string(nullptr, {nullptr, 0},
                                                                          {nullptr, 0},
                                                                          {nullptr, 0}))
+WEAK_STUB(HttpSetDynamicMetadataStringBatch,
+          envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(nullptr,
+                                                                               {nullptr, 0},
+                                                                               nullptr, 0))
 WEAK_STUB(HttpGetMetadataString, envoy_dynamic_module_callback_http_get_metadata_string(
                                      nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
                                      {nullptr, 0}, {nullptr, 0}, nullptr))

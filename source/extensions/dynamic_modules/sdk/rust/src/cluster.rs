@@ -6,8 +6,13 @@ use crate::{
   NEW_CLUSTER_CONFIG_FUNCTION,
 };
 use mockall::*;
+use std::any::Any;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::Arc;
+
+// Storage type for typed worker-slot payloads: a `Box<dyn Any + Send + Sync>` boxed once more
+// so the outer pointer is thin and survives the C ABI round-trip.
+type WorkerSlotPayload = Box<dyn Any + Send + Sync>;
 
 /// The module-side cluster configuration.
 ///
@@ -52,6 +57,14 @@ pub trait Cluster: Send + Sync {
   /// * `event_id` is the ID of the event that was scheduled with [`EnvoyClusterScheduler::commit`]
   ///   to distinguish multiple scheduled events.
   fn on_scheduled(&self, _envoy_cluster: &dyn EnvoyCluster, _event_id: u64) {}
+
+  /// Called on every worker thread once per main-thread fan-out posted by the module. The
+  /// default implementation is a no-op.
+  ///
+  /// * `envoy_cluster` provides access to the underlying Envoy cluster object.
+  /// * `event_id` is the module-defined identifier supplied at the main-thread fan-out call
+  ///   site.
+  fn on_worker_event(&self, _envoy_cluster: &dyn EnvoyCluster, _event_id: u64) {}
 
   /// Called when the server initialization is complete (PostInit lifecycle stage).
   ///
@@ -380,6 +393,25 @@ pub trait EnvoyCluster: Send + Sync {
   /// This can be used to schedule an event to the main thread where the cluster is running.
   fn new_scheduler(&self) -> Box<dyn EnvoyClusterScheduler>;
 
+  /// Posts the module's worker-event hook to every worker thread registered with the server's
+  /// thread-local engine. The main thread is excluded. Must be called from the main thread.
+  fn run_on_all_workers(&self, event_id: u64);
+
+  /// Publishes a raw opaque pointer to every registered thread's worker slot. Must be called
+  /// from the main thread. Most callers should prefer the typed
+  /// [`EnvoyClusterWorkerSlotExt::worker_slot_set`].
+  fn worker_slot_set_raw(
+    &self,
+    data_ptr: abi::envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr,
+  );
+
+  /// Returns the raw opaque pointer most recently delivered to this thread's worker slot, or
+  /// `NULL` if none. Callable from any thread that has a TLS registration. Most callers should
+  /// prefer the typed [`EnvoyClusterWorkerSlotExt::worker_slot_get`].
+  fn worker_slot_get_raw(
+    &self,
+  ) -> abi::envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr;
+
   /// Sends an HTTP request to the specified cluster and asynchronously delivers the response
   /// via [`Cluster::on_http_callout_done`].
   ///
@@ -396,6 +428,45 @@ pub trait EnvoyCluster: Send + Sync {
     body: Option<&'a [u8]>,
     timeout_milliseconds: u64,
   ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64);
+}
+
+/// Type-safe access to the cluster's worker thread-local slot. Provided as an extension trait
+/// because generic methods on `EnvoyCluster` would break its object safety, and modules receive
+/// `&dyn EnvoyCluster` in their callbacks.
+pub trait EnvoyClusterWorkerSlotExt {
+  /// Publishes an `Arc<T>` to every registered thread's worker slot. Replaces any prior payload.
+  /// Must be called from the main thread.
+  fn worker_slot_set<T: Send + Sync + 'static>(&self, value: Arc<T>);
+
+  /// Returns the current `Arc<T>` for this thread, or `None` if the slot has not been populated
+  /// on this thread or the stored payload was not an `Arc<T>` of the requested type.
+  fn worker_slot_get<T: Send + Sync + 'static>(&self) -> Option<Arc<T>>;
+}
+
+impl<C: EnvoyCluster + ?Sized> EnvoyClusterWorkerSlotExt for C {
+  fn worker_slot_set<T: Send + Sync + 'static>(&self, value: Arc<T>) {
+    let any_box: WorkerSlotPayload = Box::new(value);
+    let outer: Box<WorkerSlotPayload> = Box::new(any_box);
+    let raw =
+      Box::into_raw(outer) as abi::envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr;
+    self.worker_slot_set_raw(raw);
+  }
+
+  fn worker_slot_get<T: Send + Sync + 'static>(&self) -> Option<Arc<T>> {
+    let raw = self.worker_slot_get_raw();
+    if raw.is_null() {
+      return None;
+    }
+    // SAFETY: raw came from a leaked Box<WorkerSlotPayload> stored in the slot. The slot keeps
+    // the wrapping shared_ptr alive for at least the duration of this dispatcher tick on the
+    // calling thread, so a shared borrow is valid here.
+    let outer: &WorkerSlotPayload = unsafe { &*(raw as *const WorkerSlotPayload) };
+    debug_assert!(
+      outer.is::<Arc<T>>(),
+      "worker_slot_get<T> called with type mismatch"
+    );
+    outer.downcast_ref::<Arc<T>>().cloned()
+  }
 }
 
 /// Envoy-side load balancer operations available to the module.
@@ -901,6 +972,27 @@ impl EnvoyCluster for EnvoyClusterImpl {
         raw_ptr: scheduler_ptr,
       })
     }
+  }
+
+  fn run_on_all_workers(&self, event_id: u64) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_run_on_all_workers(self.raw, event_id);
+    }
+  }
+
+  fn worker_slot_set_raw(
+    &self,
+    data_ptr: abi::envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr,
+  ) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_worker_slot_set(self.raw, data_ptr);
+    }
+  }
+
+  fn worker_slot_get_raw(
+    &self,
+  ) -> abi::envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr {
+    unsafe { abi::envoy_dynamic_module_callback_cluster_worker_slot_get(self.raw) }
   }
 
   fn send_http_callout<'a>(
@@ -2202,6 +2294,49 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_scheduled(
   }))
   .map_err(|panic| {
     crate::log_ffi_panic("envoy_dynamic_module_on_cluster_scheduled", panic);
+  });
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_worker_event(
+  cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
+  event_id: u64,
+) {
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let cluster = cluster_module_ptr as *const *const dyn Cluster;
+    let cluster = &**cluster;
+    cluster.on_worker_event(&EnvoyClusterImpl::new(cluster_envoy_ptr), event_id);
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_cluster_worker_event", panic);
+  });
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_worker_slot_data_destroy(
+  data_module_ptr: abi::envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr,
+) {
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    if data_module_ptr.is_null() {
+      return;
+    }
+    // Reclaim the outer Box; dropping it drops the inner Arc<T> via vtable dispatch.
+    let _: Box<WorkerSlotPayload> = Box::from_raw(data_module_ptr as *mut WorkerSlotPayload);
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_cluster_worker_slot_data_destroy",
+      panic,
+    );
   });
 }
 

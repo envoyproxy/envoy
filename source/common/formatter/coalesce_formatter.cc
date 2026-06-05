@@ -1,6 +1,7 @@
 #include "source/common/formatter/coalesce_formatter.h"
 
 #include "source/common/common/fmt.h"
+#include "source/common/formatter/builtin_command_parser_factory_helper.h"
 #include "source/common/json/json_loader.h"
 
 namespace Envoy {
