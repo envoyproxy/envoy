@@ -6,9 +6,9 @@ aioquic>=0.9.21
 clang-format==18.1.8
 clang-tidy==18.1.8
 dependatool>=0.3.1
-envoy.base.utils>=0.6.4
+envoy.base.utils>=0.6.7
 envoy.ci.report>=0.1.1
-envoy.code.check>=0.6.4
+envoy.code.check>=0.6.6
 envoy.dependency.check>=0.2.1
 envoy.distribution.release>=0.1.2
 envoy.distribution.verify>=0.1.1
