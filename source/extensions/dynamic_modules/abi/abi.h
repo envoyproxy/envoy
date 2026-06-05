@@ -128,6 +128,18 @@ typedef struct envoy_dynamic_module_type_module_http_header {
 } envoy_dynamic_module_type_module_http_header;
 
 /**
+ * envoy_dynamic_module_type_module_key_value_pair represents a string key-value pair owned by the
+ * module. It is used to set multiple dynamic metadata entries under a single namespace via
+ * envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch.
+ */
+typedef struct envoy_dynamic_module_type_module_key_value_pair {
+  envoy_dynamic_module_type_buffer_module_ptr key_ptr;
+  size_t key_length;
+  envoy_dynamic_module_type_buffer_module_ptr value_ptr;
+  size_t value_length;
+} envoy_dynamic_module_type_module_key_value_pair;
+
+/**
  * envoy_dynamic_module_type_envoy_http_header represents a key-value pair of an HTTP header owned
  * by Envoy's HeaderMap.
  */
@@ -1872,6 +1884,26 @@ void envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
     envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch is called by the module to
+ * set multiple string-valued dynamic metadata entries under a single namespace in one call. It is
+ * equivalent to calling envoy_dynamic_module_callback_http_set_dynamic_metadata_string once per
+ * entry but resolves the namespace and merges into the metadata struct only once. Existing entries
+ * with the same key are overwritten. Within a single call, a later entry overwrites an earlier
+ * entry with the same key. An empty array is a no-op and does not create the namespace.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param entries is the pointer to an array of key-value pairs whose values are set as strings. It
+ * may be null only when entries_size is zero.
+ * @param entries_size is the number of entries in the array.
+ */
+void envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
 
 /**
  * envoy_dynamic_module_callback_http_get_metadata_string is called by the module to get
@@ -8405,6 +8437,16 @@ typedef void* envoy_dynamic_module_type_cluster_scheduler_module_ptr;
  */
 typedef void* envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr;
 
+/**
+ * envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr is a module-owned opaque pointer
+ * stored in the cluster's worker thread-local slot. Envoy treats the value as opaque and never
+ * dereferences it.
+ *
+ * OWNERSHIP: The module owns the allocation. Envoy retains a shared_ptr to a thin wrapper around
+ * the pointer and invokes the module's destroy hook on whichever thread drops the last reference.
+ */
+typedef void* envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr;
+
 // =============================================================================
 // Cluster Event Hooks
 // =============================================================================
@@ -8547,6 +8589,35 @@ void envoy_dynamic_module_on_cluster_lb_cancel_host_selection(
 void envoy_dynamic_module_on_cluster_scheduled(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
     envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr, uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_on_cluster_worker_event is called on every worker thread once per
+ * main-thread fan-out posted by the module. This is optional; modules that don't fan out events
+ * to workers need not implement it.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
+ * @param event_id is the module-defined identifier supplied at the main-thread fan-out call site.
+ */
+void envoy_dynamic_module_on_cluster_worker_event(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr, uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_on_cluster_worker_slot_data_destroy is invoked when a previously published
+ * worker-slot pointer is no longer referenced — that is, when the slot has been overwritten or
+ * the cluster has been torn down. The module is expected to release any allocation backing the
+ * pointer.
+ *
+ * This is optional but required for modules that publish payloads, otherwise the prior payload
+ * leaks. The hook fires on whichever thread drops the last reference, so the module must make
+ * the destructor thread-safe with respect to any shared state it touches.
+ *
+ * @param data_module_ptr is the opaque module pointer that was previously published. May be NULL
+ * if the module published NULL.
+ */
+void envoy_dynamic_module_on_cluster_worker_slot_data_destroy(
+    envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr data_module_ptr);
 
 /**
  * envoy_dynamic_module_on_cluster_server_initialized is called when the server initialization is
@@ -9143,6 +9214,46 @@ void envoy_dynamic_module_callback_cluster_scheduler_delete(
  */
 void envoy_dynamic_module_callback_cluster_scheduler_commit(
     envoy_dynamic_module_type_cluster_scheduler_module_ptr scheduler_module_ptr, uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_callback_cluster_run_on_all_workers posts the module's worker-event hook
+ * to every worker thread registered with the server's thread-local engine. The main thread is
+ * excluded. Must be called from the main thread.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @param event_id is a module-defined identifier delivered to each worker invocation.
+ */
+void envoy_dynamic_module_callback_cluster_run_on_all_workers(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_callback_cluster_worker_slot_set publishes an opaque module pointer to
+ * the cluster's worker thread-local slot. All registered threads observe the same pointer
+ * (single-pointer semantics — not a per-worker factory). Any previously published pointer is
+ * released through the module's destroy hook. Must be called from the main thread.
+ *
+ * Threads that are not yet registered with the TLS engine at the time of the call will not
+ * observe this update.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @param data_module_ptr is the opaque module pointer to publish. May be NULL to clear the slot.
+ */
+void envoy_dynamic_module_callback_cluster_worker_slot_set(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr data_module_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_worker_slot_get returns the pointer most recently
+ * delivered to the calling thread's slot, or NULL if the slot has not been populated on this
+ * thread. Callable from any thread that has a TLS registration (workers and main). The returned
+ * pointer is valid until the next slot update on this thread.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @return the opaque module pointer most recently published to this thread, or NULL.
+ */
+envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr
+envoy_dynamic_module_callback_cluster_worker_slot_get(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr);
 
 // =============================================================================
 // Cluster Dynamic Module Callbacks - Metrics

@@ -15,6 +15,7 @@ envoy_cc_library(
     hdrs = ["gcp_authn_filter.h"],
     deps = [
         "token_cache",
+        ":crypto_utils",
         ":gcp_authn_client_impl",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",

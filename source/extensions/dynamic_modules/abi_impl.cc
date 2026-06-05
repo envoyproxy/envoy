@@ -788,6 +788,26 @@ __attribute__((weak)) void envoy_dynamic_module_callback_cluster_scheduler_commi
                "not implemented in this context");
 }
 
+__attribute__((weak)) void envoy_dynamic_module_callback_cluster_run_on_all_workers(
+    envoy_dynamic_module_type_cluster_envoy_ptr, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_run_on_all_workers: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_cluster_worker_slot_set(
+    envoy_dynamic_module_type_cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_worker_slot_set: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr
+envoy_dynamic_module_callback_cluster_worker_slot_get(envoy_dynamic_module_type_cluster_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_worker_slot_get: "
+               "not implemented in this context");
+  return nullptr;
+}
+
 __attribute__((weak)) envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_cluster_config_define_counter(
     envoy_dynamic_module_type_cluster_config_envoy_ptr, envoy_dynamic_module_type_module_buffer,
@@ -3652,6 +3672,13 @@ __attribute__((weak)) void envoy_dynamic_module_callback_http_set_dynamic_metada
     envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_http_set_dynamic_metadata_string: not implemented in "
                "this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+    envoy_dynamic_module_type_http_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    const envoy_dynamic_module_type_module_key_value_pair*, size_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch: not "
+               "implemented in this context");
 }
 
 __attribute__((weak)) bool envoy_dynamic_module_callback_http_get_metadata_string(

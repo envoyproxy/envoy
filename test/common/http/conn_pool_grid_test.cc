@@ -1821,7 +1821,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAsyncConnect) {
       .WillOnce(Return(Api::SysCallIntResult{1, 0}));
 #endif
   EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _))
-      .Times(testing::AtLeast(0u))
+      .Times(testing::AnyNumber())
       .WillRepeatedly(Return(0));
   EXPECT_CALL(os_sys_calls, connect(_, _, _)).WillOnce(Return(Api::SysCallIntResult{1, 0}));
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
@@ -1845,6 +1845,57 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAsyncConnect) {
   EXPECT_CALL(os_sys_calls, send(_, _, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 101}));
   EXPECT_CALL(callbacks_.pool_failure_, ready());
   async_connect_callback->invokeCallback();
+}
+
+TEST_F(ConnectivityGridTest, DestroyGridWithActiveH2Attempts) {
+  Envoy::LogLevelSetter save_levels(spdlog::level::trace);
+  initialize();
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.conn_pool_grid_early_return_on_teardown", "true"}});
+  EXPECT_CALL(*cluster_, connectTimeout()).WillRepeatedly(Return(std::chrono::seconds(10)));
+
+  dispatcher_.allow_null_callback_ = true;
+
+  NiceMock<Network::MockTransportSocketFactory> tcp_factory;
+  EXPECT_CALL(tcp_factory, createTransportSocket(_, _))
+      .WillRepeatedly(Invoke([](Network::TransportSocketOptionsConstSharedPtr,
+                                std::shared_ptr<const Upstream::HostDescription>) {
+        return std::make_unique<NiceMock<Network::MockTransportSocket>>();
+      }));
+
+  auto& matcher =
+      static_cast<Upstream::MockTransportSocketMatcher&>(*cluster_->transport_socket_matcher_);
+  EXPECT_CALL(matcher, resolve(_, _, _))
+      .WillRepeatedly(
+          Return(Upstream::TransportSocketMatcher::MatchData(tcp_factory, matcher.stats_, "test")));
+
+  auto grid = std::make_unique<ConnectivityGrid>(
+      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000"),
+      Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
+      simTime(), alternate_protocols_, options_, quic_stat_names_, *store_.rootScope(),
+      *quic_connection_persistent_info_, OptRef<Quic::EnvoyQuicNetworkObserverRegistry>(),
+      overload_manager_);
+
+  auto* connection = new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillOnce(Return(connection));
+
+  // H2 connection is initiated synchronously during newStream() since H3 is skipped.
+  ConnectionPool::Cancellable* cancel = grid->newStream(decoder_, callbacks_,
+                                                        {/*can_send_early_data_=*/false,
+                                                         /*can_use_http3_=*/true});
+  EXPECT_NE(nullptr, cancel);
+
+  // Destroy the grid while the H2 connection attempt is active.
+  // This will:
+  // 1. Invoke signalFailureAndDeleteSelf() on the wrapper callbacks, setting
+  //    delete_started_ = true and immediately triggering callbacks_.pool_failure_.ready().
+  // 2. Destruct the H2 pool, which cancels the pending H2 connection.
+  // 3. The cancelled connection naturally triggers the connection attempt failure callback.
+  // Without the fix, this failure attempt will call describePool() on the half-destroyed H2 pool
+  // and crash. With the fix, it safely returns early because delete_started_ is true.
+  EXPECT_CALL(callbacks_.pool_failure_, ready());
+  grid.reset();
 }
 
 #endif
