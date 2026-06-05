@@ -34,10 +34,22 @@ public:
   MockGcpAuthnClient() = default;
   ~MockGcpAuthnClient() override = default;
 
-  MOCK_METHOD(void, fetchUnboundJwt, (const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience, Callbacks& callbacks), (override));
-  MOCK_METHOD(void, fetchUnboundAccessToken, (const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience, Callbacks& callbacks), (override));
-  MOCK_METHOD(void, fetchBoundJwt, (const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience, const std::string& fingerprint, Callbacks& callbacks), (override));
-  MOCK_METHOD(void, fetchBoundAccessToken, (const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience, const std::string& fingerprint, Callbacks& callbacks), (override));
+  MOCK_METHOD(void, fetchUnboundJwt,
+              (const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+               Callbacks& callbacks),
+              (override));
+  MOCK_METHOD(void, fetchUnboundAccessToken,
+              (const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+               Callbacks& callbacks),
+              (override));
+  MOCK_METHOD(void, fetchBoundJwt,
+              (const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+               const std::string& fingerprint, Callbacks& callbacks),
+              (override));
+  MOCK_METHOD(void, fetchBoundAccessToken,
+              (const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+               const std::string& fingerprint, Callbacks& callbacks),
+              (override));
   MOCK_METHOD(void, cancel, (), (override));
 };
 
@@ -134,14 +146,12 @@ public:
             config);
   }
 
-  void setClient(std::unique_ptr<GcpAuthnClient> client) {
-    filter_->client_ = std::move(client);
-  }
+  void setClient(std::unique_ptr<GcpAuthnClient> client) { filter_->client_ = std::move(client); }
 
-  void testAudiencePrecedence(
-      const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-      std::function<void(MockGcpAuthnClient&)> configure_client_expectations,
-      bool is_bound) {
+  void
+  testAudiencePrecedence(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+                         std::function<void(MockGcpAuthnClient&)> configure_client_expectations,
+                         bool is_bound) {
     setupMockObjects();
 
     std::unique_ptr<NiceMock<Network::MockTransportSocketFactory>> socket_factory;
@@ -163,8 +173,8 @@ public:
       ON_CALL(*socket_factory, clientContextConfig())
           .WillByDefault(
               testing::Return(OptRef<const Ssl::ClientContextConfig>(*client_context_config)));
-      transport_socket_matcher =
-          std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(std::move(socket_factory));
+      transport_socket_matcher = std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(
+          std::move(socket_factory));
 
       EXPECT_CALL(*fingerprinter_, getFingerprintFromPem(dummy_pem))
           .WillRepeatedly(testing::Return(expected_fingerprint));
