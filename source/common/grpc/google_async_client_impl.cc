@@ -23,7 +23,17 @@ namespace Envoy {
 namespace Grpc {
 namespace {
 static constexpr int DefaultBufferLimitBytes = 1024 * 1024;
+
+// Trim all leading and trailing '/' characters so that both "my-envoy-1" and "/my-envoy-1/"
+// produce an identical "/my-envoy-1/<service>/<method>" path and never a double slash.
+std::string trimMethodPathPrefix(absl::string_view prefix) {
+  const auto start = prefix.find_first_not_of('/');
+  if (start == absl::string_view::npos) {
+    return EMPTY_STRING;
+  }
+  return std::string(prefix.substr(start, prefix.find_last_not_of('/') - start + 1));
 }
+} // namespace
 
 GoogleAsyncClientThreadLocal::GoogleAsyncClientThreadLocal(Api::Api& api)
     : completion_thread_(api.threadFactory().createThread([this] { completionThread(); },
@@ -85,7 +95,9 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
                                              Server::Configuration::CommonFactoryContext& context,
                                              const StatNames& stat_names)
     : dispatcher_(dispatcher), tls_(tls), stat_prefix_(config.google_grpc().stat_prefix()),
-      target_uri_(config.google_grpc().target_uri()), scope_(scope),
+      target_uri_(config.google_grpc().target_uri()),
+      method_path_prefix_(trimMethodPathPrefix(config.google_grpc().method_path_prefix())),
+      scope_(scope),
       per_stream_buffer_limit_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.google_grpc(), per_stream_buffer_limit_bytes, DefaultBufferLimitBytes)),
       metadata_parser_(THROW_OR_RETURN_VALUE(
@@ -229,9 +241,12 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
                       std::string(header.value().getStringView()));
     return Http::HeaderMap::Iterate::Continue;
   });
-  // Invoke stub call.
-  rw_ = parent_.stub_->PrepareCall(&ctxt_, "/" + service_full_name_ + "/" + method_name_,
-                                   &parent_.tls_.completionQueue());
+
+  const std::string method = parent_.method_path_prefix_.empty()
+                                 ? absl::StrCat("/", service_full_name_, "/", method_name_)
+                                 : absl::StrCat("/", parent_.method_path_prefix_, "/",
+                                                service_full_name_, "/", method_name_);
+  rw_ = parent_.stub_->PrepareCall(&ctxt_, method, &parent_.tls_.completionQueue());
   if (rw_ == nullptr) {
     notifyRemoteClose(Status::WellKnownGrpcStatus::Unavailable, nullptr, EMPTY_STRING);
     call_failed_ = true;

@@ -203,6 +203,7 @@ private:
   std::list<GoogleAsyncStreamImplPtr> active_streams_;
   const std::string stat_prefix_;
   const std::string target_uri_;
+  const std::string method_path_prefix_;
   Stats::ScopeSharedPtr scope_;
   GoogleAsyncClientStats stats_;
   uint64_t per_stream_buffer_limit_bytes_;

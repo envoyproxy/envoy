@@ -122,7 +122,9 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, StreamHttpStartFail) {
   EXPECT_CALL(*child_span, setSampled(true));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
 
-  EXPECT_CALL(*stub_factory_.stub_, PrepareCall_(_, _, _)).WillOnce(Return(nullptr));
+  // With no method_path_prefix configured, the canonical "/<service>/<method>" path is used.
+  EXPECT_CALL(*stub_factory_.stub_, PrepareCall_(_, Eq("/helloworld.Greeter/SayHello"), _))
+      .WillOnce(Return(nullptr));
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
   EXPECT_CALL(grpc_callbacks, onCreateInitialMetadata(_));
   EXPECT_CALL(grpc_callbacks, onReceiveTrailingMetadata_(_));
@@ -194,6 +196,43 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, RequestHttpStartFail) {
   auto* grpc_request = grpc_client_->send(*method_descriptor_, request_msg, grpc_callbacks,
                                           active_span, Http::AsyncClient::RequestOptions());
   EXPECT_TRUE(grpc_request == nullptr);
+}
+
+// Validate that a configured method_path_prefix is prepended to the gRPC method path.
+TEST_F(EnvoyGoogleAsyncClientImplTest, MethodPathPrefix) {
+  config_.mutable_google_grpc()->set_method_path_prefix("my-envoy-1");
+  initialize();
+
+  EXPECT_CALL(*stub_factory_.stub_,
+              PrepareCall_(_, Eq("/my-envoy-1/helloworld.Greeter/SayHello"), _))
+      .WillOnce(Return(nullptr));
+  MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
+  EXPECT_CALL(grpc_callbacks, onCreateInitialMetadata(_));
+  EXPECT_CALL(grpc_callbacks, onReceiveTrailingMetadata_(_));
+  EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, ""));
+
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+  EXPECT_TRUE(grpc_stream == nullptr);
+}
+
+// Validate that leading and trailing '/' characters in method_path_prefix are trimmed, so the
+// path never contains a double slash regardless of how the prefix is written.
+TEST_F(EnvoyGoogleAsyncClientImplTest, MethodPathPrefixTrimsSlashes) {
+  config_.mutable_google_grpc()->set_method_path_prefix("/my-envoy-1/");
+  initialize();
+
+  EXPECT_CALL(*stub_factory_.stub_,
+              PrepareCall_(_, Eq("/my-envoy-1/helloworld.Greeter/SayHello"), _))
+      .WillOnce(Return(nullptr));
+  MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
+  EXPECT_CALL(grpc_callbacks, onCreateInitialMetadata(_));
+  EXPECT_CALL(grpc_callbacks, onReceiveTrailingMetadata_(_));
+  EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, ""));
+
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+  EXPECT_TRUE(grpc_stream == nullptr);
 }
 
 class EnvoyGoogleLessMockedAsyncClientImplTest : public EnvoyGoogleAsyncClientImplTest {

@@ -74,7 +74,7 @@ message GrpcService {
     bool skip_envoy_headers = 5;
   }
 
-  // [#next-free-field: 11]
+  // [#next-free-field: 12]
   message GoogleGrpc {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.GrpcService.GoogleGrpc";
@@ -310,6 +310,13 @@ message GrpcService {
 
     // Custom channels args.
     ChannelArgs channel_args = 8;
+
+    // An optional prefix prepended to the gRPC method path for every call made by this
+    // client. When set, the request path becomes ``/<method_path_prefix>/<service>/<method>``
+    // instead of the default ``/<service>/<method>``; e.g. a prefix of ``my-envoy-1`` yields
+    // ``/my-envoy-1/<service>/<method>``. Leading and trailing ``/`` characters are trimmed.
+    // The upstream gRPC server must be configured to accept the prefixed path.
+    string method_path_prefix = 11;
   }
 
   reserved 4;
