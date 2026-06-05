@@ -1030,8 +1030,8 @@ TEST(DefaultCertValidatorTest, AddClientValidationContextWithMalformedCaCert) {
   // Valid PEM envelope but garbage base64 inside — triggers a decode error
   // that is NOT PEM_R_NO_START_LINE, hitting the else-branch error return.
   std::string ca_cert = "-----BEGIN CERTIFICATE-----\n"
-                         "not valid base64 content!!!\n"
-                         "-----END CERTIFICATE-----\n";
+                        "not valid base64 content!!!\n"
+                        "-----END CERTIFICATE-----\n";
 
   auto config = makeSuppressConfig(ca_cert, false);
   auto validator = std::make_unique<DefaultCertValidator>(config.get(), stats, context);
