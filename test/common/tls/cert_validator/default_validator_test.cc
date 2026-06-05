@@ -1020,6 +1020,27 @@ TEST(DefaultCertValidatorTest, SuppressClientCaListWithMaxVerifyDepth) {
   EXPECT_EQ(SSL_CTX_get_verify_depth(ssl_ctx.get()), 9);
 }
 
+// Test that addClientValidationContext returns an error when the CA cert PEM is malformed
+// (valid PEM header but corrupt base64 content).
+TEST(DefaultCertValidatorTest, AddClientValidationContextWithMalformedCaCert) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+
+  // Valid PEM envelope but garbage base64 inside — triggers a decode error
+  // that is NOT PEM_R_NO_START_LINE, hitting the else-branch error return.
+  std::string ca_cert = "-----BEGIN CERTIFICATE-----\n"
+                         "not valid base64 content!!!\n"
+                         "-----END CERTIFICATE-----\n";
+
+  auto config = makeSuppressConfig(ca_cert, false);
+  auto validator = std::make_unique<DefaultCertValidator>(config.get(), stats, context);
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ssl_ctx, nullptr);
+  EXPECT_FALSE(validator->addClientValidationContext(ssl_ctx.get(), true).ok());
+}
+
 // Test that session ID hash differs when suppress_client_ca_list differs.
 // This prevents session resumption across contexts with different security settings.
 TEST(DefaultCertValidatorTest, SuppressClientCaListSessionIdDiffers) {
