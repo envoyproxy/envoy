@@ -1319,8 +1319,7 @@ TEST_F(EnvoyQuicServerSessionTest, GetSSLConfigDefault) {
   quic::QuicSSLConfig config = envoy_quic_session_.GetSSLConfig();
   ASSERT_TRUE(config.early_data_enabled.has_value());
   EXPECT_TRUE(*config.early_data_enabled);
-  ASSERT_TRUE(config.disable_ticket_support.has_value());
-  EXPECT_FALSE(*config.disable_ticket_support);
+  EXPECT_FALSE(config.disable_ticket_support);
 }
 
 TEST_F(EnvoyQuicServerSessionTest, SessionIdleCallbacksIdempotency) {
