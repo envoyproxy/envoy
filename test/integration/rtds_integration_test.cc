@@ -14,6 +14,7 @@
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/test_filters.pb.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -117,38 +118,6 @@ static_resources:
               socket_address:
                 address: 127.0.0.1
                 port_value: 0
-  listeners:
-  - name: http
-    address:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
-    filter_chains:
-    - filters:
-      - name: http
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-          stat_prefix: config_test
-          delayed_close_timeout:
-            nanos: 10000000
-          http_filters:
-          - name: rtds-runtime-feature-test
-            typed_config:
-              "@type": type.googleapis.com/test.integration.filters.RuntimeFeatureTestFilterConfig
-          - name: envoy.filters.http.router
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-          codec_type: HTTP2
-          route_config:
-            name: route_config_0
-            virtual_hosts:
-            - name: integration
-              domains: ["*"]
-              routes:
-              - match:
-                  prefix: "/"
-                direct_response:
-                  status: 418
 layered_runtime:
   layers:
   - name: some_static_layer
@@ -179,6 +148,46 @@ admin:
       port_value: 0
 )EOF",
                      api_type, Platform::null_device_path);
+}
+
+void addRuntimeFeatureListener(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                               Network::Address::IpVersion ip_version) {
+  auto* listener = bootstrap.mutable_static_resources()->add_listeners();
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+name: http
+address:
+  socket_address:
+    address: "{}"
+    port_value: 0
+filter_chains:
+- filters:
+  - name: http
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+      stat_prefix: config_test
+      delayed_close_timeout:
+        nanos: 10000000
+      http_filters:
+      - name: rtds-runtime-feature-test
+        typed_config:
+          "@type": type.googleapis.com/test.integration.filters.RuntimeFeatureTestFilterConfig
+      - name: envoy.filters.http.router
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+      codec_type: HTTP2
+      route_config:
+        name: route_config_0
+        virtual_hosts:
+        - name: integration
+          domains: ["*"]
+          routes:
+          - match:
+              prefix: "/"
+            direct_response:
+              status: 418
+)EOF",
+                                        Network::Test::getLoopbackAddressString(ip_version)),
+                            *listener);
 }
 
 class RtdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {
@@ -376,6 +385,10 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
 }
 
 TEST_P(RtdsIntegrationTest, RtdsOverrideRemovalClearsRuntimeFeature) {
+  config_helper_.addConfigModifier(
+      [ip_version = ipVersion()](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        addRuntimeFeatureListener(bootstrap, ip_version);
+      });
   initialize();
   acceptXdsConnection();
 
