@@ -35,15 +35,33 @@ type MetricSnapshot interface {
 	TextReadoutCount() uint64
 	// GetTextReadout writes the text readout name and value at index into name
 	// and value, returning the (possibly reallocated) slices and whether the
-	// index was valid. When false, name and value are returned unchanged. name
-	// and value must not share a backing array, as both are written by the same
-	// call.
+	// index was valid. When false, name and value are returned unchanged. The
+	// name and value slices must not share a backing array, as both are written
+	// by the same call.
 	GetTextReadout(index uint64, name, value []byte) ([]byte, []byte, bool)
 }
 
-// StatSinkHandle is passed to StatSink methods. It currently exposes only
-// logging and exists so future capabilities can be added without breaking
-// existing modules.
+// StatSinkHandle is passed to the StatSinkConfigFactory and gives a sink access
+// to host services. It provides logging, gauge definition and updates, and
+// scheduling work back onto the main thread.
 type StatSinkHandle interface {
+	// Log writes a message to Envoy's logger at the given level.
 	Log(level LogLevel, format string, args ...any)
+
+	// DefineGauge creates a gauge with the given name and returns its ID. It must
+	// be called while the sink is being created, from StatSinkConfigFactory.Create.
+	// Defining a gauge afterwards returns MetricsFrozen.
+	DefineGauge(name string) (MetricID, MetricsResult)
+
+	// SetGauge sets a gauge previously defined with DefineGauge to value. It must
+	// be called on the main thread, typically from a function scheduled with the
+	// scheduler returned by GetScheduler.
+	SetGauge(id MetricID, value uint64) MetricsResult
+
+	// GetScheduler returns a scheduler whose scheduled functions run on the main
+	// thread. A sink that aggregates metrics off the main thread, for example on a
+	// goroutine started from OnFlush, uses it to publish results with SetGauge. It
+	// must be called while the sink is being created, from
+	// StatSinkConfigFactory.Create.
+	GetScheduler() Scheduler
 }

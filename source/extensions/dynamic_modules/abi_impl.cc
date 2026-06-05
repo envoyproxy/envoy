@@ -3510,6 +3510,43 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_stat_sink_snapshot_get_
   return false;
 }
 
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_stat_sink_config_define_gauge(
+    envoy_dynamic_module_type_stat_sink_config_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_config_define_gauge: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_stat_sink_config_set_gauge(
+    envoy_dynamic_module_type_stat_sink_config_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_config_set_gauge: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr
+envoy_dynamic_module_callback_stat_sink_config_scheduler_new(
+    envoy_dynamic_module_type_stat_sink_config_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_config_scheduler_new: "
+               "not implemented in this context");
+  return nullptr;
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_stat_sink_config_scheduler_commit(
+    envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_config_scheduler_commit: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_stat_sink_config_scheduler_delete(
+    envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_config_scheduler_delete: "
+               "not implemented in this context");
+}
+
 // Additional weak stubs for callbacks declared in abi.h but not implemented above.
 
 __attribute__((weak)) envoy_dynamic_module_type_metrics_result

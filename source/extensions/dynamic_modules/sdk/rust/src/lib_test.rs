@@ -6376,18 +6376,27 @@ fn test_envoy_dynamic_module_on_stat_sink_config_new_impl() {
     fn on_histogram_complete(&self, _name: EnvoyBuffer<'_>, _value: u64) {}
   }
 
-  let mut new_fn: NewStatSinkConfigFunction = |_, _| Some(Box::new(TestStatSink));
-  let result =
-    stats_sink::envoy_dynamic_module_on_stat_sink_config_new_impl("test_sink", b"config", &new_fn);
+  let mut envoy_config = stats_sink::EnvoyStatSinkConfig::new(std::ptr::null_mut());
+  let mut new_fn: NewStatSinkConfigFunction = |_, _, _| Some(Box::new(TestStatSink));
+  let result = stats_sink::envoy_dynamic_module_on_stat_sink_config_new_impl(
+    "test_sink",
+    b"config",
+    &mut envoy_config,
+    &new_fn,
+  );
   assert!(!result.is_null());
   unsafe {
     stats_sink::envoy_dynamic_module_on_stat_sink_config_destroy(result);
   }
 
   // None should result in a null pointer (for example an unknown sink name).
-  new_fn = |_, _| None;
-  let result =
-    stats_sink::envoy_dynamic_module_on_stat_sink_config_new_impl("test_sink", b"config", &new_fn);
+  new_fn = |_, _, _| None;
+  let result = stats_sink::envoy_dynamic_module_on_stat_sink_config_new_impl(
+    "test_sink",
+    b"config",
+    &mut envoy_config,
+    &new_fn,
+  );
   assert!(result.is_null());
 }
 
@@ -6406,9 +6415,14 @@ fn test_envoy_dynamic_module_on_stat_sink_config_destroy() {
     }
   }
 
-  let new_fn: NewStatSinkConfigFunction = |_, _| Some(Box::new(TestStatSink));
-  let config_ptr =
-    stats_sink::envoy_dynamic_module_on_stat_sink_config_new_impl("test_sink", b"config", &new_fn);
+  let new_fn: NewStatSinkConfigFunction = |_, _, _| Some(Box::new(TestStatSink));
+  let mut envoy_config = stats_sink::EnvoyStatSinkConfig::new(std::ptr::null_mut());
+  let config_ptr = stats_sink::envoy_dynamic_module_on_stat_sink_config_new_impl(
+    "test_sink",
+    b"config",
+    &mut envoy_config,
+    &new_fn,
+  );
   assert!(!config_ptr.is_null());
   unsafe {
     stats_sink::envoy_dynamic_module_on_stat_sink_config_destroy(config_ptr);
@@ -6513,6 +6527,25 @@ fn test_metric_snapshot_text_readout_grows_both_buffers() {
   assert!(snapshot.text_readout(0, &mut name, &mut value));
   assert_eq!(name.as_slice(), b"text_0");
   assert_eq!(value.as_slice(), b"value_0");
+  assert_eq!(stub_write_calls(), 4);
+}
+
+#[test]
+fn test_metric_snapshot_text_readout_grows_name_only() {
+  let mut dummy = 0u8;
+  let snapshot = stats_sink::MetricSnapshot::new(&mut dummy as *mut _ as *mut std::ffi::c_void);
+
+  // The name buffer is too small but the value buffer already fits, so only the name is grown and
+  // retried. The value buffer keeps its allocation, proving the value side is not regrown.
+  let mut name = Vec::with_capacity(2);
+  let mut value = Vec::with_capacity(16);
+  let value_ptr_before = value.as_ptr();
+  reset_stub_write_calls();
+  assert!(snapshot.text_readout(0, &mut name, &mut value));
+  assert_eq!(name.as_slice(), b"text_0");
+  assert_eq!(value.as_slice(), b"value_0");
+  assert_eq!(value.as_ptr(), value_ptr_before);
+  assert!(name.capacity() >= b"text_0".len());
   assert_eq!(stub_write_calls(), 4);
 }
 
@@ -6630,6 +6663,290 @@ fn test_envoy_dynamic_module_on_stat_sink_on_histogram_complete_recovers_from_pa
   };
   unsafe {
     stats_sink::envoy_dynamic_module_on_stat_sink_on_histogram_complete(config_ptr, name_buf, 456);
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_destroy(config_ptr);
+  }
+}
+
+// Recording stubs and shared state for the stats sink gauge and scheduler callbacks. Tests that
+// exercise these callbacks must hold STAT_SINK_TEST_LOCK and call reset_stat_sink_stubs() so the
+// shared state is deterministic despite the parallel test runner.
+static STAT_SINK_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+static SS_DEFINE_GAUGE_NAMES: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+static SS_SET_GAUGE_CALLS: std::sync::Mutex<Vec<(usize, u64)>> = std::sync::Mutex::new(Vec::new());
+static SS_DEFINE_GAUGE_FROZEN: AtomicBool = AtomicBool::new(false);
+static SS_SCHEDULER_COMMITS: std::sync::Mutex<Vec<u64>> = std::sync::Mutex::new(Vec::new());
+static SS_SCHEDULER_NEW_COUNT: AtomicUsize = AtomicUsize::new(0);
+static SS_SCHEDULER_DELETE_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+fn reset_stat_sink_stubs() {
+  SS_DEFINE_GAUGE_NAMES.lock().unwrap().clear();
+  SS_SET_GAUGE_CALLS.lock().unwrap().clear();
+  SS_DEFINE_GAUGE_FROZEN.store(false, std::sync::atomic::Ordering::SeqCst);
+  SS_SCHEDULER_COMMITS.lock().unwrap().clear();
+  SS_SCHEDULER_NEW_COUNT.store(0, std::sync::atomic::Ordering::SeqCst);
+  SS_SCHEDULER_DELETE_COUNT.store(0, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_config_define_gauge(
+  _config: abi::envoy_dynamic_module_type_stat_sink_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+  gauge_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  if SS_DEFINE_GAUGE_FROZEN.load(std::sync::atomic::Ordering::SeqCst) {
+    return abi::envoy_dynamic_module_type_metrics_result::Frozen;
+  }
+  let name = unsafe { std::slice::from_raw_parts(name.ptr as *const u8, name.length) };
+  let mut names = SS_DEFINE_GAUGE_NAMES.lock().unwrap();
+  names.push(String::from_utf8_lossy(name).into_owned());
+  unsafe { *gauge_id_ptr = names.len() }; // 1-based ID, mirroring the host.
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_config_set_gauge(
+  _config: abi::envoy_dynamic_module_type_stat_sink_config_envoy_ptr,
+  gauge_id: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let defined = SS_DEFINE_GAUGE_NAMES.lock().unwrap().len();
+  if gauge_id == 0 || gauge_id > defined {
+    return abi::envoy_dynamic_module_type_metrics_result::MetricNotFound;
+  }
+  SS_SET_GAUGE_CALLS.lock().unwrap().push((gauge_id, value));
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_config_scheduler_new(
+  _config: abi::envoy_dynamic_module_type_stat_sink_config_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr {
+  SS_SCHEDULER_NEW_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+  // Allocate a token so commit and delete receive a real, non-null pointer just like the host.
+  Box::into_raw(Box::new(0u8)) as *mut std::ffi::c_void
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_config_scheduler_commit(
+  _scheduler: abi::envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr,
+  event_id: u64,
+) {
+  SS_SCHEDULER_COMMITS.lock().unwrap().push(event_id);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_config_scheduler_delete(
+  scheduler: abi::envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr,
+) {
+  SS_SCHEDULER_DELETE_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+  unsafe { drop(Box::from_raw(scheduler as *mut u8)) };
+}
+
+#[test]
+fn test_metric_snapshot_to_owned_copies_all_entries() {
+  // This drives only the read-only snapshot getter stubs, not the shared SS_* state, so unlike the
+  // gauge and scheduler tests below it does not need STAT_SINK_TEST_LOCK.
+  let mut dummy = 0u8;
+  let snapshot = stats_sink::MetricSnapshot::new(&mut dummy as *mut _ as *mut std::ffi::c_void);
+  let owned = snapshot.to_owned();
+
+  assert_eq!(
+    owned.counters,
+    vec![
+      stats_sink::OwnedCounter {
+        name: "counter_0".to_string(),
+        value: 10,
+        delta: 5,
+      },
+      stats_sink::OwnedCounter {
+        name: "counter_1".to_string(),
+        value: 20,
+        delta: 0,
+      },
+    ]
+  );
+  assert_eq!(
+    owned.gauges,
+    vec![stats_sink::OwnedGauge {
+      name: "gauge_0".to_string(),
+      value: 42,
+    }]
+  );
+  assert_eq!(
+    owned.text_readouts,
+    vec![stats_sink::OwnedTextReadout {
+      name: "text_0".to_string(),
+      value: "value_0".to_string(),
+    }]
+  );
+
+  // The owned snapshot is Send, so it can be moved to another thread for aggregation.
+  let handle = std::thread::spawn(move || owned.counters.iter().map(|c| c.value).sum::<u64>());
+  assert_eq!(handle.join().unwrap(), 30);
+}
+
+#[test]
+fn test_envoy_stat_sink_config_define_and_set_gauge() {
+  let _guard = STAT_SINK_TEST_LOCK.lock().unwrap();
+  reset_stat_sink_stubs();
+
+  let mut config = stats_sink::EnvoyStatSinkConfig::new(std::ptr::null_mut());
+  assert_eq!(config.define_gauge("gauge_a").unwrap(), EnvoyGaugeId(1));
+  assert_eq!(config.define_gauge("gauge_b").unwrap(), EnvoyGaugeId(2));
+  assert_eq!(
+    *SS_DEFINE_GAUGE_NAMES.lock().unwrap(),
+    vec!["gauge_a", "gauge_b"]
+  );
+
+  config.set_gauge(EnvoyGaugeId(2), 99).unwrap();
+  assert_eq!(*SS_SET_GAUGE_CALLS.lock().unwrap(), vec![(2, 99)]);
+
+  // An unknown gauge id is rejected, whether zero or past the last defined gauge.
+  assert_eq!(
+    config.set_gauge(EnvoyGaugeId(0), 1),
+    Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound)
+  );
+  assert_eq!(
+    config.set_gauge(EnvoyGaugeId(3), 1),
+    Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound)
+  );
+
+  // Defining a gauge after stat creation is frozen is rejected.
+  SS_DEFINE_GAUGE_FROZEN.store(true, std::sync::atomic::Ordering::SeqCst);
+  assert_eq!(
+    config.define_gauge("too_late"),
+    Err(abi::envoy_dynamic_module_type_metrics_result::Frozen)
+  );
+}
+
+#[test]
+fn test_envoy_stat_sink_config_scheduler_mock() {
+  // The scheduler is a trait so module authors can unit test their off-thread logic with a mock.
+  use crate::stats_sink::EnvoyStatSinkConfigScheduler;
+  let mut mock_scheduler = stats_sink::MockEnvoyStatSinkConfigScheduler::new();
+  mock_scheduler
+    .expect_commit()
+    .with(mockall::predicate::eq(42u64))
+    .times(1)
+    .return_const(());
+  mock_scheduler.commit(42);
+}
+
+#[test]
+fn test_envoy_stat_sink_config_scheduler_commit_and_delete() {
+  use crate::stats_sink::EnvoyStatSinkConfigScheduler;
+  let _guard = STAT_SINK_TEST_LOCK.lock().unwrap();
+  reset_stat_sink_stubs();
+
+  let config = stats_sink::EnvoyStatSinkConfig::new(std::ptr::null_mut());
+  let scheduler = config.new_config_scheduler();
+  assert_eq!(
+    SS_SCHEDULER_NEW_COUNT.load(std::sync::atomic::Ordering::SeqCst),
+    1
+  );
+  scheduler.commit(7);
+
+  // The scheduler is Send, so it can be moved to a worker thread and committed from there.
+  let handle = std::thread::spawn(move || {
+    scheduler.commit(8);
+    // The scheduler is dropped here, which must delete the Envoy-side resource.
+  });
+  handle.join().unwrap();
+
+  assert_eq!(
+    SS_SCHEDULER_DELETE_COUNT.load(std::sync::atomic::Ordering::SeqCst),
+    1
+  );
+  assert_eq!(*SS_SCHEDULER_COMMITS.lock().unwrap(), vec![7, 8]);
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_stat_sink_config_scheduled_invokes_hook() {
+  let _guard = STAT_SINK_TEST_LOCK.lock().unwrap();
+  reset_stat_sink_stubs();
+  // Pretend a single gauge was defined during configuration so the publish below succeeds.
+  SS_DEFINE_GAUGE_NAMES
+    .lock()
+    .unwrap()
+    .push("aggregated".to_string());
+
+  struct PublishingStatSink;
+  impl stats_sink::StatSink for PublishingStatSink {
+    fn on_flush(&self, _snapshot: &stats_sink::MetricSnapshot<'_>) {}
+    fn on_histogram_complete(&self, _name: EnvoyBuffer<'_>, _value: u64) {}
+    fn on_config_scheduled(
+      &self,
+      envoy_config: &mut stats_sink::EnvoyStatSinkConfig,
+      event_id: u64,
+    ) {
+      envoy_config.set_gauge(EnvoyGaugeId(1), event_id).unwrap();
+    }
+  }
+
+  let sink: Box<dyn stats_sink::StatSink> = Box::new(PublishingStatSink);
+  let config_ptr = Box::into_raw(Box::new(sink)) as *const std::ffi::c_void;
+  unsafe {
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_scheduled(
+      std::ptr::null_mut(),
+      config_ptr,
+      55,
+    );
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_destroy(config_ptr);
+  }
+
+  assert_eq!(*SS_SET_GAUGE_CALLS.lock().unwrap(), vec![(1, 55)]);
+}
+
+#[test]
+fn test_stat_sink_default_on_config_scheduled_is_noop() {
+  let _guard = STAT_SINK_TEST_LOCK.lock().unwrap();
+  reset_stat_sink_stubs();
+
+  struct DefaultStatSink;
+  impl stats_sink::StatSink for DefaultStatSink {
+    fn on_flush(&self, _snapshot: &stats_sink::MetricSnapshot<'_>) {}
+    fn on_histogram_complete(&self, _name: EnvoyBuffer<'_>, _value: u64) {}
+  }
+
+  let sink: Box<dyn stats_sink::StatSink> = Box::new(DefaultStatSink);
+  let config_ptr = Box::into_raw(Box::new(sink)) as *const std::ffi::c_void;
+  unsafe {
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_scheduled(
+      std::ptr::null_mut(),
+      config_ptr,
+      1,
+    );
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_destroy(config_ptr);
+  }
+
+  assert!(SS_SET_GAUGE_CALLS.lock().unwrap().is_empty());
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_stat_sink_config_scheduled_recovers_from_panic() {
+  // A panic in on_config_scheduled runs on the main thread, so it must be caught at the FFI
+  // boundary so it never unwinds into Envoy.
+  struct PanicStatSink;
+  impl stats_sink::StatSink for PanicStatSink {
+    fn on_flush(&self, _snapshot: &stats_sink::MetricSnapshot<'_>) {}
+    fn on_histogram_complete(&self, _name: EnvoyBuffer<'_>, _value: u64) {}
+    fn on_config_scheduled(
+      &self,
+      _envoy_config: &mut stats_sink::EnvoyStatSinkConfig,
+      _event_id: u64,
+    ) {
+      panic!("intentional panic in on_config_scheduled");
+    }
+  }
+
+  let sink: Box<dyn stats_sink::StatSink> = Box::new(PanicStatSink);
+  let config_ptr = Box::into_raw(Box::new(sink)) as *const std::ffi::c_void;
+  unsafe {
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_scheduled(
+      std::ptr::null_mut(),
+      config_ptr,
+      1,
+    );
     stats_sink::envoy_dynamic_module_on_stat_sink_config_destroy(config_ptr);
   }
 }

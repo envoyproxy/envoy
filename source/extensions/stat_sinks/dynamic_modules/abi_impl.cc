@@ -3,20 +3,30 @@
 #include <algorithm>
 #include <cstring>
 
+#include "envoy/stats/stats.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/stat_sinks/dynamic_modules/flush_context.h"
+#include "source/extensions/stat_sinks/dynamic_modules/sink_config.h"
 
 #include "absl/strings/string_view.h"
 
 namespace {
 
+using Envoy::Extensions::StatSinks::DynamicModules::DynamicModuleStatsSinkConfig;
+using Envoy::Extensions::StatSinks::DynamicModules::DynamicModuleStatsSinkConfigScheduler;
 using Envoy::Extensions::StatSinks::DynamicModules::DynamicModuleStatsSinkFlushContext;
 
 DynamicModuleStatsSinkFlushContext*
 toFlushContext(envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr ptr) {
   return static_cast<DynamicModuleStatsSinkFlushContext*>(ptr);
+}
+
+DynamicModuleStatsSinkConfig*
+toStatsSinkConfig(envoy_dynamic_module_type_stat_sink_config_envoy_ptr ptr) {
+  return static_cast<DynamicModuleStatsSinkConfig*>(ptr);
 }
 
 // Writes up to capacity bytes of src into buffer with no null terminator and reports the full size
@@ -98,6 +108,38 @@ bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(
   // module buffer. Names stay allocation-free above.
   copyToModuleBuffer(readout.value(), value_buffer, value_buffer_capacity, value_size);
   return true;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_stat_sink_config_define_gauge(
+    envoy_dynamic_module_type_stat_sink_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* gauge_id_ptr) {
+  absl::string_view name_view(name.ptr, name.length);
+  return toStatsSinkConfig(config_envoy_ptr)->defineGauge(name_view, gauge_id_ptr);
+}
+
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_stat_sink_config_set_gauge(
+    envoy_dynamic_module_type_stat_sink_config_envoy_ptr config_envoy_ptr, size_t gauge_id,
+    uint64_t value) {
+  return toStatsSinkConfig(config_envoy_ptr)->setGauge(gauge_id, value);
+}
+
+envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr
+envoy_dynamic_module_callback_stat_sink_config_scheduler_new(
+    envoy_dynamic_module_type_stat_sink_config_envoy_ptr config_envoy_ptr) {
+  return new DynamicModuleStatsSinkConfigScheduler(
+      toStatsSinkConfig(config_envoy_ptr)->weak_from_this());
+}
+
+void envoy_dynamic_module_callback_stat_sink_config_scheduler_commit(
+    envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id) {
+  static_cast<DynamicModuleStatsSinkConfigScheduler*>(scheduler_module_ptr)->commit(event_id);
+}
+
+void envoy_dynamic_module_callback_stat_sink_config_scheduler_delete(
+    envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr scheduler_module_ptr) {
+  delete static_cast<DynamicModuleStatsSinkConfigScheduler*>(scheduler_module_ptr);
 }
 
 } // extern "C"

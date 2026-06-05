@@ -39,8 +39,9 @@ absl::StatusOr<Stats::SinkPtr> DynamicModuleStatsSinkFactory::createStatsSink(
     sink_config_str = std::move(config_or_error.value());
   }
 
-  auto sink_config = newDynamicModuleStatsSinkConfig(proto_config.sink_name(), sink_config_str,
-                                                     std::move(dynamic_module_or_error.value()));
+  auto sink_config =
+      newDynamicModuleStatsSinkConfig(proto_config.sink_name(), sink_config_str,
+                                      std::move(dynamic_module_or_error.value()), server);
   if (!sink_config.ok()) {
     return sink_config.status();
   }

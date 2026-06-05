@@ -17,7 +17,9 @@ envoy_cc_library(
     srcs = ["abi_impl.cc"],
     hdrs = ["flush_context.h"],
     deps = [
+        ":sink_config_lib",
         "//envoy/stats:sink_interface",
+        "//envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/extensions/dynamic_modules:abi_impl",
@@ -33,8 +35,13 @@ envoy_cc_library(
     hdrs = ["sink_config.h"],
     deps = [
         "//envoy/common:exception_lib",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/server:factory_context_interface",
+        "//envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:thread_lib",
+        "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "@envoy_api//envoy/extensions/stat_sinks/dynamic_modules/v3:pkg_cc_proto",
     ],

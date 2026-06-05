@@ -1147,10 +1147,14 @@ pub static NEW_ACCESS_LOGGER_CONFIG_FUNCTION: OnceLock<NewAccessLoggerConfigFunc
 ///
 /// The `name` is the value of `sink_name` from the `dynamic_modules` stats sink configuration,
 /// allowing a single module to dispatch to different sink implementations. The `config` is the
-/// raw bytes from the `sink_config` field. Returning `None` causes Envoy to reject the stats
-/// sink configuration.
-pub type NewStatSinkConfigFunction =
-  fn(name: &str, config: &[u8]) -> Option<Box<dyn stats_sink::StatSink>>;
+/// raw bytes from the `sink_config` field. The `envoy_config` handle is used to define gauges and
+/// create a [`stats_sink::EnvoyStatSinkConfigScheduler`] while the configuration is being created.
+/// Returning `None` causes Envoy to reject the stats sink configuration.
+pub type NewStatSinkConfigFunction = fn(
+  name: &str,
+  config: &[u8],
+  envoy_config: &mut stats_sink::EnvoyStatSinkConfig,
+) -> Option<Box<dyn stats_sink::StatSink>>;
 
 /// The global factory function for stats sinks. This is set via the `stat_sink:` arm of
 /// [`declare_all_init_functions!`] (or [`declare_stat_sink_init_functions!`]) and is not intended
@@ -1172,7 +1176,11 @@ pub static NEW_STAT_SINK_CONFIG_FUNCTION: OnceLock<NewStatSinkConfigFunction> = 
 ///   true
 /// }
 ///
-/// fn new_stat_sink(_name: &str, _config: &[u8]) -> Option<Box<dyn StatSink>> {
+/// fn new_stat_sink(
+///   _name: &str,
+///   _config: &[u8],
+///   _envoy_config: &mut EnvoyStatSinkConfig,
+/// ) -> Option<Box<dyn StatSink>> {
 ///   Some(Box::new(MyStatSink {}))
 /// }
 ///
