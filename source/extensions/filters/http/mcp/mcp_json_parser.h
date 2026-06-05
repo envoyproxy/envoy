@@ -62,6 +62,10 @@ public:
   // Get all global fields to always extract
   const absl::flat_hash_set<std::string>& getAlwaysExtract() const { return always_extract_; }
 
+  // Security configuration
+  bool rejectDuplicateKeys() const { return reject_duplicate_keys_; }
+  void setRejectDuplicateKeys(bool v) { reject_duplicate_keys_ = v; }
+
   // Get the group metadata key (empty if disabled)
   const std::string& groupMetadataKey() const { return group_metadata_key_; }
 
@@ -91,12 +95,15 @@ private:
   // Global fields to always extract
   absl::flat_hash_set<std::string> always_extract_;
 
+  // Security settings
+  bool reject_duplicate_keys_{false};
+
   FieldRequirements default_requirements_;
   absl::flat_hash_map<std::string, FieldRequirements> method_requirements_;
 };
 
 /**
- * MCP JSON field extractor with early stopping optimization
+ * MCP JSON field extractor for streaming JSON parsing.
  */
 class McpFieldExtractor : public ProtobufUtil::converter::ObjectWriter,
                           public Logger::Loggable<Logger::Id::mcp> {
@@ -119,8 +126,11 @@ public:
   McpFieldExtractor* RenderNull(absl::string_view name) override;
   McpFieldExtractor* RenderBytes(absl::string_view name, absl::string_view value) override;
 
-  // Check if we can stop parsing early
+  // Check if parsing is complete (root object has closed)
   bool shouldStopParsing() const { return can_stop_parsing_; }
+
+  // Check if duplicate keys were detected
+  bool hasDuplicateKeys() const { return has_duplicate_keys_; }
 
   // Finalize extraction after parsing complete
   void finalizeExtraction();
@@ -136,8 +146,8 @@ public:
   const std::string& getMethod() const { return method_; }
 
 private:
-  // Check if we have all fields we need for early stop
-  void checkEarlyStop();
+  // Check for duplicate key in current scope. Returns true if key was a duplicate.
+  bool checkDuplicateKey(absl::string_view name);
 
   // Update required/optional field lists once method is known
   void updateFieldRequirements();
@@ -182,8 +192,12 @@ private:
   bool has_jsonrpc_{false};
   bool has_method_{false};
 
-  // Early stop optimization
+  // Parsing completion state
   bool can_stop_parsing_{false};
+
+  // Duplicate key detection
+  bool has_duplicate_keys_{false};
+  std::vector<absl::flat_hash_set<std::string>> scope_key_sets_;
 
   // Validation
   std::vector<std::string> missing_required_fields_;
@@ -222,10 +236,14 @@ public:
   // Check if this is a valid MCP request
   bool isValidMcpRequest() const;
 
-  bool isAllFieldsCollected() const { return all_fields_collected_; }
+  // Check if parsing is complete (root JSON object has closed)
+  bool isParsingComplete() const { return extractor_ && extractor_->shouldStopParsing(); }
 
   // Check if optional fields are configured for the current method
   bool hasOptionalFields();
+
+  // Check if duplicate keys were detected
+  bool hasDuplicateKeys() const;
 
   // Check if all required fields have been collected
   bool hasAllRequiredFields();
@@ -248,7 +266,6 @@ private:
   std::unique_ptr<McpFieldExtractor> extractor_;
   std::unique_ptr<ProtobufUtil::converter::JsonStreamParser> stream_parser_;
   bool parsing_started_{false};
-  bool all_fields_collected_{false};
 };
 
 // Compatibility aliases

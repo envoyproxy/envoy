@@ -28,12 +28,15 @@ class FilterStateObject : public StreamInfo::FilterState::Object {
 public:
   static constexpr absl::string_view FilterStateKey = "envoy.filters.http.mcp.request";
 
-  FilterStateObject(std::string method, Json::ObjectSharedPtr json, bool is_mcp_request)
-      : method_(std::move(method)), json_(std::move(json)), is_mcp_request_(is_mcp_request) {}
+  FilterStateObject(std::string method, Json::ObjectSharedPtr json, bool is_mcp_request,
+                    bool is_exceeding_limit = false)
+      : method_(std::move(method)), json_(std::move(json)), is_mcp_request_(is_mcp_request),
+        is_exceeding_limit_(is_exceeding_limit) {}
 
-  FilterStateObject(std::string method, const Protobuf::Struct& proto_struct, bool is_mcp_request)
+  FilterStateObject(std::string method, const Protobuf::Struct& proto_struct, bool is_mcp_request,
+                    bool is_exceeding_limit = false)
       : method_(std::move(method)), json_(Json::Factory::loadFromProtobufStruct(proto_struct)),
-        is_mcp_request_(is_mcp_request) {}
+        is_mcp_request_(is_mcp_request), is_exceeding_limit_(is_exceeding_limit) {}
 
   absl::optional<std::string> serializeAsString() const override {
     if (json_ == nullptr || json_->empty()) {
@@ -49,11 +52,13 @@ public:
   const Json::ObjectSharedPtr& json() const { return json_; }
 
   bool isMcpRequest() const { return is_mcp_request_; }
+  bool isExceedingLimit() const { return is_exceeding_limit_; }
 
 private:
   std::string method_;
   Json::ObjectSharedPtr json_;
   bool is_mcp_request_;
+  bool is_exceeding_limit_;
 };
 
 } // namespace Mcp

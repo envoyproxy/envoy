@@ -8,6 +8,7 @@ package(default_visibility = [
     "//test/extensions/dynamic_modules:__pkg__",
     "//test/extensions/dynamic_modules/bootstrap:__pkg__",
     "//test/extensions/dynamic_modules/http:__pkg__",
+    "//test/extensions/dynamic_modules/listener:__pkg__",
     "//test/extensions/dynamic_modules/network:__pkg__",
     "//test/extensions/upstreams/http/dynamic_modules:__pkg__",
 ])
@@ -53,6 +54,8 @@ test_program(name = "bootstrap_cluster_lifecycle_test")
 test_program(name = "bootstrap_listener_lifecycle_test")
 
 test_program(name = "network_integration_test")
+
+test_program(name = "listener_integration_test")
 
 test_program(name = "bootstrap_http_combined_test")
 
