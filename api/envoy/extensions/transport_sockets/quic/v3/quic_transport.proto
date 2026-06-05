@@ -28,7 +28,7 @@ message QuicDownstreamTransport {
   // Default to true.
   google.protobuf.BoolValue enable_early_data = 2;
 
-  // If false, QUIC will reject resumption attempts.
+  // If false, TLS session tickets are not issued and accepted by QUIC.
   // Default to true.
   google.protobuf.BoolValue enable_resumption = 3;
 }

@@ -1492,6 +1492,9 @@ TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableResumption) {
   auto codec_client_2 = makeRawHttp3Connection(
       makeClientConnectionWithHost(lookupPort("http"), "www.lyft.com"), absl::nullopt,
       /*wait_for_1rtt_key*/ true);
+  EnvoyQuicClientSession* quic_session =
+      static_cast<EnvoyQuicClientSession*>(codec_client_2->connection());
+  EXPECT_FALSE(quic_session->IsResumption());
   makeRequestAndWaitForResponse(*codec_client_2);
   codec_client_2->close();
 }
