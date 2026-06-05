@@ -1083,6 +1083,122 @@ TEST(ABIImpl, metadata_namespaces) {
   EXPECT_EQ(ns_names.count("ns3"), 1);
 }
 
+TEST(ABIImpl, metadata_string_batch) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+
+  const std::string ns = "batch_ns";
+  std::vector<envoy_dynamic_module_type_module_key_value_pair> entries = {
+      {"k1", 2, "v1", 2},
+      {"k2", 2, "v2", 2},
+  };
+
+  // Without stream info the batch set is a no-op and must not crash or create a namespace.
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+      &filter, {ns.data(), ns.size()}, entries.data(), entries.size());
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_metadata_namespaces_count(
+                &filter, envoy_dynamic_module_type_metadata_source_Dynamic),
+            0);
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+  EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(metadata));
+  filter.setDecoderFilterCallbacks(callbacks);
+
+  envoy_dynamic_module_type_envoy_buffer result_buffer = {nullptr, 0};
+
+  // An empty batch is a no-op and must not create the namespace.
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+      &filter, {ns.data(), ns.size()}, nullptr, 0);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_metadata_namespaces_count(
+                &filter, envoy_dynamic_module_type_metadata_source_Dynamic),
+            0);
+
+  // A batch creates the namespace once and sets every entry.
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+      &filter, {ns.data(), ns.size()}, entries.data(), entries.size());
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_metadata_namespaces_count(
+                &filter, envoy_dynamic_module_type_metadata_source_Dynamic),
+            1);
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()}, {"k1", 2},
+      &result_buffer));
+  EXPECT_EQ(absl::string_view(result_buffer.ptr, result_buffer.length), "v1");
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()}, {"k2", 2},
+      &result_buffer));
+  EXPECT_EQ(absl::string_view(result_buffer.ptr, result_buffer.length), "v2");
+
+  // A batch overwrites an existing key and merges new keys while leaving untouched keys intact,
+  // matching the merge semantics of sequential single-key sets.
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_string(&filter, {ns.data(), ns.size()},
+                                                                 {"k1", 2}, {"old", 3});
+  std::vector<envoy_dynamic_module_type_module_key_value_pair> overwrite = {
+      {"k1", 2, "new", 3},
+      {"k3", 2, "v3", 2},
+  };
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+      &filter, {ns.data(), ns.size()}, overwrite.data(), overwrite.size());
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()}, {"k1", 2},
+      &result_buffer));
+  EXPECT_EQ(absl::string_view(result_buffer.ptr, result_buffer.length), "new");
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()}, {"k2", 2},
+      &result_buffer));
+  EXPECT_EQ(absl::string_view(result_buffer.ptr, result_buffer.length), "v2");
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()}, {"k3", 2},
+      &result_buffer));
+  EXPECT_EQ(absl::string_view(result_buffer.ptr, result_buffer.length), "v3");
+
+  // Within a single batch, a later entry with a duplicate key wins.
+  std::vector<envoy_dynamic_module_type_module_key_value_pair> dup = {
+      {"dup", 3, "first", 5},
+      {"dup", 3, "last", 4},
+  };
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+      &filter, {ns.data(), ns.size()}, dup.data(), dup.size());
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {"dup", 3}, &result_buffer));
+  EXPECT_EQ(absl::string_view(result_buffer.ptr, result_buffer.length), "last");
+
+  // A single-entry batch sets exactly that one entry.
+  std::vector<envoy_dynamic_module_type_module_key_value_pair> single = {{"solo", 4, "alone", 5}};
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+      &filter, {ns.data(), ns.size()}, single.data(), single.size());
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {"solo", 4}, &result_buffer));
+  EXPECT_EQ(absl::string_view(result_buffer.ptr, result_buffer.length), "alone");
+
+  // A zero-length value is set as an empty string rather than skipped.
+  std::vector<envoy_dynamic_module_type_module_key_value_pair> empty_value = {{"empty", 5, "", 0}};
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+      &filter, {ns.data(), ns.size()}, empty_value.data(), empty_value.size());
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {"empty", 5}, &result_buffer));
+  EXPECT_EQ(absl::string_view(result_buffer.ptr, result_buffer.length), "");
+
+  // A batch overwrites a pre-existing number value with a string, matching the replacement that
+  // sequential single-key sets produce.
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_number(&filter, {ns.data(), ns.size()},
+                                                                 {"num", 3}, 7.0);
+  std::vector<envoy_dynamic_module_type_module_key_value_pair> over_num = {{"num", 3, "str", 3}};
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+      &filter, {ns.data(), ns.size()}, over_num.data(), over_num.size());
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {"num", 3}, &result_buffer));
+  EXPECT_EQ(absl::string_view(result_buffer.ptr, result_buffer.length), "str");
+}
+
 TEST(ABIImpl, metadata_list) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};

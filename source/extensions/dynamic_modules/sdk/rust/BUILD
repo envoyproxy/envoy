@@ -6,6 +6,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_extension_package",
 )
+load("//bazel:toolchains.bzl", "LLVM_MAJOR")
 
 licenses(["notice"])  # Apache 2
 
@@ -20,8 +21,8 @@ cargo_build_script(
         "@envoy_repo//:use_local_llvm": {
             "LIBCLANG_PATH": "%s/lib/libclang.so" % LLVM_PATH,
             "BINDGEN_EXTRA_CLANG_ARGS": " ".join([
-                "-resource-dir %s/lib/clang/18" % LLVM_PATH,
-                "-isystem %s/lib/clang/18/include" % LLVM_PATH,
+                "-resource-dir %s/lib/clang/%s" % (LLVM_PATH, LLVM_MAJOR),
+                "-isystem %s/lib/clang/%s/include" % (LLVM_PATH, LLVM_MAJOR),
                 "-isystem %s/include/x86_64-unknown-linux-gnu/c++/v1/" % LLVM_PATH,
                 "-isystem %s/include/aarch64-unknown-linux-gnu/c++/v1/" % LLVM_PATH,
             ]),
@@ -29,8 +30,8 @@ cargo_build_script(
         "@platforms//os:linux": {
             "LIBCLANG_PATH": "$(location @llvm_toolchain_llvm//:lib/libclang.so)",
             "BINDGEN_EXTRA_CLANG_ARGS": " ".join([
-                "-resource-dir $${pwd}/external/llvm_toolchain_llvm/lib/clang/18",
-                "-isystem $${pwd}/external/llvm_toolchain_llvm/lib_legacy/clang/18/include",
+                "-resource-dir $${pwd}/external/llvm_toolchain_llvm/lib/clang/" + LLVM_MAJOR,
+                "-isystem $${pwd}/external/llvm_toolchain_llvm/lib_legacy/clang/" + LLVM_MAJOR + "/include",
                 "-isystem $${pwd}/external/llvm_toolchain_llvm/include/x86_64-unknown-linux-gnu/c++/v1/",
                 "-isystem $${pwd}/external/llvm_toolchain_llvm/include/aarch64-unknown-linux-gnu/c++/v1/",
                 # This allows the cross-compilation of the SDK to succeed by providing the necessary system headers for the target platform.
