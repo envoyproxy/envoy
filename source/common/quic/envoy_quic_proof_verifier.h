@@ -59,12 +59,12 @@ public:
   //
   // TODO(b/517611362): Remove this once all ProofVerifier implementations
   // have migrated to the new VerifyCertChain.
-  quic::QuicAsyncStatus VerifyCertChain(
-      const std::string& hostname, uint16_t port,
-      const std::vector<std::string>& certs, const std::string& ocsp_response,
-      const std::string& cert_sct, const quic::ProofVerifyContext* context,
-      std::string* error_details, std::unique_ptr<quic::ProofVerifyDetails>* details,
-      uint8_t* out_alert, std::unique_ptr<quic::ProofVerifierCallback> callback) override;
+  quic::QuicAsyncStatus
+  VerifyCertChain(const std::string& hostname, uint16_t port, const std::vector<std::string>& certs,
+                  const std::string& ocsp_response, const std::string& cert_sct,
+                  const quic::ProofVerifyContext* context, std::string* error_details,
+                  std::unique_ptr<quic::ProofVerifyDetails>* details, uint8_t* out_alert,
+                  std::unique_ptr<quic::ProofVerifierCallback> callback) override;
 
 private:
   Envoy::Ssl::ClientContextSharedPtr context_;

@@ -138,11 +138,12 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
   return quic::QUIC_FAILURE;
 }
 
-quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
-    const std::string&, uint16_t, const std::vector<std::string>&,
-    const std::string&, const std::string&, const quic::ProofVerifyContext*,
-    std::string*, std::unique_ptr<quic::ProofVerifyDetails>*, uint8_t*,
-    std::unique_ptr<quic::ProofVerifierCallback>) {
+quic::QuicAsyncStatus
+EnvoyQuicProofVerifier::VerifyCertChain(const std::string&, uint16_t,
+                                        const std::vector<std::string>&, const std::string&,
+                                        const std::string&, const quic::ProofVerifyContext*,
+                                        std::string*, std::unique_ptr<quic::ProofVerifyDetails>*,
+                                        uint8_t*, std::unique_ptr<quic::ProofVerifierCallback>) {
   // This function exists only for ProofVerifiers that don't implement the new
   // VerifyCertChain (that takes a vector of absl::string_views for the certs).
   // A ProofVerifier needs to implement one of the VerifyCertChain functions
