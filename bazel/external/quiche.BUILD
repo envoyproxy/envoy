@@ -2435,6 +2435,7 @@ envoy_quic_cc_library(
         "quiche/quic/core/crypto/curve25519_key_exchange.cc",
         "quiche/quic/core/crypto/key_exchange.cc",
         "quiche/quic/core/crypto/p256_key_exchange.cc",
+        "quiche/quic/core/crypto/proof_verifier.cc",
         "quiche/quic/core/crypto/quic_compressed_certs_cache.cc",
         "quiche/quic/core/crypto/transport_parameters.cc",
     ],

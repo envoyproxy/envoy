@@ -36,7 +36,7 @@ class QuicValidateResultCallback : public Ssl::ValidateResultCallback {
 public:
   QuicValidateResultCallback(Event::Dispatcher& dispatcher,
                              std::unique_ptr<quic::ProofVerifierCallback>&& quic_callback,
-                             const std::string& hostname, const std::string& leaf_cert,
+                             const std::string& hostname, absl::string_view leaf_cert,
                              bool accept_untrusted)
       : dispatcher_(dispatcher), quic_callback_(std::move(quic_callback)), hostname_(hostname),
         leaf_cert_(leaf_cert), accept_untrusted_(accept_untrusted) {}
@@ -70,11 +70,11 @@ private:
 } // namespace
 
 quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
-    const std::string& hostname, const uint16_t /*port*/, const std::vector<std::string>& certs,
-    const std::string& /*ocsp_response*/, const std::string& /*cert_sct*/,
-    const quic::ProofVerifyContext* context, std::string* error_details,
-    std::unique_ptr<quic::ProofVerifyDetails>* details, uint8_t* out_alert,
-    std::unique_ptr<quic::ProofVerifierCallback> callback) {
+    const std::string& hostname, const uint16_t /*port*/,
+    const std::vector<absl::string_view>& certs, const std::string& /*ocsp_response*/,
+    const std::string& /*cert_sct*/, const quic::ProofVerifyContext* context,
+    std::string* error_details, std::unique_ptr<quic::ProofVerifyDetails>* details,
+    uint8_t* out_alert, std::unique_ptr<quic::ProofVerifierCallback> callback) {
   ASSERT(details != nullptr);
   ASSERT(!certs.empty());
   auto* verify_context = dynamic_cast<const EnvoyQuicProofVerifyContext*>(context);
@@ -103,7 +103,8 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
   }
 
   auto envoy_callback = std::make_unique<QuicValidateResultCallback>(
-      verify_context->dispatcher(), std::move(callback), hostname, certs[0], accept_untrusted_);
+      verify_context->dispatcher(), std::move(callback), hostname, std::string(certs[0]),
+      accept_untrusted_);
   ASSERT(dynamic_cast<Extensions::TransportSockets::Tls::ClientContextImpl*>(context_.get()) !=
          nullptr);
   // We down cast rather than add customVerifyCertChainForQuic to Envoy::Ssl::Context because
@@ -134,6 +135,21 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
   }
 
   *details = std::make_unique<CertVerifyResult>(false);
+  return quic::QUIC_FAILURE;
+}
+
+quic::QuicAsyncStatus
+EnvoyQuicProofVerifier::VerifyCertChain(const std::string&, uint16_t,
+                                        const std::vector<std::string>&, const std::string&,
+                                        const std::string&, const quic::ProofVerifyContext*,
+                                        std::string*, std::unique_ptr<quic::ProofVerifyDetails>*,
+                                        uint8_t*, std::unique_ptr<quic::ProofVerifierCallback>) {
+  // This function exists only for ProofVerifiers that don't implement the new
+  // VerifyCertChain (that takes a vector of absl::string_views for the certs).
+  // A ProofVerifier needs to implement one of the VerifyCertChain functions
+  // (and it should implement the other one). However, GCC seems to require
+  // both virtual functions to be overridden.
+  QUICHE_NOTREACHED();
   return quic::QUIC_FAILURE;
 }
 
