@@ -20,6 +20,7 @@ pep8-naming
 protobuf<7.35.0
 ply
 pygithub
+pyjwt[crypto]==2.13.0
 pyyaml
 setuptools
 slack_sdk
