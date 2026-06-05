@@ -84,6 +84,7 @@ constexpr absl::string_view RequestTrailerProcessingEffectField =
     "request_trailer_processing_effect";
 constexpr absl::string_view ResponseTrailerProcessingEffectField =
     "response_trailer_processing_effect";
+constexpr absl::string_view DestinationField = "destination";
 
 absl::optional<ProcessingMode> initProcessingMode(const ExtProcPerRoute& config) {
   if (!config.disabled() && config.has_overrides() && config.overrides().has_processing_mode()) {
@@ -490,6 +491,9 @@ ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
       static_cast<int>(decoding_processor_effects_.trailer_effect_));
   (*struct_msg->mutable_fields())[RequestBodyProcessingEffectField].set_number_value(
       static_cast<int>(decoding_processor_effects_.body_effect_));
+  if (!destination_.empty()) {
+    (*struct_msg->mutable_fields())[std::string(DestinationField)].set_string_value(destination_);
+  }
   return struct_msg;
 }
 
@@ -532,6 +536,9 @@ absl::optional<std::string> ExtProcLoggingInfo::serializeAsString() const {
   parts.push_back(absl::StrCat("bs:", bytes_sent_));
   parts.push_back(absl::StrCat("br:", bytes_received_));
   parts.push_back(absl::StrCat("os:", static_cast<int>(grpc_status_before_first_call_)));
+  if (!destination_.empty()) {
+    parts.push_back(absl::StrCat("ds:", destination_));
+  }
 
   return absl::StrJoin(parts, ",");
 }
@@ -621,6 +628,9 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   }
   if (field_name == GrpcStatusBeforeFirstCallField) {
     return static_cast<int64_t>(grpc_status_before_first_call_);
+  }
+  if (field_name == DestinationField) {
+    return absl::string_view(destination_);
   }
   return {};
 }
@@ -780,8 +790,19 @@ Filter::StreamOpenState Filter::openStream() {
                        .setSampled(absl::nullopt)
                        .setRemoteCloseTimeout(config_->remoteCloseTimeout());
 
+    if (logging_info_ != nullptr) {
+      std::string destination = "";
+      if (config_with_hash_key_.config().has_envoy_grpc()) {
+        destination = config_with_hash_key_.config().envoy_grpc().cluster_name();
+      } else if (config_with_hash_key_.config().has_google_grpc()) {
+        destination = config_with_hash_key_.config().google_grpc().target_uri();
+      }
+      logging_info_->setDestination(destination);
+    }
+
     ExternalProcessorClient* grpc_client = dynamic_cast<ExternalProcessorClient*>(client_.get());
     ExternalProcessorStreamPtr stream_object =
+
         grpc_client->start(*this, config_with_hash_key_, options, watermark_callbacks_);
 
     if (processing_complete_ || stream_object == nullptr) {
