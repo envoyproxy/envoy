@@ -195,9 +195,10 @@ public:
     result = fake_gcp_authn_connection_->waitForNewStream(*dispatcher_, request_);
     RELEASE_ASSERT(result, result.message());
 
-    std::string expected_path = absl::StrCat(
-        "/computeMetadata/v1/instance/service-accounts/default/token"
-        "?client_certificate_sha256=", expected_fingerprint);
+    std::string expected_path =
+        absl::StrCat("/computeMetadata/v1/instance/service-accounts/default/token"
+                     "?client_certificate_sha256=",
+                     expected_fingerprint);
 
     // Need to wait for headers complete before reading headers value.
     result = request_->waitForHeadersComplete();
@@ -209,15 +210,14 @@ public:
     // Send response headers with end_stream false because we want to add response body next.
     request_->encodeHeaders(default_response_headers_, false);
     // Send response data with end_stream true.
-    const std::string json_body = absl::StrCat(
-        R"({"access_token": ")", MockTokenString, R"(", "expires_in": 3600, "token_type": "Bearer"})");
+    const std::string json_body = absl::StrCat(R"({"access_token": ")", MockTokenString,
+                                               R"(", "expires_in": 3600, "token_type": "Bearer"})");
     request_->encodeData(json_body, true);
     result = request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
     // Verify the proxied request was received upstream, as expected.
     EXPECT_TRUE(request_->complete());
   }
-
 
   // Send the request to destination upstream cluster
   void sendRequestToDestinationAndValidateResponse(

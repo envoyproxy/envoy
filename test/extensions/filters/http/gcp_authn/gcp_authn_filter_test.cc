@@ -284,7 +284,6 @@ TEST_F(GcpAuthnFilterTest, ResumeFilterChainIterationWithBoundAccessToken) {
   EXPECT_EQ(default_headers_.get_("Authorization"), "Bearer mock_access_token");
 }
 
-
 TEST_F(GcpAuthnFilterTest, DestroyFilter) {
   setupMockObjects();
   setupFilterAndCallback();
