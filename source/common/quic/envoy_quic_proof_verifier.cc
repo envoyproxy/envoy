@@ -138,20 +138,5 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
   return quic::QUIC_FAILURE;
 }
 
-quic::QuicAsyncStatus
-EnvoyQuicProofVerifier::VerifyCertChain(const std::string&, uint16_t,
-                                        const std::vector<std::string>&, const std::string&,
-                                        const std::string&, const quic::ProofVerifyContext*,
-                                        std::string*, std::unique_ptr<quic::ProofVerifyDetails>*,
-                                        uint8_t*, std::unique_ptr<quic::ProofVerifierCallback>) {
-  // This function exists only for ProofVerifiers that don't implement the new
-  // VerifyCertChain (that takes a vector of absl::string_views for the certs).
-  // A ProofVerifier needs to implement one of the VerifyCertChain functions
-  // (and it should implement the other one). However, GCC seems to require
-  // both virtual functions to be overridden.
-  QUICHE_NOTREACHED();
-  return quic::QUIC_FAILURE;
-}
-
 } // namespace Quic
 } // namespace Envoy
