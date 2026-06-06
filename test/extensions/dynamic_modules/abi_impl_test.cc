@@ -1303,16 +1303,18 @@ WEAK_STUB(TransportSocketFlushWriteBuffer,
 WEAK_STUB(StatSinkSnapshotGetCounterCount,
           envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_count(nullptr))
 WEAK_STUB(StatSinkSnapshotGetCounter,
-          envoy_dynamic_module_callback_stat_sink_snapshot_get_counter(nullptr, 0, nullptr, nullptr,
-                                                                       nullptr))
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_counter(nullptr, 0, nullptr, 0,
+                                                                       nullptr, nullptr, nullptr))
 WEAK_STUB(StatSinkSnapshotGetGaugeCount,
           envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_count(nullptr))
 WEAK_STUB(StatSinkSnapshotGetGauge,
-          envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge(nullptr, 0, nullptr, nullptr))
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge(nullptr, 0, nullptr, 0,
+                                                                     nullptr, nullptr))
 WEAK_STUB(StatSinkSnapshotGetTextReadoutCount,
           envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_count(nullptr))
 WEAK_STUB(StatSinkSnapshotGetTextReadout,
-          envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(nullptr, 0, nullptr,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(nullptr, 0, nullptr, 0,
+                                                                            nullptr, nullptr, 0,
                                                                             nullptr))
 
 // Tests for the additional weak stubs added for ABI declarations missing from abi_impl.cc.
