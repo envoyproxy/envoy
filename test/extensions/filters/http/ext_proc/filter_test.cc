@@ -6416,7 +6416,6 @@ TEST_F(HttpFilterTest, LocalResponseStarted) {
   filter_->onDestroy();
 }
 
-
 } // namespace
 } // namespace ExternalProcessing
 } // namespace HttpFilters

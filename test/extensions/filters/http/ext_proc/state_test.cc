@@ -157,8 +157,6 @@ TEST(StateTest, ConsolidateOne) {
   EXPECT_EQ(chunk.length, 5);
 }
 
-
-
 } // namespace
 } // namespace ExternalProcessing
 } // namespace HttpFilters

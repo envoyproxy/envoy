@@ -13,8 +13,6 @@ namespace {
 using envoy::service::ext_proc::v3::ProcessingResponse;
 using envoy::service::ext_proc::v3::StreamedImmediateResponse;
 
-
-
 TEST(SaveProcessingResponseTest, DontSaveStreamingImmediateResponseOnError) {
   envoy::extensions::http::ext_proc::response_processors::save_processing_response::v3::
       SaveProcessingResponse config;

@@ -21,8 +21,6 @@ public:
   ExtProcLoggingInfo logging_info_;
 };
 
-
-
 TEST_F(ExtProcLoggingInfoTest, ProcessingEffectsConst) {
   const auto& const_logging_info = logging_info_;
 
