@@ -20,6 +20,7 @@ import (
 	"unsafe"
 
 	sdk "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go"
+	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/internal/buffer"
 	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared"
 )
 
@@ -2421,57 +2422,67 @@ func (s *dymMetricSnapshot) CounterCount() uint64 {
 	return uint64(C.envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_count(s.snapshotPtr))
 }
 
-func (s *dymMetricSnapshot) GetCounter(index uint64) (shared.CounterSnapshot, bool) {
-	var nameBuf C.envoy_dynamic_module_type_envoy_buffer
+func (s *dymMetricSnapshot) GetCounter(index uint64, name []byte) ([]byte, shared.CounterValue, bool) {
 	var value, delta C.uint64_t
-	ok := bool(C.envoy_dynamic_module_callback_stat_sink_snapshot_get_counter(
-		s.snapshotPtr, C.size_t(index), &nameBuf, &value, &delta,
-	))
+	name, ok := buffer.Fill(name, func(buf []byte) (uint64, bool) {
+		var size C.size_t
+		ret := C.envoy_dynamic_module_callback_stat_sink_snapshot_get_counter(
+			s.snapshotPtr, C.size_t(index), sliceDataPtr(buf), C.size_t(cap(buf)), &size, &value, &delta,
+		)
+		runtime.KeepAlive(buf)
+		return uint64(size), bool(ret)
+	})
 	if !ok {
-		return shared.CounterSnapshot{}, false
+		return name, shared.CounterValue{}, false
 	}
-	return shared.CounterSnapshot{
-		Name:  envoyBufferToUnsafeEnvoyBuffer(nameBuf),
-		Value: uint64(value),
-		Delta: uint64(delta),
-	}, true
+	return name, shared.CounterValue{Value: uint64(value), Delta: uint64(delta)}, true
 }
 
 func (s *dymMetricSnapshot) GaugeCount() uint64 {
 	return uint64(C.envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_count(s.snapshotPtr))
 }
 
-func (s *dymMetricSnapshot) GetGauge(index uint64) (shared.GaugeSnapshot, bool) {
-	var nameBuf C.envoy_dynamic_module_type_envoy_buffer
+func (s *dymMetricSnapshot) GetGauge(index uint64, name []byte) ([]byte, uint64, bool) {
 	var value C.uint64_t
-	ok := bool(C.envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge(
-		s.snapshotPtr, C.size_t(index), &nameBuf, &value,
-	))
+	name, ok := buffer.Fill(name, func(buf []byte) (uint64, bool) {
+		var size C.size_t
+		ret := C.envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge(
+			s.snapshotPtr, C.size_t(index), sliceDataPtr(buf), C.size_t(cap(buf)), &size, &value,
+		)
+		runtime.KeepAlive(buf)
+		return uint64(size), bool(ret)
+	})
 	if !ok {
-		return shared.GaugeSnapshot{}, false
+		return name, 0, false
 	}
-	return shared.GaugeSnapshot{
-		Name:  envoyBufferToUnsafeEnvoyBuffer(nameBuf),
-		Value: uint64(value),
-	}, true
+	return name, uint64(value), true
 }
 
 func (s *dymMetricSnapshot) TextReadoutCount() uint64 {
 	return uint64(C.envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_count(s.snapshotPtr))
 }
 
-func (s *dymMetricSnapshot) GetTextReadout(index uint64) (shared.TextReadoutSnapshot, bool) {
-	var nameBuf, valueBuf C.envoy_dynamic_module_type_envoy_buffer
-	ok := bool(C.envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(
-		s.snapshotPtr, C.size_t(index), &nameBuf, &valueBuf,
-	))
-	if !ok {
-		return shared.TextReadoutSnapshot{}, false
+func (s *dymMetricSnapshot) GetTextReadout(index uint64, name, value []byte) ([]byte, []byte, bool) {
+	return buffer.FillTwo(name, value, func(nameBuf, valueBuf []byte) (uint64, uint64, bool) {
+		var nameSize, valueSize C.size_t
+		ret := C.envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(
+			s.snapshotPtr, C.size_t(index),
+			sliceDataPtr(nameBuf), C.size_t(cap(nameBuf)), &nameSize,
+			sliceDataPtr(valueBuf), C.size_t(cap(valueBuf)), &valueSize,
+		)
+		runtime.KeepAlive(nameBuf)
+		runtime.KeepAlive(valueBuf)
+		return uint64(nameSize), uint64(valueSize), bool(ret)
+	})
+}
+
+// sliceDataPtr returns a pointer to the backing array of b for passing to Envoy, or nil when b
+// has no capacity. Envoy treats a nil/zero-capacity buffer as a length query and writes nothing.
+func sliceDataPtr(b []byte) *C.char {
+	if cap(b) == 0 {
+		return nil
 	}
-	return shared.TextReadoutSnapshot{
-		Name:  envoyBufferToUnsafeEnvoyBuffer(nameBuf),
-		Value: envoyBufferToUnsafeEnvoyBuffer(valueBuf),
-	}, true
+	return (*C.char)(unsafe.Pointer(unsafe.SliceData(b)))
 }
 
 // statSinkConfigManager keeps each statSinkWrapper alive for as long as Envoy

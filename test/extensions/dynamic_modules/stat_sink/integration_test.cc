@@ -72,9 +72,12 @@ INSTANTIATE_TEST_SUITE_P(
     DynamicModulesStatsSinkIntegrationTest::testParamsToString);
 
 TEST_P(DynamicModulesStatsSinkIntegrationTest, BasicFlush) {
+  // The "found gauge server.uptime" marker proves the module decoded a gauge name through the
+  // buffer-based snapshot API.
   EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
                                  {"info", "stat sink integration test: config_new called"},
                                  {"info", "stat sink integration test: flush called"},
+                                 {"info", "stat sink integration test: found gauge server.uptime"},
                              }),
                              {
                                addStatSinkAndInitialize();

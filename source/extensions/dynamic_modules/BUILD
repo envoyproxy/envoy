@@ -81,6 +81,13 @@ go_library(
 )
 
 go_library(
+    name = "go_sdk_internal_buffer",
+    srcs = ["sdk/go/internal/buffer/buffer.go"],
+    importpath = "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/internal/buffer",
+    visibility = ["//visibility:public"],
+)
+
+go_library(
     name = "go_sdk_abi",
     srcs = [
         "sdk/go/abi/internal.go",
@@ -99,6 +106,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//source/extensions/dynamic_modules:go_sdk",
+        "//source/extensions/dynamic_modules:go_sdk_internal_buffer",
         "//source/extensions/dynamic_modules:go_sdk_shared",
     ],
 )

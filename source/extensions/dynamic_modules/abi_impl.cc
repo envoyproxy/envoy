@@ -3472,8 +3472,8 @@ __attribute__((weak)) size_t envoy_dynamic_module_callback_stat_sink_snapshot_ge
 }
 
 __attribute__((weak)) bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter(
-    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t,
-    envoy_dynamic_module_type_envoy_buffer*, uint64_t*, uint64_t*) {
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, char*, size_t, size_t*,
+    uint64_t*, uint64_t*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_counter: "
                "not implemented in this context");
   return false;
@@ -3487,8 +3487,8 @@ __attribute__((weak)) size_t envoy_dynamic_module_callback_stat_sink_snapshot_ge
 }
 
 __attribute__((weak)) bool envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge(
-    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t,
-    envoy_dynamic_module_type_envoy_buffer*, uint64_t*) {
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, char*, size_t, size_t*,
+    uint64_t*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge: "
                "not implemented in this context");
   return false;
@@ -3503,8 +3503,8 @@ envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_count(
 }
 
 __attribute__((weak)) bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(
-    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t,
-    envoy_dynamic_module_type_envoy_buffer*, envoy_dynamic_module_type_envoy_buffer*) {
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, char*, size_t, size_t*, char*,
+    size_t, size_t*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout: "
                "not implemented in this context");
   return false;

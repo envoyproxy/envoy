@@ -6,44 +6,27 @@
 //! return a [`StatSink`] from it.
 
 use crate::{abi, EnvoyBuffer, NewStatSinkConfigFunction};
-use std::ffi::c_void;
+use std::ffi::{c_char, c_void};
 use std::marker::PhantomData;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 
-/// A counter entry in a [`MetricSnapshot`].
-#[derive(Debug, Clone, Copy)]
-pub struct CounterSnapshot<'a> {
-  /// The counter name. Valid only for the duration of the [`StatSink::on_flush`] call.
-  pub name: EnvoyBuffer<'a>,
+/// The values of a counter, returned by [`MetricSnapshot::counter`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CounterValue {
   /// The current accumulated value.
   pub value: u64,
   /// The increase since the previous flush.
   pub delta: u64,
 }
 
-/// A gauge entry in a [`MetricSnapshot`].
-#[derive(Debug, Clone, Copy)]
-pub struct GaugeSnapshot<'a> {
-  /// The gauge name. Valid only for the duration of the [`StatSink::on_flush`] call.
-  pub name: EnvoyBuffer<'a>,
-  /// The current value.
-  pub value: u64,
-}
-
-/// A text readout entry in a [`MetricSnapshot`].
-#[derive(Debug, Clone, Copy)]
-pub struct TextReadoutSnapshot<'a> {
-  /// The text readout name. Valid only for the duration of the [`StatSink::on_flush`] call.
-  pub name: EnvoyBuffer<'a>,
-  /// The text readout value. Valid only for the duration of the [`StatSink::on_flush`] call.
-  pub value: EnvoyBuffer<'a>,
-}
-
 /// Read-only view over the metrics captured for a single flush.
 ///
-/// The snapshot and every buffer it returns are owned by Envoy and remain valid only until the
-/// [`StatSink::on_flush`] call returns. Copy any data that must outlive the call.
+/// The snapshot is owned by Envoy and is valid only until the [`StatSink::on_flush`] call
+/// returns. Stat names and text-readout values are decoded directly into a caller-provided
+/// `Vec<u8>`, which the SDK clears and grows as needed, so a single buffer can be reused across
+/// every entry to avoid allocating a string per metric. The bytes are the same UTF-8 form
+/// produced by Envoy's stats subsystem.
 pub struct MetricSnapshot<'a> {
   envoy_ptr: *mut c_void,
   _marker: PhantomData<&'a ()>,
@@ -66,33 +49,24 @@ impl<'a> MetricSnapshot<'a> {
     }
   }
 
-  /// The counter at `index`, or `None` if the index is out of range.
-  pub fn counter(&self, index: usize) -> Option<CounterSnapshot<'a>> {
-    let mut name = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: ptr::null(),
-      length: 0,
-    };
+  /// Reads the counter at `index`, writing its name into `name` and returning its values. On
+  /// success `name` holds exactly the name bytes. Returns `None` and leaves `name` unchanged when
+  /// the index is out of range.
+  pub fn counter(&self, index: usize, name: &mut Vec<u8>) -> Option<CounterValue> {
     let mut value: u64 = 0;
     let mut delta: u64 = 0;
-    let found = unsafe {
+    let found = fill_buffer(name, |ptr, capacity, size| unsafe {
       abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_counter(
         self.envoy_ptr,
         index,
-        &mut name,
+        ptr,
+        capacity,
+        size,
         &mut value,
         &mut delta,
       )
-    };
-    found.then(|| CounterSnapshot {
-      name: unsafe { EnvoyBuffer::new_from_raw(name.ptr as *const u8, name.length) },
-      value,
-      delta,
-    })
-  }
-
-  /// An iterator over all counters in the snapshot.
-  pub fn counters(&self) -> impl Iterator<Item = CounterSnapshot<'a>> + '_ {
-    (0..self.counter_count()).filter_map(|index| self.counter(index))
+    });
+    found.then_some(CounterValue { value, delta })
   }
 
   /// The number of gauges in the snapshot.
@@ -100,30 +74,22 @@ impl<'a> MetricSnapshot<'a> {
     unsafe { abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_count(self.envoy_ptr) }
   }
 
-  /// The gauge at `index`, or `None` if the index is out of range.
-  pub fn gauge(&self, index: usize) -> Option<GaugeSnapshot<'a>> {
-    let mut name = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: ptr::null(),
-      length: 0,
-    };
+  /// Reads the gauge at `index`, writing its name into `name` and returning its value. On success
+  /// `name` holds exactly the name bytes. Returns `None` and leaves `name` unchanged when the index
+  /// is out of range.
+  pub fn gauge(&self, index: usize, name: &mut Vec<u8>) -> Option<u64> {
     let mut value: u64 = 0;
-    let found = unsafe {
+    let found = fill_buffer(name, |ptr, capacity, size| unsafe {
       abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge(
         self.envoy_ptr,
         index,
-        &mut name,
+        ptr,
+        capacity,
+        size,
         &mut value,
       )
-    };
-    found.then(|| GaugeSnapshot {
-      name: unsafe { EnvoyBuffer::new_from_raw(name.ptr as *const u8, name.length) },
-      value,
-    })
-  }
-
-  /// An iterator over all gauges in the snapshot.
-  pub fn gauges(&self) -> impl Iterator<Item = GaugeSnapshot<'a>> + '_ {
-    (0..self.gauge_count()).filter_map(|index| self.gauge(index))
+    });
+    found.then_some(value)
   }
 
   /// The number of text readouts in the snapshot.
@@ -133,33 +99,82 @@ impl<'a> MetricSnapshot<'a> {
     }
   }
 
-  /// The text readout at `index`, or `None` if the index is out of range.
-  pub fn text_readout(&self, index: usize) -> Option<TextReadoutSnapshot<'a>> {
-    let mut name = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: ptr::null(),
-      length: 0,
-    };
-    let mut value = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: ptr::null(),
-      length: 0,
-    };
-    let found = unsafe {
-      abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(
-        self.envoy_ptr,
-        index,
-        &mut name,
-        &mut value,
-      )
-    };
-    found.then(|| TextReadoutSnapshot {
-      name: unsafe { EnvoyBuffer::new_from_raw(name.ptr as *const u8, name.length) },
-      value: unsafe { EnvoyBuffer::new_from_raw(value.ptr as *const u8, value.length) },
-    })
+  /// Reads the text readout at `index`, writing its name into `name` and its value into `value`.
+  /// Returns `true` on success with both buffers holding exactly their bytes. Returns `false` and
+  /// leaves both buffers unchanged when the index is out of range.
+  pub fn text_readout(&self, index: usize, name: &mut Vec<u8>, value: &mut Vec<u8>) -> bool {
+    // Both outputs come from a single call, and either may be truncated independently, so grow
+    // whichever did not fit and retry until both fit. The snapshot is stable for the duration of
+    // the flush, so this converges in at most two iterations. As with `fill_buffer`, a
+    // zero-capacity `Vec` passes a dangling-but-non-null pointer that Envoy leaves untouched.
+    loop {
+      let name_capacity = name.capacity();
+      let value_capacity = value.capacity();
+      let mut name_size: usize = 0;
+      let mut value_size: usize = 0;
+      let found = unsafe {
+        abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(
+          self.envoy_ptr,
+          index,
+          name.as_mut_ptr() as *mut c_char,
+          name_capacity,
+          &mut name_size,
+          value.as_mut_ptr() as *mut c_char,
+          value_capacity,
+          &mut value_size,
+        )
+      };
+      if !found {
+        return false;
+      }
+      if name_size <= name_capacity && value_size <= value_capacity {
+        // SAFETY: by Envoy's snprintf-style contract, when each size is within its buffer capacity
+        // Envoy wrote exactly that many bytes, so no uninitialized bytes are exposed.
+        unsafe {
+          name.set_len(name_size);
+          value.set_len(value_size);
+        }
+        return true;
+      }
+      if name_size > name_capacity {
+        name.clear();
+        name.reserve(name_size);
+      }
+      if value_size > value_capacity {
+        value.clear();
+        value.reserve(value_size);
+      }
+    }
   }
+}
 
-  /// An iterator over all text readouts in the snapshot.
-  pub fn text_readouts(&self) -> impl Iterator<Item = TextReadoutSnapshot<'a>> + '_ {
-    (0..self.text_readout_count()).filter_map(|index| self.text_readout(index))
+/// Invokes `fill` to decode a single stat name into `buffer`, growing and retrying if the name did
+/// not fit. `fill` receives the buffer pointer, its capacity, and an out-parameter for the full
+/// name length. On success `buffer` holds exactly the bytes written and this returns `true`. If the
+/// entry does not exist `buffer` is left unchanged and this returns `false`. The reported size is
+/// stable during a flush, so this converges in at most two iterations. A zero-capacity `Vec` yields
+/// a dangling-but-non-null pointer that Envoy never dereferences because the capacity is 0.
+fn fill_buffer<F>(buffer: &mut Vec<u8>, mut fill: F) -> bool
+where
+  F: FnMut(*mut c_char, usize, &mut usize) -> bool,
+{
+  loop {
+    let capacity = buffer.capacity();
+    let mut size: usize = 0;
+    if !fill(buffer.as_mut_ptr() as *mut c_char, capacity, &mut size) {
+      return false;
+    }
+    if size <= capacity {
+      // SAFETY: Envoy's snprintf-style contract guarantees that when `size <= capacity` it wrote
+      // exactly `size` bytes into the buffer's allocation, so no uninitialized bytes are exposed.
+      unsafe {
+        buffer.set_len(size);
+      }
+      return true;
+    }
+    // The name was truncated, so grow to the reported size and retry.
+    buffer.clear();
+    buffer.reserve(size);
   }
 }
 

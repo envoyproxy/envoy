@@ -18,8 +18,11 @@ envoy_cc_library(
     hdrs = ["flush_context.h"],
     deps = [
         "//envoy/stats:sink_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/stats:symbol_table_lib",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/dynamic_modules/abi",
+        "@abseil-cpp//absl/strings:string_view",
     ],
     alwayslink = True,
 )

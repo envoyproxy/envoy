@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 
 	sdk "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go"
@@ -32,17 +33,32 @@ func (s *integrationTestSink) OnFlush(snapshot shared.MetricSnapshot) {
 	counterCount := snapshot.CounterCount()
 	gaugeCount := snapshot.GaugeCount()
 
+	// Reuse a single name/value buffer across every entry, decoding each name straight into
+	// module-owned memory. This is the allocation-free pattern the buffer API enables (for
+	// example writing each name to a socket). Start from zero capacity so the first decode
+	// exercises the SDK grow-and-retry path, after which the buffer stays sized for later entries.
+	var name []byte
+	var value []byte
 	for i := uint64(0); i < counterCount; i++ {
-		snapshot.GetCounter(i)
+		name, _, _ = snapshot.GetCounter(i, name[:0])
 	}
+	// Decode every gauge name and look for the always-present "server.uptime" gauge, which proves a
+	// name round-trips byte-for-byte through the buffer API end to end.
+	foundUptime := false
 	for i := uint64(0); i < gaugeCount; i++ {
-		snapshot.GetGauge(i)
+		name, _, _ = snapshot.GetGauge(i, name[:0])
+		if bytes.Equal(name, []byte("server.uptime")) {
+			foundUptime = true
+		}
 	}
 	textReadoutCount := snapshot.TextReadoutCount()
 	for i := uint64(0); i < textReadoutCount; i++ {
-		snapshot.GetTextReadout(i)
+		name, value, _ = snapshot.GetTextReadout(i, name[:0], value[:0])
 	}
 
+	if foundUptime {
+		s.handle.Log(shared.LogLevelInfo, "stat sink integration test: found gauge server.uptime")
+	}
 	s.handle.Log(shared.LogLevelInfo, fmt.Sprintf(
 		"stat sink integration test: flush called counters=%d gauges=%d", counterCount, gaugeCount))
 }
