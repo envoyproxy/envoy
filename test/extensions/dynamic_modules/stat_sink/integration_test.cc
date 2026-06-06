@@ -66,7 +66,7 @@ sink_config:
 };
 
 // The Rust test module aggregates flush snapshots on a worker thread and hands them back over an
-// mpsc channel. Its shared library is not ThreadSanitizer instrumented, the same Rust toolchain
+// `mpsc` channel. Its shared library is not ThreadSanitizer instrumented, the same Rust toolchain
 // limitation that keeps the Rust SDK unit test off TSAN, so the sanitizer cannot see the worker
 // synchronization and reports false data races. The Go module hands data back through the Go heap,
 // which ThreadSanitizer does not track, so it stays enabled.
