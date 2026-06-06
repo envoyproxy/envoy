@@ -967,6 +967,12 @@ TEST_P(WebsocketIntegrationTest, WebSocketUpgradeRouteTimeoutWithRetries) {
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_EQ("504", response_->headers().getStatusValue());
 
+  if (fake_upstream_connection2) {
+    AssertionResult result = fake_upstream_connection2->close();
+    RELEASE_ASSERT(result, result.message());
+    result = fake_upstream_connection2->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
+  }
   cleanupUpstreamAndDownstream();
 }
 

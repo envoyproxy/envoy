@@ -6238,3 +6238,398 @@ fn test_cluster_callout_done_with_null_buffers_yields_none() {
   assert!(GOT_NONE_HEADERS.load(std::sync::atomic::Ordering::SeqCst));
   assert!(GOT_NONE_BODY.load(std::sync::atomic::Ordering::SeqCst));
 }
+
+// =============================================================================
+// Stats Sink unit tests
+// =============================================================================
+
+// Canned snapshot data returned by the stubbed snapshot callbacks below.
+const STUB_COUNTERS: [(&str, u64, u64); 2] = [("counter_0", 10, 5), ("counter_1", 20, 0)];
+const STUB_GAUGES: [(&str, u64); 1] = [("gauge_0", 42)];
+const STUB_TEXT_READOUTS: [(&str, &str); 1] = [("text_0", "value_0")];
+
+// Counts stub_write invocations on the calling thread so tests can assert the grow-and-retry
+// behavior (each ABI getter call writes its name once, plus a value for text readouts). It is
+// thread-local so it stays correct even if tests run in parallel.
+thread_local! {
+  static STUB_WRITE_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+fn reset_stub_write_calls() {
+  STUB_WRITE_CALLS.with(|c| c.set(0));
+}
+
+fn stub_write_calls() -> usize {
+  STUB_WRITE_CALLS.with(|c| c.get())
+}
+
+// Mirrors Envoy's snprintf-style name writer. It copies up to `capacity` bytes with no null
+// terminator and reports the full source length, exercising the SDK's grow-and-retry path.
+//
+// # Safety
+// `buffer` must point to at least `capacity` writable bytes and `size_out` must be valid.
+unsafe fn stub_write(
+  src: &str,
+  buffer: *mut std::ffi::c_char,
+  capacity: usize,
+  size_out: *mut usize,
+) {
+  STUB_WRITE_CALLS.with(|c| c.set(c.get() + 1));
+  let bytes = src.as_bytes();
+  let copy = bytes.len().min(capacity);
+  if copy > 0 {
+    std::ptr::copy_nonoverlapping(bytes.as_ptr(), buffer as *mut u8, copy);
+  }
+  *size_out = bytes.len();
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_count(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+) -> usize {
+  STUB_COUNTERS.len()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_counter(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+  index: usize,
+  name_buffer: *mut std::ffi::c_char,
+  name_buffer_capacity: usize,
+  name_size: *mut usize,
+  value_out: *mut u64,
+  delta_out: *mut u64,
+) -> bool {
+  if index >= STUB_COUNTERS.len() {
+    return false;
+  }
+  let (name, value, delta) = STUB_COUNTERS[index];
+  unsafe {
+    stub_write(name, name_buffer, name_buffer_capacity, name_size);
+    *value_out = value;
+    *delta_out = delta;
+  }
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_count(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+) -> usize {
+  STUB_GAUGES.len()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+  index: usize,
+  name_buffer: *mut std::ffi::c_char,
+  name_buffer_capacity: usize,
+  name_size: *mut usize,
+  value_out: *mut u64,
+) -> bool {
+  if index >= STUB_GAUGES.len() {
+    return false;
+  }
+  let (name, value) = STUB_GAUGES[index];
+  unsafe {
+    stub_write(name, name_buffer, name_buffer_capacity, name_size);
+    *value_out = value;
+  }
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_count(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+) -> usize {
+  STUB_TEXT_READOUTS.len()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+  index: usize,
+  name_buffer: *mut std::ffi::c_char,
+  name_buffer_capacity: usize,
+  name_size: *mut usize,
+  value_buffer: *mut std::ffi::c_char,
+  value_buffer_capacity: usize,
+  value_size: *mut usize,
+) -> bool {
+  if index >= STUB_TEXT_READOUTS.len() {
+    return false;
+  }
+  let (name, value) = STUB_TEXT_READOUTS[index];
+  unsafe {
+    stub_write(name, name_buffer, name_buffer_capacity, name_size);
+    stub_write(value, value_buffer, value_buffer_capacity, value_size);
+  }
+  true
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_stat_sink_config_new_impl() {
+  struct TestStatSink;
+  impl stats_sink::StatSink for TestStatSink {
+    fn on_flush(&self, _snapshot: &stats_sink::MetricSnapshot<'_>) {}
+    fn on_histogram_complete(&self, _name: EnvoyBuffer<'_>, _value: u64) {}
+  }
+
+  let mut new_fn: NewStatSinkConfigFunction = |_, _| Some(Box::new(TestStatSink));
+  let result =
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_new_impl("test_sink", b"config", &new_fn);
+  assert!(!result.is_null());
+  unsafe {
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_destroy(result);
+  }
+
+  // None should result in a null pointer (for example an unknown sink name).
+  new_fn = |_, _| None;
+  let result =
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_new_impl("test_sink", b"config", &new_fn);
+  assert!(result.is_null());
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_stat_sink_config_destroy() {
+  // Ensure the wrapped trait object is dropped exactly once on destroy.
+  static DROPPED: AtomicBool = AtomicBool::new(false);
+  struct TestStatSink;
+  impl stats_sink::StatSink for TestStatSink {
+    fn on_flush(&self, _snapshot: &stats_sink::MetricSnapshot<'_>) {}
+    fn on_histogram_complete(&self, _name: EnvoyBuffer<'_>, _value: u64) {}
+  }
+  impl Drop for TestStatSink {
+    fn drop(&mut self) {
+      DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  let new_fn: NewStatSinkConfigFunction = |_, _| Some(Box::new(TestStatSink));
+  let config_ptr =
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_new_impl("test_sink", b"config", &new_fn);
+  assert!(!config_ptr.is_null());
+  unsafe {
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_destroy(config_ptr);
+  }
+  assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_metric_snapshot_reads_all_entry_types() {
+  let mut dummy = 0u8;
+  let snapshot = stats_sink::MetricSnapshot::new(&mut dummy as *mut _ as *mut std::ffi::c_void);
+
+  // A single reusable buffer, starting empty, serves every read and is grown by the SDK.
+  let mut name = Vec::new();
+
+  assert_eq!(snapshot.counter_count(), 2);
+  let counter = snapshot.counter(0, &mut name).unwrap();
+  assert_eq!(name.as_slice(), b"counter_0");
+  assert_eq!(counter.value, 10);
+  assert_eq!(counter.delta, 5);
+  let counter = snapshot.counter(1, &mut name).unwrap();
+  assert_eq!(name.as_slice(), b"counter_1");
+  assert_eq!(counter.value, 20);
+  assert_eq!(counter.delta, 0);
+  // An out-of-range read returns None and leaves the buffer untouched.
+  assert!(snapshot.counter(2, &mut name).is_none());
+  assert_eq!(name.as_slice(), b"counter_1");
+
+  assert_eq!(snapshot.gauge_count(), 1);
+  let value = snapshot.gauge(0, &mut name).unwrap();
+  assert_eq!(name.as_slice(), b"gauge_0");
+  assert_eq!(value, 42);
+  // An out-of-range read returns None and leaves the buffer untouched.
+  assert!(snapshot.gauge(1, &mut name).is_none());
+  assert_eq!(name.as_slice(), b"gauge_0");
+
+  assert_eq!(snapshot.text_readout_count(), 1);
+  let mut text_value = Vec::new();
+  assert!(snapshot.text_readout(0, &mut name, &mut text_value));
+  assert_eq!(name.as_slice(), b"text_0");
+  assert_eq!(text_value.as_slice(), b"value_0");
+  // An out-of-range read returns false and leaves both buffers untouched.
+  assert!(!snapshot.text_readout(1, &mut name, &mut text_value));
+  assert_eq!(name.as_slice(), b"text_0");
+  assert_eq!(text_value.as_slice(), b"value_0");
+}
+
+#[test]
+fn test_metric_snapshot_reuses_buffer_without_reallocating() {
+  let mut dummy = 0u8;
+  let snapshot = stats_sink::MetricSnapshot::new(&mut dummy as *mut _ as *mut std::ffi::c_void);
+
+  // A buffer larger than the name is reused in place. Its length is set to the name length, not
+  // the capacity, and no reallocation occurs.
+  let mut name = Vec::with_capacity(64);
+  let ptr_before = name.as_ptr();
+  snapshot.counter(0, &mut name).unwrap();
+  assert_eq!(name.as_slice(), b"counter_0");
+  assert_eq!(name.as_ptr(), ptr_before);
+  assert!(name.capacity() >= 64);
+
+  // The next read overwrites the same buffer with a different name.
+  snapshot.counter(1, &mut name).unwrap();
+  assert_eq!(name.as_slice(), b"counter_1");
+  assert_eq!(name.as_ptr(), ptr_before);
+}
+
+#[test]
+fn test_metric_snapshot_grows_then_reuses_buffer() {
+  let mut dummy = 0u8;
+  let snapshot = stats_sink::MetricSnapshot::new(&mut dummy as *mut _ as *mut std::ffi::c_void);
+
+  // Starting empty forces a length query (writes nothing) followed by a grow-and-retry, so the
+  // getter is invoked twice for the first name.
+  let mut name = Vec::new();
+  reset_stub_write_calls();
+  snapshot.counter(0, &mut name).unwrap();
+  assert_eq!(name.as_slice(), b"counter_0");
+  assert!(name.capacity() >= b"counter_0".len());
+  assert_eq!(stub_write_calls(), 2);
+
+  // The grown buffer is large enough for the next equal-length name, so it is reused in place with
+  // a single getter call and no reallocation.
+  let ptr_after_grow = name.as_ptr();
+  reset_stub_write_calls();
+  snapshot.counter(1, &mut name).unwrap();
+  assert_eq!(name.as_slice(), b"counter_1");
+  assert_eq!(name.as_ptr(), ptr_after_grow);
+  assert_eq!(stub_write_calls(), 1);
+}
+
+#[test]
+fn test_metric_snapshot_text_readout_grows_both_buffers() {
+  let mut dummy = 0u8;
+  let snapshot = stats_sink::MetricSnapshot::new(&mut dummy as *mut _ as *mut std::ffi::c_void);
+
+  // Both buffers start empty, so the first getter call truncates both. The SDK grows both and
+  // retries, giving two getter calls that each write a name and a value, for four stub_write calls.
+  let mut name = Vec::new();
+  let mut value = Vec::new();
+  reset_stub_write_calls();
+  assert!(snapshot.text_readout(0, &mut name, &mut value));
+  assert_eq!(name.as_slice(), b"text_0");
+  assert_eq!(value.as_slice(), b"value_0");
+  assert_eq!(stub_write_calls(), 4);
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_stat_sink_flush_reads_snapshot() {
+  static SEEN_COUNTERS: std::sync::Mutex<Vec<(String, u64, u64)>> =
+    std::sync::Mutex::new(Vec::new());
+  struct RecordingStatSink;
+  impl stats_sink::StatSink for RecordingStatSink {
+    fn on_flush(&self, snapshot: &stats_sink::MetricSnapshot<'_>) {
+      let mut seen = SEEN_COUNTERS.lock().unwrap();
+      let mut name = Vec::new();
+      for index in 0..snapshot.counter_count() {
+        if let Some(counter) = snapshot.counter(index, &mut name) {
+          seen.push((
+            String::from_utf8_lossy(&name).into_owned(),
+            counter.value,
+            counter.delta,
+          ));
+        }
+      }
+    }
+    fn on_histogram_complete(&self, _name: EnvoyBuffer<'_>, _value: u64) {}
+  }
+
+  let sink: Box<dyn stats_sink::StatSink> = Box::new(RecordingStatSink);
+  let config_ptr = Box::into_raw(Box::new(sink)) as *const std::ffi::c_void;
+  let mut dummy = 0u8;
+  unsafe {
+    stats_sink::envoy_dynamic_module_on_stat_sink_flush(
+      config_ptr,
+      &mut dummy as *mut _ as *mut std::ffi::c_void,
+    );
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_destroy(config_ptr);
+  }
+
+  let seen = SEEN_COUNTERS.lock().unwrap();
+  assert_eq!(
+    *seen,
+    vec![
+      ("counter_0".to_string(), 10, 5),
+      ("counter_1".to_string(), 20, 0),
+    ]
+  );
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_stat_sink_on_histogram_complete_passes_name_and_value() {
+  static SEEN: std::sync::Mutex<Vec<(String, u64)>> = std::sync::Mutex::new(Vec::new());
+  struct RecordingStatSink;
+  impl stats_sink::StatSink for RecordingStatSink {
+    fn on_flush(&self, _snapshot: &stats_sink::MetricSnapshot<'_>) {}
+    fn on_histogram_complete(&self, name: EnvoyBuffer<'_>, value: u64) {
+      let name = String::from_utf8_lossy(name.as_slice()).into_owned();
+      SEEN.lock().unwrap().push((name, value));
+    }
+  }
+
+  let sink: Box<dyn stats_sink::StatSink> = Box::new(RecordingStatSink);
+  let config_ptr = Box::into_raw(Box::new(sink)) as *const std::ffi::c_void;
+  let name = "my_histogram";
+  let name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: name.as_ptr() as *const _,
+    length: name.len(),
+  };
+  unsafe {
+    stats_sink::envoy_dynamic_module_on_stat_sink_on_histogram_complete(config_ptr, name_buf, 123);
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_destroy(config_ptr);
+  }
+
+  let seen = SEEN.lock().unwrap();
+  assert_eq!(*seen, vec![("my_histogram".to_string(), 123)]);
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_stat_sink_flush_recovers_from_panic() {
+  // A panic in on_flush must be caught at the FFI boundary so it never unwinds into Envoy.
+  struct PanicStatSink;
+  impl stats_sink::StatSink for PanicStatSink {
+    fn on_flush(&self, _snapshot: &stats_sink::MetricSnapshot<'_>) {
+      panic!("intentional panic in on_flush");
+    }
+    fn on_histogram_complete(&self, _name: EnvoyBuffer<'_>, _value: u64) {}
+  }
+
+  let sink: Box<dyn stats_sink::StatSink> = Box::new(PanicStatSink);
+  let config_ptr = Box::into_raw(Box::new(sink)) as *const std::ffi::c_void;
+  let mut dummy = 0u8;
+  unsafe {
+    stats_sink::envoy_dynamic_module_on_stat_sink_flush(
+      config_ptr,
+      &mut dummy as *mut _ as *mut std::ffi::c_void,
+    );
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_stat_sink_on_histogram_complete_recovers_from_panic() {
+  // on_histogram_complete runs on worker threads, so a panic must be caught at the FFI boundary.
+  struct PanicStatSink;
+  impl stats_sink::StatSink for PanicStatSink {
+    fn on_flush(&self, _snapshot: &stats_sink::MetricSnapshot<'_>) {}
+    fn on_histogram_complete(&self, _name: EnvoyBuffer<'_>, _value: u64) {
+      panic!("intentional panic in on_histogram_complete");
+    }
+  }
+
+  let sink: Box<dyn stats_sink::StatSink> = Box::new(PanicStatSink);
+  let config_ptr = Box::into_raw(Box::new(sink)) as *const std::ffi::c_void;
+  let name = "my_histogram";
+  let name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: name.as_ptr() as *const _,
+    length: name.len(),
+  };
+  unsafe {
+    stats_sink::envoy_dynamic_module_on_stat_sink_on_histogram_complete(config_ptr, name_buf, 456);
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_destroy(config_ptr);
+  }
+}
