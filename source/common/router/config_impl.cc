@@ -193,6 +193,7 @@ createRedirectConfig(const envoy::config::route::v3::Route& route, Regex::Engine
                                       route.redirect().regex_rewrite().pattern(), regex_engine),
                                   Regex::CompiledMatcherPtr)
           : nullptr,
+      nullptr,
       route.redirect().path_redirect().find('?') != absl::string_view::npos,
       route.redirect().https_redirect(),
       route.redirect().strip_query()};
@@ -775,7 +776,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
               redirect_config_->path_redirect_);
   }
 
-  if (route.has_redirect() && !route.redirect().path_rewrite().empty()) {
+  if (redirect_config_ != nullptr && !route.redirect().path_rewrite().empty()) {
     auto formatter_or =
         Envoy::Formatter::FormatterImpl::create(route.redirect().path_rewrite(), true);
     if (!formatter_or.ok()) {
@@ -783,7 +784,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
           absl::StrCat("Failed to create path_rewrite formatter: ", formatter_or.status()));
       return;
     }
-    redirect_path_rewrite_formatter_ = std::move(formatter_or.value());
+    redirect_config_->path_rewrite_formatter_ = std::move(formatter_or.value());
   }
 
   if (!route.stat_prefix().empty()) {
@@ -859,7 +860,7 @@ bool RouteEntryImplBase::isRedirect() const {
   return !redirect_config_->host_redirect_.empty() || !redirect_config_->path_redirect_.empty() ||
          !redirect_config_->prefix_rewrite_redirect_.empty() ||
          redirect_config_->regex_rewrite_redirect_ != nullptr ||
-         redirect_path_rewrite_formatter_ != nullptr;
+         redirect_config_->path_rewrite_formatter_ != nullptr;
 }
 
 bool RouteEntryImplBase::matchRoute(const RouteMatchContext& route_match_context,
@@ -1119,9 +1120,9 @@ std::string RouteEntryImplBase::newUri(const Http::RequestHeaderMap& headers,
   ASSERT(isDirectResponse());
   const auto redirect_config_ref = ::Envoy::makeOptRefFromPtr(
       const_cast<const ::Envoy::Http::Utility::RedirectConfig*>(redirect_config_.get()));
-  if (redirect_path_rewrite_formatter_ != nullptr) {
+  if (redirect_config_ != nullptr && redirect_config_->path_rewrite_formatter_ != nullptr) {
     return ::Envoy::Http::Utility::newUriWithFormatter(
-        redirect_config_ref, headers, *redirect_path_rewrite_formatter_, stream_info);
+        redirect_config_ref, headers, *redirect_config_->path_rewrite_formatter_, stream_info);
   }
   return ::Envoy::Http::Utility::newUri(redirect_config_ref, headers);
 }

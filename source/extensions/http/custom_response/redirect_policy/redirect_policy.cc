@@ -35,6 +35,7 @@ createRedirectConfig(const envoy::config::route::v3::RedirectAction& redirect_ac
       "",      // prefix_rewrite
       "",      // regex_rewrite_redirect_substitution
       nullptr, // regex_rewrite_redirect
+      nullptr, // path_rewrite_formatter
       redirect_action.path_redirect().find('?') != absl::string_view::npos,
       redirect_action.https_redirect(),
       redirect_action.strip_query()};
@@ -43,6 +44,15 @@ createRedirectConfig(const envoy::config::route::v3::RedirectAction& redirect_ac
   }
   if (redirect_action.has_prefix_rewrite()) {
     throw Envoy::EnvoyException("prefix_rewrite is not supported for Custom Response");
+  }
+  if (!redirect_action.path_rewrite().empty()) {
+    auto formatter_or =
+        Envoy::Formatter::FormatterImpl::create(redirect_action.path_rewrite(), true);
+    if (!formatter_or.ok()) {
+      throw Envoy::EnvoyException(absl::StrCat("Failed to create path_rewrite formatter: ",
+                                               formatter_or.status().message()));
+    }
+    redirect_config.path_rewrite_formatter_ = std::move(formatter_or.value());
   }
   return redirect_config;
 }
@@ -89,15 +99,6 @@ RedirectPolicy::RedirectPolicy(
     throw EnvoyException(
         absl::StrCat("#fragment is not supported for custom response. Specified path_redirect is ",
                      redirect_action_->path_redirect_));
-  }
-  if (config.has_redirect_action() && !config.redirect_action().path_rewrite().empty()) {
-    auto formatter_or =
-        Envoy::Formatter::FormatterImpl::create(config.redirect_action().path_rewrite(), true);
-    if (!formatter_or.ok()) {
-      throw EnvoyException(absl::StrCat("Failed to create path_rewrite formatter: ",
-                                        formatter_or.status().message()));
-    }
-    redirect_path_rewrite_formatter_ = std::move(formatter_or.value());
   }
 }
 
@@ -178,10 +179,10 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
 
   ::Envoy::Http::Utility::Url absolute_url;
   std::string uri;
-  if (redirect_path_rewrite_formatter_ != nullptr) {
+  if (redirect_action_ != nullptr && redirect_action_->path_rewrite_formatter_ != nullptr) {
     uri = ::Envoy::Http::Utility::newUriWithFormatter(
         ::Envoy::makeOptRefFromPtr(redirect_action_.get()), *downstream_headers,
-        *redirect_path_rewrite_formatter_, decoder_callbacks->streamInfo());
+        *redirect_action_->path_rewrite_formatter_, decoder_callbacks->streamInfo());
   }
   if (uri.empty()) {
     uri = uri_ ? *uri_ : ::Envoy::Http::Utility::newUri(*redirect_action_, *downstream_headers);

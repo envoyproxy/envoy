@@ -1658,6 +1658,7 @@ std::string Utility::newUriWithFormatter(OptRef<const RedirectConfig> redirect_c
         "",
         "",
         nullptr,
+        nullptr,
         formatted_path.find('?') != std::string::npos,
         redirect_config ? redirect_config->https_redirect_ : false,
         redirect_config ? redirect_config->strip_query_ : false};

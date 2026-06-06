@@ -699,6 +699,7 @@ struct RedirectConfig {
   const std::string prefix_rewrite_redirect_;
   const std::string regex_rewrite_redirect_substitution_;
   Regex::CompiledMatcherPtr regex_rewrite_redirect_;
+  Formatter::FormatterPtr path_rewrite_formatter_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const bool path_redirect_has_query_;
   const bool https_redirect_;

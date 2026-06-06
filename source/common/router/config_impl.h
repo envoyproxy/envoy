@@ -974,8 +974,7 @@ private:
   const OptionalTimeouts optional_timeouts_;
   Runtime::Loader& loader_;
   std::unique_ptr<const RuntimeData> runtime_;
-  std::unique_ptr<const ::Envoy::Http::Utility::RedirectConfig> redirect_config_;
-  Formatter::FormatterPtr redirect_path_rewrite_formatter_;
+  std::unique_ptr<::Envoy::Http::Utility::RedirectConfig> redirect_config_;
   std::unique_ptr<const HedgePolicyImpl> hedge_policy_;
   RetryPolicyConstSharedPtr retry_policy_;
   std::unique_ptr<const InternalRedirectPolicyImpl> internal_redirect_policy_;
