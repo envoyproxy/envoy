@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"runtime"
 
 	sdk "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go"
 	_ "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/abi"
@@ -128,4 +129,8 @@ func (s *integrationTestSink) OnDestroy() {
 	close(s.flushes)
 	<-s.done
 	s.handle.Log(shared.LogLevelInfo, "stat sink integration test: config_destroy called")
+	// Drop the scheduler reference and force the GC to release the scheduler and its Envoy-side
+	// resource through the finalizer before process exit.
+	s.scheduler = nil
+	runtime.GC()
 }

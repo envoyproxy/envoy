@@ -2565,18 +2565,11 @@ func envoy_dynamic_module_on_stat_sink_config_destroy(
 	if wrapper == nil {
 		return
 	}
-	// Stop the module worker first so it will not commit another event.
+	// Drop the scheduler reference so its finalizer can release the Envoy-side resource. Envoy never
+	// schedules another event for this config after destroy, so dropping the reference cannot strand a
+	// task that would otherwise run.
+	wrapper.handle.scheduler = nil
 	wrapper.sink.OnDestroy()
-	// Release the Envoy-side scheduler now that the worker has stopped. A config-lifetime scheduler
-	// outlives every garbage collection, so its finalizer would not run before process exit and the
-	// Envoy object would leak. Cancel the finalizer to avoid a double free.
-	if scheduler := wrapper.handle.scheduler; scheduler != nil {
-		wrapper.handle.scheduler = nil
-		runtime.SetFinalizer(scheduler, nil)
-		C.envoy_dynamic_module_callback_stat_sink_config_scheduler_delete(
-			(C.envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr)(scheduler.schedulerPtr),
-		)
-	}
 	statSinkConfigManager.remove(unsafe.Pointer(configPtr))
 }
 
