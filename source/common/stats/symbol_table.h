@@ -620,10 +620,6 @@ public:
       return true;
     }
 
-    if (size_and_data_ == nullptr || rhs.size_and_data_ == nullptr) {
-      return empty() && rhs.empty();
-    }
-
     return dataAsStringView() == rhs.dataAsStringView();
   }
   bool operator!=(const StatName& rhs) const { return !(*this == rhs); }
@@ -684,7 +680,7 @@ public:
   bool empty() const {
     // Avoid a full varint decode: it is sufficient to know the first byte,
     // since 0x00 uniquely encodes zero
-    return size_and_data_ == nullptr || size_and_data_[0] == 0;
+    return size_and_data_[0] == 0;
   }
 
   /**
@@ -704,14 +700,11 @@ private:
    * this method so the decode happens in exactly one place.
    */
   absl::string_view dataAsStringView() const {
-    if (empty()) {
-      return {};
-    }
     const auto [data_size, prefix_size] = SymbolTable::Encoding::decodeNumber(size_and_data_);
     return {reinterpret_cast<const char*>(size_and_data_ + prefix_size), data_size};
   }
 
-  const uint8_t* size_and_data_{nullptr};
+  const uint8_t* size_and_data_;
 };
 
 StatName StatNameStorageBase::statName() const { return StatName(bytes_.get()); }
