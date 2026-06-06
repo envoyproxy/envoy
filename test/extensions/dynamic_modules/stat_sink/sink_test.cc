@@ -371,6 +371,32 @@ TEST_F(DynamicModuleStatsSinkGaugeTest, SchedulerPostedEventAfterConfigDestroyed
   EXPECT_FALSE(hook_ran);
 }
 
+// Once the server signals shutdown, commit() drops the event instead of posting, so a module worker
+// thread cannot post after the dispatch loop has stopped and race with dispatcher teardown.
+TEST_F(DynamicModuleStatsSinkGaugeTest, SchedulerCommitAfterShutdownIsDropped) {
+  // Capture the shutdown callback the config registers so the test can fire it.
+  Server::ServerLifecycleNotifier::StageCallback shutdown_cb;
+  EXPECT_CALL(context_.lifecycle_notifier_,
+              registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+                               testing::An<Server::ServerLifecycleNotifier::StageCallback>()))
+      .WillOnce(Invoke([&shutdown_cb](Server::ServerLifecycleNotifier::Stage,
+                                      Server::ServerLifecycleNotifier::StageCallback cb)
+                           -> Server::ServerLifecycleNotifier::HandlePtr {
+        shutdown_cb = std::move(cb);
+        return nullptr;
+      }));
+
+  auto config = makeConfig();
+  ASSERT_TRUE(shutdown_cb);
+
+  // The server begins shutting down before the dispatch loop exits.
+  shutdown_cb();
+
+  EXPECT_CALL(context_.dispatcher_, post(_)).Times(0);
+  DynamicModuleStatsSinkConfigScheduler scheduler(config->weak_from_this());
+  scheduler.commit(7); // Must not post after shutdown.
+}
+
 // When a module is missing its config_new symbol, newDynamicModuleStatsSinkConfig
 // must surface a clear error rather than construct a half-built config.
 TEST(DynamicModuleStatsSinkConfigTest, FactoryFunctionMissingSymbol) {

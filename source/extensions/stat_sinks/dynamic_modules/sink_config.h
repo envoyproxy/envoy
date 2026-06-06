@@ -7,12 +7,15 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/stat_sinks/dynamic_modules/v3/dynamic_modules.pb.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/server/lifecycle_notifier.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/utility.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
+
+#include "absl/synchronization/mutex.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -91,6 +94,13 @@ public:
    */
   void onScheduled(uint64_t event_id);
 
+  /**
+   * Posts the scheduled event to the main thread, unless the server has begun shutting down. Safe
+   * to call from any thread, so a module worker thread cannot post an event that would race with
+   * dispatcher teardown.
+   */
+  void postScheduledEvent(uint64_t event_id);
+
 private:
   friend absl::StatusOr<std::shared_ptr<DynamicModuleStatsSinkConfig>>
   newDynamicModuleStatsSinkConfig(absl::string_view sink_name, absl::string_view sink_config,
@@ -111,6 +121,14 @@ private:
   // This mirrors the HTTP filter config contract.
   std::atomic<bool> stat_creation_frozen_{false};
   std::vector<ModuleGaugeHandle> gauges_;
+
+  // Guards posting through the scheduler. Set false on the main thread at server shutdown, before
+  // the dispatch loop exits, and held across the post so an in-flight commit from a module worker
+  // thread cannot post after the loop has stopped and race with dispatcher teardown.
+  absl::Mutex commit_mutex_;
+  bool accepting_commits_ ABSL_GUARDED_BY(commit_mutex_){true};
+  // Shutdown callback handle that stops accepting commits. Destroyed with the config to deregister.
+  Server::ServerLifecycleNotifier::HandlePtr shutdown_handle_;
 };
 
 using DynamicModuleStatsSinkConfigSharedPtr = std::shared_ptr<DynamicModuleStatsSinkConfig>;
@@ -125,16 +143,11 @@ public:
       : config_(std::move(config)) {}
 
   void commit(uint64_t event_id) {
-    // Lock the config so its dispatcher member stays valid across post().
-    auto config_shared = config_.lock();
-    if (!config_shared) {
-      return;
+    // Lock the config so it stays alive across the post. The config drops the event if the server
+    // has begun shutting down.
+    if (auto config_shared = config_.lock()) {
+      config_shared->postScheduledEvent(event_id);
     }
-    config_shared->main_thread_dispatcher_.post([config = config_, event_id]() {
-      if (std::shared_ptr<DynamicModuleStatsSinkConfig> cs = config.lock()) {
-        cs->onScheduled(event_id);
-      }
-    });
   }
 
 private:

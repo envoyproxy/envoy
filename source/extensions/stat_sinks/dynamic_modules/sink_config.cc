@@ -16,7 +16,15 @@ DynamicModuleStatsSinkConfig::DynamicModuleStatsSinkConfig(
     Server::Configuration::ServerFactoryContext& server)
     : main_thread_dispatcher_(server.mainThreadDispatcher()), sink_name_(sink_name),
       sink_config_(sink_config), dynamic_module_(std::move(dynamic_module)),
-      stats_scope_(server.scope().createScope("")), stat_name_pool_(stats_scope_->symbolTable()) {}
+      stats_scope_(server.scope().createScope("")), stat_name_pool_(stats_scope_->symbolTable()) {
+  // Stop accepting commits once the server starts shutting down, before the dispatch loop exits, so
+  // a module worker thread does not post events that would race with dispatcher teardown.
+  shutdown_handle_ = server.lifecycleNotifier().registerCallback(
+      Server::ServerLifecycleNotifier::Stage::ShutdownExit, [this]() {
+        absl::MutexLock lock(&commit_mutex_);
+        accepting_commits_ = false;
+      });
+}
 
 DynamicModuleStatsSinkConfig::~DynamicModuleStatsSinkConfig() {
   if (in_module_config_ != nullptr && on_config_destroy_ != nullptr) {
@@ -54,6 +62,18 @@ void DynamicModuleStatsSinkConfig::onScheduled(uint64_t event_id) {
   if (on_config_scheduled_ != nullptr) {
     on_config_scheduled_(this, in_module_config_, event_id);
   }
+}
+
+void DynamicModuleStatsSinkConfig::postScheduledEvent(uint64_t event_id) {
+  absl::MutexLock lock(&commit_mutex_);
+  if (!accepting_commits_) {
+    return;
+  }
+  main_thread_dispatcher_.post([self = weak_from_this(), event_id]() {
+    if (std::shared_ptr<DynamicModuleStatsSinkConfig> config = self.lock()) {
+      config->onScheduled(event_id);
+    }
+  });
 }
 
 absl::StatusOr<DynamicModuleStatsSinkConfigSharedPtr>
