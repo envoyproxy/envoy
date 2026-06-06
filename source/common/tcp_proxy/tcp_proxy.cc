@@ -685,10 +685,8 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
   ENVOY_CONN_LOG(debug, "Creating connection to cluster {}", read_callbacks_->connection(),
                  cluster_name);
   if (!initial_upstream_connection_start_time_.has_value()) {
-    auto& time_source = read_callbacks_->connection().dispatcher().timeSource();
-    initial_upstream_connection_start_time_.emplace(time_source.monotonicTime());
-    // Record the upstream connect begin time point for COMMON_DURATION access logging.
-    getStreamInfo().upstreamInfo()->upstreamTiming().onUpstreamConnectStart(time_source);
+    initial_upstream_connection_start_time_.emplace(
+        read_callbacks_->connection().dispatcher().timeSource().monotonicTime());
   }
 
   const Upstream::ClusterInfoConstSharedPtr& cluster = thread_local_cluster->info();
@@ -904,13 +902,20 @@ void Filter::onGenericPoolReady(StreamInfo::StreamInfo* info,
                                 const Network::ConnectionInfoProvider& address_provider,
                                 Ssl::ConnectionInfoConstSharedPtr ssl_info) {
   StreamInfo::UpstreamInfo& upstream_info = *getStreamInfo().upstreamInfo();
-  auto& time_source = read_callbacks_->connection().dispatcher().timeSource();
   if (!upstream_info.upstreamTiming().connectionPoolCallbackLatency()) {
     upstream_info.upstreamTiming().recordConnectionPoolCallbackLatency(
-        initial_upstream_connection_start_time_.value(), time_source);
+        initial_upstream_connection_start_time_.value(),
+        read_callbacks_->connection().dispatcher().timeSource());
   }
-  // Record the upstream connect end time point for COMMON_DURATION access logging.
-  upstream_info.upstreamTiming().onUpstreamConnectComplete(time_source);
+  // Plumb the upstream connection timing into the downstream stream info so the US_CX_BEG and
+  // US_CX_END COMMON_DURATION time points reflect the real connect timing.
+  if (info != nullptr && info->upstreamInfo() != nullptr) {
+    const auto& upstream_timing = info->upstreamInfo()->upstreamTiming();
+    upstream_info.upstreamTiming().upstream_connect_start_ =
+        upstream_timing.upstream_connect_start_;
+    upstream_info.upstreamTiming().upstream_connect_complete_ =
+        upstream_timing.upstream_connect_complete_;
+  }
   upstream_ = std::move(upstream);
   generic_conn_pool_.reset();
   read_callbacks_->upstreamHost(host);

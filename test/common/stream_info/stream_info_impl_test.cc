@@ -17,6 +17,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -120,6 +121,22 @@ TEST_F(StreamInfoImplTest, TimingTest) {
   EXPECT_FALSE(info.requestComplete());
   info.onRequestComplete();
   dur = checkDuration(dur, info.requestComplete());
+}
+
+// onDownstreamConnectionEnd records only the first close so the duration is not inflated.
+TEST(DownstreamTimingTest, ConnectionEndRecordsFirstClose) {
+  Event::SimulatedTimeSystem time_system;
+  DownstreamTiming timing;
+  EXPECT_FALSE(timing.downstreamConnectionEnd().has_value());
+
+  timing.onDownstreamConnectionEnd(time_system);
+  ASSERT_TRUE(timing.downstreamConnectionEnd().has_value());
+  const MonotonicTime first_close = timing.downstreamConnectionEnd().value();
+
+  // A later close event does not overwrite the recorded connection end time.
+  time_system.advanceTimeWait(std::chrono::milliseconds(5));
+  timing.onDownstreamConnectionEnd(time_system);
+  EXPECT_EQ(first_close, timing.downstreamConnectionEnd().value());
 }
 
 TEST_F(StreamInfoImplTest, BytesTest) {

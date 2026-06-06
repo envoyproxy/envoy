@@ -441,8 +441,10 @@ struct DownstreamTiming {
     last_downstream_header_rx_byte_received_ = time_source.monotonicTime();
   }
   void onDownstreamConnectionEnd(TimeSource& time_source) {
-    // Overwrite any existing value so the latest close time is recorded.
-    downstream_connection_end_ = time_source.monotonicTime();
+    // Record only the first close so the connection duration is not inflated.
+    if (!downstream_connection_end_) {
+      downstream_connection_end_ = time_source.monotonicTime();
+    }
   }
 
   absl::flat_hash_map<std::string, MonotonicTime> timings_;
