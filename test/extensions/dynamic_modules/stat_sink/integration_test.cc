@@ -65,14 +65,14 @@ sink_config:
   }
 };
 
-// The Go test module aggregates flush snapshots on a go routine and hands them back over a Go
-// channel. C++ ThreadSanitizer cannot model the Go runtime channel and scheduler synchronization,
-// so it reports false data races between the flush thread and the go routines. The Rust worker uses
-// std synchronization primitives that ThreadSanitizer understands, so only the Go module is skipped
-// under TSAN.
+// The Rust test module aggregates flush snapshots on a worker thread and hands them back over an
+// mpsc channel. Its shared library is not ThreadSanitizer instrumented, the same Rust toolchain
+// limitation that keeps the Rust SDK unit test off TSAN, so the sanitizer cannot see the worker
+// synchronization and reports false data races. The Go module hands data back through the Go heap,
+// which ThreadSanitizer does not track, so it stays enabled.
 std::vector<std::string> testModuleLanguages() {
 #if defined(__has_feature) && __has_feature(thread_sanitizer)
-  return {"c", "rust"};
+  return {"c", "go"};
 #else
   return {"c", "go", "rust"};
 #endif
