@@ -8,7 +8,7 @@
 #include "source/extensions/load_balancing_policies/dynamic_modules/load_balancer.h"
 
 #include "test/extensions/dynamic_modules/util.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"

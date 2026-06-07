@@ -104,9 +104,7 @@ static constexpr absl::string_view COLON_SPACE = ": ";
 
 StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
                                      StreamInfo::BytesMeterSharedPtr&& bytes_meter)
-    : connection_(connection), disable_chunk_encoding_(false), chunk_encoding_(true),
-      connect_request_(false), is_tcp_tunneling_(false), is_response_to_head_request_(false),
-      is_response_to_connect_request_(false), bytes_meter_(std::move(bytes_meter)) {
+    : connection_(connection), bytes_meter_(std::move(bytes_meter)) {
   if (!bytes_meter_) {
     bytes_meter_ = std::make_shared<StreamInfo::BytesMeter>();
   }
@@ -535,9 +533,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
                                uint32_t max_headers_kb, const uint32_t max_headers_count)
     : connection_(connection), stats_(stats), codec_settings_(settings),
       encode_only_header_key_formatter_(encodeOnlyFormatterFromSettings(settings)),
-      processing_trailers_(false), handling_upgrade_(false), reset_stream_called_(false),
-      deferred_end_stream_headers_(false), dispatching_(false), max_headers_kb_(max_headers_kb),
-      max_headers_count_(max_headers_count) {
+      max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
   parser_ = std::make_unique<BalsaParser>(type, this, max_headers_kb_ * 1024, enableTrailers(),
                                           codec_settings_.allow_custom_methods_);
 }
@@ -1061,7 +1057,7 @@ void ClientConnectionImpl::dumpAdditionalState(std::ostream& os, int indent_leve
   os << spaces << "Dumping corresponding downstream request:";
   if (pending_response_.has_value()) {
     os << '\n';
-    const ResponseDecoder* decoder = pending_response_.value().decoder_;
+    const ResponseDecoder* decoder = pending_response_.value().decoder_handle_->get().ptr();
     DUMP_DETAILS(decoder);
   } else {
     os << " null\n";
@@ -1250,7 +1246,11 @@ Envoy::StatusOr<CallbackResult> ServerConnectionImpl::onHeadersCompleteBase() {
     if (parser_->isChunked() ||
         (parser_->contentLength().has_value() && parser_->contentLength().value() > 0) ||
         handling_upgrade_) {
-      active_request_->request_decoder_->decodeHeaders(std::move(headers), false);
+      RequestDecoder* decoder = active_request_->request_decoder_handle_->get().ptr();
+      ENVOY_BUG(decoder != nullptr, "RequestDecoder is null in onHeadersCompleteBase");
+      if (decoder) {
+        decoder->decodeHeaders(std::move(headers), false);
+      }
 
       // If the connection has been closed (or is closing) after decoding headers, pause the parser
       // so we return control to the caller.
@@ -1269,7 +1269,8 @@ Status ServerConnectionImpl::onMessageBeginBase() {
   if (!resetStreamCalled()) {
     ASSERT(active_request_ == nullptr);
     active_request_ = std::make_unique<ActiveRequest>(*this, std::move(bytes_meter_before_stream_));
-    active_request_->request_decoder_ = &callbacks_.newStream(active_request_->response_encoder_);
+    active_request_->request_decoder_handle_ =
+        callbacks_.newStream(active_request_->response_encoder_).getRequestDecoderHandle();
 
     // Check for pipelined request flood as we prepare to accept a new request.
     // Parse errors that happen prior to onMessageBegin result in stream termination, it is not
@@ -1293,7 +1294,11 @@ void ServerConnectionImpl::onBody(Buffer::Instance& data) {
   ASSERT(!deferred_end_stream_headers_);
   if (active_request_) {
     ENVOY_CONN_LOG(trace, "body size={}", connection_, data.length());
-    active_request_->request_decoder_->decodeData(data, false);
+    RequestDecoder* decoder = active_request_->request_decoder_handle_->get().ptr();
+    ENVOY_BUG(decoder != nullptr, "RequestDecoder is null in onBody");
+    if (decoder) {
+      decoder->decodeData(data, false);
+    }
   }
 }
 
@@ -1329,19 +1334,25 @@ CallbackResult ServerConnectionImpl::onMessageCompleteBase() {
   if (active_request_) {
 
     // The request_decoder should be non-null after we've called the newStream on callbacks.
-    ASSERT(active_request_->request_decoder_);
+    RequestDecoder* decoder = active_request_->request_decoder_handle_->get().ptr();
+    ENVOY_BUG(decoder != nullptr, "request_decoder_handle_ is null in onMessageCompleteBase");
     active_request_->remote_complete_ = true;
 
     if (deferred_end_stream_headers_) {
-      active_request_->request_decoder_->decodeHeaders(
-          std::move(absl::get<RequestHeaderMapPtr>(headers_or_trailers_)), true);
+      if (decoder) {
+        decoder->decodeHeaders(std::move(absl::get<RequestHeaderMapPtr>(headers_or_trailers_)),
+                               true);
+      }
       deferred_end_stream_headers_ = false;
     } else if (processing_trailers_) {
-      active_request_->request_decoder_->decodeTrailers(
-          std::move(absl::get<RequestTrailerMapPtr>(headers_or_trailers_)));
+      if (decoder) {
+        decoder->decodeTrailers(std::move(absl::get<RequestTrailerMapPtr>(headers_or_trailers_)));
+      }
     } else {
       Buffer::OwnedImpl buffer;
-      active_request_->request_decoder_->decodeData(buffer, true);
+      if (decoder) {
+        decoder->decodeData(buffer, true);
+      }
     }
 
     // Reset to ensure no information from one requests persists to the next.
@@ -1386,8 +1397,12 @@ Status ServerConnectionImpl::sendProtocolError(absl::string_view details) {
 
   active_request_->response_encoder_.setDetails(details);
   if (!active_request_->response_encoder_.startedResponse()) {
-    active_request_->request_decoder_->sendLocalReply(
-        error_code_, CodeUtility::toString(error_code_), nullptr, absl::nullopt, details);
+    RequestDecoder* decoder = active_request_->request_decoder_handle_->get().ptr();
+    ENVOY_BUG(decoder != nullptr, "RequestDecoder is null in sendProtocolError");
+    if (decoder) {
+      decoder->sendLocalReply(error_code_, CodeUtility::toString(error_code_), nullptr,
+                              absl::nullopt, details);
+    }
   }
   return okStatus();
 }
@@ -1487,7 +1502,8 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& response_decode
 
   ASSERT(!pending_response_.has_value());
   ASSERT(pending_response_done_);
-  pending_response_.emplace(*this, std::move(bytes_meter_before_stream_), &response_decoder);
+  pending_response_.emplace(*this, std::move(bytes_meter_before_stream_),
+                            response_decoder.createResponseDecoderHandle());
   pending_response_done_ = false;
   return pending_response_.value().encoder_;
 }
@@ -1544,12 +1560,16 @@ Envoy::StatusOr<CallbackResult> ClientConnectionImpl::onHeadersCompleteBase() {
       }
     }
 
-    if (HeaderUtility::isSpecial1xx(*headers)) {
-      pending_response_.value().decoder_->decode1xxHeaders(std::move(headers));
-    } else if (cannotHaveBody() && !handling_upgrade_) {
-      deferred_end_stream_headers_ = true;
-    } else {
-      pending_response_.value().decoder_->decodeHeaders(std::move(headers), false);
+    ResponseDecoder* decoder = pending_response_.value().decoder_handle_->get().ptr();
+    ENVOY_BUG(decoder != nullptr, "ResponseDecoder is null in onHeadersCompleteBase");
+    if (decoder) {
+      if (HeaderUtility::isSpecial1xx(*headers)) {
+        decoder->decode1xxHeaders(std::move(headers));
+      } else if (cannotHaveBody() && !handling_upgrade_) {
+        deferred_end_stream_headers_ = true;
+      } else {
+        decoder->decodeHeaders(std::move(headers), false);
+      }
     }
 
     // http-parser treats 1xx headers as their own complete response. Swallow the spurious
@@ -1580,7 +1600,11 @@ void ClientConnectionImpl::onBody(Buffer::Instance& data) {
   ASSERT(!deferred_end_stream_headers_);
   if (pending_response_.has_value()) {
     ASSERT(!pending_response_done_);
-    pending_response_.value().decoder_->decodeData(data, false);
+    ResponseDecoder* decoder = pending_response_.value().decoder_handle_->get().ptr();
+    ENVOY_BUG(decoder != nullptr, "ResponseDecoder is null in onBody");
+    if (decoder) {
+      decoder->decodeData(data, false);
+    }
   }
 }
 
@@ -1598,16 +1622,19 @@ CallbackResult ClientConnectionImpl::onMessageCompleteBase() {
     // be reset just yet. Preserve the state in pending_response_done_ instead.
     pending_response_done_ = true;
 
-    if (deferred_end_stream_headers_) {
-      response.decoder_->decodeHeaders(
-          std::move(absl::get<ResponseHeaderMapPtr>(headers_or_trailers_)), true);
-      deferred_end_stream_headers_ = false;
-    } else if (processing_trailers_) {
-      response.decoder_->decodeTrailers(
-          std::move(absl::get<ResponseTrailerMapPtr>(headers_or_trailers_)));
-    } else {
-      Buffer::OwnedImpl buffer;
-      response.decoder_->decodeData(buffer, true);
+    ResponseDecoder* decoder = response.decoder_handle_->get().ptr();
+    ENVOY_BUG(decoder != nullptr, "ResponseDecoder is null in onMessageCompleteBase");
+    if (decoder) {
+      if (deferred_end_stream_headers_) {
+        decoder->decodeHeaders(std::move(absl::get<ResponseHeaderMapPtr>(headers_or_trailers_)),
+                               true);
+        deferred_end_stream_headers_ = false;
+      } else if (processing_trailers_) {
+        decoder->decodeTrailers(std::move(absl::get<ResponseTrailerMapPtr>(headers_or_trailers_)));
+      } else {
+        Buffer::OwnedImpl buffer;
+        decoder->decodeData(buffer, true);
+      }
     }
 
     if (force_reset_on_premature_upstream_half_close_ && !encode_complete_) {

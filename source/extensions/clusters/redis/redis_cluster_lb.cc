@@ -101,9 +101,24 @@ void RedisClusterLoadBalancerFactory::onHostHealthUpdate() {
   }
 }
 
-Upstream::LoadBalancerPtr RedisClusterLoadBalancerFactory::create(Upstream::LoadBalancerParams) {
-  absl::ReaderMutexLock lock(mutex_);
-  return std::make_unique<RedisClusterLoadBalancer>(slot_array_, shard_vector_, random_);
+Upstream::LoadBalancerPtr
+RedisClusterLoadBalancerFactory::create(Upstream::LoadBalancerParams params) {
+  return std::make_unique<RedisClusterLoadBalancer>(shared_from_this(), params.priority_set);
+}
+
+RedisClusterLoadBalancerFactory::RedisClusterLoadBalancer::RedisClusterLoadBalancer(
+    std::shared_ptr<RedisClusterLoadBalancerFactory> factory,
+    const Upstream::PrioritySet& priority_set)
+    : factory_(factory), random_(factory->random_) {
+  refresh();
+  member_update_cb_ = priority_set.addMemberUpdateCb(
+      [this](const Upstream::HostVector&, const Upstream::HostVector&) { refresh(); });
+}
+
+void RedisClusterLoadBalancerFactory::RedisClusterLoadBalancer::refresh() {
+  absl::ReaderMutexLock lock(factory_->mutex_);
+  slot_array_ = factory_->slot_array_;
+  shard_vector_ = factory_->shard_vector_;
 }
 
 namespace {

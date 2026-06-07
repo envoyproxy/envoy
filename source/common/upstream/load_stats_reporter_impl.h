@@ -75,7 +75,7 @@ private:
   Grpc::AsyncClient<envoy::service::load_stats::v3::LoadStatsRequest,
                     envoy::service::load_stats::v3::LoadStatsResponse>
       async_client_;
-  Grpc::AsyncStream<envoy::service::load_stats::v3::LoadStatsRequest> stream_{};
+  Grpc::AsyncStream<envoy::service::load_stats::v3::LoadStatsRequest> stream_;
   const Protobuf::MethodDescriptor& service_method_;
   Event::TimerPtr retry_timer_;
   Event::TimerPtr response_timer_;

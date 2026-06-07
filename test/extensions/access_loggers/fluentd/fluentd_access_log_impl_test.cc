@@ -66,6 +66,7 @@ public:
       packer.pack_bin_body(record_bytes, data_.size());
     }
 
+    // NOLINTNEXTLINE(modernize-return-braced-init-list)
     return std::string(buffer.data(), buffer.size());
   }
 

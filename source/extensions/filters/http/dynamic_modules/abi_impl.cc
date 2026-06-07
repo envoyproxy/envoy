@@ -1017,6 +1017,32 @@ void envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
   metadata_namespace->MergeFrom(metadata_value);
 }
 
+void envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size) {
+  if (entries_size == 0) {
+    // An empty batch is a no-op and must not create the namespace.
+    return;
+  }
+  auto metadata_namespace = getDynamicMetadataNamespace(filter_envoy_ptr, ns);
+  if (!metadata_namespace) {
+    // If stream info is not available, we cannot guarantee that the namespace is created.
+    // TODO(wbpcode): this should never happen and we should simplify this.
+    return;
+  }
+  // Build the whole namespace fragment first, then merge once instead of once per entry.
+  Protobuf::Struct metadata_value;
+  auto* fields = metadata_value.mutable_fields();
+  for (size_t i = 0; i < entries_size; i++) {
+    const auto& entry = entries[i];
+    absl::string_view key_view(entry.key_ptr, entry.key_length);
+    absl::string_view value_view(entry.value_ptr, entry.value_length);
+    (*fields)[key_view].set_string_value(value_view);
+  }
+  metadata_namespace->MergeFrom(metadata_value);
+}
+
 bool envoy_dynamic_module_callback_http_get_metadata_string(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_metadata_source metadata_source,
@@ -1267,8 +1293,7 @@ bool envoy_dynamic_module_callback_http_set_filter_state_bytes(
   absl::string_view key_view(key.ptr, key.length);
   absl::string_view value_view(value.ptr, value.length);
   stream_info->filterState()->setData(key_view,
-                                      std::make_unique<Router::StringAccessorImpl>(value_view),
-                                      StreamInfo::FilterState::StateType::ReadOnly);
+                                      std::make_unique<Router::StringAccessorImpl>(value_view));
   return true;
 }
 
@@ -1324,8 +1349,7 @@ bool envoy_dynamic_module_callback_http_set_filter_state_typed(
     return false;
   }
 
-  stream_info->filterState()->setData(key_view, std::move(object),
-                                      StreamInfo::FilterState::StateType::Mutable);
+  stream_info->filterState()->setData(key_view, std::move(object));
   return true;
 }
 

@@ -61,9 +61,7 @@ TEST_F(CacheFilterFactoryTest, UnregisteredTypedConfig) {
 
 class FailToCreateCacheFactory : public HttpCacheFactory {
 public:
-  std::string name() const override {
-    return std::string("envoy.extensions.http.cache_v2.fake_fail");
-  }
+  std::string name() const override { return {"envoy.extensions.http.cache_v2.fake_fail"}; }
   // Arbitrarily use "Key" as the proto type of the config because it's convenient,
   // and we have to register it as *some* type of proto message.
   ProtobufTypes::MessagePtr createEmptyConfigProto() override { return std::make_unique<Key>(); }

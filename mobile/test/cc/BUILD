@@ -11,6 +11,16 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
+        "//library/cc:mobile_engine_builder_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "engine_builder_test_shim_legacy_lib",
+    hdrs = ["engine_builder_test_shim.h"],
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [
         "//library/cc:engine_builder_lib",
     ],
 )

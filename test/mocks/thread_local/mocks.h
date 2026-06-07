@@ -40,6 +40,7 @@ public:
   void shutdownThread_() {
     shutdown_ = true;
     // Reverse order which is same as the production code.
+    // NOLINTNEXTLINE(modernize-loop-convert)
     for (auto it = data_.rbegin(); it != data_.rend(); ++it) {
       it->reset();
     }

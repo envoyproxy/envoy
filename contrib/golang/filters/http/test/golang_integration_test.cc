@@ -10,6 +10,7 @@
 #include "test/test_common/utility.h"
 
 #include "contrib/golang/filters/http/source/golang_filter.h"
+#include "contrib/golang/filters/http/test/golang_test_filters.pb.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -65,10 +66,11 @@ public:
 };
 
 class RetrieveDynamicMetadataFilterConfig
-    : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+    : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<
+          contrib::golang::filters::http::test::RetrieveDynamicMetadataFilterConfig> {
 public:
   RetrieveDynamicMetadataFilterConfig()
-      : Extensions::HttpFilters::Common::EmptyHttpFilterConfig("validate-dynamic-metadata") {}
+      : UniqueEmptyHttpFilterConfig("validate-dynamic-metadata") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
@@ -138,7 +140,11 @@ typed_config:
     auto yaml_string = absl::StrFormat(yaml_fmt, so_id, genSoPath(), so_id);
     config_helper_.prependFilter(yaml_string);
     if (with_injected_metadata_validator) {
-      config_helper_.prependFilter("{ name: validate-dynamic-metadata }");
+      config_helper_.prependFilter(R"EOF(
+        name: validate-dynamic-metadata
+        typed_config:
+          "@type": type.googleapis.com/contrib.golang.filters.http.test.RetrieveDynamicMetadataFilterConfig
+      )EOF");
     }
 
     config_helper_.skipPortUsageValidation();
@@ -886,7 +892,7 @@ typed_config:
           });
     }
 
-    if (add_endpoint != "") {
+    if (!add_endpoint.empty()) {
       config_helper_.addConfigModifier(
           [add_endpoint](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
             auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
@@ -924,7 +930,7 @@ typed_config:
     ASSERT_TRUE(response->waitForEndStream(std::chrono::milliseconds(100000)));
 
     EXPECT_EQ(expected_status_code, response->headers().getStatusValue());
-    if (expected_upstream_host != "") {
+    if (!expected_upstream_host.empty()) {
       EXPECT_TRUE(absl::StrContains(getHeader(response->headers(), "rsp-upstream-host"),
                                     expected_upstream_host));
     }

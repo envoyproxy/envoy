@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "source/extensions/filters/network/tcp_bandwidth_limit/tcp_bandwidth_limit.h"
 
 #include "test/mocks/event/mocks.h"
@@ -9,7 +11,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
@@ -885,7 +886,7 @@ TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedReadWithTokens) {
   setup(yaml);
 
   getReadBuffer().add("test data");
-  getReadTimer().reset(new Event::MockTimer());
+  getReadTimer() = std::make_unique<Event::MockTimer>();
 
   time_source_.advanceTimeWait(std::chrono::milliseconds(100));
   EXPECT_CALL(read_filter_callbacks_,
@@ -911,7 +912,7 @@ TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedWriteWithTokens) {
 
   EXPECT_CALL(write_filter_callbacks_, onAboveWriteBufferHighWatermark());
   getWriteBuffer().add("test data");
-  getWriteTimer().reset(new Event::MockTimer());
+  getWriteTimer() = std::make_unique<Event::MockTimer>();
 
   time_source_.advanceTimeWait(std::chrono::milliseconds(100));
 

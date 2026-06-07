@@ -342,6 +342,7 @@ public:
   NiceMock<MockResponseEncoder> response_encoder_;
   std::vector<MockStreamDecoderFilter*> decoder_filters_;
   std::vector<MockStreamEncoderFilter*> encoder_filters_;
+  std::deque<std::string> filter_names_;
   std::shared_ptr<AccessLog::MockInstance> log_handler_;
   envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       PathWithEscapedSlashesAction path_with_escaped_slashes_action_{

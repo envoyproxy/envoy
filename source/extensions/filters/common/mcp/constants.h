@@ -51,6 +51,7 @@ constexpr absl::string_view VERSION_FIELD = "version";
 constexpr absl::string_view DEFAULT_SERVER_VERSION = "1.0.0";
 
 constexpr absl::string_view IS_MCP_REQUEST = "is_mcp_request";
+constexpr absl::string_view IS_EXCEEDING_LIMIT = "is_exceeding_limit";
 
 // HTTP header names
 constexpr absl::string_view MCP_SESSION_ID_HEADER = "mcp-session-id";

@@ -159,16 +159,16 @@ OverrideHostLoadBalancer::LoadBalancerImpl::chooseHostInternal(LoadBalancerConte
   }
 
   OverrideHostFilterState* override_host_state = nullptr;
+  std::shared_ptr<OverrideHostFilterState> state_ptr;
   if (override_host_state =
           context->requestStreamInfo()->filterState()->getDataMutable<OverrideHostFilterState>(
               OverrideHostFilterState::kFilterStateKey);
       override_host_state == nullptr) {
-    auto state_ptr = std::make_shared<OverrideHostFilterState>(getSelectedHosts(context));
+    state_ptr = std::make_shared<OverrideHostFilterState>(getSelectedHosts(context));
     override_host_state = state_ptr.get();
 
-    context->requestStreamInfo()->filterState()->setData(
-        OverrideHostFilterState::kFilterStateKey, std::move(state_ptr),
-        StreamInfo::FilterState::StateType::Mutable);
+    context->requestStreamInfo()->filterState()->setData(OverrideHostFilterState::kFilterStateKey,
+                                                         state_ptr);
   }
 
   if (override_host_state->empty()) {
@@ -208,7 +208,7 @@ void OverrideHostLoadBalancer::LoadBalancerImpl::addSelectedHostKey(
 
   const std::string selected_endpoint = response.host->address()->asString();
   const Config::MetadataKey& metadata_key = config_.selectedHostKey().value();
-  if (metadata_key.path_.size() < 1) {
+  if (metadata_key.path_.empty()) {
     // Should not be possible based on proto validation, catching anyways.
     ENVOY_LOG(trace, "Path was not provided in selected_host_key.");
     return;

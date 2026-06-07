@@ -1,8 +1,11 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.h"
+#include "envoy/registry/registry.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/router/string_accessor_impl.h"
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/integration/http_integration.h"
@@ -11,6 +14,25 @@ namespace Envoy {
 namespace Extensions {
 namespace Clusters {
 namespace DynamicModules {
+
+namespace {
+
+// ObjectFactory used by the cluster filter-state read test: the dynamic-module HTTP filter
+// writes through this factory via envoy_dynamic_module_callback_http_set_filter_state_typed,
+// and the dynamic-module cluster reads it back during host selection via
+// envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed.
+class ClusterTypedObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "envoy.test.cluster_typed_object"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+
+REGISTER_FACTORY(ClusterTypedObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
+} // namespace
 
 class DynamicModuleClusterIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
@@ -116,6 +138,27 @@ TEST_P(DynamicModuleClusterIntegrationTest, SchedulerHostUpdate) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// Test the main→worker push pipeline end-to-end. The Rust fixture publishes an
+// Arc<Snapshot{multiplier=5}> from main and posts run_on_all_workers(event_id=7); each worker
+// reads the snapshot back and increments a counter by event_id * multiplier. With concurrency=4
+// the final counter must be exactly 4 * 7 * 5 = 140 — which proves the fan-out fired once per
+// worker, the event_id passed through, the typed payload survived FFI, and main was excluded.
+TEST_P(DynamicModuleClusterIntegrationTest, RunOnAllWorkersFiresOnEachWorker) {
+  concurrency_ = 4;
+  initializeWithDecCluster("run_on_all_workers");
+
+  test_server_->waitForCounter("dynamicmodulescustom.worker_events_applied_total",
+                               testing::Eq(140));
+
+  // Cluster should remain functional for normal traffic after the fan-out.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 // Verifies that the cluster lifecycle callbacks fire correctly during cluster
 // initialization.
 TEST_P(DynamicModuleClusterIntegrationTest, LifecycleCallbacks) {
@@ -128,6 +171,84 @@ TEST_P(DynamicModuleClusterIntegrationTest, LifecycleCallbacks) {
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   auto response =
       sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// =============================================================================
+// Filter-state read ABI: an upstream HTTP filter writes filter state on the
+// request path; the dynamic-module cluster reads it back during host selection.
+// =============================================================================
+class DynamicModuleClusterFilterStateIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  DynamicModuleClusterFilterStateIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void initializeWithProducerAndReader() {
+    TestEnvironment::setEnvVar(
+        "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+        TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/rust"), 1);
+
+    // Prepend the dynamic-module HTTP filter so it writes filter state on every
+    // request before the router runs.
+    constexpr absl::string_view producer_filter_config = R"EOF(
+name: envoy.extensions.filters.http.dynamic_modules
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
+  dynamic_module_config:
+    name: cluster_filter_state_test
+  filter_name: filter_state_producer
+  filter_config:
+    "@type": type.googleapis.com/google.protobuf.StringValue
+    value: ""
+)EOF";
+    config_helper_.prependFilter(std::string(producer_filter_config));
+
+    // Replace cluster_0 with a dynamic-module cluster whose Rust load balancer
+    // reads the filter state we just wrote.
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      const std::string upstream_address = fake_upstreams_[0]->localAddress()->asString();
+
+      cluster->set_name("cluster_0");
+      cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+      cluster->clear_load_assignment();
+
+      envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig reader_config;
+      reader_config.mutable_dynamic_module_config()->set_name("cluster_filter_state_test");
+      reader_config.set_cluster_name("filter_state_reader");
+
+      Protobuf::StringValue config_proto;
+      config_proto.set_value(upstream_address);
+      reader_config.mutable_cluster_config()->PackFrom(config_proto);
+
+      cluster->mutable_cluster_type()->set_name("envoy.clusters.dynamic_modules");
+      cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(reader_config);
+    });
+
+    HttpIntegrationTest::initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModuleClusterFilterStateIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Verifies that filter state written by an upstream HTTP filter on the request
+// path is observable in the dynamic-module cluster's choose_host callback via
+// both the bytes and the typed filter-state ABI accessors. The cluster returns
+// its only host only when both values match the producer's payload, so a 200
+// response proves the round trip.
+TEST_P(DynamicModuleClusterFilterStateIntegrationTest, ReadsFilterStateProducedByHttpFilter) {
+  initializeWithProducerAndReader();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());

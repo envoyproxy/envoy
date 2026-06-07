@@ -57,6 +57,7 @@ private:
 
 using MetricStoreSharedPtr = std::shared_ptr<MetricStore>;
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 struct httpConfigInternal;
 
 class SecretReader {
@@ -448,8 +449,10 @@ private:
   std::atomic<bool> has_destroyed_{false};
 };
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 struct httpConfigInternal : httpConfig {
   std::weak_ptr<FilterConfig> config_;
+  // NOLINTNEXTLINE(readability-identifier-naming)
   httpConfigInternal(std::weak_ptr<FilterConfig> c) { config_ = c; }
   std::weak_ptr<FilterConfig> weakFilterConfig() { return config_; }
 };

@@ -5,6 +5,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/thread.h"
 #include "source/common/http/message_impl.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/clusters/dynamic_modules/cluster.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
@@ -31,6 +32,30 @@ getConfig(envoy_dynamic_module_type_cluster_config_envoy_ptr config_envoy_ptr) {
 Envoy::Upstream::LoadBalancerContext*
 getContext(envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr) {
   return static_cast<Envoy::Upstream::LoadBalancerContext*>(context_envoy_ptr);
+}
+
+// Helper that maps a host_stat enum to its counter/gauge accessor on HostStats.
+uint64_t readHostStat(const Envoy::Upstream::HostStats& host_stats,
+                      envoy_dynamic_module_type_host_stat stat) {
+  switch (stat) {
+  case envoy_dynamic_module_type_host_stat_CxConnectFail:
+    return host_stats.cx_connect_fail_.value();
+  case envoy_dynamic_module_type_host_stat_CxTotal:
+    return host_stats.cx_total_.value();
+  case envoy_dynamic_module_type_host_stat_RqError:
+    return host_stats.rq_error_.value();
+  case envoy_dynamic_module_type_host_stat_RqSuccess:
+    return host_stats.rq_success_.value();
+  case envoy_dynamic_module_type_host_stat_RqTimeout:
+    return host_stats.rq_timeout_.value();
+  case envoy_dynamic_module_type_host_stat_RqTotal:
+    return host_stats.rq_total_.value();
+  case envoy_dynamic_module_type_host_stat_CxActive:
+    return host_stats.cx_active_.value();
+  case envoy_dynamic_module_type_host_stat_RqActive:
+    return host_stats.rq_active_.value();
+  }
+  return 0;
 }
 
 // Helper to look up a metadata value by filter name and key for a host in the cluster priority set.
@@ -476,26 +501,7 @@ uint64_t envoy_dynamic_module_callback_cluster_lb_get_host_stat(
   if (index >= hosts.size()) {
     return 0;
   }
-  const auto& host_stats = hosts[index]->stats();
-  switch (stat) {
-  case envoy_dynamic_module_type_host_stat_CxConnectFail:
-    return host_stats.cx_connect_fail_.value();
-  case envoy_dynamic_module_type_host_stat_CxTotal:
-    return host_stats.cx_total_.value();
-  case envoy_dynamic_module_type_host_stat_RqError:
-    return host_stats.rq_error_.value();
-  case envoy_dynamic_module_type_host_stat_RqSuccess:
-    return host_stats.rq_success_.value();
-  case envoy_dynamic_module_type_host_stat_RqTimeout:
-    return host_stats.rq_timeout_.value();
-  case envoy_dynamic_module_type_host_stat_RqTotal:
-    return host_stats.rq_total_.value();
-  case envoy_dynamic_module_type_host_stat_CxActive:
-    return host_stats.cx_active_.value();
-  case envoy_dynamic_module_type_host_stat_RqActive:
-    return host_stats.rq_active_.value();
-  }
-  return 0;
+  return readHostStat(hosts[index]->stats(), stat);
 }
 
 bool envoy_dynamic_module_callback_cluster_lb_get_host_locality(
@@ -831,6 +837,81 @@ bool envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_
   return true;
 }
 
+bool envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result) {
+  if (context_envoy_ptr == nullptr || result == nullptr) {
+    return false;
+  }
+  auto* stream_info = getContext(context_envoy_ptr)->requestStreamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+  absl::string_view key_view(key.ptr, key.length);
+  auto filter_state =
+      stream_info->filterState()->getDataReadOnly<Envoy::Router::StringAccessor>(key_view);
+  if (!filter_state) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "key '{}' not found in filter state", key_view);
+    return false;
+  }
+  absl::string_view str = filter_state->asString();
+  *result = {const_cast<char*>(str.data()), str.size()};
+  return true;
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result) {
+  if (context_envoy_ptr == nullptr || result == nullptr) {
+    return false;
+  }
+  auto* stream_info = getContext(context_envoy_ptr)->requestStreamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+
+  absl::string_view key_view(key.ptr, key.length);
+  const auto* object = stream_info->filterState()->getDataReadOnlyGeneric(key_view);
+  if (object == nullptr) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "key '{}' not found in filter state", key_view);
+    return false;
+  }
+
+  auto serialized = object->serializeAsString();
+  if (!serialized.has_value()) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "filter state object for key '{}' does not support serialization",
+                        key_view);
+    return false;
+  }
+
+  // Cluster host selection runs on a worker thread serially per request. We stash the
+  // serialized buffer on a thread-local so its address survives until the next call to
+  // this function on the same thread (matching the documented lifetime in abi.h).
+  thread_local std::string last_serialized_filter_state;
+  last_serialized_filter_state = std::move(serialized.value());
+  result->ptr = const_cast<char*>(last_serialized_filter_state.data());
+  result->length = last_serialized_filter_state.size();
+  return true;
+}
+
+uint64_t envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr host_envoy_ptr,
+    envoy_dynamic_module_type_host_stat stat) {
+  if (context_envoy_ptr == nullptr || host_envoy_ptr == nullptr) {
+    return 0;
+  }
+  const auto* host = static_cast<const Envoy::Upstream::Host*>(host_envoy_ptr);
+  return readHostStat(host->stats(), stat);
+}
+
 envoy_dynamic_module_type_cluster_scheduler_module_ptr
 envoy_dynamic_module_callback_cluster_scheduler_new(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr) {
@@ -851,6 +932,35 @@ void envoy_dynamic_module_callback_cluster_scheduler_commit(
       static_cast<Envoy::Extensions::Clusters::DynamicModules::DynamicModuleClusterScheduler*>(
           scheduler_module_ptr);
   scheduler->commit(event_id);
+}
+
+void envoy_dynamic_module_callback_cluster_run_on_all_workers(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uint64_t event_id) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_run_on_all_workers must be called on the "
+                 "main thread");
+    return;
+  }
+  getCluster(cluster_envoy_ptr)->runOnAllWorkers(event_id);
+}
+
+void envoy_dynamic_module_callback_cluster_worker_slot_set(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr data_module_ptr) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_worker_slot_set must be called on the "
+                 "main thread");
+    return;
+  }
+  getCluster(cluster_envoy_ptr)->workerSlotSet(data_module_ptr);
+}
+
+envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr
+envoy_dynamic_module_callback_cluster_worker_slot_get(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr) {
+  // Callable from any thread with a TLS registration; the registered-thread guard lives inside
+  // DynamicModuleCluster::workerSlotGet().
+  return getCluster(cluster_envoy_ptr)->workerSlotGet();
 }
 
 // =============================================================================

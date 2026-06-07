@@ -53,7 +53,7 @@ public:
   LegacyDnsClusterFactory(const std::string& name, bool set_all_addresses_in_single_endpoint)
       : ClusterFactoryImplBase(name),
         set_all_addresses_in_single_endpoint_(set_all_addresses_in_single_endpoint) {}
-  virtual absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
+  absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
   createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context) override {
     absl::StatusOr<Network::DnsResolverSharedPtr> dns_resolver_or_error =

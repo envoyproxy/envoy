@@ -3,6 +3,7 @@
 #include <bitset>
 #include <functional>
 #include <list>
+#include <memory>
 #include <regex>
 #include <string>
 #include <vector>
@@ -14,6 +15,7 @@
 #include "source/common/formatter/substitution_format_utility.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/status/statusor.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -48,9 +50,10 @@ public:
 };
 
 using StreamInfoFormatterProviderPtr = std::unique_ptr<StreamInfoFormatterProvider>;
+using StreamInfoFormatterResult = absl::StatusOr<StreamInfoFormatterProviderPtr>;
 
 using StreamInfoFormatterProviderCreateFunc =
-    std::function<StreamInfoFormatterProviderPtr(absl::string_view, absl::optional<size_t>)>;
+    std::function<StreamInfoFormatterResult(absl::string_view, absl::optional<size_t>)>;
 
 enum class DurationPrecision { Milliseconds, Microseconds, Nanoseconds };
 
@@ -182,6 +185,10 @@ private:
       "DS_RX_BEG"; // Downstream request receiving begin.
   static constexpr absl::string_view LastDownstreamRxByteReceived =
       "DS_RX_END"; // Downstream request receiving end.
+  static constexpr absl::string_view DownstreamConnectionBegin =
+      "DS_CX_BEG"; // Downstream connection begin.
+  static constexpr absl::string_view DownstreamConnectionEnd =
+      "DS_CX_END"; // Downstream connection end.
   static constexpr absl::string_view UpstreamConnectStart =
       "US_CX_BEG"; // Upstream TCP connection establishment start.
   static constexpr absl::string_view UpstreamConnectEnd =
