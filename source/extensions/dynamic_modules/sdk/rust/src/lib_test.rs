@@ -6950,3 +6950,273 @@ fn test_envoy_dynamic_module_on_stat_sink_config_scheduled_recovers_from_panic()
     stats_sink::envoy_dynamic_module_on_stat_sink_config_destroy(config_ptr);
   }
 }
+
+// =============================================================================
+// Transport Socket Tests
+// =============================================================================
+
+#[test]
+fn test_transport_socket_io_result_conversions() {
+  let keep = IoResult::keep_open(7, true);
+  assert_eq!(keep.action, PostIoAction::KeepOpen);
+  assert_eq!(keep.bytes_processed, 7);
+  assert!(keep.end_stream_read);
+
+  let close = IoResult::close(3, false);
+  assert_eq!(close.action, PostIoAction::Close);
+  assert_eq!(close.bytes_processed, 3);
+  assert!(!close.end_stream_read);
+
+  // Round-trip through the ABI representation in both directions.
+  let abi_result: abi::envoy_dynamic_module_type_transport_socket_io_result = keep.into();
+  assert_eq!(abi_result.bytes_processed, 7);
+  assert!(abi_result.end_stream_read);
+  assert_eq!(IoResult::from(abi_result), keep);
+}
+
+#[test]
+fn test_transport_socket_post_io_action_conversions() {
+  for action in [PostIoAction::KeepOpen, PostIoAction::Close] {
+    let abi_action: abi::envoy_dynamic_module_type_transport_socket_post_io_action = action.into();
+    assert_eq!(PostIoAction::from(abi_action), action);
+  }
+}
+
+#[test]
+fn test_transport_socket_io_status_conversions() {
+  assert_eq!(
+    IoStatus::from(abi::envoy_dynamic_module_type_transport_socket_io_status::Success),
+    IoStatus::Success
+  );
+  assert_eq!(
+    IoStatus::from(abi::envoy_dynamic_module_type_transport_socket_io_status::Again),
+    IoStatus::Again
+  );
+  assert_eq!(
+    IoStatus::from(abi::envoy_dynamic_module_type_transport_socket_io_status::Error),
+    IoStatus::Error
+  );
+}
+
+#[test]
+fn test_transport_socket_connection_event_conversions() {
+  for event in [
+    ConnectionEvent::RemoteClose,
+    ConnectionEvent::LocalClose,
+    ConnectionEvent::Connected,
+    ConnectionEvent::ConnectedZeroRtt,
+  ] {
+    let abi_event: abi::envoy_dynamic_module_type_network_connection_event = event.into();
+    assert_eq!(ConnectionEvent::from(abi_event), event);
+  }
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_transport_socket_hooks() {
+  static DROPPED: AtomicBool = AtomicBool::new(false);
+
+  struct TestConfig;
+  impl TransportSocketFactoryConfig<EnvoyTransportSocketImpl> for TestConfig {
+    fn new_transport_socket(
+      &self,
+      _envoy: &mut EnvoyTransportSocketImpl,
+    ) -> Box<dyn TransportSocket<EnvoyTransportSocketImpl>> {
+      Box::new(TestSocket)
+    }
+  }
+
+  // The hooks below pass a null Envoy pointer, so the socket must never call back into Envoy.
+  struct TestSocket;
+  impl Drop for TestSocket {
+    fn drop(&mut self) {
+      DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+  impl TransportSocket<EnvoyTransportSocketImpl> for TestSocket {
+    fn on_set_callbacks(&mut self, _envoy: &mut EnvoyTransportSocketImpl) {}
+    fn on_connected(&mut self, _envoy: &mut EnvoyTransportSocketImpl) {}
+    fn on_do_read(&mut self, _envoy: &mut EnvoyTransportSocketImpl) -> IoResult {
+      IoResult::keep_open(0, true)
+    }
+    fn on_do_write(
+      &mut self,
+      _envoy: &mut EnvoyTransportSocketImpl,
+      _end_stream: bool,
+    ) -> IoResult {
+      IoResult::close(0, false)
+    }
+    fn on_close(
+      &mut self,
+      _envoy: &mut EnvoyTransportSocketImpl,
+      _event: ConnectionEvent,
+      _abort_reset: bool,
+    ) {
+    }
+    fn get_protocol(&self, _envoy: &mut EnvoyTransportSocketImpl) -> String {
+      "test-proto".to_string()
+    }
+    fn get_failure_reason(&self, _envoy: &mut EnvoyTransportSocketImpl) -> String {
+      "test-failure".to_string()
+    }
+    fn can_flush_close(&self, _envoy: &mut EnvoyTransportSocketImpl) -> bool {
+      true
+    }
+    fn start_secure_transport(&mut self, _envoy: &mut EnvoyTransportSocketImpl) -> bool {
+      true
+    }
+  }
+
+  let config: Box<dyn TransportSocketFactoryConfig<EnvoyTransportSocketImpl>> =
+    Box::new(TestConfig);
+  let config_ptr = wrap_into_c_void_ptr!(config);
+  let socket_ptr = unsafe {
+    transport_socket::envoy_dynamic_module_on_transport_socket_new(config_ptr, std::ptr::null_mut())
+  };
+  assert!(!socket_ptr.is_null());
+
+  unsafe {
+    transport_socket::envoy_dynamic_module_on_transport_socket_set_callbacks(
+      std::ptr::null_mut(),
+      socket_ptr,
+    );
+    transport_socket::envoy_dynamic_module_on_transport_socket_on_connected(
+      std::ptr::null_mut(),
+      socket_ptr,
+    );
+
+    let read = transport_socket::envoy_dynamic_module_on_transport_socket_do_read(
+      std::ptr::null_mut(),
+      socket_ptr,
+    );
+    assert_eq!(
+      read.action,
+      abi::envoy_dynamic_module_type_transport_socket_post_io_action::KeepOpen
+    );
+    assert!(read.end_stream_read);
+
+    let write = transport_socket::envoy_dynamic_module_on_transport_socket_do_write(
+      std::ptr::null_mut(),
+      socket_ptr,
+      true,
+    );
+    assert_eq!(
+      write.action,
+      abi::envoy_dynamic_module_type_transport_socket_post_io_action::Close
+    );
+
+    assert!(
+      transport_socket::envoy_dynamic_module_on_transport_socket_can_flush_close(
+        std::ptr::null_mut(),
+        socket_ptr,
+      )
+    );
+    assert!(
+      transport_socket::envoy_dynamic_module_on_transport_socket_start_secure_transport(
+        std::ptr::null_mut(),
+        socket_ptr,
+      )
+    );
+
+    let mut protocol_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    transport_socket::envoy_dynamic_module_on_transport_socket_get_protocol(
+      std::ptr::null_mut(),
+      socket_ptr,
+      &mut protocol_buf,
+    );
+    let protocol = std::slice::from_raw_parts(protocol_buf.ptr as *const u8, protocol_buf.length);
+    assert_eq!(protocol, b"test-proto");
+
+    let mut failure_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    transport_socket::envoy_dynamic_module_on_transport_socket_get_failure_reason(
+      std::ptr::null_mut(),
+      socket_ptr,
+      &mut failure_buf,
+    );
+    let failure = std::slice::from_raw_parts(failure_buf.ptr as *const u8, failure_buf.length);
+    assert_eq!(failure, b"test-failure");
+
+    transport_socket::envoy_dynamic_module_on_transport_socket_close(
+      std::ptr::null_mut(),
+      socket_ptr,
+      abi::envoy_dynamic_module_type_network_connection_event::LocalClose,
+      false,
+    );
+
+    transport_socket::envoy_dynamic_module_on_transport_socket_destroy(socket_ptr);
+    transport_socket::envoy_dynamic_module_on_transport_socket_factory_config_destroy(config_ptr);
+  }
+
+  assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+// =============================================================================
+// MockEnvoyTransportSocket Tests
+// =============================================================================
+
+#[test]
+fn test_mock_envoy_transport_socket_do_read() {
+  struct EchoTransportSocket;
+  impl TransportSocket<transport_socket::MockEnvoyTransportSocket> for EchoTransportSocket {
+    fn on_set_callbacks(&mut self, _envoy: &mut transport_socket::MockEnvoyTransportSocket) {}
+    fn on_connected(&mut self, _envoy: &mut transport_socket::MockEnvoyTransportSocket) {}
+    fn on_do_read(&mut self, envoy: &mut transport_socket::MockEnvoyTransportSocket) -> IoResult {
+      let mut buffer = [0u8; 8];
+      let (status, n) = envoy.io_read(&mut buffer);
+      assert_eq!(status, IoStatus::Success);
+      envoy.read_buffer_add(&buffer[..n]);
+      IoResult::keep_open(n, false)
+    }
+    fn on_do_write(
+      &mut self,
+      _envoy: &mut transport_socket::MockEnvoyTransportSocket,
+      _end_stream: bool,
+    ) -> IoResult {
+      IoResult::keep_open(0, false)
+    }
+    fn on_close(
+      &mut self,
+      _envoy: &mut transport_socket::MockEnvoyTransportSocket,
+      _event: ConnectionEvent,
+      _abort_reset: bool,
+    ) {
+    }
+    fn get_protocol(&self, _envoy: &mut transport_socket::MockEnvoyTransportSocket) -> String {
+      String::new()
+    }
+    fn get_failure_reason(
+      &self,
+      _envoy: &mut transport_socket::MockEnvoyTransportSocket,
+    ) -> String {
+      String::new()
+    }
+    fn can_flush_close(&self, _envoy: &mut transport_socket::MockEnvoyTransportSocket) -> bool {
+      true
+    }
+    fn start_secure_transport(
+      &mut self,
+      _envoy: &mut transport_socket::MockEnvoyTransportSocket,
+    ) -> bool {
+      false
+    }
+  }
+
+  let mut mock = transport_socket::MockEnvoyTransportSocket::new();
+  mock.expect_io_read().times(1).returning(|buffer| {
+    buffer[..5].copy_from_slice(b"hello");
+    (IoStatus::Success, 5)
+  });
+  mock
+    .expect_read_buffer_add()
+    .with(mockall::predicate::eq(b"hello".as_slice()))
+    .times(1)
+    .returning(|_| ());
+
+  let mut socket = EchoTransportSocket;
+  assert_eq!(socket.on_do_read(&mut mock), IoResult::keep_open(5, false));
+}
