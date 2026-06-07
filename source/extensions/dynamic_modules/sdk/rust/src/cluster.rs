@@ -151,6 +151,22 @@ pub trait EnvoyAsyncHostSelectionComplete: Send {
     host: Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>,
     details: &str,
   );
+
+  /// Access the request context again after the asynchronous work resumes.
+  ///
+  /// When [`ClusterLb::choose_host`] returns [`HostSelectionResult::AsyncPending`], Envoy does not
+  /// re-present the [`ClusterLbContext`] when the asynchronous task completes, so a module that
+  /// needs per-request inputs (filter state, headers, hash key, override host) to make its final
+  /// selection has nothing to read. The completion object retains the Envoy-owned context pointer,
+  /// which stays valid until the result is delivered via
+  /// [`EnvoyAsyncHostSelectionComplete::async_host_selection_complete`]; this returns the same
+  /// context the synchronous call would have seen, or `None` if the request had no context (the
+  /// same cases where `choose_host` receives `None`, e.g. health-check selections).
+  ///
+  /// The returned context borrows Envoy-owned per-request state. It must be used on the worker
+  /// thread that drives the completion and must not be retained past the
+  /// `async_host_selection_complete` call that delivers the result.
+  fn request_context(&self) -> Option<Box<dyn ClusterLbContext>>;
 }
 
 /// The module-side load balancer instance.
@@ -1791,6 +1807,17 @@ impl EnvoyAsyncHostSelectionComplete for EnvoyAsyncHostSelectionCompleteImpl {
       );
     }
   }
+
+  fn request_context(&self) -> Option<Box<dyn ClusterLbContext>> {
+    // A null context pointer mirrors choose_host's `None` (e.g. health-check selections).
+    if self.raw_context.is_null() {
+      return None;
+    }
+    Some(Box::new(ClusterLbContextImpl::new(
+      self.raw_context,
+      self.raw_lb,
+    )))
+  }
 }
 
 struct ClusterLbContextImpl {
@@ -2447,4 +2474,36 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_http_callout_done(
   .map_err(|panic| {
     crate::log_ffi_panic("envoy_dynamic_module_on_cluster_http_callout_done", panic);
   });
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  // The per-request accessor callbacks are satisfied by the link-time stubs in lib_test.rs.
+  #[test]
+  fn request_context_present_when_context_retained() {
+    let completion = EnvoyAsyncHostSelectionCompleteImpl {
+      raw_lb: std::ptr::null_mut(),
+      // A non-null sentinel: the per-request callback stubs ignore the pointer value.
+      raw_context: 0x1 as *mut _,
+    };
+
+    // Reads route through the per-request callbacks; the stubs report no hash / zero headers.
+    let ctx = completion
+      .request_context()
+      .expect("a retained context must be re-presented");
+    assert_eq!(ctx.compute_hash_key(), None);
+    assert_eq!(ctx.get_downstream_headers_size(), 0);
+  }
+
+  // A null context pointer yields None, matching choose_host (e.g. health-check selections).
+  #[test]
+  fn request_context_absent_when_no_context() {
+    let completion = EnvoyAsyncHostSelectionCompleteImpl {
+      raw_lb: std::ptr::null_mut(),
+      raw_context: std::ptr::null_mut(),
+    };
+    assert!(completion.request_context().is_none());
+  }
 }

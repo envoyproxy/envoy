@@ -5225,6 +5225,32 @@ fn test_async_host_selection_complete_empty_details() {
 }
 
 #[test]
+fn test_async_host_selection_request_context() {
+  // On resume the module reads the re-presented context (here a hash key and header count).
+  let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+  mock_completion.expect_request_context().returning(|| {
+    let mut ctx = cluster::MockClusterLbContext::new();
+    ctx.expect_compute_hash_key().returning(|| Some(4242));
+    ctx.expect_get_downstream_headers_size().returning(|| 3);
+    Some(Box::new(ctx))
+  });
+
+  let ctx = mock_completion
+    .request_context()
+    .expect("context present on resume");
+  assert_eq!(ctx.compute_hash_key(), Some(4242));
+  assert_eq!(ctx.get_downstream_headers_size(), 3);
+}
+
+#[test]
+fn test_async_host_selection_request_context_absent() {
+  // No context (e.g. health-check selections) is reported as None, matching choose_host.
+  let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+  mock_completion.expect_request_context().returning(|| None);
+  assert!(mock_completion.request_context().is_none());
+}
+
+#[test]
 fn test_async_host_selection_with_stored_completion() {
   struct DnsResolvingLb {
     pending_completion: Option<Box<dyn cluster::EnvoyAsyncHostSelectionComplete>>,
