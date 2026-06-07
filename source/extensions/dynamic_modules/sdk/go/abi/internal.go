@@ -2401,13 +2401,59 @@ type statSinkWrapper struct {
 	handle *dymStatSinkHandle
 }
 
-// dymStatSinkHandle implements shared.StatSinkHandle. Today it only carries
-// logging. It is kept as a struct so we can add fields (worker index, shared
-// data) without changing the interface contract.
-type dymStatSinkHandle struct{}
+// dymStatSinkHandle implements shared.StatSinkHandle. It carries the Envoy-side
+// configuration pointer used to define and set gauges and, lazily, a scheduler
+// whose committed tasks run on the main thread.
+type dymStatSinkHandle struct {
+	hostConfigPtr C.envoy_dynamic_module_type_stat_sink_config_envoy_ptr
+	scheduler     *dymScheduler
+}
 
-func (*dymStatSinkHandle) Log(level shared.LogLevel, format string, args ...any) {
+func (h *dymStatSinkHandle) Log(level shared.LogLevel, format string, args ...any) {
 	hostLog(level, format, args)
+}
+
+func (h *dymStatSinkHandle) DefineGauge(name string) (shared.MetricID, shared.MetricsResult) {
+	var metricID C.size_t = 0
+	result := C.envoy_dynamic_module_callback_stat_sink_config_define_gauge(
+		h.hostConfigPtr,
+		stringToModuleBuffer(name),
+		&metricID,
+	)
+	runtime.KeepAlive(name)
+	return shared.MetricID(metricID), shared.MetricsResult(result)
+}
+
+func (h *dymStatSinkHandle) SetGauge(id shared.MetricID, value uint64) shared.MetricsResult {
+	return shared.MetricsResult(C.envoy_dynamic_module_callback_stat_sink_config_set_gauge(
+		h.hostConfigPtr,
+		C.size_t(id),
+		C.uint64_t(value),
+	))
+}
+
+func (h *dymStatSinkHandle) GetScheduler() shared.Scheduler {
+	if h.scheduler == nil {
+		// The scheduler is created lazily and should never be nil in
+		// practice. But it will be nil in mock tests.
+		schedulerPtr := C.envoy_dynamic_module_callback_stat_sink_config_scheduler_new(
+			h.hostConfigPtr)
+		h.scheduler = newDymScheduler(
+			unsafe.Pointer(schedulerPtr),
+			func(schedulerPtr unsafe.Pointer, taskID C.uint64_t) {
+				C.envoy_dynamic_module_callback_stat_sink_config_scheduler_commit(
+					(C.envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr)(schedulerPtr),
+					taskID,
+				)
+			},
+		)
+		runtime.SetFinalizer(h.scheduler, func(s *dymScheduler) {
+			C.envoy_dynamic_module_callback_stat_sink_config_scheduler_delete(
+				(C.envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr)(s.schedulerPtr),
+			)
+		})
+	}
+	return h.scheduler
 }
 
 // dymMetricSnapshot implements shared.MetricSnapshot by delegating to the
@@ -2493,14 +2539,14 @@ var statSinkConfigManager = newManager[statSinkWrapper]()
 
 //export envoy_dynamic_module_on_stat_sink_config_new
 func envoy_dynamic_module_on_stat_sink_config_new(
-	_ C.envoy_dynamic_module_type_stat_sink_config_envoy_ptr,
+	configEnvoyPtr C.envoy_dynamic_module_type_stat_sink_config_envoy_ptr,
 	name C.envoy_dynamic_module_type_envoy_buffer,
 	config C.envoy_dynamic_module_type_envoy_buffer,
 ) C.envoy_dynamic_module_type_stat_sink_config_module_ptr {
 	nameString := envoyBufferToStringUnsafe(name)
 	configBytes := envoyBufferToBytesUnsafe(config)
 
-	handle := &dymStatSinkHandle{}
+	handle := &dymStatSinkHandle{hostConfigPtr: configEnvoyPtr}
 	sink, err := sdk.NewStatSink(handle, nameString, configBytes)
 	if err != nil || sink == nil {
 		handle.Log(shared.LogLevelWarn, "Failed to load stats sink configuration: %v", err)
@@ -2519,6 +2565,10 @@ func envoy_dynamic_module_on_stat_sink_config_destroy(
 	if wrapper == nil {
 		return
 	}
+	// Drop the scheduler reference so its finalizer can release the Envoy-side resource. Envoy never
+	// schedules another event for this config after destroy, so dropping the reference cannot strand a
+	// task that would otherwise run.
+	wrapper.handle.scheduler = nil
 	wrapper.sink.OnDestroy()
 	statSinkConfigManager.remove(unsafe.Pointer(configPtr))
 }
@@ -2547,4 +2597,17 @@ func envoy_dynamic_module_on_stat_sink_on_histogram_complete(
 		return
 	}
 	wrapper.sink.OnHistogramComplete(envoyBufferToUnsafeEnvoyBuffer(histogramName), uint64(value))
+}
+
+//export envoy_dynamic_module_on_stat_sink_config_scheduled
+func envoy_dynamic_module_on_stat_sink_config_scheduled(
+	_ C.envoy_dynamic_module_type_stat_sink_config_envoy_ptr,
+	configPtr C.envoy_dynamic_module_type_stat_sink_config_module_ptr,
+	taskID C.uint64_t,
+) {
+	wrapper := statSinkConfigManager.unwrap(unsafe.Pointer(configPtr))
+	if wrapper == nil || wrapper.handle == nil || wrapper.handle.scheduler == nil {
+		return
+	}
+	wrapper.handle.scheduler.onScheduled(uint64(taskID))
 }

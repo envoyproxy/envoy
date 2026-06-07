@@ -2,8 +2,10 @@
 
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/stat_sinks/dynamic_modules/flush_context.h"
+#include "source/extensions/stat_sinks/dynamic_modules/sink_config.h"
 
 #include "test/extensions/dynamic_modules/stat_sink/test_util.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -15,6 +17,8 @@ namespace StatSinks {
 namespace DynamicModules {
 namespace {
 
+using testing::_;
+using testing::Invoke;
 using testing::NiceMock;
 using testing::ReturnRef;
 
@@ -288,6 +292,23 @@ TEST_F(DynamicModuleStatsSinkAbiTest, GetTextReadoutEmptyValue) {
   EXPECT_EQ('Y', value_buffer[0]);
 }
 
+// A zero-capacity value buffer is a length query, so the full value size is reported and nothing is
+// written even when the value is non-empty. This is the first call a module makes before sizing its
+// buffer, so the null buffer must not be de-referenced.
+TEST_F(DynamicModuleStatsSinkAbiTest, GetTextReadoutValueLengthQuery) {
+  t0_.name_ = "version";
+  t0_.value_ = "1.28.0"; // 6 bytes.
+  snapshot_.text_readouts_.push_back(t0_);
+
+  char name_buffer[256];
+  size_t name_size = 0;
+  size_t value_size = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(
+      snapshotHandle(), 0, name_buffer, sizeof(name_buffer), &name_size, nullptr, 0, &value_size));
+  EXPECT_EQ("version", written(name_buffer, name_size, sizeof(name_buffer)));
+  EXPECT_EQ(6u, value_size);
+}
+
 // Both the name and value honor the truncation-and-retry contract independently.
 TEST_F(DynamicModuleStatsSinkAbiTest, GetTextReadoutValueTruncated) {
   t0_.name_ = "control_plane";
@@ -352,6 +373,68 @@ TEST_F(DynamicModuleStatsSinkAbiTest, GetTextReadoutOutOfRange) {
   EXPECT_EQ(54321u, value_size);
   EXPECT_EQ('Z', name_buffer[0]);
   EXPECT_EQ('Y', value_buffer[0]);
+}
+
+// =============================================================================
+// Config gauge and scheduler callbacks
+// =============================================================================
+
+// Exercises the C ABI callbacks the module uses to define and publish gauges and to schedule events
+// back to the main thread, driving them through a real configuration object.
+class DynamicModuleStatsSinkConfigAbiTest : public testing::Test {
+public:
+  envoy_dynamic_module_type_stat_sink_config_envoy_ptr configHandle() { return config_.get(); }
+
+  static envoy_dynamic_module_type_module_buffer buffer(absl::string_view value) {
+    return {value.data(), value.size()};
+  }
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  DynamicModuleStatsSinkConfigSharedPtr config_{std::make_shared<DynamicModuleStatsSinkConfig>(
+      "test_sink", "test_config", /*dynamic_module=*/nullptr, context_)};
+};
+
+TEST_F(DynamicModuleStatsSinkConfigAbiTest, DefineAndSetGauge) {
+  size_t id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_stat_sink_config_define_gauge(configHandle(), buffer("g"),
+                                                                        &id));
+  EXPECT_EQ(1u, id);
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_stat_sink_config_set_gauge(configHandle(), id, 99));
+
+  auto gauge = TestUtility::findGauge(context_.store_, "g");
+  ASSERT_NE(nullptr, gauge);
+  EXPECT_EQ(99u, gauge->value());
+}
+
+TEST_F(DynamicModuleStatsSinkConfigAbiTest, SetGaugeInvalidIdReturnsMetricNotFound) {
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_stat_sink_config_set_gauge(configHandle(), 1, 1));
+}
+
+// The scheduler created, committed, and deleted through the ABI runs the scheduled hook on the main
+// thread, which publishes the committed event id into the gauge via the set_gauge ABI callback.
+TEST_F(DynamicModuleStatsSinkConfigAbiTest, SchedulerNewCommitDelete) {
+  size_t id = 0;
+  ASSERT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_stat_sink_config_define_gauge(configHandle(), buffer("g"),
+                                                                        &id));
+  config_->on_config_scheduled_ =
+      [](envoy_dynamic_module_type_stat_sink_config_envoy_ptr config_envoy_ptr,
+         envoy_dynamic_module_type_stat_sink_config_module_ptr, uint64_t event_id) {
+        envoy_dynamic_module_callback_stat_sink_config_set_gauge(config_envoy_ptr, 1, event_id);
+      };
+
+  auto* scheduler = envoy_dynamic_module_callback_stat_sink_config_scheduler_new(configHandle());
+  ASSERT_NE(nullptr, scheduler);
+  EXPECT_CALL(context_.dispatcher_, post(_)).WillOnce(Invoke([](Event::PostCb cb) { cb(); }));
+  envoy_dynamic_module_callback_stat_sink_config_scheduler_commit(scheduler, 77);
+  envoy_dynamic_module_callback_stat_sink_config_scheduler_delete(scheduler);
+
+  auto gauge = TestUtility::findGauge(context_.store_, "g");
+  ASSERT_NE(nullptr, gauge);
+  EXPECT_EQ(77u, gauge->value());
 }
 
 } // namespace

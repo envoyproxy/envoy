@@ -12406,6 +12406,22 @@ typedef const void* envoy_dynamic_module_type_stat_sink_config_module_ptr;
  */
 typedef void* envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr;
 
+/**
+ * envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr is a raw pointer to the
+ * DynamicModuleStatsSinkConfigScheduler class in Envoy.
+ *
+ * The scheduler dispatches events from any thread to the stats sink configuration on the main
+ * thread, which lets a module aggregate metrics off the main thread and publish the results back
+ * safely. It is created by envoy_dynamic_module_callback_stat_sink_config_scheduler_new, used via
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_commit, and destroyed by
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_delete.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Since its lifecycle is owned by the module, this has the _module_ptr
+ * suffix.
+ */
+typedef void* envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr;
+
 // =============================================================================
 // Stats Sink Event Hooks
 // =============================================================================
@@ -12462,6 +12478,24 @@ void envoy_dynamic_module_on_stat_sink_flush(
 void envoy_dynamic_module_on_stat_sink_on_histogram_complete(
     envoy_dynamic_module_type_stat_sink_config_module_ptr config_module_ptr,
     envoy_dynamic_module_type_envoy_buffer histogram_name, uint64_t value);
+
+/**
+ * envoy_dynamic_module_on_stat_sink_config_scheduled is called when an event committed via
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_commit is dispatched.
+ *
+ * This is called on the main thread. It is the place to publish gauges aggregated off the main
+ * thread back into Envoy via envoy_dynamic_module_callback_stat_sink_config_set_gauge.
+ *
+ * This hook is optional. Modules that do not schedule events do not need to implement it.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleStatsSinkConfig object in Envoy.
+ * @param config_module_ptr is the pointer to the in-module configuration object.
+ * @param event_id is the value passed to
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_commit.
+ */
+void envoy_dynamic_module_on_stat_sink_config_scheduled(
+    envoy_dynamic_module_type_stat_sink_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_stat_sink_config_module_ptr config_module_ptr, uint64_t event_id);
 
 // =============================================================================
 // Stats Sink Callbacks
@@ -12563,6 +12597,85 @@ bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
     char* name_buffer, size_t name_buffer_capacity, size_t* name_size, char* value_buffer,
     size_t value_buffer_capacity, size_t* value_size);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_config_define_gauge creates a gauge with the given name
+ * that the module can update later via envoy_dynamic_module_callback_stat_sink_config_set_gauge.
+ *
+ * This must only be called during envoy_dynamic_module_on_stat_sink_config_new. Calls made after
+ * the configuration is created return envoy_dynamic_module_type_metrics_result_Frozen.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleStatsSinkConfig object in Envoy.
+ * @param name is the name of the gauge to define. Valid only during this call.
+ * @param gauge_id_ptr is where the opaque id identifying the gauge is stored. The id can be passed
+ * to envoy_dynamic_module_callback_stat_sink_config_set_gauge.
+ * @return envoy_dynamic_module_type_metrics_result_Success on success, or
+ * envoy_dynamic_module_type_metrics_result_Frozen if called after the configuration is created.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_stat_sink_config_define_gauge(
+    envoy_dynamic_module_type_stat_sink_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* gauge_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_config_set_gauge sets the value of a gauge previously
+ * defined via envoy_dynamic_module_callback_stat_sink_config_define_gauge.
+ *
+ * This must be called on the main thread, typically from the
+ * envoy_dynamic_module_on_stat_sink_config_scheduled event hook.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleStatsSinkConfig object in Envoy.
+ * @param gauge_id is the id returned by
+ * envoy_dynamic_module_callback_stat_sink_config_define_gauge.
+ * @param value is the value to set the gauge to.
+ * @return envoy_dynamic_module_type_metrics_result_Success on success, or
+ * envoy_dynamic_module_type_metrics_result_MetricNotFound if the id does not identify a gauge.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_stat_sink_config_set_gauge(
+    envoy_dynamic_module_type_stat_sink_config_envoy_ptr config_envoy_ptr, size_t gauge_id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_new creates a new stats sink
+ * configuration scheduler. The scheduler dispatches events to the stats sink configuration on the
+ * main thread from any thread, including the ones managed by the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleStatsSinkConfig object in Envoy.
+ * @return a pointer to the created scheduler.
+ *
+ * NOTE: it is the caller's responsibility to delete the scheduler using
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_delete when it is no longer needed.
+ * See the comment on envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr.
+ */
+envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr
+envoy_dynamic_module_callback_stat_sink_config_scheduler_new(
+    envoy_dynamic_module_type_stat_sink_config_envoy_ptr config_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_commit schedules an event to the stats
+ * sink configuration on the main thread. This eventually invokes the
+ * envoy_dynamic_module_on_stat_sink_config_scheduled event hook on the main thread.
+ *
+ * This can be called multiple times to schedule multiple events to the same configuration.
+ *
+ * @param scheduler_module_ptr is the pointer to the scheduler created by
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_new.
+ * @param event_id is the id of the event. It can be any module-defined value and is passed back to
+ * the envoy_dynamic_module_on_stat_sink_config_scheduled event hook.
+ */
+void envoy_dynamic_module_callback_stat_sink_config_scheduler_commit(
+    envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_delete deletes the scheduler created by
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_new.
+ *
+ * @param scheduler_module_ptr is the pointer to the scheduler created by
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_new.
+ */
+void envoy_dynamic_module_callback_stat_sink_config_scheduler_delete(
+    envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr scheduler_module_ptr);
 
 #ifdef __cplusplus
 }

@@ -65,10 +65,23 @@ sink_config:
   }
 };
 
+// The Rust test module aggregates flush snapshots on a worker thread and hands them back over an
+// `mpsc` channel. Its shared library is not ThreadSanitizer instrumented, the same Rust toolchain
+// limitation that keeps the Rust SDK unit test off TSAN, so the sanitizer cannot see the worker
+// synchronization and reports false data races. The Go module hands data back through the Go heap,
+// which ThreadSanitizer does not track, so it stays enabled.
+std::vector<std::string> testModuleLanguages() {
+#if defined(__has_feature) && __has_feature(thread_sanitizer)
+  return {"c", "go"};
+#else
+  return {"c", "go", "rust"};
+#endif
+}
+
 INSTANTIATE_TEST_SUITE_P(
     IpVersionsAndLanguages, DynamicModulesStatsSinkIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values("c", "go", "rust")),
+                     testing::ValuesIn(testModuleLanguages())),
     DynamicModulesStatsSinkIntegrationTest::testParamsToString);
 
 TEST_P(DynamicModulesStatsSinkIntegrationTest, BasicFlush) {
@@ -102,6 +115,21 @@ TEST_P(DynamicModulesStatsSinkIntegrationTest, FlushAfterTraffic) {
                                  {"info", "stat sink integration test: histogram complete"},
                              }),
                              body());
+}
+
+// The Rust and Go modules aggregate each flush snapshot on a worker thread and commit the result
+// back to the main thread, where the scheduled hook publishes it into a gauge. Waiting for the
+// gauge to reach a non-zero value proves the full off-main-thread round trip works end to end. The
+// snapshot is copied on the main thread, aggregated on the worker, committed, then published on the
+// main thread via the scheduler and gauge callbacks.
+TEST_P(DynamicModulesStatsSinkIntegrationTest, OffThreadAggregationPublishesGauge) {
+  if (language() == "c") {
+    GTEST_SKIP() << "off-thread aggregation is only implemented in the Rust and Go test modules";
+  }
+  addStatSinkAndInitialize();
+  // The gauge name has no prefix, so the published value is the sum of the flush snapshot counter
+  // values, which becomes non-zero as Envoy increments counters.
+  test_server_->waitForGauge("integration_aggregated_counters", testing::Ge(1));
 }
 
 } // namespace

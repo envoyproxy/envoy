@@ -4,11 +4,12 @@
 // public module API.
 package buffer
 
-// Fill decodes a single value into buf, growing it and retrying when the value did not fit. fill
-// writes up to cap(buf) bytes and returns the full size of the value and whether it exists. On
-// success the returned slice holds exactly the bytes written. When the value does not exist, buf is
-// returned unchanged with false. The size is stable during a flush, so this converges in at most
-// two iterations. Pass buf[:0] and assign the result back to reuse the allocation.
+// Fill decodes a single value into buf, growing it and retrying when the value did not fit. The
+// fill callback writes up to cap(buf) bytes and returns the full size of the value and whether it
+// exists. On success the returned slice holds exactly the bytes written. When the value does not
+// exist, buf is returned unchanged with false. The size is stable during a flush, so this
+// converges in at most two iterations. Pass buf[:0] and assign the result back to reuse the
+// allocation.
 func Fill(buf []byte, fill func(buf []byte) (size uint64, ok bool)) ([]byte, bool) {
 	for {
 		size, ok := fill(buf)
@@ -23,10 +24,11 @@ func Fill(buf []byte, fill func(buf []byte) (size uint64, ok bool)) ([]byte, boo
 }
 
 // FillTwo decodes a name and a value produced by a single call, growing whichever did not fit and
-// retrying until both fit. fill rewrites both buffers on every call, so a retry repopulates the one
-// that already fit before the final reslice. Both sizes are stable during a flush, so this
-// converges in at most two iterations. When the value does not exist, the buffers are returned
-// unchanged with false. nameBuf and valueBuf must not share a backing array.
+// retrying until both fit. The fill callback rewrites both buffers on every call, so a retry
+// repopulates the one that already fit before the final reslice. Both sizes are stable during a
+// flush, so this converges in at most two iterations. When the value does not exist, the buffers
+// are returned unchanged with false. The nameBuf and valueBuf slices must not share a backing
+// array.
 func FillTwo(
 	nameBuf, valueBuf []byte,
 	fill func(nameBuf, valueBuf []byte) (nameSize, valueSize uint64, ok bool),

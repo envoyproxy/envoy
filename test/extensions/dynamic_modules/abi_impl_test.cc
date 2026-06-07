@@ -1316,6 +1316,17 @@ WEAK_STUB(StatSinkSnapshotGetTextReadout,
           envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(nullptr, 0, nullptr, 0,
                                                                             nullptr, nullptr, 0,
                                                                             nullptr))
+WEAK_STUB(StatSinkConfigDefineGauge,
+          envoy_dynamic_module_callback_stat_sink_config_define_gauge(nullptr, {nullptr, 0},
+                                                                      nullptr))
+WEAK_STUB(StatSinkConfigSetGauge,
+          envoy_dynamic_module_callback_stat_sink_config_set_gauge(nullptr, 0, 0))
+WEAK_STUB(StatSinkConfigSchedulerNew,
+          envoy_dynamic_module_callback_stat_sink_config_scheduler_new(nullptr))
+WEAK_STUB(StatSinkConfigSchedulerCommit,
+          envoy_dynamic_module_callback_stat_sink_config_scheduler_commit(nullptr, 0))
+WEAK_STUB(StatSinkConfigSchedulerDelete,
+          envoy_dynamic_module_callback_stat_sink_config_scheduler_delete(nullptr))
 
 // Tests for the additional weak stubs added for ABI declarations missing from abi_impl.cc.
 WEAK_STUB(HttpFilterConfigDefineCounter,
