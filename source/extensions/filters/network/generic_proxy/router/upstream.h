@@ -320,7 +320,6 @@ protected:
       encoder_decoder = data.get();
       connection.streamInfo().filterState()->setData(RouterFilterEncoderDecoderName,
                                                      std::move(data),
-                                                     StreamInfo::FilterState::StateType::Mutable,
                                                      StreamInfo::FilterState::LifeSpan::Connection);
     }
     return encoder_decoder;

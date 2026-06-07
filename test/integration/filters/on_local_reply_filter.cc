@@ -7,6 +7,7 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 namespace Envoy {
 
@@ -44,9 +45,13 @@ public:
   bool dual_reply_{};
 };
 
-class OnLocalReplyFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpDualFilterConfig {
+class OnLocalReplyFilterConfig
+    : public Extensions::HttpFilters::Common::UniqueEmptyHttpDualFilterConfig<
+          test::integration::filters::OnLocalReplyFilterConfig> {
 public:
-  OnLocalReplyFilterConfig() : EmptyHttpDualFilterConfig("on-local-reply-filter") {}
+  OnLocalReplyFilterConfig()
+      : UniqueEmptyHttpDualFilterConfig<test::integration::filters::OnLocalReplyFilterConfig>(
+            "on-local-reply-filter") {}
   absl::StatusOr<Http::FilterFactoryCb>
   createDualFilter(const std::string&, Server::Configuration::ServerFactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {

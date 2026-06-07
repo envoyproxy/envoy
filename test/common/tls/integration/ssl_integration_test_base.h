@@ -20,6 +20,7 @@ public:
 
   void initialize() override;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void TearDown();
 
   Network::ClientConnectionPtr makeSslConn() { return makeSslClientConnection({}); }

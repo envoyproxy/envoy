@@ -1,4 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+load("//bazel:toolchains.bzl", "LIBCLANG_CPP", "LIBLLVM")
 
 licenses(["notice"])  # Apache 2
 
@@ -12,8 +13,8 @@ cc_binary(
     name = "prefixer",
     srcs = ["prefixer.cpp"],
     additional_linker_inputs = [
-        "@llvm_toolchain_llvm//:lib/libclang-cpp.so.18.1",
-    ],
+        LIBCLANG_CPP,
+    ] + ([LIBLLVM] if LIBLLVM else []),
     copts = [
         "-fno-rtti",  # Required by libclang-cpp
         "-isystem external/llvm_toolchain_llvm/include",
@@ -24,8 +25,8 @@ cc_binary(
         "-isystem external/sysroot_linux_amd64/usr/include/x86_64-linux-gnu/c++/13",
     ],
     linkopts = [
-        # Directly link to the versioned shared library
-        "$(location @llvm_toolchain_llvm//:lib/libclang-cpp.so.18.1)",
+        "$(location " + LIBCLANG_CPP + ")",
+    ] + (["$(location " + LIBLLVM + ")"] if LIBLLVM else []) + [
         "-Wl,-rpath,$$ORIGIN/../lib",
         # Use libstdc++ for ABI compatibility with libclang-cpp
         "-stdlib=libstdc++",

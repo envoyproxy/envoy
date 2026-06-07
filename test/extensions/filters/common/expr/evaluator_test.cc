@@ -15,8 +15,6 @@ namespace Common {
 namespace Expr {
 namespace {
 
-using ::testing::MatchesRegex;
-
 TEST(Evaluator, Print) {
   EXPECT_EQ(print(CelValue::CreateBool(false)), "false");
   EXPECT_EQ(print(CelValue::CreateInt64(123)), "123");

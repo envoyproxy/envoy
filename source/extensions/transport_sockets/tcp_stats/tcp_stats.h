@@ -13,6 +13,7 @@
 #include "source/extensions/transport_sockets/common/passthrough.h"
 
 // Defined in /usr/include/linux/tcp.h.
+// NOLINTNEXTLINE(readability-identifier-naming)
 struct tcp_info;
 
 namespace Envoy {

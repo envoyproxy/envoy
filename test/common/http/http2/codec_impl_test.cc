@@ -1863,7 +1863,7 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServerIfLocalEndStreamBefor
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
   EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AnyNumber());
   EXPECT_CALL(response_decoder_, decodeData(_, true));
-  EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::RemoteReset, _));
+  EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::RemoteResetNoError, _));
   driveToCompletion();
   EXPECT_TRUE(client_wrapper_->status_.ok());
 }
@@ -3089,6 +3089,56 @@ TEST_P(Http2CodecImplTest, ManyRequestHeadersInvokeResetStream) {
   EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
   driveToCompletion();
+}
+
+// Tests stream reset when the size of request headers (including cookies)
+// exceeds the limit.
+TEST_P(Http2CodecImplTest, HeaderListSizeTooLargeWithCookies) {
+  max_request_headers_kb_ = 5;
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  // Add many small cookies that exceed the limit in total
+  for (int i = 0; i < 60; i++) {
+    request_headers.addCopy("cookie", std::string(100, 'a'));
+  }
+
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _));
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  if (http2_implementation_ != Http2Impl::Oghttp2) {
+    // oghttp2 resets the stream from within the codec
+    EXPECT_EQ(1, server_stats_store_.counter("http2.header_list_size_too_large").value());
+  }
+}
+
+// Tests stream reset when the size of request headers (excluding cookies)
+// exceeds the limit.
+TEST_P(Http2CodecImplTest, HeaderListSizeTooLargeWithoutCookies) {
+  max_request_headers_kb_ = 5;
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  // Add many small headers that exceed the limit in total
+  for (int i = 0; i < 60; i++) {
+    request_headers.addCopy(std::to_string(i), std::string(100, 'a'));
+  }
+
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _));
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  if (http2_implementation_ != Http2Impl::Oghttp2) {
+    // oghttp2 resets the stream from within the codec
+    EXPECT_EQ(1, server_stats_store_.counter("http2.header_list_size_too_large").value());
+  }
 }
 
 // Tests that max number of request headers is configurable.
@@ -4592,6 +4642,7 @@ TEST_P(Http2CodecImplTest, ChunkProcessingShouldNotScheduleIfReadDisabled) {
 }
 
 TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointCanCauseServerToSendGoAway) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.http2_fix_goaway_loadshed_point", false);
   initialize();
   ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
 
@@ -4613,6 +4664,7 @@ TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointCanCauseServerToSendGoAway
 }
 
 TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointSendGoAwayAndClose) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.http2_fix_goaway_loadshed_point", false);
   expect_buffered_data_on_teardown_ = true;
 
   initialize();
@@ -4633,6 +4685,8 @@ TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointSendGoAwayAndClose) {
 }
 
 TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointsAreOnlyConsultedOncePerDispatch) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.http2_fix_goaway_loadshed_point", false);
+
   initialize();
 
   int times_shed_load_goaway_invoked = 0;

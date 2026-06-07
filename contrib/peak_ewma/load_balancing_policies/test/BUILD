@@ -30,7 +30,7 @@ envoy_cc_test(
         "//source/common/protobuf:utility_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//contrib/envoy/extensions/load_balancing_policies/peak_ewma/v3alpha:pkg_cc_proto",

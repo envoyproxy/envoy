@@ -33,6 +33,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, OnDemandScopedRdsIntegrationTes
 TEST_P(OnDemandScopedRdsIntegrationTest, OnDemandUpdateSuccess) {
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
     )EOF");
   const std::string scope_route1 = R"EOF(
 name: foo_scope1
@@ -85,6 +87,8 @@ TEST_P(OnDemandScopedRdsIntegrationTest, OnDemandUpdateScopeNotMatch) {
 
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
     )EOF");
 
   constexpr absl::string_view scope_tmpl = R"EOF(
@@ -135,6 +139,8 @@ TEST_P(OnDemandScopedRdsIntegrationTest, OnDemandUpdatePrimaryVirtualHostNotMatc
 
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
     )EOF");
 
   constexpr absl::string_view scope_tmpl = R"EOF(
@@ -185,6 +191,8 @@ TEST_P(OnDemandScopedRdsIntegrationTest, OnDemandUpdateVirtualHostNotMatch) {
 
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
     )EOF");
 
   const std::string scope_route1 = R"EOF(
@@ -239,6 +247,8 @@ key:
 TEST_P(OnDemandScopedRdsIntegrationTest, DifferentPriorityScopeShareRoute) {
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
     )EOF");
 
   const std::string scope_route1 = R"EOF(
@@ -295,6 +305,8 @@ key:
 TEST_P(OnDemandScopedRdsIntegrationTest, OnDemandUpdateAfterActiveStreamDestroyed) {
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
     )EOF");
   const std::string scope_route1 = R"EOF(
 name: foo_scope1
@@ -343,6 +355,8 @@ class OnDemandVhdsIntegrationTest : public VhdsIntegrationTest {
   void initialize() override {
     config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
     )EOF");
     VhdsIntegrationTest::initialize();
   }
@@ -839,6 +853,8 @@ public:
                                       isUnified() ? "true" : "false");
     config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
     )EOF");
   }
 

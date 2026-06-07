@@ -298,6 +298,22 @@ fn test_dynamic_metadata_callbacks_on_response_body() {
     .withf(|_, ns, key| ns == "ns_req_header" && key == "key")
     .returning(|_, _, _| None)
     .once();
+  // String-batch metadata with one populated namespace and one empty no-op batch.
+  envoy_filter
+    .expect_set_dynamic_metadata_string_batch()
+    .withf(|ns, entries| {
+      ns == "ns_req_header_batch"
+        && entries.len() == 2
+        && entries[0] == ("k1", "v1")
+        && entries[1] == ("k2", "v2")
+    })
+    .return_const(())
+    .once();
+  envoy_filter
+    .expect_set_dynamic_metadata_string_batch()
+    .withf(|ns, entries| ns == "ns_req_header_batch_empty" && entries.is_empty())
+    .return_const(())
+    .once();
   // Route/Cluster/Host metadata.
   envoy_filter
     .expect_get_metadata_string()

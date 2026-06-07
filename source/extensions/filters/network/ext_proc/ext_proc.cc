@@ -110,7 +110,6 @@ void NetworkExtProcFilter::initializeLoggingInfo() {
           NetworkFilterNames::get().NetworkExternalProcessor)) {
     filter_state->setData(NetworkFilterNames::get().NetworkExternalProcessor,
                           std::make_shared<NetworkExtProcLoggingInfo>(),
-                          Envoy::StreamInfo::FilterState::StateType::Mutable,
                           Envoy::StreamInfo::FilterState::LifeSpan::Connection);
   }
 
@@ -275,14 +274,6 @@ void NetworkExtProcFilter::handleMessageTimeout(bool is_read) {
   read_pending_ = false;
   write_pending_ = false;
 
-  // Re-enable close callbacks for both directions
-  if (disable_count_read_ > 0) {
-    updateCloseCallbackStatus(false, true);
-  }
-  if (disable_count_write_ > 0) {
-    updateCloseCallbackStatus(false, false);
-  }
-
   closeStream();
 
   // Handle timeout based on failure mode
@@ -371,6 +362,17 @@ void NetworkExtProcFilter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&
     return;
   }
 
+  if (response->has_dynamic_metadata()) {
+    const auto& response_metadata = response->dynamic_metadata();
+    for (const auto& [key, value] : response_metadata.fields()) {
+      if (config_->untypedReceivingMetadataNamespaces().contains(key)) {
+        if (value.has_struct_value()) {
+          read_callbacks_->connection().streamInfo().setDynamicMetadata(key, value.struct_value());
+        }
+      }
+    }
+  }
+
   if (response->has_read_data()) {
     const auto& data = response->read_data();
     if (timeout_manager_ && read_pending_) {
@@ -401,6 +403,17 @@ void NetworkExtProcFilter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&
   } else {
     ENVOY_CONN_LOG(debug, "Response contained no data, continuing", read_callbacks_->connection());
     stats_.empty_response_received_.inc();
+  }
+
+  // Check if we should close the sidestream and bypass further processing.
+  if (response->close_stream_to_ext_proc_server()) {
+    ENVOY_CONN_LOG(
+        debug,
+        "External processor requested to close sidestream. Future data will bypass ext_proc.",
+        read_callbacks_->connection());
+    processing_complete_ = true;
+
+    closeStream();
   }
 }
 
@@ -468,6 +481,20 @@ void NetworkExtProcFilter::closeStream() {
   write_call_start_time_ = absl::nullopt;
   read_call_start_time_ = absl::nullopt;
 
+  // Ensure that any pending close-disabling is balanced and re-enabled.
+  // If the sidestream is closed early (e.g. with close_stream_to_ext_proc_server, timeout,
+  // or gRPC error), the close callbacks would remain disabled indefinitely, leading to
+  // connection leaks. Regardless of how many outstanding requests were sent, calling
+  // disableClose(false) once completely re-enables closure.
+  if (disable_count_read_ > 0) {
+    read_callbacks_->disableClose(false);
+    disable_count_read_ = 0;
+  }
+  if (disable_count_write_ > 0) {
+    write_callbacks_->disableClose(false);
+    disable_count_write_ = 0;
+  }
+
   if (stream_ == nullptr) {
     return;
   }
@@ -486,9 +513,7 @@ void NetworkExtProcFilter::closeConnection(const std::string& reason,
       info, "Closing connection: {}, close_type: {}", read_callbacks_->connection(), reason,
       close_type == Network::ConnectionCloseType::FlushWrite ? "FlushWrite" : "AbortReset");
 
-  // Ensure all callbacks are enabled before closing
-  read_callbacks_->disableClose(false);
-  write_callbacks_->disableClose(false);
+  closeStream();
   read_callbacks_->connection().close(close_type, reason);
 
   // Track different types of closures in stats

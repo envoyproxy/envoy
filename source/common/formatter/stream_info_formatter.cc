@@ -372,6 +372,18 @@ const absl::flat_hash_map<absl::string_view, CommonDurationFormatter::TimePointG
            }
            return {};
          }},
+        {DownstreamConnectionBegin,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           return stream_info.startTimeMonotonic();
+         }},
+        {DownstreamConnectionEnd,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto downstream_timing = stream_info.downstreamTiming();
+           if (downstream_timing.has_value()) {
+             return downstream_timing->downstreamConnectionEnd();
+           }
+           return {};
+         }},
         {UpstreamConnectStart,
          [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
            const auto upstream_info = stream_info.upstreamInfo();
@@ -2572,7 +2584,10 @@ public:
     THROW_IF_NOT_OK(Envoy::Formatter::CommandSyntaxChecker::verifySyntax(
         (*it).second.first, command, sub_command, max_length));
 
-    return (*it).second.second(sub_command, max_length);
+    StreamInfoFormatterResult result = (*it).second.second(sub_command, max_length);
+    THROW_IF_NOT_OK_REF(result.status());
+
+    return (std::move(result)).value();
   }
 };
 

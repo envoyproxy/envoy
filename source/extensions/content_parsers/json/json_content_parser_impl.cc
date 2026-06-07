@@ -47,8 +47,7 @@ ContentParser::ParseResult JsonContentParserImpl::parse(absl::string_view data) 
   bool all_rules_have_limits = true;
   bool all_limited_rules_satisfied = true;
 
-  for (size_t i = 0; i < rules_.size(); ++i) {
-    auto& rule = rules_[i];
+  for (auto& rule : rules_) {
 
     // Track if any rule has no limit
     if (rule.stop_processing_after_matches_ == 0) {

@@ -242,6 +242,24 @@ public:
   std::string toString(const StatName& stat_name) const;
 
   /**
+   * Serializes stat_name to the same period-delimited form as toString() directly into a
+   * caller-provided buffer, without allocating. This lets callers that already own a buffer, such
+   * as stats sinks during flush, avoid the per-name std::string allocation that toString() incurs.
+   *
+   * At most buffer_size bytes are written and no null terminator is added. The symbol-table lock is
+   * acquired once for the call, so this suits periodic operations such as the stats flush rather
+   * than the request hot path.
+   *
+   * @param stat_name the stat name to serialize.
+   * @param buffer the destination buffer. May be null only if buffer_size is 0, which makes this a
+   *               length query that writes nothing.
+   * @param buffer_size the capacity of buffer in bytes.
+   * @return the total number of bytes the full name requires. If the return value is greater than
+   *         buffer_size the output was truncated and the caller may retry with a larger buffer.
+   */
+  size_t serializeToBuffer(const StatName& stat_name, char* buffer, size_t buffer_size) const;
+
+  /**
    * @return uint64_t the number of symbols in the symbol table.
    */
   uint64_t numSymbols() const;
@@ -519,6 +537,7 @@ public:
   const uint8_t* bytes() const { return bytes_.get(); }
 
 protected:
+  SymbolTable::StoragePtr releaseBytes() { return std::move(bytes_); }
   void setBytes(SymbolTable::StoragePtr&& bytes) { bytes_ = std::move(bytes); }
   void clear() { bytes_.reset(); }
 
@@ -567,6 +586,9 @@ public:
    * @param table the symbol table.
    */
   void free(SymbolTable& table);
+
+protected:
+  StatNameStorage() = default;
 };
 
 /**
@@ -733,8 +755,9 @@ public:
   // generate symbols for it.
   StatNameManagedStorage(absl::string_view name, SymbolTable& table)
       : StatNameStorage(name, table), symbol_table_(table) {}
-  StatNameManagedStorage(StatNameManagedStorage&& src) noexcept
-      : StatNameStorage(std::move(src)), symbol_table_(src.symbol_table_) {}
+  StatNameManagedStorage(StatNameManagedStorage&& src) noexcept : symbol_table_(src.symbol_table_) {
+    setBytes(src.releaseBytes());
+  }
   StatNameManagedStorage(StatName src, SymbolTable& table) noexcept
       : StatNameStorage(src, table), symbol_table_(table) {}
 
