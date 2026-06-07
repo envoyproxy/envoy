@@ -707,11 +707,13 @@ PendingStream::PendingStream(ConnPoolImplBase& parent, bool can_send_early_data)
   Upstream::ClusterTrafficStats& traffic_stats = *parent_.host()->cluster().trafficStats();
   traffic_stats.upstream_rq_pending_total_.inc();
   traffic_stats.upstream_rq_pending_active_.inc();
+  parent_.host()->stats().rq_pending_active_.inc();
   parent_.host()->cluster().resourceManager(parent_.priority()).pendingRequests().inc();
 }
 
 PendingStream::~PendingStream() {
   parent_.host()->cluster().trafficStats()->upstream_rq_pending_active_.dec();
+  parent_.host()->stats().rq_pending_active_.dec();
   parent_.host()->cluster().resourceManager(parent_.priority()).pendingRequests().dec();
 }
 

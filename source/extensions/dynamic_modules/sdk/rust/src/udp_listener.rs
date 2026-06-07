@@ -202,17 +202,11 @@ impl EnvoyUdpListenerFilter for EnvoyUdpListenerFilterImpl {
     if size == 0 {
       return (Vec::new(), 0);
     }
-    let mut buffers = vec![
-      abi::envoy_dynamic_module_type_envoy_buffer {
-        ptr: std::ptr::null(),
-        length: 0,
-      };
-      size
-    ];
+    let mut buffers: Vec<EnvoyBuffer> = Vec::with_capacity(size);
     let ok = unsafe {
       abi::envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
         self.raw,
-        buffers.as_mut_ptr(),
+        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
     if !ok {
@@ -223,15 +217,14 @@ impl EnvoyUdpListenerFilter for EnvoyUdpListenerFilterImpl {
       abi::envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(self.raw)
     };
     if total_length == 0 {
-      // This shouldn't happen if chunks were retrieved, but for safety:
+      // This shouldn't happen if chunks were retrieved, but we guard for safety.
       return (Vec::new(), 0);
     }
 
-    let envoy_buffers: Vec<EnvoyBuffer> = buffers
-      .into_iter()
-      .map(|b| unsafe { EnvoyBuffer::new_from_raw(b.ptr as *const _, b.length) })
-      .collect();
-    (envoy_buffers, total_length)
+    unsafe {
+      buffers.set_len(size);
+    }
+    (buffers, total_length)
   }
 
   fn set_datagram_data(&mut self, data: &[u8]) -> bool {

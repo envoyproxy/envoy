@@ -361,8 +361,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onGoAway(
 }
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HealthCheckResult
-HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
-  const uint64_t response_code = Http::Utility::getResponseStatus(*response_headers_);
+HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult(uint64_t response_code) {
   ENVOY_CONN_LOG(debug, "hc response_code={} health_flags={}", *client_, response_code,
                  HostUtility::healthFlagsToString(*host_));
 
@@ -418,12 +417,16 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
   request_in_flight_ = false;
 
+  // Extract the HTTP response code for inclusion in health check events.
+  const uint64_t response_code =
+      response_headers_ != nullptr ? Http::Utility::getResponseStatus(*response_headers_) : 0;
+
   // Store the raw HTTP response code on the host for HDS metadata reporting.
   if (response_headers_ != nullptr) {
-    host_->setLastHealthCheckHttpStatus(Http::Utility::getResponseStatus(*response_headers_));
+    host_->setLastHealthCheckHttpStatus(response_code);
   }
 
-  switch (healthCheckResult()) {
+  switch (healthCheckResult(response_code)) {
   case HealthCheckResult::Succeeded:
     handleSuccess(false);
     break;
@@ -431,10 +434,12 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
     handleSuccess(true);
     break;
   case HealthCheckResult::Failed:
-    handleFailure(envoy::data::core::v3::ACTIVE, /*retriable=*/false);
+    handleFailure(envoy::data::core::v3::ACTIVE, /*retriable=*/false,
+                  /*http_status_code=*/response_code);
     break;
   case HealthCheckResult::Retriable:
-    handleFailure(envoy::data::core::v3::ACTIVE, /*retriable=*/true);
+    handleFailure(envoy::data::core::v3::ACTIVE, /*retriable=*/true,
+                  /*http_status_code=*/response_code);
     break;
   }
 

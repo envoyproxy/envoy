@@ -128,6 +128,18 @@ typedef struct envoy_dynamic_module_type_module_http_header {
 } envoy_dynamic_module_type_module_http_header;
 
 /**
+ * envoy_dynamic_module_type_module_key_value_pair represents a string key-value pair owned by the
+ * module. It is used to set multiple dynamic metadata entries under a single namespace via
+ * envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch.
+ */
+typedef struct envoy_dynamic_module_type_module_key_value_pair {
+  envoy_dynamic_module_type_buffer_module_ptr key_ptr;
+  size_t key_length;
+  envoy_dynamic_module_type_buffer_module_ptr value_ptr;
+  size_t value_length;
+} envoy_dynamic_module_type_module_key_value_pair;
+
+/**
  * envoy_dynamic_module_type_envoy_http_header represents a key-value pair of an HTTP header owned
  * by Envoy's HeaderMap.
  */
@@ -1872,6 +1884,26 @@ void envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
     envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch is called by the module to
+ * set multiple string-valued dynamic metadata entries under a single namespace in one call. It is
+ * equivalent to calling envoy_dynamic_module_callback_http_set_dynamic_metadata_string once per
+ * entry but resolves the namespace and merges into the metadata struct only once. Existing entries
+ * with the same key are overwritten. Within a single call, a later entry overwrites an earlier
+ * entry with the same key. An empty array is a no-op and does not create the namespace.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param entries is the pointer to an array of key-value pairs whose values are set as strings. It
+ * may be null only when entries_size is zero.
+ * @param entries_size is the number of entries in the array.
+ */
+void envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
 
 /**
  * envoy_dynamic_module_callback_http_get_metadata_string is called by the module to get
@@ -12341,6 +12373,309 @@ void envoy_dynamic_module_callback_transport_socket_set_is_readable(
  */
 void envoy_dynamic_module_callback_transport_socket_flush_write_buffer(
     envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
+
+// =============================================================================
+// ============================== Stats Sink ===================================
+// =============================================================================
+
+// =============================================================================
+// Stats Sink Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_stat_sink_config_envoy_ptr is a raw pointer to
+ * the DynamicModuleStatsSinkConfig class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_stat_sink_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_stat_sink_config_module_ptr is a pointer to an in-module stats sink
+ * configuration.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_stat_sink_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr is an opaque handle to the metric
+ * snapshot for a single flush. It is passed to the snapshot read-back callbacks.
+ *
+ * OWNERSHIP: Envoy owns the pointer. Valid only during the flush event hook.
+ */
+typedef void* envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr is a raw pointer to the
+ * DynamicModuleStatsSinkConfigScheduler class in Envoy.
+ *
+ * The scheduler dispatches events from any thread to the stats sink configuration on the main
+ * thread, which lets a module aggregate metrics off the main thread and publish the results back
+ * safely. It is created by envoy_dynamic_module_callback_stat_sink_config_scheduler_new, used via
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_commit, and destroyed by
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_delete.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Since its lifecycle is owned by the module, this has the _module_ptr
+ * suffix.
+ */
+typedef void* envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr;
+
+// =============================================================================
+// Stats Sink Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_stat_sink_config_new is called when a new stats sink configuration
+ * is created. The module must return a pointer to its own configuration object. If the module
+ * returns nullptr, the stats sink will fail to be created.
+ *
+ * This is called on the main thread during server initialization.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleStatsSinkConfig object in Envoy.
+ * @param sink_name is the name identifying the sink implementation within the module.
+ * @param sink_config is the configuration bytes for the sink. This is valid only during this call.
+ * @return a pointer to the in-module configuration object, or nullptr on failure.
+ */
+envoy_dynamic_module_type_stat_sink_config_module_ptr envoy_dynamic_module_on_stat_sink_config_new(
+    envoy_dynamic_module_type_stat_sink_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer sink_name,
+    envoy_dynamic_module_type_envoy_buffer sink_config);
+
+/**
+ * envoy_dynamic_module_on_stat_sink_config_destroy is called when the stats sink configuration
+ * is being destroyed. The module must release all resources associated with the configuration.
+ *
+ * @param config_module_ptr is the pointer to the in-module configuration object.
+ */
+void envoy_dynamic_module_on_stat_sink_config_destroy(
+    envoy_dynamic_module_type_stat_sink_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_stat_sink_flush is called periodically to flush metrics to the sink.
+ * The module can iterate over counters, gauges, and text readouts via the snapshot callbacks.
+ *
+ * This is called on the main thread during the periodic stats flush. Implementations must not
+ * block.
+ *
+ * @param config_module_ptr is the pointer to the in-module configuration object.
+ * @param snapshot_envoy_ptr is the opaque snapshot handle. Valid only during this call.
+ */
+void envoy_dynamic_module_on_stat_sink_flush(
+    envoy_dynamic_module_type_stat_sink_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_stat_sink_on_histogram_complete is called synchronously on the worker
+ * thread that records a histogram observation. Implementations must be thread-safe and must not
+ * block.
+ *
+ * @param config_module_ptr is the pointer to the in-module configuration object.
+ * @param histogram_name is the name of the histogram. Valid only during this call.
+ * @param value is the recorded value.
+ */
+void envoy_dynamic_module_on_stat_sink_on_histogram_complete(
+    envoy_dynamic_module_type_stat_sink_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer histogram_name, uint64_t value);
+
+/**
+ * envoy_dynamic_module_on_stat_sink_config_scheduled is called when an event committed via
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_commit is dispatched.
+ *
+ * This is called on the main thread. It is the place to publish gauges aggregated off the main
+ * thread back into Envoy via envoy_dynamic_module_callback_stat_sink_config_set_gauge.
+ *
+ * This hook is optional. Modules that do not schedule events do not need to implement it.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleStatsSinkConfig object in Envoy.
+ * @param config_module_ptr is the pointer to the in-module configuration object.
+ * @param event_id is the value passed to
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_commit.
+ */
+void envoy_dynamic_module_on_stat_sink_config_scheduled(
+    envoy_dynamic_module_type_stat_sink_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_stat_sink_config_module_ptr config_module_ptr, uint64_t event_id);
+
+// =============================================================================
+// Stats Sink Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_count returns the number of
+ * counters in the metric snapshot.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @return the number of counters.
+ */
+size_t envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_counter writes the name and returns the
+ * values of a counter at the given index. The name is written directly into a module-provided
+ * buffer, allowing the module to decode it straight into its own storage (for example a socket
+ * write buffer) without Envoy allocating an intermediate string.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @param index is the index of the counter (0-based).
+ * @param name_buffer is the module-owned buffer that receives the counter name. No null
+ *        terminator is written. May be null only if name_buffer_capacity is 0.
+ * @param name_buffer_capacity is the capacity of name_buffer in bytes.
+ * @param name_size is set to the full length of the name. If it exceeds name_buffer_capacity the
+ *        name was truncated and the module should retry with a buffer of at least name_size bytes.
+ *        Must not be null.
+ * @param value_out is the output for the current accumulated counter value.
+ * @param delta_out is the output for the counter delta since the last flush.
+ * @return true if the index is valid, false otherwise. When false, no outputs are written.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size, uint64_t* value_out,
+    uint64_t* delta_out);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_count returns the number of
+ * gauges in the metric snapshot.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @return the number of gauges.
+ */
+size_t envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge writes the name and returns the
+ * value of a gauge at the given index. The name is written directly into a module-provided
+ * buffer, as described for the counter callback above.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @param index is the index of the gauge (0-based).
+ * @param name_buffer is the module-owned buffer that receives the gauge name. No null terminator
+ *        is written. May be null only if name_buffer_capacity is 0.
+ * @param name_buffer_capacity is the capacity of name_buffer in bytes.
+ * @param name_size is set to the full length of the name. If it exceeds name_buffer_capacity the
+ *        name was truncated and the module should retry with a buffer of at least name_size bytes.
+ *        Must not be null.
+ * @param value_out is the output for the current gauge value.
+ * @return true if the index is valid, false otherwise. When false, no outputs are written.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size, uint64_t* value_out);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_count returns the number
+ * of text readouts in the metric snapshot.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @return the number of text readouts.
+ */
+size_t envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout writes the name and value
+ * of a text readout at the given index into module-provided buffers.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @param index is the index of the text readout (0-based).
+ * @param name_buffer is the module-owned buffer that receives the text readout name. No null
+ *        terminator is written. May be null only if name_buffer_capacity is 0.
+ * @param name_buffer_capacity is the capacity of name_buffer in bytes.
+ * @param name_size is set to the full length of the name. If it exceeds name_buffer_capacity the
+ *        name was truncated and the module should retry with a buffer of at least name_size bytes.
+ *        Must not be null.
+ * @param value_buffer is the module-owned buffer that receives the text readout value. No null
+ *        terminator is written. May be null only if value_buffer_capacity is 0.
+ * @param value_buffer_capacity is the capacity of value_buffer in bytes.
+ * @param value_size is set to the full length of the value, with the same truncation contract as
+ *        name_size. Must not be null.
+ * @return true if the index is valid, false otherwise. When false, no outputs are written.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size, char* value_buffer,
+    size_t value_buffer_capacity, size_t* value_size);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_config_define_gauge creates a gauge with the given name
+ * that the module can update later via envoy_dynamic_module_callback_stat_sink_config_set_gauge.
+ *
+ * This must only be called during envoy_dynamic_module_on_stat_sink_config_new. Calls made after
+ * the configuration is created return envoy_dynamic_module_type_metrics_result_Frozen.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleStatsSinkConfig object in Envoy.
+ * @param name is the name of the gauge to define. Valid only during this call.
+ * @param gauge_id_ptr is where the opaque id identifying the gauge is stored. The id can be passed
+ * to envoy_dynamic_module_callback_stat_sink_config_set_gauge.
+ * @return envoy_dynamic_module_type_metrics_result_Success on success, or
+ * envoy_dynamic_module_type_metrics_result_Frozen if called after the configuration is created.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_stat_sink_config_define_gauge(
+    envoy_dynamic_module_type_stat_sink_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* gauge_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_config_set_gauge sets the value of a gauge previously
+ * defined via envoy_dynamic_module_callback_stat_sink_config_define_gauge.
+ *
+ * This must be called on the main thread, typically from the
+ * envoy_dynamic_module_on_stat_sink_config_scheduled event hook.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleStatsSinkConfig object in Envoy.
+ * @param gauge_id is the id returned by
+ * envoy_dynamic_module_callback_stat_sink_config_define_gauge.
+ * @param value is the value to set the gauge to.
+ * @return envoy_dynamic_module_type_metrics_result_Success on success, or
+ * envoy_dynamic_module_type_metrics_result_MetricNotFound if the id does not identify a gauge.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_stat_sink_config_set_gauge(
+    envoy_dynamic_module_type_stat_sink_config_envoy_ptr config_envoy_ptr, size_t gauge_id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_new creates a new stats sink
+ * configuration scheduler. The scheduler dispatches events to the stats sink configuration on the
+ * main thread from any thread, including the ones managed by the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleStatsSinkConfig object in Envoy.
+ * @return a pointer to the created scheduler.
+ *
+ * NOTE: it is the caller's responsibility to delete the scheduler using
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_delete when it is no longer needed.
+ * See the comment on envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr.
+ */
+envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr
+envoy_dynamic_module_callback_stat_sink_config_scheduler_new(
+    envoy_dynamic_module_type_stat_sink_config_envoy_ptr config_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_commit schedules an event to the stats
+ * sink configuration on the main thread. This eventually invokes the
+ * envoy_dynamic_module_on_stat_sink_config_scheduled event hook on the main thread.
+ *
+ * This can be called multiple times to schedule multiple events to the same configuration.
+ *
+ * @param scheduler_module_ptr is the pointer to the scheduler created by
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_new.
+ * @param event_id is the id of the event. It can be any module-defined value and is passed back to
+ * the envoy_dynamic_module_on_stat_sink_config_scheduled event hook.
+ */
+void envoy_dynamic_module_callback_stat_sink_config_scheduler_commit(
+    envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_delete deletes the scheduler created by
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_new.
+ *
+ * @param scheduler_module_ptr is the pointer to the scheduler created by
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_new.
+ */
+void envoy_dynamic_module_callback_stat_sink_config_scheduler_delete(
+    envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr scheduler_module_ptr);
 
 #ifdef __cplusplus
 }
