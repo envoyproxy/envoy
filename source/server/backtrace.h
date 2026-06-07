@@ -42,6 +42,18 @@ public:
   BackwardsTrace() = default;
 
   /**
+   * Construct a trace directly from raw frame pointers that were captured
+   * elsewhere. The number of frames copied is clamped to MaxStackDepth.
+   *
+   * @param frames Pointer to an array of captured frame addresses.
+   * @param depth Number of valid entries in @p frames.
+   */
+  BackwardsTrace(void* const* frames, int depth) {
+    stack_depth_ = std::min(depth, MaxStackDepth);
+    std::copy(frames, frames + stack_depth_, stack_trace_);
+  }
+
+  /**
    * Attempts to get the memory offsets of the current process, so the
    * stack trace addresses can be mapped to line numbers even after the
    * process is not running.
@@ -130,11 +142,6 @@ public:
     ENVOY_LOG(critical, "Caught {}, suspect faulting address {}", signame, addr);
   }
 
-  void loadRaw(void* const* frames, int depth) {
-    stack_depth_ = depth;
-    std::copy(frames, frames + depth, stack_trace_);
-  }
-
   void printTrace(std::ostream& os) {
     visitTrace([&](int index, const char* symbol, void* address) {
       if (symbol != nullptr) {
@@ -169,10 +176,7 @@ private:
     }
   }
 
-public:
   static constexpr int MaxStackDepth = 64;
-
-private:
   void* stack_trace_[MaxStackDepth];
   int stack_depth_{0};
 };

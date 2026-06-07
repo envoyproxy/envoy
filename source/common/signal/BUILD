@@ -51,6 +51,7 @@ envoy_cc_library(
     hdrs = ["non_fatal_signal_handler.h"],
     deps = [
         "//source/common/common:logger_lib",
+        "//source/common/common:thread_lib",
     ],
 )
 

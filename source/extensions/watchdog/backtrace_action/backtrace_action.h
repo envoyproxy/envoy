@@ -24,7 +24,7 @@ class BacktraceAction : public Server::Configuration::GuardDogAction {
 public:
   BacktraceAction(envoy::extensions::watchdog::backtrace_action::v3::BacktraceActionConfig& config,
                   Server::Configuration::GuardDogActionFactoryContext& context);
-  ~BacktraceAction();
+  ~BacktraceAction() override;
 
   void run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent event,
            const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_last_checkin_pairs,
@@ -32,7 +32,7 @@ public:
 
 private:
   static constexpr int MaxSlots = 16;
-  static constexpr int MaxStackDepth = BackwardsTrace::MaxStackDepth;
+  static constexpr int MaxStackDepth = 64;
 
   struct RawTrace {
     void* frames[MaxStackDepth];
@@ -49,7 +49,7 @@ private:
   static void onNonFatalSignal(int sig, siginfo_t* info, void* context);
 
   // Minimum amount of time between backtraces for a given thread.
-  std::chrono::seconds cooldown_duration_;
+  std::chrono::milliseconds cooldown_duration_;
 
   // Guards against duplicate registration of the signal handler onNonFatalSignal.
   static bool signal_handler_registered_;

@@ -24,7 +24,7 @@ BacktraceAction::BacktraceAction(
     envoy::extensions::watchdog::backtrace_action::v3::BacktraceActionConfig& config,
     Server::Configuration::GuardDogActionFactoryContext& context)
     : cooldown_duration_(
-          std::chrono::seconds(PROTOBUF_GET_SECONDS_OR_DEFAULT(config, cooldown_duration, 10))) {
+          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, cooldown_duration, 10000))) {
   if (!signal_handler_registered_) {
     signal_handler_registered_ =
         NonFatalSignalHandler::registerNonFatalSignalHandler(onNonFatalSignal);
@@ -36,8 +36,7 @@ BacktraceAction::BacktraceAction(
       if (slot.ready.load(std::memory_order_acquire)) {
         ENVOY_LOG_MISC(critical, "Backtrace Action: backtrace for thread {}:",
                        slot.tid.load(std::memory_order_relaxed));
-        BackwardsTrace tracer;
-        tracer.loadRaw(slot.trace.frames, slot.trace.depth);
+        BackwardsTrace tracer(slot.trace.frames, slot.trace.depth);
         tracer.logTrace();
       }
       slot.tid.store(0, std::memory_order_release);
@@ -94,7 +93,8 @@ void BacktraceAction::run(
 
   for (const auto& [tid, ltt] : thread_last_checkin_pairs) {
     if (auto it = tid_to_last_backtrace_.find(tid); it != tid_to_last_backtrace_.end()) {
-      if (std::chrono::duration_cast<std::chrono::seconds>(now - it->second) < cooldown_duration_) {
+      if (std::chrono::duration_cast<std::chrono::milliseconds>(now - it->second) <
+          cooldown_duration_) {
         continue;
       }
     }

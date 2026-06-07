@@ -3,22 +3,19 @@
 #include <atomic>
 
 #include "source/common/common/logger.h"
-
-#include "absl/base/attributes.h"
-#include "absl/synchronization/mutex.h"
+#include "source/common/common/thread.h"
 
 namespace Envoy {
 namespace NonFatalSignalHandler {
 
 namespace {
 
-ABSL_CONST_INIT static absl::Mutex handler_mutex(absl::kConstInit);
 static std::atomic<NonFatalSignalCallback> handlers[MaxHandlers]{};
 
 } // namespace
 
 bool registerNonFatalSignalHandler(NonFatalSignalCallback cb) {
-  absl::MutexLock l(&handler_mutex);
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   for (auto& slot : handlers) {
     if (slot.load(std::memory_order_relaxed) == nullptr) {
       slot.store(cb, std::memory_order_release);
@@ -31,7 +28,7 @@ bool registerNonFatalSignalHandler(NonFatalSignalCallback cb) {
 }
 
 void removeNonFatalSignalHandler(NonFatalSignalCallback cb) {
-  absl::MutexLock l(&handler_mutex);
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   for (auto& slot : handlers) {
     if (slot.load(std::memory_order_relaxed) == cb) {
       slot.store(nullptr, std::memory_order_release);
