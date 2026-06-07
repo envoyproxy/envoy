@@ -573,6 +573,7 @@ protected:
   StatNameStorage() = default;
 };
 
+// Backing store for empty StatName constructor; the 0 indicates there are 0 bytes in the encoding.
 constexpr uint8_t EmptyStatNameData[] = {0};
 
 /**
