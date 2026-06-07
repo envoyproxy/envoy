@@ -607,7 +607,7 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
     if (nullptr != key_value_pair) {
       // Encode the TLV value as configured.
       std::string sanitised_value;
-      if (key_value_pair->encode() == envoy::extensions::filters::listener::proxy_protocol::v3::
+      if (key_value_pair->value_encoding() == envoy::extensions::filters::listener::proxy_protocol::v3::
                                             ProxyProtocol::KeyValuePair::BASE64) {
         sanitised_value = Base64::encode(tlv_value.data(), tlv_value.size());
       } else {

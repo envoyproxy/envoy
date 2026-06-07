@@ -35,7 +35,7 @@ message ProxyProtocol {
   message KeyValuePair {
     // Specifies the encoding scheme that is used to encode the TLV value before it is
     // stored in dynamic metadata or filter state.
-    enum ValueEncode {
+    enum ValueEncoding {
       // The TLV value will be sanitized to a valid UTF-8 string before being stored:
       // any invalid UTF-8 sequences will be replaced with the ``!`` character.
       UNSPECIFIED = 0;
@@ -52,7 +52,7 @@ message ProxyProtocol {
     // The key to use within the namespace.
     string key = 2 [(validate.rules).string = {min_len: 1}];
 
-    // The encode scheme that is used to encode the TLV value before it is stored in
+    // The value encoding scheme that is used to encode the TLV value before it is stored in
     // dynamic metadata or filter state. If not set, defaults to ``UNSPECIFIED``, which
     // sanitizes the TLV value to a valid UTF-8 string.
     //
@@ -60,8 +60,8 @@ message ProxyProtocol {
     //
     //   This option only applies to the legacy untyped dynamic metadata and filter state.
     //   For the new typed dynamic metadata, the raw TLV value bytes are stored as is and
-    //   no encode is applied.
-    ValueEncode encode = 3;
+    //   no encoding is applied.
+    ValueEncoding value_encoding = 3;
   }
 
   // A Rule defines what metadata to apply when a header is present or missing.

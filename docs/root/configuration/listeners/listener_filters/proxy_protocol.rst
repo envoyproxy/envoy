@@ -87,7 +87,7 @@ the typed dynamic metadata always stores the raw TLV value bytes as is:
           - tlv_type: 0xEA
             on_tlv_present:
               key: "aws_vpce_id"
-              encoding: BASE64
+              value_encoding: BASE64
 
 This implementation supports both version 1 and version 2, it
 automatically determines on a per-connection basis which of the two
