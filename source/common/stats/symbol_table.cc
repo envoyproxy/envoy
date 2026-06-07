@@ -30,21 +30,17 @@ void StatName::debugPrint() {
   // TODO(jmarantz): capture this functionality (always prints regardless of
   // loglevel) in an ENVOY_LOG macro variant or similar, perhaps
   // ENVOY_LOG_MISC(stderr, ...);
-  if (size_and_data_ == nullptr) {
-    std::cerr << "Null StatName" << std::endl;
-  } else {
-    const size_t nbytes = dataSize();
-    std::cerr << "dataSize=" << nbytes << ":";
-    for (size_t i = 0; i < nbytes; ++i) {
-      std::cerr << " " << static_cast<uint64_t>(data()[i]);
-    }
-    const SymbolVec encoding = SymbolTable::Encoding::decodeSymbols(*this);
-    std::cerr << ", numSymbols=" << encoding.size() << ":";
-    for (Symbol symbol : encoding) {
-      std::cerr << " " << symbol;
-    }
-    std::cerr << std::endl;
+  const size_t nbytes = dataSize();
+  std::cerr << "dataSize=" << nbytes << ":";
+  for (size_t i = 0; i < nbytes; ++i) {
+    std::cerr << " " << static_cast<uint64_t>(data()[i]);
   }
+  const SymbolVec encoding = SymbolTable::Encoding::decodeSymbols(*this);
+  std::cerr << ", numSymbols=" << encoding.size() << ":";
+  for (Symbol symbol : encoding) {
+    std::cerr << " " << symbol;
+  }
+  std::cerr << std::endl;
 }
 #endif
 
@@ -119,14 +115,9 @@ public:
 
   TokenIter(StatName stat_name) {
     const uint8_t* raw_data = stat_name.dataIncludingSize();
-    if (raw_data == nullptr) {
-      size_ = 0;
-      array_ = nullptr;
-    } else {
-      std::pair<uint64_t, size_t> size_consumed = decodeNumber(raw_data);
-      size_ = size_consumed.first;
-      array_ = raw_data + size_consumed.second;
-    }
+    std::pair<uint64_t, size_t> size_consumed = decodeNumber(raw_data);
+    size_ = size_consumed.first;
+    array_ = raw_data + size_consumed.second;
   }
 
   /**
@@ -254,12 +245,7 @@ void SymbolTable::Encoding::moveToMemBlock(MemBlockBuilder<uint8_t>& mem_block) 
 
 void SymbolTable::Encoding::appendToMemBlock(StatName stat_name,
                                              MemBlockBuilder<uint8_t>& mem_block) {
-  const uint8_t* data = stat_name.dataIncludingSize();
-  if (data == nullptr) {
-    mem_block.appendOne(0);
-  } else {
-    mem_block.appendData(absl::MakeSpan(data, stat_name.size()));
-  }
+  mem_block.appendData(absl::MakeSpan(stat_name.dataIncludingSize(), stat_name.size()));
 }
 
 SymbolTable::SymbolTable()
