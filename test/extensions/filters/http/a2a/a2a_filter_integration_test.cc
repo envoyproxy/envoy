@@ -218,7 +218,7 @@ TEST_P(A2aFilterIntegrationTest, BodyTooLargeDefaultLimit) {
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_FALSE(upstream_request_);
-  EXPECT_EQ("400", response->headers().getStatusValue());
+  EXPECT_EQ("413", response->headers().getStatusValue());
   // Verify it was rejected due to body size.
   EXPECT_THAT(response->body(), testing::HasSubstr("request body is too large."));
 }
@@ -357,7 +357,7 @@ TEST_P(A2aFilterIntegrationTest, BodyTooLargeRejected) {
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_FALSE(upstream_request_);
-  EXPECT_EQ("400", response->headers().getStatusValue());
+  EXPECT_EQ("413", response->headers().getStatusValue());
   EXPECT_THAT(response->body(), testing::HasSubstr("request body is too large"));
 }
 
