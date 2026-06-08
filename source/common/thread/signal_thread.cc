@@ -25,6 +25,7 @@ bool terminateThread(const ThreadId& tid) {
   // Assume POSIX-compatible system and signal to the thread.
   return kill(toPlatformTid(tid.getId()), SIGABRT) == 0;
 #else
+  // Windows, currently unsupported termination of thread.
   ENVOY_LOG_MISC(error, "Windows is currently unsupported for terminateThread.");
   return false;
 #endif
@@ -34,6 +35,7 @@ bool signalThread(const ThreadId& tid, int signal) {
 #ifdef __linux__
   return syscall(SYS_tgkill, getpid(), toPlatformTid(tid.getId()), signal) == 0;
 #else
+  // Only Linux supports the tgkill system call.
   ENVOY_LOG_MISC(error, "signalThread is only supported on Linux.");
   return false;
 #endif
