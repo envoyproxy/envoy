@@ -16,6 +16,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.watchdog.backtrace_action]
 
 // Configuration for the backtrace watchdog action.
+//
+// This action is currently only supported on Linux.
 message BacktraceActionConfig {
   // Minimum time between backtrace logs per thread. Defaults to 10 seconds if not set.
   // Set to 0 to disable the cooldown and log a backtrace on every watchdog event.
