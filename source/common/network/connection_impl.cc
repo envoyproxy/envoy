@@ -122,7 +122,6 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
 ConnectionImpl::~ConnectionImpl() {
   ASSERT(!socket_->isOpen() && delayed_close_timer_ == nullptr,
          "ConnectionImpl destroyed with open socket and/or active timer");
-
   // In general we assume that owning code has called close() previously to the destructor being
   // run. This generally must be done so that callbacks run in the correct context (vs. deferred
   // deletion). Hence the assert above. However, call close() here just to be completely sure that
@@ -1103,6 +1102,15 @@ ClientConnectionImpl::ClientConnectionImpl(
       ioHandle().activateFileEvents(Event::FileReadyType::Write);
     }
   }
+}
+
+ClientConnectionImpl::~ClientConnectionImpl() {
+  // Ensure the connection (and its underlying socket) is closed before stream_info_, which is
+  // owned by this class, is destroyed and before the base ConnectionImpl destructor runs its
+  // open-socket assert. Without this, a client connection that is still open at destruction time
+  // (e.g. an in-progress/unreachable scoped IPv6 upstream connect) trips the
+  // "ConnectionImpl destroyed with open socket" assert in ~ConnectionImpl().
+  close(ConnectionCloseType::NoFlush);
 }
 
 void ClientConnectionImpl::connect() {
