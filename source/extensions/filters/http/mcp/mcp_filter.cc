@@ -383,6 +383,13 @@ Http::FilterDataStatus McpFilter::completeParsing() {
 
   Protobuf::Struct metadata = parser_->metadata();
 
+  // For JSON-RPC responses (no method field), set a synthetic method so the
+  // router can identify and dispatch them.
+  if (is_mcp_request_ && parser_->isResponse()) {
+    (*metadata.mutable_fields())["method"].set_string_value(
+        std::string(Filters::Common::Mcp::McpConstants::Methods::JSONRPC_RESPONSE));
+  }
+
   const std::string& group_metadata_key = config_->parserConfig().groupMetadataKey();
   if (!group_metadata_key.empty()) {
     std::string method_group = config_->parserConfig().getMethodGroup(parser_->getMethod());

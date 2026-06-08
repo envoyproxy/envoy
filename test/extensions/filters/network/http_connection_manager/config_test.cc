@@ -82,7 +82,7 @@ http_filters:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
-                            "Didn't find a registered implementation for name: 'foo'");
+                            "Didn't find a registered implementation for 'foo' with type URL: ''");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, InvalidServerName) {
@@ -800,6 +800,8 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultInternalAddress) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -826,6 +828,8 @@ TEST_F(HttpConnectionManagerConfigTest, CidrRangeBasedInternalAddress) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1969,9 +1973,6 @@ TEST_F(HttpConnectionManagerConfigTest, UnconfiguredRequestTimeout) {
 }
 
 TEST_F(HttpConnectionManagerConfigTest, SingleDateProvider) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   const std::string yaml_string = R"EOF(
 codec_type: http1
 stat_prefix: router
@@ -1987,6 +1988,8 @@ route_config:
         cluster: cluster
 http_filters:
 - name: encoder-decoder-buffer-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.EncoderDecoderBufferFilterConfig
 - name: envoy.filters.http.router
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -2692,7 +2695,7 @@ TEST_F(HttpConnectionManagerConfigTest, UnknownHttpFilterWithException) {
 
   EXPECT_THROW_WITH_REGEX(
       createHttpConnectionManagerConfig(yaml_string), EnvoyException,
-      "Didn't find a registered implementation for name: 'envoy.filters.http.unknown'");
+      "Didn't find a registered implementation for 'envoy.filters.http.unknown' with type URL: ''");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, UnknownOptionalHttpFilterWithIgnore) {

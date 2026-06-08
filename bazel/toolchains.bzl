@@ -17,35 +17,28 @@ LIBLLVM = ("@llvm_toolchain_llvm//:" + _LLVM_LIB_PREFIX + "/libLLVM.so." + LLVM_
 _LLVM_LOCAL_BUILD = """\
 package(default_visibility = ["//visibility:public"])
 
-exports_files(glob(
-    [
-        "bin/*",
-        "lib/**",
-        "lib64/**",
-        "include/**",
-    ],
-    allow_empty = True,
-))
+exports_files([
+    "{lib_dir}/libclang-cpp.so.{major_minor}",
+    "{lib_dir}/libLLVM.so.{major_minor}",
+    "lib/clang/{major}/include/fuzzer/FuzzedDataProvider.h",
+])
 
 filegroup(
     name = "include",
-    srcs = glob([
-        "include/**/c++/**",
-        "lib/clang/*/include/**",
-    ]),
-)
-
-filegroup(
-    name = "all_includes",
     srcs = glob(
-        ["include/**"],
+        ["lib/clang/*/include/**"],
         allow_empty = True,
     ),
 )
 
 filegroup(
+    name = "all_includes",
+    srcs = [],
+)
+
+filegroup(
     name = "symbolizer",
-    srcs = glob(["bin/llvm-symbolizer*"]),
+    srcs = ["bin/llvm-symbolizer"],
 )
 """
 
@@ -63,7 +56,11 @@ def envoy_toolchains():
         native.new_local_repository(
             name = "llvm_toolchain_llvm",
             path = LLVM_PATH,
-            build_file_content = _LLVM_LOCAL_BUILD,
+            build_file_content = _LLVM_LOCAL_BUILD.format(
+                lib_dir = LLVM_LIB_DIR,
+                major = LLVM_MAJOR,
+                major_minor = LLVM_MAJOR_MINOR,
+            ),
         )
 
     llvm_toolchain(

@@ -388,7 +388,19 @@ Current supported substitution commands include:
       ``*_TX_END`` values lower than ``*_RX_END`` values, in cases where upstream peer has half-closed
       its stream before downstream peer. In these cases the ``COMMON_DURATION`` value will become negative.
 
-  TCP/UDP
+  TCP
+    Total duration between the ``START`` time point and the ``END`` time point in specific ``PRECISION``.
+    The connection time points are populated for TCP connections and specified by the following
+    values (all values here are case-sensitive):
+
+    * ``DS_CX_BEG``: The time point of the downstream connection begin.
+    * ``DS_CX_END``: The time point of the downstream connection end.
+    * ``US_CX_BEG``: The time point of the upstream TCP connect begin.
+    * ``US_CX_END``: The time point of the upstream TCP connect end.
+
+    The ``PRECISION`` is the same as the HTTP case above.
+
+  UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
 ``%REQUEST_DURATION%``

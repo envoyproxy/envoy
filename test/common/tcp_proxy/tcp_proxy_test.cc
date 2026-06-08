@@ -1664,6 +1664,47 @@ TEST_P(TcpProxyTest, AccessLogUpstreamLocalAddress) {
   EXPECT_EQ(access_log_data_, "2.2.2.2:50000");
 }
 
+// Test that the COMMON_DURATION downstream and upstream connection time points are populated for
+// TCP connections, with the upstream connect timing plumbed back from the upstream connection.
+TEST_P(TcpProxyTest, AccessLogCommonDuration) {
+  // Put the downstream connection begin on the test clock so the DS_CX_* time points render
+  // deterministically.
+  filter_callbacks_.connection_.stream_info_.start_time_monotonic_ =
+      timeSystem().monotonicTime() - std::chrono::microseconds(10);
+
+  setup(1, accessLogConfig("%COMMON_DURATION(DS_CX_BEG:US_CX_BEG:us)% "
+                           "%COMMON_DURATION(US_CX_BEG:US_CX_END:us)% "
+                           "%COMMON_DURATION(DS_CX_BEG:DS_CX_END:us)%"));
+
+  // Record the real connect timing on the upstream connection so it is plumbed back to the
+  // downstream stream info, mirroring how the HTTP router records upstream connect timing.
+  auto& upstream_timing =
+      upstream_connections_.at(0)->stream_info_.upstreamInfo()->upstreamTiming();
+  upstream_timing.onUpstreamConnectStart(timeSystem());
+  timeSystem().advanceTimeWait(std::chrono::microseconds(40));
+  upstream_timing.onUpstreamConnectComplete(timeSystem());
+  raiseEventUpstreamConnected(0);
+
+  timeSystem().advanceTimeWait(std::chrono::microseconds(60));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  filter_.reset();
+
+  EXPECT_EQ(access_log_data_, "10 40 110");
+}
+
+// Test that when the upstream connection is never established the US_CX time points stay unset and
+// render as "-", so a failed pool attempt is not logged as a real connect.
+TEST_P(TcpProxyTest, AccessLogCommonDurationUpstreamConnectFailure) {
+  setup(1, accessLogConfig("%COMMON_DURATION(DS_CX_BEG:US_CX_BEG:us)% "
+                           "%COMMON_DURATION(US_CX_BEG:US_CX_END:us)%"));
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::Timeout);
+
+  filter_.reset();
+  EXPECT_EQ(access_log_data_, "- -");
+}
+
 // Test that access log fields %DOWNSTREAM_PEER_URI_SAN% is correctly logged.
 TEST_P(TcpProxyTest, AccessLogPeerUriSan) {
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(

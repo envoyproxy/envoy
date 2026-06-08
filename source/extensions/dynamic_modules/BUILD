@@ -60,6 +60,8 @@ go_library(
         "sdk/go/shared/listener_base.go",
         "sdk/go/shared/network_api.go",
         "sdk/go/shared/network_base.go",
+        "sdk/go/shared/stats_sink.go",
+        "sdk/go/shared/stats_sink_api.go",
         "sdk/go/shared/types.go",
     ],
     cgo = True,
@@ -76,6 +78,13 @@ go_library(
     deps = [
         "//source/extensions/dynamic_modules:go_sdk_shared",
     ],
+)
+
+go_library(
+    name = "go_sdk_internal_buffer",
+    srcs = ["sdk/go/internal/buffer/buffer.go"],
+    importpath = "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/internal/buffer",
+    visibility = ["//visibility:public"],
 )
 
 go_library(
@@ -97,6 +106,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//source/extensions/dynamic_modules:go_sdk",
+        "//source/extensions/dynamic_modules:go_sdk_internal_buffer",
         "//source/extensions/dynamic_modules:go_sdk_shared",
     ],
 )
