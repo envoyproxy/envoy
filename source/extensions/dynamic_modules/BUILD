@@ -11,29 +11,29 @@ envoy_extension_package()
 
 envoy_cc_library(
     name = "dynamic_modules_lib",
-    srcs = ["dynamic_modules.cc"],
+    srcs = [
+        "background_fetch_manager.cc",
+        "dynamic_modules.cc",
+    ],
     hdrs = [
+        "background_fetch_manager.h",
         "dynamic_modules.h",
     ],
     external_deps = ["ssl"],
     deps = [
         "//envoy/common:exception_lib",
-        "//source/common/common:hex_lib",
-        "//source/common/common:utility_lib",
-        "//source/extensions/dynamic_modules/abi",
-    ],
-)
-
-envoy_cc_library(
-    name = "background_fetch_manager_lib",
-    srcs = ["background_fetch_manager.cc"],
-    hdrs = ["background_fetch_manager.h"],
-    deps = [
-        ":dynamic_modules_lib",
+        "//envoy/init:manager_interface",
+        "//envoy/server:factory_context_interface",
         "//envoy/singleton:manager_interface",
+        "//source/common/common:hex_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/common:utility_lib",
         "//source/common/config:remote_data_fetcher_lib",
+        "//source/extensions/common/wasm:remote_async_datasource_lib",
+        "//source/extensions/dynamic_modules/abi",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/dynamic_modules/v3:pkg_cc_proto",
     ],
 )
 
