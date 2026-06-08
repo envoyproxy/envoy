@@ -67,12 +67,21 @@ message Audience {
   message AccessToken {
   }
 
+  message BoundJwt {
+    // The audience URL, used for fetching bound JWT token.
+    string url = 1 [(validate.rules).string = {min_len: 1}];
+  }
+
   // The audience URL, used for fetching unbound JWT token.
   string url = 1;
 
   // If defined, the filter will fetch unbound Access Token instead of JWT.
   // It takes precedence over ``url``.
   AccessToken access_token = 2;
+
+  // If defined, the filter will fetch bound JWT token instead of unbound.
+  // It takes precedence over ``access_token`` and ``url``.
+  BoundJwt bound_jwt = 3;
 }
 
 // Token Cache configuration.

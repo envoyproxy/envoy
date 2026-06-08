@@ -601,9 +601,9 @@ dependatool==0.3.1 \
     --hash=sha256:265fc69e8b1605edb8e33872a36d3a2c2cc055743bec8e58d1ed3c72a17a9431 \
     --hash=sha256:6be19ce9fbdffccf639bad0393e454080b7bba8510a98edc78855a6a93895020
     # via -r requirements.in
-envoy-base-utils==0.6.5 \
-    --hash=sha256:9bb71c96741bb4ffeaae7b6c121418182afbb9791f8139a2e5569654a3d78068 \
-    --hash=sha256:ceb6b6afcf6443b20a127627456785b8c3b3baaa961b961da5734f83837e1470
+envoy-base-utils==0.6.7 \
+    --hash=sha256:cebe9b389bb0e6e924f8daddeb02306f3d9f2612ee3cd9cf6f87dba1ec57286a \
+    --hash=sha256:f1f9f9dffddc232f23f5d46c94d45a903ba2123b372b0b051e7264954a346ed9
     # via
     #   -r requirements.in
     #   envoy-code-check
@@ -616,9 +616,9 @@ envoy-ci-report==0.1.1 \
     --hash=sha256:481115be4d05941b83ffbbd8fdac241f10e9823c076f850d8bef7f0308aa382d \
     --hash=sha256:a38da2e996b266b32ff80f2f404018d1887f156ad086e3fa8fd4233bb4cd6fe7
     # via -r requirements.in
-envoy-code-check==0.6.4 \
-    --hash=sha256:6e5b82d9a6726a875bf07676ab42951734c8b7442cd452bcc961a5fe2182296c \
-    --hash=sha256:a93ab843e4f8a78ea0a2f584132928b24d6b335534b7f9c97ef64b1d51c783ab
+envoy-code-check==0.6.6 \
+    --hash=sha256:003c8b26557a87f22dfba24bd5026bedf1d2bb8cab8a6cf2bfbdc110c491657f \
+    --hash=sha256:733cc88ce18bb84fadd89e4b8d4972bc2a8f04cd0494d07258db6fb14588a771
     # via -r requirements.in
 envoy-dependency-check==0.2.1 \
     --hash=sha256:a037ab34b7db9893ecf07247c8e9149481148de26f340f1c27e4adfa7a48e227 \
@@ -1325,9 +1325,9 @@ pygithub==2.9.1 \
     --hash=sha256:2ec78fca30092d51a42d76f4ddb02131b6f0c666a35dfdf364cf302cdda115b9 \
     --hash=sha256:59771d7ff63d54d427be2e7d0dad2208dfffc2b0a045fec959263787739b611c
     # via -r requirements.in
-pyjwt[crypto]==2.12.1 \
-    --hash=sha256:28ca37c070cad8ba8cd9790cd940535d40274d22f80ab87f3ac6a713e6e8454c \
-    --hash=sha256:c74a7a2adf861c04d002db713dd85f84beb242228e671280bf709d765b03672b
+pyjwt[crypto]==2.13.0 \
+    --hash=sha256:41571c89ca91598c79e8ef18a2d07367d4810fbbd6f637794879baf1b7703423 \
+    --hash=sha256:66adcc2aff09b3f1bbd95fc1e1577df8ac8723c978552fd43304c8a290ac5728
     # via
     #   gidgethub
     #   pygithub

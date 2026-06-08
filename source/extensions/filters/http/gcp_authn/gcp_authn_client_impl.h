@@ -27,8 +27,13 @@ public:
 
   void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 
-  void fetchToken(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-                  GcpAuthnClient::Callbacks& callbacks) override;
+  void fetchUnboundJwt(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+                       GcpAuthnClient::Callbacks& callbacks) override;
+  void
+  fetchUnboundAccessToken(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+                          GcpAuthnClient::Callbacks& callbacks) override;
+  void fetchBoundJwt(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+                     const std::string& fingerprint, GcpAuthnClient::Callbacks& callbacks) override;
   void cancel() override;
 
   // Http::AsyncClient::Callbacks implemented by this class.
@@ -38,15 +43,21 @@ public:
                  Http::AsyncClient::FailureReason reason) override;
 
 private:
-  enum class TokenType { Jwt, AccessToken };
+  enum class TokenType { Jwt, AccessToken, BoundJwt };
 
   void onError(absl::string_view error_msg);
+  void makeTokenRequest(TokenType token_type,
+                        const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+                        const std::string& final_url,
+                        const absl::optional<std::string>& fingerprint,
+                        GcpAuthnClient::Callbacks& callbacks);
   const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config_;
   Server::Configuration::FactoryContext& context_;
   Http::AsyncClient::Request* active_request_{};
   GcpAuthnClient::Callbacks* callbacks_{};
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience_;
   TokenType token_type_{TokenType::Jwt};
+  absl::optional<std::string> fingerprint_;
 };
 
 } // namespace GcpAuthn
