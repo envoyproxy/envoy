@@ -40,10 +40,10 @@ HeaderMutationFactoryConfig::createFilterFactoryFromProtoWithServerContextTyped(
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 HeaderMutationFactoryConfig::createRouteSpecificFilterConfigTyped(
     const PerRouteProtoConfig& proto_config, Server::Configuration::ServerFactoryContext& context,
-    ProtobufMessage::ValidationVisitor&) {
+    ProtobufMessage::ValidationVisitor& validation_visitor) {
   absl::Status creation_status = absl::OkStatus();
-  auto route_config =
-      std::make_shared<PerRouteHeaderMutation>(proto_config, context, creation_status);
+  auto route_config = std::make_shared<PerRouteHeaderMutation>(proto_config, context,
+                                                               validation_visitor, creation_status);
   RETURN_IF_NOT_OK_REF(creation_status);
   return route_config;
 }
