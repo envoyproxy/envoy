@@ -4,6 +4,7 @@
 #include <utility>
 
 #include <sys/resource.h>
+#include <format>
 
 #include "absl/strings/string_view.h"
 #include "absl/synchronization/notification.h"
@@ -99,6 +100,8 @@ InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
       main_dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()),
       enable_logger_(enable_logger), use_worker_thread_(use_worker_thread),
       request_dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()) {
+  auto dummy = std::format("Hello {}!", "World");
+  ENVOY_LOG_MISC(info, "dummy: {}", dummy);
   ExtensionRegistry::registerFactories();
 
   Api::External::registerApi(std::string(ENVOY_EVENT_TRACKER_API_NAME), &event_tracker_);
