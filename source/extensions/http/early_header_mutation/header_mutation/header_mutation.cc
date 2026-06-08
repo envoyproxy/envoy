@@ -1,7 +1,10 @@
 #include "source/extensions/http/early_header_mutation/header_mutation/header_mutation.h"
 
+#include <utility>
+
 #include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
 
+#include "source/common/formatter/substitution_format_string.h"
 #include "source/common/http/header_map_impl.h"
 
 namespace Envoy {
@@ -10,11 +13,30 @@ namespace Http {
 namespace EarlyHeaderMutation {
 namespace HeaderMutation {
 
+namespace {
+
+absl::StatusOr<std::unique_ptr<Envoy::Http::HeaderMutations>>
+createHeaderMutations(const ProtoHeaderMutation& mutations,
+                      Server::Configuration::ServerFactoryContext& context,
+                      ProtobufMessage::ValidationVisitor& validation_visitor) {
+  auto command_parsers_or_error = Formatter::SubstitutionFormatStringUtils::parseFormatters(
+      mutations.formatters(), context, validation_visitor);
+  if (!command_parsers_or_error.ok()) {
+    return command_parsers_or_error.status();
+  }
+  Formatter::CommandParserPtrVector command_parsers =
+      std::move(command_parsers_or_error.value());
+  return Envoy::Http::HeaderMutations::create(mutations.mutations(), context, command_parsers);
+}
+
+} // namespace
+
 HeaderMutation::HeaderMutation(const ProtoHeaderMutation& mutations,
-                               Server::Configuration::ServerFactoryContext& context)
-    : mutations_(THROW_OR_RETURN_VALUE(
-          Envoy::Http::HeaderMutations::create(mutations.mutations(), context),
-          std::unique_ptr<Envoy::Http::HeaderMutations>)) {}
+                               Server::Configuration::ServerFactoryContext& context,
+                               ProtobufMessage::ValidationVisitor& validation_visitor)
+    : mutations_(
+          THROW_OR_RETURN_VALUE(createHeaderMutations(mutations, context, validation_visitor),
+                                std::unique_ptr<Envoy::Http::HeaderMutations>)) {}
 
 bool HeaderMutation::mutate(Envoy::Http::RequestHeaderMap& headers,
                             const StreamInfo::StreamInfo& stream_info) const {
