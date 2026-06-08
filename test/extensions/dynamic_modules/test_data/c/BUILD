@@ -16,6 +16,7 @@ package(default_visibility = [
     "//test/extensions/matching/input_matchers/dynamic_modules:__pkg__",
     "//test/extensions/network/dns_resolver/hickory:__pkg__",
     "//test/extensions/tracers/dynamic_modules:__pkg__",
+    "//test/extensions/transport_sockets/dynamic_modules:__pkg__",
     "//test/extensions/transport_sockets/tls/cert_validator/dynamic_modules:__pkg__",
     "//test/extensions/upstreams/http/dynamic_modules:__pkg__",
 ])

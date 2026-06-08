@@ -31,6 +31,7 @@ Currently, dynamic modules are supported at the following extension points:
 * As an :ref:`HTTP matching data input <envoy_v3_api_msg_extensions.matching.http.dynamic_modules.v3.HttpDynamicModuleMatchInput>`.
 * As an :ref:`input matcher <envoy_v3_api_msg_extensions.matching.input_matchers.dynamic_modules.v3.DynamicModuleMatcher>`.
 * As a :ref:`TLS certificate validator <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig>`.
+* As a :ref:`transport socket <envoy_v3_api_msg_extensions.transport_sockets.dynamic_modules.v3.DynamicModuleTransportSocket>`.
 * As a :ref:`load balancing policy <envoy_v3_api_msg_extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig>`.
 * As an :ref:`upstream HTTP TCP bridge <envoy_v3_api_msg_extensions.upstreams.http.dynamic_modules.v3.Config>`.
 * As a :ref:`tracer <envoy_v3_api_msg_extensions.tracers.dynamic_modules.v3.DynamicModuleTracer>`.
