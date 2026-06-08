@@ -107,18 +107,18 @@ public:
                                           bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
-  void onDestroy() override;
 
 private:
   // Handles "method" field in the MCP request.
-  void handleMcpMethod(const nlohmann::json& json_rpc,
-                       Http::RequestHeaderMapOptRef request_headers);
+  void handleMcpMethod(const nlohmann::json& json_rpc, Http::RequestHeaderMapOptRef request_headers,
+                       const McpJsonRestBridgePerRouteConfig* per_route_config);
 
   // Modifies the response from upstream into JSON-RPC response.
   void encodeJsonRpcData(Http::ResponseHeaderMapOptRef response_headers);
 
   // Maps the tool call request to the backend API.
-  void mapMcpToolToApiBackend(const nlohmann::json& json_rpc);
+  void mapMcpToolToApiBackend(const nlohmann::json& json_rpc,
+                              const McpJsonRestBridgePerRouteConfig* per_route_config);
 
   // Sends MCP error response.
   void sendErrorResponse(Http::Code response_code, absl::string_view response_code_details,
@@ -168,10 +168,7 @@ private:
   std::string streaming_json_suffix_;
   bool is_first_streaming_chunk_ = true;
 
-  // Route and per-route config, latched on decodeData.
   McpJsonRestBridgeFilterConfigSharedPtr config_;
-  Router::RouteConstSharedPtr route_;
-  const McpJsonRestBridgePerRouteConfig* per_route_config_{nullptr};
 };
 
 } // namespace McpJsonRestBridge
