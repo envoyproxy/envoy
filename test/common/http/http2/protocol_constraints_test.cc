@@ -208,6 +208,87 @@ TEST_F(ProtocolConstraintsTest, WindowUpdate) {
   EXPECT_EQ(1, stats_store_.counter("http2.inbound_window_update_frames_flood").value());
 }
 
+TEST_F(ProtocolConstraintsTest, WindowUpdateActiveStreamsDecrement) {
+  options_.mutable_max_inbound_window_update_frames_per_data_frame_sent()->set_value(0);
+  ProtocolConstraints constraints(http2CodecStats(), options_, true);
+  // Create two streams
+  constraints.incrementOpenedStreamCount();
+  constraints.incrementOpenedStreamCount();
+
+  // Formula: 5 + 2 * (active_streams + 0) = 5 + 2 * 2 = 9
+  const uint8_t type = OGHTTP2_WINDOW_UPDATE_FRAME_TYPE;
+  const bool end_stream = false;
+  const bool is_empty = false;
+  for (uint32_t i = 0; i < 9; ++i) {
+    EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
+  }
+  EXPECT_TRUE(constraints.status().ok());
+
+  // Close one stream. active_streams becomes 1.
+  // inbound_window_update_frames should be decremented by 2: 9 - 2 = 7.
+  // New limit: 5 + 2 * (1 + 0) = 7.
+  constraints.decrementActiveStreamCount();
+  EXPECT_TRUE(constraints.status().ok());
+
+  // One more WINDOW_UPDATE should fail. 7 + 1 = 8 > 7.
+  EXPECT_TRUE(isBufferFloodError(constraints.trackInboundFrame(type, end_stream, is_empty)));
+  EXPECT_TRUE(isBufferFloodError(constraints.status()));
+}
+
+TEST_F(ProtocolConstraintsTest, WindowUpdateOpenedStreamsNoDecrement) {
+  options_.mutable_max_inbound_window_update_frames_per_data_frame_sent()->set_value(0);
+  ProtocolConstraints constraints(http2CodecStats(), options_, false);
+  // Create two streams
+  constraints.incrementOpenedStreamCount();
+  constraints.incrementOpenedStreamCount();
+
+  // Formula: 5 + 2 * (opened_streams + 0) = 5 + 2 * 2 = 9
+  const uint8_t type = OGHTTP2_WINDOW_UPDATE_FRAME_TYPE;
+  const bool end_stream = false;
+  const bool is_empty = false;
+  for (uint32_t i = 0; i < 9; ++i) {
+    EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
+  }
+  EXPECT_TRUE(constraints.status().ok());
+
+  // Close one stream. active_streams becomes 1.
+  // inbound_window_update_frames should NOT be decremented.
+  // Limit still uses opened_streams (2): 5 + 2 * (2 + 0) = 9.
+  constraints.decrementActiveStreamCount();
+  EXPECT_TRUE(constraints.status().ok());
+
+  // One more WINDOW_UPDATE should fail. 9 + 1 = 10 > 9.
+  EXPECT_TRUE(isBufferFloodError(constraints.trackInboundFrame(type, end_stream, is_empty)));
+  EXPECT_TRUE(isBufferFloodError(constraints.status()));
+}
+
+TEST_F(ProtocolConstraintsTest, PriorityActiveStreamsDecrement) {
+  options_.mutable_max_inbound_priority_frames_per_stream()->set_value(10);
+  ProtocolConstraints constraints(http2CodecStats(), options_, true);
+  // Create two streams
+  constraints.incrementOpenedStreamCount();
+  constraints.incrementOpenedStreamCount();
+
+  // Formula: max * (1 + active_streams) = 10 * (1 + 2) = 30
+  const uint8_t type = OGHTTP2_PRIORITY_FRAME_TYPE;
+  const bool end_stream = false;
+  const bool is_empty = false;
+  for (uint32_t i = 0; i < 30; ++i) {
+    EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
+  }
+  EXPECT_TRUE(constraints.status().ok());
+
+  // Close one stream. active_streams becomes 1.
+  // inbound_priority_frames should be decremented by max (10): 30 - 10 = 20.
+  // New limit: 10 * (1 + 1) = 20.
+  constraints.decrementActiveStreamCount();
+  EXPECT_TRUE(constraints.status().ok());
+
+  // One more PRIORITY frame should fail. 20 + 1 = 21 > 20.
+  EXPECT_TRUE(isBufferFloodError(constraints.trackInboundFrame(type, end_stream, is_empty)));
+  EXPECT_TRUE(isBufferFloodError(constraints.status()));
+}
+
 TEST_F(ProtocolConstraintsTest, DumpsStateWithoutAllocatingMemory) {
   std::array<char, 1024> buffer;
   OutputBufferStream ostream{buffer.data(), buffer.size()};
