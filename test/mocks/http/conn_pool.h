@@ -39,9 +39,25 @@ public:
   MOCK_METHOD(bool, maybePreconnect, (float));
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
   MOCK_METHOD(absl::string_view, protocolDescription, (), (const));
+  MOCK_METHOD(void, setLifetimeCallbacks,
+              (std::weak_ptr<ConnectionLifetimeCallbacks> callbacks,
+               std::vector<uint8_t> hash_key));
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_;
   IdleCb idle_cb_;
+};
+
+class MockConnectionLifetimeCallbacks : public ConnectionLifetimeCallbacks {
+public:
+  MOCK_METHOD(void, onConnectionOpen,
+              (Instance & pool, const std::vector<uint8_t>& hash_key,
+               const Network::Connection& connection));
+  MOCK_METHOD(void, onConnectionDraining,
+              (Instance & pool, const std::vector<uint8_t>& hash_key,
+               const Network::Connection& connection));
+  MOCK_METHOD(void, onConnectionClosed,
+              (Instance & pool, const std::vector<uint8_t>& hash_key,
+               const Network::Connection& connection));
 };
 
 } // namespace ConnectionPool

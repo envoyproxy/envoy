@@ -155,6 +155,8 @@ public:
 
   bool connectCalled() const { return connect_called_; }
 
+  const Network::Connection& connection() const { return *connection_; }
+
 protected:
   /**
    * Create a codec client and connect to a remote host/port.

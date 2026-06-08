@@ -403,17 +403,13 @@ TEST_F(ClusterTest, PopulatedCache) {
 TEST_F(ClusterTest, LoadBalancer_LifetimeCallbacksWithoutCoalescing) {
   initialize(default_yaml_config_, false);
 
-  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetime_callbacks =
-      lb_->lifetimeCallbacks();
-  ASSERT_FALSE(lifetime_callbacks.has_value());
+  ASSERT_TRUE(lb_->lifetimeCallbacks().expired());
 }
 
 TEST_F(ClusterTest, LoadBalancer_LifetimeCallbacksWithCoalescing) {
   initialize(coalesce_connection_config_, false);
 
-  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetime_callbacks =
-      lb_->lifetimeCallbacks();
-  ASSERT_TRUE(lifetime_callbacks.has_value());
+  ASSERT_FALSE(lb_->lifetimeCallbacks().expired());
 }
 
 TEST_F(ClusterTest, LoadBalancer_SelectPoolNoConnections) {
@@ -446,9 +442,8 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolMatchingConnection) {
 
   Envoy::Http::ConnectionPool::MockInstance pool;
   Envoy::Network::MockConnection connection;
-  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetime_callbacks =
-      lb_->lifetimeCallbacks();
-  ASSERT_TRUE(lifetime_callbacks.has_value());
+  auto lifetime_callbacks = lb_->lifetimeCallbacks().lock();
+  ASSERT_TRUE(lifetime_callbacks != nullptr);
 
   EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
   EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("h2"));
@@ -479,9 +474,8 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolMatchingConnectionHttp3) {
 
   Envoy::Http::ConnectionPool::MockInstance pool;
   Envoy::Network::MockConnection connection;
-  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetime_callbacks =
-      lb_->lifetimeCallbacks();
-  ASSERT_TRUE(lifetime_callbacks.has_value());
+  auto lifetime_callbacks = lb_->lifetimeCallbacks().lock();
+  ASSERT_TRUE(lifetime_callbacks != nullptr);
 
   EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
   EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("h3"));
@@ -512,9 +506,8 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolNoMatchingConnectionAfterDraining) {
 
   Envoy::Http::ConnectionPool::MockInstance pool;
   Envoy::Network::MockConnection connection;
-  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetime_callbacks =
-      lb_->lifetimeCallbacks();
-  ASSERT_TRUE(lifetime_callbacks.has_value());
+  auto lifetime_callbacks = lb_->lifetimeCallbacks().lock();
+  ASSERT_TRUE(lifetime_callbacks != nullptr);
 
   EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
   EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("h2"));
@@ -522,7 +515,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolNoMatchingConnectionAfterDraining) {
   EXPECT_CALL(connection, ssl()).WillRepeatedly(Return(ssl_info));
   lifetime_callbacks->onConnectionOpen(pool, hash_key, connection);
 
-  // Drain the connection then no verify that no connection is subsequently selected.
+  // Drain the connection then verify that no connection is subsequently selected.
   lifetime_callbacks->onConnectionDraining(pool, hash_key, connection);
 
   absl::optional<Upstream::SelectedPoolAndConnection> selection =
@@ -544,9 +537,8 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolInvalidAlpn) {
 
   Envoy::Http::ConnectionPool::MockInstance pool;
   Envoy::Network::MockConnection connection;
-  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetime_callbacks =
-      lb_->lifetimeCallbacks();
-  ASSERT_TRUE(lifetime_callbacks.has_value());
+  auto lifetime_callbacks = lb_->lifetimeCallbacks().lock();
+  ASSERT_TRUE(lifetime_callbacks != nullptr);
 
   EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
   EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("hello"));
@@ -573,9 +565,8 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolSanMismatch) {
 
   Envoy::Http::ConnectionPool::MockInstance pool;
   Envoy::Network::MockConnection connection;
-  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetime_callbacks =
-      lb_->lifetimeCallbacks();
-  ASSERT_TRUE(lifetime_callbacks.has_value());
+  auto lifetime_callbacks = lb_->lifetimeCallbacks().lock();
+  ASSERT_TRUE(lifetime_callbacks != nullptr);
   EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
   EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("h2"));
   auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
@@ -603,9 +594,8 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolHashMismatch) {
 
   Envoy::Http::ConnectionPool::MockInstance pool;
   Envoy::Network::MockConnection connection;
-  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetime_callbacks =
-      lb_->lifetimeCallbacks();
-  ASSERT_TRUE(lifetime_callbacks.has_value());
+  auto lifetime_callbacks = lb_->lifetimeCallbacks().lock();
+  ASSERT_TRUE(lifetime_callbacks != nullptr);
   EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
   EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("h2"));
   auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
@@ -632,9 +622,8 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolIpMismatch) {
 
   Envoy::Http::ConnectionPool::MockInstance pool;
   Envoy::Network::MockConnection connection;
-  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetime_callbacks =
-      lb_->lifetimeCallbacks();
-  ASSERT_TRUE(lifetime_callbacks.has_value());
+  auto lifetime_callbacks = lb_->lifetimeCallbacks().lock();
+  ASSERT_TRUE(lifetime_callbacks != nullptr);
   EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
   EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("h2"));
   auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
@@ -662,9 +651,8 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolEmptyHostname) {
 
   Envoy::Http::ConnectionPool::MockInstance pool;
   Envoy::Network::MockConnection connection;
-  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetime_callbacks =
-      lb_->lifetimeCallbacks();
-  ASSERT_TRUE(lifetime_callbacks.has_value());
+  auto lifetime_callbacks = lb_->lifetimeCallbacks().lock();
+  ASSERT_TRUE(lifetime_callbacks != nullptr);
   EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
   EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("h2"));
   auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
@@ -696,9 +684,8 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolNoSSSL) {
 
   Envoy::Http::ConnectionPool::MockInstance pool;
   Envoy::Network::MockConnection connection;
-  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetime_callbacks =
-      lb_->lifetimeCallbacks();
-  ASSERT_TRUE(lifetime_callbacks.has_value());
+  auto lifetime_callbacks = lb_->lifetimeCallbacks().lock();
+  ASSERT_TRUE(lifetime_callbacks != nullptr);
   EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
   EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("h2"));
   auto ssl_info = nullptr;

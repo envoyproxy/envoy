@@ -197,7 +197,7 @@ AggregateClusterLoadBalancer::selectExistingConnection(Upstream::LoadBalancerCon
   return absl::nullopt;
 }
 
-OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
+std::weak_ptr<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
 AggregateClusterLoadBalancer::lifetimeCallbacks() {
   if (load_balancer_) {
     return load_balancer_->lifetimeCallbacks();

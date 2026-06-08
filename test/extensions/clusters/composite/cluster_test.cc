@@ -216,7 +216,7 @@ cluster_type:
 
   EXPECT_EQ(nullptr, lb.peekAnotherHost(&context));
   EXPECT_EQ(absl::nullopt, lb.selectExistingConnection(&context, host, hash_key));
-  EXPECT_FALSE(lb.lifetimeCallbacks().has_value());
+  EXPECT_TRUE(lb.lifetimeCallbacks().expired());
 }
 
 // Test cluster update callbacks.

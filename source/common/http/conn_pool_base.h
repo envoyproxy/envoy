@@ -98,6 +98,13 @@ public:
   virtual absl::optional<HttpServerPropertiesCache::Origin>& origin() { return origin_; }
   virtual Http::HttpServerPropertiesCacheSharedPtr cache() { return nullptr; }
 
+  void setLifetimeCallbacks(std::weak_ptr<ConnectionPool::ConnectionLifetimeCallbacks> callbacks,
+                            std::vector<uint8_t> hash_key) override;
+
+  void onConnectionOpen(const Network::Connection& connection);
+  void onConnectionDraining(const Network::Connection& connection);
+  void onConnectionClose(const Network::Connection& connection);
+
 protected:
   friend class ActiveClient;
 
@@ -107,6 +114,8 @@ protected:
 
 private:
   absl::optional<HttpServerPropertiesCache::Origin> origin_;
+  std::weak_ptr<ConnectionPool::ConnectionLifetimeCallbacks> lifetime_callbacks_;
+  std::vector<uint8_t> hash_key_;
 };
 
 // An implementation of Envoy::ConnectionPool::ActiveClient for HTTP/1.1 and HTTP/2
@@ -241,6 +250,8 @@ public:
   // Http::ConnectionCallbacks
   void onGoAway(Http::GoAwayErrorCode error_code) override;
   void onSettings(ReceivedSettings& settings) override;
+
+  void onEvent(Network::ConnectionEvent event) override;
 
 private:
   bool closed_with_active_rq_{};

@@ -137,7 +137,7 @@ TEST_F(RedisClusterLoadBalancerTest, LoadBalancerStubMethods) {
   EXPECT_EQ(absl::nullopt, lb->selectExistingConnection(nullptr, *hosts[0], hash_key));
 
   // lifetimeCallbacks is not implemented and returns empty OptRef.
-  EXPECT_FALSE(lb->lifetimeCallbacks().has_value());
+  EXPECT_TRUE(lb->lifetimeCallbacks().expired());
 }
 
 // Works correctly with empty context

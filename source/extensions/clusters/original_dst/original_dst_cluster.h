@@ -111,7 +111,8 @@ public:
       return absl::nullopt;
     }
     // Lifetime tracking not implemented for OriginalDstCluster
-    OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+    std::weak_ptr<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
+    lifetimeCallbacks() override {
       return {};
     }
 

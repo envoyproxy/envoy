@@ -91,10 +91,29 @@ private:
   using HostInfoMap = absl::flat_hash_map<std::string, HostInfo>;
 
   class DFPHostSelectionHandle;
+  class LoadBalancer;
+
+  class LifetimeCallbacksReceiver
+      : public Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks {
+  public:
+    LifetimeCallbacksReceiver(LoadBalancer& parent) : parent_(parent) {}
+
+    void onConnectionOpen(Envoy::Http::ConnectionPool::Instance& pool,
+                          const std::vector<uint8_t>& hash_key,
+                          const Network::Connection& connection) override;
+    void onConnectionDraining(Envoy::Http::ConnectionPool::Instance& pool,
+                              const std::vector<uint8_t>& hash_key,
+                              const Network::Connection& connection) override;
+    void onConnectionClosed(Envoy::Http::ConnectionPool::Instance& pool,
+                            const std::vector<uint8_t>& hash_key,
+                            const Network::Connection& connection) override;
+
+  private:
+    LoadBalancer& parent_;
+  };
 
   class LoadBalancer : public Upstream::LoadBalancer,
-                       public Extensions::Common::DynamicForwardProxy::DfpLb,
-                       public Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks {
+                       public Extensions::Common::DynamicForwardProxy::DfpLb {
   public:
     LoadBalancer(std::weak_ptr<const Cluster> cluster) : cluster_(cluster) {}
     ~LoadBalancer() override;
@@ -110,18 +129,25 @@ private:
     absl::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Upstream::LoadBalancerContext* context, const Upstream::Host& host,
                              std::vector<uint8_t>& hash_key) override;
-    OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override;
+    std::weak_ptr<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
+    lifetimeCallbacks() override;
 
-    // Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks
     void onConnectionOpen(Envoy::Http::ConnectionPool::Instance& pool,
-                          std::vector<uint8_t>& hash_key,
-                          const Network::Connection& connection) override;
+                          const std::vector<uint8_t>& hash_key,
+                          const Network::Connection& connection);
 
     void onConnectionDraining(Envoy::Http::ConnectionPool::Instance& pool,
-                              std::vector<uint8_t>& hash_key,
-                              const Network::Connection& connection) override;
+                              const std::vector<uint8_t>& hash_key,
+                              const Network::Connection& connection);
+
+    void onConnectionClosed(Envoy::Http::ConnectionPool::Instance& pool,
+                            const std::vector<uint8_t>& hash_key,
+                            const Network::Connection& connection);
 
   private:
+    void removeConnection(Envoy::Http::ConnectionPool::Instance& pool,
+                          const std::vector<uint8_t>& hash_key,
+                          const Network::Connection& connection);
     struct ConnectionInfo {
       Envoy::Http::ConnectionPool::Instance* pool_; // Not a ref to allow assignment in remove().
       const Network::Connection* connection_;       // Not a ref to allow assignment in remove().
@@ -142,6 +168,8 @@ private:
     absl::flat_hash_map<LookupKey, std::vector<ConnectionInfo>, LookupKeyHash> connection_info_map_;
     absl::flat_hash_set<DFPHostSelectionHandle*> pending_host_selection_handles_;
     std::weak_ptr<const Cluster> cluster_;
+    std::shared_ptr<LifetimeCallbacksReceiver> lifetime_callbacks_receiver_{
+        std::make_shared<LifetimeCallbacksReceiver>(*this)};
   };
 
   // This acts as the bridge for asynchronous host lookup. If the host is not

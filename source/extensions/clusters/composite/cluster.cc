@@ -170,7 +170,7 @@ CompositeClusterLoadBalancer::selectExistingConnection(Upstream::LoadBalancerCon
   return cluster->loadBalancer().selectExistingConnection(&composite_context, host, hash_key);
 }
 
-OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
+std::weak_ptr<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
 CompositeClusterLoadBalancer::lifetimeCallbacks() {
   // Return empty for now. Could be enhanced to aggregate callbacks from sub-clusters.
   return {};

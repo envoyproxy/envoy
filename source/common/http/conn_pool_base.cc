@@ -104,6 +104,31 @@ void HttpConnPoolImplBase::onPoolReady(Envoy::ConnectionPool::ActiveClient& clie
                         http_client->codec_client_->protocol());
 }
 
+void HttpConnPoolImplBase::setLifetimeCallbacks(
+    std::weak_ptr<ConnectionPool::ConnectionLifetimeCallbacks> callbacks,
+    std::vector<uint8_t> hash_key) {
+  lifetime_callbacks_ = callbacks;
+  hash_key_ = std::move(hash_key);
+}
+
+void HttpConnPoolImplBase::onConnectionOpen(const Network::Connection& connection) {
+  if (auto callbacks = lifetime_callbacks_.lock()) {
+    callbacks->onConnectionOpen(*this, hash_key_, connection);
+  }
+}
+
+void HttpConnPoolImplBase::onConnectionDraining(const Network::Connection& connection) {
+  if (auto callbacks = lifetime_callbacks_.lock()) {
+    callbacks->onConnectionDraining(*this, hash_key_, connection);
+  }
+}
+
+void HttpConnPoolImplBase::onConnectionClose(const Network::Connection& connection) {
+  if (auto callbacks = lifetime_callbacks_.lock()) {
+    callbacks->onConnectionClosed(*this, hash_key_, connection);
+  }
+}
+
 // All streams are 2^31. Client streams are half that, minus stream 0. Just to be on the safe
 // side we do 2^29.
 constexpr uint32_t DEFAULT_MAX_STREAMS = 1U << 29;
@@ -115,6 +140,7 @@ void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode) {
     if (codec_client_->numActiveRequests() == 0) {
       codec_client_->close();
     } else {
+      parent().onConnectionDraining(codec_client_->connection());
       parent_.transitionActiveClientState(*this, ActiveClient::State::Draining);
     }
   }
@@ -223,6 +249,22 @@ RequestEncoder& MultiplexedActiveClientBase::newStreamEncoder(ResponseDecoder& r
 RequestEncoder&
 MultiplexedActiveClientBase::newStreamEncoder(ResponseDecoderHandlePtr response_decoder_handle) {
   return codec_client_->newStream(std::move(response_decoder_handle));
+}
+
+void MultiplexedActiveClientBase::onEvent(Network::ConnectionEvent event) {
+  // Lifetime callbacks must fire synchronously before ActiveClient::onEvent, because that call
+  // triggers deferred deletion of this client (and its connection).
+  if (event == Network::ConnectionEvent::Connected &&
+      state() == Envoy::ConnectionPool::ActiveClient::State::Connecting) {
+    parent().onConnectionOpen(codec_client_->connection());
+  } else if (event == Network::ConnectionEvent::ConnectedZeroRtt) {
+    parent().onConnectionOpen(codec_client_->connection());
+  } else if (event == Network::ConnectionEvent::LocalClose ||
+             event == Network::ConnectionEvent::RemoteClose) {
+    parent().onConnectionClose(codec_client_->connection());
+  }
+
+  ActiveClient::onEvent(event);
 }
 
 } // namespace Http

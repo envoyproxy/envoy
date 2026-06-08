@@ -596,7 +596,7 @@ TEST_F(ZoneAwareLoadBalancerBaseTest, SourceTypeMethods) {
 }
 
 TEST_F(ZoneAwareLoadBalancerBaseTest, BaseMethods) {
-  EXPECT_FALSE(lb_.lifetimeCallbacks().has_value());
+  EXPECT_TRUE(lb_.lifetimeCallbacks().expired());
   std::vector<uint8_t> hash_key;
   auto mock_host = std::make_shared<NiceMock<MockHost>>();
   EXPECT_FALSE(lb_.selectExistingConnection(nullptr, *mock_host, hash_key).has_value());
@@ -675,7 +675,7 @@ TEST(ZoneAwareLbCoalesceDisabledTest, FallbackPathExercised) {
   host_set.healthy_hosts_ = host_set.hosts_;
   host_set.runCallbacks({}, {});
 
-  EXPECT_FALSE(lb.lifetimeCallbacks().has_value());
+  EXPECT_TRUE(lb.lifetimeCallbacks().expired());
 }
 
 // Exercises the coalescing branch of ZoneAwareLoadBalancerBase: PriorityUpdateCb stages dirty
@@ -703,7 +703,7 @@ TEST(ZoneAwareLbCoalesceEnabledTest, CoalescedPathExercised) {
   host_set.healthy_hosts_ = host_set.hosts_;
   host_set.runCallbacks({}, {});
 
-  EXPECT_FALSE(lb.lifetimeCallbacks().has_value());
+  EXPECT_TRUE(lb.lifetimeCallbacks().expired());
 }
 
 } // namespace

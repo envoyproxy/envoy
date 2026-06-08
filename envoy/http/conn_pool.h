@@ -62,17 +62,26 @@ public:
    * @param hash_key the hash key used for this connection.
    * @param connection newly open connection.
    */
-  virtual void onConnectionOpen(Instance& pool, std::vector<uint8_t>& hash_key,
+  virtual void onConnectionOpen(Instance& pool, const std::vector<uint8_t>& hash_key,
                                 const Network::Connection& connection) PURE;
 
   /**
    * Called when a connection is draining and may no longer be used for requests.
    * @param pool which the connection is associated with.
    * @param hash_key the hash key used for this connection.
-   * @param connection newly open connection.
+   * @param connection the draining connection.
    */
-  virtual void onConnectionDraining(Instance& pool, std::vector<uint8_t>& hash_key,
+  virtual void onConnectionDraining(Instance& pool, const std::vector<uint8_t>& hash_key,
                                     const Network::Connection& connection) PURE;
+
+  /**
+   * Called when a connection is closed and may no longer be used for requests.
+   * @param pool which the connection is associated with.
+   * @param hash_key the hash key used for this connection.
+   * @param connection the closed connection.
+   */
+  virtual void onConnectionClosed(Instance& pool, const std::vector<uint8_t>& hash_key,
+                                  const Network::Connection& connection) PURE;
 };
 
 /**
@@ -119,6 +128,9 @@ public:
    * @return absl::string_view a protocol description for logging.
    */
   virtual absl::string_view protocolDescription() const PURE;
+
+  virtual void setLifetimeCallbacks(std::weak_ptr<ConnectionLifetimeCallbacks> callbacks,
+                                    std::vector<uint8_t> hash_key) PURE;
 };
 
 using InstancePtr = std::unique_ptr<Instance>;

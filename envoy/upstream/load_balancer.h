@@ -246,7 +246,8 @@ public:
    * will return nullopt.
    * @return optional lifetime callbacks for this load balancer.
    */
-  virtual OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() PURE;
+  virtual std::weak_ptr<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
+  lifetimeCallbacks() PURE;
 
   /**
    * Returns a specific pool and existing connection to be used for the specified host.

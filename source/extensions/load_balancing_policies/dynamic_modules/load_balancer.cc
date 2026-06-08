@@ -74,7 +74,7 @@ DynamicModuleLoadBalancer::peekAnotherHost(Upstream::LoadBalancerContext*) {
   return nullptr;
 }
 
-OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
+std::weak_ptr<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
 DynamicModuleLoadBalancer::lifetimeCallbacks() {
   return {};
 }

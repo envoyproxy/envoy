@@ -85,6 +85,12 @@ public:
 
   void createHttp3AlternatePool() {
     ConnectionPool::MockInstance* instance = new NiceMock<ConnectionPool::MockInstance>();
+    EXPECT_CALL(*instance, setLifetimeCallbacks(_, _))
+        .WillRepeatedly(
+            Invoke([this, instance](std::weak_ptr<ConnectionPool::ConnectionLifetimeCallbacks> cb,
+                                    std::vector<uint8_t> key) {
+              captured_lifetime_callbacks_[instance] = {cb.lock(), std::move(key)};
+            }));
     setupPool(*instance);
     http3_alternate_pool_.reset(instance);
     pools_.push_back(instance);
@@ -120,6 +126,12 @@ public:
               return cancel_;
             }));
     EXPECT_CALL(*instance, protocolDescription()).Times(AnyNumber()).WillRepeatedly(Return(type));
+    EXPECT_CALL(*instance, setLifetimeCallbacks(_, _))
+        .WillRepeatedly(
+            Invoke([this, instance](std::weak_ptr<ConnectionPool::ConnectionLifetimeCallbacks> cb,
+                                    std::vector<uint8_t> key) {
+              captured_lifetime_callbacks_[instance] = {cb.lock(), std::move(key)};
+            }));
     return absl::WrapUnique(instance);
   }
 
@@ -148,6 +160,28 @@ public:
     return http3_status_tracker.isHttp3Confirmed();
   }
 
+  void simulateConnectionOpen(ConnectionPool::Instance& pool,
+                              const Network::Connection& connection) {
+    auto it = captured_lifetime_callbacks_.find(&pool);
+    ASSERT_TRUE(it != captured_lifetime_callbacks_.end());
+    ASSERT_TRUE(it->second.callbacks != nullptr);
+    it->second.callbacks->onConnectionOpen(pool, it->second.hash_key, connection);
+  }
+  void simulateConnectionDraining(ConnectionPool::Instance& pool,
+                                  const Network::Connection& connection) {
+    auto it = captured_lifetime_callbacks_.find(&pool);
+    ASSERT_TRUE(it != captured_lifetime_callbacks_.end());
+    ASSERT_TRUE(it->second.callbacks != nullptr);
+    it->second.callbacks->onConnectionDraining(pool, it->second.hash_key, connection);
+  }
+  void simulateConnectionClosed(ConnectionPool::Instance& pool,
+                                const Network::Connection& connection) {
+    auto it = captured_lifetime_callbacks_.find(&pool);
+    ASSERT_TRUE(it != captured_lifetime_callbacks_.end());
+    ASSERT_TRUE(it->second.callbacks != nullptr);
+    it->second.callbacks->onConnectionClosed(pool, it->second.hash_key, connection);
+  }
+
   StreamInfo::MockStreamInfo* info_;
   NiceMock<MockRequestEncoder>* encoder_;
   void setDestroying() { destroying_ = true; }
@@ -160,6 +194,12 @@ public:
 
   bool alternate_immediate_{true};
   bool alternate_failure_{true};
+
+  struct CapturedCallbacks {
+    std::shared_ptr<ConnectionPool::ConnectionLifetimeCallbacks> callbacks;
+    std::vector<uint8_t> hash_key;
+  };
+  absl::flat_hash_map<ConnectionPool::Instance*, CapturedCallbacks> captured_lifetime_callbacks_;
 };
 
 namespace {
@@ -1899,6 +1939,187 @@ TEST_F(ConnectivityGridTest, DestroyGridWithActiveH2Attempts) {
 }
 
 #endif
+
+// --- ConnectionLifetimeCallbacks tests ---
+
+TEST_F(ConnectivityGridTest, PoolsWorkWithoutLifetimeCallbacks) {
+  initialize();
+  addHttp3AlternateProtocol();
+
+  grid_->immediate_success_ = true;
+  auto* cancel = grid_->newStream(decoder_, callbacks_,
+                                  {/*can_send_early_data_=*/false, /*can_use_http3_=*/true});
+  EXPECT_EQ(cancel, nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
+
+  NiceMock<Network::MockConnection> connection;
+  grid_->simulateConnectionOpen(*grid_->http3Pool(), connection);
+  grid_->simulateConnectionDraining(*grid_->http3Pool(), connection);
+  grid_->simulateConnectionClosed(*grid_->http3Pool(), connection);
+}
+
+TEST_F(ConnectivityGridTest, H2PoolWorksWithoutLifetimeCallbacks) {
+  initialize();
+  addHttp3AlternateProtocol();
+
+  EXPECT_NE(grid_->newStream(decoder_, callbacks_,
+                             {/*can_send_early_data_=*/false, /*can_use_http3_=*/true}),
+            nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
+
+  grid_->immediate_success_ = true;
+  grid_->callbacks()->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                    "reason", host_);
+  EXPECT_NE(grid_->http2Pool(), nullptr);
+
+  NiceMock<Network::MockConnection> connection;
+  grid_->simulateConnectionOpen(*grid_->http2Pool(), connection);
+  grid_->simulateConnectionDraining(*grid_->http2Pool(), connection);
+}
+
+TEST_F(ConnectivityGridTest, H3AltPoolWorksWithoutLifetimeCallbacks) {
+  initialize();
+  addHttp3AlternateProtocol();
+  grid_->createHttp3AlternatePool();
+
+  EXPECT_NE(grid_->alternate(), nullptr);
+
+  NiceMock<Network::MockConnection> connection;
+  grid_->simulateConnectionOpen(*grid_->alternate(), connection);
+  grid_->simulateConnectionDraining(*grid_->alternate(), connection);
+}
+
+TEST_F(ConnectivityGridTest, LifetimeCallbacksH3Only) {
+  initialize();
+  addHttp3AlternateProtocol();
+
+  auto lifetime_callbacks = std::make_shared<ConnectionPool::MockConnectionLifetimeCallbacks>();
+  std::vector<uint8_t> hash_key = {1, 2, 3};
+  grid_->setLifetimeCallbacks(lifetime_callbacks, hash_key);
+
+  EXPECT_NE(grid_->newStream(decoder_, callbacks_,
+                             {/*can_send_early_data_=*/false, /*can_use_http3_=*/true}),
+            nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
+
+  NiceMock<Network::MockConnection> connection;
+
+  EXPECT_CALL(*lifetime_callbacks,
+              onConnectionOpen(testing::Ref(*grid_->http3Pool()), testing::ContainerEq(hash_key),
+                               testing::Ref(connection)));
+  grid_->simulateConnectionOpen(*grid_->http3Pool(), connection);
+
+  EXPECT_CALL(*lifetime_callbacks,
+              onConnectionDraining(testing::Ref(*grid_->http3Pool()),
+                                   testing::ContainerEq(hash_key), testing::Ref(connection)));
+  grid_->simulateConnectionDraining(*grid_->http3Pool(), connection);
+
+  EXPECT_CALL(*lifetime_callbacks,
+              onConnectionClosed(testing::Ref(*grid_->http3Pool()), testing::ContainerEq(hash_key),
+                                 testing::Ref(connection)));
+  grid_->simulateConnectionClosed(*grid_->http3Pool(), connection);
+}
+
+TEST_F(ConnectivityGridTest, LifetimeCallbacksH3AndH2) {
+  initialize();
+  addHttp3AlternateProtocol();
+
+  auto lifetime_callbacks = std::make_shared<ConnectionPool::MockConnectionLifetimeCallbacks>();
+  std::vector<uint8_t> hash_key = {4, 5, 6};
+  grid_->setLifetimeCallbacks(lifetime_callbacks, hash_key);
+
+  EXPECT_NE(grid_->newStream(decoder_, callbacks_,
+                             {/*can_send_early_data_=*/false, /*can_use_http3_=*/true}),
+            nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
+
+  grid_->callbacks()->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                    "reason", host_);
+  EXPECT_NE(grid_->http2Pool(), nullptr);
+
+  NiceMock<Network::MockConnection> h3_conn;
+  NiceMock<Network::MockConnection> h2_conn;
+
+  EXPECT_CALL(*lifetime_callbacks,
+              onConnectionOpen(testing::Ref(*grid_->http3Pool()), testing::ContainerEq(hash_key),
+                               testing::Ref(h3_conn)));
+  grid_->simulateConnectionOpen(*grid_->http3Pool(), h3_conn);
+
+  EXPECT_CALL(*lifetime_callbacks,
+              onConnectionOpen(testing::Ref(*grid_->http2Pool()), testing::ContainerEq(hash_key),
+                               testing::Ref(h2_conn)));
+  grid_->simulateConnectionOpen(*grid_->http2Pool(), h2_conn);
+
+  EXPECT_CALL(*lifetime_callbacks,
+              onConnectionDraining(testing::Ref(*grid_->http2Pool()),
+                                   testing::ContainerEq(hash_key), testing::Ref(h2_conn)));
+  grid_->simulateConnectionDraining(*grid_->http2Pool(), h2_conn);
+}
+
+TEST_F(ConnectivityGridTest, LifetimeCallbacksH3Alt) {
+  initialize();
+  addHttp3AlternateProtocol();
+
+  auto lifetime_callbacks = std::make_shared<ConnectionPool::MockConnectionLifetimeCallbacks>();
+  std::vector<uint8_t> hash_key = {9, 10};
+  grid_->setLifetimeCallbacks(lifetime_callbacks, hash_key);
+
+  grid_->createHttp3AlternatePool();
+  EXPECT_NE(grid_->alternate(), nullptr);
+
+  NiceMock<Network::MockConnection> connection;
+
+  EXPECT_CALL(*lifetime_callbacks,
+              onConnectionOpen(testing::Ref(*grid_->alternate()), testing::ContainerEq(hash_key),
+                               testing::Ref(connection)));
+  grid_->simulateConnectionOpen(*grid_->alternate(), connection);
+}
+
+TEST_F(ConnectivityGridTest, LifetimeCallbacksSetAfterPoolCreation) {
+  initialize();
+  addHttp3AlternateProtocol();
+
+  EXPECT_NE(grid_->newStream(decoder_, callbacks_,
+                             {/*can_send_early_data_=*/false, /*can_use_http3_=*/true}),
+            nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
+
+  auto lifetime_callbacks = std::make_shared<ConnectionPool::MockConnectionLifetimeCallbacks>();
+  std::vector<uint8_t> hash_key = {11, 12};
+  grid_->setLifetimeCallbacks(lifetime_callbacks, hash_key);
+
+  NiceMock<Network::MockConnection> connection;
+  EXPECT_CALL(*lifetime_callbacks,
+              onConnectionOpen(testing::Ref(*grid_->http3Pool()), testing::ContainerEq(hash_key),
+                               testing::Ref(connection)));
+  grid_->simulateConnectionOpen(*grid_->http3Pool(), connection);
+
+  EXPECT_CALL(*lifetime_callbacks,
+              onConnectionDraining(testing::Ref(*grid_->http3Pool()),
+                                   testing::ContainerEq(hash_key), testing::Ref(connection)));
+  grid_->simulateConnectionDraining(*grid_->http3Pool(), connection);
+}
+
+TEST_F(ConnectivityGridTest, LifetimeCallbacksExpiredWeakPtrNoCrash) {
+  initialize();
+  addHttp3AlternateProtocol();
+
+  {
+    auto lifetime_callbacks = std::make_shared<ConnectionPool::MockConnectionLifetimeCallbacks>();
+    std::vector<uint8_t> hash_key = {1};
+    grid_->setLifetimeCallbacks(lifetime_callbacks, hash_key);
+  }
+  // lifetime_callbacks is destroyed; weak_ptr should be expired.
+
+  EXPECT_NE(grid_->newStream(decoder_, callbacks_,
+                             {/*can_send_early_data_=*/false, /*can_use_http3_=*/true}),
+            nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
+
+  NiceMock<Network::MockConnection> connection;
+  grid_->simulateConnectionOpen(*grid_->http3Pool(), connection);
+  grid_->simulateConnectionDraining(*grid_->http3Pool(), connection);
+}
 
 } // namespace
 } // namespace Http

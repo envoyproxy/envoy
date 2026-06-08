@@ -356,6 +356,24 @@ void Cluster::onDnsHostRemove(const std::string& host) {
   updatePriorityState({}, hosts_removed);
 }
 
+void Cluster::LifetimeCallbacksReceiver::onConnectionOpen(
+    Envoy::Http::ConnectionPool::Instance& pool, const std::vector<uint8_t>& hash_key,
+    const Network::Connection& connection) {
+  parent_.onConnectionOpen(pool, hash_key, connection);
+}
+
+void Cluster::LifetimeCallbacksReceiver::onConnectionDraining(
+    Envoy::Http::ConnectionPool::Instance& pool, const std::vector<uint8_t>& hash_key,
+    const Network::Connection& connection) {
+  parent_.onConnectionDraining(pool, hash_key, connection);
+}
+
+void Cluster::LifetimeCallbacksReceiver::onConnectionClosed(
+    Envoy::Http::ConnectionPool::Instance& pool, const std::vector<uint8_t>& hash_key,
+    const Network::Connection& connection) {
+  parent_.onConnectionClosed(pool, hash_key, connection);
+}
+
 Upstream::HostSelectionResponse
 Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   if (!context) {
@@ -542,19 +560,19 @@ Cluster::LoadBalancer::selectExistingConnection(Upstream::LoadBalancerContext* /
   return absl::nullopt;
 }
 
-OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
+std::weak_ptr<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
 Cluster::LoadBalancer::lifetimeCallbacks() {
   if (auto cluster = cluster_.lock()) {
     if (!cluster->allowCoalescedConnections()) {
       return {};
     }
-    return makeOptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>(*this);
+    return lifetime_callbacks_receiver_;
   }
   return {};
 }
 
 void Cluster::LoadBalancer::onConnectionOpen(Envoy::Http::ConnectionPool::Instance& pool,
-                                             std::vector<uint8_t>& hash_key,
+                                             const std::vector<uint8_t>& hash_key,
                                              const Network::Connection& connection) {
   // Only coalesce connections that are over TLS.
   if (!connection.ssl()) {
@@ -571,16 +589,33 @@ void Cluster::LoadBalancer::onConnectionOpen(Envoy::Http::ConnectionPool::Instan
   connection_info_map_[key].push_back(info);
 }
 
-void Cluster::LoadBalancer::onConnectionDraining(Envoy::Http::ConnectionPool::Instance& pool,
-                                                 std::vector<uint8_t>& hash_key,
-                                                 const Network::Connection& connection) {
+void Cluster::LoadBalancer::removeConnection(Envoy::Http::ConnectionPool::Instance& pool,
+                                             const std::vector<uint8_t>& hash_key,
+                                             const Network::Connection& connection) {
   const LookupKey key = {hash_key, *connection.connectionInfoProvider().remoteAddress()};
-  connection_info_map_[key].erase(
-      std::remove_if(connection_info_map_[key].begin(), connection_info_map_[key].end(),
-                     [&pool, &connection](const ConnectionInfo& info) {
-                       return (info.pool_ == &pool && info.connection_ == &connection);
-                     }),
-      connection_info_map_[key].end());
+  auto it = connection_info_map_.find(key);
+  if (it == connection_info_map_.end()) {
+    return;
+  }
+
+  std::erase_if(it->second, [&pool, &connection](const ConnectionInfo& info) {
+    return (info.pool_ == &pool && info.connection_ == &connection);
+  });
+  if (it->second.empty()) {
+    connection_info_map_.erase(it);
+  }
+}
+
+void Cluster::LoadBalancer::onConnectionDraining(Envoy::Http::ConnectionPool::Instance& pool,
+                                                 const std::vector<uint8_t>& hash_key,
+                                                 const Network::Connection& connection) {
+  removeConnection(pool, hash_key, connection);
+}
+
+void Cluster::LoadBalancer::onConnectionClosed(Envoy::Http::ConnectionPool::Instance& pool,
+                                               const std::vector<uint8_t>& hash_key,
+                                               const Network::Connection& connection) {
+  removeConnection(pool, hash_key, connection);
 }
 
 absl::StatusOr<std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>

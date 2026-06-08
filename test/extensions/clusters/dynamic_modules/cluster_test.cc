@@ -353,7 +353,7 @@ TEST_F(DynamicModuleClusterTest, LoadBalancerLifecycle) {
   EXPECT_FALSE(existing.has_value());
 
   // lifetimeCallbacks should return empty (not supported).
-  EXPECT_FALSE(lb->lifetimeCallbacks().has_value());
+  EXPECT_TRUE(lb->lifetimeCallbacks().expired());
 
   // Clean up.
   cluster->removeHosts(dummy_hosts);

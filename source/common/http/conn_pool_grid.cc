@@ -428,6 +428,7 @@ ConnectionPool::InstancePtr ConnectivityGrid::createHttp3Pool(bool attempt_alter
 
 void ConnectivityGrid::setupPool(ConnectionPool::Instance& pool) {
   pool.addIdleCallback([this]() { onIdleReceived(); });
+  pool.setLifetimeCallbacks(receiver_, hash_key_);
 }
 
 bool ConnectivityGrid::hasActiveConnections() const {
@@ -619,6 +620,47 @@ void ConnectivityGrid::onHandshakeComplete() {
 void ConnectivityGrid::onZeroRttHandshakeFailed() {
   ENVOY_LOG(trace, "Marking HTTP/3 failed for host '{}'.", host_->hostname());
   getHttp3StatusTracker().markHttp3FailedRecently();
+}
+
+void ConnectionLifetimeCallbacksReceiver::onConnectionOpen(ConnectionPool::Instance& pool,
+                                                           const std::vector<uint8_t>& hash_key,
+                                                           const Network::Connection& connection) {
+  parent_.onConnectionOpen(pool, hash_key, connection);
+}
+
+void ConnectionLifetimeCallbacksReceiver::onConnectionDraining(
+    ConnectionPool::Instance& pool, const std::vector<uint8_t>& hash_key,
+    const Network::Connection& connection) {
+  parent_.onConnectionDraining(pool, hash_key, connection);
+}
+
+void ConnectionLifetimeCallbacksReceiver::onConnectionClosed(
+    ConnectionPool::Instance& pool, const std::vector<uint8_t>& hash_key,
+    const Network::Connection& connection) {
+  parent_.onConnectionClosed(pool, hash_key, connection);
+}
+
+void ConnectivityGrid::onConnectionOpen(ConnectionPool::Instance& pool, const std::vector<uint8_t>&,
+                                        const Network::Connection& connection) {
+  if (auto callbacks = lifetime_callbacks_.lock()) {
+    callbacks->onConnectionOpen(pool, hash_key_, connection);
+  }
+}
+
+void ConnectivityGrid::onConnectionDraining(ConnectionPool::Instance& pool,
+                                            const std::vector<uint8_t>&,
+                                            const Network::Connection& connection) {
+  if (auto callbacks = lifetime_callbacks_.lock()) {
+    callbacks->onConnectionDraining(pool, hash_key_, connection);
+  }
+}
+
+void ConnectivityGrid::onConnectionClosed(ConnectionPool::Instance& pool,
+                                          const std::vector<uint8_t>&,
+                                          const Network::Connection& connection) {
+  if (auto callbacks = lifetime_callbacks_.lock()) {
+    callbacks->onConnectionClosed(pool, hash_key_, connection);
+  }
 }
 
 } // namespace Http

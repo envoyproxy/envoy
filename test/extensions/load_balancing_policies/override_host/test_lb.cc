@@ -62,7 +62,7 @@ private:
       return {hosts[0]};
     }
 
-    OptRef<Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+    std::weak_ptr<Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
       return {};
     }
 

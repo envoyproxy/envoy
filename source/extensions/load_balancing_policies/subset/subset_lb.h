@@ -53,7 +53,8 @@ public:
     return absl::nullopt;
   }
   // Lifetime tracking not implemented.
-  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+  std::weak_ptr<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
+  lifetimeCallbacks() override {
     return {};
   }
 

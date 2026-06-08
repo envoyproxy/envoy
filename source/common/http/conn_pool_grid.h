@@ -13,6 +13,23 @@
 namespace Envoy {
 namespace Http {
 
+class ConnectivityGrid;
+
+class ConnectionLifetimeCallbacksReceiver : public ConnectionPool::ConnectionLifetimeCallbacks {
+public:
+  ConnectionLifetimeCallbacksReceiver(ConnectivityGrid& parent) : parent_(parent) {}
+
+  void onConnectionOpen(ConnectionPool::Instance& pool, const std::vector<uint8_t>& hash_key,
+                        const Network::Connection& connection) override;
+  void onConnectionDraining(ConnectionPool::Instance& pool, const std::vector<uint8_t>& hash_key,
+                            const Network::Connection& connection) override;
+  void onConnectionClosed(ConnectionPool::Instance& pool, const std::vector<uint8_t>& hash_key,
+                          const Network::Connection& connection) override;
+
+private:
+  ConnectivityGrid& parent_;
+};
+
 // An HTTP connection pool which handles HTTP/3 failing over to HTTP/2
 //
 // The ConnectivityGrid wraps an inner HTTP/3 and HTTP/2 pool.
@@ -228,6 +245,19 @@ public:
   void onHandshakeComplete() override;
   void onZeroRttHandshakeFailed() override;
 
+  void setLifetimeCallbacks(std::weak_ptr<ConnectionPool::ConnectionLifetimeCallbacks> callbacks,
+                            std::vector<uint8_t> hash_key) override {
+    lifetime_callbacks_ = callbacks;
+    hash_key_ = std::move(hash_key);
+  }
+
+  void onConnectionOpen(Instance& pool, const std::vector<uint8_t>& hash_key,
+                        const Network::Connection& connection);
+  void onConnectionDraining(Instance& pool, const std::vector<uint8_t>& hash_key,
+                            const Network::Connection& connection);
+  void onConnectionClosed(Instance& pool, const std::vector<uint8_t>& hash_key,
+                          const Network::Connection& connection);
+
 protected:
   // Set the required idle callback on the pool.
   void setupPool(ConnectionPool::Instance& pool);
@@ -308,6 +338,14 @@ private:
   bool deferred_deleting_{};
 
   OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry_;
+
+  std::weak_ptr<ConnectionPool::ConnectionLifetimeCallbacks> lifetime_callbacks_;
+  // The hash_key identifies this pool in the cluster manager's pool map. It encodes protocol,
+  // socket options, and transport-socket options. Inner pools snapshot this value at creation
+  // time, so setLifetimeCallbacks() must be called before any inner pool is created.
+  std::vector<uint8_t> hash_key_;
+  std::shared_ptr<ConnectionLifetimeCallbacksReceiver> receiver_{
+      std::make_shared<ConnectionLifetimeCallbacksReceiver>(*this)};
 };
 
 } // namespace Http

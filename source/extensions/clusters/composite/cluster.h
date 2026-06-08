@@ -65,7 +65,8 @@ public:
   absl::optional<Upstream::SelectedPoolAndConnection>
   selectExistingConnection(Upstream::LoadBalancerContext* context, const Upstream::Host& host,
                            std::vector<uint8_t>& hash_key) override;
-  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override;
+  std::weak_ptr<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
+  lifetimeCallbacks() override;
 
   // Extract retry attempt count from LoadBalancerContext.
   uint32_t getAttemptCount(Upstream::LoadBalancerContext* context) const;

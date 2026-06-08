@@ -88,7 +88,8 @@ public:
   selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
                            const Upstream::Host& /*host*/,
                            std::vector<uint8_t>& /*hash_key*/) override;
-  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override;
+  std::weak_ptr<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
+  lifetimeCallbacks() override;
 
 private:
   // Use inner class to extend LoadBalancerBase. When initializing AggregateClusterLoadBalancer, the
@@ -115,7 +116,8 @@ private:
                              std::vector<uint8_t>& /*hash_key*/) override {
       return {};
     }
-    OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+    std::weak_ptr<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
+    lifetimeCallbacks() override {
       return {};
     }
 

@@ -20,8 +20,8 @@ public:
   MOCK_METHOD(absl::optional<Upstream::SelectedPoolAndConnection>, selectExistingConnection,
               (Upstream::LoadBalancerContext * context, const Upstream::Host& host,
                std::vector<uint8_t>& hash_key));
-  MOCK_METHOD(OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>, lifetimeCallbacks,
-              ());
+  MOCK_METHOD(std::weak_ptr<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>,
+              lifetimeCallbacks, ());
 
   std::shared_ptr<MockHost> host_{new NiceMock<MockHost>()};
 };

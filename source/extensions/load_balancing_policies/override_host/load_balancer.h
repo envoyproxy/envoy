@@ -136,7 +136,8 @@ private:
 
     HostSelectionResponse chooseHost(LoadBalancerContext* context) override;
 
-    OptRef<Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+    std::weak_ptr<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
+    lifetimeCallbacks() override {
       // TODO(yavlasov): Check if this is needed by the fallback LB.
       return {};
     }

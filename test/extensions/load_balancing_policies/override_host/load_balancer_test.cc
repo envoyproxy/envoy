@@ -211,7 +211,7 @@ TEST_F(OverrideHostLoadBalancerTest, NoMetadataOrHeaders) {
   HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
   EXPECT_EQ(host->address()->asString(), "127.0.0.1:80");
 
-  EXPECT_FALSE(load_balancer_->lifetimeCallbacks().has_value());
+  EXPECT_TRUE(load_balancer_->lifetimeCallbacks().expired());
   std::vector<uint8_t> out_value;
   EXPECT_FALSE(load_balancer_->selectExistingConnection(&load_balancer_context_, *host, out_value)
                    .has_value());

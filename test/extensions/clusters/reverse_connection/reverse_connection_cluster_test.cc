@@ -1079,11 +1079,8 @@ TEST_F(ReverseConnectionClusterTest, LoadBalancerNoopMethods) {
     EXPECT_FALSE(selected_connection.has_value());
   }
 
-  // Test lifetimeCallbacks. It should return an empty OptRef.
-  {
-    auto lifetime_callbacks = lb.lifetimeCallbacks();
-    EXPECT_FALSE(lifetime_callbacks.has_value());
-  }
+  // Test lifetimeCallbacks. It should return an expired weak_ptr.
+  { EXPECT_TRUE(lb.lifetimeCallbacks().expired()); }
 }
 
 // UpstreamReverseConnectionAddress tests

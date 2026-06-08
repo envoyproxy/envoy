@@ -485,7 +485,7 @@ TEST_F(DynamicModulesLoadBalancerTest, LifetimeCallbacks) {
   ASSERT_NE(lb, nullptr);
 
   // lifetimeCallbacks should return empty optional.
-  EXPECT_FALSE(lb->lifetimeCallbacks().has_value());
+  EXPECT_TRUE(lb->lifetimeCallbacks().expired());
 }
 
 TEST_F(DynamicModulesLoadBalancerTest, SelectExistingConnection) {

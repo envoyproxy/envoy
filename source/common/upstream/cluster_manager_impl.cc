@@ -2022,6 +2022,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
         pool->addIdleCallback([&parent = parent_, host, priority, hash_key]() {
           parent.httpConnPoolIsIdle(host, priority, hash_key);
         });
+        ASSERT(lb_ != nullptr);
+        pool->setLifetimeCallbacks(lb_->lifetimeCallbacks(), hash_key);
 
         return pool;
       });

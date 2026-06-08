@@ -198,7 +198,7 @@ TEST_F(OriginalDstClusterTest, NoContext) {
     EXPECT_EQ(host, nullptr);
 
     EXPECT_EQ(nullptr, lb.peekAnotherHost(nullptr));
-    EXPECT_FALSE(lb.lifetimeCallbacks().has_value());
+    EXPECT_TRUE(lb.lifetimeCallbacks().expired());
     std::vector<uint8_t> hash_key;
     auto mock_host = std::make_shared<NiceMock<MockHost>>();
     EXPECT_FALSE(lb.selectExistingConnection(nullptr, *mock_host, hash_key).has_value());
