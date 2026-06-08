@@ -406,6 +406,8 @@ def _spdlog():
     external_http_archive(
         name = "spdlog",
         build_file = "@envoy//bazel/external:spdlog.BUILD",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:spdlog.patch"],
     )
 
 def _benchmark():

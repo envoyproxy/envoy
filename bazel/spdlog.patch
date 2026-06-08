@@ -1,0 +1,16 @@
+# Ensure Envoy's external-fmt configuration wins even if a toolchain or
+# environment defines SPDLOG_USE_STD_FORMAT.
+diff --git a/include/spdlog/tweakme.h b/include/spdlog/tweakme.h
+--- a/include/spdlog/tweakme.h
++++ b/include/spdlog/tweakme.h
+@@ -2,6 +2,10 @@
+ 
+ #pragma once
+ 
++#if defined(SPDLOG_FMT_EXTERNAL) && defined(SPDLOG_USE_STD_FORMAT)
++#undef SPDLOG_USE_STD_FORMAT
++#endif
++
+ ///////////////////////////////////////////////////////////////////////////////
+ //
+ // Edit this file to squeeze more performance, and to customize supported
