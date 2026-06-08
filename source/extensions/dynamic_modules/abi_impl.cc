@@ -3536,6 +3536,52 @@ envoy_dynamic_module_callback_http_filter_record_histogram_value(
   return envoy_dynamic_module_type_metrics_result_MetricNotFound;
 }
 
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_increment_counter(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t, uint64_t) {
+  IS_ENVOY_BUG(
+      "envoy_dynamic_module_callback_http_filter_config_increment_counter: not implemented "
+      "in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_increment_gauge(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_http_filter_config_increment_gauge: not implemented "
+               "in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_decrement_gauge(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_http_filter_config_decrement_gauge: not implemented "
+               "in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_set_gauge(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_http_filter_config_set_gauge: not implemented in "
+               "this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_record_histogram_value(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_http_filter_config_record_histogram_value: not "
+               "implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
 __attribute__((weak)) bool envoy_dynamic_module_callback_http_get_header(
     envoy_dynamic_module_type_http_filter_envoy_ptr, envoy_dynamic_module_type_http_header_type,
     envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_envoy_buffer*, size_t,

@@ -1321,6 +1321,20 @@ WEAK_STUB(HttpFilterConfigDefineHistogram,
 WEAK_STUB(HttpFilterRecordHistogramValue,
           envoy_dynamic_module_callback_http_filter_record_histogram_value(nullptr, 0, nullptr, 0,
                                                                            0))
+WEAK_STUB(HttpFilterConfigIncrementCounter,
+          envoy_dynamic_module_callback_http_filter_config_increment_counter(nullptr, 0, nullptr, 0,
+                                                                             0))
+WEAK_STUB(HttpFilterConfigIncrementGauge,
+          envoy_dynamic_module_callback_http_filter_config_increment_gauge(nullptr, 0, nullptr, 0,
+                                                                           0))
+WEAK_STUB(HttpFilterConfigDecrementGauge,
+          envoy_dynamic_module_callback_http_filter_config_decrement_gauge(nullptr, 0, nullptr, 0,
+                                                                           0))
+WEAK_STUB(HttpFilterConfigSetGauge,
+          envoy_dynamic_module_callback_http_filter_config_set_gauge(nullptr, 0, nullptr, 0, 0))
+WEAK_STUB(HttpFilterConfigRecordHistogramValue,
+          envoy_dynamic_module_callback_http_filter_config_record_histogram_value(nullptr, 0,
+                                                                                  nullptr, 0, 0))
 WEAK_STUB(HttpGetHeader, envoy_dynamic_module_callback_http_get_header(
                              nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader,
                              {nullptr, 0}, nullptr, 0, nullptr))

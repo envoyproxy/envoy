@@ -382,6 +382,84 @@ pub trait EnvoyHttpFilterConfig {
     labels: &[&str],
   ) -> Result<EnvoyHistogramVecId, envoy_dynamic_module_type_metrics_result>;
 
+  /// Increment the counter with the given id from the config context.
+  ///
+  /// Unlike [`EnvoyHttpFilter::increment_counter`], this does not require a per-stream filter and
+  /// can be called outside of the request lifecycle, for example from a scheduled background task.
+  fn increment_counter(
+    &self,
+    id: EnvoyCounterId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Increment the counter vec with the given id from the config context.
+  fn increment_counter_vec<'a>(
+    &self,
+    id: EnvoyCounterVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Increase the gauge with the given id from the config context.
+  fn increase_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Increase the gauge vec with the given id from the config context.
+  fn increase_gauge_vec<'a>(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Decrease the gauge with the given id from the config context.
+  fn decrease_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Decrease the gauge vec with the given id from the config context.
+  fn decrease_gauge_vec<'a>(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Set the value of the gauge with the given id from the config context.
+  fn set_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Set the value of the gauge vec with the given id from the config context.
+  fn set_gauge_vec<'a>(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Record a value in the histogram with the given id from the config context.
+  fn record_histogram_value(
+    &self,
+    id: EnvoyHistogramId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Record a value in the histogram vec with the given id from the config context.
+  fn record_histogram_value_vec<'a>(
+    &self,
+    id: EnvoyHistogramVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
   /// Create a new implementation of the [`EnvoyHttpFilterConfigScheduler`] trait.
   ///
   /// This can be used to schedule an event to the main thread where the filter config is running.
@@ -556,6 +634,191 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
       )
     })?;
     Ok(EnvoyHistogramVecId(id))
+  }
+
+  fn increment_counter(
+    &self,
+    id: EnvoyCounterId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyCounterId(id) = id;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_increment_counter(
+        self.raw_ptr,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn increment_counter_vec(
+    &self,
+    id: EnvoyCounterVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyCounterVecId(id) = id;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_increment_counter(
+        self.raw_ptr,
+        id,
+        labels.as_ptr() as *const _ as *mut _,
+        labels.len(),
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn increase_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_increment_gauge(
+        self.raw_ptr,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn increase_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_increment_gauge(
+        self.raw_ptr,
+        id,
+        labels.as_ptr() as *const _ as *mut _,
+        labels.len(),
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn decrease_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_decrement_gauge(
+        self.raw_ptr,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn decrease_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_decrement_gauge(
+        self.raw_ptr,
+        id,
+        labels.as_ptr() as *const _ as *mut _,
+        labels.len(),
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn set_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_set_gauge(
+        self.raw_ptr,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn set_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_set_gauge(
+        self.raw_ptr,
+        id,
+        labels.as_ptr() as *const _ as *mut _,
+        labels.len(),
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn record_histogram_value(
+    &self,
+    id: EnvoyHistogramId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyHistogramId(id) = id;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_record_histogram_value(
+        self.raw_ptr,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn record_histogram_value_vec(
+    &self,
+    id: EnvoyHistogramVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyHistogramVecId(id) = id;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_record_histogram_value(
+        self.raw_ptr,
+        id,
+        labels.as_ptr() as *const _ as *mut _,
+        labels.len(),
+        value,
+      )
+    })?;
+    Ok(())
   }
 
   fn new_scheduler(&self) -> Box<dyn EnvoyHttpFilterConfigScheduler> {
