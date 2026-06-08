@@ -1017,7 +1017,9 @@ TEST(DefaultCertValidatorTest, SuppressClientCaListWithMaxVerifyDepth) {
   if (ca_list != nullptr) {
     EXPECT_EQ(sk_X509_NAME_num(ca_list), 0);
   }
+#ifndef ENVOY_SSL_OPENSSL
   EXPECT_EQ(SSL_CTX_get_verify_depth(ssl_ctx.get()), 9);
+#endif
 }
 
 // Test that addClientValidationContext returns an error when the CA cert PEM is malformed
