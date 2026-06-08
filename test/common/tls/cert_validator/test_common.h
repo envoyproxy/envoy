@@ -55,8 +55,12 @@ public:
 
   void setValidatedCertChain(std::vector<bssl::UniquePtr<X509>>) override {}
 
-  void setServerSentCertificateRequest() override { server_sent_certificate_request_ = true; }
-  bool serverSentCertificateRequest() const override { return server_sent_certificate_request_; }
+  void setServerSentCertificateRequest(bool value) override {
+    server_sent_certificate_request_ = value;
+  }
+  absl::optional<bool> serverSentCertificateRequest() const override {
+    return server_sent_certificate_request_;
+  }
 
 private:
   Envoy::Ssl::ClientValidationStatus status_;
@@ -64,7 +68,7 @@ private:
   Ssl::CertificateSelectionStatus cert_selection_result_{
       Ssl::CertificateSelectionStatus::NotStarted};
   std::string cert_validation_error_;
-  bool server_sent_certificate_request_{false};
+  absl::optional<bool> server_sent_certificate_request_;
 };
 
 class TestCertificateValidationContextConfig

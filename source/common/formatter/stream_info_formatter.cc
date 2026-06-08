@@ -1753,10 +1753,13 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                  return std::make_unique<
                                      StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
                                      [](const Ssl::ConnectionInfo& connection_info) {
-                                       return absl::optional<std::string>(
-                                           connection_info.serverSentCertificateRequest()
-                                               ? "true"
-                                               : "false");
+                                       const auto result =
+                                           connection_info.serverSentCertificateRequest();
+                                       if (!result.has_value()) {
+                                         return absl::optional<std::string>(absl::nullopt);
+                                       }
+                                       return absl::optional<std::string>(*result ? "true"
+                                                                                  : "false");
                                      });
                                }}},
                              {"DOWNSTREAM_LOCAL_ADDRESS",

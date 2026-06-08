@@ -1559,6 +1559,11 @@ Current supported substitution commands include:
 ``%UPSTREAM_CLIENT_CERT_REQUESTED%``
   HTTP/TCP/THRIFT
     Whether the upstream sent a TLS ``CertificateRequest`` during the handshake.
+    Returns ``true`` if a ``CertificateRequest`` was received, ``false`` if the handshake
+    completed without one, or ``"-"`` if tracking was not active (i.e.
+    :ref:`require_certificate_request <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.require_certificate_request>`
+    is not set and the ``envoy.reloadable_features.tls_upstream_record_cert_request``
+    runtime flag is disabled).
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 

@@ -109,29 +109,54 @@ ClientContextImpl::ClientContextImpl(
     if (auto factory = config.tlsCertificateSelectorFactory(); factory) {
       tls_certificate_selector_ = factory->createUpstreamTlsCertificateSelector(*this);
     }
-  }
 
-  // BoringSSL only invokes cert_cb when the server sends a CertificateRequest, making it a
-  // reliable signal for both UPSTREAM_CLIENT_CERT_REQUESTED and require_certificate_request_.
-  if (tls_certificate_selector_ != nullptr || require_certificate_request_ ||
-      Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.tls_upstream_cert_request_tracking")) {
-    SSL_CTX_set_cert_cb(
-        tls_contexts_[0].ssl_ctx_.get(),
-        [](SSL* ssl, void*) -> int {
-          auto* client_ctx =
-              static_cast<ClientContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)));
-          auto* extended_socket_info = reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
-              SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex()));
-          if (extended_socket_info != nullptr) {
-            extended_socket_info->setServerSentCertificateRequest();
-          }
-          if (client_ctx->tls_certificate_selector_ != nullptr) {
-            return client_ctx->selectTlsContext(ssl);
-          }
-          return 1;
-        },
-        nullptr);
+    // cert_cb fires only when the server sends a CertificateRequest — a reliable signal for
+    // UPSTREAM_CLIENT_CERT_REQUESTED and require_certificate_request enforcement.
+    // Only register it when needed: selector always needs it; static cert only when tracking.
+    const bool track_cert_request =
+        require_certificate_request_ ||
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.tls_upstream_record_cert_request");
+
+    if (tls_certificate_selector_ != nullptr) {
+      if (track_cert_request) {
+        SSL_CTX_set_cert_cb(
+            tls_contexts_[0].ssl_ctx_.get(),
+            [](SSL* ssl, void*) -> int {
+              auto* client_ctx =
+                  static_cast<ClientContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)));
+              auto* extended_socket_info = reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
+                  SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex()));
+              if (extended_socket_info != nullptr) {
+                extended_socket_info->setServerSentCertificateRequest(true);
+              }
+              return client_ctx->selectTlsContext(ssl);
+            },
+            nullptr);
+      } else {
+        // Custom selector, no tracking.
+        SSL_CTX_set_cert_cb(
+            tls_contexts_[0].ssl_ctx_.get(),
+            [](SSL* ssl, void*) -> int {
+              return static_cast<ClientContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)))
+                  ->selectTlsContext(ssl);
+            },
+            nullptr);
+      }
+    } else if (track_cert_request) {
+      // Static cert, no selector: only register when tracking is needed.
+      SSL_CTX_set_cert_cb(
+          tls_contexts_[0].ssl_ctx_.get(),
+          [](SSL* ssl, void*) -> int {
+            auto* extended_socket_info = reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
+                SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex()));
+            if (extended_socket_info != nullptr) {
+              extended_socket_info->setServerSentCertificateRequest(true);
+            }
+            return 1;
+          },
+          nullptr);
+    }
   }
 }
 
@@ -225,12 +250,26 @@ ClientContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& o
 }
 
 absl::optional<ContextImpl::PostHandshakeFailure> ClientContextImpl::verifyPostHandshake(SSL* ssl) {
+  const bool track_cert_request =
+      require_certificate_request_ ||
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_upstream_record_cert_request");
+
+  auto* extended_socket_info = reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
+      SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex()));
+
+  // If tracking is active but cert_cb never fired, explicitly record false so that
+  // UPSTREAM_CLIENT_CERT_REQUESTED shows "false" (tracked, not sent) rather than
+  // "-" (not tracked at all).
+  if (track_cert_request && extended_socket_info != nullptr &&
+      !extended_socket_info->serverSentCertificateRequest().has_value()) {
+    extended_socket_info->setServerSentCertificateRequest(false);
+  }
+
   if (!require_certificate_request_) {
     return absl::nullopt;
   }
-  auto* extended_socket_info = reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
-      SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex()));
-  if (extended_socket_info == nullptr || !extended_socket_info->serverSentCertificateRequest()) {
+  if (extended_socket_info == nullptr ||
+      !extended_socket_info->serverSentCertificateRequest().value_or(false)) {
     stats_.fail_no_cert_request_.inc();
     return PostHandshakeFailure{"TLS error: upstream did not send a CertificateRequest",
                                 "upstream_no_certificate_request"};

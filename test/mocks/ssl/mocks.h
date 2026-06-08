@@ -80,7 +80,9 @@ public:
   MOCK_METHOD(const std::string&, tlsVersion, (), (const));
   MOCK_METHOD(const std::string&, alpn, (), (const));
   MOCK_METHOD(const std::string&, sni, (), (const));
-  MOCK_METHOD(bool, serverSentCertificateRequest, (), (const));
+  MOCK_METHOD(uint16_t, tlsGroupId, (), (const));
+  MOCK_METHOD(absl::string_view, tlsGroupString, (), (const));
+  MOCK_METHOD(absl::optional<bool>, serverSentCertificateRequest, (), (const));
 };
 
 class MockClientContext : public ClientContext {

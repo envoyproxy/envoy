@@ -3266,6 +3266,51 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     EXPECT_THAT(upstream_format.formatValue({}, stream_info),
                 ProtoEq(ValueUtil::stringValue(subject)));
   }
+
+  // UPSTREAM_CLIENT_CERT_REQUESTED: three states — true, false, nullopt (not tracked)
+  {
+    // true: cert_cb fired, server sent CertificateRequest
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_CLIENT_CERT_REQUESTED");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, serverSentCertificateRequest())
+        .WillRepeatedly(Return(absl::optional<bool>(true)));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_EQ("true", upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("true")));
+  }
+  {
+    // false: tracking active, cert_cb never fired (server did not send CertificateRequest)
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_CLIENT_CERT_REQUESTED");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, serverSentCertificateRequest())
+        .WillRepeatedly(Return(absl::optional<bool>(false)));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_EQ("false", upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("false")));
+  }
+  {
+    // nullopt: tracking not active (feature gate off, no enforcement) — renders as "-"
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_CLIENT_CERT_REQUESTED");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, serverSentCertificateRequest())
+        .WillRepeatedly(Return(absl::optional<bool>(absl::nullopt)));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    // no upstream SSL connection — also renders as "-"
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.upstreamInfo()->setUpstreamSslConnection(nullptr);
+    StreamInfoFormatter upstream_format("UPSTREAM_CLIENT_CERT_REQUESTED");
+    EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
 }
 
 TEST(SubstitutionFormatterTest, requestedServerNameFormatter) {

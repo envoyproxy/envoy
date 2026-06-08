@@ -140,9 +140,10 @@ public:
    */
   virtual void setValidatedCertChain(std::vector<bssl::UniquePtr<X509>> chain) PURE;
 
-  /** Set/query whether the upstream sent a TLS CertificateRequest during the handshake. **/
-  virtual void setServerSentCertificateRequest() PURE;
-  virtual bool serverSentCertificateRequest() const PURE;
+  /** Set/query whether the upstream sent a TLS CertificateRequest during the handshake.
+   *  Returns absl::nullopt if the handshake did not track this (feature not enabled). **/
+  virtual void setServerSentCertificateRequest(bool value) PURE;
+  virtual absl::optional<bool> serverSentCertificateRequest() const PURE;
 };
 
 } // namespace Ssl

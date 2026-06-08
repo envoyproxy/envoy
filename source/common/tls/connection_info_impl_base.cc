@@ -391,10 +391,13 @@ const std::string& ConnectionInfoImplBase::sni() const {
   });
 }
 
-bool ConnectionInfoImplBase::serverSentCertificateRequest() const {
+absl::optional<bool> ConnectionInfoImplBase::serverSentCertificateRequest() const {
   auto* extended_socket_info = reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
       SSL_get_ex_data(ssl(), ContextImpl::sslExtendedSocketInfoIndex()));
-  return extended_socket_info != nullptr && extended_socket_info->serverSentCertificateRequest();
+  if (extended_socket_info == nullptr) {
+    return absl::nullopt;
+  }
+  return extended_socket_info->serverSentCertificateRequest();
 }
 
 const std::string& ConnectionInfoImplBase::serialNumberPeerCertificate() const {

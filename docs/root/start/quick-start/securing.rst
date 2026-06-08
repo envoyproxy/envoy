@@ -172,7 +172,7 @@ When connecting to an upstream with client certificates you can set them as foll
    ``CertificateRequest`` at all. Set
    :ref:`require_certificate_request <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.require_certificate_request>`
    to ``true`` to enforce that the upstream requested a client certificate. Rejections
-   increment the ``ssl.fail_no_cert_request`` counter, set the ``UF`` response flag, and populate
+   increment the ``ssl.fail_no_cert_request`` counter and populate
    ``%UPSTREAM_TRANSPORT_FAILURE_REASON%`` with the precise reason. Use
    ``%UPSTREAM_CLIENT_CERT_REQUESTED%`` in the access log to audit without blocking connections.
 

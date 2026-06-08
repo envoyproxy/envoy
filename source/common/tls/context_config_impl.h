@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -35,7 +36,7 @@ class ContextConfigImpl : public virtual Ssl::ContextConfig,
 public:
   // Ssl::ContextConfig
   const std::string& alpnProtocols() const override { return alpn_protocols_; }
-  const std::string& cipherSuites() const override { return cipher_suites_; }
+  const std::string& cipherSuites() const override { return *cipher_suites_; }
   const std::string& ecdhCurves() const override { return ecdh_curves_; }
   const std::string& signatureAlgorithms() const override { return signature_algorithms_; }
   absl::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
@@ -104,7 +105,7 @@ private:
       unsigned default_version);
 
   const std::string alpn_protocols_;
-  const std::string cipher_suites_;
+  const std::shared_ptr<const std::string> cipher_suites_;
   const std::string ecdh_curves_;
   const std::string signature_algorithms_;
 
@@ -157,6 +158,7 @@ public:
   size_t maxSessionKeys() const override { return max_session_keys_; }
   bool enforceRsaKeyUsage() const override { return enforce_rsa_key_usage_; }
   bool requireCertificateRequest() const override { return require_certificate_request_; }
+
   void setSecretUpdateCallback(std::function<absl::Status()> callback) override;
   OptRef<Ssl::UpstreamTlsCertificateSelectorFactory>
   tlsCertificateSelectorFactory() const override {
@@ -178,6 +180,7 @@ private:
   const bool allow_renegotiation_ : 1;
   const bool enforce_rsa_key_usage_ : 1;
   const bool require_certificate_request_ : 1;
+
   const size_t max_session_keys_;
   // Certificate selector contains a reference to this context so should be destroyed first.
   Ssl::UpstreamTlsCertificateSelectorFactoryPtr tls_certificate_selector_factory_;
