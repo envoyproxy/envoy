@@ -98,7 +98,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <arch_overview_advanced_filter_state_sharing>` object in a namespace matching the filter
 // name.
 //
-// [#next-free-field: 27]
+// [#next-free-field: 28]
 message ExternalProcessor {
   // Describes the route cache action to be taken when an external processor response
   // is received in response to request headers.
@@ -386,6 +386,16 @@ message ExternalProcessor {
   //    request smuggling. Thus, please use your own discretion when enabling this feature.
   //
   bool allow_content_length_header = 26;
+
+  // In ``FULL_DUPLEX_STREAMED`` body send mode, if the data plane does not
+  // receive the first response message on the ext_proc stream within this
+  // timeout, it will assume that the ext_proc server does not support flow
+  // control, and the stream will proceed without using flow control.
+  // This knob exists for backward compatibility with legacy ext_proc
+  // servers.
+  //
+  // [#not-implemented-hide:]
+  google.protobuf.Duration flow_control_init_timeout = 27;
 }
 
 // ExtProcHttpService is used for HTTP communication between the filter and the external processing service.

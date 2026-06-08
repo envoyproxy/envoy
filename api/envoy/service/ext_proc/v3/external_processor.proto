@@ -79,8 +79,68 @@ message ProtocolConfiguration {
 
 // This represents the different types of messages that the data plane can send
 // to an external processing server.
-// [#next-free-field: 12]
+// [#next-free-field: 14]
 message ProcessingRequest {
+  // Initial flow control window sizes for ``FULL_DUPLEX_STREAMED`` and
+  // ``GRPC`` body send modes.
+  //
+  // A sender starts with this amount of flow control window. Whenever
+  // it sends body data, it must decrement its flow control window by
+  // the number of bytes that it has sent. When its flow control
+  // window is less than or equal to the amount of body data it wishes
+  // to send, it may not send until it receives a window update causing
+  // its flow control window to be large enough.
+  //
+  // However, note that in ``GRPC`` body send mode, whenever the flow
+  // control window is greater than zero, a sender may send a single
+  // message, even if the size of that message exceeds the available flow
+  // control window. At that point, the flow control window will be negative
+  // and the sender must not send the next message until it becomes positive.
+  //
+  // Note that the initial size for the to-sidestream windows are set by
+  // the sender, not the receiver. This is because each sidestream may be
+  // routed to a different ext_proc server instance, but there is no
+  // connection-level handshake to set a default for that server
+  // instance, so the only alternative here would be to have the
+  // ext_proc server instance set this on a per-stream basis, which
+  // would require an additional round-trip and therefore hurt latency.
+  // This unfortunately means that the ext_proc server instance has a
+  // bit less control: as soon as it receives these initial values, it can
+  // immediately send a window update that reduces the window, but it
+  // must be prepared to handle any data that the sender has already sent.
+  //
+  // In ``FULL_DUPLEX_STREAMED`` body send mode, for backward compatibility
+  // with existing ext_proc servers that do not support flow control, if
+  // the ext_proc server's first response does not include a window
+  // update, or if the data plane does not receive the first response
+  // from the ext_proc server within the configured timeout, then the
+  // data plane will assume that the ext_proc server does not support
+  // flow control, and it will proceed without it.
+  //
+  // [#not-implemented-hide:]
+  message FlowControlInit {
+    // Downstream-to-sidestream initial window size.
+    int64 initial_window_downstream_to_sidestream = 1;
+    // Sidestream-to-upstream initial window size.
+    int64 initial_window_sidestream_to_upstream = 2;
+    // Upstream-to-sidestream initial window size.
+    int64 initial_window_upstream_to_sidestreama = 3;
+    // Sidestream-to-downstream initial window size.
+    int64 initial_window_sidestream_to_downstream = 4;
+  }
+
+  // Flow control window update. Values may be positive or negative. The
+  // sender must immediately add these values to its flow control window,
+  // which governs how much data can be sent.
+  //
+  // [#not-implemented-hide:]
+  message ClientWindowUpdate {
+    // Window update for sidestream-to-upstream.
+    int64 window_increment_sidesteram_to_upstream = 1;
+    // Window update for sidestream-to-downstream.
+    int64 window_increment_sidestream_to_downstream = 2;
+  }
+
   reserved 1;
 
   reserved "async_mode";
@@ -89,8 +149,6 @@ message ProcessingRequest {
   // ones are set for a particular HTTP request/response depend on the
   // processing mode.
   oneof request {
-    option (validate.required) = true;
-
     // Information about the HTTP request headers, as well as peer info and additional
     // properties. Unless ``observability_mode`` is ``true``, the server must send back a
     // ``HeaderResponse`` message, an ``ImmediateResponse`` message, or close the stream.
@@ -148,6 +206,32 @@ message ProcessingRequest {
   // Specify the filter protocol configurations to be sent to the server.
   // ``protocol_config`` is only encoded in the first ``ProcessingRequest`` message from the client to the server.
   ProtocolConfiguration protocol_config = 11;
+
+  // Flow control initialization for ``FULL_DUPLEX_STREAMED`` and
+  // ``GRPC`` body send modes.
+  //
+  // Must be set in the initial message on the stream. Not used in
+  // subsequent messages.
+  //
+  // [#not-implemented-hide:]
+  FlowControlInit flow_control_init = 12;
+
+  // Flow control updates for ``FULL_DUPLEX_STREAMED`` and ``GRPC`` body
+  // send modes.
+  //
+  // This message may be included in a response message that also
+  // populates one of the fields in the ``request`` oneof above, or it
+  // may be sent in a response message that does not set the
+  // ``request`` oneof.
+  //
+  // In ``FULL_DUPLEX_STREAMED`` body send mode, for backward
+  // compatibility with data planes that do not yet support flow control,
+  // the data plane must not send a message containing only this field
+  // (i.e., not setting the ``request`` oneof) unless the ext_proc server
+  // has sent a window update, thus indicating that it supports flow control.
+  //
+  // [#not-implemented-hide:]
+  ClientWindowUpdate client_window_update = 13;
 }
 
 // This represents the different types of messages the server may send back to the data plane
@@ -159,12 +243,22 @@ message ProcessingRequest {
 //   the server must send back exactly one ``ProcessingResponse`` message.
 // * If it is set to ``FULL_DUPLEX_STREAMED``, the server must follow the API defined
 //   for this mode to send the ``ProcessingResponse`` messages.
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message ProcessingResponse {
+  // Flow control window update. Values may be positive or negative. The
+  // sender must immediately add these values to its flow control window,
+  // which governs how much data can be sent.
+  //
+  // [#not-implemented-hide:]
+  message ServerWindowUpdate {
+    // Window update for downstream-to-sidestream.
+    int64 window_increment_downstream_to_sidestream = 1;
+    // Window update for upstream-to-sidestream.
+    int64 window_increment_upstream_to_sidestream = 2;
+  }
+
   // The response type that is sent by the server.
   oneof response {
-    option (validate.required) = true;
-
     // The server must send back this message in response to a message with the
     // ``request_headers`` field set.
     HeadersResponse request_headers = 1;
@@ -259,6 +353,29 @@ message ProcessingResponse {
   // Such a message can be sent at most once in a particular data plane ext_proc filter processing
   // state. To enable this API, ``max_message_timeout`` must be set to a value >= 1ms.
   google.protobuf.Duration override_message_timeout = 10;
+
+  // Flow control updates for ``FULL_DUPLEX_STREAMED`` and ``GRPC`` body
+  // send modes.
+  //
+  // This message may be included in a response message that also
+  // populates one of the fields in the ``response`` oneof above, or it
+  // may be sent in a response message that does not set the
+  // ``response`` oneof.
+  //
+  // In ``FULL_DUPLEX_STREAMED`` body send mode, for backward
+  // compatibility with data planes that do not yet support flow control,
+  // the ext_proc server must not set this field unless the data plane
+  // sent initial window sizes in its initial message on the stream.
+  // Conversely, if the data plane did send initial window sizes in its
+  // initial message on the stream, the ext_proc server must send a
+  // window update immediately to let the data plane know that it also
+  // supports flow control. If the ext_proc server is sending a message
+  // immediately anyway (e.g., for a header or body chunk), it can include
+  // this field in that same message; otherwise, the ext_proc server must
+  // send a message containing only this field.
+  //
+  // [#not-implemented-hide:]
+  ServerWindowUpdate server_window_update = 13;
 }
 
 // The following are messages that are sent to the server.
