@@ -33,6 +33,11 @@ public:
   parseFormatters(const FormattersConfig& formatters,
                   Server::Configuration::GenericFactoryContext& context,
                   std::vector<CommandParserPtr>&& commands_parsers = {});
+  static absl::StatusOr<std::vector<CommandParserPtr>>
+  parseFormatters(const FormattersConfig& formatters,
+                  Server::Configuration::ServerFactoryContext& server_context,
+                  ProtobufMessage::ValidationVisitor& validation_visitor,
+                  std::vector<CommandParserPtr>&& commands_parsers = {});
 
   /**
    * Generate a formatter object from config SubstitutionFormatString.

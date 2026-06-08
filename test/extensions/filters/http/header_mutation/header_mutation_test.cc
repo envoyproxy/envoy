@@ -66,7 +66,7 @@ TEST(HeaderMutationFilterTest, RequestMutationTest) {
         append_action: "ADD_IF_ABSENT"
   )EOF";
 
-  Server::Configuration::MockServerFactoryContext context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   PerRouteProtoConfig per_route_proto_config;
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
@@ -132,6 +132,168 @@ TEST(HeaderMutationFilterTest, RequestMutationTest) {
   }
 }
 
+#if defined(USE_CEL_PARSER)
+
+// Each mutation site formats a string-function expression that only a configured CEL parser
+// (`cel_config`) can build, so a site that didn't get the parser fails config load instead of
+// passing silently. Confirms the parser reaches every site.
+TEST(HeaderMutationFilterTest, CelConfigAppliedToAllMutationSites) {
+  const std::string config_yaml = R"EOF(
+  mutations:
+    request_mutations:
+    - append:
+        header:
+          key: "flag-request-header"
+          value: "%CEL('prefix-old-suffix'.replace('old', 'new'))%"
+        append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
+    response_mutations:
+    - append:
+        header:
+          key: "flag-response-header"
+          value: "%CEL('prefix-old-suffix'.replace('old', 'new'))%"
+        append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
+    request_trailers_mutations:
+    - append:
+        header:
+          key: "flag-request-trailer"
+          value: "%CEL('prefix-old-suffix'.replace('old', 'new'))%"
+        append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
+    response_trailers_mutations:
+    - append:
+        header:
+          key: "flag-response-trailer"
+          value: "%CEL('prefix-old-suffix'.replace('old', 'new'))%"
+        append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
+    query_parameter_mutations:
+    - append:
+        record:
+          key: "flag-query"
+          value: "%CEL('prefix-old-suffix'.replace('old', 'new'))%"
+        action: "OVERWRITE_IF_EXISTS_OR_ADD"
+    formatters:
+    - name: envoy.formatter.cel
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.formatter.cel.v3.Cel
+        cel_config:
+          enable_string_functions: true
+  )EOF";
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  ProtoConfig proto_config;
+  TestUtility::loadFromYaml(config_yaml, proto_config);
+
+  absl::Status creation_status = absl::OkStatus();
+  HeaderMutationConfigSharedPtr global_config =
+      std::make_shared<HeaderMutationConfig>(proto_config, context, creation_status);
+  ASSERT_TRUE(creation_status.ok()) << creation_status;
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+
+  HeaderMutation filter{global_config};
+  filter.setDecoderFilterCallbacks(decoder_callbacks);
+  filter.setEncoderFilterCallbacks(encoder_callbacks);
+
+  EXPECT_CALL(*decoder_callbacks.route_, perFilterConfigs(_))
+      .WillOnce(
+          Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs { return {}; }));
+
+  Envoy::Http::TestRequestHeaderMapImpl request_headers = {
+      {":method", "GET"},
+      {":path", "/path?flag-query=old"},
+      {":scheme", "http"},
+      {":authority", "host"}};
+  Envoy::Http::TestRequestTrailerMapImpl request_trailers{{"placeholder", "value"}};
+  Envoy::Http::TestResponseHeaderMapImpl response_headers = {{":status", "200"}};
+  Envoy::Http::TestResponseTrailerMapImpl response_trailers{{"placeholder", "value"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter.decodeTrailers(request_trailers));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.encodeHeaders(response_headers, true));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter.encodeTrailers(response_trailers));
+
+  EXPECT_EQ("prefix-new-suffix", request_headers.get_("flag-request-header"));
+  EXPECT_EQ("prefix-new-suffix", response_headers.get_("flag-response-header"));
+  EXPECT_EQ("prefix-new-suffix", request_trailers.get_("flag-request-trailer"));
+  EXPECT_EQ("prefix-new-suffix", response_trailers.get_("flag-response-trailer"));
+  auto params =
+      Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(request_headers.getPathValue());
+  EXPECT_EQ("prefix-new-suffix", params.data().at("flag-query").front());
+}
+
+TEST(HeaderMutationFilterTest, StringFunctionExpressionRejectedWhenDisabled) {
+  const std::string config_yaml = R"EOF(
+  mutations:
+    request_mutations:
+    - append:
+        header:
+          key: "flag-header"
+          value: "%CEL(request.headers['source-header'].replace('old', 'new'))%"
+        append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
+    formatters:
+    - name: envoy.formatter.cel
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.formatter.cel.v3.Cel
+        cel_config:
+          enable_string_functions: false
+  )EOF";
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  ProtoConfig proto_config;
+  TestUtility::loadFromYaml(config_yaml, proto_config);
+
+  absl::Status creation_status = absl::OkStatus();
+  EXPECT_THROW(HeaderMutationConfig config(proto_config, context, creation_status), EnvoyException);
+}
+
+TEST(HeaderMutationFilterTest, BuiltInCelWorksWithoutFormatters) {
+  const std::string config_yaml = R"EOF(
+  mutations:
+    request_mutations:
+    - append:
+        header:
+          key: "flag-header"
+          value: "%CEL(request.headers[':method'])%"
+        append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
+  )EOF";
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ScopedThreadLocalServerContextSetter server_context_singleton_setter(context);
+
+  ProtoConfig proto_config;
+  TestUtility::loadFromYaml(config_yaml, proto_config);
+
+  absl::Status creation_status = absl::OkStatus();
+  HeaderMutationConfigSharedPtr global_config =
+      std::make_shared<HeaderMutationConfig>(proto_config, context, creation_status);
+  ASSERT_TRUE(creation_status.ok()) << creation_status;
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+
+  HeaderMutation filter{global_config};
+  filter.setDecoderFilterCallbacks(decoder_callbacks);
+  filter.setEncoderFilterCallbacks(encoder_callbacks);
+
+  EXPECT_CALL(*decoder_callbacks.route_, perFilterConfigs(_))
+      .WillOnce(
+          Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs { return {}; }));
+
+  Envoy::Http::TestRequestHeaderMapImpl headers = {
+      {":method", "GET"},
+      {":path", "/path"},
+      {":scheme", "http"},
+      {":authority", "host"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.decodeHeaders(headers, true));
+
+  EXPECT_EQ("GET", headers.get_("flag-header"));
+}
+
+#endif // USE_CEL_PARSER
+
 TEST(HeaderMutationFilterTest, ResponseMutationTest) {
   const std::string route_config_yaml = R"EOF(
   mutations:
@@ -180,7 +342,7 @@ TEST(HeaderMutationFilterTest, ResponseMutationTest) {
     - remove: "global-flag-header"
   )EOF";
 
-  Server::Configuration::MockServerFactoryContext context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   PerRouteProtoConfig per_route_proto_config;
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
@@ -358,7 +520,7 @@ TEST(HeaderMutationFilterTest, ResponseTrailerMutationTest) {
     - remove: "global-flag-header"
   )EOF";
 
-  Server::Configuration::MockServerFactoryContext context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   PerRouteProtoConfig per_route_proto_config;
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
@@ -538,7 +700,7 @@ TEST(HeaderMutationFilterTest, HybridMutationTest) {
     - remove: "global-flag-header"
   )EOF";
 
-  Server::Configuration::MockServerFactoryContext context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   PerRouteProtoConfig per_route_proto_config;
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
@@ -670,7 +832,7 @@ TEST(HeaderMutationFilterTest, QueryParameterMutationTest) {
     - remove: "global-flag-header"
   )EOF";
 
-  Server::Configuration::MockServerFactoryContext context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   PerRouteProtoConfig per_route_proto_config;
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
@@ -784,7 +946,7 @@ TEST(HeaderMutationFilterTest, RequestTrailerMutationTest) {
     - remove: "global-flag-header"
   )EOF";
 
-  Server::Configuration::MockServerFactoryContext context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   PerRouteProtoConfig per_route_proto_config;
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
@@ -918,7 +1080,7 @@ TEST(HeaderMutationFilterTest, QueryParameterMutationUrlEncodingTest) {
         action: "APPEND_IF_EXISTS_OR_ADD"
   )EOF";
 
-  Server::Configuration::MockServerFactoryContext context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   ProtoConfig proto_config;
   TestUtility::loadFromYaml(config_yaml, proto_config);

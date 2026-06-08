@@ -25,6 +25,18 @@ absl::StatusOr<std::vector<CommandParserPtr>> SubstitutionFormatStringUtils::par
   return commands;
 }
 
+absl::StatusOr<std::vector<CommandParserPtr>> SubstitutionFormatStringUtils::parseFormatters(
+    const FormattersConfig& formatters, Server::Configuration::ServerFactoryContext& server_context,
+    ProtobufMessage::ValidationVisitor& validation_visitor,
+    std::vector<CommandParserPtr>&& commands_parsers) {
+  if (formatters.empty()) {
+    return std::move(commands_parsers);
+  }
+
+  Server::GenericFactoryContextImpl generic_context(server_context, validation_visitor);
+  return parseFormatters(formatters, generic_context, std::move(commands_parsers));
+}
+
 absl::StatusOr<FormatterPtr> SubstitutionFormatStringUtils::fromProtoConfig(
     const envoy::config::core::v3::SubstitutionFormatString& config,
     Server::Configuration::GenericFactoryContext& context,
