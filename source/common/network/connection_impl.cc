@@ -1109,6 +1109,14 @@ ClientConnectionImpl::ClientConnectionImpl(
   }
 }
 
+ClientConnectionImpl::~ClientConnectionImpl() {
+  // In general we assume that owning code has called close() previously to the destructor being
+  // run. This generally must be done so that callbacks run in the correct context (vs. deferred
+  // deletion). Hence the assert above. However, call close() here just to be completely sure that
+  // the fd is closed and make it more likely that we crash from a bad close callback.
+  close(ConnectionCloseType::NoFlush);
+}
+
 void ClientConnectionImpl::connect() {
   ENVOY_CONN_LOG_EVENT(debug, "client_connection", "connecting to {}", *this,
                        socket_->connectionInfoProvider().remoteAddress()->asString());
