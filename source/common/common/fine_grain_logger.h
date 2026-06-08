@@ -239,11 +239,11 @@ FineGrainLogContext& getFineGrainLogContext();
       static std::atomic<const char*> cached_name_ptr{nullptr};                                    \
       const char* current_ptr = name.data();                                                       \
       if (ABSL_PREDICT_FALSE(!local_flogger ||                                                     \
-                               cached_name_ptr.load(std::memory_order_relaxed) != current_ptr)) {  \
-        if (!local_flogger ||                                                                      \
-            !::Envoy::getFineGrainLogContext().checkFineGrainLogger(local_flogger, __FILE__, name)) { \
+                             cached_name_ptr.load(std::memory_order_relaxed) != current_ptr)) {    \
+        if (!local_flogger || !::Envoy::getFineGrainLogContext().checkFineGrainLogger(             \
+                                  local_flogger, __FILE__, name)) {                                \
           local_flogger =                                                                          \
-              ::Envoy::getFineGrainLogContext().initFineGrainLogger(__FILE__, name, flogger);       \
+              ::Envoy::getFineGrainLogContext().initFineGrainLogger(__FILE__, name, flogger);      \
         }                                                                                          \
         if (local_flogger) {                                                                       \
           cached_name_ptr.store(current_ptr, std::memory_order_relaxed);                           \

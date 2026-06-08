@@ -52,11 +52,12 @@ spdlog::level::level_enum FineGrainLogContext::getVerbosityDefaultLevel() const 
 }
 
 bool FineGrainLogContext::checkFineGrainLogger(spdlog::logger* logger, absl::string_view file,
-                                             absl::string_view name) {
+                                               absl::string_view name) {
   absl::string_view logger_name = logger->name();
   // Fast path for static strings: the pointer address might match if they are string literals.
-  // spdlog logger name is usually a std::string, so logger_name.data() is not the same as file.data().
-  
+  // spdlog logger name is usually a std::string, so logger_name.data() is not the same as
+  // file.data().
+
   if (name.empty()) {
     return logger_name == file;
   }

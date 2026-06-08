@@ -36,12 +36,14 @@ static void BM_FineGrainDynamic(benchmark::State& state) {
   const std::string key2 = absl::StrCat(__FILE__, ":", name2);
   getFineGrainLogContext().setFineGrainLogger(key1, lv);
   getFineGrainLogContext().setFineGrainLogger(key2, lv);
-  
+
   // Ensure loggers exist and disable logging to avoid I/O overhead
   auto logger1 = getFineGrainLogContext().getFineGrainLogEntry(key1);
-  if (logger1) logger1->set_level(spdlog::level::off);
+  if (logger1)
+    logger1->set_level(spdlog::level::off);
   auto logger2 = getFineGrainLogContext().getFineGrainLogEntry(key2);
-  if (logger2) logger2->set_level(spdlog::level::off);
+  if (logger2)
+    logger2->set_level(spdlog::level::off);
 
   bool toggle = false;
   for (auto _ : state) {
@@ -60,7 +62,7 @@ static void BM_FineGrainDynamicStable(benchmark::State& state) {
   const std::string name = "stable_name";
   const std::string key = absl::StrCat(__FILE__, ":", name);
   getFineGrainLogContext().setFineGrainLogger(key, lv);
-  
+
   // Disable logging to avoid I/O overhead in benchmark
   auto logger = getFineGrainLogContext().getFineGrainLogEntry(key);
   if (logger) {
@@ -85,7 +87,8 @@ static void BM_EnvoyLogMisc(benchmark::State& state) {
   }
 }
 
-// Range(0) = 0 means log level is INFO (trace log suppressed), 1 means log level is TRACE (log emitted).
+// Range(0) = 0 means log level is INFO (trace log suppressed), 1 means log level is TRACE (log
+// emitted).
 BENCHMARK(BM_FineGrainStatic)->Args({0})->Args({1});
 BENCHMARK(BM_FineGrainDynamicStable)->Args({0})->Args({1});
 BENCHMARK(BM_FineGrainDynamic)->Args({0})->Args({1});
