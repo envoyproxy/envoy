@@ -378,6 +378,12 @@ PYBIND11_MODULE(envoy_engine, m) {
             return self.enableStatsCollection(on);
           },
           py::arg("stats_collection_on"), py::return_value_policy::reference)
+      .def(
+          "enable_worker_thread",
+          [](Envoy::Platform::EngineBuilder& self, bool on) -> Envoy::Platform::EngineBuilder& {
+            return self.enableWorkerThread(on);
+          },
+          py::arg("use_worker_thread_on"), py::return_value_policy::reference)
       .def("build", &Envoy::Platform::EngineBuilder::build,
            py::call_guard<py::gil_scoped_release>());
 }

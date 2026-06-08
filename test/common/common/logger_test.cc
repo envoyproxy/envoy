@@ -4,6 +4,7 @@
 
 #include "source/common/common/json_escape_string.h"
 #include "source/common/common/logger.h"
+#include "source/common/version/version_string.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
@@ -173,6 +174,10 @@ public:
         ->add_flag<CustomFlagFormatter::ExtractedMessage>(
             CustomFlagFormatter::ExtractedMessage::Placeholder)
         .set_pattern(pattern);
+    formatter
+        ->add_flag<CustomFlagFormatter::EnvoyVersion>(
+            CustomFlagFormatter::EnvoyVersion::Placeholder)
+        .set_pattern(pattern);
     logger_->set_formatter(std::move(formatter));
     logger_->set_level(spdlog::level::info);
 
@@ -236,6 +241,18 @@ TEST_P(LoggerCustomFlagsTest, LogMessageWithTagsAndExtractTags) {
                    ",\"key1\":\"val1\",\"key2\":\"val2\"");
   expectLogMessage("%*", "[Tags: \"key\":\"val\"] mes] sge3", ",\"key\":\"val\"");
   expectLogMessage("%*", "[Tags: \"key\":\"val\"] mes\"] sge4", ",\"key\":\"val\"");
+}
+
+TEST_P(LoggerCustomFlagsTest, LogMessageWithEnvoyVersion) {
+  // Sanity-check the version string before using it as expected output: it must be non-empty
+  // and follow the slash-separated format produced by envoyVersionString().
+  const std::string& version = envoyVersionString();
+  EXPECT_FALSE(version.empty());
+  EXPECT_NE(version.find('/'), std::string::npos);
+
+  // %N emits the Envoy version string from envoyVersionString().
+  expectLogMessage("%N %v", "hello", absl::StrCat(version, " hello"));
+  expectLogMessage("%v", "hello", "hello");
 }
 
 class NamedLogTest : public Loggable<Id::assert>, public testing::Test {};

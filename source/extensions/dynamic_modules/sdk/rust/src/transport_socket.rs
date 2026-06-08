@@ -406,8 +406,9 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_factory_config
   is_upstream: bool,
 ) -> abi::envoy_dynamic_module_type_transport_socket_factory_config_module_ptr {
   catch_unwind(AssertUnwindSafe(|| {
-    let name_bytes =
-      unsafe { std::slice::from_raw_parts(socket_name.ptr as *const u8, socket_name.length) };
+    let name_bytes = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(socket_name.ptr as *const u8, socket_name.length)
+    };
     let name_str = match std::str::from_utf8(name_bytes) {
       Ok(s) => s,
       Err(_) => {
@@ -415,8 +416,12 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_factory_config
         return std::ptr::null();
       },
     };
-    let config_slice =
-      unsafe { std::slice::from_raw_parts(socket_config.ptr as *const u8, socket_config.length) };
+    let config_slice = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(
+        socket_config.ptr as *const u8,
+        socket_config.length,
+      )
+    };
     let Some(new_config_fn) = crate::NEW_TRANSPORT_SOCKET_FACTORY_CONFIG_FUNCTION.get() else {
       crate::envoy_log_error!(
         "transport socket factory config function not registered; ensure \
@@ -430,7 +435,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_factory_config
     }
   }))
   .unwrap_or_else(|panic| {
-    log_panic(
+    crate::log_ffi_panic(
       "envoy_dynamic_module_on_transport_socket_factory_config_new",
       panic,
     );
@@ -453,7 +458,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_factory_config
     );
   }))
   .map_err(|panic| {
-    log_panic(
+    crate::log_ffi_panic(
       "envoy_dynamic_module_on_transport_socket_factory_config_destroy",
       panic,
     );
@@ -479,7 +484,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_new(
     Box::into_raw(wrapper) as abi::envoy_dynamic_module_type_transport_socket_module_ptr
   }))
   .unwrap_or_else(|panic| {
-    log_panic("envoy_dynamic_module_on_transport_socket_new", panic);
+    crate::log_ffi_panic("envoy_dynamic_module_on_transport_socket_new", panic);
     std::ptr::null()
   })
 }
@@ -497,7 +502,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_destroy(
     let _ = unsafe { Box::from_raw(wrapper) };
   }))
   .map_err(|panic| {
-    log_panic("envoy_dynamic_module_on_transport_socket_destroy", panic);
+    crate::log_ffi_panic("envoy_dynamic_module_on_transport_socket_destroy", panic);
   });
 }
 
@@ -516,7 +521,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_set_callbacks(
     wrapper.socket.on_set_callbacks(&mut envoy);
   }))
   .map_err(|panic| {
-    log_panic(
+    crate::log_ffi_panic(
       "envoy_dynamic_module_on_transport_socket_set_callbacks",
       panic,
     );
@@ -538,7 +543,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_on_connected(
     wrapper.socket.on_connected(&mut envoy);
   }))
   .map_err(|panic| {
-    log_panic(
+    crate::log_ffi_panic(
       "envoy_dynamic_module_on_transport_socket_on_connected",
       panic,
     );
@@ -561,7 +566,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_do_read(
     io.into()
   }))
   .unwrap_or_else(|panic| {
-    log_panic("envoy_dynamic_module_on_transport_socket_do_read", panic);
+    crate::log_ffi_panic("envoy_dynamic_module_on_transport_socket_do_read", panic);
     IoResult::close(0, false).into()
   })
 }
@@ -584,7 +589,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_do_write(
     io.into()
   }))
   .unwrap_or_else(|panic| {
-    log_panic("envoy_dynamic_module_on_transport_socket_do_write", panic);
+    crate::log_ffi_panic("envoy_dynamic_module_on_transport_socket_do_write", panic);
     IoResult::close(0, false).into()
   })
 }
@@ -605,7 +610,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_close(
     wrapper.socket.on_close(&mut envoy, event.into());
   }))
   .map_err(|panic| {
-    log_panic("envoy_dynamic_module_on_transport_socket_close", panic);
+    crate::log_ffi_panic("envoy_dynamic_module_on_transport_socket_close", panic);
   });
 }
 
@@ -626,7 +631,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_get_protocol(
     fill_string_buffer_out(&GET_PROTOCOL_BUF, result, &s);
   }))
   .map_err(|panic| {
-    log_panic(
+    crate::log_ffi_panic(
       "envoy_dynamic_module_on_transport_socket_get_protocol",
       panic,
     );
@@ -650,7 +655,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_get_failure_re
     fill_string_buffer_out(&GET_FAILURE_REASON_BUF, result, &s);
   }))
   .map_err(|panic| {
-    log_panic(
+    crate::log_ffi_panic(
       "envoy_dynamic_module_on_transport_socket_get_failure_reason",
       panic,
     );
@@ -672,19 +677,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_can_flush_clos
     wrapper.socket.can_flush_close(&mut envoy)
   }))
   .unwrap_or_else(|panic| {
-    log_panic(
+    crate::log_ffi_panic(
       "envoy_dynamic_module_on_transport_socket_can_flush_close",
       panic,
     );
     false
   })
-}
-
-/// Log a panic caught at an FFI boundary.
-fn log_panic(function_name: &str, panic: Box<dyn std::any::Any + Send>) {
-  crate::envoy_log_error!(
-    "{}: caught panic: {}",
-    function_name,
-    crate::panic_payload_to_string(panic)
-  );
 }

@@ -9,10 +9,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
-using testing::Return;
-using testing::ReturnRef;
-
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
@@ -29,9 +25,7 @@ protected:
   }
 
   // Helper function to create a test address.
-  ReverseConnectionAddress createTestAddress() {
-    return ReverseConnectionAddress(createTestConfig());
-  }
+  ReverseConnectionAddress createTestAddress() { return {createTestConfig()}; }
 
   // Set log level to debug for this test class.
   LogLevelSetter log_level_setter_ = LogLevelSetter(spdlog::level::debug);
@@ -297,6 +291,7 @@ TEST_F(ReverseConnectionAddressTest, CopyAndAssignment) {
   ReverseConnectionAddress original(config);
 
   // Test copy constructor.
+  // NOLINTNEXTLINE(performance-unnecessary-copy-initialization)
   ReverseConnectionAddress copied(original);
   EXPECT_TRUE(original == copied);
   EXPECT_EQ(original.logicalName(), copied.logicalName());

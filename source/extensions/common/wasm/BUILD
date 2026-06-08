@@ -90,6 +90,7 @@ envoy_cc_extension(
         ],
     }),
     visibility = [
+        "//contrib:__subpackages__",
         "//source/extensions:__subpackages__",
         "//test/extensions:__subpackages__",
         "//test/test_common:__subpackages__",

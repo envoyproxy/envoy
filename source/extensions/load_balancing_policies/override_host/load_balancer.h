@@ -189,6 +189,8 @@ private:
     // Called by worker threads to create a thread-local load balancer.
     LoadBalancerPtr create(LoadBalancerParams params) override;
 
+    bool recreateOnHostChange() const override { return false; }
+
   private:
     // Hosts in the load balancer. Owned by the cluster manager.
     const OverrideHostLbConfig& config_;

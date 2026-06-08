@@ -6,6 +6,7 @@ use crate::{
   NewBootstrapExtensionConfigFunction, NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION,
 };
 use mockall::*;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 
 /// EnvoyBootstrapExtensionConfig is the Envoy-side bootstrap extension configuration.
 /// This is a handle to the Envoy configuration object.
@@ -566,10 +567,15 @@ impl EnvoyBootstrapExtensionConfigScheduler for Box<dyn EnvoyBootstrapExtensionC
 /// A timer handle for bootstrap extensions on the main thread event loop.
 ///
 /// The timer is created via [`EnvoyBootstrapExtensionConfig::new_timer`] and fires by calling
-/// [`BootstrapExtensionConfig::on_timer_fired`]. All methods must be called on the main thread.
+/// [`BootstrapExtensionConfig::on_timer_fired`]. All methods must be called on the main thread,
+/// including dropping the owning handle, since the underlying Envoy timer deregisters from the
+/// main thread dispatcher when destroyed.
 ///
 /// The owning handle (returned by `new_timer`) will automatically destroy the underlying Envoy
-/// timer when dropped.
+/// timer when dropped. If the handle is stored in a context that may be dropped off the main
+/// thread (for example, a future spawned onto a worker pool), the module is responsible for
+/// ensuring the drop happens on the main thread, typically by posting the drop through an
+/// [`EnvoyBootstrapExtensionConfigScheduler`].
 ///
 /// Each timer has a unique [`id`](EnvoyBootstrapExtensionTimer::id) that is stable for its
 /// lifetime. This allows modules with multiple timers to identify which timer fired in the
@@ -1235,7 +1241,8 @@ impl EnvoyBootstrapExtension for EnvoyBootstrapExtensionImpl {
       if wrapper.stopped {
         return abi::envoy_dynamic_module_type_stats_iteration_action::Stop;
       }
-      let name_slice = unsafe { std::slice::from_raw_parts(name.ptr as *const u8, name.length) };
+      let name_slice =
+        unsafe { crate::ffi_helpers::slice_from_raw_or_empty(name.ptr as *const u8, name.length) };
       let name_str = std::str::from_utf8(name_slice).unwrap_or("");
       if (wrapper.callback)(name_str, value) {
         abi::envoy_dynamic_module_type_stats_iteration_action::Continue
@@ -1274,7 +1281,8 @@ impl EnvoyBootstrapExtension for EnvoyBootstrapExtensionImpl {
       if wrapper.stopped {
         return abi::envoy_dynamic_module_type_stats_iteration_action::Stop;
       }
-      let name_slice = unsafe { std::slice::from_raw_parts(name.ptr as *const u8, name.length) };
+      let name_slice =
+        unsafe { crate::ffi_helpers::slice_from_raw_or_empty(name.ptr as *const u8, name.length) };
       let name_str = std::str::from_utf8(name_slice).unwrap_or("");
       if (wrapper.callback)(name_str, value) {
         abi::envoy_dynamic_module_type_stats_iteration_action::Continue
@@ -1306,23 +1314,30 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_config_new(
   name: abi::envoy_dynamic_module_type_envoy_buffer,
   config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr {
-  let mut envoy_extension_config =
-    EnvoyBootstrapExtensionConfigImpl::new(envoy_extension_config_ptr);
-  let name_str = unsafe {
-    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-      name.ptr as *const _,
-      name.length,
-    ))
-  };
-  let config_slice = unsafe { std::slice::from_raw_parts(config.ptr as *const _, config.length) };
-  init_bootstrap_extension_config(
-    &mut envoy_extension_config,
-    name_str,
-    config_slice,
-    NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION
-      .get()
-      .expect("NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION must be set"),
-  )
+  catch_unwind(AssertUnwindSafe(|| {
+    let mut envoy_extension_config =
+      EnvoyBootstrapExtensionConfigImpl::new(envoy_extension_config_ptr);
+    let name_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(name.ptr as *const u8, name.length) };
+    let config_slice = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(config.ptr as *const u8, config.length)
+    };
+    init_bootstrap_extension_config(
+      &mut envoy_extension_config,
+      name_str.as_ref(),
+      config_slice,
+      NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION
+        .get()
+        .expect("NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION must be set"),
+    )
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_bootstrap_extension_config_new",
+      panic,
+    );
+    std::ptr::null()
+  })
 }
 
 pub(crate) fn init_bootstrap_extension_config(
@@ -1346,7 +1361,15 @@ pub(crate) fn init_bootstrap_extension_config(
 pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_config_destroy(
   extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
 ) {
-  drop_wrapped_c_void_ptr!(extension_config_ptr, BootstrapExtensionConfig);
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    drop_wrapped_c_void_ptr!(extension_config_ptr, BootstrapExtensionConfig);
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_bootstrap_extension_config_destroy",
+      panic,
+    );
+  });
 }
 
 /// # Safety
@@ -1358,12 +1381,18 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_new(
   extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
   envoy_extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
 ) -> abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr {
-  let mut envoy_extension = EnvoyBootstrapExtensionImpl::new(envoy_extension_ptr);
-  let extension_config = {
-    let raw = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
-    &**raw
-  };
-  envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, extension_config)
+  catch_unwind(AssertUnwindSafe(|| {
+    let mut envoy_extension = EnvoyBootstrapExtensionImpl::new(envoy_extension_ptr);
+    let extension_config = {
+      let raw = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+      &**raw
+    };
+    envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, extension_config)
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_bootstrap_extension_new", panic);
+    std::ptr::null()
+  })
 }
 
 pub(crate) fn envoy_dynamic_module_on_bootstrap_extension_new_impl(
@@ -1379,9 +1408,17 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_server_initialized
   envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
   extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
 ) {
-  let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
-  let extension = unsafe { &mut *extension };
-  extension.on_server_initialized(&mut EnvoyBootstrapExtensionImpl::new(envoy_ptr));
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
+    let extension = unsafe { &mut *extension };
+    extension.on_server_initialized(&mut EnvoyBootstrapExtensionImpl::new(envoy_ptr));
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_bootstrap_extension_server_initialized",
+      panic,
+    );
+  });
 }
 
 #[no_mangle]
@@ -1389,9 +1426,17 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_worker_thread_init
   envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
   extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
 ) {
-  let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
-  let extension = unsafe { &mut *extension };
-  extension.on_worker_thread_initialized(&mut EnvoyBootstrapExtensionImpl::new(envoy_ptr));
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
+    let extension = unsafe { &mut *extension };
+    extension.on_worker_thread_initialized(&mut EnvoyBootstrapExtensionImpl::new(envoy_ptr));
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized",
+      panic,
+    );
+  });
 }
 
 #[no_mangle]
@@ -1399,9 +1444,17 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_drain_started(
   envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
   extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
 ) {
-  let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
-  let extension = unsafe { &mut *extension };
-  extension.on_drain_started(&mut EnvoyBootstrapExtensionImpl::new(envoy_ptr));
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
+    let extension = unsafe { &mut *extension };
+    extension.on_drain_started(&mut EnvoyBootstrapExtensionImpl::new(envoy_ptr));
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_bootstrap_extension_drain_started",
+      panic,
+    );
+  });
 }
 
 #[no_mangle]
@@ -1411,17 +1464,30 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_shutdown(
   completion_callback: abi::envoy_dynamic_module_type_event_cb,
   completion_context: *mut std::os::raw::c_void,
 ) {
-  let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
-  let extension = unsafe { &mut *extension };
-  let completion = CompletionCallback::new(completion_callback, completion_context);
-  extension.on_shutdown(&mut EnvoyBootstrapExtensionImpl::new(envoy_ptr), completion);
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
+    let extension = unsafe { &mut *extension };
+    let completion = CompletionCallback::new(completion_callback, completion_context);
+    extension.on_shutdown(&mut EnvoyBootstrapExtensionImpl::new(envoy_ptr), completion);
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_bootstrap_extension_shutdown",
+      panic,
+    );
+  });
 }
 
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_destroy(
   extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
 ) {
-  let _ = unsafe { Box::from_raw(extension_ptr as *mut Box<dyn BootstrapExtension>) };
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let _ = unsafe { Box::from_raw(extension_ptr as *mut Box<dyn BootstrapExtension>) };
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_bootstrap_extension_destroy", panic);
+  });
 }
 
 #[no_mangle]
@@ -1430,12 +1496,20 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_config_scheduled(
   extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
   event_id: u64,
 ) {
-  let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
-  let extension_config = unsafe { &**extension_config };
-  extension_config.on_scheduled(
-    &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
-    event_id,
-  );
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+    let extension_config = unsafe { &**extension_config };
+    extension_config.on_scheduled(
+      &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+      event_id,
+    );
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_bootstrap_extension_config_scheduled",
+      panic,
+    );
+  });
 }
 
 /// Event hook called by Envoy when an HTTP callout initiated by a bootstrap extension completes.
@@ -1459,29 +1533,45 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_http_callou
   body_chunks: *const abi::envoy_dynamic_module_type_envoy_buffer,
   body_chunks_size: usize,
 ) {
-  let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
-  let extension_config = unsafe { &**extension_config };
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+    let extension_config = unsafe { &**extension_config };
 
-  let headers = if headers_size > 0 {
-    Some(unsafe {
-      std::slice::from_raw_parts(headers as *const (EnvoyBuffer, EnvoyBuffer), headers_size)
-    })
-  } else {
-    None
-  };
-  let body = if body_chunks_size > 0 {
-    Some(unsafe { std::slice::from_raw_parts(body_chunks as *const EnvoyBuffer, body_chunks_size) })
-  } else {
-    None
-  };
+    let headers = if headers_size > 0 {
+      Some(unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(
+          headers as *const (EnvoyBuffer, EnvoyBuffer),
+          headers_size,
+        )
+      })
+    } else {
+      None
+    };
+    let body = if body_chunks_size > 0 {
+      Some(unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(
+          body_chunks as *const EnvoyBuffer,
+          body_chunks_size,
+        )
+      })
+    } else {
+      None
+    };
 
-  extension_config.on_http_callout_done(
-    &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
-    callout_id,
-    result,
-    headers,
-    body,
-  );
+    extension_config.on_http_callout_done(
+      &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+      callout_id,
+      result,
+      headers,
+      body,
+    );
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_bootstrap_extension_http_callout_done",
+      panic,
+    );
+  });
 }
 
 /// Event hook called by Envoy when a timer created by a bootstrap extension fires.
@@ -1491,16 +1581,24 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_timer_fired(
   extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
   timer_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr,
 ) {
-  let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
-  let extension_config = unsafe { &**extension_config };
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+    let extension_config = unsafe { &**extension_config };
 
-  // Create a non-owning reference to the timer so the module can re-enable it.
-  let timer_ref = EnvoyBootstrapExtensionTimerRef { raw_ptr: timer_ptr };
+    // Create a non-owning reference to the timer so the module can re-enable it.
+    let timer_ref = EnvoyBootstrapExtensionTimerRef { raw_ptr: timer_ptr };
 
-  extension_config.on_timer_fired(
-    &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
-    &timer_ref,
-  );
+    extension_config.on_timer_fired(
+      &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+      &timer_ref,
+    );
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_bootstrap_extension_timer_fired",
+      panic,
+    );
+  });
 }
 
 /// Event hook called by Envoy when a watched file changes for a bootstrap extension.
@@ -1511,21 +1609,25 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_file_changed(
   path: abi::envoy_dynamic_module_type_envoy_buffer,
   events: u32,
 ) {
-  let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
-  let extension_config = unsafe { &**extension_config };
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+    let extension_config = unsafe { &**extension_config };
 
-  let path_str = unsafe {
-    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-      path.ptr as *const u8,
-      path.length,
-    ))
-  };
+    let path_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(path.ptr as *const u8, path.length) };
 
-  extension_config.on_file_changed(
-    &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
-    path_str,
-    events,
-  );
+    extension_config.on_file_changed(
+      &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+      path_str.as_ref(),
+      events,
+    );
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_bootstrap_extension_file_changed",
+      panic,
+    );
+  });
 }
 
 /// Event hook called by Envoy when an admin endpoint registered by a bootstrap extension is
@@ -1547,44 +1649,47 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_admin_reque
   path: abi::envoy_dynamic_module_type_envoy_buffer,
   body: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> u32 {
-  let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
-  let extension_config = unsafe { &**extension_config };
+  catch_unwind(AssertUnwindSafe(|| {
+    let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+    let extension_config = unsafe { &**extension_config };
 
-  let method_str = unsafe {
-    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-      method.ptr as *const u8,
-      method.length,
-    ))
-  };
-  let path_str = unsafe {
-    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-      path.ptr as *const u8,
-      path.length,
-    ))
-  };
-  let body_slice = unsafe { std::slice::from_raw_parts(body.ptr as *const u8, body.length) };
+    let method_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(method.ptr as *const u8, method.length) };
+    let path_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(path.ptr as *const u8, path.length) };
+    let body_slice =
+      unsafe { crate::ffi_helpers::slice_from_raw_or_empty(body.ptr as *const u8, body.length) };
 
-  let (status_code, response_str) = extension_config.on_admin_request(
-    &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
-    method_str,
-    path_str,
-    body_slice,
-  );
-
-  // Pass the response body to Envoy via the callback. Envoy copies the buffer immediately,
-  // so the string only needs to live until the call returns.
-  if !response_str.is_empty() {
-    let response_buf = abi::envoy_dynamic_module_type_module_buffer {
-      ptr: response_str.as_ptr() as *const _,
-      length: response_str.len(),
-    };
-    abi::envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(
-      envoy_ptr,
-      response_buf,
+    let (status_code, response_str) = extension_config.on_admin_request(
+      &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+      method_str.as_ref(),
+      path_str.as_ref(),
+      body_slice,
     );
-  }
 
-  status_code
+    // Pass the response body to Envoy via the callback. Envoy copies the buffer immediately,
+    // so the string only needs to live until the call returns.
+    if !response_str.is_empty() {
+      let response_buf = abi::envoy_dynamic_module_type_module_buffer {
+        ptr: response_str.as_ptr() as *const _,
+        length: response_str.len(),
+      };
+      abi::envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(
+        envoy_ptr,
+        response_buf,
+      );
+    }
+
+    status_code
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_bootstrap_extension_admin_request",
+      panic,
+    );
+    // Fail-closed: 500 Internal Server Error.
+    500
+  })
 }
 
 /// Event hook called by Envoy when a cluster is added to or updated in the ClusterManager.
@@ -1599,20 +1704,25 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_cluster_add
   extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
   cluster_name: abi::envoy_dynamic_module_type_envoy_buffer,
 ) {
-  let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
-  let extension_config = unsafe { &**extension_config };
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+    let extension_config = unsafe { &**extension_config };
 
-  let cluster_name_str = unsafe {
-    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-      cluster_name.ptr as *const u8,
-      cluster_name.length,
-    ))
-  };
+    let cluster_name_str = unsafe {
+      crate::ffi_helpers::str_lossy_from_raw(cluster_name.ptr as *const u8, cluster_name.length)
+    };
 
-  extension_config.on_cluster_add_or_update(
-    &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
-    cluster_name_str,
-  );
+    extension_config.on_cluster_add_or_update(
+      &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+      cluster_name_str.as_ref(),
+    );
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update",
+      panic,
+    );
+  });
 }
 
 /// Event hook called by Envoy when a cluster is removed from the ClusterManager.
@@ -1627,20 +1737,25 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_cluster_rem
   extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
   cluster_name: abi::envoy_dynamic_module_type_envoy_buffer,
 ) {
-  let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
-  let extension_config = unsafe { &**extension_config };
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+    let extension_config = unsafe { &**extension_config };
 
-  let cluster_name_str = unsafe {
-    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-      cluster_name.ptr as *const u8,
-      cluster_name.length,
-    ))
-  };
+    let cluster_name_str = unsafe {
+      crate::ffi_helpers::str_lossy_from_raw(cluster_name.ptr as *const u8, cluster_name.length)
+    };
 
-  extension_config.on_cluster_removal(
-    &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
-    cluster_name_str,
-  );
+    extension_config.on_cluster_removal(
+      &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+      cluster_name_str.as_ref(),
+    );
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_bootstrap_extension_cluster_removal",
+      panic,
+    );
+  });
 }
 
 /// Event hook called by Envoy when a listener is added to or updated in the ListenerManager.
@@ -1655,20 +1770,25 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_listener_ad
   extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
   listener_name: abi::envoy_dynamic_module_type_envoy_buffer,
 ) {
-  let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
-  let extension_config = unsafe { &**extension_config };
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+    let extension_config = unsafe { &**extension_config };
 
-  let listener_name_str = unsafe {
-    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-      listener_name.ptr as *const u8,
-      listener_name.length,
-    ))
-  };
+    let listener_name_str = unsafe {
+      crate::ffi_helpers::str_lossy_from_raw(listener_name.ptr as *const u8, listener_name.length)
+    };
 
-  extension_config.on_listener_add_or_update(
-    &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
-    listener_name_str,
-  );
+    extension_config.on_listener_add_or_update(
+      &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+      listener_name_str.as_ref(),
+    );
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update",
+      panic,
+    );
+  });
 }
 
 /// Event hook called by Envoy when a listener is removed from the ListenerManager.
@@ -1683,18 +1803,23 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_listener_re
   extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
   listener_name: abi::envoy_dynamic_module_type_envoy_buffer,
 ) {
-  let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
-  let extension_config = unsafe { &**extension_config };
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+    let extension_config = unsafe { &**extension_config };
 
-  let listener_name_str = unsafe {
-    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-      listener_name.ptr as *const u8,
-      listener_name.length,
-    ))
-  };
+    let listener_name_str = unsafe {
+      crate::ffi_helpers::str_lossy_from_raw(listener_name.ptr as *const u8, listener_name.length)
+    };
 
-  extension_config.on_listener_removal(
-    &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
-    listener_name_str,
-  );
+    extension_config.on_listener_removal(
+      &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+      listener_name_str.as_ref(),
+    );
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_bootstrap_extension_listener_removal",
+      panic,
+    );
+  });
 }

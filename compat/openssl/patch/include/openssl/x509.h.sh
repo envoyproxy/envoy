@@ -37,6 +37,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl X509_NAME_entry_count \
   --uncomment-func-decl X509_NAME_get_index_by_NID \
   --uncomment-func-decl X509_NAME_get_entry \
+  --uncomment-func-decl X509_NAME_add_entry_by_NID \
   --uncomment-func-decl X509_NAME_add_entry_by_txt \
   --uncomment-func-decl X509_NAME_ENTRY_set \
   --uncomment-func-decl X509_EXTENSION_get_data \

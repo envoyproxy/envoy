@@ -183,6 +183,7 @@ private:
     // Upstream::LoadBalancerFactory.
     Upstream::LoadBalancerPtr create() { return std::make_unique<LoadBalancer>(cluster_); }
     Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override { return create(); }
+    bool recreateOnHostChange() const override { return false; }
 
     const std::shared_ptr<RevConCluster> cluster_;
   };
@@ -203,7 +204,10 @@ private:
   void cleanup();
 
   // Checks if a host exists for a given host identifier and if not creates and caches it.
-  Upstream::HostSelectionResponse checkAndCreateHost(absl::string_view host_id);
+  Upstream::HostSelectionResponse checkAndCreateHost(absl::string_view host_id,
+                                                     Upstream::HostSharedPtr& created_host);
+
+  void addHostToHostSet(Upstream::HostSharedPtr host);
 
   // Get the upstream socket manager from the thread-local registry.
   BootstrapReverseConnection::UpstreamSocketManager* getUpstreamSocketManager() const;

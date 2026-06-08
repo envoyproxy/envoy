@@ -106,7 +106,7 @@ public:
   void setBufferLimits(uint32_t limit) override;
   void setBufferHighWatermarkTimeout(std::chrono::milliseconds timeout) override;
   uint32_t bufferLimit() const override { return read_buffer_limit_; }
-  bool aboveHighWatermark() const override { return write_buffer_above_high_watermark_; }
+  bool aboveHighWatermark() const override { return above_high_watermark_count_ > 0; }
   const ConnectionSocket::OptionsSharedPtr& socketOptions() const override {
     return socket_->options();
   }
@@ -264,20 +264,19 @@ private:
   StreamInfo::DetectedCloseType detected_close_type_{StreamInfo::DetectedCloseType::Normal};
   std::chrono::milliseconds buffer_high_watermark_timeout_{};
   Event::TimerPtr buffer_high_watermark_timer_{nullptr};
-  bool write_buffer_above_high_watermark_ : 1;
-  bool detect_early_close_ : 1;
-  bool enable_half_close_ : 1;
-  bool read_end_stream_raised_ : 1;
-  bool read_end_stream_ : 1;
-  bool write_end_stream_ : 1;
-  bool current_write_end_stream_ : 1;
-  bool dispatch_buffered_data_ : 1;
+  bool detect_early_close_ : 1 = true;
+  bool enable_half_close_ : 1 = false;
+  bool read_end_stream_raised_ : 1 = false;
+  bool read_end_stream_ : 1 = false;
+  bool write_end_stream_ : 1 = false;
+  bool current_write_end_stream_ : 1 = false;
+  bool dispatch_buffered_data_ : 1 = false;
   // True if the most recent call to the transport socket's doRead method invoked
   // setTransportSocketIsReadable to schedule read resumption after yielding due to
   // shouldDrainReadBuffer(). When true, readDisable must schedule read resumption when
   // read_disable_count_ == 0 to ensure that read resumption happens when remaining bytes are held
   // in transport socket internal buffers.
-  bool transport_wants_read_ : 1;
+  bool transport_wants_read_ : 1 = false;
   bool enable_close_through_filter_manager_ : 1;
 };
 

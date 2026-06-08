@@ -1,3 +1,6 @@
+#include <tuple>
+
+#include "envoy/extensions/clusters/mcp_multicluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/http/mcp/v3/mcp.pb.h"
 #include "envoy/extensions/filters/http/mcp_router/v3/mcp_router.pb.h"
 
@@ -11,10 +14,19 @@ namespace HttpFilters {
 namespace McpRouter {
 namespace {
 
-class McpRouterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+// Make this test suite run with server config in either filter or cluster.
+// TODO(yanavlasov): remove this parameterization once server config is removed from the filter.
+enum class ConfigSource { Filter, Cluster };
+using TestParams = std::tuple<Network::Address::IpVersion, ConfigSource>;
+using testing::Eq;
+
+class McpRouterIntegrationTest : public testing::TestWithParam<TestParams>,
                                  public HttpIntegrationTest {
 public:
-  McpRouterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+  McpRouterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
+
+  Network::Address::IpVersion ipVersion() const { return std::get<0>(GetParam()); }
+  ConfigSource configSource() const { return std::get<1>(GetParam()); }
 
   void createUpstreams() override {
     // Create two fake upstreams for MCP backends (time and tools)
@@ -40,7 +52,7 @@ public:
       auto* time_locality = time_endpoint->add_endpoints();
       auto* time_lb = time_locality->add_lb_endpoints();
       time_lb->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address(
-          Network::Test::getLoopbackAddressString(GetParam()));
+          Network::Test::getLoopbackAddressString(ipVersion()));
       time_lb->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(
           fake_upstreams_[0]->localAddress()->ip()->port());
 
@@ -56,30 +68,61 @@ public:
       auto* tools_locality = tools_endpoint->add_endpoints();
       auto* tools_lb = tools_locality->add_lb_endpoints();
       tools_lb->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address(
-          Network::Test::getLoopbackAddressString(GetParam()));
+          Network::Test::getLoopbackAddressString(ipVersion()));
       tools_lb->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(
           fake_upstreams_[1]->localAddress()->ip()->port());
+
+      // Add MCP multicluster.
+      auto* multicluster = bootstrap.mutable_static_resources()->add_clusters();
+      multicluster->set_name("multicluster");
+      multicluster->mutable_connect_timeout()->set_seconds(5);
+      multicluster->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+      multicluster->mutable_cluster_type()->set_name("envoy.clusters.mcp_multicluster");
+
+      // Configure the MCP multicluster.
+      envoy::extensions::clusters::mcp_multicluster::v3::ClusterConfig multicluster_config;
+      auto* server = multicluster_config.add_servers();
+      server->set_name("time");
+      auto* mcp_cluster = server->mutable_mcp_cluster();
+      mcp_cluster->set_cluster("mcp_time_backend");
+      mcp_cluster->set_host_rewrite_literal("time.mcp.example.com");
+
+      server = multicluster_config.add_servers();
+      server->set_name("tools");
+      mcp_cluster = server->mutable_mcp_cluster();
+      mcp_cluster->set_cluster("mcp_tools_backend");
+      mcp_cluster->set_host_rewrite_literal("tools.mcp.example.com");
+
+      multicluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(multicluster_config);
     });
 
     // MCP router as terminal filter
-    config_helper_.prependFilter(R"EOF(
-      name: envoy.filters.http.mcp_router
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_router.v3.McpRouter
-        servers:
-          - name: time
-            mcp_cluster:
-              cluster: mcp_time_backend
-              path: /mcp
-              timeout: 5s
-              host_rewrite_literal: time.mcp.example.com
-          - name: tools
-            mcp_cluster:
-              cluster: mcp_tools_backend
-              path: /mcp
-              timeout: 5s
-              host_rewrite_literal: tools.mcp.example.com
-    )EOF");
+    if (configSource() == ConfigSource::Cluster) {
+      config_helper_.prependFilter(R"EOF(
+        name: envoy.filters.http.mcp_router
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_router.v3.McpRouter
+      )EOF");
+    } else {
+      config_helper_.prependFilter(R"EOF(
+        name: envoy.filters.http.mcp_router
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_router.v3.McpRouter
+          servers:
+            - name: time
+              mcp_cluster:
+                cluster: mcp_time_backend
+                path: /mcp
+                timeout: 5s
+                host_rewrite_literal: time.mcp.example.com
+            - name: tools
+              mcp_cluster:
+                cluster: mcp_tools_backend
+                path: /mcp
+                timeout: 5s
+                host_rewrite_literal: tools.mcp.example.com
+      )EOF");
+    }
 
     // MCP filter (validates JSON-RPC, sets metadata)
     config_helper_.prependFilter(R"EOF(
@@ -91,8 +134,9 @@ public:
 
     // Remove the default router filter.
     config_helper_.addConfigModifier(
-        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-               hcm) {
+        [this](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
           auto* filters = hcm.mutable_http_filters();
           for (auto it = filters->begin(); it != filters->end();) {
             if (it->name() == "envoy.filters.http.router") {
@@ -100,6 +144,13 @@ public:
             } else {
               ++it;
             }
+          }
+          if (configSource() == ConfigSource::Cluster) {
+            hcm.mutable_route_config()
+                ->mutable_virtual_hosts(0)
+                ->mutable_routes(0)
+                ->mutable_route()
+                ->set_cluster("multicluster");
           }
         });
 
@@ -114,8 +165,10 @@ public:
   FakeStreamPtr tools_backend_request_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, McpRouterIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, McpRouterIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(ConfigSource::Filter, ConfigSource::Cluster)));
 
 // Test that ping request returns JSON-RPC response with empty result
 TEST_P(McpRouterIntegrationTest, PingReturnsEmptyResult) {
@@ -147,8 +200,8 @@ TEST_P(McpRouterIntegrationTest, PingReturnsEmptyResult) {
   EXPECT_THAT(response->body(), testing::HasSubstr("\"result\":{}"));
 
   // Verify stats: ping is a direct response
-  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_total", 1);
-  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_direct_response", 1);
+  test_server_->waitForCounter("http.config_test.mcp_router.rq_total", Eq(1));
+  test_server_->waitForCounter("http.config_test.mcp_router.rq_direct_response", Eq(1));
 }
 
 // Test notifications/initialized request returns 202 Accepted
@@ -177,9 +230,9 @@ TEST_P(McpRouterIntegrationTest, NotificationInitializedReturns202) {
   EXPECT_EQ("202", response->headers().getStatusValue());
 
   // Verify stats: notification is a direct response with fanout
-  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_total", 1);
-  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_direct_response", 1);
-  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_fanout", 1);
+  test_server_->waitForCounter("http.config_test.mcp_router.rq_total", Eq(1));
+  test_server_->waitForCounter("http.config_test.mcp_router.rq_direct_response", Eq(1));
+  test_server_->waitForCounter("http.config_test.mcp_router.rq_fanout", Eq(1));
 }
 
 // Test invalid JSON returns 400
@@ -307,8 +360,8 @@ TEST_P(McpRouterIntegrationTest, InitializeFanoutToBothBackends) {
   EXPECT_THAT(response->body(), testing::HasSubstr("envoy-mcp-gateway"));
 
   // Verify stats: initialize is a fanout operation
-  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_total", 1);
-  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_fanout", 1);
+  test_server_->waitForCounter("http.config_test.mcp_router.rq_total", Eq(1));
+  test_server_->waitForCounter("http.config_test.mcp_router.rq_fanout", Eq(1));
 }
 
 // Test tools/list request fans out to both backends and aggregates tools with prefixes
@@ -437,8 +490,8 @@ TEST_P(McpRouterIntegrationTest, ToolCallRoutesToCorrectBackend) {
   EXPECT_THAT(response->body(), testing::HasSubstr("2023-10-27T10:00:00Z"));
 
   // Verify stats: tool call with body rewrite
-  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_total", 1);
-  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_body_rewrite", 1);
+  test_server_->waitForCounter("http.config_test.mcp_router.rq_total", Eq(1));
+  test_server_->waitForCounter("http.config_test.mcp_router.rq_body_rewrite", Eq(1));
 }
 
 // Test tools/call routes to the second backend (tools) based on prefix
@@ -868,8 +921,8 @@ TEST_P(McpRouterIntegrationTest, ToolCallWithUnknownBackendReturns400) {
   EXPECT_EQ("400", response->headers().getStatusValue());
 
   // Verify stats: unknown backend
-  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_total", 1);
-  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_unknown_backend", 1);
+  test_server_->waitForCounter("http.config_test.mcp_router.rq_total", Eq(1));
+  test_server_->waitForCounter("http.config_test.mcp_router.rq_unknown_backend", Eq(1));
 }
 
 // Test tools/call with SSE response from backend returns SSE to client
@@ -2145,29 +2198,60 @@ public:
       auto* time_locality = time_endpoint->add_endpoints();
       auto* time_lb = time_locality->add_lb_endpoints();
       time_lb->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address(
-          Network::Test::getLoopbackAddressString(GetParam()));
+          Network::Test::getLoopbackAddressString(ipVersion()));
       time_lb->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(
           fake_upstreams_[0]->localAddress()->ip()->port());
+
+      // Add MCP multicluster.
+      auto* multicluster = bootstrap.mutable_static_resources()->add_clusters();
+      multicluster->set_name("multicluster");
+      multicluster->mutable_connect_timeout()->set_seconds(5);
+      multicluster->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+      multicluster->mutable_cluster_type()->set_name("envoy.clusters.mcp_multicluster");
+
+      // Configure the MCP multicluster.
+      envoy::extensions::clusters::mcp_multicluster::v3::ClusterConfig multicluster_config;
+      auto* server = multicluster_config.add_servers();
+      server->set_name("time");
+      auto* mcp_cluster = server->mutable_mcp_cluster();
+      mcp_cluster->set_cluster("mcp_time_backend");
+      mcp_cluster->set_host_rewrite_literal("time.mcp.example.com");
+
+      multicluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(multicluster_config);
     });
 
     // MCP router with session identity and ENFORCE validation
-    config_helper_.prependFilter(R"EOF(
-      name: envoy.filters.http.mcp_router
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_router.v3.McpRouter
-        servers:
-          - name: time
-            mcp_cluster:
-              cluster: mcp_time_backend
-              path: /mcp
-              timeout: 5s
-        session_identity:
-          identity:
-            header:
-              name: x-user-id
-          validation:
-            mode: ENFORCE
-    )EOF");
+    if (configSource() == ConfigSource::Cluster) {
+      config_helper_.prependFilter(R"EOF(
+        name: envoy.filters.http.mcp_router
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_router.v3.McpRouter
+          session_identity:
+            identity:
+              header:
+                name: x-user-id
+            validation:
+              mode: ENFORCE
+      )EOF");
+    } else {
+      config_helper_.prependFilter(R"EOF(
+        name: envoy.filters.http.mcp_router
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_router.v3.McpRouter
+          servers:
+            - name: time
+              mcp_cluster:
+                cluster: mcp_time_backend
+                path: /mcp
+                timeout: 5s
+          session_identity:
+            identity:
+              header:
+                name: x-user-id
+            validation:
+              mode: ENFORCE
+      )EOF");
+    }
 
     config_helper_.prependFilter(R"EOF(
       name: envoy.filters.http.mcp
@@ -2177,8 +2261,9 @@ public:
     )EOF");
 
     config_helper_.addConfigModifier(
-        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-               hcm) {
+        [this](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
           auto* filters = hcm.mutable_http_filters();
           for (auto it = filters->begin(); it != filters->end();) {
             if (it->name() == "envoy.filters.http.router") {
@@ -2186,6 +2271,13 @@ public:
             } else {
               ++it;
             }
+          }
+          if (configSource() == ConfigSource::Cluster) {
+            hcm.mutable_route_config()
+                ->mutable_virtual_hosts(0)
+                ->mutable_routes(0)
+                ->mutable_route()
+                ->set_cluster("multicluster");
           }
         });
 
@@ -2200,9 +2292,10 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, McpRouterSubjectValidationIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, McpRouterSubjectValidationIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(ConfigSource::Filter, ConfigSource::Cluster)));
 
 // Subject mismatch returns 403
 TEST_P(McpRouterSubjectValidationIntegrationTest, SubjectMismatchReturns403) {
@@ -2230,8 +2323,8 @@ TEST_P(McpRouterSubjectValidationIntegrationTest, SubjectMismatchReturns403) {
   EXPECT_EQ("403", response->headers().getStatusValue());
 
   // Verify stats: auth failure (subject mismatch)
-  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_total", 1);
-  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_auth_failure", 1);
+  test_server_->waitForCounter("http.config_test.mcp_router.rq_total", Eq(1));
+  test_server_->waitForCounter("http.config_test.mcp_router.rq_auth_failure", Eq(1));
 }
 
 // Missing auth header returns 403

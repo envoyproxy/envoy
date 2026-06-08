@@ -7,6 +7,7 @@
 #include "envoy/upstream/locality.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/thread.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
@@ -31,9 +32,10 @@ struct DynamicModuleThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBa
   struct LoadBalancerFactory : public Upstream::LoadBalancerFactory {
     LoadBalancerFactory(DynamicModuleClusterHandleSharedPtr handle) : handle_(std::move(handle)) {}
 
-    Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
-      return std::make_unique<DynamicModuleLoadBalancer>(handle_);
+    Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams params) override {
+      return std::make_unique<DynamicModuleLoadBalancer>(handle_, params.priority_set);
     }
+    bool recreateOnHostChange() const override { return false; }
 
     DynamicModuleClusterHandleSharedPtr handle_;
   };
@@ -95,6 +97,16 @@ absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>> DynamicModuleCluster
       "envoy_dynamic_module_on_cluster_scheduled");
   config->on_cluster_scheduled_ = on_scheduled.ok() ? on_scheduled.value() : nullptr;
 
+  auto on_worker_event = config->dynamic_module_->getFunctionPointer<OnClusterWorkerEventType>(
+      "envoy_dynamic_module_on_cluster_worker_event");
+  config->on_cluster_worker_event_ = on_worker_event.ok() ? on_worker_event.value() : nullptr;
+
+  auto on_worker_slot_destroy =
+      config->dynamic_module_->getFunctionPointer<OnClusterWorkerSlotDataDestroyType>(
+          "envoy_dynamic_module_on_cluster_worker_slot_data_destroy");
+  config->on_cluster_worker_slot_data_destroy_ =
+      on_worker_slot_destroy.ok() ? on_worker_slot_destroy.value() : nullptr;
+
   // Lifecycle hooks are optional. Modules that don't need them don't need to implement them.
   auto on_server_initialized =
       config->dynamic_module_->getFunctionPointer<OnClusterServerInitializedType>(
@@ -134,6 +146,8 @@ absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>> DynamicModuleCluster
     return absl::InvalidArgumentError("Failed to create in-module cluster configuration");
   }
 
+  config->stat_creation_frozen_ = true;
+
   return config;
 }
 
@@ -157,13 +171,24 @@ DynamicModuleClusterConfig::~DynamicModuleClusterConfig() {
 DynamicModuleClusterHandle::~DynamicModuleClusterHandle() {
   std::shared_ptr<DynamicModuleCluster> cluster = std::move(cluster_);
   cluster_.reset();
-  // Release lifecycle handles eagerly while the lifecycle notifier is still valid. When the
-  // dispatcher destructor clears pending callbacks, the cluster destructor would otherwise try to
-  // unregister from already-destroyed lifecycle notifier lists.
+  if (cluster == nullptr) {
+    return;
+  }
+  Event::Dispatcher& dispatcher = cluster->dispatcher_;
+  // The lifecycle handle resets unregister from main-thread-owned notifiers. When the handle is
+  // destroyed on a worker thread, post the full teardown onto the main dispatcher.
+  if (!Thread::MainThread::isMainThread() && !Thread::TestThread::isTestThread()) {
+    dispatcher.post([cluster = std::move(cluster)]() mutable {
+      cluster->server_initialized_handle_.reset();
+      cluster->shutdown_handle_.reset();
+      cluster->drain_handle_.reset();
+      cluster.reset();
+    });
+    return;
+  }
   cluster->server_initialized_handle_.reset();
   cluster->shutdown_handle_.reset();
   cluster->drain_handle_.reset();
-  Event::Dispatcher& dispatcher = cluster->dispatcher_;
   dispatcher.post([cluster = std::move(cluster)]() mutable { cluster.reset(); });
 }
 
@@ -176,7 +201,6 @@ DynamicModuleCluster::DynamicModuleCluster(const envoy::config::cluster::v3::Clu
                                            Upstream::ClusterFactoryContext& context,
                                            absl::Status& creation_status)
     : ClusterImplBase(cluster, context, creation_status), config_(std::move(config)),
-      in_module_cluster_(nullptr),
       dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       server_context_(context.serverFactoryContext()) {
 
@@ -265,6 +289,79 @@ void DynamicModuleCluster::onScheduled(uint64_t event_id) {
   }
 }
 
+void DynamicModuleCluster::ensureWorkerSlot() {
+  ASSERT(dispatcher_.isThreadSafe(),
+         "DynamicModuleCluster::ensureWorkerSlot must be called from the main thread");
+  if (worker_slot_ == nullptr) {
+    worker_slot_ =
+        ThreadLocal::TypedSlot<WorkerSlotData>::makeUnique(server_context_.threadLocal());
+    // Seed with a null-payload factory so the slot is in a "set" state before any payload is
+    // published.
+    worker_slot_->set(
+        [](Event::Dispatcher&) -> std::shared_ptr<WorkerSlotData> { return nullptr; });
+  }
+}
+
+void DynamicModuleCluster::runOnAllWorkers(uint64_t event_id) {
+  ASSERT(dispatcher_.isThreadSafe(),
+         "envoy_dynamic_module_callback_cluster_run_on_all_workers must be called from the main "
+         "thread");
+  if (config_->on_cluster_worker_event_ == nullptr) {
+    // If the module did not export envoy_dynamic_module_on_cluster_worker_event, this call is a
+    // no-op: no slot allocation and no fan-out.
+    return;
+  }
+
+  ensureWorkerSlot();
+
+  // weak_from_this lets workers racing cluster destruction skip safely. The lambda also filters
+  // out the main thread because Envoy's TLS engine fires runOnAllThreads on main too.
+  auto weak_self = weak_from_this();
+  Event::Dispatcher& main_dispatcher = dispatcher_;
+  worker_slot_->runOnAllThreads([weak_self, event_id, &main_dispatcher](OptRef<WorkerSlotData>) {
+    if (main_dispatcher.isThreadSafe()) {
+      return;
+    }
+    auto self = weak_self.lock();
+    if (!self) {
+      return;
+    }
+    if (self->in_module_cluster_ != nullptr && self->config_->on_cluster_worker_event_ != nullptr) {
+      self->config_->on_cluster_worker_event_(self.get(), self->in_module_cluster_, event_id);
+    }
+  });
+}
+
+void DynamicModuleCluster::workerSlotSet(
+    envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr data_ptr) {
+  ASSERT(dispatcher_.isThreadSafe(),
+         "envoy_dynamic_module_callback_cluster_worker_slot_set must be called from the main "
+         "thread");
+  ensureWorkerSlot();
+
+  // Capture the wrapper by value so every thread observes the same shared_ptr (single-pointer
+  // semantics); the prior wrapper is released when its last reference drops, firing the module's
+  // destroy hook.
+  auto wrapper = std::make_shared<WorkerSlotData>(
+      data_ptr, config_->on_cluster_worker_slot_data_destroy_, config_);
+  worker_slot_->set(
+      [wrapper](Event::Dispatcher&) -> std::shared_ptr<WorkerSlotData> { return wrapper; });
+}
+
+envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr
+DynamicModuleCluster::workerSlotGet() {
+  // Guard against access from threads with no TLS registration: TypedSlot::get on such a thread
+  // would index past the slot vector.
+  if (worker_slot_ == nullptr || !worker_slot_->currentThreadRegistered()) {
+    return nullptr;
+  }
+  OptRef<WorkerSlotData> ref = worker_slot_->get();
+  if (!ref.has_value()) {
+    return nullptr;
+  }
+  return ref->data();
+}
+
 namespace {
 // Builds hosts-per-locality from a host vector using value-based locality comparison.
 Upstream::HostsPerLocalityConstSharedPtr buildHostsPerLocality(const Upstream::HostVector& hosts) {
@@ -346,7 +443,7 @@ bool DynamicModuleCluster::addHosts(
   }
 
   {
-    absl::WriterMutexLock lock(&host_map_lock_);
+    absl::WriterMutexLock lock(host_map_lock_);
     for (const auto& host : result_hosts) {
       host_map_[host.get()] = host;
     }
@@ -428,7 +525,7 @@ Upstream::HostSharedPtr DynamicModuleCluster::findHostByAddress(const std::strin
 }
 
 Upstream::HostSharedPtr DynamicModuleCluster::findHost(void* raw_host_ptr) {
-  absl::ReaderMutexLock lock(&host_map_lock_);
+  absl::ReaderMutexLock lock(host_map_lock_);
   auto it = host_map_.find(raw_host_ptr);
   if (it == host_map_.end()) {
     return nullptr;
@@ -442,7 +539,7 @@ size_t DynamicModuleCluster::removeHosts(const std::vector<Upstream::HostSharedP
 
   // Remove all valid hosts from the map.
   {
-    absl::WriterMutexLock lock(&host_map_lock_);
+    absl::WriterMutexLock lock(host_map_lock_);
     for (const auto& host : hosts) {
       if (host == nullptr) {
         continue;
@@ -460,7 +557,7 @@ size_t DynamicModuleCluster::removeHosts(const std::vector<Upstream::HostSharedP
   }
 
   // Build the remaining host list and update the priority set once.
-  ASSERT(priority_set_.hostSetsPerPriority().size() >= 1);
+  ASSERT(!priority_set_.hostSetsPerPriority().empty());
   const auto& first_host_set = priority_set_.getOrCreateHostSet(0);
 
   // Build a set of removed host pointers for O(1) lookup.
@@ -590,15 +687,55 @@ void DynamicModuleCluster::HttpCalloutCallback::onFailure(const Http::AsyncClien
 // DynamicModuleLoadBalancer
 // =================================================================================================
 
+namespace {
+// Process-wide registry of live `DynamicModuleLoadBalancer` instances, consulted by the async
+// host selection completion ABI callback to validate the raw pointer it receives from the module.
+absl::Mutex& activeDynamicModuleLoadBalancersMutex() {
+  static auto* m = new absl::Mutex();
+  return *m;
+}
+
+absl::flat_hash_set<const DynamicModuleLoadBalancer*>& activeDynamicModuleLoadBalancers()
+    ABSL_EXCLUSIVE_LOCKS_REQUIRED(activeDynamicModuleLoadBalancersMutex()) {
+  static auto* s = new absl::flat_hash_set<const DynamicModuleLoadBalancer*>();
+  return *s;
+}
+
+void registerActiveDynamicModuleLoadBalancer(const DynamicModuleLoadBalancer* lb) {
+  absl::MutexLock lock(activeDynamicModuleLoadBalancersMutex());
+  activeDynamicModuleLoadBalancers().insert(lb);
+}
+
+void unregisterActiveDynamicModuleLoadBalancer(const DynamicModuleLoadBalancer* lb) {
+  absl::MutexLock lock(activeDynamicModuleLoadBalancersMutex());
+  activeDynamicModuleLoadBalancers().erase(lb);
+}
+} // namespace
+
+bool DynamicModuleLoadBalancer::withActiveInstance(
+    const DynamicModuleLoadBalancer* lb,
+    absl::FunctionRef<void(const DynamicModuleLoadBalancer&)> f) {
+  absl::MutexLock lock(activeDynamicModuleLoadBalancersMutex());
+  if (!activeDynamicModuleLoadBalancers().contains(lb)) {
+    return false;
+  }
+  f(*lb);
+  return true;
+}
+
 DynamicModuleLoadBalancer::DynamicModuleLoadBalancer(
-    const DynamicModuleClusterHandleSharedPtr& handle)
-    : handle_(handle), in_module_lb_(nullptr) {
+    const DynamicModuleClusterHandleSharedPtr& handle, const Upstream::PrioritySet& priority_set)
+    : handle_(handle), priority_set_(priority_set) {
+  // Register before invoking any module hook so a concurrent async host selection completion can
+  // validate its raw pointer against a live instance.
+  registerActiveDynamicModuleLoadBalancer(this);
   in_module_lb_ =
       handle_->cluster_->config()->on_cluster_lb_new_(handle_->cluster_->inModuleCluster(), this);
 
-  // Register for host membership updates if the module implements the hook.
+  // Register for host membership updates if the module implements the hook. Subscribe on the
+  // worker local priority set so the callback list is only mutated on this worker thread.
   if (handle_->cluster_->config()->on_cluster_lb_on_host_membership_update_ != nullptr) {
-    member_update_cb_ = handle_->cluster_->prioritySet().addMemberUpdateCb(
+    member_update_cb_ = priority_set_.addMemberUpdateCb(
         [this](const Upstream::HostVector& hosts_added, const Upstream::HostVector& hosts_removed) {
           hosts_added_ = &hosts_added;
           hosts_removed_ = &hosts_removed;
@@ -611,6 +748,9 @@ DynamicModuleLoadBalancer::DynamicModuleLoadBalancer(
 }
 
 DynamicModuleLoadBalancer::~DynamicModuleLoadBalancer() {
+  // Unregister before tearing down module-side state so any concurrent async host selection
+  // completion observes the instance as gone and drops the event.
+  unregisterActiveDynamicModuleLoadBalancer(this);
   if (in_module_lb_ != nullptr && handle_->cluster_->config()->on_cluster_lb_destroy_ != nullptr) {
     handle_->cluster_->config()->on_cluster_lb_destroy_(in_module_lb_);
   }

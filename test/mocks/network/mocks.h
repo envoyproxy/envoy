@@ -193,6 +193,8 @@ public:
   MOCK_METHOD(const ConnectionSocket&, socket, ());
   MOCK_METHOD(void, injectWriteDataToFilterChain, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(void, disableClose, (bool disable));
+  MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
+  MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
 
   testing::NiceMock<MockConnection> connection_;
   testing::NiceMock<MockConnectionSocket> socket_;
@@ -339,7 +341,7 @@ public:
   MOCK_METHOD(bool, addedViaApi, (), (const));
   MOCK_METHOD(const FilterChainInfoSharedPtr&, filterChainInfo, (), (const));
 
-  envoy::config::core::v3::Metadata metadata_{};
+  envoy::config::core::v3::Metadata metadata_;
   FilterChainInfoSharedPtr filter_chain_info_;
 };
 
@@ -353,7 +355,7 @@ public:
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
 
   std::string filter_chain_name_{"mock"};
-  envoy::config::core::v3::Metadata metadata_{};
+  envoy::config::core::v3::Metadata metadata_;
 };
 
 class MockFilterChainManager : public FilterChainManager {
@@ -580,6 +582,7 @@ public:
   MOCK_METHOD(void, enableListeners, ());
   MOCK_METHOD(void, setListenerRejectFraction, (UnitFloat), (override));
   MOCK_METHOD(const std::string&, statPrefix, (), (const));
+  MOCK_METHOD(void, closeIdleHttpConnections, (bool), (override));
 
   uint64_t num_handler_connections_{};
 };

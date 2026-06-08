@@ -41,8 +41,9 @@ envoy_cc_mock(
     srcs = ["eds_resources_cache.cc"],
     hdrs = ["eds_resources_cache.h"],
     deps = [
+        "//envoy/common:optref_lib",
+        "//envoy/common:pure_lib",
         "//envoy/config:eds_resources_cache_interface",
-        "//source/common/common:logger_lib",
     ],
 )
 

@@ -80,10 +80,6 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
           [this]() -> void { this->onReadBufferLowWatermark(); },
           [this]() -> void { this->onReadBufferHighWatermark(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
-      write_buffer_above_high_watermark_(false), detect_early_close_(true),
-      enable_half_close_(false), read_end_stream_raised_(false), read_end_stream_(false),
-      write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false),
-      transport_wants_read_(false),
       enable_close_through_filter_manager_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.connection_close_through_filter_manager")) {
 
@@ -360,7 +356,9 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   }
 
   ENVOY_CONN_LOG(debug, "closing socket: {}", *this, static_cast<uint32_t>(close_type));
-  transport_socket_->closeSocket(close_type);
+  const bool abort_reset = detected_close_type_ == StreamInfo::DetectedCloseType::RemoteReset ||
+                           detected_close_type_ == StreamInfo::DetectedCloseType::LocalReset;
+  transport_socket_->closeSocket(close_type, abort_reset);
 
   // Drain input and output buffers.
   updateReadBufferStats(0, 0);
@@ -374,8 +372,7 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
 
   connection_stats_.reset();
 
-  if (detected_close_type_ == StreamInfo::DetectedCloseType::RemoteReset ||
-      detected_close_type_ == StreamInfo::DetectedCloseType::LocalReset) {
+  if (abort_reset) {
 #if ENVOY_PLATFORM_ENABLE_SEND_RST
     const bool ok = Network::Socket::applyOptions(
         Network::SocketOptionFactory::buildZeroSoLingerOptions(), *socket_,
@@ -697,30 +694,18 @@ void ConnectionImpl::onReadBufferHighWatermark() {
 
 void ConnectionImpl::onWriteBufferLowWatermark() {
   ENVOY_CONN_LOG(debug, "onBelowWriteBufferLowWatermark", *this);
-  ASSERT(write_buffer_above_high_watermark_);
-  write_buffer_above_high_watermark_ = false;
   if (state() == State::Open) {
     maybeCancelBufferHighWatermarkTimeout();
   }
-  for (ConnectionCallbacks* callback : callbacks_) {
-    if (callback) {
-      callback->onBelowWriteBufferLowWatermark();
-    }
-  }
+  onFilterBelowLowWatermark();
 }
 
 void ConnectionImpl::onWriteBufferHighWatermark() {
   ENVOY_CONN_LOG(debug, "onAboveWriteBufferHighWatermark", *this);
-  ASSERT(!write_buffer_above_high_watermark_);
-  write_buffer_above_high_watermark_ = true;
   if (state() == State::Open) {
     scheduleBufferHighWatermarkTimeout();
   }
-  for (ConnectionCallbacks* callback : callbacks_) {
-    if (callback) {
-      callback->onAboveWriteBufferHighWatermark();
-    }
-  }
+  onFilterAboveHighWatermark();
 }
 
 void ConnectionImpl::setFailureReason(absl::string_view failure_reason) {
@@ -1139,7 +1124,7 @@ ClientConnectionImpl::ClientConnectionImpl(
   if (transport_options) {
     for (const auto& object : transport_options->downstreamSharedFilterStateObjects()) {
       // This does not throw as all objects are distinctly named and the stream info is empty.
-      stream_info_.filterState()->setData(object.name_, object.data_, object.state_type_,
+      stream_info_.filterState()->setData(object.name_, object.data_,
                                           StreamInfo::FilterState::LifeSpan::Connection,
                                           object.stream_sharing_);
     }

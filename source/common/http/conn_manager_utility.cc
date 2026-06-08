@@ -717,7 +717,14 @@ void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response
   }
   if (clear_hop_by_hop) {
     response_headers.removeTransferEncoding();
-    response_headers.removeKeepAlive();
+    // Only preserve Keep-Alive for HTTP/1.x downstream connections when the feature is enabled.
+    // Keep-Alive is an HTTP/1.1 hop-by-hop header with no meaning in HTTP/2 or HTTP/3.
+    const auto protocol = stream_info.protocol();
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.preserve_downstream_keepalive") ||
+        !protocol.has_value() || *protocol >= Protocol::Http2) {
+      response_headers.removeKeepAlive();
+    }
     response_headers.removeProxyConnection();
   }
 

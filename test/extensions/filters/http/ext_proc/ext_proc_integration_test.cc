@@ -8,6 +8,7 @@
 #include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.h"
 #include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3/mapped_attribute_builder.pb.h"
+#include "envoy/extensions/retry/host/previous_hosts/v3/previous_hosts.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "envoy/type/v3/http_status.pb.h"
@@ -28,7 +29,6 @@
 #include "test/integration/filters/common.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -68,8 +68,8 @@ using Extensions::HttpFilters::ExternalProcessing::TestOnProcessingResponseFacto
 using Http::LowerCaseString;
 using test::integration::filters::LoggingTestFilterConfig;
 using testing::_;
+using testing::Ge;
 using testing::Not;
-
 using namespace std::chrono_literals;
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing, ExtProcIntegrationTest,
@@ -380,7 +380,7 @@ TEST_P(ExtProcIntegrationTest, OnlyRequestHeadersResetOnServerMessage) {
   EXPECT_TRUE(processor_stream_->waitForReset());
   // In case of Envoy gRPC client the cluster reset stat will be incremented
   if (IsEnvoyGrpc()) {
-    test_server_->waitForCounterGe("cluster.ext_proc_server_0.upstream_rq_tx_reset", 1);
+    test_server_->waitForCounter("cluster.ext_proc_server_0.upstream_rq_tx_reset", Ge(1));
   }
 }
 
@@ -3831,6 +3831,8 @@ TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
   proto_config_.mutable_request_attributes()->Add("request.size");    // tests int64
   proto_config_.mutable_request_attributes()->Add("connection.mtls"); // tests bool
   proto_config_.mutable_request_attributes()->Add("connection.id");   // tests uint64
+  proto_config_.mutable_request_attributes()->Add(
+      "connection.peer_certificate"); // tests string, not present without TLS
   proto_config_.mutable_request_attributes()->Add("response.code");
   proto_config_.mutable_response_attributes()->Add("response.code"); // tests int64
   proto_config_.mutable_response_attributes()->Add("response.code_details");
@@ -3855,6 +3857,8 @@ TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
         EXPECT_EQ(proto_struct.fields().at("request.size").number_value(), 0);
         EXPECT_EQ(proto_struct.fields().at("connection.mtls").bool_value(), false);
         EXPECT_TRUE(proto_struct.fields().at("connection.id").has_number_value());
+        // connection.peer_certificate is not present without TLS
+        EXPECT_FALSE(proto_struct.fields().contains("connection.peer_certificate"));
         // Make sure we did not include the attribute which was not yet available.
         EXPECT_EQ(proto_struct.fields().size(), 6);
         EXPECT_FALSE(proto_struct.fields().contains("response.code"));
@@ -4259,7 +4263,10 @@ TEST_P(ExtProcIntegrationTest, RetryOnDifferentHost) {
   retry_policy->mutable_num_retries()->set_value(2);
   retry_policy->set_retry_on("resource-exhausted"); // resource-exhausted: 8
   // Retry on new host only.
-  retry_policy->add_retry_host_predicate()->set_name("envoy.retry_host_predicates.previous_hosts");
+  auto* host_predicate = retry_policy->add_retry_host_predicate();
+  host_predicate->set_name("envoy.retry_host_predicates.previous_hosts");
+  envoy::extensions::retry::host::previous_hosts::v3::PreviousHostsPredicate previous_hosts_config;
+  host_predicate->mutable_typed_config()->PackFrom(previous_hosts_config);
   // First cluster has 2 endpoints now.
   grpc_upstream_count_ = 3;
   initializeConfig({}, {{0, 2}, {1, 1}});
@@ -4389,8 +4396,8 @@ TEST_P(ExtProcIntegrationTest, RetryStatsVerification) {
             "success");
 
   // Verify retry stats are incremented correctly.
-  test_server_->waitForCounterGe("cluster.ext_proc_server_0.upstream_rq_retry", 2);
-  test_server_->waitForCounterGe("cluster.ext_proc_server_0.upstream_rq_total", 3);
+  test_server_->waitForCounter("cluster.ext_proc_server_0.upstream_rq_retry", Ge(2));
+  test_server_->waitForCounter("cluster.ext_proc_server_0.upstream_rq_total", Ge(3));
 
   verifyDownstreamResponse(*response, 200);
 }
@@ -4452,8 +4459,8 @@ TEST_P(ExtProcIntegrationTest, RetryOnDeadlineExceeded) {
             "passed");
 
   // Verify retry stats are incremented.
-  test_server_->waitForCounterGe("cluster.ext_proc_server_0.upstream_rq_retry", 1);
-  test_server_->waitForCounterGe("cluster.ext_proc_server_0.upstream_rq_total", 2);
+  test_server_->waitForCounter("cluster.ext_proc_server_0.upstream_rq_retry", Ge(1));
+  test_server_->waitForCounter("cluster.ext_proc_server_0.upstream_rq_total", Ge(2));
 
   verifyDownstreamResponse(*response, 200);
 }
@@ -4527,9 +4534,9 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackUpstream) {
 
   // Large body is sent from sidestream server to downstream client. Thus, flow control is expected
   // to be triggered in sidestream cluster.
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_flow_control_"
-                                 "paused_reading_total",
-                                 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_"
+                               "paused_reading_total",
+                               Ge(1));
 
   verifyDownstreamResponse(*response, 200);
 }
@@ -4576,9 +4583,9 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackUpstreamObservabilityMode) {
 
   // Large body is sent from sidestream server to downstream client. Thus, flow control is expected
   // to be triggered in sidestream cluster.
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_flow_control_"
-                                 "paused_reading_total",
-                                 2);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_"
+                               "paused_reading_total",
+                               Ge(2));
 
   verifyDownstreamResponse(*response, 200);
 }
@@ -4701,7 +4708,7 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespStreamedTes
     ProcessingRequest body_request;
     ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, body_request));
     ASSERT_TRUE(body_request.has_request_body());
-    body_received = absl::StrCat(body_received, body_request.request_body().body());
+    absl::StrAppend(&body_received, body_request.request_body().body());
     end_stream = body_request.request_body().end_of_stream();
     total_body_msg_count++;
   }

@@ -372,6 +372,18 @@ const absl::flat_hash_map<absl::string_view, CommonDurationFormatter::TimePointG
            }
            return {};
          }},
+        {DownstreamConnectionBegin,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           return stream_info.startTimeMonotonic();
+         }},
+        {DownstreamConnectionEnd,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto downstream_timing = stream_info.downstreamTiming();
+           if (downstream_timing.has_value()) {
+             return downstream_timing->downstreamConnectionEnd();
+           }
+           return {};
+         }},
         {UpstreamConnectStart,
          [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
            const auto upstream_info = stream_info.upstreamInfo();
@@ -1646,6 +1658,16 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                        return connection_info.ciphersuiteString();
                                      });
                                }}},
+                             {"UPSTREAM_TLS_GROUP",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return absl::make_optional<std::string>(
+                                           connection_info.tlsGroupString());
+                                     });
+                               }}},
                              {"UPSTREAM_TLS_VERSION",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, absl::optional<size_t>) {
@@ -1662,6 +1684,25 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                      StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
                                      [](const Ssl::ConnectionInfo& connection_info) {
                                        return connection_info.sessionId();
+                                     });
+                               }}},
+                             {"UPSTREAM_SERVER_NAME",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> absl::optional<std::string> {
+                                       if (stream_info.upstreamInfo() &&
+                                           stream_info.upstreamInfo()->upstreamSslConnection() !=
+                                               nullptr) {
+                                         auto sni = stream_info.upstreamInfo()
+                                                        ->upstreamSslConnection()
+                                                        ->sni();
+                                         if (!sni.empty()) {
+                                           return std::string(sni);
+                                         }
+                                       }
+                                       return absl::nullopt;
                                      });
                                }}},
                              {"UPSTREAM_PEER_ISSUER",
@@ -2086,6 +2127,16 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                      StreamInfoSslConnectionInfoFormatterProvider>(
                                      [](const Ssl::ConnectionInfo& connection_info) {
                                        return connection_info.ciphersuiteString();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_TLS_GROUP",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return absl::make_optional<std::string>(
+                                           connection_info.tlsGroupString());
                                      });
                                }}},
                              {"DOWNSTREAM_TLS_VERSION",
@@ -2533,7 +2584,10 @@ public:
     THROW_IF_NOT_OK(Envoy::Formatter::CommandSyntaxChecker::verifySyntax(
         (*it).second.first, command, sub_command, max_length));
 
-    return (*it).second.second(sub_command, max_length);
+    StreamInfoFormatterResult result = (*it).second.second(sub_command, max_length);
+    THROW_IF_NOT_OK_REF(result.status());
+
+    return (std::move(result)).value();
   }
 };
 

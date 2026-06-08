@@ -53,10 +53,7 @@ impl BootstrapExtensionConfig for AdminHandlerTestBootstrapExtensionConfig {
     envoy_log_info!("Admin request received: {} {}", method, path);
     (
       200,
-      format!(
-        "Hello from dynamic module admin handler! method={} path={}",
-        method, path
-      ),
+      format!("Hello from dynamic module admin handler! method={method} path={path}"),
     )
   }
 }

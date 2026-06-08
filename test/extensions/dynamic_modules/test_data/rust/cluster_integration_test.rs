@@ -39,6 +39,16 @@ fn new_cluster_config(
     "lifecycle_callbacks" => Some(Box::new(LifecycleCallbacksClusterConfig {
       upstream_address: config_str.to_string(),
     })),
+    "run_on_all_workers" => {
+      let counter_id = envoy_cluster_metrics
+        .define_counter("worker_events_applied_total")
+        .ok();
+      Some(Box::new(RunOnAllWorkersClusterConfig {
+        upstream_address: config_str.to_string(),
+        counter_id,
+        metrics: envoy_cluster_metrics,
+      }))
+    },
     _ => None,
   }
 }
@@ -344,6 +354,108 @@ struct LifecycleCallbacksLb {
 }
 
 impl ClusterLb for LifecycleCallbacksLb {
+  fn choose_host(
+    &mut self,
+    _context: Option<&dyn ClusterLbContext>,
+    _async_completion: Box<dyn EnvoyAsyncHostSelectionComplete>,
+  ) -> HostSelectionResult {
+    let hosts = self.hosts.lock().unwrap();
+    if hosts.0.is_empty() {
+      return HostSelectionResult::NoHost;
+    }
+    HostSelectionResult::Selected(hosts.0[0])
+  }
+}
+
+// =============================================================================
+// run_on_all_workers fan-out plus worker_slot_set/get end-to-end.
+// =============================================================================
+//
+// on_init defers the publish + fan-out through the scheduler (the TLS engine has not yet
+// registered workers at on_init time). on_scheduled publishes an Arc<Snapshot{multiplier}>
+// to the worker slot and posts the fan-out. on_worker_event reads the snapshot back and
+// increments the cluster counter by event_id * multiplier. With concurrency=4, event_id=7,
+// multiplier=5, the counter must equal 4 * 7 * 5 = 140 — proving fan-out coverage,
+// event_id pass-through, typed-payload FFI, and main exclusion.
+
+const RUN_ON_ALL_WORKERS_TRIGGER_EVENT_ID: u64 = 1;
+const RUN_ON_ALL_WORKERS_EVENT_ID: u64 = 7;
+const RUN_ON_ALL_WORKERS_MULTIPLIER: u64 = 5;
+
+#[derive(Debug)]
+struct RunOnAllWorkersSnapshot {
+  multiplier: u64,
+}
+
+struct RunOnAllWorkersClusterConfig {
+  upstream_address: String,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterConfig for RunOnAllWorkersClusterConfig {
+  fn new_cluster(&self, _envoy_cluster: &dyn EnvoyCluster) -> Box<dyn Cluster> {
+    Box::new(RunOnAllWorkersCluster {
+      upstream_address: self.upstream_address.clone(),
+      hosts: Arc::new(Mutex::new(HostList(Vec::new()))),
+      counter_id: self.counter_id,
+      metrics: self.metrics.clone(),
+    })
+  }
+}
+
+struct RunOnAllWorkersCluster {
+  upstream_address: String,
+  hosts: SharedHostList,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl Cluster for RunOnAllWorkersCluster {
+  fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
+    let addresses = vec![self.upstream_address.clone()];
+    let weights = vec![1u32];
+    if let Some(host_ptrs) = envoy_cluster.add_hosts(&addresses, &weights) {
+      self.hosts.lock().unwrap().0 = host_ptrs;
+    }
+    envoy_cluster.pre_init_complete();
+
+    // Defer the publish + fan-out until workers are registered with the TLS engine.
+    let scheduler = envoy_cluster.new_scheduler();
+    scheduler.commit(RUN_ON_ALL_WORKERS_TRIGGER_EVENT_ID);
+  }
+
+  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
+    Box::new(RunOnAllWorkersLb {
+      hosts: self.hosts.clone(),
+    })
+  }
+
+  fn on_scheduled(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
+    if event_id == RUN_ON_ALL_WORKERS_TRIGGER_EVENT_ID {
+      let snap = Arc::new(RunOnAllWorkersSnapshot {
+        multiplier: RUN_ON_ALL_WORKERS_MULTIPLIER,
+      });
+      envoy_cluster.worker_slot_set(snap);
+      envoy_cluster.run_on_all_workers(RUN_ON_ALL_WORKERS_EVENT_ID);
+    }
+  }
+
+  fn on_worker_event(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
+    let snap = envoy_cluster.worker_slot_get::<RunOnAllWorkersSnapshot>();
+    if let (Some(counter_id), Some(snap)) = (self.counter_id, snap) {
+      let _ = self
+        .metrics
+        .increment_counter(counter_id, event_id * snap.multiplier);
+    }
+  }
+}
+
+struct RunOnAllWorkersLb {
+  hosts: SharedHostList,
+}
+
+impl ClusterLb for RunOnAllWorkersLb {
   fn choose_host(
     &mut self,
     _context: Option<&dyn ClusterLbContext>,

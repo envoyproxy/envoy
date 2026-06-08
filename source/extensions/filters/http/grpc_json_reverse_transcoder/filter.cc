@@ -64,9 +64,9 @@ namespace GrpcJsonReverseTranscoder {
 
 namespace {
 
-// AppendHttpBodyEnvelope wraps the response returned from the upstream server
+// appendHttpBodyEnvelope wraps the response returned from the upstream server
 // in a google.api.HttpBody message.
-void AppendHttpBodyEnvelope(Buffer::Instance& output, std::string content_type,
+void appendHttpBodyEnvelope(Buffer::Instance& output, std::string content_type,
                             uint64_t content_length) {
   // Manually encode the protobuf envelope for the body.
   // See https://developers.google.com/protocol-buffers/docs/encoding#embedded
@@ -101,12 +101,13 @@ void AppendHttpBodyEnvelope(Buffer::Instance& output, std::string content_type,
   output.add(proto_envelope);
 }
 
-bool ReadToBuffer(Protobuf::io::ZeroCopyInputStream& stream, Buffer::Instance& buffer) {
+bool readToBuffer(Protobuf::io::ZeroCopyInputStream& stream, Buffer::Instance& buffer) {
   const void* out;
   int size;
   while (stream.Next(&out, &size)) {
-    if (size == 0)
+    if (size == 0) {
       return true;
+    }
     buffer.add(out, size);
   }
   return false;
@@ -192,8 +193,9 @@ bool GrpcJsonReverseTranscoderFilter::EncoderBufferLimitReached(uint64_t buffer_
 
 bool GrpcJsonReverseTranscoderFilter::CheckAndRejectIfRequestTranscoderFailed() const {
   const auto& status = transcoder_->RequestStatus();
-  if (status.ok())
+  if (status.ok()) {
     return false;
+  }
   decoder_callbacks_->sendLocalReply(
       Code::BadRequest, status.message(), nullptr, Status::WellKnownGrpcStatus::InvalidArgument,
       absl::StrCat(RcDetails::get().grpc_transcode_failed, "{",
@@ -204,8 +206,9 @@ bool GrpcJsonReverseTranscoderFilter::CheckAndRejectIfRequestTranscoderFailed() 
 
 bool GrpcJsonReverseTranscoderFilter::CheckAndRejectIfResponseTranscoderFailed() const {
   const auto& status = transcoder_->ResponseStatus();
-  if (status.ok())
+  if (status.ok()) {
     return false;
+  }
   ENVOY_STREAM_LOG(error, "Response transcoding failed: {}", *encoder_callbacks_, status.message());
   encoder_callbacks_->sendLocalReply(
       Code::InternalServerError, status.message(), nullptr, Status::WellKnownGrpcStatus::Internal,
@@ -258,7 +261,7 @@ void GrpcJsonReverseTranscoderFilter::SendHttpBodyResponse(Buffer::Instance* dat
     return;
   }
   Buffer::OwnedImpl message_payload;
-  AppendHttpBodyEnvelope(message_payload, response_content_type_, response_data_.length());
+  appendHttpBodyEnvelope(message_payload, response_content_type_, response_data_.length());
   response_content_type_.clear();
   message_payload.move(response_data_);
   Grpc::Encoder().prependFrameHeader(Grpc::GRPC_FH_DEFAULT, message_payload);
@@ -493,7 +496,7 @@ FilterDataStatus GrpcJsonReverseTranscoderFilter::decodeData(Buffer::Instance& d
     return FilterDataStatus::StopIterationNoBuffer;
   }
 
-  ReadToBuffer(*transcoder_->RequestOutput(), request_buffer_);
+  readToBuffer(*transcoder_->RequestOutput(), request_buffer_);
 
   if (!end_stream) {
     return FilterDataStatus::StopIterationNoBuffer;
@@ -603,7 +606,7 @@ FilterDataStatus GrpcJsonReverseTranscoderFilter::encodeData(Buffer::Instance& d
       return FilterDataStatus::StopIterationNoBuffer;
     }
 
-    ReadToBuffer(*transcoder_->ResponseOutput(), response_buffer_);
+    readToBuffer(*transcoder_->ResponseOutput(), response_buffer_);
 
     if (CheckAndRejectIfResponseTranscoderFailed()) {
       return FilterDataStatus::StopIterationNoBuffer;

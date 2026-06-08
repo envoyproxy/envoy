@@ -22,6 +22,8 @@
 
 #include "gtest/gtest.h"
 
+using ::testing::Eq;
+using ::testing::Ge;
 using ::testing::HasSubstr;
 
 namespace Envoy {
@@ -159,7 +161,7 @@ void Http2FloodMitigationTest::floodServer(const Http2Frame& frame, const std::s
   tcp_client_->waitForDisconnect();
 
   EXPECT_EQ(1, test_server_->counter(flood_stat)->value());
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_delayed_close_timeout", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_delayed_close_timeout", Ge(1));
 }
 
 // Send header only request, flood client, and verify that the upstream is disconnected and client
@@ -239,9 +241,9 @@ void Http2FloodMitigationTest::prefillOutboundDownstreamQueue(uint32_t data_fram
 
   // Wait for some data to arrive and then wait for the upstream_rq_active to flip to 0 to indicate
   // that the first request has completed.
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 10000);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
-  test_server_->waitForGaugeEq("http2.outbound_frames_active", data_frame_count + 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_rx_bytes_total", Ge(10000));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(0));
+  test_server_->waitForGauge("http2.outbound_frames_active", Eq(data_frame_count + 1));
   // Verify that pre-fill did not trigger flood protection
   EXPECT_EQ(0, test_server_->counter("http2.outbound_flood")->value());
 }
@@ -285,7 +287,7 @@ Http2FloodMitigationTest::prefillOutboundUpstreamQueue(uint32_t frame_count) {
   auto* upstream = fake_upstreams_.front().get();
   EXPECT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
   // Wait for pre-fill data to arrive to Envoy
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 500);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_rx_bytes_total", Ge(500));
   // Verify that pre-fill did not kill upstream connection.
   EXPECT_TRUE(fake_upstream_connection_->connected());
   return response;
@@ -841,7 +843,7 @@ TEST_P(Http2FloodMitigationTest, RstStreamOnUpstreamRemoteCloseBeforeResponseHea
   sendFrame(request2);
 
   // Wait for it to be proxied
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_total", 2);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_total", Ge(2));
 
   // Disconnect upstream connection. Since there no response headers were sent yet the router
   // filter will send 503 with body and then RST_STREAM. With these 3 frames the downstream outbound
@@ -1488,16 +1490,16 @@ TEST_P(Http2FloodMitigationTest, UpstreamRstStreamStormOnDownstreamCloseRegressi
                                            {Http2Frame::Header("no_end_stream", "1")});
     sendFrame(request);
   }
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", num_requests,
-                               TestUtility::DefaultTimeout);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(num_requests),
+                             TestUtility::DefaultTimeout);
 
   // Disconnect downstream connection. Envoy should send RST_STREAM to cancel active upstream
   // requests.
   tcp_client_->close();
 
   // Wait until the disconnect is detected and all upstream connections have been closed.
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0,
-                               TestUtility::DefaultTimeout);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(0),
+                             TestUtility::DefaultTimeout);
 
   // The disconnect shouldn't trigger an outbound control frame flood.
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.http2.outbound_control_flood")->value());
@@ -1607,6 +1609,82 @@ TEST_P(Http2FloodMitigationTest, HeadersContinuationObservesLimit) {
   }
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http2.too_many_headers"));
   EXPECT_EQ(1, test_server_->counter("http2.header_overflow")->value());
+}
+
+TEST_P(Http2FloodMitigationTest, HpackCookieBomb) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
+  uint32_t max_headers_kb = 4;
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.mutable_max_request_headers_kb()->set_value(max_headers_kb); });
+  autonomous_upstream_ = true;
+  beginSession();
+
+  // Stream 1: Setup dynamic table with large cookie.
+  const uint32_t request_stream_id = Http2Frame::makeClientStreamId(0);
+  uint8_t setup_flags =
+      orFlags(Http2Frame::HeadersFlags::EndHeaders, Http2Frame::HeadersFlags::EndStream);
+  auto setup_frame = Http2Frame::makeEmptyHeadersFrame(
+      request_stream_id, static_cast<Http2Frame::HeadersFlags>(setup_flags));
+  setup_frame.appendStaticHeader(Http2Frame::StaticHeaderIndex::MethodGet);
+  setup_frame.appendStaticHeader(Http2Frame::StaticHeaderIndex::SchemeHttps);
+  setup_frame.appendHeaderWithoutIndexing(Http2Frame::StaticHeaderIndex::Path, "/content");
+  setup_frame.appendHeaderWithoutIndexing(Http2Frame::StaticHeaderIndex::Authority, "localhost");
+  setup_frame.appendHeaderWithIncrementalIndexing(static_cast<Http2Frame::StaticHeaderIndex>(32),
+                                                  "session=" + std::string(1024, 'X'));
+  setup_frame.adjustPayloadSize();
+  sendFrame(setup_frame);
+
+  Http2Frame setup_frame_response;
+  do {
+    setup_frame_response = readFrame();
+    if (setup_frame_response.streamId() == 0) {
+      // skip SETTINGS frames from the initial setup.
+      continue;
+    }
+    EXPECT_EQ(setup_frame_response.streamId(), request_stream_id);
+  } while (!setup_frame_response.endStream());
+
+  // Stream 3: Bomb stream (references cookie many times).
+  const uint32_t bomb_stream_id = Http2Frame::makeClientStreamId(1);
+  uint8_t bomb_flags =
+      orFlags(Http2Frame::HeadersFlags::EndHeaders, Http2Frame::HeadersFlags::EndStream);
+  auto bomb_frame = Http2Frame::makeEmptyHeadersFrame(
+      bomb_stream_id, static_cast<Http2Frame::HeadersFlags>(bomb_flags));
+  bomb_frame.appendStaticHeader(Http2Frame::StaticHeaderIndex::MethodGet);
+  bomb_frame.appendStaticHeader(Http2Frame::StaticHeaderIndex::SchemeHttps);
+  bomb_frame.appendHeaderWithoutIndexing(Http2Frame::StaticHeaderIndex::Path, "/content");
+  bomb_frame.appendHeaderWithoutIndexing(Http2Frame::StaticHeaderIndex::Authority, "localhost");
+
+  const int num_references = max_headers_kb * 6;
+  for (int i = 0; i < num_references; i++) {
+    bomb_frame.appendIndexedHeader(62);
+  }
+  bomb_frame.adjustPayloadSize();
+  sendFrame(bomb_frame);
+
+  auto bomb_response = readFrame();
+  EXPECT_EQ(bomb_response.streamId(), bomb_stream_id);
+  EXPECT_EQ(bomb_response.type(), Http2Frame::Type::RstStream);
+
+  // Stream 5: Valid request after the bomb stream. Only the bomb stream is
+  // reset but the connection remains open.
+  const uint32_t valid_stream_id = Http2Frame::makeClientStreamId(2);
+  auto valid_frame = Http2Frame::makeRequest(valid_stream_id, "localhost", "/");
+  sendFrame(valid_frame);
+
+  Http2Frame valid_response = readFrame();
+  EXPECT_EQ(valid_response.streamId(), valid_stream_id);
+  EXPECT_EQ(valid_response.type(), Http2Frame::Type::Headers);
+
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1, true),
+              std::get<1>(GetParam()) == Http2Impl::Oghttp2
+                  // oghttp2 resets the stream from within the codec, nghttp2 does not handle this
+                  // case and relies on http2/codec_impl.cc to enforce this limit.
+                  ? HasSubstr("http2.remote_reset")
+                  : HasSubstr("http2.header_list_size_too_large"));
+
+  tcp_client_->close();
 }
 
 } // namespace Envoy

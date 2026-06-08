@@ -145,6 +145,24 @@ absl::Status writeDynamicModuleBytesToDisk(absl::string_view module_bytes,
  */
 std::filesystem::path moduleTempPath(absl::string_view sha256);
 
+/**
+ * Verifies that the file at ``path`` has SHA256 digest equal to ``expected_sha256_hex``.
+ *
+ * This is used to defend the cache-hit fast path in remote-module loading: ``moduleTempPath``
+ * is a deterministic location under ``/tmp`` derived from the expected hash. Without this
+ * check, an attacker who can write to ``/tmp`` (a co-tenant container or shared host) can
+ * pre-populate the path with a malicious shared object that Envoy will then dlopen, yielding
+ * attacker-controlled code execution.
+ *
+ * @param path absolute path to the file to verify.
+ * @param expected_sha256_hex the hex-encoded expected SHA256 digest (64 chars). The
+ *        comparison is case-insensitive.
+ * @return OkStatus when the on-disk SHA256 matches; FailedPreconditionError on mismatch;
+ *         InternalError on any I/O failure.
+ */
+absl::Status verifyFileSha256(const std::filesystem::path& path,
+                              absl::string_view expected_sha256_hex);
+
 } // namespace DynamicModules
 } // namespace Extensions
 } // namespace Envoy

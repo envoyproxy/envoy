@@ -9,6 +9,7 @@
 
 #include "test/extensions/load_balancing_policies/common/load_balancer_impl_base_test.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 
@@ -417,12 +418,13 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, SlowStartConfig_RampUp) {
   size_t h1_count = 0, h2_count = 0;
   for (size_t i = 0; i < picks1; ++i) {
     auto chosen = lb_->chooseHost(nullptr).host;
-    if (chosen == h1)
+    if (chosen == h1) {
       ++h1_count;
-    else if (chosen == h2)
+    } else if (chosen == h2) {
       ++h2_count;
-    else
+    } else {
       FAIL();
+    }
   }
   // Expect h1 to be chosen noticeably more often (ratio ~ (1):(0.35)).
   EXPECT_GT(h1_count, h2_count);
@@ -435,12 +437,13 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, SlowStartConfig_RampUp) {
   h2_count = 0;
   for (size_t i = 0; i < picks1; ++i) {
     auto chosen = lb_->chooseHost(nullptr).host;
-    if (chosen == h1)
+    if (chosen == h1) {
       ++h1_count;
-    else if (chosen == h2)
+    } else if (chosen == h2) {
       ++h2_count;
-    else
+    } else {
       FAIL();
+    }
   }
   // Now expect closer to 2:1 ratio in favor of h1; i.e., still h1 > h2.
   EXPECT_GT(h1_count, h2_count);
@@ -453,12 +456,13 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, SlowStartConfig_RampUp) {
   h2_count = 0;
   for (size_t i = 0; i < picks1; ++i) {
     auto chosen = lb_->chooseHost(nullptr).host;
-    if (chosen == h1)
+    if (chosen == h1) {
       ++h1_count;
-    else if (chosen == h2)
+    } else if (chosen == h2) {
       ++h2_count;
-    else
+    } else {
       FAIL();
+    }
   }
   // Expect approximately equal selection; allow 30% tolerance.
   double final_ratio =
@@ -570,7 +574,6 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
      GetUtilizationFromOrcaReport_ApplicationUtilization) {
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
   orca_load_report.set_application_utilization(0.5);
-  orca_load_report.mutable_named_metrics()->insert({"foo", 0.3});
   orca_load_report.set_cpu_utilization(0.6);
   EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::getUtilizationFromOrcaReport(
                 orca_load_report, {"named_metrics.foo"}),
@@ -584,6 +587,26 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetUtilizationFromOrcaReport_
   EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::getUtilizationFromOrcaReport(
                 orca_load_report, {"named_metrics.foo"}),
             0.3);
+}
+
+TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetUtilizationFromOrcaReport_Preference) {
+  xds::data::orca::v3::OrcaLoadReport orca_load_report;
+  orca_load_report.set_application_utilization(0.5);
+  orca_load_report.mutable_named_metrics()->insert({"foo", 0.3});
+  orca_load_report.set_cpu_utilization(0.6);
+
+  // By default (flag enabled), named metrics win.
+  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::getUtilizationFromOrcaReport(
+                orca_load_report, {"named_metrics.foo"}),
+            0.3);
+
+  // With flag disabled, application utilization wins.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.orca_weight_manager_use_named_metrics_first", "false"}});
+  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::getUtilizationFromOrcaReport(
+                orca_load_report, {"named_metrics.foo"}),
+            0.5);
 }
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetUtilizationFromOrcaReport_CpuUtilization) {
@@ -663,6 +686,23 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
                 orca_load_report, {"named_metrics.foo"}, 2.0)
                 .value(),
             1428);
+}
+
+TEST(ClientSideWeightedRoundRobinConfigTest, OobConfigDefaultsAndOverridePropagate) {
+  envoy::extensions::load_balancing_policies::client_side_weighted_round_robin::v3::
+      ClientSideWeightedRoundRobin proto;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<ThreadLocal::MockInstance> tls;
+
+  ClientSideWeightedRoundRobinLbConfig defaults(proto, dispatcher, tls);
+  EXPECT_FALSE(defaults.enable_oob_load_report);
+  EXPECT_EQ(defaults.oob_reporting_period, std::chrono::seconds(10));
+
+  proto.mutable_enable_oob_load_report()->set_value(true);
+  proto.mutable_oob_reporting_period()->set_seconds(5);
+  ClientSideWeightedRoundRobinLbConfig override(proto, dispatcher, tls);
+  EXPECT_TRUE(override.enable_oob_load_report);
+  EXPECT_EQ(override.oob_reporting_period, std::chrono::seconds(5));
 }
 
 } // namespace

@@ -68,6 +68,7 @@ envoy_cc_library(
         ":admin_lib",
         ":api_lib",
         ":cluster_manager_lib",
+        "//envoy/server:bootstrap_extension_config_interface",
         "//envoy/server:drain_manager_interface",
         "//envoy/server:instance_interface",
         "//envoy/ssl:context_manager_interface",

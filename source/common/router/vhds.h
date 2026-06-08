@@ -19,7 +19,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/config/subscription_base.h"
+#include "source/common/config/resource_type_helper.h"
 #include "source/common/init/target_impl.h"
 #include "source/common/protobuf/utility.h"
 
@@ -36,7 +36,7 @@ struct VhdsStats {
   ALL_VHDS_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-class VhdsSubscription : Envoy::Config::SubscriptionBase<envoy::config::route::v3::VirtualHost>,
+class VhdsSubscription : public Envoy::Config::SubscriptionCallbacks,
                          Logger::Loggable<Logger::Id::router> {
 public:
   static absl::StatusOr<std::unique_ptr<VhdsSubscription>>
@@ -80,6 +80,9 @@ private:
   VhdsStats stats_;
   Envoy::Config::SubscriptionPtr subscription_;
   Init::TargetImpl init_target_;
+  const Envoy::Config::ResourceTypeHelper<envoy::config::route::v3::VirtualHost>
+      resource_type_helper_;
+
   Rds::RouteConfigProvider* route_config_provider_;
 };
 

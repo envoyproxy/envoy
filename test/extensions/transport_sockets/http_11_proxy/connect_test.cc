@@ -68,12 +68,11 @@ public:
     transport_callbacks_.connection_.stream_info_.filterState()->setData(
         "envoy.network.transport_socket.http_11_proxy.address",
         std::make_unique<Network::Http11ProxyInfoFilterState>("www.foo.com", address),
-        StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::FilterChain);
   }
 
   void injectHeaderOnceTest() {
-    EXPECT_CALL(io_handle_, write(BufferStringEqual(connect_data_.toString())))
+    EXPECT_CALL(io_handle_, write(BufferString(connect_data_.toString())))
         .WillOnce(Invoke([&](Buffer::Instance& buffer) {
           auto length = buffer.length();
           buffer.drain(length);
@@ -279,11 +278,11 @@ TEST_P(Http11ConnectTest, ReturnsKeepOpenWhenWriteErrorIsAgain) {
   Buffer::OwnedImpl msg("initial data");
   {
     InSequence s;
-    EXPECT_CALL(io_handle_, write(BufferStringEqual(connect_data_.toString())))
+    EXPECT_CALL(io_handle_, write(BufferString(connect_data_.toString())))
         .WillOnce(Invoke([&](Buffer::Instance&) {
           return Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEagainError());
         }));
-    EXPECT_CALL(io_handle_, write(BufferStringEqual(connect_data_.toString())))
+    EXPECT_CALL(io_handle_, write(BufferString(connect_data_.toString())))
         .WillOnce(Invoke([&](Buffer::Instance& buffer) {
           auto length = buffer.length();
           buffer.drain(length);
@@ -657,7 +656,7 @@ TEST_P(Http11ConnectTest, RuntimeGuardLegacyBehaviorTransportSocketOpts) {
   Buffer::OwnedImpl msg("initial data");
   Buffer::OwnedImpl expected_legacy_data{"CONNECT www.foo.com:443 HTTP/1.1\r\n\r\n"};
 
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_legacy_data.toString())))
+  EXPECT_CALL(io_handle_, write(BufferString(expected_legacy_data.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) {
         auto length = buffer.length();
         buffer.drain(length);
@@ -707,7 +706,7 @@ TEST_P(Http11ConnectTest, RuntimeGuardLegacyBehaviorEndpointMetadata) {
       "CONNECT ", Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234 HTTP/1.1\r\n\r\n");
   Buffer::OwnedImpl expected_legacy_data{expected_connect_string};
 
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_legacy_data.toString())))
+  EXPECT_CALL(io_handle_, write(BufferString(expected_legacy_data.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) {
         auto length = buffer.length();
         buffer.drain(length);
@@ -750,7 +749,7 @@ TEST_P(Http11ConnectTest, WriteFlushedAfterConnectRead) {
   initialize();
 
   // Write CONNECT header.
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(connect_data_.toString())))
+  EXPECT_CALL(io_handle_, write(BufferString(connect_data_.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) {
         auto length = buffer.length();
         buffer.drain(length);
@@ -802,7 +801,7 @@ TEST_P(Http11ConnectTest, WriteFlushedAfterConnectRead) {
 TEST_P(Http11ConnectTest, FragmentedConnectResponse) {
   initialize();
 
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(connect_data_.toString())))
+  EXPECT_CALL(io_handle_, write(BufferString(connect_data_.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) {
         auto length = buffer.length();
         buffer.drain(length);

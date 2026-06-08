@@ -6,6 +6,7 @@
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/http/codes.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/router/router.h"
 #include "envoy/stream_info/stream_info.h"
@@ -30,14 +31,14 @@ namespace Upstream {
 using ClusterProto = envoy::config::cluster::v3::Cluster;
 
 /*
- * A handle to allow cancelation of asynchronous host selection.
+ * A handle to allow cancellation of asynchronous host selection.
  * If chooseHost returns a HostSelectionResponse with an AsyncHostSelectionHandle
- * handle, and the endpoint does not wish to receive onAsyncHostSelction call,
+ * handle, and the endpoint does not wish to receive onAsyncHostSelection call,
  * it must call cancel() on the provided handle.
  *
  * Please note that the AsyncHostSelectionHandle may be deleted after the
- * cancel() call. It is up to the implemention of the asynchronous load balancer
- * to ensure the cancelation state persists until the load balancer checks it.
+ * cancel() call. It is up to the implementation of the asynchronous load balancer
+ * to ensure the cancellation state persists until the load balancer checks it.
  */
 class AsyncHostSelectionHandle {
 public:
@@ -53,7 +54,7 @@ public:
  * load balancing, returns an AsyncHostSelectionHandle handle.
  *
  * If it returns a AsyncHostSelectionHandle handle, the load balancer guarantees an
- * eventual call to LoadBalancerContext::onAsyncHostSelction unless
+ * eventual call to LoadBalancerContext::onAsyncHostSelection unless
  * AsyncHostSelectionHandle::cancel is called.
  */
 struct HostSelectionResponse {
@@ -66,6 +67,9 @@ struct HostSelectionResponse {
   // Optional details if host selection fails (empty string implies no details).
   std::string details;
   std::unique_ptr<AsyncHostSelectionHandle> cancelable;
+  // Optional HTTP status code to use when host selection fails because the strict override
+  // destination is missing from available endpoints. If not set, defaults to 503.
+  absl::optional<Http::Code> failure_status;
 };
 
 /**
@@ -156,6 +160,10 @@ public:
     // If strict and no valid host is found, the load balancer should return nullptr.
     // If not strict, the load balancer will select another host if the target host is not valid.
     bool strict{false};
+    // The HTTP status code to return when strict mode is enabled and the target host
+    // is not found in the set of available endpoints. Does not apply when the host
+    // exists but is unhealthy. Defaults to 503 (ServiceUnavailable).
+    Http::Code status_on_strict_destination_not_found{Http::Code::ServiceUnavailable};
   };
   /**
    * Returns the host the load balancer should select directly. If the expected host exists and

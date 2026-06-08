@@ -14,7 +14,7 @@ TEST(ContribVersionTest, BuildVersionContainsSuffix) {
   const auto& fields = build_version.metadata().fields();
   ASSERT_NE(fields.find(BuildVersionMetadataKeys::get().BuildLabel), fields.end());
   EXPECT_THAT(fields.at(BuildVersionMetadataKeys::get().BuildLabel).string_value(),
-              testing::EndsWith("-contrib"));
+              testing::EndsWith("contrib"));
 }
 
 } // namespace Envoy

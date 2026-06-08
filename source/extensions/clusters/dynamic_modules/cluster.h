@@ -14,6 +14,7 @@
 #include "envoy/server/lifecycle_notifier.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
+#include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/logger.h"
@@ -26,6 +27,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
+#include "absl/functional/function_ref.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -48,6 +50,9 @@ using OnClusterLbChooseHostType = decltype(&envoy_dynamic_module_on_cluster_lb_c
 using OnClusterLbCancelHostSelectionType =
     decltype(&envoy_dynamic_module_on_cluster_lb_cancel_host_selection);
 using OnClusterScheduledType = decltype(&envoy_dynamic_module_on_cluster_scheduled);
+using OnClusterWorkerEventType = decltype(&envoy_dynamic_module_on_cluster_worker_event);
+using OnClusterWorkerSlotDataDestroyType =
+    decltype(&envoy_dynamic_module_on_cluster_worker_slot_data_destroy);
 using OnClusterServerInitializedType =
     decltype(&envoy_dynamic_module_on_cluster_server_initialized);
 using OnClusterDrainStartedType = decltype(&envoy_dynamic_module_on_cluster_drain_started);
@@ -88,6 +93,8 @@ public:
   OnClusterLbChooseHostType on_cluster_lb_choose_host_ = nullptr;
   OnClusterLbCancelHostSelectionType on_cluster_lb_cancel_host_selection_ = nullptr;
   OnClusterScheduledType on_cluster_scheduled_ = nullptr;
+  OnClusterWorkerEventType on_cluster_worker_event_ = nullptr;
+  OnClusterWorkerSlotDataDestroyType on_cluster_worker_slot_data_destroy_ = nullptr;
   OnClusterServerInitializedType on_cluster_server_initialized_ = nullptr;
   OnClusterDrainStartedType on_cluster_drain_started_ = nullptr;
   OnClusterShutdownType on_cluster_shutdown_ = nullptr;
@@ -260,6 +267,11 @@ public:
 
   const Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNamePool stat_name_pool_;
+  // We only allow the module to create stats during on_cluster_config_new, and not later from
+  // worker threads, so that we don't have to wrap stat_name_pool_ in a lock. Per-request label
+  // values use a stack-local Stats::StatNameDynamicPool in the increment callbacks (see
+  // abi_impl.cc).
+  bool stat_creation_frozen_ = false;
 
 private:
   DynamicModuleClusterConfig(const std::string& cluster_name, const std::string& cluster_config,
@@ -335,6 +347,25 @@ public:
   void onScheduled(uint64_t event_id);
 
   /**
+   * Posts the module's worker-event hook to every worker dispatcher registered with the server's
+   * thread-local engine. Main is excluded. Must be called from the main thread.
+   */
+  void runOnAllWorkers(uint64_t event_id);
+
+  /**
+   * Publishes an opaque module pointer to the cluster's worker thread-local slot. All registered
+   * threads observe the same pointer (single-pointer semantics). Any previously published pointer
+   * is released through the module's destroy hook. Must be called from the main thread.
+   */
+  void workerSlotSet(envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr data_ptr);
+
+  /**
+   * Returns the opaque pointer most recently delivered to the calling thread's slot, or nullptr
+   * if the slot has not been populated on this thread.
+   */
+  envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr workerSlotGet();
+
+  /**
    * Sends an HTTP callout to the specified cluster with the given message.
    * This must be called on the main thread.
    *
@@ -397,10 +428,38 @@ private:
     const uint64_t callout_id_{};
   };
 
+  /**
+   * Wrapper for the module-owned opaque pointer stored in worker_slot_. Pins the config (and
+   * therefore the underlying DynamicModule .so that owns destroy_fn_) for as long as any wrapper
+   * has a live reference; the destructor invokes the destroy hook when the last shared_ptr
+   * reference drops.
+   */
+  class WorkerSlotData : public ThreadLocal::ThreadLocalObject {
+  public:
+    WorkerSlotData(envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr data_ptr,
+                   OnClusterWorkerSlotDataDestroyType destroy_fn,
+                   DynamicModuleClusterConfigSharedPtr config)
+        : data_ptr_(data_ptr), destroy_fn_(destroy_fn), config_(std::move(config)) {}
+    ~WorkerSlotData() override {
+      if (destroy_fn_ != nullptr) {
+        destroy_fn_(data_ptr_);
+      }
+    }
+    envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr data() const { return data_ptr_; }
+
+  private:
+    envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr data_ptr_;
+    OnClusterWorkerSlotDataDestroyType destroy_fn_;
+    DynamicModuleClusterConfigSharedPtr config_;
+  };
+
+  // Allocates worker_slot_ lazily on first use.
+  void ensureWorkerSlot();
+
   uint64_t getNextCalloutId() { return next_callout_id_++; }
 
   DynamicModuleClusterConfigSharedPtr config_;
-  envoy_dynamic_module_type_cluster_module_ptr in_module_cluster_;
+  envoy_dynamic_module_type_cluster_module_ptr in_module_cluster_{nullptr};
   Event::Dispatcher& dispatcher_;
   Server::Configuration::ServerFactoryContext& server_context_;
 
@@ -416,6 +475,10 @@ private:
 
   // Handle for the server initialized lifecycle callback registration.
   Server::ServerLifecycleNotifier::HandlePtr server_initialized_handle_;
+
+  // Thread-local slot backing both the worker fan-out and the worker_slot_set/get pattern.
+  // Allocated lazily on first use.
+  ThreadLocal::TypedSlotPtr<WorkerSlotData> worker_slot_;
 
   // HTTP callout tracking.
   uint64_t next_callout_id_ = 1; // 0 is reserved as an invalid id.
@@ -433,25 +496,28 @@ public:
    * Creates a new scheduler for the given cluster.
    */
   static DynamicModuleClusterScheduler* create(DynamicModuleCluster* cluster) {
-    return new DynamicModuleClusterScheduler(cluster->weak_from_this(), cluster->dispatcher_);
+    return new DynamicModuleClusterScheduler(cluster->weak_from_this());
   }
 
   void commit(uint64_t event_id) {
-    dispatcher_.post([cluster = cluster_, event_id]() {
-      if (std::shared_ptr<DynamicModuleCluster> cluster_shared = cluster.lock()) {
-        cluster_shared->onScheduled(event_id);
+    // Lock the cluster so its dispatcher member stays valid across `post`.
+    auto cluster_shared = cluster_.lock();
+    if (!cluster_shared) {
+      return;
+    }
+    cluster_shared->dispatcher_.post([cluster = cluster_, event_id]() {
+      if (std::shared_ptr<DynamicModuleCluster> cs = cluster.lock()) {
+        cs->onScheduled(event_id);
       }
     });
   }
 
 private:
-  DynamicModuleClusterScheduler(std::weak_ptr<DynamicModuleCluster> cluster,
-                                Event::Dispatcher& dispatcher)
-      : cluster_(std::move(cluster)), dispatcher_(dispatcher) {}
+  explicit DynamicModuleClusterScheduler(std::weak_ptr<DynamicModuleCluster> cluster)
+      : cluster_(std::move(cluster)) {}
 
   // Using a weak pointer to avoid unnecessarily extending the lifetime of the cluster.
   std::weak_ptr<DynamicModuleCluster> cluster_;
-  Event::Dispatcher& dispatcher_;
 };
 
 /**
@@ -475,7 +541,7 @@ public:
 
 private:
   envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle_;
-  envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_;
+  envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_{nullptr};
   OnClusterLbCancelHostSelectionType cancel_fn_;
   std::shared_ptr<std::atomic<bool>> cancelled_;
 };
@@ -485,7 +551,11 @@ private:
  */
 class DynamicModuleLoadBalancer : public Upstream::LoadBalancer {
 public:
-  DynamicModuleLoadBalancer(const DynamicModuleClusterHandleSharedPtr& handle);
+  // ``priority_set`` must be the worker local priority set supplied via
+  // ``LoadBalancerParams::priority_set``. The membership update subscription is registered on it so
+  // that the callback list is mutated only on the thread that owns this load balancer instance.
+  DynamicModuleLoadBalancer(const DynamicModuleClusterHandleSharedPtr& handle,
+                            const Upstream::PrioritySet& priority_set);
   ~DynamicModuleLoadBalancer() override;
 
   // Upstream::LoadBalancer.
@@ -532,8 +602,22 @@ public:
   const Upstream::HostVector* hostsAdded() const { return hosts_added_; }
   const Upstream::HostVector* hostsRemoved() const { return hosts_removed_; }
 
+  // Returns the priority set that this load balancer subscribes to for host membership updates.
+  const Upstream::PrioritySet& memberUpdatePrioritySet() const { return priority_set_; }
+
+  /**
+   * Looks up `lb` in the process-wide registry of live instances. Returns true and invokes `f`
+   * with the instance under the registry lock when found, false otherwise. Used by the async
+   * host selection completion ABI callback, which receives a raw pointer from the module that
+   * may outlive the load balancer.
+   */
+  static bool withActiveInstance(const DynamicModuleLoadBalancer* lb,
+                                 absl::FunctionRef<void(const DynamicModuleLoadBalancer&)> f);
+
 private:
   const DynamicModuleClusterHandleSharedPtr handle_;
+  // Worker local priority set that backs the membership update subscription.
+  const Upstream::PrioritySet& priority_set_;
   envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_;
 
   // Shared cancellation flag for the active async host selection. Set in chooseHost when the
@@ -552,6 +636,8 @@ private:
 
   // Membership update callback handle.
   Envoy::Common::CallbackHandlePtr member_update_cb_;
+
+  friend class DynamicModuleClusterTestPeer;
 };
 
 /**

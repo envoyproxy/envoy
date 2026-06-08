@@ -16,6 +16,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Eq;
 namespace Envoy {
 namespace {
 
@@ -57,8 +58,8 @@ TEST_P(InternalListenerIntegrationTest, BasicConfigUpdate) {
 
   new_config_helper.setLds("1");
 
-  test_server_->waitForCounterEq("listener_manager.listener_modified", 1);
-  test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", 0);
+  test_server_->waitForCounter("listener_manager.listener_modified", Eq(1));
+  test_server_->waitForGauge("listener_manager.total_listeners_draining", Eq(0));
 }
 
 TEST_P(InternalListenerIntegrationTest, InplaceUpdate) {
@@ -80,8 +81,8 @@ TEST_P(InternalListenerIntegrationTest, InplaceUpdate) {
 
   new_config_helper.setLds("1");
 
-  test_server_->waitForCounterEq("listener_manager.listener_modified", 1);
-  test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", 0);
+  test_server_->waitForCounter("listener_manager.listener_modified", Eq(1));
+  test_server_->waitForGauge("listener_manager.total_listeners_draining", Eq(0));
 }
 
 TEST_P(InternalListenerIntegrationTest, DeleteListener) {
@@ -96,8 +97,8 @@ TEST_P(InternalListenerIntegrationTest, DeleteListener) {
 
   new_config_helper.setLds("1");
 
-  test_server_->waitForCounterEq("listener_manager.listener_removed", 1);
-  test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", 0);
+  test_server_->waitForCounter("listener_manager.listener_removed", Eq(1));
+  test_server_->waitForGauge("listener_manager.total_listeners_draining", Eq(0));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, InternalListenerIntegrationTest,

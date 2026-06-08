@@ -11,6 +11,7 @@
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -32,7 +33,6 @@ using ::testing::Return;
 TEST(OrcaLoadReportHandlerTest, GetUtilizationFromOrcaReport_ApplicationUtilization) {
   xds::data::orca::v3::OrcaLoadReport report;
   report.set_application_utilization(0.5);
-  report.mutable_named_metrics()->insert({"foo", 0.3});
   report.set_cpu_utilization(0.6);
   EXPECT_EQ(OrcaLoadReportHandler::getUtilizationFromOrcaReport(report, {"named_metrics.foo"}),
             0.5);
@@ -44,6 +44,53 @@ TEST(OrcaLoadReportHandlerTest, GetUtilizationFromOrcaReport_NamedMetrics) {
   report.set_cpu_utilization(0.6);
   EXPECT_EQ(OrcaLoadReportHandler::getUtilizationFromOrcaReport(report, {"named_metrics.foo"}),
             0.3);
+}
+
+TEST(OrcaLoadReportHandlerTest, GetUtilizationFromOrcaReport_Preference) {
+  xds::data::orca::v3::OrcaLoadReport report;
+  report.set_application_utilization(0.5);
+  report.mutable_named_metrics()->insert({"foo", 0.3});
+  report.set_cpu_utilization(0.6);
+
+  // By default (flag enabled), named metrics win.
+  EXPECT_EQ(OrcaLoadReportHandler::getUtilizationFromOrcaReport(report, {"named_metrics.foo"}),
+            0.3);
+
+  // With flag disabled, application utilization wins.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.orca_weight_manager_use_named_metrics_first", "false"}});
+  EXPECT_EQ(OrcaLoadReportHandler::getUtilizationFromOrcaReport(report, {"named_metrics.foo"}),
+            0.5);
+}
+
+TEST(OrcaLoadReportHandlerTest,
+     GetUtilizationFromOrcaReport_Preference_FlagDisabled_FallbackToNamedMetrics) {
+  xds::data::orca::v3::OrcaLoadReport report;
+  report.mutable_named_metrics()->insert({"foo", 0.3});
+  report.set_cpu_utilization(0.6);
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.orca_weight_manager_use_named_metrics_first", "false"}});
+
+  // application_utilization is not set (0), so it falls back to named metrics.
+  EXPECT_EQ(OrcaLoadReportHandler::getUtilizationFromOrcaReport(report, {"named_metrics.foo"}),
+            0.3);
+}
+
+TEST(OrcaLoadReportHandlerTest,
+     GetUtilizationFromOrcaReport_Preference_FlagDisabled_FallbackToCpu) {
+  xds::data::orca::v3::OrcaLoadReport report;
+  report.set_cpu_utilization(0.6);
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.orca_weight_manager_use_named_metrics_first", "false"}});
+
+  // application_utilization and named metrics are not set, so it falls back to cpu.
+  EXPECT_EQ(OrcaLoadReportHandler::getUtilizationFromOrcaReport(report, {"named_metrics.foo"}),
+            0.6);
 }
 
 TEST(OrcaLoadReportHandlerTest, GetUtilizationFromOrcaReport_CpuUtilizationFallback) {

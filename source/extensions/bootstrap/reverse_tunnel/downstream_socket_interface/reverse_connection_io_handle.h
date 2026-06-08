@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/io_handle.h"
 #include "envoy/network/socket.h"
 #include "envoy/stats/scope.h"
@@ -83,6 +84,9 @@ struct ReverseConnectionSocketConfig {
   std::string src_tenant_id;  // Tenant identifier of local envoy instance.
   std::string request_path{
       std::string(ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH)};
+  std::vector<envoy::config::core::v3::HeaderValueOption>
+      additional_headers;       // Additional headers for the handshake request.
+  bool use_http_upgrade{false}; // Negotiate handshake as HTTP/1.1 Upgrade -> 101.
   // TODO(basundhara-c): Add support for multiple remote clusters using the same
   // ReverseConnectionIOHandle. Currently, each ReverseConnectionIOHandle handles
   // reverse connections for a single upstream cluster since a different ReverseConnectionAddress
@@ -90,10 +94,10 @@ struct ReverseConnectionSocketConfig {
   // multiple remote clusters in the same ReverseConnectionAddress and therefore should be able
   // to use a single ReverseConnectionIOHandle for multiple remote clusters.
   std::vector<RemoteClusterConnectionConfig>
-      remote_clusters;         // List of remote cluster configurations.
-  bool enable_circuit_breaker; // Whether to place a cluster in backoff when reverse connection
-                               // attempts fail.
-  ReverseConnectionSocketConfig() : enable_circuit_breaker(true) {}
+      remote_clusters;               // List of remote cluster configurations.
+  bool enable_circuit_breaker{true}; // Whether to place a cluster in backoff when reverse
+                                     // connection attempts fail.
+  ReverseConnectionSocketConfig() = default;
 };
 
 /**
@@ -304,6 +308,18 @@ public:
    * @return reference to the configured HTTP handshake request path.
    */
   const std::string& requestPath() const { return config_.request_path; }
+
+  /**
+   * @return reference to the additional headers for the handshake request.
+   */
+  const std::vector<envoy::config::core::v3::HeaderValueOption>& additionalHeaders() const {
+    return config_.additional_headers;
+  }
+
+  /**
+   * @return whether the handshake is negotiated as an HTTP/1.1 Upgrade exchange.
+   */
+  bool useHttpUpgrade() const { return config_.use_http_upgrade; }
 
 private:
   /**

@@ -1,12 +1,13 @@
 load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
+load("@mobile_pip3//:requirements.bzl", "requirement")
 load("@pybind11_bazel//:build_defs.bzl", "pybind_extension", "pybind_library")
-load("@python_abi//:abi.bzl", "abi_tag", "python_tag")
 load("@rules_python//python:defs.bzl", "py_library")
 load("@rules_python//python:packaging.bzl", "py_package", "py_wheel")
 
 licenses(["notice"])  # Apache 2
 
-package(default_visibility = ["//visibility:public"])
+envoy_mobile_package()
 
 string_flag(
     name = "python_platform",
@@ -26,6 +27,26 @@ config_setting(
 config_setting(
     name = "is_macos_arm64",
     flag_values = {":python_platform": "macosx_11_0_arm64"},
+)
+
+string_flag(
+    name = "python_version",
+    build_setting_default = "3.12",
+)
+
+config_setting(
+    name = "is_python_3_12",
+    flag_values = {":python_version": "3.12"},
+)
+
+config_setting(
+    name = "is_python_3_13",
+    flag_values = {":python_version": "3.13"},
+)
+
+config_setting(
+    name = "is_python_3_14",
+    flag_values = {":python_version": "3.14"},
 )
 
 pybind_library(
@@ -93,7 +114,10 @@ py_library(
     ],
     imports = ["."],
     visibility = ["//visibility:public"],
-    deps = [":async_client"],
+    deps = [
+        ":async_client",
+        requirement("httpx"),
+    ],
 )
 
 py_package(
@@ -107,7 +131,11 @@ py_package(
 #   --//library/python:python_platform="manylinux2014_x86_64" \
 py_wheel(
     name = "envoy_mobile_wheel",
-    abi = abi_tag(),
+    abi = select({
+        ":is_python_3_14": "cp314",
+        ":is_python_3_13": "cp313",
+        "//conditions:default": "cp312",
+    }),
     distribution = "envoy-mobile-client",
     platform = select({
         ":is_linux_x86_64": "manylinux2014_x86_64",
@@ -115,7 +143,11 @@ py_wheel(
         ":is_macos_arm64": "macosx_11_0_arm64",
         "//conditions:default": "any",
     }),
-    python_tag = python_tag(),
+    python_tag = select({
+        ":is_python_3_14": "cp314",
+        ":is_python_3_13": "cp313",
+        "//conditions:default": "cp312",
+    }),
     strip_path_prefixes = [
         "mobile/library/python",
         "library/python",

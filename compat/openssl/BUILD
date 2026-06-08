@@ -1,4 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
+load("//bazel:toolchains.bzl", "LIBCLANG_CPP", "LIBLLVM")
 load("//compat/openssl:bazel/rules.bzl", "mapping_func_filegroup", "patched_bssl_filegroup")
 
 licenses(["notice"])  # Apache 2
@@ -174,7 +175,7 @@ genrule(
         done
 
         # Set up LD_LIBRARY_PATH for libclang-cpp.so
-        LLVM_LIB_DIR=$$(dirname $(location @llvm_toolchain_llvm//:lib/libclang-cpp.so.18.1))
+        LLVM_LIB_DIR=$$(dirname $(location """ + LIBCLANG_CPP + """))
         export LD_LIBRARY_PATH="$$LLVM_LIB_DIR$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}"
 
         # Run the prefixer with absolute source path and relative output path
@@ -186,11 +187,22 @@ genrule(
             --include "$$CLANG_INCLUDE_DIR" \
             --output $(RULEDIR) \
             --prefix ossl 2>&1
+
+        # Some distros (e.g. Fedora) use multiarch OpenSSL headers where
+        # configuration.h dispatches to platform-specific files like
+        # configuration-x86_64.h. Flatten by replacing configuration.h
+        # with the platform-specific content, stripping the include guard.
+        OSSL_DIR=$(RULEDIR)/include/ossl/openssl
+        PLATFORM_CFG="$$OSSL_DIR/configuration-$$(uname -m).h"
+        if [ -f "$$PLATFORM_CFG" ]; then
+            sed '/openssl_conf_multilib_redirection_h/,/#endif/d;/#error/d' \
+                "$$PLATFORM_CFG" > "$$OSSL_DIR/configuration.h"
+        fi
     """,
     tools = [
         "//compat/openssl/prefixer",
-        "@llvm_toolchain_llvm//:lib/libclang-cpp.so.18.1",
-    ],
+        LIBCLANG_CPP,
+    ] + ([LIBLLVM] if LIBLLVM else []),
     visibility = ["//visibility:private"],
 )
 
@@ -502,8 +514,14 @@ mapping_func_filegroup(
         "EVP_PKEY_assign_RSA",
         "EVP_PKEY_bits",
         "EVP_PKEY_cmp",
+        "EVP_PKEY_eq",
+        "EVP_PKEY_CTX_free",
+        "EVP_PKEY_CTX_new",
         "EVP_PKEY_CTX_set_rsa_mgf1_md",
+        "EVP_PKEY_CTX_set_rsa_oaep_md",
         "EVP_PKEY_CTX_set_rsa_padding",
+        "EVP_PKEY_encrypt_init",
+        "EVP_PKEY_encrypt",
         "EVP_PKEY_free",
         "EVP_PKEY_get_raw_public_key",
         "EVP_PKEY_get0_EC_KEY",
@@ -550,6 +568,7 @@ mapping_func_filegroup(
         "OBJ_obj2nid",
         "OBJ_obj2txt",
         "OBJ_txt2obj",
+        "OPENSSL_cleanse",
         "OPENSSL_free",
         "OPENSSL_init_ssl",
         "OPENSSL_malloc",
@@ -692,6 +711,7 @@ mapping_func_filegroup(
         "SSL_free",
         "SSL_get_all_cipher_names",
         "SSL_get_all_signature_algorithm_names",
+        "SSL_get_all_group_names",
         "SSL_get_all_version_names",
         "SSL_get_certificate",
         "SSL_get_cipher_by_value",
@@ -699,6 +719,8 @@ mapping_func_filegroup(
         "SSL_get_client_CA_list",
         "SSL_get_current_cipher",
         "SSL_get_curve_id",
+        "SSL_get_group_id",
+        "SSL_get_group_name",
         "SSL_get_error",
         "SSL_get_ex_data_X509_STORE_CTX_idx",
         "SSL_get_ex_data",
@@ -812,6 +834,7 @@ mapping_func_filegroup(
         "X509_getm_notAfter",
         "X509_getm_notBefore",
         "X509_INFO_free",
+        "X509_NAME_add_entry_by_NID",
         "X509_NAME_add_entry_by_txt",
         "X509_NAME_cmp",
         "X509_NAME_digest",

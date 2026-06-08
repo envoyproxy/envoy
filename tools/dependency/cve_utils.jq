@@ -129,7 +129,7 @@ def iterate_cves(cves; deps; ignored):
   .
   | [cves[]
     | . as $cve
-    | select(ignored | index($cve.id) | not)
+    | select(ignored | index($cve.cve.id) | not)
     | [.cve.configurations[]?.nodes[]?.cpeMatch[]?
         | parse_cve_cpe(.; $cve)]
       | matching_deps(.; deps)

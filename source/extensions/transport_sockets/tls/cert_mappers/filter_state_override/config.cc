@@ -15,8 +15,9 @@ namespace {
 class Mapper : public Ssl::UpstreamTlsCertificateMapper {
 public:
   explicit Mapper(const std::string& default_value) : default_value_(default_value) {}
-  std::string deriveFromServerHello(const SSL&,
-                                    const Network::TransportSocketOptionsConstSharedPtr& options) {
+  std::string
+  deriveFromServerHello(const SSL&,
+                        const Network::TransportSocketOptionsConstSharedPtr& options) override {
     if (options) {
       for (const auto& obj : options->downstreamSharedFilterStateObjects()) {
         if (obj.name_ == "envoy.tls.certificate_mappers.on_demand_secret") {

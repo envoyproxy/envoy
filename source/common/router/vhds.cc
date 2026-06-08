@@ -66,9 +66,7 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                                    const std::string& stat_prefix,
                                    Rds::RouteConfigProvider* route_config_provider,
                                    absl::Status& status)
-    : Envoy::Config::SubscriptionBase<envoy::config::route::v3::VirtualHost>(
-          factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
-      config_update_info_(config_update_info),
+    : config_update_info_(config_update_info),
       scope_(factory_context.scope().createScope(
           stat_prefix + "vhds." + config_update_info_->protobufConfigurationCast().name() + ".")),
       stats_({ALL_VHDS_STATS(POOL_COUNTER(*scope_))}),
@@ -78,14 +76,17 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                      subscription_->start(
                          {config_update_info_->protobufConfigurationCast().name()});
                    }),
+      resource_type_helper_(factory_context.messageValidationContext().dynamicValidationVisitor(),
+                            "name"),
       route_config_provider_(route_config_provider) {
-  const auto resource_name = getResourceName();
+  const auto resource_name = resource_type_helper_.getResourceName();
   Envoy::Config::SubscriptionOptions options;
   options.use_namespace_matching_ = true;
   absl::StatusOr<Envoy::Config::SubscriptionPtr> status_or =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_update_info_->protobufConfigurationCast().vhds().config_source(),
-          Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, options);
+          Grpc::Common::typeUrl(resource_name), *scope_, *this,
+          resource_type_helper_.resourceDecoder(), options);
   SET_AND_RETURN_IF_NOT_OK(status_or.status(), status);
   subscription_ = std::move(status_or.value());
 }

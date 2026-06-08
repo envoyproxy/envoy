@@ -11,7 +11,8 @@ namespace TagUtility {
 
 TagStatNameJoiner::TagStatNameJoiner(StatName prefix, StatName stat_name,
                                      StatNameTagVectorOptConstRef stat_name_tags,
-                                     SymbolTable& symbol_table) {
+                                     SymbolTable& symbol_table)
+    : stat_name_tags_(stat_name_tags) {
   prefix_storage_ = symbol_table.join({prefix, stat_name});
   tag_extracted_name_ = StatName(prefix_storage_.get());
 

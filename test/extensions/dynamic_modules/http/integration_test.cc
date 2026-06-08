@@ -22,7 +22,7 @@ public:
   initializeFilter(const std::string& filter_name, const std::string& config = "",
                    const std::string& per_route_config = "",
                    const std::string& type_url = "type.googleapis.com/google.protobuf.StringValue",
-                   bool upstream_filter = false) {
+                   bool upstream_filter = false, const std::string& per_route_type_url = "") {
     std::string module_name = "http_integration_test";
     if (GetParam() != "rust_static") {
       TestEnvironment::setEnvVar(
@@ -48,6 +48,10 @@ typed_config:
 )EOF";
 
     if (!per_route_config.empty()) {
+      // The per-route config defaults to using ``type_url`` so existing callers continue to share
+      // the same Any type for both the filter and per-route configuration.
+      const std::string& effective_per_route_type_url =
+          per_route_type_url.empty() ? type_url : per_route_type_url;
       constexpr auto filter_per_route_config = R"EOF(
 dynamic_module_config:
   name: {}
@@ -59,7 +63,7 @@ filter_config:
       envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilterPerRoute
           per_route_config_proto;
       TestUtility::loadFromYaml(fmt::format(filter_per_route_config, module_name, filter_name,
-                                            type_url, per_route_config),
+                                            effective_per_route_type_url, per_route_config),
                                 per_route_config_proto);
 
       config_helper_.addConfigModifier(
@@ -307,6 +311,48 @@ TEST_P(DynamicModulesIntegrationTest, PerRouteConfig) {
                      .get(Http::LowerCaseString("x-per-route-config"))[0]
                      ->value()
                      .getStringView());
+}
+
+// Verifies that a ``google.protobuf.Struct`` per-route configuration is serialized to a JSON
+// string before being passed to the dynamic module.
+TEST_P(DynamicModulesIntegrationTest, PerRouteStructConfig) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    // The per_route_config test filter that surfaces the raw config bytes back as a header is
+    // implemented by the Rust integration test data, so the Struct check is scoped to those
+    // language flavors.
+    return;
+  }
+
+  // The regular filter config remains a ``StringValue``, preserving the existing semantics of
+  // the per_route_config test filter for the ``x-config`` header, while the per-route override
+  // is supplied as a ``google.protobuf.Struct``.
+  initializeFilter("per_route_config", "a", R"({"struct_key":"struct_value"})",
+                   "type.googleapis.com/google.protobuf.StringValue", false,
+                   "type.googleapis.com/google.protobuf.Struct");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{{"foo", "bar"},
+                                                 {":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("a", upstream_request_->headers()
+                     .get(Http::LowerCaseString("x-config"))[0]
+                     ->value()
+                     .getStringView());
+  // The per-route ``Struct`` must arrive as its JSON serialization rather than as raw protobuf
+  // binary bytes (which would have started with a ``0x0a`` wire-tag byte and broken any module
+  // that attempted to ``json.Unmarshal`` the payload). See
+  // https://github.com/envoyproxy/envoy/issues/44733.
+  EXPECT_EQ(R"({"struct_key":"struct_value"})",
+            upstream_request_->headers()
+                .get(Http::LowerCaseString("x-per-route-config"))[0]
+                ->value()
+                .getStringView());
 }
 
 TEST_P(DynamicModulesIntegrationTest, BodyCallbacks) {
@@ -980,12 +1026,6 @@ TEST_P(DynamicModulesIntegrationTest, ConfigScheduler) {
 
 // Test buffer limit callbacks for non-terminal filters.
 TEST_P(DynamicModulesIntegrationTest, BufferLimitFilter) {
-  // TODO(wbpcode): Enable this test for other SDKs when supported.
-  if (GetParam() != "rust") {
-    // Buffer limit callbacks are only supported in the Rust SDK currently.
-    return;
-  }
-
   initializeFilter("buffer_limit_filter");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
 

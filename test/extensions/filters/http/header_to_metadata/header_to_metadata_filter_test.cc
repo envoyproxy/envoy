@@ -9,7 +9,6 @@
 #include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 

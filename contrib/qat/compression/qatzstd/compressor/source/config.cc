@@ -23,8 +23,7 @@ QatzstdCompressorFactory::QatzstdCompressorFactory(
   }
 }
 
-QatzstdCompressorFactory::QatzstdThreadLocal::QatzstdThreadLocal()
-    : initialized_(false), sequenceProducerState_(nullptr) {}
+QatzstdCompressorFactory::QatzstdThreadLocal::QatzstdThreadLocal() = default;
 
 QatzstdCompressorFactory::QatzstdThreadLocal::~QatzstdThreadLocal() {
   if (initialized_) {

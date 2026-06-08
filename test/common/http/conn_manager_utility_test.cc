@@ -23,7 +23,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/printers.h"
@@ -2490,6 +2490,25 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceOnBrokenUuid) {
   EXPECT_EQ(Tracing::Reason::NotTraceable, request_id_extension_->getTraceReason(request_headers));
 }
 
+// Signed request IDs are malformed and must not participate in trace sampling.
+TEST_F(ConnectionManagerUtilityTest, NoTraceOnSignedRequestId) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"x-request-id", "-1aaaaaa-6f55-44ba-ad80-413f09f48a28"}};
+
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("tracing.random_sampling", An<const envoy::type::v3::FractionalPercent&>(), _))
+      .Times(0);
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
+      .Times(0);
+  EXPECT_CALL(*request_id_extension_, setTraceReason(_, _)).Times(0);
+
+  callMutateRequestHeaders(request_headers, Protocol::Http2);
+  EXPECT_EQ(Tracing::Reason::NotTraceable, request_id_extension_->getTraceReason(request_headers));
+}
+
 TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeaders) {
   Http::TestRequestHeaderMapImpl request_headers{{}};
   Http::TestResponseHeaderMapImpl response_headers{{"keep-alive", "timeout=60"},
@@ -2502,6 +2521,59 @@ TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeaders) {
 
   EXPECT_FALSE(response_headers.has("keep-alive"));
   EXPECT_FALSE(response_headers.has("proxy-connection"));
+}
+
+// Verify that when preserve_downstream_keepalive is enabled, Keep-Alive headers
+// are preserved by mutateResponseHeaders for HTTP/1.1 downstream connections.
+TEST_F(ConnectionManagerUtilityTest, PreserveUserAddedKeepAlive) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.preserve_downstream_keepalive", "true"}});
+
+  ON_CALL(connection_.stream_info_, protocol()).WillByDefault(Return(Http::Protocol::Http11));
+
+  Http::TestRequestHeaderMapImpl request_headers{{}};
+  Http::TestResponseHeaderMapImpl response_headers{{"keep-alive", "timeout=70"}};
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, "",
+                                                  connection_.stream_info_, node_id_);
+
+  // Keep-Alive should be preserved when the runtime flag is enabled and downstream is HTTP/1.1.
+  EXPECT_TRUE(response_headers.has("keep-alive"));
+  EXPECT_EQ("timeout=70", response_headers.get_("keep-alive"));
+}
+
+// Verify that when preserve_downstream_keepalive is disabled, Keep-Alive is still removed.
+TEST_F(ConnectionManagerUtilityTest, RemoveKeepAliveWhenFlagDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.preserve_downstream_keepalive", "false"}});
+
+  ON_CALL(connection_.stream_info_, protocol()).WillByDefault(Return(Http::Protocol::Http11));
+
+  Http::TestRequestHeaderMapImpl request_headers{{}};
+  Http::TestResponseHeaderMapImpl response_headers{{"keep-alive", "timeout=70"},
+                                                   {"proxy-connection", "proxy-header"}};
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, "",
+                                                  connection_.stream_info_, node_id_);
+
+  EXPECT_FALSE(response_headers.has("keep-alive"));
+  EXPECT_FALSE(response_headers.has("proxy-connection"));
+}
+
+// Verify that Keep-Alive is always stripped for HTTP/2 downstream, even with
+// preserve_downstream_keepalive enabled (Keep-Alive is an HTTP/1.1 concept).
+TEST_F(ConnectionManagerUtilityTest, RemoveKeepAliveForHttp2Downstream) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.preserve_downstream_keepalive", "true"}});
+
+  ON_CALL(connection_.stream_info_, protocol()).WillByDefault(Return(Http::Protocol::Http2));
+
+  Http::TestRequestHeaderMapImpl request_headers{{}};
+  Http::TestResponseHeaderMapImpl response_headers{{"keep-alive", "timeout=70"}};
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, "",
+                                                  connection_.stream_info_, node_id_);
+
+  // Keep-Alive must be stripped for HTTP/2 downstream regardless of the runtime flag.
+  EXPECT_FALSE(response_headers.has("keep-alive"));
 }
 
 // maybeNormalizePath() returns true with an empty path.

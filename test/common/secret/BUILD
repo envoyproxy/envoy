@@ -57,7 +57,6 @@ envoy_cc_test(
         "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/filesystem:filesystem_mocks",
-        "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/init:init_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/secret:secret_mocks",

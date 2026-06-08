@@ -122,6 +122,8 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl SSL_early_callback_ctx_extension_get \
   --uncomment-func-decl SSL_get_cipher_by_value \
   --uncomment-func-decl SSL_get_curve_id \
+  --uncomment-func-decl SSL_get_group_id \
+  --uncomment-func-decl SSL_get_group_name \
   --uncomment-func-decl SSL_get_curve_name \
   --uncomment-func-decl SSL_get_peer_signature_algorithm \
   --uncomment-func-decl SSL_get_signature_algorithm_name \
@@ -218,6 +220,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl SSL_get_all_signature_algorithm_names \
   --uncomment-func-decl SSL_get_all_version_names \
   --uncomment-func-decl SSL_get_all_curve_names \
+  --uncomment-func-decl SSL_get_all_group_names \
   --uncomment-macro SSL_GROUP_SECP256R1 \
   --uncomment-macro SSL_GROUP_SECP384R1 \
   --uncomment-macro SSL_GROUP_SECP521R1 \

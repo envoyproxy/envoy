@@ -3,7 +3,6 @@
 #include "envoy/http/metadata_interface.h"
 
 #include "source/common/buffer/buffer_impl.h"
-#include "source/common/common/logger.h"
 #include "source/common/common/random_generator.h"
 #include "source/common/http/http2/metadata_decoder.h"
 #include "source/common/http/http2/metadata_encoder.h"

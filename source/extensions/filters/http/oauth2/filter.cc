@@ -30,6 +30,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
+#include "openssl/mem.h"
 #include "openssl/rand.h"
 
 using namespace std::chrono_literals;
@@ -42,6 +43,14 @@ namespace Oauth2 {
 namespace {
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     authorization_handle(Http::CustomHeaders::get().Authorization);
+
+// Cryptographically safe HMAC comparison of two string views.
+bool safeStringViewEqual(absl::string_view s1, absl::string_view s2) {
+  if (s1.length() != s2.length()) {
+    return false;
+  }
+  return CRYPTO_memcmp(s1.data(), s2.data(), s1.length()) == 0;
+}
 
 constexpr const char* CookieDeleteFormatString =
     "{}=deleted; path={}; expires=Thu, 01 Jan 1970 00:00:00 GMT";
@@ -279,7 +288,7 @@ bool validateCsrfTokenHmac(const std::string& hmac_secret, const std::string& cs
   std::string token = std::string(csrf_token.substr(0, pos));
   std::string hmac = std::string(csrf_token.substr(pos + 1));
   std::vector<uint8_t> hmac_secret_vec(hmac_secret.begin(), hmac_secret.end());
-  return generateHmacBase64(hmac_secret_vec, token) == hmac;
+  return safeStringViewEqual(generateHmacBase64(hmac_secret_vec, token), hmac);
 }
 
 // Generates a PKCE code verifier with 32 octets of randomness.
@@ -600,10 +609,12 @@ bool OAuth2CookieValidator::hmacIsValid() const {
   if (!cookie_domain_.empty()) {
     cookie_domain = cookie_domain_;
   }
-  return ((encodeHmacBase64(secret_, cookie_domain, expires_, access_token_, id_token_,
-                            refresh_token_) == hmac_) ||
-          (encodeHmacHexBase64(secret_, cookie_domain, expires_, access_token_, id_token_,
-                               refresh_token_) == hmac_));
+  return (safeStringViewEqual(encodeHmacBase64(secret_, cookie_domain, expires_, access_token_,
+                                               id_token_, refresh_token_),
+                              hmac_) ||
+          safeStringViewEqual(encodeHmacHexBase64(secret_, cookie_domain, expires_, access_token_,
+                                                  id_token_, refresh_token_),
+                              hmac_));
 }
 
 bool OAuth2CookieValidator::timestampIsValid() const {
@@ -917,10 +928,6 @@ void OAuth2Filter::decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& hea
     return;
   }
 
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_encrypt_tokens")) {
-    return;
-  }
-
   absl::flat_hash_map<std::string, std::string> cookies = Http::Utility::parseCookies(headers);
   if (cookies.empty()) {
     return;
@@ -956,10 +963,7 @@ std::string OAuth2Filter::encryptToken(const std::string& token) const {
     return token;
   }
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_encrypt_tokens")) {
-    return encrypt(token, config_->hmacSecret(), random_);
-  }
-  return token;
+  return encrypt(token, config_->hmacSecret(), random_);
 }
 
 std::string OAuth2Filter::decryptToken(const std::string& encrypted_token) const {
@@ -968,15 +972,26 @@ std::string OAuth2Filter::decryptToken(const std::string& encrypted_token) const
   }
 
   DecryptResult decrypt_result = decrypt(encrypted_token, config_->hmacSecret());
-  if (decrypt_result.error.has_value()) {
+
+  // Decryption can spuriously succeed against a token that was either never encrypted, or was
+  // encrypted under a different secret — PKCS#7 padding is valid by chance with probability
+  // ~1/256, leaving us with arbitrary binary bytes that would later fail HeaderString validation
+  // when written back into the Cookie header. Treat any plaintext that is not a valid header value
+  // as a decrypt failure and fall through to the legacy/wrong-secret behavior below.
+  const bool decrypt_failed = decrypt_result.error.has_value() ||
+                              !Http::HeaderUtility::headerValueIsValid(decrypt_result.plaintext);
+
+  if (decrypt_failed) {
     ENVOY_STREAM_LOG(error, "failed to decrypt token: {}, error: {}", *decoder_callbacks_,
-                     encrypted_token, decrypt_result.error.value());
+                     encrypted_token,
+                     decrypt_result.error.value_or("plaintext is not a valid header value"));
     // There are two cases:
     // 1. The token is a legacy unencrypted token.
     // In this case, we return the token as-is to allow the request to proceed.
-    // 2. The token is encrypted, but the decryption failed due to the HMAC secret is changed.
-    // In this case, we return the original encrypted token, the HMAC validation will fail
-    // and the user will be redirected to the OAuth server for re-authentication.
+    // 2. The token is encrypted, but the decryption failed (or produced invalid plaintext) due to
+    // the HMAC secret being changed. In this case, we return the original encrypted token; the HMAC
+    // validation will fail and the user will be redirected to the OAuth server for
+    // re-authentication.
     return encrypted_token;
   }
   return decrypt_result.plaintext;
@@ -1092,7 +1107,7 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
       {cookie_names.bearer_token_, config_->bearerTokenCookieSettings().path_},
       {cookie_names.id_token_, config_->idTokenCookieSettings().path_},
       {cookie_names.refresh_token_, config_->refreshTokenCookieSettings().path_},
-
+      {cookie_names.oauth_expires_, config_->expiresCookieSettings().path_},
   };
 
   absl::flat_hash_map<std::string, std::string> request_cookies =
@@ -1654,7 +1669,7 @@ bool OAuth2Filter::validateCsrfToken(const Http::RequestHeaderMap& headers,
     return false;
   }
 
-  if (cookie_value.value() != csrf_token) {
+  if (!safeStringViewEqual(cookie_value.value(), csrf_token)) {
     return false;
   }
   return validateCsrfTokenHmac(config_->hmacSecret(), csrf_token);

@@ -13,7 +13,6 @@
 #include "source/common/router/context_impl.h"
 
 #include "test/common/upstream/test_cluster_manager.h"
-#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/config/xds_manager.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/admin.h"

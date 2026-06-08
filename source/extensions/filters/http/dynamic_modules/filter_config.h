@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 #include "envoy/server/factory_context.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -134,7 +136,15 @@ public:
   // We only allow the module to create stats during envoy_dynamic_module_on_http_filter_config_new,
   // and not later during request handling, so that we don't have to wrap the stat storage in a
   // lock.
-  bool stat_creation_frozen_ = false;
+  //
+  // ``stat_creation_frozen_`` is set by the factory (main thread, before any worker observes
+  // this config) and read by the per-request ``define_*`` ABI callbacks (worker thread). The
+  // store/load pair establishes the necessary happens-before via release/acquire ordering;
+  // pre-fix this was a plain ``bool`` whose load was racy with the publishing store under the
+  // C++ memory model, even though steady-state shared_ptr publication usually masked it. An
+  // adversarial module spawning a worker thread inside ``on_http_filter_config_new`` could
+  // observe the stale ``false`` and reproduce the seed StatNamePool race.
+  std::atomic<bool> stat_creation_frozen_{false};
 
   bool terminal_filter_ = false;
 
@@ -439,21 +449,25 @@ private:
 
 class DynamicModuleHttpFilterConfigScheduler {
 public:
-  DynamicModuleHttpFilterConfigScheduler(std::weak_ptr<DynamicModuleHttpFilterConfig> config,
-                                         Event::Dispatcher& dispatcher)
-      : config_(std::move(config)), dispatcher_(dispatcher) {}
+  explicit DynamicModuleHttpFilterConfigScheduler(
+      std::weak_ptr<DynamicModuleHttpFilterConfig> config)
+      : config_(std::move(config)) {}
 
   void commit(uint64_t event_id) {
-    dispatcher_.post([config = config_, event_id]() {
-      if (std::shared_ptr<DynamicModuleHttpFilterConfig> config_shared = config.lock()) {
-        config_shared->onScheduled(event_id);
+    // Lock the config so its dispatcher member stays valid across `post`.
+    auto config_shared = config_.lock();
+    if (!config_shared) {
+      return;
+    }
+    config_shared->main_thread_dispatcher_.post([config = config_, event_id]() {
+      if (std::shared_ptr<DynamicModuleHttpFilterConfig> cs = config.lock()) {
+        cs->onScheduled(event_id);
       }
     });
   }
 
 private:
   std::weak_ptr<DynamicModuleHttpFilterConfig> config_;
-  Event::Dispatcher& dispatcher_;
 };
 
 class DynamicModuleHttpPerRouteFilterConfig : public Router::RouteSpecificFilterConfig {

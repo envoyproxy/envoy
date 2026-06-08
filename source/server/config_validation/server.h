@@ -7,6 +7,7 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/event/timer.h"
+#include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"
 #include "envoy/ssl/context_manager.h"
@@ -195,6 +196,7 @@ private:
   std::unique_ptr<ListenerManager> listener_manager_;
   std::unique_ptr<OverloadManager> overload_manager_;
   std::unique_ptr<OverloadManager> null_overload_manager_;
+  std::vector<BootstrapExtensionPtr> bootstrap_extensions_;
   MutexTracer* mutex_tracer_{nullptr};
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;

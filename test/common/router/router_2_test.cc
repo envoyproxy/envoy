@@ -1,3 +1,4 @@
+#include "source/common/router/retry_state_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
 #include "test/common/router/router_test_base.h"
@@ -955,12 +956,18 @@ TEST(RouterFilterUtilityTest, StrictCheckValidHeaders) {
        "cancelled,internal,deadline-exceeded,resource-exhausted , unavailable"}, // space is allowed
   };
 
-  for (const auto& target : SUPPORTED_STRICT_CHECKED_HEADERS) {
-    EXPECT_TRUE(
-        FilterUtility::StrictHeaderChecker::checkHeader(headers, Http::LowerCaseString(target))
-            .valid_)
-        << fmt::format("'{}' should have passed strict validation", target);
-  }
+  EXPECT_TRUE(FilterUtility::StrictHeaderChecker::isInteger(headers.EnvoyUpstreamRequestTimeoutMs())
+                  .valid_);
+  EXPECT_TRUE(
+      FilterUtility::StrictHeaderChecker::isInteger(headers.EnvoyUpstreamRequestPerTryTimeoutMs())
+          .valid_);
+  EXPECT_TRUE(FilterUtility::StrictHeaderChecker::isInteger(headers.EnvoyMaxRetries()).valid_);
+  EXPECT_TRUE(FilterUtility::StrictHeaderChecker::hasValidRetryFields(
+                  headers.EnvoyRetryOn(), &Router::RetryStateImpl::parseRetryOn)
+                  .valid_);
+  EXPECT_TRUE(FilterUtility::StrictHeaderChecker::hasValidRetryFields(
+                  headers.EnvoyRetryGrpcOn(), &Router::RetryStateImpl::parseRetryGrpcOn)
+                  .valid_);
 
   Http::TestRequestHeaderMapImpl failing_headers{
       {"X-envoy-Upstream-rq-timeout-ms", "10.0"},
@@ -970,12 +977,20 @@ TEST(RouterFilterUtilityTest, StrictCheckValidHeaders) {
       {"x-envoy-retry-grpc-on", "5xx,cancelled, internal"}, // '5xx' is an invalid entry
   };
 
-  for (const auto& target : SUPPORTED_STRICT_CHECKED_HEADERS) {
-    EXPECT_FALSE(FilterUtility::StrictHeaderChecker::checkHeader(failing_headers,
-                                                                 Http::LowerCaseString(target))
-                     .valid_)
-        << fmt::format("'{}' should have failed strict validation", target);
-  }
+  EXPECT_FALSE(
+      FilterUtility::StrictHeaderChecker::isInteger(failing_headers.EnvoyUpstreamRequestTimeoutMs())
+          .valid_);
+  EXPECT_FALSE(FilterUtility::StrictHeaderChecker::isInteger(
+                   failing_headers.EnvoyUpstreamRequestPerTryTimeoutMs())
+                   .valid_);
+  EXPECT_FALSE(
+      FilterUtility::StrictHeaderChecker::isInteger(failing_headers.EnvoyMaxRetries()).valid_);
+  EXPECT_FALSE(FilterUtility::StrictHeaderChecker::hasValidRetryFields(
+                   failing_headers.EnvoyRetryOn(), &Router::RetryStateImpl::parseRetryOn)
+                   .valid_);
+  EXPECT_FALSE(FilterUtility::StrictHeaderChecker::hasValidRetryFields(
+                   failing_headers.EnvoyRetryGrpcOn(), &Router::RetryStateImpl::parseRetryGrpcOn)
+                   .valid_);
 }
 
 class RouterTestSupressGRPCStatsEnabled : public RouterTestBase {

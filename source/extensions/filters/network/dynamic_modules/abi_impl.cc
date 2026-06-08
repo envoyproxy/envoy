@@ -442,9 +442,9 @@ bool envoy_dynamic_module_callback_network_set_filter_state_bytes(
   absl::string_view key_view(key.ptr, key.length);
   absl::string_view value_view(value.ptr, value.length);
 
-  stream_info.filterState()->setData(
-      key_view, std::make_unique<Router::StringAccessorImpl>(value_view),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+  stream_info.filterState()->setData(key_view,
+                                     std::make_unique<Router::StringAccessorImpl>(value_view),
+                                     StreamInfo::FilterState::LifeSpan::Connection);
   return true;
 }
 
@@ -493,7 +493,6 @@ bool envoy_dynamic_module_callback_network_set_filter_state_typed(
   }
 
   stream_info.filterState()->setData(key_view, std::move(object),
-                                     StreamInfo::FilterState::StateType::Mutable,
                                      StreamInfo::FilterState::LifeSpan::Connection);
   return true;
 }
@@ -720,7 +719,6 @@ ensureUpstreamSocketOptionsFilterState(DynamicModuleNetworkFilter& filter) {
   if (!has_options) {
     filter_state.setData(Network::UpstreamSocketOptionsFilterState::key(),
                          std::make_unique<Network::UpstreamSocketOptionsFilterState>(),
-                         StreamInfo::FilterState::StateType::Mutable,
                          StreamInfo::FilterState::LifeSpan::Connection);
   }
   return filter_state.getDataMutable<Network::UpstreamSocketOptionsFilterState>(
@@ -837,6 +835,9 @@ envoy_dynamic_module_callback_network_filter_config_define_counter(
     envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer name, size_t* counter_id_ptr) {
   auto* config = static_cast<DynamicModuleNetworkFilterConfig*>(config_envoy_ptr);
+  if (config->stat_creation_frozen_) {
+    return envoy_dynamic_module_type_metrics_result_Frozen;
+  }
   Stats::StatName main_stat_name =
       config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
   Stats::Counter& c = Stats::Utility::counterFromStatNames(*config->stats_scope_, {main_stat_name});
@@ -862,6 +863,9 @@ envoy_dynamic_module_callback_network_filter_config_define_gauge(
     envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer name, size_t* gauge_id_ptr) {
   auto* config = static_cast<DynamicModuleNetworkFilterConfig*>(config_envoy_ptr);
+  if (config->stat_creation_frozen_) {
+    return envoy_dynamic_module_type_metrics_result_Frozen;
+  }
   Stats::StatName main_stat_name =
       config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
   Stats::Gauge& g = Stats::Utility::gaugeFromStatNames(*config->stats_scope_, {main_stat_name},
@@ -913,6 +917,9 @@ envoy_dynamic_module_callback_network_filter_config_define_histogram(
     envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer name, size_t* histogram_id_ptr) {
   auto* config = static_cast<DynamicModuleNetworkFilterConfig*>(config_envoy_ptr);
+  if (config->stat_creation_frozen_) {
+    return envoy_dynamic_module_type_metrics_result_Frozen;
+  }
   Stats::StatName main_stat_name =
       config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
   Stats::Histogram& h = Stats::Utility::histogramFromStatNames(
@@ -1173,11 +1180,7 @@ envoy_dynamic_module_type_network_filter_scheduler_module_ptr
 envoy_dynamic_module_callback_network_filter_scheduler_new(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  Event::Dispatcher* dispatcher = filter->dispatcher();
-  if (dispatcher == nullptr) {
-    return nullptr;
-  }
-  return new DynamicModuleNetworkFilterScheduler(filter->weak_from_this(), *dispatcher);
+  return new DynamicModuleNetworkFilterScheduler(filter->weak_from_this());
 }
 
 void envoy_dynamic_module_callback_network_filter_scheduler_delete(
@@ -1196,8 +1199,7 @@ envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr
 envoy_dynamic_module_callback_network_filter_config_scheduler_new(
     envoy_dynamic_module_type_network_filter_config_envoy_ptr filter_config_envoy_ptr) {
   auto* filter_config = static_cast<DynamicModuleNetworkFilterConfig*>(filter_config_envoy_ptr);
-  return new DynamicModuleNetworkFilterConfigScheduler(filter_config->weak_from_this(),
-                                                       filter_config->main_thread_dispatcher_);
+  return new DynamicModuleNetworkFilterConfigScheduler(filter_config->weak_from_this());
 }
 
 void envoy_dynamic_module_callback_network_filter_config_scheduler_delete(
