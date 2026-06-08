@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <string>
 
 #include "envoy/config/typed_config.h"
@@ -7,6 +8,8 @@
 
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -33,9 +36,23 @@ private:
 class CELFormatterCommandParser : public ::Envoy::Formatter::CommandParser {
 public:
   CELFormatterCommandParser() = default;
+  CELFormatterCommandParser(
+      const ::Envoy::LocalInfo::LocalInfo& local_info,
+      Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr expr_builder);
   ::Envoy::Formatter::FormatterProviderPtr parse(absl::string_view command,
                                                  absl::string_view subcommand,
                                                  absl::optional<size_t> max_length) const override;
+
+private:
+  struct ConfiguredState {
+    std::reference_wrapper<const ::Envoy::LocalInfo::LocalInfo> local_info;
+    Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr expr_builder;
+  };
+
+  // Present only for parsers created from explicit `envoy.formatter.cel` config. Keeping the
+  // server-owned values together avoids a half-configured parser; absence means built-in parser
+  // mode, where `parse()` resolves the active server context for each CEL command.
+  absl::optional<ConfiguredState> configured_state_;
 };
 
 } // namespace Formatter
