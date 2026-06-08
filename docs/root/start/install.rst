@@ -57,13 +57,14 @@ Install Envoy on Debian-based Linux
       $ sudo apt-get install envoy
       $ envoy --version
 
-   .. code-tab:: console Ubuntu noble
+.. note::
 
-      $ wget -O- https://apt.envoyproxy.io/signing.key | sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg
-      $ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io noble main" | sudo tee /etc/apt/sources.list.d/envoy.list
-      $ sudo apt-get update
-      $ sudo apt-get install envoy
-      $ envoy --version
+   An apt repository for Ubuntu 24.04 (``noble``) is not currently published
+   at ``https://apt.envoyproxy.io``. If you are running Ubuntu 24.04, please
+   use the :ref:`pre-built Docker images <install_binaries>` or download the
+   static binary from the `GitHub release page <https://github.com/envoyproxy/envoy/releases>`__.
+   See `issue #44405 <https://github.com/envoyproxy/envoy/issues/44405>`__ for
+   the tracking discussion.
 
 .. _start_install_macosx:
 
