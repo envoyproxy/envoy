@@ -305,6 +305,8 @@ public:
                        const Network::ConnectionSocket::OptionsSharedPtr& options,
                        const Network::TransportSocketOptionsConstSharedPtr& transport_options);
 
+  ~ClientConnectionImpl() override;
+
   // Network::ClientConnection
   void connect() override;
 
