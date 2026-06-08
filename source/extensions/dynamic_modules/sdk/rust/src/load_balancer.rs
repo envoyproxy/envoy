@@ -14,12 +14,8 @@ use std::sync::Arc;
 /// valid during the [`LoadBalancer::choose_host`] callback.
 #[automock]
 pub trait EnvoyLoadBalancer {
-  /// Returns the cluster name.
-  fn get_cluster_name(&self) -> String;
-
-  /// Borrowed variant of `get_cluster_name` that returns the cluster name bytes without copying.
-  /// Returns `None` if the name is empty.
-  fn get_cluster_name_bytes<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
+  /// Returns the cluster name, or `None` if the name is empty.
+  fn get_cluster_name<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
 
   /// Returns the number of all hosts at a given priority.
   fn get_hosts_count(&self, priority: u32) -> usize;
@@ -34,14 +30,8 @@ pub trait EnvoyLoadBalancer {
   fn get_priority_set_size(&self) -> usize;
 
   /// Returns the address of a healthy host by index at a given priority.
-  fn get_healthy_host_address(&self, priority: u32, index: usize) -> Option<String>;
-
-  /// Borrowed variant of `get_healthy_host_address` that returns the address bytes without copying.
-  fn get_healthy_host_address_bytes<'a>(
-    &'a self,
-    priority: u32,
-    index: usize,
-  ) -> Option<EnvoyBuffer<'a>>;
+  fn get_healthy_host_address<'a>(&'a self, priority: u32, index: usize)
+    -> Option<EnvoyBuffer<'a>>;
 
   /// Returns the weight of a healthy host by index at a given priority.
   fn get_healthy_host_weight(&self, priority: u32, index: usize) -> u32;
@@ -64,10 +54,7 @@ pub trait EnvoyLoadBalancer {
   ) -> Option<abi::envoy_dynamic_module_type_host_health>;
 
   /// Returns the address of a host by index within all hosts at a given priority.
-  fn get_host_address(&self, priority: u32, index: usize) -> Option<String>;
-
-  /// Borrowed variant of `get_host_address` that returns the address bytes without copying.
-  fn get_host_address_bytes<'a>(&'a self, priority: u32, index: usize) -> Option<EnvoyBuffer<'a>>;
+  fn get_host_address<'a>(&'a self, priority: u32, index: usize) -> Option<EnvoyBuffer<'a>>;
 
   /// Returns the weight of a host by index within all hosts at a given priority.
   fn get_host_weight(&self, priority: u32, index: usize) -> u32;
@@ -83,11 +70,7 @@ pub trait EnvoyLoadBalancer {
 
   /// Returns the locality information (region, zone, sub_zone) for a host by index within all
   /// hosts at a given priority. This enables zone-aware and locality-aware load balancing.
-  fn get_host_locality(&self, priority: u32, index: usize) -> Option<(String, String, String)>;
-
-  /// Borrowed variant of `get_host_locality` that returns the (region, zone, sub_zone) bytes
-  /// without copying.
-  fn get_host_locality_bytes<'a>(
+  fn get_host_locality<'a>(
     &'a self,
     priority: u32,
     index: usize,
@@ -178,25 +161,19 @@ pub trait EnvoyLoadBalancer {
   /// Only valid during choose_host callback.
   fn context_get_downstream_headers_size(&self) -> usize;
 
-  /// Returns all downstream request headers as a vector of (key, value) pairs.
+  /// Returns all downstream request headers as a vector of borrowed (key, value) pairs.
+  ///
+  /// Returns an empty vector if no headers are available.
   /// Only valid during choose_host callback.
-  fn context_get_downstream_headers(&self) -> Option<Vec<(String, String)>>;
-
-  /// Borrowed variant of `context_get_downstream_headers` that returns the (key, value) byte pairs
-  /// without copying. Returns an empty vector if no headers are available.
-  /// Only valid during choose_host callback.
-  fn context_get_downstream_headers_bytes<'a>(&'a self) -> Vec<(EnvoyBuffer<'a>, EnvoyBuffer<'a>)>;
+  fn context_get_downstream_headers<'a>(&'a self) -> Vec<(EnvoyBuffer<'a>, EnvoyBuffer<'a>)>;
 
   /// Returns a downstream request header value by key and index.
-  /// Since a header can have multiple values, the index is used to get the specific value.
-  /// Returns the value and optionally the total number of values for the key.
+  ///
+  /// Since a header key can have multiple values, the `index` parameter selects a specific value.
+  /// Returns `Some((value, total_count))` where `total_count` is the number of values for the key,
+  /// or `None` if the header was not found at the given index.
   /// Only valid during choose_host callback.
-  fn context_get_downstream_header(&self, key: &str, index: usize) -> Option<(String, usize)>;
-
-  /// Borrowed variant of `context_get_downstream_header` that returns the value bytes without
-  /// copying. Returns the value and the total number of values for the key.
-  /// Only valid during choose_host callback.
-  fn context_get_downstream_header_bytes<'a>(
+  fn context_get_downstream_header<'a>(
     &'a self,
     key: &str,
     index: usize,
@@ -219,12 +196,7 @@ pub trait EnvoyLoadBalancer {
   /// Returns `Some((address, strict))` if an override host is set, `None` otherwise. When
   /// `strict` is true, the load balancer should return no host if the override is not valid.
   /// Only valid during choose_host callback.
-  fn context_get_override_host(&self) -> Option<(String, bool)>;
-
-  /// Borrowed variant of `context_get_override_host` that returns the address bytes without
-  /// copying. Returns `Some((address, strict))` if an override host is set, `None` otherwise.
-  /// Only valid during choose_host callback.
-  fn context_get_override_host_bytes<'a>(&'a self) -> Option<(EnvoyBuffer<'a>, bool)>;
+  fn context_get_override_host<'a>(&'a self) -> Option<(EnvoyBuffer<'a>, bool)>;
 }
 
 /// Implementation of EnvoyLoadBalancer that calls into the Envoy ABI.
@@ -247,22 +219,7 @@ impl EnvoyLoadBalancerImpl {
 }
 
 impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
-  fn get_cluster_name(&self) -> String {
-    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: std::ptr::null(),
-      length: 0,
-    };
-    unsafe {
-      abi::envoy_dynamic_module_callback_lb_get_cluster_name(self.lb_ptr, &mut result);
-      if !result.ptr.is_null() && result.length > 0 {
-        crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length).into_owned()
-      } else {
-        String::new()
-      }
-    }
-  }
-
-  fn get_cluster_name_bytes(&self) -> Option<EnvoyBuffer<'_>> {
+  fn get_cluster_name(&self) -> Option<EnvoyBuffer<'_>> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
@@ -296,32 +253,7 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     unsafe { abi::envoy_dynamic_module_callback_lb_get_priority_set_size(self.lb_ptr) }
   }
 
-  fn get_healthy_host_address(&self, priority: u32, index: usize) -> Option<String> {
-    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: std::ptr::null(),
-      length: 0,
-    };
-    let found = unsafe {
-      abi::envoy_dynamic_module_callback_lb_get_healthy_host_address(
-        self.lb_ptr,
-        priority,
-        index,
-        &mut result,
-      )
-    };
-    if found && !result.ptr.is_null() && result.length > 0 {
-      unsafe {
-        Some(
-          crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length)
-            .into_owned(),
-        )
-      }
-    } else {
-      None
-    }
-  }
-
-  fn get_healthy_host_address_bytes(&self, priority: u32, index: usize) -> Option<EnvoyBuffer<'_>> {
+  fn get_healthy_host_address(&self, priority: u32, index: usize) -> Option<EnvoyBuffer<'_>> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
@@ -379,32 +311,7 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     }
   }
 
-  fn get_host_address(&self, priority: u32, index: usize) -> Option<String> {
-    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: std::ptr::null(),
-      length: 0,
-    };
-    let found = unsafe {
-      abi::envoy_dynamic_module_callback_lb_get_host_address(
-        self.lb_ptr,
-        priority,
-        index,
-        &mut result,
-      )
-    };
-    if found && !result.ptr.is_null() && result.length > 0 {
-      unsafe {
-        Some(
-          crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length)
-            .into_owned(),
-        )
-      }
-    } else {
-      None
-    }
-  }
-
-  fn get_host_address_bytes(&self, priority: u32, index: usize) -> Option<EnvoyBuffer<'_>> {
+  fn get_host_address(&self, priority: u32, index: usize) -> Option<EnvoyBuffer<'_>> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
@@ -439,54 +346,7 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     }
   }
 
-  fn get_host_locality(&self, priority: u32, index: usize) -> Option<(String, String, String)> {
-    let mut region = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: std::ptr::null(),
-      length: 0,
-    };
-    let mut zone = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: std::ptr::null(),
-      length: 0,
-    };
-    let mut sub_zone = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: std::ptr::null(),
-      length: 0,
-    };
-    let found = unsafe {
-      abi::envoy_dynamic_module_callback_lb_get_host_locality(
-        self.lb_ptr,
-        priority,
-        index,
-        &mut region,
-        &mut zone,
-        &mut sub_zone,
-      )
-    };
-    if !found {
-      return None;
-    }
-    unsafe {
-      let region_str = if !region.ptr.is_null() && region.length > 0 {
-        crate::ffi_helpers::str_lossy_from_raw(region.ptr as *const u8, region.length).into_owned()
-      } else {
-        String::new()
-      };
-      let zone_str = if !zone.ptr.is_null() && zone.length > 0 {
-        crate::ffi_helpers::str_lossy_from_raw(zone.ptr as *const u8, zone.length).into_owned()
-      } else {
-        String::new()
-      };
-      let sub_zone_str = if !sub_zone.ptr.is_null() && sub_zone.length > 0 {
-        crate::ffi_helpers::str_lossy_from_raw(sub_zone.ptr as *const u8, sub_zone.length)
-          .into_owned()
-      } else {
-        String::new()
-      };
-      Some((region_str, zone_str, sub_zone_str))
-    }
-  }
-
-  fn get_host_locality_bytes(
+  fn get_host_locality(
     &self,
     priority: u32,
     index: usize,
@@ -756,48 +616,7 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     }
   }
 
-  fn context_get_downstream_headers(&self) -> Option<Vec<(String, String)>> {
-    if self.context_ptr.is_null() {
-      return None;
-    }
-    let size = self.context_get_downstream_headers_size();
-    if size == 0 {
-      return Some(Vec::new());
-    }
-    let mut headers = vec![
-      abi::envoy_dynamic_module_type_envoy_http_header {
-        key_ptr: std::ptr::null(),
-        key_length: 0,
-        value_ptr: std::ptr::null(),
-        value_length: 0,
-      };
-      size
-    ];
-    let success = unsafe {
-      abi::envoy_dynamic_module_callback_lb_context_get_downstream_headers(
-        self.context_ptr,
-        headers.as_mut_ptr(),
-      )
-    };
-    if !success {
-      return None;
-    }
-    Some(
-      headers
-        .iter()
-        .map(|h| unsafe {
-          (
-            crate::ffi_helpers::str_lossy_from_raw(h.key_ptr as *const u8, h.key_length)
-              .into_owned(),
-            crate::ffi_helpers::str_lossy_from_raw(h.value_ptr as *const u8, h.value_length)
-              .into_owned(),
-          )
-        })
-        .collect(),
-    )
-  }
-
-  fn context_get_downstream_headers_bytes(&self) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
+  fn context_get_downstream_headers(&self) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
     if self.context_ptr.is_null() {
       return Vec::default();
     }
@@ -821,42 +640,7 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     headers
   }
 
-  fn context_get_downstream_header(&self, key: &str, index: usize) -> Option<(String, usize)> {
-    if self.context_ptr.is_null() {
-      return None;
-    }
-    let key_buf = abi::envoy_dynamic_module_type_module_buffer {
-      ptr: key.as_ptr() as *const _,
-      length: key.len(),
-    };
-    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: std::ptr::null(),
-      length: 0,
-    };
-    let mut count: usize = 0;
-    let found = unsafe {
-      abi::envoy_dynamic_module_callback_lb_context_get_downstream_header(
-        self.context_ptr,
-        key_buf,
-        &mut result,
-        index,
-        &mut count,
-      )
-    };
-    if found {
-      unsafe {
-        Some((
-          crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length)
-            .into_owned(),
-          count,
-        ))
-      }
-    } else {
-      None
-    }
-  }
-
-  fn context_get_downstream_header_bytes(
+  fn context_get_downstream_header(
     &self,
     key: &str,
     index: usize,
@@ -915,36 +699,7 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     }
   }
 
-  fn context_get_override_host(&self) -> Option<(String, bool)> {
-    if self.context_ptr.is_null() {
-      return None;
-    }
-    let mut address = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: std::ptr::null(),
-      length: 0,
-    };
-    let mut strict = false;
-    let found = unsafe {
-      abi::envoy_dynamic_module_callback_lb_context_get_override_host(
-        self.context_ptr,
-        &mut address,
-        &mut strict,
-      )
-    };
-    if found {
-      unsafe {
-        Some((
-          crate::ffi_helpers::str_lossy_from_raw(address.ptr as *const u8, address.length)
-            .into_owned(),
-          strict,
-        ))
-      }
-    } else {
-      None
-    }
-  }
-
-  fn context_get_override_host_bytes(&self) -> Option<(EnvoyBuffer<'_>, bool)> {
+  fn context_get_override_host(&self) -> Option<(EnvoyBuffer<'_>, bool)> {
     if self.context_ptr.is_null() {
       return None;
     }

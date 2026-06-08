@@ -197,11 +197,7 @@ pub trait EnvoyListenerFilter {
 
   /// Get the string-typed dynamic metadata value with the given namespace and key value.
   /// Returns None if the metadata is not found or is the wrong type.
-  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<String>;
-
-  /// Borrowed variant of `get_dynamic_metadata_string` that returns the value bytes without
-  /// copying. Returns None if the metadata is not found or is the wrong type.
-  fn get_dynamic_metadata_string_bytes<'a>(
+  fn get_dynamic_metadata_string<'a>(
     &'a self,
     namespace: &str,
     key: &str,
@@ -801,33 +797,7 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
     }
   }
 
-  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<String> {
-    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: std::ptr::null(),
-      length: 0,
-    };
-    let success = unsafe {
-      abi::envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_string(
-        self.raw,
-        str_to_module_buffer(namespace),
-        str_to_module_buffer(key),
-        &mut result as *mut _ as *mut _,
-      )
-    };
-    if success && !result.ptr.is_null() && result.length > 0 {
-      let value_str =
-        unsafe { crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length) };
-      Some(value_str.into_owned())
-    } else {
-      None
-    }
-  }
-
-  fn get_dynamic_metadata_string_bytes(
-    &self,
-    namespace: &str,
-    key: &str,
-  ) -> Option<EnvoyBuffer<'_>> {
+  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<EnvoyBuffer<'_>> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,

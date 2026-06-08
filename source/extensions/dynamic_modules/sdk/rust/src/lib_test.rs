@@ -669,15 +669,15 @@ fn test_listener_filter_counter_invalid_id() {
 }
 
 #[test]
-fn test_listener_get_dynamic_metadata_string_bytes() {
+fn test_listener_get_dynamic_metadata_string() {
   let mut mock = listener::MockEnvoyListenerFilter::new();
   mock
-    .expect_get_dynamic_metadata_string_bytes()
+    .expect_get_dynamic_metadata_string()
     .withf(|namespace, key| namespace == "my.namespace" && key == "my_key")
     .returning(|_, _| Some(EnvoyBuffer::new(b"my_value")));
   assert_eq!(
     mock
-      .get_dynamic_metadata_string_bytes("my.namespace", "my_key")
+      .get_dynamic_metadata_string("my.namespace", "my_key")
       .unwrap()
       .as_slice(),
     b"my_value"
@@ -685,14 +685,12 @@ fn test_listener_get_dynamic_metadata_string_bytes() {
 }
 
 #[test]
-fn test_listener_get_dynamic_metadata_string_bytes_none() {
+fn test_listener_get_dynamic_metadata_string_none() {
   let mut mock = listener::MockEnvoyListenerFilter::new();
   mock
-    .expect_get_dynamic_metadata_string_bytes()
+    .expect_get_dynamic_metadata_string()
     .returning(|_, _| None);
-  assert!(mock
-    .get_dynamic_metadata_string_bytes("missing", "key")
-    .is_none());
+  assert!(mock.get_dynamic_metadata_string("missing", "key").is_none());
 }
 
 #[test]
@@ -1697,7 +1695,7 @@ fn test_get_upstream_host_address_with_host() {
   let result = filter.get_upstream_host_address();
   assert!(result.is_some());
   let (addr, port) = result.unwrap();
-  assert_eq!(addr, "192.168.1.100");
+  assert_eq!(addr.as_slice(), b"192.168.1.100");
   assert_eq!(port, 8080);
 }
 
@@ -1747,7 +1745,7 @@ fn test_get_upstream_host_hostname_with_host() {
 
   let result = filter.get_upstream_host_hostname();
   assert!(result.is_some());
-  assert_eq!(result.unwrap(), "api.example.com");
+  assert_eq!(result.unwrap().as_slice(), b"api.example.com");
 }
 
 #[test]
@@ -1796,7 +1794,7 @@ fn test_get_upstream_host_cluster_with_host() {
 
   let result = filter.get_upstream_host_cluster();
   assert!(result.is_some());
-  assert_eq!(result.unwrap(), "backend_cluster");
+  assert_eq!(result.unwrap().as_slice(), b"backend_cluster");
 }
 
 #[test]
@@ -1891,16 +1889,19 @@ fn test_upstream_host_full_info() {
   let addr_result = filter.get_upstream_host_address();
   assert!(addr_result.is_some());
   let (addr, port) = addr_result.unwrap();
-  assert_eq!(addr, "10.20.30.40");
+  assert_eq!(addr.as_slice(), b"10.20.30.40");
   assert_eq!(port, 8443);
 
   let hostname_result = filter.get_upstream_host_hostname();
   assert!(hostname_result.is_some());
-  assert_eq!(hostname_result.unwrap(), "secure-backend.example.com");
+  assert_eq!(
+    hostname_result.unwrap().as_slice(),
+    b"secure-backend.example.com"
+  );
 
   let cluster_result = filter.get_upstream_host_cluster();
   assert!(cluster_result.is_some());
-  assert_eq!(cluster_result.unwrap(), "secure_cluster");
+  assert_eq!(cluster_result.unwrap().as_slice(), b"secure_cluster");
 }
 
 #[test]
@@ -1924,7 +1925,7 @@ fn test_upstream_host_partial_info() {
   let addr_result = filter.get_upstream_host_address();
   assert!(addr_result.is_some());
   let (addr, port) = addr_result.unwrap();
-  assert_eq!(addr, "192.168.0.1");
+  assert_eq!(addr.as_slice(), b"192.168.0.1");
   assert_eq!(port, 3000);
 
   // Hostname should be None.
@@ -1933,7 +1934,7 @@ fn test_upstream_host_partial_info() {
   // Cluster should be available.
   let cluster_result = filter.get_upstream_host_cluster();
   assert!(cluster_result.is_some());
-  assert_eq!(cluster_result.unwrap(), "partial_cluster");
+  assert_eq!(cluster_result.unwrap().as_slice(), b"partial_cluster");
 }
 
 #[test]
@@ -1953,7 +1954,7 @@ fn test_upstream_host_ipv6_address() {
   let addr_result = filter.get_upstream_host_address();
   assert!(addr_result.is_some());
   let (addr, port) = addr_result.unwrap();
-  assert_eq!(addr, "::1");
+  assert_eq!(addr.as_slice(), b"::1");
   assert_eq!(port, 8080);
 }
 
@@ -1974,122 +1975,24 @@ fn test_upstream_host_full_ipv6_address() {
   let addr_result = filter.get_upstream_host_address();
   assert!(addr_result.is_some());
   let (addr, port) = addr_result.unwrap();
-  assert_eq!(addr, "2001:0db8:85a3:0000:0000:8a2e:0370:7334");
+  assert_eq!(addr.as_slice(), b"2001:0db8:85a3:0000:0000:8a2e:0370:7334");
   assert_eq!(port, 443);
 }
 
 // =============================================================================
-// Borrowed Upstream Host Access Tests
+// Network Dynamic Metadata String Tests
 // =============================================================================
 
 #[test]
-fn test_get_upstream_host_address_bytes_with_host() {
-  reset_upstream_host_mock();
-  set_upstream_host_mock(MockUpstreamHost {
-    address: Some("192.168.1.100".to_string()),
-    port: 8080,
-    hostname: None,
-    cluster_name: None,
-  });
-
-  let filter = EnvoyNetworkFilterImpl {
-    raw: std::ptr::null_mut(),
-  };
-
-  let result = filter.get_upstream_host_address_bytes();
-  assert!(result.is_some());
-  let (addr, port) = result.unwrap();
-  assert_eq!(addr.as_slice(), b"192.168.1.100");
-  assert_eq!(port, 8080);
-}
-
-#[test]
-fn test_get_upstream_host_address_bytes_no_host() {
-  reset_upstream_host_mock();
-
-  let filter = EnvoyNetworkFilterImpl {
-    raw: std::ptr::null_mut(),
-  };
-
-  assert!(filter.get_upstream_host_address_bytes().is_none());
-}
-
-#[test]
-fn test_get_upstream_host_hostname_bytes_with_host() {
-  reset_upstream_host_mock();
-  set_upstream_host_mock(MockUpstreamHost {
-    address: None,
-    port: 0,
-    hostname: Some("api.example.com".to_string()),
-    cluster_name: None,
-  });
-
-  let filter = EnvoyNetworkFilterImpl {
-    raw: std::ptr::null_mut(),
-  };
-
-  let result = filter.get_upstream_host_hostname_bytes();
-  assert!(result.is_some());
-  assert_eq!(result.unwrap().as_slice(), b"api.example.com");
-}
-
-#[test]
-fn test_get_upstream_host_hostname_bytes_empty() {
-  reset_upstream_host_mock();
-  set_upstream_host_mock(MockUpstreamHost {
-    address: None,
-    port: 0,
-    hostname: Some(String::new()),
-    cluster_name: None,
-  });
-
-  let filter = EnvoyNetworkFilterImpl {
-    raw: std::ptr::null_mut(),
-  };
-
-  assert!(filter.get_upstream_host_hostname_bytes().is_none());
-}
-
-#[test]
-fn test_get_upstream_host_cluster_bytes_with_host() {
-  reset_upstream_host_mock();
-  set_upstream_host_mock(MockUpstreamHost {
-    address: None,
-    port: 0,
-    hostname: None,
-    cluster_name: Some("backend_cluster".to_string()),
-  });
-
-  let filter = EnvoyNetworkFilterImpl {
-    raw: std::ptr::null_mut(),
-  };
-
-  let result = filter.get_upstream_host_cluster_bytes();
-  assert!(result.is_some());
-  assert_eq!(result.unwrap().as_slice(), b"backend_cluster");
-}
-
-#[test]
-fn test_get_upstream_host_cluster_bytes_no_host() {
-  reset_upstream_host_mock();
-
-  let filter = EnvoyNetworkFilterImpl {
-    raw: std::ptr::null_mut(),
-  };
-
-  assert!(filter.get_upstream_host_cluster_bytes().is_none());
-}
-
-#[test]
-fn test_network_get_dynamic_metadata_string_bytes() {
+fn test_network_get_dynamic_metadata_string() {
   let mut mock = network::MockEnvoyNetworkFilter::new();
   mock
-    .expect_get_dynamic_metadata_string_bytes()
+    .expect_get_dynamic_metadata_string()
     .withf(|namespace, key| namespace == "my.namespace" && key == "my_key")
     .returning(|_, _| Some(EnvoyBuffer::new(b"my_value")));
   assert_eq!(
     mock
-      .get_dynamic_metadata_string_bytes("my.namespace", "my_key")
+      .get_dynamic_metadata_string("my.namespace", "my_key")
       .unwrap()
       .as_slice(),
     b"my_value"
@@ -2097,14 +2000,12 @@ fn test_network_get_dynamic_metadata_string_bytes() {
 }
 
 #[test]
-fn test_network_get_dynamic_metadata_string_bytes_none() {
+fn test_network_get_dynamic_metadata_string_none() {
   let mut mock = network::MockEnvoyNetworkFilter::new();
   mock
-    .expect_get_dynamic_metadata_string_bytes()
+    .expect_get_dynamic_metadata_string()
     .returning(|_, _| None);
-  assert!(mock
-    .get_dynamic_metadata_string_bytes("missing", "key")
-    .is_none());
+  assert!(mock.get_dynamic_metadata_string("missing", "key").is_none());
 }
 
 // =============================================================================
@@ -3870,114 +3771,107 @@ fn test_lb_config_vec_metric_invalid_id() {
 }
 
 // =============================================================================
-// Load Balancer borrowed accessor tests
+// Load Balancer accessor tests
 // =============================================================================
 
 #[test]
-fn test_lb_get_cluster_name_bytes() {
+fn test_lb_get_cluster_name() {
   let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
   mock_lb
-    .expect_get_cluster_name_bytes()
+    .expect_get_cluster_name()
     .returning(|| Some(EnvoyBuffer::new(b"my_cluster")));
   assert_eq!(
-    mock_lb.get_cluster_name_bytes().unwrap().as_slice(),
+    mock_lb.get_cluster_name().unwrap().as_slice(),
     b"my_cluster"
   );
 }
 
 #[test]
-fn test_lb_get_cluster_name_bytes_none() {
+fn test_lb_get_cluster_name_none() {
   let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
-  mock_lb.expect_get_cluster_name_bytes().returning(|| None);
-  assert!(mock_lb.get_cluster_name_bytes().is_none());
+  mock_lb.expect_get_cluster_name().returning(|| None);
+  assert!(mock_lb.get_cluster_name().is_none());
 }
 
 #[test]
-fn test_lb_get_healthy_host_address_bytes() {
+fn test_lb_get_healthy_host_address() {
   let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
   mock_lb
-    .expect_get_healthy_host_address_bytes()
+    .expect_get_healthy_host_address()
     .withf(|priority, index| *priority == 0 && *index == 1)
     .returning(|_, _| Some(EnvoyBuffer::new(b"10.0.0.1:8080")));
   assert_eq!(
-    mock_lb
-      .get_healthy_host_address_bytes(0, 1)
-      .unwrap()
-      .as_slice(),
+    mock_lb.get_healthy_host_address(0, 1).unwrap().as_slice(),
     b"10.0.0.1:8080"
   );
 }
 
 #[test]
-fn test_lb_get_host_address_bytes() {
+fn test_lb_get_host_address() {
   let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
   mock_lb
-    .expect_get_host_address_bytes()
+    .expect_get_host_address()
     .returning(|_, _| Some(EnvoyBuffer::new(b"192.168.0.1:443")));
   assert_eq!(
-    mock_lb.get_host_address_bytes(0, 0).unwrap().as_slice(),
+    mock_lb.get_host_address(0, 0).unwrap().as_slice(),
     b"192.168.0.1:443"
   );
 }
 
 #[test]
-fn test_lb_get_host_address_bytes_none() {
+fn test_lb_get_host_address_none() {
   let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
-  mock_lb
-    .expect_get_host_address_bytes()
-    .returning(|_, _| None);
-  assert!(mock_lb.get_host_address_bytes(0, 0).is_none());
+  mock_lb.expect_get_host_address().returning(|_, _| None);
+  assert!(mock_lb.get_host_address(0, 0).is_none());
 }
 
 #[test]
-fn test_lb_get_host_locality_bytes() {
+fn test_lb_get_host_locality() {
   let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
-  mock_lb.expect_get_host_locality_bytes().returning(|_, _| {
+  mock_lb.expect_get_host_locality().returning(|_, _| {
     Some((
       EnvoyBuffer::new(b"us-east-1"),
       EnvoyBuffer::new(b"us-east-1a"),
       EnvoyBuffer::new(b"sub-1"),
     ))
   });
-  let (region, zone, sub_zone) = mock_lb.get_host_locality_bytes(0, 0).unwrap();
+  let (region, zone, sub_zone) = mock_lb.get_host_locality(0, 0).unwrap();
   assert_eq!(region.as_slice(), b"us-east-1");
   assert_eq!(zone.as_slice(), b"us-east-1a");
   assert_eq!(sub_zone.as_slice(), b"sub-1");
 }
 
 #[test]
-fn test_lb_context_get_downstream_headers_bytes() {
+fn test_lb_context_get_downstream_headers() {
   let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
   mock_lb
-    .expect_context_get_downstream_headers_bytes()
+    .expect_context_get_downstream_headers()
     .returning(|| vec![(EnvoyBuffer::new(b"host"), EnvoyBuffer::new(b"example.com"))]);
-  let headers = mock_lb.context_get_downstream_headers_bytes();
+  let headers = mock_lb.context_get_downstream_headers();
   assert_eq!(headers.len(), 1);
   assert_eq!(headers[0].0.as_slice(), b"host");
   assert_eq!(headers[0].1.as_slice(), b"example.com");
 }
 
 #[test]
-fn test_lb_context_get_downstream_header_bytes() {
+fn test_lb_context_get_downstream_header() {
   let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
   mock_lb
-    .expect_context_get_downstream_header_bytes()
+    .expect_context_get_downstream_header()
     .withf(|key, index| key == "host" && *index == 0)
     .returning(|_, _| Some((EnvoyBuffer::new(b"example.com"), 1)));
-  let result = mock_lb
-    .context_get_downstream_header_bytes("host", 0)
-    .unwrap();
+  let result = mock_lb.context_get_downstream_header("host", 0).unwrap();
   assert_eq!(result.0.as_slice(), b"example.com");
   assert_eq!(result.1, 1);
 }
 
 #[test]
-fn test_lb_context_get_override_host_bytes() {
+fn test_lb_context_get_override_host() {
   let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
   mock_lb
-    .expect_context_get_override_host_bytes()
+    .expect_context_get_override_host()
     .returning(|| Some((EnvoyBuffer::new(b"10.0.0.2:9090"), false)));
-  let result = mock_lb.context_get_override_host_bytes().unwrap();
+  let result = mock_lb.context_get_override_host().unwrap();
   assert_eq!(result.0.as_slice(), b"10.0.0.2:9090");
   assert!(!result.1);
 }
@@ -5144,22 +5038,24 @@ fn test_cluster_lb_context_get_downstream_headers_size() {
 fn test_cluster_lb_context_get_downstream_headers() {
   let mut mock_ctx = cluster::MockClusterLbContext::new();
   mock_ctx.expect_get_downstream_headers().returning(|| {
-    Some(vec![
-      (":method".to_string(), "GET".to_string()),
-      ("host".to_string(), "example.com".to_string()),
-    ])
+    vec![
+      (EnvoyBuffer::new(b":method"), EnvoyBuffer::new(b"GET")),
+      (EnvoyBuffer::new(b"host"), EnvoyBuffer::new(b"example.com")),
+    ]
   });
-  let headers = mock_ctx.get_downstream_headers().unwrap();
+  let headers = mock_ctx.get_downstream_headers();
   assert_eq!(headers.len(), 2);
-  assert_eq!(headers[0], (":method".to_string(), "GET".to_string()));
-  assert_eq!(headers[1], ("host".to_string(), "example.com".to_string()));
+  assert_eq!(headers[0].0.as_slice(), b":method");
+  assert_eq!(headers[0].1.as_slice(), b"GET");
+  assert_eq!(headers[1].0.as_slice(), b"host");
+  assert_eq!(headers[1].1.as_slice(), b"example.com");
 }
 
 #[test]
-fn test_cluster_lb_context_get_downstream_headers_none() {
+fn test_cluster_lb_context_get_downstream_headers_empty() {
   let mut mock_ctx = cluster::MockClusterLbContext::new();
-  mock_ctx.expect_get_downstream_headers().returning(|| None);
-  assert!(mock_ctx.get_downstream_headers().is_none());
+  mock_ctx.expect_get_downstream_headers().returning(Vec::new);
+  assert!(mock_ctx.get_downstream_headers().is_empty());
 }
 
 #[test]
@@ -5168,9 +5064,9 @@ fn test_cluster_lb_context_get_downstream_header() {
   mock_ctx
     .expect_get_downstream_header()
     .withf(|key, index| key == "host" && *index == 0)
-    .returning(|_, _| Some(("example.com".to_string(), 1)));
+    .returning(|_, _| Some((EnvoyBuffer::new(b"example.com"), 1)));
   let result = mock_ctx.get_downstream_header("host", 0).unwrap();
-  assert_eq!(result.0, "example.com");
+  assert_eq!(result.0.as_slice(), b"example.com");
   assert_eq!(result.1, 1);
 }
 
@@ -5216,9 +5112,9 @@ fn test_cluster_lb_context_get_override_host() {
   let mut mock_ctx = cluster::MockClusterLbContext::new();
   mock_ctx
     .expect_get_override_host()
-    .returning(|| Some(("10.0.0.1:8080".to_string(), true)));
+    .returning(|| Some((EnvoyBuffer::new(b"10.0.0.1:8080"), true)));
   let result = mock_ctx.get_override_host().unwrap();
-  assert_eq!(result.0, "10.0.0.1:8080");
+  assert_eq!(result.0.as_slice(), b"10.0.0.1:8080");
   assert!(result.1);
 }
 
@@ -5227,9 +5123,9 @@ fn test_cluster_lb_context_get_override_host_non_strict() {
   let mut mock_ctx = cluster::MockClusterLbContext::new();
   mock_ctx
     .expect_get_override_host()
-    .returning(|| Some(("10.0.0.2:9090".to_string(), false)));
+    .returning(|| Some((EnvoyBuffer::new(b"10.0.0.2:9090"), false)));
   let result = mock_ctx.get_override_host().unwrap();
-  assert_eq!(result.0, "10.0.0.2:9090");
+  assert_eq!(result.0.as_slice(), b"10.0.0.2:9090");
   assert!(!result.1);
 }
 
@@ -5245,10 +5141,10 @@ fn test_cluster_lb_context_get_downstream_connection_sni() {
   let mut mock_ctx = cluster::MockClusterLbContext::new();
   mock_ctx
     .expect_get_downstream_connection_sni()
-    .returning(|| Some("example.com".to_string()));
+    .returning(|| Some(EnvoyBuffer::new(b"example.com")));
   assert_eq!(
-    mock_ctx.get_downstream_connection_sni(),
-    Some("example.com".to_string())
+    mock_ctx.get_downstream_connection_sni().unwrap().as_slice(),
+    b"example.com"
   );
 }
 
@@ -5259,63 +5155,6 @@ fn test_cluster_lb_context_get_downstream_connection_sni_none() {
     .expect_get_downstream_connection_sni()
     .returning(|| None);
   assert!(mock_ctx.get_downstream_connection_sni().is_none());
-}
-
-#[test]
-fn test_cluster_lb_context_get_downstream_headers_bytes() {
-  let mut mock_ctx = cluster::MockClusterLbContext::new();
-  mock_ctx
-    .expect_get_downstream_headers_bytes()
-    .returning(|| {
-      vec![
-        (EnvoyBuffer::new(b":method"), EnvoyBuffer::new(b"GET")),
-        (EnvoyBuffer::new(b"host"), EnvoyBuffer::new(b"example.com")),
-      ]
-    });
-  let headers = mock_ctx.get_downstream_headers_bytes();
-  assert_eq!(headers.len(), 2);
-  assert_eq!(headers[0].0.as_slice(), b":method");
-  assert_eq!(headers[0].1.as_slice(), b"GET");
-  assert_eq!(headers[1].0.as_slice(), b"host");
-  assert_eq!(headers[1].1.as_slice(), b"example.com");
-}
-
-#[test]
-fn test_cluster_lb_context_get_downstream_header_bytes() {
-  let mut mock_ctx = cluster::MockClusterLbContext::new();
-  mock_ctx
-    .expect_get_downstream_header_bytes()
-    .withf(|key, index| key == "host" && *index == 0)
-    .returning(|_, _| Some((EnvoyBuffer::new(b"example.com"), 1)));
-  let result = mock_ctx.get_downstream_header_bytes("host", 0).unwrap();
-  assert_eq!(result.0.as_slice(), b"example.com");
-  assert_eq!(result.1, 1);
-}
-
-#[test]
-fn test_cluster_lb_context_get_override_host_bytes() {
-  let mut mock_ctx = cluster::MockClusterLbContext::new();
-  mock_ctx
-    .expect_get_override_host_bytes()
-    .returning(|| Some((EnvoyBuffer::new(b"10.0.0.1:8080"), true)));
-  let result = mock_ctx.get_override_host_bytes().unwrap();
-  assert_eq!(result.0.as_slice(), b"10.0.0.1:8080");
-  assert!(result.1);
-}
-
-#[test]
-fn test_cluster_lb_context_get_downstream_connection_sni_bytes() {
-  let mut mock_ctx = cluster::MockClusterLbContext::new();
-  mock_ctx
-    .expect_get_downstream_connection_sni_bytes()
-    .returning(|| Some(EnvoyBuffer::new(b"example.com")));
-  assert_eq!(
-    mock_ctx
-      .get_downstream_connection_sni_bytes()
-      .unwrap()
-      .as_slice(),
-    b"example.com"
-  );
 }
 
 #[test]
@@ -5350,72 +5189,67 @@ fn test_cluster_lb_context_get_host_stat_null_host() {
 }
 
 #[test]
-fn test_cluster_lb_get_cluster_name_bytes() {
+fn test_cluster_lb_get_cluster_name() {
   let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
   mock_lb
-    .expect_get_cluster_name_bytes()
+    .expect_get_cluster_name()
     .returning(|| Some(EnvoyBuffer::new(b"my_cluster")));
   assert_eq!(
-    mock_lb.get_cluster_name_bytes().unwrap().as_slice(),
+    mock_lb.get_cluster_name().unwrap().as_slice(),
     b"my_cluster"
   );
 }
 
 #[test]
-fn test_cluster_lb_get_cluster_name_bytes_none() {
+fn test_cluster_lb_get_cluster_name_none() {
   let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
-  mock_lb.expect_get_cluster_name_bytes().returning(|| None);
-  assert!(mock_lb.get_cluster_name_bytes().is_none());
+  mock_lb.expect_get_cluster_name().returning(|| None);
+  assert!(mock_lb.get_cluster_name().is_none());
 }
 
 #[test]
-fn test_cluster_lb_get_healthy_host_address_bytes() {
+fn test_cluster_lb_get_healthy_host_address() {
   let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
   mock_lb
-    .expect_get_healthy_host_address_bytes()
+    .expect_get_healthy_host_address()
     .withf(|priority, index| *priority == 0 && *index == 1)
     .returning(|_, _| Some(EnvoyBuffer::new(b"10.0.0.1:8080")));
   assert_eq!(
-    mock_lb
-      .get_healthy_host_address_bytes(0, 1)
-      .unwrap()
-      .as_slice(),
+    mock_lb.get_healthy_host_address(0, 1).unwrap().as_slice(),
     b"10.0.0.1:8080"
   );
 }
 
 #[test]
-fn test_cluster_lb_get_host_address_bytes() {
+fn test_cluster_lb_get_host_address() {
   let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
   mock_lb
-    .expect_get_host_address_bytes()
+    .expect_get_host_address()
     .returning(|_, _| Some(EnvoyBuffer::new(b"192.168.0.1:443")));
   assert_eq!(
-    mock_lb.get_host_address_bytes(0, 0).unwrap().as_slice(),
+    mock_lb.get_host_address(0, 0).unwrap().as_slice(),
     b"192.168.0.1:443"
   );
 }
 
 #[test]
-fn test_cluster_lb_get_host_address_bytes_none() {
+fn test_cluster_lb_get_host_address_none() {
   let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
-  mock_lb
-    .expect_get_host_address_bytes()
-    .returning(|_, _| None);
-  assert!(mock_lb.get_host_address_bytes(0, 0).is_none());
+  mock_lb.expect_get_host_address().returning(|_, _| None);
+  assert!(mock_lb.get_host_address(0, 0).is_none());
 }
 
 #[test]
-fn test_cluster_lb_get_host_locality_bytes() {
+fn test_cluster_lb_get_host_locality() {
   let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
-  mock_lb.expect_get_host_locality_bytes().returning(|_, _| {
+  mock_lb.expect_get_host_locality().returning(|_, _| {
     Some((
       EnvoyBuffer::new(b"us-east-1"),
       EnvoyBuffer::new(b"us-east-1a"),
       EnvoyBuffer::new(b"sub-1"),
     ))
   });
-  let (region, zone, sub_zone) = mock_lb.get_host_locality_bytes(0, 0).unwrap();
+  let (region, zone, sub_zone) = mock_lb.get_host_locality(0, 0).unwrap();
   assert_eq!(region.as_slice(), b"us-east-1");
   assert_eq!(zone.as_slice(), b"us-east-1a");
   assert_eq!(sub_zone.as_slice(), b"sub-1");
@@ -5538,13 +5372,13 @@ fn test_cluster_lb_context_full_workflow() {
         Some(s) => s,
         None => return cluster::HostSelectionResult::NoHost,
       };
-      assert_eq!(sni, "backend.example.com");
+      assert_eq!(sni.as_slice(), b"backend.example.com");
 
       let (host_header, _) = match ctx.get_downstream_header("host", 0) {
         Some(h) => h,
         None => return cluster::HostSelectionResult::NoHost,
       };
-      assert_eq!(host_header, "backend.example.com");
+      assert_eq!(host_header.as_slice(), b"backend.example.com");
 
       let hash = match ctx.compute_hash_key() {
         Some(h) => h,
@@ -5563,11 +5397,11 @@ fn test_cluster_lb_context_full_workflow() {
   let mut mock_ctx = cluster::MockClusterLbContext::new();
   mock_ctx
     .expect_get_downstream_connection_sni()
-    .returning(|| Some("backend.example.com".to_string()));
+    .returning(|| Some(EnvoyBuffer::new(b"backend.example.com")));
   mock_ctx
     .expect_get_downstream_header()
     .withf(|key, index| key == "host" && *index == 0)
-    .returning(|_, _| Some(("backend.example.com".to_string(), 1)));
+    .returning(|_, _| Some((EnvoyBuffer::new(b"backend.example.com"), 1)));
   mock_ctx.expect_compute_hash_key().returning(|| Some(99999));
   mock_ctx
     .expect_should_select_another_host()

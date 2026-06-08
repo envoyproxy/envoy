@@ -278,11 +278,7 @@ pub trait EnvoyNetworkFilter {
 
   /// Get the string-typed dynamic metadata value with the given namespace and key value.
   /// Returns None if the metadata is not found or is the wrong type.
-  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<String>;
-
-  /// Borrowed variant of `get_dynamic_metadata_string` that returns the value bytes without
-  /// copying. Returns None if the metadata is not found or is the wrong type.
-  fn get_dynamic_metadata_string_bytes<'a>(
+  fn get_dynamic_metadata_string<'a>(
     &'a self,
     namespace: &str,
     key: &str,
@@ -413,27 +409,15 @@ pub trait EnvoyNetworkFilter {
 
   /// Get the upstream host address and port if an upstream host is selected.
   /// Returns None if no upstream host is set or the address is not an IP.
-  fn get_upstream_host_address(&self) -> Option<(String, u32)>;
-
-  /// Borrowed variant of `get_upstream_host_address` that returns the address bytes without
-  /// copying. Returns None if no upstream host is set or the address is not an IP.
-  fn get_upstream_host_address_bytes<'a>(&'a self) -> Option<(EnvoyBuffer<'a>, u32)>;
+  fn get_upstream_host_address<'a>(&'a self) -> Option<(EnvoyBuffer<'a>, u32)>;
 
   /// Get the upstream host hostname if an upstream host is selected.
   /// Returns None if no upstream host is set or hostname is empty.
-  fn get_upstream_host_hostname(&self) -> Option<String>;
-
-  /// Borrowed variant of `get_upstream_host_hostname` that returns the hostname bytes without
-  /// copying. Returns None if no upstream host is set or hostname is empty.
-  fn get_upstream_host_hostname_bytes<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
+  fn get_upstream_host_hostname<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
 
   /// Get the upstream host cluster name if an upstream host is selected.
   /// Returns None if no upstream host is set.
-  fn get_upstream_host_cluster(&self) -> Option<String>;
-
-  /// Borrowed variant of `get_upstream_host_cluster` that returns the cluster name bytes without
-  /// copying. Returns None if no upstream host is set.
-  fn get_upstream_host_cluster_bytes<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
+  fn get_upstream_host_cluster<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
 
   /// Check if an upstream host has been selected for this connection.
   fn has_upstream_host(&self) -> bool;
@@ -1124,33 +1108,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     }
   }
 
-  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<String> {
-    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: std::ptr::null(),
-      length: 0,
-    };
-    let success = unsafe {
-      abi::envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
-        self.raw,
-        str_to_module_buffer(namespace),
-        str_to_module_buffer(key),
-        &mut result as *mut _ as *mut _,
-      )
-    };
-    if success && !result.ptr.is_null() && result.length > 0 {
-      let value_str =
-        unsafe { crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length) };
-      Some(value_str.into_owned())
-    } else {
-      None
-    }
-  }
-
-  fn get_dynamic_metadata_string_bytes(
-    &self,
-    namespace: &str,
-    key: &str,
-  ) -> Option<EnvoyBuffer<'_>> {
+  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<EnvoyBuffer<'_>> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
@@ -1515,28 +1473,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     }
   }
 
-  fn get_upstream_host_address(&self) -> Option<(String, u32)> {
-    let mut address = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: std::ptr::null_mut(),
-      length: 0,
-    };
-    let mut port: u32 = 0;
-    let result = unsafe {
-      abi::envoy_dynamic_module_callback_network_filter_get_upstream_host_address(
-        self.raw,
-        &mut address as *mut _ as *mut _,
-        &mut port,
-      )
-    };
-    if !result || address.length == 0 || address.ptr.is_null() {
-      return None;
-    }
-    let address_str =
-      unsafe { crate::ffi_helpers::str_lossy_from_raw(address.ptr as *const u8, address.length) };
-    Some((address_str.into_owned(), port))
-  }
-
-  fn get_upstream_host_address_bytes(&self) -> Option<(EnvoyBuffer<'_>, u32)> {
+  fn get_upstream_host_address(&self) -> Option<(EnvoyBuffer<'_>, u32)> {
     let mut address = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null_mut(),
       length: 0,
@@ -1558,26 +1495,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     ))
   }
 
-  fn get_upstream_host_hostname(&self) -> Option<String> {
-    let mut hostname = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: std::ptr::null_mut(),
-      length: 0,
-    };
-    let result = unsafe {
-      abi::envoy_dynamic_module_callback_network_filter_get_upstream_host_hostname(
-        self.raw,
-        &mut hostname as *mut _ as *mut _,
-      )
-    };
-    if !result || hostname.length == 0 || hostname.ptr.is_null() {
-      return None;
-    }
-    let hostname_str =
-      unsafe { crate::ffi_helpers::str_lossy_from_raw(hostname.ptr as *const u8, hostname.length) };
-    Some(hostname_str.into_owned())
-  }
-
-  fn get_upstream_host_hostname_bytes(&self) -> Option<EnvoyBuffer<'_>> {
+  fn get_upstream_host_hostname(&self) -> Option<EnvoyBuffer<'_>> {
     let mut hostname = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null_mut(),
       length: 0,
@@ -1594,27 +1512,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     Some(unsafe { EnvoyBuffer::new_from_raw(hostname.ptr as *const u8, hostname.length) })
   }
 
-  fn get_upstream_host_cluster(&self) -> Option<String> {
-    let mut cluster_name = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: std::ptr::null_mut(),
-      length: 0,
-    };
-    let result = unsafe {
-      abi::envoy_dynamic_module_callback_network_filter_get_upstream_host_cluster(
-        self.raw,
-        &mut cluster_name as *mut _ as *mut _,
-      )
-    };
-    if !result || cluster_name.length == 0 || cluster_name.ptr.is_null() {
-      return None;
-    }
-    let cluster_str = unsafe {
-      crate::ffi_helpers::str_lossy_from_raw(cluster_name.ptr as *const u8, cluster_name.length)
-    };
-    Some(cluster_str.into_owned())
-  }
-
-  fn get_upstream_host_cluster_bytes(&self) -> Option<EnvoyBuffer<'_>> {
+  fn get_upstream_host_cluster(&self) -> Option<EnvoyBuffer<'_>> {
     let mut cluster_name = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null_mut(),
       length: 0,
