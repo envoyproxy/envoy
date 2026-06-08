@@ -818,11 +818,18 @@ ListenerManagerImpl::listeners(ListenerState state) {
 
 bool ListenerManagerImpl::doFinalPreWorkerListenerInit(ListenerImpl& listener) {
   TRY_ASSERT_MAIN_THREAD {
+    absl::Status success = listener.doFinalPreWorkerInit();
+    if (!success.ok()) {
+      ENVOY_LOG(error, "final pre-worker listener init for listener '{}' failed: {}",
+                listener.name(), success.message());
+      return false;
+    }
     for (auto& socket_factory : listener.listenSocketFactories()) {
       absl::Status success = (socket_factory->doFinalPreWorkerInit());
       if (!success.ok()) {
-        ENVOY_LOG(error, "final pre-worker listener init for listener '{}' failed: {}",
-                  listener.name(), success.message());
+        ENVOY_LOG(error, "final pre-worker listener init for listener '{}' and socket '{}': {}",
+                  listener.name(), socket_factory->localAddress()->asStringView(),
+                  success.message());
         return false;
       }
     }

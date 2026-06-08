@@ -343,6 +343,7 @@ public:
     }
   }
 
+  absl::Status doFinalPreWorkerInit();
   absl::Status cloneSocketFactoryFrom(const ListenerImpl& other);
   void closeAllSockets();
 

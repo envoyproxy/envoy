@@ -327,6 +327,11 @@ public:
    * @return socket options specific to this factory that should be applied to all sockets.
    */
   virtual const Network::Socket::OptionsSharedPtr& socketOptions() const PURE;
+
+  virtual absl::Status doFinalPreWorkerInit(Network::ListenSocketFactory& socket_factory) {
+    UNREFERENCED_PARAMETER(socket_factory);
+    return absl::OkStatus();
+  }
 };
 
 using ActiveUdpListenerFactoryPtr = std::unique_ptr<ActiveUdpListenerFactory>;

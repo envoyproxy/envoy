@@ -371,8 +371,6 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
       *Config::Utility::translateToFactoryConfig(cid_generator_config, validation_visitor,
                                                  cid_generator_config_factory),
       validation_visitor, context_);
-  quic_cid_generator_context_ =
-      quic_cid_generator_factory_->createQuicConnectionIdGeneratorContext();
 
   if (config.has_server_preferred_address_config()) {
     const envoy::config::core::v3::TypedExtensionConfig& server_preferred_address_config =
@@ -387,7 +385,12 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
                                                        server_preferred_address_config_factory),
             validation_visitor, context_.serverFactoryContext());
   }
+}
 
+absl::Status ActiveQuicListenerFactory::doFinalPreWorkerInit(Network::ListenSocketFactory&) {
+  ASSERT(quic_cid_generator_factory_ != nullptr);
+  quic_cid_generator_context_ =
+      quic_cid_generator_factory_->createQuicConnectionIdGeneratorContext();
   worker_selector_ =
       quic_cid_generator_context_->getCompatibleConnectionIdWorkerSelector(concurrency_);
   if (!disable_kernel_bpf_packet_routing_for_test_) {
@@ -408,14 +411,15 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
                   "connection_id_generator. QUIC performance may be degraded.");
         break;
       default:
-        THROW_IF_NOT_OK_REF(opt_or_status.status());
+        return opt_or_status.status();
         break;
       }
     } else {
       ENVOY_LOG(info, "Not applying BPF because concurrency is 1");
       kernel_worker_routing_ = true;
     }
-  };
+  }
+  return absl::OkStatus();
 }
 
 Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::createActiveUdpListener(
@@ -466,6 +470,7 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
       proof_source_factory_.value(),
       quic_cid_generator_context_->createQuicConnectionIdGenerator(worker_index));
 }
+
 Network::ConnectionHandler::ActiveUdpListenerPtr
 ActiveQuicListenerFactory::createActiveQuicListener(
     Runtime::Loader& runtime, uint32_t worker_index, uint32_t concurrency,
