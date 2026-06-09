@@ -66,7 +66,7 @@ envoy_cmake(
         "-G",
         "Ninja",
     ],
-    lib_source = "@com_github_fdio_vpp_vcl//:all",
+    lib_source = "@vpp-vcl//:all",
     linkopts = ["-Wno-unused-variable"],
     out_static_libs = [
         "libvppcom.a",

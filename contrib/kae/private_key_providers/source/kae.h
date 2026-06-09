@@ -74,7 +74,7 @@ private:
 class KaeSection : public Logger::Loggable<Logger::Id::connection> {
 public:
   KaeSection(LibUadkCryptoSharedPtr libuadk);
-  bool startSection(Api::Api& api, std::chrono::milliseconds poll_delay);
+  bool startSection(Api::Api& api, std::chrono::milliseconds poll_delay, uint32_t max_instances);
   KaeHandle& getNextHandle();
   bool isInitialized();
 

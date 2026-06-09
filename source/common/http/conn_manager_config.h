@@ -20,6 +20,9 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/common/tracing/tracer_config_impl.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -164,6 +167,8 @@ enum class ForwardClientCertType {
  * information to the next hop.
  */
 enum class ClientCertDetailsType { Cert, Chain, Subject, URI, DNS };
+
+enum class ClientCertFormat { Text, Json };
 
 /**
  * Type that indicates how port should be stripped from Host header.
@@ -428,6 +433,11 @@ public:
   virtual ForwardClientCertType forwardClientCert() const PURE;
 
   /**
+   * @return ClientCertFormat the format to use for the XFCC header value (text or JSON).
+   */
+  virtual ClientCertFormat clientCertFormat() const PURE;
+
+  /**
    * @return vector of ClientCertDetailsType the configuration of the current client cert's details
    * to be forwarded.
    */
@@ -568,6 +578,18 @@ public:
    *         Connection Lifetime.
    */
   virtual bool addProxyProtocolConnectionState() const PURE;
+
+  /**
+   * @return a set of destination ports that should be treated as HTTPS when the
+   *         local address was restored from PROXY protocol.
+   */
+  virtual const absl::flat_hash_set<uint32_t>& httpsDestinationPorts() const PURE;
+
+  /**
+   * @return a set of destination ports that should be treated as HTTP when the
+   *         local address was restored from PROXY protocol.
+   */
+  virtual const absl::flat_hash_set<uint32_t>& httpDestinationPorts() const PURE;
 };
 
 using ConnectionManagerConfigSharedPtr = std::shared_ptr<ConnectionManagerConfig>;

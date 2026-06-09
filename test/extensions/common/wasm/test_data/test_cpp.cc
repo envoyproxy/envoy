@@ -107,8 +107,9 @@ WASM_EXPORT(uint32_t, proxy_on_vm_start, (uint32_t context_id, uint32_t configur
     name = "test_historam";
     CHECK_RESULT(proxy_define_metric(MetricType::Histogram, name.data(), name.size(), &h));
     // Bad type.
-    CHECK_RESULT_NOT_OK(
-        proxy_define_metric(static_cast<MetricType>(9999), name.data(), name.size(), &c));
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
+    const auto bad_metric_type = static_cast<MetricType>(9999);
+    CHECK_RESULT_NOT_OK(proxy_define_metric(bad_metric_type, name.data(), name.size(), &c));
 
     CHECK_RESULT(proxy_increment_metric(c, 1));
     CHECK_RESULT(proxy_increment_metric(g, 1));
@@ -220,7 +221,7 @@ WASM_EXPORT(uint32_t, proxy_on_vm_start, (uint32_t context_id, uint32_t configur
     }
     // Check if the monotonic clock actually increases monotonically.
     const std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
-    if ((t2-t1).count() <= 0) {
+    if ((t2 - t1).count() <= 0) {
       FAIL_NOW("monotonic clock should be available");
     }
 #ifndef WIN32
@@ -277,9 +278,7 @@ WASM_EXPORT(uint32_t, proxy_on_done, (uint32_t)) {
   return 0;
 }
 
-WASM_EXPORT(void, proxy_on_tick, (uint32_t)) {
-  proxy_done();
-}
+WASM_EXPORT(void, proxy_on_tick, (uint32_t)) { proxy_done(); }
 
 WASM_EXPORT(void, proxy_on_delete, (uint32_t)) {
   std::string message = "on_delete logging";

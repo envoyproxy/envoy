@@ -1,15 +1,18 @@
-load("@dynamic_modules_rust_sdk_crate_index//:defs.bzl", "all_crate_deps")
 load("@envoy_repo//:compiler.bzl", "LLVM_PATH")
+load("@envoy_rust_crate_index//:defs.bzl", "all_crate_deps")
 load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
 load("@rules_rust//rust:defs.bzl", "rust_library")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_extension_package",
 )
+load("//bazel:toolchains.bzl", "LLVM_MAJOR")
 
 licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
+
+exports_files(["Cargo.toml"])
 
 cargo_build_script(
     name = "build_script",
@@ -18,8 +21,8 @@ cargo_build_script(
         "@envoy_repo//:use_local_llvm": {
             "LIBCLANG_PATH": "%s/lib/libclang.so" % LLVM_PATH,
             "BINDGEN_EXTRA_CLANG_ARGS": " ".join([
-                "-resource-dir %s/lib/clang/18" % LLVM_PATH,
-                "-isystem %s/lib/clang/18/include" % LLVM_PATH,
+                "-resource-dir %s/lib/clang/%s" % (LLVM_PATH, LLVM_MAJOR),
+                "-isystem %s/lib/clang/%s/include" % (LLVM_PATH, LLVM_MAJOR),
                 "-isystem %s/include/x86_64-unknown-linux-gnu/c++/v1/" % LLVM_PATH,
                 "-isystem %s/include/aarch64-unknown-linux-gnu/c++/v1/" % LLVM_PATH,
             ]),
@@ -27,16 +30,21 @@ cargo_build_script(
         "@platforms//os:linux": {
             "LIBCLANG_PATH": "$(location @llvm_toolchain_llvm//:lib/libclang.so)",
             "BINDGEN_EXTRA_CLANG_ARGS": " ".join([
-                "-resource-dir $${pwd}/external/llvm_toolchain_llvm/lib/clang/18",
-                "-isystem $${pwd}/external/llvm_toolchain_llvm/lib_legacy/clang/18/include",
+                "-resource-dir $${pwd}/external/llvm_toolchain_llvm/lib/clang/" + LLVM_MAJOR,
+                "-isystem $${pwd}/external/llvm_toolchain_llvm/lib_legacy/clang/" + LLVM_MAJOR + "/include",
                 "-isystem $${pwd}/external/llvm_toolchain_llvm/include/x86_64-unknown-linux-gnu/c++/v1/",
                 "-isystem $${pwd}/external/llvm_toolchain_llvm/include/aarch64-unknown-linux-gnu/c++/v1/",
+                # This allows the cross-compilation of the SDK to succeed by providing the necessary system headers for the target platform.
+                "-isystem $${pwd}/external/sysroot_linux_x86_64/usr/include",
+                "-isystem $${pwd}/external/sysroot_linux_x86_64/usr/include/x86_64-linux-gnu",
+                "-isystem $${pwd}/external/sysroot_linux_arm64/usr/include",
+                "-isystem $${pwd}/external/sysroot_linux_arm64/usr/include/aarch64-linux-gnu",
             ]),
         },
         "//conditions:default": {},
     }),
     data = [
-        "//source/extensions/dynamic_modules:abi.h",
+        "//source/extensions/dynamic_modules/abi:abi.h",
     ] + select({
         "@envoy_repo//:use_local_llvm": [],
         "@platforms//os:linux": [
@@ -44,6 +52,11 @@ cargo_build_script(
             "@llvm_toolchain_llvm//:lib/libclang.so",
             "@llvm_toolchain_llvm//:lib_legacy",
         ],
+        "//conditions:default": [],
+    }) + select({
+        # This allows the cross-compilation of the SDK to succeed by providing the necessary system headers for the target platform.
+        "@platforms//cpu:x86_64": ["@sysroot_linux_amd64//:headers"],
+        "@platforms//cpu:aarch64": ["@sysroot_linux_arm64//:headers"],
         "//conditions:default": [],
     }),
     edition = "2021",

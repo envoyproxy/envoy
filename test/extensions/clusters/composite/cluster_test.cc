@@ -49,7 +49,7 @@ public:
     absl::Status creation_status = absl::OkStatus();
     cluster_ = std::shared_ptr<Cluster>(
         new Cluster(cluster_config_, config_, factory_context, creation_status));
-    THROW_IF_NOT_OK(creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
   }
 
   envoy::config::cluster::v3::Cluster cluster_config_;
@@ -601,10 +601,13 @@ TEST_F(CompositeClusterTest, LoadBalancerContextAdditionalMethods) {
   EXPECT_EQ(&criteria, wrapper.metadataMatchCriteria());
 
   // Test overrideHostToSelect.
-  absl::optional<std::pair<absl::string_view, bool>> override_host =
-      std::make_pair("override_host", true);
-  EXPECT_CALL(mock_context, overrideHostToSelect()).WillOnce(Return(override_host));
-  EXPECT_EQ(override_host, wrapper.overrideHostToSelect());
+  Upstream::LoadBalancerContext::OverrideHost override_host{"override_host", true};
+  EXPECT_CALL(mock_context, overrideHostToSelect())
+      .WillOnce(Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host)));
+  OptRef<const Upstream::LoadBalancerContext::OverrideHost> result = wrapper.overrideHostToSelect();
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(override_host.host, result->host);
+  EXPECT_EQ(override_host.strict, result->strict);
 
   // Test setHeadersModifier.
   std::function<void(Http::ResponseHeaderMap&)> modifier;

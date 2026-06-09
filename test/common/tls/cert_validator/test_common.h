@@ -53,6 +53,8 @@ public:
   }
   absl::string_view certificateValidationError() const override { return cert_validation_error_; }
 
+  void setValidatedCertChain(std::vector<bssl::UniquePtr<X509>>) override {}
+
 private:
   Envoy::Ssl::ClientValidationStatus status_;
   Ssl::ValidateStatus validate_result_{Ssl::ValidateStatus::NotStarted};
@@ -120,7 +122,7 @@ private:
   Api::ApiPtr api_;
   const absl::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_;
   const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
-      san_matchers_{};
+      san_matchers_;
   const std::string ca_cert_;
   const std::string ca_cert_path_{"TEST_CA_CERT_PATH"};
   const std::string ca_cert_name_{"TEST_CA_CERT_NAME"};

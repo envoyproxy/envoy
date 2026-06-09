@@ -182,7 +182,8 @@ filterStateObjectMatcherFromProto(const envoy::type::matcher::v3::FilterStateMat
   case envoy::type::matcher::v3::FilterStateMatcher::MatcherCase::kAddressMatch: {
     auto ip_list = Network::Address::IpList::create(matcher.address_match().ranges());
     RETURN_IF_NOT_OK_REF(ip_list.status());
-    return std::make_unique<FilterStateIpRangeMatcher>(std::move(*ip_list));
+    return std::make_unique<FilterStateIpRangeMatcher>(std::move(*ip_list),
+                                                       matcher.address_match().invert_match());
     break;
   }
   default:

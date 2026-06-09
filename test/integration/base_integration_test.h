@@ -552,6 +552,7 @@ public:
 protected:
   static std::string finalizeConfigWithPorts(ConfigHelper& helper, std::vector<uint32_t>& ports,
                                              bool use_lds);
+  static envoy::config::bootstrap::v3::Bootstrap configToBootstrap(const std::string& config);
 
   void setUdpFakeUpstream(absl::optional<FakeUpstreamConfig::UdpConfig> config) {
     upstream_config_.udp_fake_upstream_ = config;
@@ -671,7 +672,7 @@ protected:
 
   // If this member is not empty, the test will use a fixed RNG value specified
   // by it.
-  absl::optional<uint64_t> deterministic_value_{};
+  absl::optional<uint64_t> deterministic_value_;
 
   // Set true when your test will itself take care of ensuring listeners are up, and registering
   // them in the port_map_.

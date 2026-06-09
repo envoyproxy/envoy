@@ -75,7 +75,8 @@ public:
 protected:
   struct TableBuildEntry {
     TableBuildEntry(const HostConstSharedPtr& host, uint64_t offset, uint64_t skip, double weight)
-        : host_(host), offset_(offset), skip_(skip), weight_(weight) {}
+        : host_(host), offset_(offset), skip_(skip), weight_(weight), current_permutation_(offset) {
+    }
 
     HostConstSharedPtr host_;
     const uint64_t offset_;
@@ -84,9 +85,8 @@ protected:
     double target_weight_{};
     uint64_t next_{};
     uint64_t count_{};
+    uint64_t current_permutation_{};
   };
-
-  uint64_t permutation(const TableBuildEntry& entry);
 
   /**
    * Template method for constructing the Maglev table.
@@ -160,6 +160,26 @@ private:
   // host to load balance to.
   BitArray table_;
   std::vector<HostConstSharedPtr> host_table_;
+};
+
+// A simplified implementation for the case where there is only a single host.
+class DegenerateMaglevTable : public MaglevTable {
+public:
+  DegenerateMaglevTable(const NormalizedHostWeightVector& normalized_host_weights,
+                        double max_normalized_weight, uint64_t table_size,
+                        bool use_hostname_for_hashing, MaglevLoadBalancerStats& stats);
+  ~DegenerateMaglevTable() override = default;
+
+  // ThreadAwareLoadBalancerBase::HashingLoadBalancer
+  HostSelectionResponse chooseHost(uint64_t hash, uint32_t attempt) const override;
+
+  void logMaglevTable(bool use_hostname_for_hashing) const override;
+
+private:
+  void constructImplementationInternals(std::vector<TableBuildEntry>& table_build_entries,
+                                        double max_normalized_weight) override;
+
+  HostConstSharedPtr single_host_;
 };
 
 /**

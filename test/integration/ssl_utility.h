@@ -72,7 +72,7 @@ struct ClientSslTransportOptions {
 
   bool alpn_{};
   bool client_ecdsa_cert_{false};
-  std::vector<std::string> cipher_suites_{};
+  std::vector<std::string> cipher_suites_;
   std::string san_;
   std::vector<std::string> sigalgs_;
   std::vector<std::string> curves_;

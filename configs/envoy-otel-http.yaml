@@ -1,10 +1,32 @@
-# Example configuration for exporting OpenTelemetry logs and traces via HTTP.
-# This demonstrates OTLP/HTTP transport for both access logs and tracing.
+# Example configuration for exporting OpenTelemetry logs, traces, and metrics via HTTP.
+# This demonstrates OTLP/HTTP transport for access logs, tracing, and metrics.
 #
 # Usage:
 #   1. Start an OTLP HTTP collector on localhost:4318 (e.g., otel-tui)
 #   2. Run: bazel-bin/source/exe/envoy-static -c configs/envoy-otel-http.yaml
 #   3. Test: curl localhost:10080/get
+#   4. Wait 5 seconds for logs/metrics flush, then check collector for all three signals
+
+# Flush metrics every 1 second (delta temporality handles fast flush intervals).
+stats_flush_interval: 1s
+
+stats_sinks:
+- name: envoy.stat_sinks.open_telemetry
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig
+    http_service:
+      http_uri:
+        uri: "http://localhost:4318/v1/metrics"
+        cluster: otel_collector
+        timeout: 1s
+      request_headers_to_add:
+      - header:
+          key: "Authorization"
+          value: "Bearer fake"
+    report_counters_as_deltas: true
+    report_histograms_as_deltas: true
+    emit_tags_as_attributes: true
+    use_tag_extracted_name: true
 
 admin:
   address:

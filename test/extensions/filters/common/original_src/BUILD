@@ -14,7 +14,9 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/network:address_lib",
+        "//source/common/network:utility_lib",
         "//source/extensions/filters/common/original_src:original_src_socket_option_lib",
+        "//source/extensions/filters/common/original_src:socket_option_factory_lib",
         "//test/mocks:common_lib",
         "//test/mocks/network:network_mocks",
         "//test/test_common:printers_lib",

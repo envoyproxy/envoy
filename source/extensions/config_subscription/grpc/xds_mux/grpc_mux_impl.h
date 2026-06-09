@@ -104,15 +104,20 @@ public:
     genericHandleResponse(message->type_url(), *message, control_plane_stats);
   }
 
-  absl::Status
-  updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_client,
-                  Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope& scope,
-                  BackOffStrategyPtr&& backoff_strategy,
-                  const envoy::config::core::v3::ApiConfigSource& ads_config_source) override;
+  absl::Status updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_client,
+                               Grpc::RawAsyncClientSharedPtr&& failover_async_client,
+                               Stats::Scope& scope, BackOffStrategyPtr&& backoff_strategy,
+                               const envoy::config::core::v3::ApiConfigSource& ads_config_source,
+                               std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>
+                                   load_stats_reporter_factory = nullptr) override;
 
   EdsResourcesCacheOptRef edsResourcesCache() override {
     return makeOptRefFromPtr(eds_resources_cache_.get());
   }
+
+  // TODO(adisuissa): finish implementation.
+  Upstream::LoadStatsReporter* loadStatsReporter() const override { return nullptr; }
+  Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() override { return nullptr; }
 
   GrpcStreamInterface<RQ, RS>& grpcStreamForTest() {
     // TODO(adisuissa): Once envoy.restart_features.xds_failover_support is deprecated,
@@ -301,9 +306,10 @@ public:
                                    SubscriptionCallbacks&, OpaqueResourceDecoderSharedPtr,
                                    const SubscriptionOptions&) override;
 
-  absl::Status updateMuxSource(Grpc::RawAsyncClientSharedPtr&&, Grpc::RawAsyncClientSharedPtr&&,
-                               Stats::Scope&, BackOffStrategyPtr&&,
-                               const envoy::config::core::v3::ApiConfigSource&) override {
+  absl::Status updateMuxSource(
+      Grpc::RawAsyncClientSharedPtr&&, Grpc::RawAsyncClientSharedPtr&&, Stats::Scope&,
+      BackOffStrategyPtr&&, const envoy::config::core::v3::ApiConfigSource&,
+      std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> = nullptr) override {
     return absl::UnimplementedError("");
   }
 
@@ -312,6 +318,9 @@ public:
   }
 
   EdsResourcesCacheOptRef edsResourcesCache() override { return {}; }
+
+  Upstream::LoadStatsReporter* loadStatsReporter() const override { return nullptr; }
+  Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() override { return nullptr; }
 };
 
 } // namespace XdsMux

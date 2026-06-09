@@ -22,6 +22,11 @@ std::vector<std::pair<int64_t, ConnectionType>> DefaultSystemHelper::getAllConne
   return {};
 }
 
+std::unique_ptr<Platform::NetworkChangeMonitor>
+DefaultSystemHelper::initializeNetworkChangeMonitor(Platform::NetworkChangeListener&) {
+  return nullptr;
+}
+
 void DefaultSystemHelper::bindSocketToNetwork(Network::ConnectionSocket& /*socket*/,
                                               int64_t /*network_handle*/) {}
 

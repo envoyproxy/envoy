@@ -28,13 +28,13 @@ class TestObject : public StreamInfo::FilterState::Object {};
 
 class MockUserSpaceIoHandle : public Network::MockIoHandle, public IoHandle {
 public:
-  MOCK_METHOD(void, setWriteEnd, ());
-  MOCK_METHOD(bool, isPeerShutDownWrite, (), (const));
+  MOCK_METHOD(void, setEof, ());
+  MOCK_METHOD(bool, hasReceivedEof, (), (const));
   MOCK_METHOD(void, onPeerDestroy, ());
   MOCK_METHOD(void, setNewDataAvailable, ());
-  MOCK_METHOD(Buffer::Instance*, getWriteBuffer, ());
-  MOCK_METHOD(bool, isWritable, (), (const));
-  MOCK_METHOD(bool, isPeerWritable, (), (const));
+  MOCK_METHOD(Buffer::Instance*, getReceiveBuffer, ());
+  MOCK_METHOD(bool, canReceiveData, (), (const));
+  MOCK_METHOD(bool, isWriteUnblocked, (), (const));
   MOCK_METHOD(void, onPeerBufferLowWatermark, ());
   MOCK_METHOD(bool, isReadable, (), (const));
   MOCK_METHOD(std::shared_ptr<PassthroughState>, passthroughState, ());
@@ -81,8 +81,8 @@ TEST_F(InternalSocketTest, NativeSocket) {
 TEST_F(InternalSocketTest, PassthroughStateInjected) {
   auto filter_state_object = std::make_shared<TestObject>();
   filter_state_objects_.push_back(
-      {filter_state_object, StreamInfo::FilterState::StateType::ReadOnly,
-       StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection, "test.object"});
+      {filter_state_object, StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection,
+       "test.object"});
   Protobuf::Struct& map = (*metadata_->mutable_filter_metadata())["envoy.test"];
   Protobuf::Value val;
   val.set_string_value("val");

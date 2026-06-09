@@ -7,17 +7,19 @@
 #include <memory>
 #include <string>
 
+#include "envoy/stats/stats_matcher.h"
 #include "envoy/stats/tag.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/hash.h"
 #include "source/common/common/thread_synchronizer.h"
-#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/allocator.h"
 #include "source/common/stats/histogram_impl.h"
 #include "source/common/stats/null_counter.h"
 #include "source/common/stats/null_gauge.h"
 #include "source/common/stats/null_text_readout.h"
 #include "source/common/stats/symbol_table.h"
+#include "source/common/stats/tag_utility.h"
 #include "source/common/stats/utility.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -34,7 +36,7 @@ namespace Stats {
 class ThreadLocalHistogramImpl : public HistogramImplHelper {
 public:
   ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit, StatName tag_extracted_name,
-                           const StatNameTagVector& stat_name_tags, SymbolTable& symbol_table,
+                           StatNameTagSpan stat_name_tags, SymbolTable& symbol_table,
                            absl::optional<uint32_t> bins);
   ~ThreadLocalHistogramImpl() override;
 
@@ -84,7 +86,7 @@ class ThreadLocalStoreImpl;
 class ParentHistogramImpl : public MetricImpl<ParentHistogram> {
 public:
   ParentHistogramImpl(StatName name, Histogram::Unit unit, ThreadLocalStoreImpl& parent,
-                      StatName tag_extracted_name, const StatNameTagVector& stat_name_tags,
+                      StatName tag_extracted_name, StatNameTagSpan stat_name_tags,
                       ConstSupportedBuckets& supported_buckets, absl::optional<uint32_t> bins,
                       uint64_t id);
   ~ParentHistogramImpl() override;
@@ -115,6 +117,7 @@ public:
   std::vector<Bucket> detailedIntervalBuckets() const override {
     return detailedlBucketsHelper(*interval_histogram_);
   }
+  uint64_t cumulativeCountLessThanOrEqualToValue(double value) const override;
 
   // Stats::Metric
   SymbolTable& symbolTable() override;
@@ -134,8 +137,8 @@ public:
 
 private:
   bool usedLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
-  static std::vector<Stats::ParentHistogram::Bucket>
-  detailedlBucketsHelper(const histogram_t& histogram);
+  std::vector<Stats::ParentHistogram::Bucket>
+  detailedlBucketsHelper(const histogram_t& histogram) const;
 
   const Histogram::Unit unit_;
   const absl::optional<uint32_t> bins_;
@@ -245,7 +248,7 @@ private:
     // The counters, gauges and text readouts in the TLS cache are stored by reference,
     // depending on the CentralCache for backing store. This avoids a potential
     // contention-storm when destructing a scope, as the counter/gauge ref-count
-    // decrement in allocator_impl.cc needs to hold the single allocator mutex.
+    // decrement in allocator.cc needs to hold the single allocator mutex.
     StatRefMap<Counter> counters_;
     StatRefMap<Gauge> gauges_;
     StatRefMap<TextReadout> text_readouts_;
@@ -253,7 +256,7 @@ private:
     // Histograms also require holding a mutex while decrementing reference
     // counts. The only difference from other stats is that the histogram_set_
     // lives in the ThreadLocalStore object, rather than in
-    // AllocatorImpl. Histograms are removed from that set when all scopes
+    // Allocator. Histograms are removed from that set when all scopes
     // referencing the histogram are dropped. Each ParentHistogram has a unique
     // index, which is not re-used during the process lifetime.
     //
@@ -288,8 +291,13 @@ private:
 
   struct ScopeImpl : public Scope {
     ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix, bool evictable,
-              const ScopeStatsLimitSettings& limits = {});
+              const ScopeStatsLimitSettings& limits = {},
+              StatsMatcherSharedPtr scope_matcher = nullptr);
     ~ScopeImpl() override;
+
+    void setCleanupCallback(std::function<void()> callback) override {
+      cleanup_callback_ = std::move(callback);
+    }
 
     // Stats::Scope
     Counter& counterFromStatNameWithTags(const StatName& name,
@@ -302,9 +310,11 @@ private:
     TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags) override;
     ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
-                               const ScopeStatsLimitSettings& limits = {}) override;
+                               const ScopeStatsLimitSettings& limits = {},
+                               StatsMatcherSharedPtr matcher = nullptr) override;
     ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false,
-                                     const ScopeStatsLimitSettings& limits = {}) override;
+                                     const ScopeStatsLimitSettings& limits = {},
+                                     StatsMatcherSharedPtr matcher = nullptr) override;
     const SymbolTable& constSymbolTable() const final { return parent_.constSymbolTable(); }
     SymbolTable& symbolTable() final { return parent_.symbolTable(); }
 
@@ -325,6 +335,13 @@ private:
       StatNameManagedStorage storage(name, symbolTable());
       return textReadoutFromStatName(storage.statName());
     }
+
+    Counter& getOrCreateCounterBase(const TagUtility::TagStatNameJoiner& joiner);
+    Gauge& getOrCreateGaugeBase(const TagUtility::TagStatNameJoiner& joiner,
+                                Gauge::ImportMode import_mode);
+    Histogram& getOrCreateHistogramBase(const TagUtility::TagStatNameJoiner& joiner,
+                                        Histogram::Unit unit);
+    TextReadout& getOrCreateTextReadoutBase(const TagUtility::TagStatNameJoiner& joiner);
 
     template <class StatMap, class StatFn> bool iterHelper(StatFn fn, const StatMap& map) const {
       for (auto& iter : map) {
@@ -382,7 +399,7 @@ private:
 
     template <class StatType>
     using MakeStatFn = std::function<RefcountPtr<StatType>(
-        Allocator&, StatName name, StatName tag_extracted_name, const StatNameTagVector& tags)>;
+        Allocator&, StatName name, StatName tag_extracted_name, StatNameTagSpan tags)>;
 
     /**
      * Makes a stat either by looking it up in the central cache,
@@ -399,7 +416,7 @@ private:
      */
     template <class StatType>
     StatType& safeMakeStat(StatName full_stat_name, StatName name_no_tags,
-                           const absl::optional<StatNameTagVector>& stat_name_tags,
+                           absl::optional<StatNameTagSpan> stat_name_tags,
                            StatNameHashMap<RefcountPtr<StatType>>& central_cache_map,
                            StatsMatcher::FastResult fast_reject_result,
                            StatNameStorageSet& central_rejected_stats,
@@ -457,15 +474,26 @@ private:
       return central_cache_;
     }
 
+    // Returns the effective matcher for this scope: scope-level if set, else store-level.
+    const StatsMatcher& effectiveMatcher() const {
+      return scope_matcher_ ? *scope_matcher_ : *parent_.stats_matcher_;
+    }
+    bool scopeRejectsAll() const { return effectiveMatcher().rejectsAll(); }
+    StatsMatcher::FastResult scopeFastRejects(StatName name) const {
+      return effectiveMatcher().fastRejects(name);
+    }
+
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
     const bool evictable_{};
 
     const ScopeStatsLimitSettings limits_;
+    StatsMatcherSharedPtr scope_matcher_;
 
   private:
     StatNameStorage prefix_;
     mutable CentralCacheEntrySharedPtr central_cache_ ABSL_GUARDED_BY(parent_.lock_);
+    std::function<void()> cleanup_callback_;
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
@@ -542,7 +570,7 @@ private:
                            std::function<void(const StatSharedPtr&)> f_deletion);
   bool checkAndRememberRejection(StatName name, StatsMatcher::FastResult fast_reject_result,
                                  StatNameStorageSet& central_rejected_stats,
-                                 StatNameHashSet* tls_rejected_stats);
+                                 StatNameHashSet* tls_rejected_stats, const StatsMatcher& matcher);
   TlsCache& tlsCache() { return **tls_cache_; }
   void addScope(std::shared_ptr<ScopeImpl>& new_scope);
 
@@ -558,9 +586,9 @@ private:
   TagProducerPtr tag_producer_;
   StatsMatcherPtr stats_matcher_;
   HistogramSettingsConstPtr histogram_settings_;
-  std::atomic<bool> threading_ever_initialized_{};
-  std::atomic<bool> shutting_down_{};
-  std::atomic<bool> merge_in_progress_{};
+  std::atomic<bool> threading_ever_initialized_{false};
+  std::atomic<bool> shutting_down_{false};
+  std::atomic<bool> merge_in_progress_{false};
   OptRef<ThreadLocal::Instance> tls_;
 
   NullCounterImpl null_counter_;
@@ -569,7 +597,7 @@ private:
   NullTextReadoutImpl null_text_readout_;
 
   mutable Thread::ThreadSynchronizer sync_;
-  std::atomic<uint64_t> next_scope_id_{};
+  std::atomic<uint64_t> next_scope_id_{0};
   uint64_t next_histogram_id_ ABSL_GUARDED_BY(hist_mutex_) = 0;
 
   StatNameSetPtr well_known_tags_;

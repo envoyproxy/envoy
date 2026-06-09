@@ -31,7 +31,8 @@ class TcpGrpcAccessLog : public Common::ImplBase {
 public:
   TcpGrpcAccessLog(AccessLog::FilterPtr&& filter, const TcpGrpcAccessLogConfig config,
                    ThreadLocal::SlotAllocator& tls,
-                   GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache);
+                   GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
+                   const Formatter::CommandParserPtrVector& command_parsers = {});
 
 private:
   /**

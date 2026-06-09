@@ -4,12 +4,12 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
+#include "quiche_platform_impl/quiche_logging_impl.h"
+
 #include <atomic>
 #include <cstdlib>
 
 #include "source/common/common/utility.h"
-
-#include "quiche_platform_impl/quiche_logging_impl.h"
 
 namespace quiche {
 

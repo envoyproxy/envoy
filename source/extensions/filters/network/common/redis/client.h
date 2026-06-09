@@ -117,7 +117,17 @@ using ClientPtr = std::unique_ptr<Client>;
 /**
  * Read policy to use for Redis cluster.
  */
-enum class ReadPolicy { Primary, PreferPrimary, Replica, PreferReplica, Any };
+enum class ReadPolicy {
+  Primary,
+  PreferPrimary,
+  Replica,
+  PreferReplica,
+  Any,
+  // Zone-aware routing: prefer replicas in same zone, fallback to any replica, then primary
+  LocalZoneAffinity,
+  // Zone-aware routing: prefer replicas in same zone, then primary in same zone, then any
+  LocalZoneAffinityReplicasAndPrimary
+};
 
 /**
  * Configuration for a redis connection pool.

@@ -166,6 +166,32 @@ protocol: TWITTER
       EnvoyException);
 }
 
+TEST(Factory, BasicWithServerContext) {
+  const std::string yaml = R"(
+request_rules:
+- field: PROTOCOL
+  on_present:
+    metadata_namespace: envoy.lb
+    key: protocol
+  on_missing:
+    metadata_namespace: envoy.lb
+    key: protocol
+    value: "unknown"
+  )";
+
+  ThriftToMetadataConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  auto callback =
+      factory.createFilterFactoryFromProtoWithServerContext(*proto_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  callback(filter_callback);
+}
+
 } // namespace ThriftToMetadata
 } // namespace HttpFilters
 } // namespace Extensions

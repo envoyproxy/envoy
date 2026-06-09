@@ -3,7 +3,6 @@ load(
     "rust_clippy",
     "rust_doc_test",
     "rust_test",
-    "rustfmt_test",
 )
 load(
     "//bazel:envoy_build_system.bzl",
@@ -37,32 +36,22 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         ":util",
-        "//source/extensions/dynamic_modules:abi_impl",
-        "//source/extensions/dynamic_modules:dynamic_modules_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "abi_version_test",
-    srcs = ["abi_version_test.cc"],
-    data = [
-        "//source/extensions/dynamic_modules:abi.h",
-    ],
-    rbe_pool = "6gig",
-    deps = [
+        "//source/common/buffer:buffer_lib",
         "//source/common/common:hex_lib",
         "//source/common/crypto:utility_lib",
-        "//source/extensions/dynamic_modules:abi_version_lib",
-        "//test/test_common:environment_lib",
-        "//test/test_common:utility_lib",
+        "//source/extensions/dynamic_modules:abi_impl",
+        "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "//test/extensions/dynamic_modules/test_data/c:matcher_no_op_static",
     ],
 )
 
 envoy_cc_test(
     name = "abi_impl_test",
+    size = "large",
     srcs = ["abi_impl_test.cc"],
     deps = [
         "//source/extensions/dynamic_modules:abi_impl",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
     ],
 )
@@ -101,17 +90,6 @@ rust_doc_test(
     tags = [
         "no_san",
         "nocoverage",
-    ],
-)
-
-# As per the discussion in https://github.com/envoyproxy/envoy/pull/35627,
-# we set the rust_fmt and clippy target here instead of the part of //tools/code_format target for now.
-rustfmt_test(
-    name = "rust_sdk_fmt",
-    tags = ["nocoverage"],
-    targets = [
-        "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk",
-        "//source/extensions/dynamic_modules/sdk/rust:build_script_",
     ],
 )
 

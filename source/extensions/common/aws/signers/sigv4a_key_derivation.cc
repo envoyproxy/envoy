@@ -72,7 +72,7 @@ absl::StatusOr<EC_KEY*> SigV4AKeyDerivation::derivePrivateKey(absl::string_view 
       // And set the private key we calculated above
       if (!EC_KEY_set_private_key(ec_key, priv_key_num)) {
         BN_free(priv_key_num);
-        OPENSSL_free(ec_key);
+        EC_KEY_free(ec_key);
         return absl::InvalidArgumentError("SigV4a private key could not be set");
       }
       BN_free(priv_key_num);

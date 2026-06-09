@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package envoy.extensions.matching.actions.transform_stat.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.matching.actions.transform_stat.v3";
+option java_outer_classname = "TransformStatProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/matching/actions/transform_stat/v3;transform_statv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Transform Stat actions]
+// [#extension: envoy.matching.actions.transform_stat]
+
+// Transform action for the stat matched by the tag.
+message TransformStat {
+  // Action that drops the stat.
+  message DropStat {
+  }
+
+  // Action that drops the tag.
+  // This removes the tag from the stat entirely. This is different from updating the
+  // tag to an empty value, which keeps the tag key with an empty value.
+  message DropTag {
+  }
+
+  // Action that updates the tag.
+  message UpdateTag {
+    // The new tag value.
+    string new_tag_value = 2;
+  }
+
+  // If multiple actions are configured, only the first non-empty action will be
+  // applied based on the following order:
+  // 1. drop_stat
+  // 2. drop_tag
+  // 3. update_tag
+
+  // If set, the stat will be dropped.
+  DropStat drop_stat = 1;
+
+  // If set, the tag ill be dropped.
+  // This removes the tag from the stat entirely.
+  DropTag drop_tag = 2;
+
+  // If set, the tag will be updated.
+  UpdateTag update_tag = 3;
+}

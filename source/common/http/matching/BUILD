@@ -45,6 +45,7 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/http:header_map_interface",
+        "//envoy/stream_info:stream_info_interface",
         "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",

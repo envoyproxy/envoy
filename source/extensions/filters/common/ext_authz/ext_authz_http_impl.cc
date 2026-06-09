@@ -33,23 +33,17 @@ const Http::HeaderMap& lengthZeroHeader() {
   return *headers;
 }
 
-// Static response used for creating authorization ERROR responses.
-const Response& errorResponse() {
-  CONSTRUCT_ON_FIRST_USE(Response, Response{CheckStatus::Error,
-                                            UnsafeHeaderVector{},
-                                            UnsafeHeaderVector{},
-                                            UnsafeHeaderVector{},
-                                            UnsafeHeaderVector{},
-                                            UnsafeHeaderVector{},
-                                            UnsafeHeaderVector{},
-                                            UnsafeHeaderVector{},
-                                            false,
-                                            {{}},
-                                            Http::Utility::QueryParamsVector{},
-                                            {},
-                                            EMPTY_STRING,
-                                            Http::Code::Forbidden,
-                                            Protobuf::Struct{}});
+Http::Code zeroHttpCode() {
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
+  return static_cast<Http::Code>(0);
+}
+
+// Response used for creating authorization ERROR responses.
+// Note: status_code is left unset so the filter can use the configured status_on_error
+// configuration.
+ResponsePtr errorResponse() {
+  return std::make_unique<Response>(
+      Response{.status = CheckStatus::Error, .status_code = zeroHttpCode()});
 }
 
 // Static matcher that never matches anything. Used for matchers that are not applicable
@@ -68,7 +62,7 @@ struct SuccessResponse {
       : headers_(headers), matchers_(matchers), append_matchers_(append_matchers),
         response_matchers_(response_matchers),
         to_dynamic_metadata_matchers_(dynamic_metadata_matchers),
-        response_(std::make_unique<Response>(response)) {
+        response_(std::make_unique<Response>(std::move(response))) {
     headers_.iterate([this](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
       // UpstreamHeaderMatcher
       if (matchers_->matches(header.key().getStringView())) {
@@ -115,6 +109,22 @@ absl::StatusOr<std::string> validatePathPrefix(absl::string_view path_prefix) {
   return std::string(path_prefix);
 }
 
+absl::StatusOr<std::string> validatePathOverride(absl::string_view path_override) {
+  if (!path_override.empty() && path_override[0] != '/') {
+    return absl::InvalidArgumentError("path_override should start with \"/\".");
+  }
+  return std::string(path_override);
+}
+
+absl::Status validateOnlyOneOfPathPrefixOrOverride(absl::string_view path_prefix,
+                                                   absl::string_view path_override) {
+  if (!path_prefix.empty() && !path_override.empty()) {
+    return absl::InvalidArgumentError(
+        "Only one of path_prefix or path_override may be set, not both.");
+  }
+  return absl::OkStatus();
+}
+
 absl::StatusOr<Router::RetryPolicyConstSharedPtr>
 createRetryPolicy(const envoy::config::core::v3::RetryPolicy& core_retry_policy,
                   Server::Configuration::CommonFactoryContext& context) {
@@ -154,6 +164,8 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
           context)),
       cluster_name_(config.http_service().server_uri().cluster()), timeout_(timeout),
       path_prefix_(THROW_OR_RETURN_VALUE(validatePathPrefix(path_prefix), std::string)),
+      path_override_(THROW_OR_RETURN_VALUE(
+          validatePathOverride(config.http_service().path_override()), std::string)),
       tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())),
       request_headers_parser_(THROW_OR_RETURN_VALUE(
           Router::HeaderParser::configure(
@@ -165,7 +177,10 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
                         ? THROW_OR_RETURN_VALUE(
                               createRetryPolicy(config.http_service().retry_policy(), context),
                               Router::RetryPolicyConstSharedPtr)
-                        : nullptr) {}
+                        : nullptr) {
+  THROW_IF_NOT_OK(
+      validateOnlyOneOfPathPrefixOrOverride(path_prefix, config.http_service().path_override()));
+}
 
 ClientConfig::ClientConfig(
     const envoy::extensions::filters::http::ext_authz::v3::HttpService& http_service,
@@ -183,6 +198,8 @@ ClientConfig::ClientConfig(
       cluster_name_(http_service.server_uri().cluster()), timeout_(timeout),
       path_prefix_(
           THROW_OR_RETURN_VALUE(validatePathPrefix(http_service.path_prefix()), std::string)),
+      path_override_(
+          THROW_OR_RETURN_VALUE(validatePathOverride(http_service.path_override()), std::string)),
       tracing_name_(fmt::format("async {} egress", http_service.server_uri().cluster())),
       request_headers_parser_(THROW_OR_RETURN_VALUE(
           Router::HeaderParser::configure(
@@ -194,7 +211,10 @@ ClientConfig::ClientConfig(
           http_service.has_retry_policy()
               ? THROW_OR_RETURN_VALUE(createRetryPolicy(http_service.retry_policy(), context),
                                       Router::RetryPolicyConstSharedPtr)
-              : nullptr) {}
+              : nullptr) {
+  THROW_IF_NOT_OK(validateOnlyOneOfPathPrefixOrOverride(http_service.path_prefix(),
+                                                        http_service.path_override()));
+}
 
 MatcherSharedPtr
 ClientConfig::toClientMatchersOnSuccess(const envoy::type::matcher::v3::ListStringMatcher& list,
@@ -292,8 +312,14 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
         continue;
       }
 
-      if (key == Http::Headers::get().Path && !config_->pathPrefix().empty()) {
-        headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.raw_value()));
+      if (key == Http::Headers::get().Path) {
+        if (!config_->pathOverride().empty()) {
+          headers->addCopy(key, config_->pathOverride());
+        } else if (!config_->pathPrefix().empty()) {
+          headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.raw_value()));
+        } else {
+          headers->addCopy(key, header.raw_value());
+        }
       } else {
         headers->addCopy(key, header.raw_value());
       }
@@ -307,8 +333,14 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
         continue;
       }
 
-      if (key == Http::Headers::get().Path && !config_->pathPrefix().empty()) {
-        headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.second));
+      if (key == Http::Headers::get().Path) {
+        if (!config_->pathOverride().empty()) {
+          headers->addCopy(key, config_->pathOverride());
+        } else if (!config_->pathPrefix().empty()) {
+          headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.second));
+        } else {
+          headers->addCopy(key, header.second);
+        }
       } else {
         headers->addCopy(key, header.second);
       }
@@ -331,7 +363,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   if (thread_local_cluster == nullptr) {
     // TODO(dio): Add stats related to this.
     ENVOY_LOG(debug, "ext_authz cluster '{}' does not exist", cluster);
-    callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
+    callbacks_->onComplete(errorResponse());
     callbacks_ = nullptr;
   } else {
     // Do not enforce a sampling decision on this span; instead keep the parent's sampling status.
@@ -364,7 +396,7 @@ void RawHttpClientImpl::onFailure(const Http::AsyncClient::Request&,
   // TODO(botengyao): handle different failure reasons.
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset ||
          reason == Http::AsyncClient::FailureReason::ExceedResponseBufferLimit);
-  callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
+  callbacks_->onComplete(errorResponse());
   callbacks_ = nullptr;
 }
 
@@ -387,7 +419,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
   // codes. A Forbidden response is sent to the client if the filter has not been configured with
   // failure_mode_allow.
   if (Http::CodeUtility::is5xx(status_code)) {
-    return std::make_unique<Response>(errorResponse());
+    return errorResponse();
   }
 
   // Extract headers-to-remove from the storage header coming from the

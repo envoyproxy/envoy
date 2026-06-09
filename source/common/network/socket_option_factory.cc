@@ -1,6 +1,7 @@
 #include "source/common/network/socket_option_factory.h"
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/network/address.h"
 
 #include "source/common/common/fmt.h"
 #include "source/common/network/addr_family_aware_socket_option_impl.h"
@@ -113,12 +114,27 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildLiteralOptions(
     } else if (socket_option.has_type() && socket_option.type().has_datagram()) {
       socket_type = Network::Socket::Type::Datagram;
     }
+    absl::optional<Network::Address::IpVersion> socket_ip_version = absl::nullopt;
+    switch (socket_option.ip_version()) {
+    case envoy::config::core::v3::SocketOption::SOCKET_IP_VERSION_UNSPECIFIED:
+      break;
+    case envoy::config::core::v3::SocketOption::SOCKET_IP_VERSION_IPV4:
+      socket_ip_version = Network::Address::IpVersion::v4;
+      break;
+    case envoy::config::core::v3::SocketOption::SOCKET_IP_VERSION_IPV6:
+      socket_ip_version = Network::Address::IpVersion::v6;
+      break;
+    default:
+      ENVOY_LOG(warn, "Socket option specified with unknown ip_version: {}",
+                socket_option.DebugString());
+      break;
+    }
     options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
         socket_option.state(),
         Network::SocketOptionName(
             socket_option.level(), socket_option.name(),
             fmt::format("{}/{}", socket_option.level(), socket_option.name())),
-        buf, socket_type));
+        buf, socket_type, socket_ip_version));
   }
   return options;
 }

@@ -5,6 +5,7 @@
 
 #ifndef NULL_PLUGIN
 #include "proxy_wasm_intrinsics.h"
+
 #include "source/extensions/common/wasm/ext/envoy_proxy_wasm_api.h"
 #else
 #include "source/extensions/common/wasm/ext/envoy_null_plugin.h"

@@ -46,6 +46,13 @@ public:
    * for HTTP protocol tracing.
    */
   virtual uint32_t maxPathTagLength() const PURE;
+
+  /**
+   * @return true if trace context propagation should be disabled. When true, trace context headers
+   * (e.g., traceparent, tracestate, X-B3-* headers) will not be injected when proxying requests
+   * to upstreams. Span reporting still occurs; only context propagation is disabled.
+   */
+  virtual bool noContextPropagation() const PURE;
 };
 
 } // namespace Tracing

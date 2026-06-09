@@ -25,8 +25,8 @@ envoy_extension_cc_test(
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
-        "@opentelemetry_proto//:logs_proto_cc",
-        "@opentelemetry_proto//:logs_service_proto_cc",
+        "@opentelemetry-proto//:logs_proto_cc",
+        "@opentelemetry-proto//:logs_service_proto_cc",
     ],
 )
 
@@ -45,8 +45,8 @@ envoy_extension_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
-        "@opentelemetry_proto//:logs_proto_cc",
-        "@opentelemetry_proto//:logs_service_proto_cc",
+        "@opentelemetry-proto//:logs_proto_cc",
+        "@opentelemetry-proto//:logs_service_proto_cc",
     ],
 )
 
@@ -56,10 +56,11 @@ envoy_extension_cc_test(
     extension_names = ["envoy.access_loggers.open_telemetry"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/http:http_service_headers_lib",
         "//source/extensions/access_loggers/open_telemetry:http_access_log_lib",
         "//test/mocks/event:event_mocks",
-        "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:utility_lib",
@@ -78,17 +79,15 @@ envoy_extension_cc_test(
         "//source/common/router:string_accessor_lib",
         "//source/extensions/access_loggers/open_telemetry:access_log_lib",
         "//test/mocks/access_log:access_log_mocks",
-        "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/server:server_mocks",
-        "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
-        "@opentelemetry_proto//:logs_proto_cc",
-        "@opentelemetry_proto//:logs_service_proto_cc",
+        "@opentelemetry-proto//:logs_proto_cc",
+        "@opentelemetry-proto//:logs_service_proto_cc",
     ],
 )
 
@@ -126,8 +125,8 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/open_telemetry/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-        "@opentelemetry_proto//:logs_proto_cc",
-        "@opentelemetry_proto//:logs_service_proto_cc",
+        "@opentelemetry-proto//:logs_proto_cc",
+        "@opentelemetry-proto//:logs_service_proto_cc",
     ],
 )
 
@@ -157,12 +156,12 @@ envoy_extension_cc_test(
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:utility_lib",
-        "@opentelemetry_proto//:logs_proto_cc",
+        "@opentelemetry-proto//:logs_proto_cc",
     ] + select(
         {
             "//bazel:windows_x86_64": [],
             "//conditions:default": [
-                "@com_google_cel_cpp//parser",
+                "@cel-cpp//parser",
             ],
         },
     ),
@@ -179,8 +178,8 @@ envoy_cc_benchmark_binary(
         "//source/extensions/access_loggers/open_telemetry:substitution_formatter_lib",
         "//test/common/stream_info:test_util",
         "//test/mocks/stream_info:stream_info_mocks",
-        "@com_github_google_benchmark//:benchmark",
-        "@opentelemetry_proto//:common_proto_cc",
+        "@benchmark",
+        "@opentelemetry-proto//:common_proto_cc",
     ],
 )
 

@@ -580,18 +580,16 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterDynamicMetadataTest) {
 }
 
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterClusterMetadataTest) {
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::TestRequestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
   Http::TestResponseTrailerMapImpl response_trailer{{"third", "POST"}, {"test-2", "test-2"}};
 
   envoy::config::core::v3::Metadata metadata;
   populateMetadataTestData(metadata);
-  absl::optional<std::shared_ptr<NiceMock<Upstream::MockClusterInfo>>> cluster =
-      std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  EXPECT_CALL(**cluster, metadata()).WillRepeatedly(ReturnRef(metadata));
-  EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(ReturnPointee(cluster));
-  EXPECT_CALL(Const(stream_info), upstreamClusterInfo()).WillRepeatedly(ReturnPointee(cluster));
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  EXPECT_CALL(*cluster, metadata()).WillRepeatedly(ReturnRef(metadata));
+  stream_info.upstream_cluster_info_ = cluster;
 
   OpenTelemetryFormatMap expected = {
       {"test_key", "test_value"},
@@ -642,16 +640,10 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterClusterMetadataNoClusterIn
                             key_mapping);
   OpenTelemetryFormatter formatter(key_mapping, {});
 
-  // Empty optional (absl::nullopt)
+  // No cluster info
   {
-    EXPECT_CALL(Const(stream_info), upstreamClusterInfo()).WillOnce(Return(absl::nullopt));
-    verifyOpenTelemetryOutput(
-        formatter.format({&request_header, &response_header, &response_trailer}, stream_info),
-        expected);
-  }
-  // Empty cluster info (nullptr)
-  {
-    EXPECT_CALL(Const(stream_info), upstreamClusterInfo()).WillOnce(Return(nullptr));
+    EXPECT_CALL(Const(stream_info), upstreamClusterInfo())
+        .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}));
     verifyOpenTelemetryOutput(
         formatter.format({&request_header, &response_header, &response_trailer}, stream_info),
         expected);
@@ -661,11 +653,9 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterClusterMetadataNoClusterIn
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateTest) {
   StreamInfo::MockStreamInfo stream_info;
   stream_info.filter_state_->setData("test_key",
-                                     std::make_unique<Router::StringAccessorImpl>("test_value"),
-                                     StreamInfo::FilterState::StateType::ReadOnly);
+                                     std::make_unique<Router::StringAccessorImpl>("test_value"));
   stream_info.filter_state_->setData("test_obj",
-                                     std::make_unique<TestSerializedStructFilterState>(),
-                                     StreamInfo::FilterState::StateType::ReadOnly);
+                                     std::make_unique<TestSerializedStructFilterState>());
   EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
 
   OpenTelemetryFormatMap expected = {{"test_key", "\"test_value\""},
@@ -694,10 +684,8 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateTest) {
   const StreamInfo::FilterStateSharedPtr upstream_filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request);
   upstream_filter_state->setData("test_key",
-                                 std::make_unique<Router::StringAccessorImpl>("test_value"),
-                                 StreamInfo::FilterState::StateType::ReadOnly);
-  upstream_filter_state->setData("test_obj", std::make_unique<TestSerializedStructFilterState>(),
-                                 StreamInfo::FilterState::StateType::ReadOnly);
+                                 std::make_unique<Router::StringAccessorImpl>("test_value"));
+  upstream_filter_state->setData("test_obj", std::make_unique<TestSerializedStructFilterState>());
 
   EXPECT_CALL(stream_info, upstreamInfo()).Times(testing::AtLeast(1));
   // Get pointer to MockUpstreamInfo.
@@ -732,8 +720,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateTest) {
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateSpeciferTest) {
   StreamInfo::MockStreamInfo stream_info;
   stream_info.filter_state_->setData(
-      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"));
   EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
 
   OpenTelemetryFormatMap expected = {
@@ -767,8 +754,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateSpecife
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request));
 
   stream_info.upstream_info_->upstreamFilterState()->setData(
-      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"));
 
   EXPECT_CALL(Const(stream_info), upstreamInfo()).Times(testing::AtLeast(1));
 
@@ -798,8 +784,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateErrorSpeciferTe
   StreamInfo::MockStreamInfo stream_info;
   std::string body;
   stream_info.filter_state_->setData(
-      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"));
 
   // 'ABCDE' is error specifier.
   KeyValueList key_mapping;
@@ -829,8 +814,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateErrorSp
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request));
 
   stream_info.upstream_info_->upstreamFilterState()->setData(
-      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"));
 
   // 'ABCDE' is error specifier.
   KeyValueList key_mapping;

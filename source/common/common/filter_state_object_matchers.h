@@ -21,11 +21,13 @@ using FilterStateObjectMatcherPtr = std::unique_ptr<FilterStateObjectMatcher>;
 
 class FilterStateIpRangeMatcher : public FilterStateObjectMatcher {
 public:
-  FilterStateIpRangeMatcher(std::unique_ptr<Network::Address::IpList>&& ip_list);
+  FilterStateIpRangeMatcher(std::unique_ptr<Network::Address::IpList>&& ip_list,
+                            bool invert_match = false);
   bool match(const StreamInfo::FilterState::Object& object) const override;
 
 private:
   std::unique_ptr<Envoy::Network::Address::IpList> ip_list_;
+  const bool invert_match_;
 };
 
 class FilterStateStringMatcher : public FilterStateObjectMatcher {

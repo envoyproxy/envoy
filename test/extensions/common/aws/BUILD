@@ -3,7 +3,6 @@ load(
     "envoy_cc_mock",
     "envoy_cc_test",
     "envoy_package",
-    "envoy_select_boringssl",
 )
 
 licenses(["notice"])  # Apache 2
@@ -38,7 +37,6 @@ envoy_cc_test(
         "//source/extensions/common/aws:credential_provider_chains_lib",
         "//source/extensions/common/aws/credential_providers:inline_credentials_provider_lib",
         "//test/extensions/common/aws:aws_mocks",
-        "//test/mocks/api:api_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:environment_lib",
@@ -60,11 +58,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
-    copts = envoy_select_boringssl(
-        [
-            "-DENVOY_SSL_FIPS",
-        ],
-    ),
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/common/aws:utility_lib",
@@ -96,7 +89,6 @@ envoy_cc_test(
         "//source/extensions/common/aws:metadata_fetcher_lib",
         "//test/extensions/common/aws:aws_mocks",
         "//test/extensions/filters/http/common:mock_lib",
-        "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:environment_lib",

@@ -13,7 +13,8 @@ START_WASM_PLUGIN(HttpWasmTestCpp)
 
 class CloseStreamRootContext : public RootContext {
 public:
-  explicit CloseStreamRootContext(uint32_t id, std::string_view root_id) : RootContext(id, root_id) {}
+  explicit CloseStreamRootContext(uint32_t id, std::string_view root_id)
+      : RootContext(id, root_id) {}
 };
 
 class CloseStreamContext : public Context {
@@ -25,7 +26,8 @@ public:
 };
 
 static RegisterContextFactory register_CloseStreamContext(CONTEXT_FACTORY(CloseStreamContext),
-                                                   ROOT_FACTORY(CloseStreamRootContext), "close_stream");
+                                                          ROOT_FACTORY(CloseStreamRootContext),
+                                                          "close_stream");
 
 FilterHeadersStatus CloseStreamContext::onRequestHeaders(uint32_t, bool) {
   closeRequest();

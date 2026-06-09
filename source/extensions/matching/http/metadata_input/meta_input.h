@@ -28,9 +28,8 @@ public:
       : filter_(input_config.filter()), path_(initializePath(input_config.path())) {}
 
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            std::make_unique<MetadataMatchData>(
-                Envoy::Config::Metadata::metadataValue(&data.metadata(), filter_, path_))};
+    return Matcher::DataInputGetResult::CreateCustom(std::make_shared<MetadataMatchData>(
+        Envoy::Config::Metadata::metadataValue(&data.metadata(), filter_, path_)));
   }
 
 private:

@@ -45,6 +45,7 @@ public:
   void addReadFilter(Network::ReadFilterSharedPtr filter) override;
   void removeReadFilter(Network::ReadFilterSharedPtr filter) override;
   bool initializeReadFilters() override;
+  void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
   // Network::Connection
   void addBytesSentCallback(Network::Connection::BytesSentCb /*cb*/) override {
@@ -131,6 +132,7 @@ public:
     IS_ENVOY_BUG("unexpected write call");
   }
   void setBufferLimits(uint32_t limit) override;
+  void setBufferHighWatermarkTimeout(std::chrono::milliseconds timeout) override;
   uint32_t bufferLimit() const override {
     // As quic connection is not HTTP1.1, this method shouldn't be called by HCM.
     PANIC("not implemented");

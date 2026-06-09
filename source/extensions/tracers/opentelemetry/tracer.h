@@ -91,7 +91,7 @@ public:
   // Tracing::Span functions
   void setOperation(absl::string_view /*operation*/) override;
   void setTag(absl::string_view /*name*/, absl::string_view /*value*/) override;
-  void log(SystemTime /*timestamp*/, const std::string& /*event*/) override {};
+  void log(SystemTime /*timestamp*/, const std::string& /*event*/) override;
   void finishSpan() override;
   void injectContext(Envoy::Tracing::TraceContext& /*trace_context*/,
                      const Tracing::UpstreamContext&) override;
@@ -107,6 +107,11 @@ public:
    * @return whether the local tracing decision is used by the span.
    */
   bool useLocalDecision() const override { return use_local_decision_; }
+
+  /**
+   * @return whether the span will be exported to the OTLP backend.
+   */
+  bool exportedSpan() const override { return sampled_; }
 
   /**
    * @return whether or not the sampled attribute is set

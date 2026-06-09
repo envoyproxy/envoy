@@ -35,6 +35,10 @@ public:
             /*err=*/Api::IoError::none()};
   }
 
+  void setBlocked() { write_blocked_ = true; }
+
+  Network::IoHandle& ioHandle() { return io_handle_; }
+
 private:
   bool write_blocked_{false};
   Network::IoHandle& io_handle_;

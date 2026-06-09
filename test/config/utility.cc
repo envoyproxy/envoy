@@ -32,6 +32,7 @@
 #include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace {
 envoy::config::bootstrap::v3::Bootstrap&
@@ -691,6 +692,50 @@ ConfigHelper::buildRouteConfig(const std::string& name, const std::string& clust
   UNREFERENCED_PARAMETER(name);
   UNREFERENCED_PARAMETER(cluster);
   UNREFERENCED_PARAMETER(header_mutations);
+  PANIC("YAML support compiled out");
+#endif
+}
+
+envoy::config::route::v3::RouteConfiguration
+ConfigHelper::buildRouteConfigWithVhdsOverAds(const std::string& name) {
+  API_NO_BOOST(envoy::config::route::v3::RouteConfiguration) route;
+#ifdef ENVOY_ENABLE_YAML
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+      name: "{}"
+      vhds:
+        config_source:
+          ads: {{}}
+    )EOF",
+                                        name),
+                            route);
+  return route;
+#else
+  UNREFERENCED_PARAMETER(name);
+  PANIC("YAML support compiled out");
+#endif
+}
+
+envoy::config::route::v3::VirtualHost ConfigHelper::buildVirtualHost(const std::string& name,
+                                                                     const std::string& domain,
+                                                                     const std::string& prefix,
+                                                                     const std::string& cluster) {
+  API_NO_BOOST(envoy::config::route::v3::VirtualHost) vhost;
+#ifdef ENVOY_ENABLE_YAML
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+        name: {}
+        domains: [{}]
+        routes:
+        - match: {{ prefix: {} }}
+          route: {{ cluster: {} }}
+      )EOF",
+                                        name, domain, prefix, cluster),
+                            vhost);
+  return vhost;
+#else
+  UNREFERENCED_PARAMETER(name);
+  UNREFERENCED_PARAMETER(domain);
+  UNREFERENCED_PARAMETER(prefix);
+  UNREFERENCED_PARAMETER(cluster);
   PANIC("YAML support compiled out");
 #endif
 }
@@ -1916,11 +1961,11 @@ void EdsHelper::setEdsAndWait(
     const std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment>& cluster_load_assignments,
     IntegrationTestServerStats& server_stats) {
   // Make sure the last version has been accepted before setting a new one.
-  server_stats.waitForCounterGe("cluster.cluster_0.update_success", update_successes_);
+  server_stats.waitForCounter("cluster.cluster_0.update_success", Ge(update_successes_));
   setEds(cluster_load_assignments);
   // Make sure Envoy has consumed the update now that it is running.
   ++update_successes_;
-  server_stats.waitForCounterGe("cluster.cluster_0.update_success", update_successes_);
+  server_stats.waitForCounter("cluster.cluster_0.update_success", Ge(update_successes_));
   RELEASE_ASSERT(
       update_successes_ == server_stats.counter("cluster.cluster_0.update_success")->value(), "");
 }

@@ -9,6 +9,7 @@
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 namespace Envoy {
 
@@ -33,12 +34,12 @@ public:
   }
 
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
-                                          bool end_stream) override {
+                                          bool /* end_stream */) override {
     headers.setContentLength(body_.length());
-    encoder_callbacks_->dispatcher().post([this, end_stream]() -> void {
+    encoder_callbacks_->dispatcher().post([this]() -> void {
       response_injected_ = true;
       Buffer::OwnedImpl buffer(body_);
-      encoder_callbacks_->injectEncodedDataToFilterChain(buffer, end_stream);
+      encoder_callbacks_->injectEncodedDataToFilterChain(buffer, true);
       if (response_encoded_) {
         encoder_callbacks_->continueEncoding();
       }
@@ -75,10 +76,16 @@ private:
   bool response_encoded_{};
 };
 
-static Registry::RegisterFactory<SimpleFilterConfig<StopIterationHeadersInjectBodyFilter>,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<
+        StopIterationHeadersInjectBodyFilter,
+        test::integration::filters::StopIterationHeadersInjectBodyFilterConfig>,
+    Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
-static Registry::RegisterFactory<SimpleFilterConfig<StopIterationHeadersInjectBodyFilter>,
-                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<
+        StopIterationHeadersInjectBodyFilter,
+        test::integration::filters::StopIterationHeadersInjectBodyFilterConfig>,
+    Server::Configuration::UpstreamHttpFilterConfigFactory>
     register_upstream_;
 } // namespace Envoy

@@ -325,7 +325,7 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflowWithDnsCacheResourceManager) {
 TEST_F(ProxyFilterTest, NoRoute) {
   InSequence s;
 
-  EXPECT_CALL(callbacks_, route()).WillOnce(Return(nullptr));
+  EXPECT_CALL(callbacks_, route()).WillOnce(Return(OptRef<const Router::Route>{}));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
@@ -629,7 +629,6 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
   const auto pre_address = Network::Utility::parseInternetAddressNoThrow("1.2.3.3", 80);
   filter_state->setData(StreamInfo::UpstreamAddress::key(),
                         std::make_unique<StreamInfo::UpstreamAddress>(pre_address),
-                        StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::Request);
 
   InSequence s;
@@ -722,7 +721,7 @@ public:
 
 class ProxySettingsProxyFilterTest : public ProxyFilterTest {
 public:
-  virtual void setupFilter() override {
+  void setupFilter() override {
     EXPECT_CALL(*dns_cache_manager_, getCache(_));
 
     Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
@@ -778,7 +777,6 @@ public:
 
     filter_->setDecoderFilterCallbacks(callbacks_);
 
-    ON_CALL(callbacks_, route()).WillByDefault(Return(callbacks_.route_));
     ON_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
         .WillByDefault(Return(
             &factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
@@ -802,7 +800,6 @@ TEST_F(ProxyFilterWithFilterStateHostTest, NoFilterStatePresent) {
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
 
-  ON_CALL(callbacks_, route()).WillByDefault(Return(callbacks_.route_));
   ON_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
       .WillByDefault(
           Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
@@ -830,7 +827,6 @@ TEST_F(ProxyFilterWithFilterStateHostTest, WithFilterStateHostPresent) {
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
 
-  ON_CALL(callbacks_, route()).WillByDefault(Return(callbacks_.route_));
   ON_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
       .WillByDefault(
           Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
@@ -845,7 +841,6 @@ TEST_F(ProxyFilterWithFilterStateHostTest, WithFilterStateHostPresent) {
   const std::string filter_state_host = "filter-state-host.example.com";
   filter_state_->setData("envoy.upstream.dynamic_host",
                          std::make_unique<Router::StringAccessorImpl>(filter_state_host),
-                         StreamInfo::FilterState::StateType::ReadOnly,
                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Should use the value from filter state, not host header.
@@ -878,7 +873,6 @@ public:
 
     filter_->setDecoderFilterCallbacks(callbacks_);
 
-    ON_CALL(callbacks_, route()).WillByDefault(Return(callbacks_.route_));
     ON_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
         .WillByDefault(Return(
             &factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
@@ -915,7 +909,6 @@ TEST_F(ProxyFilterWithFilterStateHostDisabledTest, DoesNotUseFilterStateWhenFlag
   const std::string filter_state_host = "filter-state-host.example.com";
   filter_state_->setData("envoy.upstream.dynamic_host",
                          std::make_unique<Router::StringAccessorImpl>(filter_state_host),
-                         StreamInfo::FilterState::StateType::ReadOnly,
                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(callbacks_.stream_info_));
@@ -939,7 +932,6 @@ TEST_F(ProxyFilterWithFilterStateHostDisabledTest, IgnoresFilterStateHostWhenFla
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
 
-  ON_CALL(callbacks_, route()).WillByDefault(Return(callbacks_.route_));
   ON_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
       .WillByDefault(
           Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
@@ -954,7 +946,6 @@ TEST_F(ProxyFilterWithFilterStateHostDisabledTest, IgnoresFilterStateHostWhenFla
   const std::string filter_state_host = "filter-state-host.example.com";
   filter_state_->setData("envoy.upstream.dynamic_host",
                          std::make_unique<Router::StringAccessorImpl>(filter_state_host),
-                         StreamInfo::FilterState::StateType::ReadOnly,
                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Should use host header "foo", not filter state, when the flag is disabled.
@@ -974,7 +965,6 @@ TEST_F(ProxyFilterWithFilterStateHostTest, WithFilterStatePortPresent) {
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
 
-  ON_CALL(callbacks_, route()).WillByDefault(Return(callbacks_.route_));
   ON_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
       .WillByDefault(
           Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
@@ -989,7 +979,6 @@ TEST_F(ProxyFilterWithFilterStateHostTest, WithFilterStatePortPresent) {
   constexpr uint32_t filter_state_port = 9999;
   filter_state_->setData("envoy.upstream.dynamic_port",
                          std::make_unique<StreamInfo::UInt32AccessorImpl>(filter_state_port),
-                         StreamInfo::FilterState::StateType::ReadOnly,
                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Should use "foo" from host header but port from filter state.
@@ -1010,7 +999,6 @@ TEST_F(ProxyFilterWithFilterStateHostTest, WithFilterStateHostAndPortPresent) {
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
 
-  ON_CALL(callbacks_, route()).WillByDefault(Return(callbacks_.route_));
   ON_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
       .WillByDefault(
           Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
@@ -1026,11 +1014,9 @@ TEST_F(ProxyFilterWithFilterStateHostTest, WithFilterStateHostAndPortPresent) {
   constexpr uint32_t filter_state_port = 9999;
   filter_state_->setData("envoy.upstream.dynamic_host",
                          std::make_unique<Router::StringAccessorImpl>(filter_state_host),
-                         StreamInfo::FilterState::StateType::ReadOnly,
                          StreamInfo::FilterState::LifeSpan::FilterChain);
   filter_state_->setData("envoy.upstream.dynamic_port",
                          std::make_unique<StreamInfo::UInt32AccessorImpl>(filter_state_port),
-                         StreamInfo::FilterState::StateType::ReadOnly,
                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Should use both host and port from filter state.
@@ -1051,7 +1037,6 @@ TEST_F(ProxyFilterWithFilterStateHostDisabledTest, IgnoresFilterStatePortWhenFla
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
 
-  ON_CALL(callbacks_, route()).WillByDefault(Return(callbacks_.route_));
   ON_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
       .WillByDefault(
           Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
@@ -1067,11 +1052,9 @@ TEST_F(ProxyFilterWithFilterStateHostDisabledTest, IgnoresFilterStatePortWhenFla
   constexpr uint32_t filter_state_port = 9999;
   filter_state_->setData("envoy.upstream.dynamic_host",
                          std::make_unique<Router::StringAccessorImpl>(filter_state_host),
-                         StreamInfo::FilterState::StateType::ReadOnly,
                          StreamInfo::FilterState::LifeSpan::FilterChain);
   filter_state_->setData("envoy.upstream.dynamic_port",
                          std::make_unique<StreamInfo::UInt32AccessorImpl>(filter_state_port),
-                         StreamInfo::FilterState::StateType::ReadOnly,
                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Should use "foo" from host header and default port 80, ignoring filter state.

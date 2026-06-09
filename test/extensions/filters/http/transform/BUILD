@@ -21,7 +21,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/filters/http/transform:config",
-        "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:registry_lib",
@@ -58,6 +57,6 @@ envoy_extension_cc_test(
         "//test/mocks/server:instance_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/strings:str_format",
+        "@abseil-cpp//absl/strings:str_format",
     ],
 )

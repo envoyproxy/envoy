@@ -1,7 +1,8 @@
 #include "source/extensions/filters/http/file_system_buffer/config.h"
 #include "source/extensions/filters/http/file_system_buffer/filter.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -300,6 +301,30 @@ INSTANTIATE_TEST_SUITE_P(
                                    "alwaysFullyBuffer, injectContentLength, replaceContentLength"},
                       BehaviorCase{"fully_buffer: {}", "alwaysFullyBuffer"}),
     &behaviorCaseName);
+
+TEST_F(FileSystemBufferFilterConfigTest, ValidConfigWithServerContext) {
+  const std::string yaml_string = R"EOF(
+    request:
+      memory_buffer_bytes_limit: 1234
+      storage_buffer_bytes_limit: 5678
+    response:
+      memory_buffer_bytes_limit: 1235
+      storage_buffer_bytes_limit: 5679
+    manager_config:
+      thread_pool:
+        thread_count: 1
+  )EOF";
+
+  auto proto_config = FileSystemBufferFilterConfigTest::configFromYaml(yaml_string);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  FileSystemBufferFilterFactory factory;
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  cb(filter_callback);
+}
 
 } // namespace FileSystemBuffer
 } // namespace HttpFilters

@@ -7,6 +7,7 @@
 namespace Envoy {
 namespace Upstream {
 namespace {
+
 bool shouldUseCompactTable(size_t num_hosts, uint64_t table_size) {
   // Don't use compact maglev on 32-bit platforms.
   if constexpr (!(ENVOY_BIT_ARRAY_SUPPORTED)) {
@@ -41,7 +42,14 @@ public:
                     bool use_hostname_for_hashing, MaglevLoadBalancerStats& stats) {
 
     MaglevTableSharedPtr maglev_table;
-    if (shouldUseCompactTable(normalized_host_weights.size(), table_size)) {
+    if (normalized_host_weights.size() == 1) {
+      maglev_table =
+          std::make_shared<DegenerateMaglevTable>(normalized_host_weights, max_normalized_weight,
+                                                  table_size, use_hostname_for_hashing, stats);
+      ENVOY_LOG(debug,
+                "creating single host maglev table given table size {} and number of hosts {}",
+                table_size, normalized_host_weights.size());
+    } else if (shouldUseCompactTable(normalized_host_weights.size(), table_size)) {
       maglev_table =
           std::make_shared<CompactMaglevTable>(normalized_host_weights, max_normalized_weight,
                                                table_size, use_hostname_for_hashing, stats);
@@ -159,6 +167,8 @@ void OriginalMaglevTable::constructImplementationInternals(
   for (uint32_t iteration = 1; table_index < table_size_; ++iteration) {
     for (uint64_t i = 0; i < table_build_entries.size() && table_index < table_size_; i++) {
       TableBuildEntry& entry = table_build_entries[i];
+      ASSERT(entry.skip_ < table_size_, "skip must be less than table size");
+
       // To understand how target_weight_ and weight_ are used below, consider a host with weight
       // equal to max_normalized_weight. This would be picked on every single iteration. If it had
       // weight equal to max_normalized_weight / 3, then it would only be picked every 3 iterations,
@@ -167,19 +177,27 @@ void OriginalMaglevTable::constructImplementationInternals(
         continue;
       }
       entry.target_weight_ += max_normalized_weight;
-      uint64_t c = permutation(entry);
+      uint64_t c = entry.current_permutation_;
       while (table_[c] != nullptr) {
         entry.next_++;
-        c = permutation(entry);
+        c += entry.skip_;
+        if (c >= table_size_) {
+          c -= table_size_;
+        }
       }
 
       table_[c] = entry.host_;
       entry.next_++;
+      entry.current_permutation_ = c + entry.skip_;
+      if (entry.current_permutation_ >= table_size_) {
+        entry.current_permutation_ -= table_size_;
+      }
       entry.count_++;
       table_index++;
     }
   }
 }
+
 CompactMaglevTable::CompactMaglevTable(const NormalizedHostWeightVector& normalized_host_weights,
                                        double max_normalized_weight, uint64_t table_size,
                                        bool use_hostname_for_hashing,
@@ -209,6 +227,8 @@ void CompactMaglevTable::constructImplementationInternals(
   for (uint32_t iteration = 1; table_index < table_size_; ++iteration) {
     for (uint32_t i = 0; i < table_build_entries.size() && table_index < table_size_; i++) {
       TableBuildEntry& entry = table_build_entries[i];
+      ASSERT(entry.skip_ < table_size_, "skip must be less than table size");
+
       // To understand how target_weight_ and weight_ are used below, consider a host with weight
       // equal to max_normalized_weight. This would be picked on every single iteration. If it had
       // weight equal to max_normalized_weight / 3, then it would only be picked every 3 iterations,
@@ -219,10 +239,13 @@ void CompactMaglevTable::constructImplementationInternals(
       entry.target_weight_ += max_normalized_weight;
       // As we're using the compact implementation, our table size is limited to
       // 32-bit, hence static_cast here should be safe.
-      uint32_t c = static_cast<uint32_t>(permutation(entry));
+      uint32_t c = static_cast<uint32_t>(entry.current_permutation_);
       while (occupied[c]) {
         entry.next_++;
-        c = static_cast<uint32_t>(permutation(entry));
+        c += entry.skip_;
+        if (c >= table_size_) {
+          c -= table_size_;
+        }
       }
 
       // Record the index of the given host.
@@ -230,10 +253,31 @@ void CompactMaglevTable::constructImplementationInternals(
       occupied[c] = true;
 
       entry.next_++;
+      entry.current_permutation_ = c + entry.skip_;
+      if (entry.current_permutation_ >= table_size_) {
+        entry.current_permutation_ -= table_size_;
+      }
       entry.count_++;
       table_index++;
     }
   }
+}
+
+DegenerateMaglevTable::DegenerateMaglevTable(
+    const NormalizedHostWeightVector& normalized_host_weights, double max_normalized_weight,
+    uint64_t table_size, bool use_hostname_for_hashing, MaglevLoadBalancerStats& stats)
+    : MaglevTable(table_size, stats) {
+  constructMaglevTableInternal(normalized_host_weights, max_normalized_weight,
+                               use_hostname_for_hashing);
+}
+
+void DegenerateMaglevTable::constructImplementationInternals(
+    std::vector<TableBuildEntry>& table_build_entries, double /*max_normalized_weight*/) {
+  ASSERT(table_build_entries.size() == 1,
+         "DegenerateMaglevTable is intended for the case of a single host!");
+  TableBuildEntry& entry = table_build_entries[0];
+  single_host_ = entry.host_;
+  ++entry.count_;
 }
 
 void OriginalMaglevTable::logMaglevTable(bool use_hostname_for_hashing) const {
@@ -255,6 +299,10 @@ void CompactMaglevTable::logMaglevTable(bool use_hostname_for_hashing) const {
     ENVOY_LOG(trace, "maglev: i={} address={} host={}", i, host->address()->asString(),
               key_to_hash);
   }
+}
+
+void DegenerateMaglevTable::logMaglevTable(bool /*use_hostname_for_hashing*/) const {
+  ENVOY_LOG(trace, "maglev: single host {}", single_host_->address()->asString());
 }
 
 MaglevTable::MaglevTable(uint64_t table_size, MaglevLoadBalancerStats& stats)
@@ -292,8 +340,9 @@ HostSelectionResponse CompactMaglevTable::chooseHost(uint64_t hash, uint32_t att
   return {host_table_[index]};
 }
 
-uint64_t MaglevTable::permutation(const TableBuildEntry& entry) {
-  return (entry.offset_ + (entry.skip_ * entry.next_)) % table_size_;
+HostSelectionResponse DegenerateMaglevTable::chooseHost(uint64_t /*hash*/,
+                                                        uint32_t /*attempt*/) const {
+  return {single_host_};
 }
 
 MaglevLoadBalancer::MaglevLoadBalancer(const PrioritySet& priority_set, ClusterLbStats& stats,

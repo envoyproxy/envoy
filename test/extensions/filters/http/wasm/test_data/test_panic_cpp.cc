@@ -21,7 +21,7 @@ public:
   explicit PanicContext(uint32_t id, RootContext* root) : Context(id, root) {}
 
   FilterHeadersStatus onRequestHeaders(uint32_t, bool) override;
-  FilterDataStatus onRequestBody(size_t , bool ) override;
+  FilterDataStatus onRequestBody(size_t, bool) override;
   FilterTrailersStatus onRequestTrailers(uint32_t) override;
   FilterHeadersStatus onResponseHeaders(uint32_t, bool) override;
   FilterDataStatus onResponseBody(size_t, bool) override;
@@ -29,7 +29,7 @@ public:
 };
 
 static RegisterContextFactory register_PanicContext(CONTEXT_FACTORY(PanicContext),
-                                                   ROOT_FACTORY(PanicRootContext), "panic");
+                                                    ROOT_FACTORY(PanicRootContext), "panic");
 
 static int* badptr = nullptr;
 
@@ -48,7 +48,7 @@ FilterTrailersStatus PanicContext::onRequestTrailers(uint32_t) {
   return FilterTrailersStatus::Continue;
 }
 
-FilterDataStatus PanicContext::onRequestBody(size_t , bool ) {
+FilterDataStatus PanicContext::onRequestBody(size_t, bool) {
   *badptr = 0;
   return FilterDataStatus::Continue;
 }

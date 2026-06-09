@@ -48,11 +48,12 @@ bool MatchInputRateLimitDescriptor::populateDescriptor(RateLimit::DescriptorEntr
   Http::Matching::HttpMatchingDataImpl data(info);
   data.onRequestHeaders(headers);
   auto result = data_input_->get(data);
-  if (!absl::holds_alternative<std::string>(result.data_)) {
+  auto string_data = result.stringData();
+  if (!string_data) {
     return false;
   }
-  if (absl::string_view str = absl::get<std::string>(result.data_); !str.empty()) {
-    descriptor_entry = {descriptor_key_, std::string(str)};
+  if (!string_data->empty()) {
+    descriptor_entry = {descriptor_key_, std::string(*string_data)};
   }
   return true;
 }
@@ -93,10 +94,11 @@ bool SourceClusterAction::populateDescriptor(RateLimit::DescriptorEntry& descrip
 bool DestinationClusterAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                                                   const std::string&, const Http::RequestHeaderMap&,
                                                   const StreamInfo::StreamInfo& info) const {
-  if (info.route() == nullptr || info.route()->routeEntry() == nullptr) {
+  const auto route = info.route();
+  if (!route || route->routeEntry() == nullptr) {
     return false;
   }
-  descriptor_entry = {"destination_cluster", info.route()->routeEntry()->clusterName()};
+  descriptor_entry = {"destination_cluster", route->routeEntry()->clusterName()};
   return true;
 }
 
@@ -205,9 +207,29 @@ bool MetaDataAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_e
   case envoy::config::route::v3::RateLimit::Action::MetaData::DYNAMIC:
     metadata_source = &info.dynamicMetadata();
     break;
-  case envoy::config::route::v3::RateLimit::Action::MetaData::ROUTE_ENTRY:
-    metadata_source = &info.route()->metadata();
+  case envoy::config::route::v3::RateLimit::Action::MetaData::ROUTE_ENTRY: {
+    const auto route = info.route();
+    metadata_source = route ? &route->metadata() : nullptr;
     break;
+  }
+  case envoy::config::route::v3::RateLimit::Action::MetaData::CLUSTER_ENTRY: {
+    OptRef<const Upstream::ClusterInfo> cluster_info = info.upstreamClusterInfo();
+    metadata_source = cluster_info.has_value() ? &cluster_info.ref().metadata() : nullptr;
+    break;
+  }
+  case envoy::config::route::v3::RateLimit::Action::MetaData::CLUSTER_LOCALITY_ENTRY: {
+    const auto upstream_info = info.upstreamInfo();
+    // Upstream host is only available after upstream host selection.
+    // This means that the cluster locality metadata can only be used on the
+    // response path (apply_on_stream_done is set to true) or in a scenario where host selection is
+    // done before the rate limit action is executed.
+    if (upstream_info.has_value() && upstream_info->upstreamHost()) {
+      metadata_source = upstream_info->upstreamHost()->localityMetadata().get();
+    } else {
+      metadata_source = nullptr;
+    }
+    break;
+  }
   }
 
   const std::string metadata_string_value =
@@ -342,12 +364,54 @@ QueryParameterValueMatchAction::buildQueryParameterMatcherVector(
   return ret;
 }
 
+RemoteAddressMatchAction::RemoteAddressMatchAction(
+    const envoy::config::route::v3::RateLimit::Action::RemoteAddressMatch& action,
+    Server::Configuration::CommonFactoryContext&)
+    : descriptor_key_(!action.descriptor_key().empty() ? action.descriptor_key()
+                                                       : "remote_address_match"),
+      default_value_(action.default_value()),
+      ip_list_(Network::Address::IpList::create(action.address_matcher().ranges()).value()),
+      invert_match_(action.address_matcher().invert_match()),
+      descriptor_formatter_(
+          Formatter::FormatterImpl::create(action.descriptor_value(), true).value()) {}
+
+bool RemoteAddressMatchAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
+                                                  const std::string&,
+                                                  const Http::RequestHeaderMap& headers,
+                                                  const StreamInfo::StreamInfo& info) const {
+  // Check if remote address matches the address matcher
+  const Network::Address::InstanceConstSharedPtr& remote_address =
+      info.downstreamAddressProvider().remoteAddress();
+  if (remote_address->type() != Network::Address::Type::Ip) {
+    return false;
+  }
+
+  const bool matches = ip_list_->contains(*remote_address);
+  const bool should_apply = invert_match_ ? !matches : matches;
+  if (!should_apply) {
+    return false;
+  }
+
+  // Format the descriptor value
+  const std::string formatted_value = descriptor_formatter_->format({&headers}, info);
+  if (!formatted_value.empty()) {
+    descriptor_entry = {descriptor_key_, formatted_value};
+  } else if (!default_value_.empty()) {
+    descriptor_entry = {descriptor_key_, default_value_};
+  } else {
+    // If formatting resulted in empty string and no default_value, skip this descriptor
+    return false;
+  }
+  return true;
+}
+
 RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
     const envoy::config::route::v3::RateLimit& config,
     Server::Configuration::CommonFactoryContext& context, absl::Status& creation_status)
     : disable_key_(config.disable_key()),
       stage_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stage, 0))),
-      apply_on_stream_done_(config.apply_on_stream_done()) {
+      apply_on_stream_done_(config.apply_on_stream_done()),
+      x_ratelimit_option_(config.x_ratelimit_option()) {
   actions_.reserve(config.actions().size());
   for (const auto& action : config.actions()) {
     switch (action.action_specifier_case()) {
@@ -451,6 +515,9 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
           action.query_parameter_value_match(), context, std::move(formatter_or_error.value())));
       break;
     }
+    case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kRemoteAddressMatch:
+      actions_.emplace_back(new RemoteAddressMatchAction(action.remote_address_match(), context));
+      break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::ACTION_SPECIFIER_NOT_SET:
       PANIC_DUE_TO_CORRUPT_ENUM;
     }
@@ -481,6 +548,7 @@ void RateLimitPolicyEntryImpl::populateDescriptors(std::vector<RateLimit::Descri
   }
 
   if (result) {
+    descriptor.x_ratelimit_option_ = x_ratelimit_option_;
     descriptors.emplace_back(descriptor);
   }
 }

@@ -200,6 +200,7 @@ public:
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
   }
+  Http::ClientCertFormat clientCertFormat() const override { return Http::ClientCertFormat::Text; }
   const Matcher::MatchTreePtr<Http::HttpMatchingData>& forwardClientCertMatcher() const override {
     return forward_client_cert_matcher_;
   }
@@ -247,9 +248,17 @@ public:
   bool appendLocalOverload() const override { return false; }
   bool appendXForwardedPort() const override { return false; }
   bool addProxyProtocolConnectionState() const override { return true; }
+  const absl::flat_hash_set<uint32_t>& httpsDestinationPorts() const override {
+    return https_destination_ports_;
+  }
+  const absl::flat_hash_set<uint32_t>& httpDestinationPorts() const override {
+    return http_destination_ports_;
+  }
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       config_;
+  absl::flat_hash_set<uint32_t> https_destination_ports_;
+  absl::flat_hash_set<uint32_t> http_destination_ports_;
   NiceMock<Random::MockRandomGenerator> random_;
   RequestIDExtensionSharedPtr request_id_extension_;
   AccessLog::InstanceSharedPtrVector access_logs_;

@@ -32,7 +32,7 @@
 #     targets = {
 #         "//distribution:envoy-binary": "envoy",
 #         "//distribution:envoy-contrib-binary": "envoy-contrib",
-#         "@com_github_ncopa_suexec//:su-exec": "utils/su-exec",
+#         "@su-exec": "utils/su-exec",
 #     },
 # )
 #

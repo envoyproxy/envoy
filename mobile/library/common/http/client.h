@@ -65,6 +65,11 @@ public:
         // and having local data of 2M + kernel-buffer-limit for HTTP/1.1
         random_(random), high_watermark_(high_watermark.value_or(2 * 1024 * 1024)) {}
 
+  ~Client() {
+    ASSERT(api_listener_ == nullptr,
+           "shutdownApiListener must be called before Client is destructed");
+  }
+
   /**
    * Attempts to open a new stream to the remote. Note that this function is asynchronous and
    * opening a stream may fail. The returned handle is immediately valid for use with this API, but
@@ -139,7 +144,10 @@ public:
     CONSTRUCT_ON_FIRST_USE(std::string, "client_cancelled_stream");
   }
 
-  void shutdownApiListener() { api_listener_.reset(); }
+  void shutdownApiListener() {
+    ENVOY_LOG(debug, "shutdownApiListener called");
+    api_listener_.reset();
+  }
 
 private:
   class DirectStream;
@@ -349,7 +357,7 @@ private:
     // read faster than the mobile caller can process it.
     bool explicit_flow_control_ = false;
     // Latest intel data retrieved from the StreamInfo.
-    envoy_stream_intel stream_intel_{-1, -1, 0, 0};
+    envoy_stream_intel stream_intel_{-1, -1, 0, 0, -1, -1};
     envoy_final_stream_intel envoy_final_stream_intel_{-1, -1, -1, -1, -1, -1, -1, -1,
                                                        -1, -1, -1, 0,  0,  0,  0,  -1};
     StreamInfo::BytesMeterSharedPtr bytes_meter_;

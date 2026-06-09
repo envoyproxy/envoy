@@ -1,5 +1,6 @@
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 
+#include "source/common/http/http_service_headers.h"
 #include "source/common/http/message_impl.h"
 #include "source/extensions/filters/http/ext_proc/http_client/http_client_impl.h"
 
@@ -33,11 +34,13 @@ public:
 
   void SetUp() override {
     TestUtility::loadFromYaml(default_http_config_, config_);
-    client_ = std::make_unique<ExtProcHttpClient>(config_, context_);
+    auto headers_applicator = Http::HttpServiceHeadersApplicator::createOrThrow(
+        config_.http_service().http_service(), context_);
+    client_ = std::make_unique<ExtProcHttpClient>(config_, context_, std::move(headers_applicator));
   }
 
 protected:
-  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor config_{};
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor config_;
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Upstream::MockClusterManager& cm_{context_.cluster_manager_};
   std::unique_ptr<ExtProcHttpClient> client_;

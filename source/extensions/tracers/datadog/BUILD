@@ -48,8 +48,8 @@ envoy_cc_library(
         "//source/common/upstream:cluster_update_tracker_lib",
         "//source/common/version:version_lib",
         "//source/extensions/tracers/common:factory_base_lib",
-        "@com_github_datadog_dd_trace_cpp//:dd_trace_cpp",
-        "@com_github_nlohmann_json//:json",
+        "@dd-trace-cpp//:dd_trace_cpp",
+        "@nlohmann_json//:json",
     ],
 )
 

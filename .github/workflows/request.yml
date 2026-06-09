@@ -28,7 +28,31 @@ concurrency:
 
 
 jobs:
+  # Envoy (and mirror repos) have an environment setup that requires maintainer approval
+  # to use it. This CI checks if the request is from a first-time contributor, and in that
+  # case it uses the environment and requires the permission to proceed.
+  authorize:
+    if: >-
+      ${{ github.repository == 'envoyproxy/envoy'
+          || (vars.ENVOY_CI && github.event_name != 'schedule')
+          || (vars.ENVOY_SCHEDULED_CI && github.event_name == 'schedule') }}
+    runs-on: ubuntu-24.04
+    environment: >-
+      ${{ github.event_name == 'pull_request_target'
+          && github.event.pull_request.author_association != 'MEMBER'
+          && github.event.pull_request.author_association != 'COLLABORATOR'
+          && github.event.pull_request.author_association != 'CONTRIBUTOR'
+          && github.event.pull_request.author_association != 'OWNER'
+          && 'external-contributors'
+          || '' }}
+    steps:
+    - run: |
+        echo "Authorized"
+        echo "  Event: ${{ github.event_name }}"
+        echo "  Author association: ${{ github.event.pull_request.author_association }}"
+
   request:
+    needs: authorize
     permissions:
       actions: write
       contents: read

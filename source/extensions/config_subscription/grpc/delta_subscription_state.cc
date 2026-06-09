@@ -13,7 +13,6 @@ namespace Config {
 
 DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                                                UntypedConfigUpdateCallbacks& watch_map,
-                                               const LocalInfo::LocalInfo& local_info,
                                                Event::Dispatcher& dispatcher,
                                                XdsConfigTrackerOptRef xds_config_tracker)
     // TODO(snowp): Hard coding VHDS here is temporary until we can move it away from relying on
@@ -37,7 +36,7 @@ DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
             watch_map_.onConfigUpdate({}, removed_resources, "");
           },
           dispatcher, dispatcher.timeSource()),
-      type_url_(std::move(type_url)), watch_map_(watch_map), local_info_(local_info),
+      type_url_(std::move(type_url)), watch_map_(watch_map),
       xds_config_tracker_(xds_config_tracker) {}
 
 void DeltaSubscriptionState::updateSubscriptionInterest(
@@ -136,7 +135,7 @@ bool DeltaSubscriptionState::subscriptionUpdatePending() const {
   // because even if it's empty, it won't be interpreted as legacy wildcard subscription, which can
   // only for the first request in the stream. So sending an empty request at this point should be
   // harmless.
-  return must_send_discovery_request_;
+  return dynamic_context_changed_;
 }
 
 void DeltaSubscriptionState::markStreamFresh(bool should_send_initial_resource_versions) {
@@ -292,7 +291,6 @@ void DeltaSubscriptionState::handleEstablishmentFailure() {
 envoy::service::discovery::v3::DeltaDiscoveryRequest
 DeltaSubscriptionState::getNextRequestAckless() {
   envoy::service::discovery::v3::DeltaDiscoveryRequest request;
-  must_send_discovery_request_ = false;
   if (!any_request_sent_yet_in_current_stream_) {
     any_request_sent_yet_in_current_stream_ = true;
     const bool is_legacy_wildcard = isInitialRequestForLegacyWildcard();
@@ -335,7 +333,6 @@ DeltaSubscriptionState::getNextRequestAckless() {
   names_removed_.clear();
 
   request.set_type_url(type_url_);
-  request.mutable_node()->MergeFrom(local_info_.node());
   return request;
 }
 

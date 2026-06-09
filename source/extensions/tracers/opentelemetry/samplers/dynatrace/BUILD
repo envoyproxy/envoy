@@ -43,7 +43,7 @@ envoy_cc_library(
         "//source/common/config:datasource_lib",
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
         "//source/extensions/tracers/opentelemetry/samplers:sampler_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/tracers/opentelemetry/samplers/v3:pkg_cc_proto",
     ],

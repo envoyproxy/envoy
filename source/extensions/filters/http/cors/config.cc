@@ -27,6 +27,16 @@ Http::FilterFactoryCb CorsFilterFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
+Http::FilterFactoryCb CorsFilterFactory::createFilterFactoryFromProtoWithServerContextTyped(
+    const envoy::extensions::filters::http::cors::v3::Cors&, const std::string& stats_prefix,
+    Server::Configuration::ServerFactoryContext& context) {
+  CorsFilterConfigSharedPtr config =
+      std::make_shared<CorsFilterConfig>(stats_prefix, context.scope());
+  return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<CorsFilter>(config));
+  };
+}
+
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 CorsFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::cors::v3::CorsPolicy& policy,

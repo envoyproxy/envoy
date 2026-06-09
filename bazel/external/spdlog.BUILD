@@ -13,5 +13,5 @@ cc_library(
     ],
     includes = ["include"],
     visibility = ["//visibility:public"],
-    deps = ["@com_github_fmtlib_fmt//:fmt"],
+    deps = ["@fmt"],
 )

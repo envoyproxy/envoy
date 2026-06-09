@@ -97,7 +97,10 @@ public:
     }
 
     cm_.initializeThreadLocalClusters({"ext_authz"});
-    return std::make_shared<ClientConfig>(proto_config, timeout, path_prefix, factory_context_);
+    const std::string path_prefix_value =
+        yaml.empty() ? path_prefix : proto_config.http_service().path_prefix();
+    return std::make_shared<ClientConfig>(proto_config, timeout, path_prefix_value,
+                                          factory_context_);
   }
 
   void dynamicMetadataTest(CheckStatus status, const std::string& http_status) {
@@ -226,8 +229,21 @@ TEST_F(ExtAuthzHttpClientTest, ClientConfigFromHttpService) {
                                             /*timeout_ms=*/123, factory_context_);
   EXPECT_EQ(cfg->cluster(), "ext_authz");
   EXPECT_EQ(cfg->pathPrefix(), "/prefix");
+  EXPECT_TRUE(cfg->pathOverride().empty());
   EXPECT_EQ(cfg->timeout(), std::chrono::milliseconds{123});
   EXPECT_TRUE(cfg->encodeRawHeaders());
+}
+
+TEST_F(ExtAuthzHttpClientTest, ClientConfigFromHttpServiceWithPathOverride) {
+  envoy::extensions::filters::http::ext_authz::v3::HttpService http_service;
+  http_service.mutable_server_uri()->set_uri("ext_authz:9000");
+  http_service.mutable_server_uri()->set_cluster("ext_authz");
+  http_service.mutable_server_uri()->mutable_timeout()->set_seconds(0);
+  http_service.set_path_override("/override");
+  auto cfg = std::make_shared<ClientConfig>(http_service, /*encode_raw_headers=*/false,
+                                            /*timeout_ms=*/456, factory_context_);
+  EXPECT_EQ(cfg->pathPrefix(), "");
+  EXPECT_EQ(cfg->pathOverride(), "/override");
 }
 
 TEST_F(ExtAuthzHttpClientTest, StreamInfo) {
@@ -301,12 +317,63 @@ TEST_F(ExtAuthzHttpClientTest, PathPrefixShouldBeSanitized) {
                             "path_prefix should start with \"/\".");
 }
 
-// Verify client response when the authorization server returns a 200 OK and path_prefix is
-// configured.
-TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathRewrite) {
-  Http::RequestMessagePtr message_ptr = sendRequest({{":path", "/foo"}, {"foo", "bar"}});
+// Verify path_override completely replaces the path (no prefix of original path).
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathOverride) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    path_override: "/auth"
+  )EOF";
+  initialize(yaml);
+  Http::RequestMessagePtr message_ptr = sendRequest({{":path", "/hello"}, {"foo", "bar"}});
+  EXPECT_EQ(message_ptr->headers().getPathValue(), "/auth");
+}
 
-  EXPECT_EQ(message_ptr->headers().getPathValue(), "/bar/foo");
+// Same input path /hello but with path_prefix /auth yields /auth/hello.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathPrefixSameInput) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    path_prefix: "/auth"
+  )EOF";
+  initialize(yaml);
+  Http::RequestMessagePtr message_ptr = sendRequest({{":path", "/hello"}, {"foo", "bar"}});
+  EXPECT_EQ(message_ptr->headers().getPathValue(), "/auth/hello");
+}
+
+// Verify only one of path_prefix or path_override may be set.
+TEST_F(ExtAuthzHttpClientTest, PathPrefixAndPathOverrideMutuallyExclusive) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    path_prefix: "/prefix"
+    path_override: "/override"
+  )EOF";
+  EXPECT_THROW_WITH_MESSAGE(createConfig(yaml), EnvoyException,
+                            "Only one of path_prefix or path_override may be set, not both.");
+}
+
+// Verify path_override must start with /.
+TEST_F(ExtAuthzHttpClientTest, PathOverrideMustStartWithSlash) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    path_override: "no-leading-slash"
+  )EOF";
+  EXPECT_THROW_WITH_MESSAGE(createConfig(yaml), EnvoyException,
+                            "path_override should start with \"/\".");
 }
 
 // Verify request body is set correctly when the normal body is empty and raw body is set.
@@ -626,6 +693,60 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxError) {
   client_->onSuccess(async_request_, std::move(check_response));
 }
 
+// Test that HTTP call failure leaves status_code unset. This allows the filter to use
+// status_on_error configuration instead of a hardcoded value.
+TEST_F(ExtAuthzHttpClientTest, HttpCallFailureDoesNotSetStatusCode) {
+  envoy::service::auth::v3::CheckRequest request;
+
+  // Expected: status_code should be unset (0), not Forbidden.
+  auto expected_response = Response{};
+  expected_response.status = CheckStatus::Error;
+  expected_response.status_code = static_cast<Http::Code>(0);
+
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                      AuthzErrorResponseWithAttributes(expected_response))));
+  client_->onFailure(async_request_, Http::AsyncClient::FailureReason::Reset);
+}
+
+// Test that HTTP 5xx response leaves status_code unset. This allows the filter to use
+// status_on_error configuration instead of a hardcoded value.
+TEST_F(ExtAuthzHttpClientTest, Http5xxResponseDoesNotSetStatusCode) {
+  Http::ResponseMessagePtr check_response(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}}));
+  envoy::service::auth::v3::CheckRequest request;
+
+  // Expected: status_code should be unset (0), not Forbidden.
+  auto expected_response = Response{};
+  expected_response.status = CheckStatus::Error;
+  expected_response.status_code = static_cast<Http::Code>(0);
+
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                      AuthzErrorResponseWithAttributes(expected_response))));
+  client_->onSuccess(async_request_, std::move(check_response));
+}
+
+// Test that missing cluster leaves status_code unset. This allows the filter to use
+// status_on_error configuration instead of a hardcoded value.
+TEST_F(ExtAuthzHttpClientTest, MissingClusterDoesNotSetStatusCode) {
+  InSequence s;
+
+  // Expected: status_code should be unset (0), not Forbidden.
+  auto expected_response = Response{};
+  expected_response.status = CheckStatus::Error;
+  expected_response.status_code = static_cast<Http::Code>(0);
+
+  EXPECT_CALL(cm_, getThreadLocalCluster(Eq("ext_authz"))).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).Times(0);
+  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                      AuthzErrorResponseWithAttributes(expected_response))));
+  client_->check(request_callbacks_, envoy::service::auth::v3::CheckRequest{}, parent_span_,
+                 stream_info_);
+}
+
 // Test the client when the request is canceled.
 TEST_F(ExtAuthzHttpClientTest, CancelledAuthorizationRequest) {
   envoy::service::auth::v3::CheckRequest request;
@@ -844,6 +965,221 @@ TEST_F(ExtAuthzHttpClientTest, MultipleSetCookieHeadersOnSuccess) {
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(expected_response))));
   client_->onSuccess(async_request_, std::move(message_response));
+}
+
+TEST_F(ExtAuthzHttpClientTest, AppendMatchers) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    authorization_response:
+      allowed_upstream_headers_to_append:
+        patterns:
+        - exact: "x-append-me"
+  )EOF";
+
+  initialize(yaml);
+
+  auto message_response = std::make_unique<Http::ResponseMessageImpl>(
+      Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
+          {{Http::LowerCaseString(":status"), "200"},
+           {Http::LowerCaseString("x-append-me"), "value1"}}));
+
+  Response expected_response = TestCommon::makeAuthzResponse(CheckStatus::OK, Http::Code::OK);
+  expected_response.headers_to_add = {{"x-append-me", "value1"}};
+
+  envoy::service::auth::v3::CheckRequest request;
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(expected_response))));
+  client_->onSuccess(async_request_, std::move(message_response));
+}
+
+TEST_F(ExtAuthzHttpClientTest, PathPrefix) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    path_prefix: "/prefix"
+  )EOF";
+
+  initialize(yaml);
+
+  // Explicitly set up getThreadLocalCluster.
+  ON_CALL(cm_, getThreadLocalCluster(absl::string_view("ext_authz")))
+      .WillByDefault(Return(&cm_.thread_local_cluster_));
+
+  envoy::service::auth::v3::CheckRequest request;
+  auto* http_request = request.mutable_attributes()->mutable_request()->mutable_http();
+  (*http_request->mutable_headers())[":path"] = "/original";
+
+  EXPECT_CALL(async_client_, send_(_, _, _))
+      .WillOnce(Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+                           const Http::AsyncClient::RequestOptions&) {
+        EXPECT_EQ("/prefix/original", message->headers().getPathValue());
+        return &async_request_;
+      }));
+
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  // Complete the request.
+  Http::ResponseMessagePtr response_message(
+      new Http::ResponseMessageImpl(Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
+          {{Http::LowerCaseString(":status"), "200"}})));
+  EXPECT_CALL(request_callbacks_, onComplete_(_));
+  client_->onSuccess(async_request_, std::move(response_message));
+}
+
+TEST_F(ExtAuthzHttpClientTest, PathOverrideReal) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+  )EOF";
+
+  initialize(yaml);
+
+  // Explicitly set up getThreadLocalCluster.
+  ON_CALL(cm_, getThreadLocalCluster(absl::string_view("ext_authz")))
+      .WillByDefault(Return(&cm_.thread_local_cluster_));
+
+  envoy::service::auth::v3::CheckRequest request;
+  auto* http_request = request.mutable_attributes()->mutable_request()->mutable_http();
+  (*http_request->mutable_headers())[":path"] = "/original";
+
+  EXPECT_CALL(async_client_, send_(_, _, _))
+      .WillOnce(Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+                           const Http::AsyncClient::RequestOptions&) {
+        EXPECT_EQ("/original", message->headers().getPathValue());
+        return &async_request_;
+      }));
+
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  // Complete the request.
+  Http::ResponseMessagePtr response_message(
+      new Http::ResponseMessageImpl(Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
+          {{Http::LowerCaseString(":status"), "200"}})));
+  EXPECT_CALL(request_callbacks_, onComplete_(_));
+  client_->onSuccess(async_request_, std::move(response_message));
+}
+
+TEST_F(ExtAuthzHttpClientTest, PathTransformationsWithEncodeRawHeaders) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+  encode_raw_headers: true
+  )EOF";
+
+  initialize(yaml);
+
+  // Explicitly set up getThreadLocalCluster.
+  ON_CALL(cm_, getThreadLocalCluster(absl::string_view("ext_authz")))
+      .WillByDefault(Return(&cm_.thread_local_cluster_));
+
+  // Test case 1: Path prefix.
+  {
+    envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config{};
+    TestUtility::loadFromYaml(yaml, proto_config);
+    // Don't set path_prefix in proto_config, but pass it to constructor (simulating ext_authz.cc
+    // behavior).
+    auto config = std::make_shared<ClientConfig>(proto_config, 250, "/prefix", factory_context_);
+    auto client = std::make_unique<RawHttpClientImpl>(cm_, config);
+
+    envoy::service::auth::v3::CheckRequest request;
+    auto* http_request = request.mutable_attributes()->mutable_request()->mutable_http();
+    auto* header_map = http_request->mutable_header_map();
+    auto* header = header_map->add_headers();
+    header->set_key(":path");
+    header->set_raw_value("/original");
+
+    EXPECT_CALL(async_client_, send_(_, _, _))
+        .WillOnce(Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+                             const Http::AsyncClient::RequestOptions&) {
+          EXPECT_EQ("/prefix/original", message->headers().getPathValue());
+          return &async_request_;
+        }));
+
+    client->check(request_callbacks_, request, parent_span_, stream_info_);
+
+    // Cleanup.
+    EXPECT_CALL(request_callbacks_, onComplete_(_));
+    client->onSuccess(async_request_, std::make_unique<Http::ResponseMessageImpl>(
+                                          Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
+                                              {{Http::LowerCaseString(":status"), "200"}})));
+  }
+
+  // Test case 2: Path override.
+  {
+    envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config{};
+    TestUtility::loadFromYaml(yaml, proto_config);
+    proto_config.mutable_http_service()->set_path_override("/override");
+    // Pass empty path_prefix to avoid conflict with path_override.
+    auto config = std::make_shared<ClientConfig>(proto_config, 250, "", factory_context_);
+    auto client = std::make_unique<RawHttpClientImpl>(cm_, config);
+
+    envoy::service::auth::v3::CheckRequest request;
+    auto* http_request = request.mutable_attributes()->mutable_request()->mutable_http();
+    auto* header_map = http_request->mutable_header_map();
+    auto* header = header_map->add_headers();
+    header->set_key(":path");
+    header->set_raw_value("/original");
+
+    EXPECT_CALL(async_client_, send_(_, _, _))
+        .WillOnce(Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+                             const Http::AsyncClient::RequestOptions&) {
+          EXPECT_EQ("/override", message->headers().getPathValue());
+          return &async_request_;
+        }));
+
+    client->check(request_callbacks_, request, parent_span_, stream_info_);
+
+    // Cleanup.
+    EXPECT_CALL(request_callbacks_, onComplete_(_));
+    client->onSuccess(async_request_, std::make_unique<Http::ResponseMessageImpl>(
+                                          Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
+                                              {{Http::LowerCaseString(":status"), "200"}})));
+  }
+
+  // Test case 3: No transformation.
+  {
+    envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config{};
+    TestUtility::loadFromYaml(yaml, proto_config);
+    auto config = std::make_shared<ClientConfig>(proto_config, 250, "", factory_context_);
+    auto client = std::make_unique<RawHttpClientImpl>(cm_, config);
+
+    envoy::service::auth::v3::CheckRequest request;
+    auto* http_request = request.mutable_attributes()->mutable_request()->mutable_http();
+    auto* header_map = http_request->mutable_header_map();
+    auto* header = header_map->add_headers();
+    header->set_key(":path");
+    header->set_raw_value("/original");
+
+    EXPECT_CALL(async_client_, send_(_, _, _))
+        .WillOnce(Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+                             const Http::AsyncClient::RequestOptions&) {
+          EXPECT_EQ("/original", message->headers().getPathValue());
+          return &async_request_;
+        }));
+
+    client->check(request_callbacks_, request, parent_span_, stream_info_);
+
+    // Cleanup.
+    EXPECT_CALL(request_callbacks_, onComplete_(_));
+    client->onSuccess(async_request_, std::make_unique<Http::ResponseMessageImpl>(
+                                          Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
+                                              {{Http::LowerCaseString(":status"), "200"}})));
+  }
 }
 
 } // namespace

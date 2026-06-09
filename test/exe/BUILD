@@ -4,7 +4,6 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_select_admin_functionality",
-    "envoy_select_boringssl",
     "envoy_sh_test",
 )
 
@@ -80,7 +79,6 @@ envoy_cc_test_library(
         "//source/common/stats:isolated_store_lib",
         "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:contention_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:thread_factory_for_test_lib",
@@ -100,7 +98,6 @@ envoy_cc_test(
         "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",
         "//source/extensions/clusters/dns:dns_cluster_lib",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:contention_lib",
         "//test/test_common:environment_lib",
     ],
@@ -119,7 +116,6 @@ envoy_cc_test(
         "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",
         "//source/extensions/clusters/dns:dns_cluster_lib",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:contention_lib",
         "//test/test_common:environment_lib",
     ],
@@ -155,7 +151,10 @@ envoy_cc_test(
     name = "all_extensions_build_test",
     size = "large",
     srcs = ["all_extensions_build_test.cc"],
-    copts = envoy_select_boringssl(["-DENVOY_SSL_FIPS"]),
+    copts = select({
+        "//bazel:fips_build": ["-DENVOY_SSL_FIPS"],
+        "//conditions:default": [],
+    }),
     data = [
         "fips_check.sh",
         "//source/extensions:extensions_metadata.yaml",
@@ -191,7 +190,6 @@ envoy_cc_test(
     deps = [
         "//source/common/api:api_lib",
         "//source/exe:envoy_main_common_with_core_extensions_lib",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:contention_lib",
         "//test/test_common:environment_lib",
     ],
@@ -214,7 +212,6 @@ envoy_cc_test(
     deps = [
         "//source/common/api:api_lib",
         "//source/exe:main_common_with_all_extensions_lib",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:contention_lib",
         "//test/test_common:environment_lib",
     ],
@@ -226,6 +223,5 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/exe:platform_impl_lib",
-        "//test/mocks/runtime:runtime_mocks",
     ],
 )

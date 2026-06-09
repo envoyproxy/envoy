@@ -80,10 +80,11 @@ private:
 
 /**
  * Builds the rate limit client.
+ * @param timeout the timeout for the gRPC request. If nullopt, no timeout is applied (infinite).
  */
 ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
                           const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-                          const std::chrono::milliseconds timeout);
+                          const absl::optional<std::chrono::milliseconds>& timeout);
 
 } // namespace RateLimit
 } // namespace Common

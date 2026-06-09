@@ -56,8 +56,8 @@ envoy_cc_library(
     hdrs = ["supported_commands.h"],
     deps = [
         "//source/common/common:macros",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
     ],
 )
 

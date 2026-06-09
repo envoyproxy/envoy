@@ -254,7 +254,7 @@ envoy_cc_library(
     deps = [
         "//bazel/foreign_cc:librdkafka",
         "//envoy/common:pure_lib",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 

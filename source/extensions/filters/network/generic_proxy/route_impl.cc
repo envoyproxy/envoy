@@ -24,12 +24,6 @@ RouteSpecificFilterConfigConstSharedPtr RouteEntryImpl::createRouteSpecificFilte
 
   auto* factory = Config::Utility::getFactoryByType<NamedFilterConfigFactory>(typed_config);
   if (factory == nullptr) {
-    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.no_extension_lookup_by_name")) {
-      factory = Config::Utility::getFactoryByName<NamedFilterConfigFactory>(name);
-    }
-  }
-
-  if (factory == nullptr) {
     ExceptionUtil::throwEnvoyException(
         fmt::format("Didn't find a registered implementation for '{}' with type URL: '{}'", name,
                     Config::Utility::getFactoryType(typed_config)));
@@ -88,7 +82,7 @@ VirtualHostImpl::VirtualHostImpl(const ProtoVirtualHost& virtual_host_config,
 }
 
 RouteEntryConstSharedPtr VirtualHostImpl::routeEntry(const MatchInput& request) const {
-  Matcher::MatchResult match_result = Matcher::evaluateMatch<MatchInput>(*matcher_, request);
+  Matcher::ActionMatchResult match_result = Matcher::evaluateMatch<MatchInput>(*matcher_, request);
 
   if (match_result.isMatch()) {
     Matcher::ActionConstSharedPtr action = match_result.actionByMove();

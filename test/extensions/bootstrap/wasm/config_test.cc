@@ -6,9 +6,7 @@
 #include "source/extensions/bootstrap/wasm/config.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/server/mocks.h"
-#include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
 
@@ -50,7 +48,7 @@ protected:
     EXPECT_CALL(context_, lifecycleNotifier())
         .WillRepeatedly(testing::ReturnRef(lifecycle_notifier_));
     extension_ = factory->createBootstrapExtension(config, context_);
-    extension_->onServerInitialized();
+    extension_->onServerInitialized(server_);
     static_cast<Bootstrap::Wasm::WasmServiceExtension*>(extension_.get())->wasmService();
     EXPECT_CALL(init_watcher_, ready());
     init_manager_.initialize(init_watcher_);
@@ -59,6 +57,7 @@ protected:
   envoy::extensions::wasm::v3::WasmService config_;
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   testing::NiceMock<Server::MockServerLifecycleNotifier> lifecycle_notifier_;
+  NiceMock<Server::MockInstance> server_;
   Init::ExpectableWatcherImpl init_watcher_;
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;

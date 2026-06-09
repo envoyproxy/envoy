@@ -61,8 +61,8 @@ void CacheFilter::onDestroy() {
 }
 
 void CacheFilter::sendUpstreamRequest(Http::RequestHeaderMap& request_headers) {
-  Router::RouteConstSharedPtr route = decoder_callbacks_->route();
-  const Router::RouteEntry* route_entry = (route == nullptr) ? nullptr : route->routeEntry();
+  const auto route = decoder_callbacks_->route();
+  const Router::RouteEntry* route_entry = route ? route->routeEntry() : nullptr;
   if (route_entry == nullptr) {
     return sendNoRouteResponse();
   }
@@ -94,8 +94,7 @@ void CacheFilter::onStreamComplete() {
   InsertStatus insert_status = insertStatus();
   decoder_callbacks_->streamInfo().filterState()->setData(
       CacheFilterLoggingInfo::FilterStateKey,
-      std::make_shared<CacheFilterLoggingInfo>(lookup_status, insert_status),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      std::make_shared<CacheFilterLoggingInfo>(lookup_status, insert_status));
 }
 
 Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& headers,

@@ -257,6 +257,6 @@ envoy_cc_library(
     ],
     deps = [
         "//source/common/common:macros",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )

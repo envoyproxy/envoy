@@ -17,8 +17,7 @@ namespace Mcp {
 namespace {
 
 using ::testing::HasSubstr;
-using ::testing::IsEmpty;
-using ::testing::Not;
+using namespace Filters::Common::Mcp::McpConstants;
 
 class McpJsonParserTest : public testing::Test {
 protected:
@@ -84,7 +83,7 @@ TEST_F(McpJsonParserTest, ToolsCallExtraction) {
   EXPECT_OK(parser_->parse(json));
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
 
   // Check extracted metadata contains params.name
   const auto* value = parser_->getNestedValue("params.name");
@@ -102,7 +101,7 @@ TEST_F(McpJsonParserTest, ResourcesListExtraction) {
   EXPECT_OK(parser_->parse(json));
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_LIST);
+  EXPECT_EQ(parser_->getMethod(), Methods::RESOURCES_LIST);
 }
 
 TEST_F(McpJsonParserTest, ResourcesReadExtraction) {
@@ -118,7 +117,7 @@ TEST_F(McpJsonParserTest, ResourcesReadExtraction) {
   EXPECT_OK(parser_->parse(json));
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_READ);
+  EXPECT_EQ(parser_->getMethod(), Methods::RESOURCES_READ);
 
   const auto* value = parser_->getNestedValue("params.uri");
   ASSERT_NE(value, nullptr);
@@ -138,7 +137,7 @@ TEST_F(McpJsonParserTest, ResourcesSubscribeExtraction) {
   EXPECT_OK(parser_->parse(json));
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_SUBSCRIBE);
+  EXPECT_EQ(parser_->getMethod(), Methods::RESOURCES_SUBSCRIBE);
 
   const auto* value = parser_->getNestedValue("params.uri");
   ASSERT_NE(value, nullptr);
@@ -158,7 +157,7 @@ TEST_F(McpJsonParserTest, ResourcesUnsubscribeExtraction) {
   EXPECT_OK(parser_->parse(json));
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_UNSUBSCRIBE);
+  EXPECT_EQ(parser_->getMethod(), Methods::RESOURCES_UNSUBSCRIBE);
 
   const auto* value = parser_->getNestedValue("params.uri");
   ASSERT_NE(value, nullptr);
@@ -175,7 +174,7 @@ TEST_F(McpJsonParserTest, PromptsListExtraction) {
   EXPECT_OK(parser_->parse(json));
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::PROMPTS_LIST);
+  EXPECT_EQ(parser_->getMethod(), Methods::PROMPTS_LIST);
 }
 
 TEST_F(McpJsonParserTest, PromptsGetExtraction) {
@@ -195,7 +194,7 @@ TEST_F(McpJsonParserTest, PromptsGetExtraction) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::PROMPTS_GET);
+  EXPECT_EQ(parser_->getMethod(), Methods::PROMPTS_GET);
 
   const auto* value = parser_->getNestedValue("params.name");
   ASSERT_NE(value, nullptr);
@@ -222,7 +221,7 @@ TEST_F(McpJsonParserTest, CompletionCompleteExtraction) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::COMPLETION_COMPLETE);
+  EXPECT_EQ(parser_->getMethod(), Methods::COMPLETION_COMPLETE);
 
   // Verify that params.ref object was extracted
   const auto* ref = parser_->getNestedValue("params.ref");
@@ -264,7 +263,7 @@ TEST_F(McpJsonParserTest, InitializeExtraction) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::INITIALIZE);
+  EXPECT_EQ(parser_->getMethod(), Methods::INITIALIZE);
 
   const auto* version_value = parser_->getNestedValue("params.protocolVersion");
   ASSERT_NE(version_value, nullptr);
@@ -288,7 +287,7 @@ TEST_F(McpJsonParserTest, NotificationProgressExtraction) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::NOTIFICATION_PROGRESS);
+  EXPECT_EQ(parser_->getMethod(), Methods::NOTIFICATION_PROGRESS);
 
   const auto* token = parser_->getNestedValue("params.progressToken");
   ASSERT_NE(token, nullptr);
@@ -312,7 +311,7 @@ TEST_F(McpJsonParserTest, NotificationCancelledExtraction) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::NOTIFICATION_CANCELLED);
+  EXPECT_EQ(parser_->getMethod(), Methods::NOTIFICATION_CANCELLED);
 
   const auto* request_id = parser_->getNestedValue("params.requestId");
   ASSERT_NE(request_id, nullptr);
@@ -349,7 +348,7 @@ TEST_F(McpJsonParserTest, PartialParsingSingleChunk) {
   EXPECT_OK(status3); // Complete now
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
 
   const auto* value = parser_->getNestedValue("params.name");
   ASSERT_NE(value, nullptr);
@@ -371,7 +370,7 @@ TEST_F(McpJsonParserTest, PartialParsingMidString) {
   ASSERT_TRUE(parser_->finishParse().ok());
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_READ);
+  EXPECT_EQ(parser_->getMethod(), Methods::RESOURCES_READ);
 
   const auto* value = parser_->getNestedValue("params.uri");
   ASSERT_NE(value, nullptr);
@@ -379,19 +378,24 @@ TEST_F(McpJsonParserTest, PartialParsingMidString) {
 }
 
 TEST_F(McpJsonParserTest, PartialParsingEscapeSequence) {
-  // Split in the middle of an escape sequence
+  // Split in the middle of an escape sequence inside params object.
+  // The JSON parsing will fail due to incomplete escape sequence,
+  // but the MCP request is still valid if we have jsonrpc and method.
   std::string json1 = R"({"jsonrpc": "2.0", "method": "test", "id": 1, "params": {"text": "line1\)";
 
   auto status = parser_->parse(json1);
 
-  // Early termination.
-  EXPECT_FALSE(status.ok());
+  // In streaming mode, Parse() of a partial chunk succeeds because it expects more data.
+  EXPECT_OK(status);
 
+  // The parsing fails on finishParse() due to the incomplete escape sequence.
+  auto finish_status = parser_->finishParse();
+  EXPECT_FALSE(finish_status.ok());
   EXPECT_TRUE(parser_->isValidMcpRequest());
 }
 
-TEST_F(McpJsonParserTest, EarlyTerminationToolsCall) {
-  // Large JSON that should stop parsing after finding all required fields
+TEST_F(McpJsonParserTest, FieldExtractionToolsCall) {
+  // Parse JSON and verify correct field extraction for tools/call
   std::string json = R"({
     "jsonrpc": "2.0",
     "method": "tools/call",
@@ -412,7 +416,7 @@ TEST_F(McpJsonParserTest, EarlyTerminationToolsCall) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
 
   // Should have extracted params.name
   const auto* name = parser_->getNestedValue("params.name");
@@ -424,7 +428,7 @@ TEST_F(McpJsonParserTest, EarlyTerminationToolsCall) {
   EXPECT_EQ(extra, nullptr);
 }
 
-TEST_F(McpJsonParserTest, EarlyTerminationWithUnorderedFields) {
+TEST_F(McpJsonParserTest, FieldExtractionWithUnorderedFields) {
   // Method comes after params - parser should handle this correctly
   std::string json = R"({
     "id": 123,
@@ -440,7 +444,7 @@ TEST_F(McpJsonParserTest, EarlyTerminationWithUnorderedFields) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_READ);
+  EXPECT_EQ(parser_->getMethod(), Methods::RESOURCES_READ);
 
   // Should have extracted params.uri
   const auto* uri = parser_->getNestedValue("params.uri");
@@ -448,8 +452,8 @@ TEST_F(McpJsonParserTest, EarlyTerminationWithUnorderedFields) {
   EXPECT_EQ(uri->string_value(), "file:///test.txt");
 }
 
-TEST_F(McpJsonParserTest, EarlyTerminationWithObjectField) {
-  // Verify early termination works when extracting object fields (params.ref)
+TEST_F(McpJsonParserTest, FieldExtractionWithObjectField) {
+  // Verify parsing works when extracting object fields (params.ref)
   std::string json = R"({
     "jsonrpc": "2.0",
     "method": "completion/complete",
@@ -467,7 +471,7 @@ TEST_F(McpJsonParserTest, EarlyTerminationWithObjectField) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_TRUE(parser_->isAllFieldsCollected()); // Verify early-stop worked
+  EXPECT_TRUE(parser_->isParsingComplete()); // Verify parsing completed
 
   // Verify params.ref was extracted correctly
   const auto* ref = parser_->getNestedValue("params.ref");
@@ -503,7 +507,7 @@ TEST_F(McpJsonParserTest, DeeplyNestedStructures) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::COMPLETION_COMPLETE);
+  EXPECT_EQ(parser_->getMethod(), Methods::COMPLETION_COMPLETE);
 }
 
 TEST_F(McpJsonParserTest, InvalidJson) {
@@ -560,7 +564,7 @@ TEST_F(McpJsonParserTest, NumericValues) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::LOGGING_SET_LEVEL);
+  EXPECT_EQ(parser_->getMethod(), Methods::LOGGING_SET_LEVEL);
 
   const auto* level = parser_->getNestedValue("params.level");
   ASSERT_NE(level, nullptr);
@@ -589,7 +593,7 @@ TEST_F(McpJsonParserTest, ResetAndReuse) {
   parseJson(json1);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
 
   const auto* name1 = parser_->getNestedValue("params.name");
   ASSERT_NE(name1, nullptr);
@@ -603,7 +607,7 @@ TEST_F(McpJsonParserTest, ResetAndReuse) {
   parseJson(json2);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_READ);
+  EXPECT_EQ(parser_->getMethod(), Methods::RESOURCES_READ);
 
   const auto* uri = parser_->getNestedValue("params.uri");
   ASSERT_NE(uri, nullptr);
@@ -622,7 +626,7 @@ TEST_F(McpJsonParserTest, CustomFieldExtraction) {
       McpParserConfig::AttributeExtractionRule("params.custom_field"),
       McpParserConfig::AttributeExtractionRule("params.metadata.version")};
 
-  custom_config.addMethodConfig(McpConstants::Methods::TOOLS_CALL, rules);
+  custom_config.addMethodConfig(Methods::TOOLS_CALL, rules);
 
   auto custom_parser = std::make_unique<McpJsonParser>(custom_config);
 
@@ -662,6 +666,114 @@ TEST_F(McpJsonParserTest, CustomFieldExtraction) {
   EXPECT_EQ(author, nullptr);
 }
 
+TEST_F(McpJsonParserTest, OptionalFieldConfigDetection) {
+  // params._meta is a global optional field, so any method could have optional fields
+  McpParserConfig custom_config;
+  std::vector<McpParserConfig::AttributeExtractionRule> rules = {
+      McpParserConfig::AttributeExtractionRule("params.name")};
+
+  custom_config.addMethodConfig(Methods::TOOLS_CALL, rules);
+
+  auto parser = std::make_unique<McpJsonParser>(custom_config);
+
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "tool"}})";
+
+  EXPECT_OK(parser->parse(json));
+  EXPECT_TRUE(parser->hasOptionalFields());
+  EXPECT_TRUE(parser->hasAllRequiredFields());
+
+  const auto* meta = parser->getNestedValue("params._meta");
+  EXPECT_EQ(meta, nullptr);
+}
+
+TEST_F(McpJsonParserTest, MetaAsRequiredFieldExtraction) {
+  // When params._meta is explicitly configured as a required (extracted) field,
+  // there should be no optional fields, and parsing should complete normally.
+  McpParserConfig custom_config = McpParserConfig::createDefault();
+
+  // Override tools/call config to include _meta as required field
+  std::vector<McpParserConfig::AttributeExtractionRule> rules = {
+      McpParserConfig::AttributeExtractionRule("params.name"),
+      McpParserConfig::AttributeExtractionRule("params._meta") // _meta as required
+  };
+  custom_config.addMethodConfig(Methods::TOOLS_CALL, rules);
+
+  auto parser = std::make_unique<McpJsonParser>(custom_config);
+
+  // JSON with _meta present followed by extra data
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "tool", "_meta": {"trace": "t1"}, "extra": "data"}})";
+
+  EXPECT_OK(parser->parse(json));
+
+  // Since _meta is required (not optional), hasOptionalFields should be false
+  EXPECT_FALSE(parser->hasOptionalFields());
+  // All required fields were found, parsing completed
+  EXPECT_TRUE(parser->isParsingComplete());
+  EXPECT_TRUE(parser->hasAllRequiredFields());
+
+  // Verify extracted fields
+  const auto* name = parser->getNestedValue("params.name");
+  ASSERT_NE(name, nullptr);
+  EXPECT_EQ(name->string_value(), "tool");
+
+  const auto* meta = parser->getNestedValue("params._meta");
+  ASSERT_NE(meta, nullptr);
+  ASSERT_TRUE(meta->has_struct_value());
+}
+
+TEST_F(McpJsonParserTest, GlobalOptionalMetaFieldExtraction) {
+  // params._meta is a global optional field and should be extracted
+  // for all methods when present
+  McpParserConfig config = McpParserConfig::createDefault();
+  auto parser = std::make_unique<McpJsonParser>(config);
+
+  std::string json1 = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "tool",
+      "_meta": {"trace_id": "t1"}
+    },
+    "id": 1
+  })";
+
+  EXPECT_OK(parser->parse(json1));
+  EXPECT_TRUE(parser->isValidMcpRequest());
+
+  const auto* meta1 = parser->getNestedValue("params._meta");
+  ASSERT_NE(meta1, nullptr);
+  ASSERT_TRUE(meta1->has_struct_value());
+  const auto& meta1_fields = meta1->struct_value().fields();
+  auto meta1_it = meta1_fields.find("trace_id");
+  ASSERT_NE(meta1_it, meta1_fields.end());
+  EXPECT_EQ(meta1_it->second.string_value(), "t1");
+
+  parser->reset();
+
+  std::string json2 = R"({
+    "jsonrpc": "2.0",
+    "method": "resources/read",
+    "params": {
+      "uri": "file:///test.txt",
+      "_meta": {"trace_id": "t2"}
+    },
+    "id": 2
+  })";
+
+  EXPECT_OK(parser->parse(json2));
+  EXPECT_TRUE(parser->isValidMcpRequest());
+
+  const auto* meta2 = parser->getNestedValue("params._meta");
+  ASSERT_NE(meta2, nullptr);
+  ASSERT_TRUE(meta2->has_struct_value());
+  const auto& meta2_fields = meta2->struct_value().fields();
+  auto meta2_it = meta2_fields.find("trace_id");
+  ASSERT_NE(meta2_it, meta2_fields.end());
+  EXPECT_EQ(meta2_it->second.string_value(), "t2");
+}
+
 TEST_F(McpJsonParserTest, BooleanValues) {
   std::string json = R"({
     "jsonrpc": "2.0",
@@ -679,14 +791,14 @@ TEST_F(McpJsonParserTest, BooleanValues) {
       McpParserConfig::AttributeExtractionRule("params.subscribe"),
   };
 
-  custom_config.addMethodConfig(McpConstants::Methods::RESOURCES_SUBSCRIBE, rules);
+  custom_config.addMethodConfig(Methods::RESOURCES_SUBSCRIBE, rules);
 
   auto parser = std::make_unique<McpJsonParser>(custom_config);
 
   EXPECT_OK(parser->parse(json));
 
   EXPECT_TRUE(parser->isValidMcpRequest());
-  EXPECT_EQ(parser->getMethod(), McpConstants::Methods::RESOURCES_SUBSCRIBE);
+  EXPECT_EQ(parser->getMethod(), Methods::RESOURCES_SUBSCRIBE);
 
   const auto* subscribe = parser->getNestedValue("params.subscribe");
   ASSERT_NE(subscribe, nullptr);
@@ -714,7 +826,7 @@ TEST_F(McpJsonParserTest, LargePayload) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
 
   // Should have only extracted params.name
   const auto* name = parser_->getNestedValue("params.name");
@@ -891,7 +1003,7 @@ TEST_F(McpJsonParserTest, FloatingPointValues) {
   std::vector<McpParserConfig::AttributeExtractionRule> rules = {
       McpParserConfig::AttributeExtractionRule("params.level"),
       McpParserConfig::AttributeExtractionRule("params.other")};
-  custom_config.addMethodConfig(McpConstants::Methods::LOGGING_SET_LEVEL, rules);
+  custom_config.addMethodConfig(Methods::LOGGING_SET_LEVEL, rules);
 
   auto parser = std::make_unique<McpJsonParser>(custom_config);
 
@@ -1012,7 +1124,7 @@ TEST_F(McpJsonParserTest, ArrayWithNestedObjectsAndStrings) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
 
   // Should extract params.name
   const auto* name = parser_->getNestedValue("params.name");
@@ -1037,11 +1149,11 @@ TEST_F(McpJsonParserTest, JsonRpcBeforeMethod) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
 }
 
-TEST_F(McpJsonParserTest, BoolInArrayAndAfterEarlyStop) {
-  // Create a config that will cause early stop
+TEST_F(McpJsonParserTest, BoolInArrayNotExtracted) {
+  // Verify bool values in arrays are not extracted as named fields
   McpParserConfig custom_config;
   std::vector<McpParserConfig::AttributeExtractionRule> rules = {
       McpParserConfig::AttributeExtractionRule("params.name"),
@@ -1065,7 +1177,7 @@ TEST_F(McpJsonParserTest, BoolInArrayAndAfterEarlyStop) {
 
   EXPECT_TRUE(parser->isValidMcpRequest());
 
-  // The bool values in array and after early stop should be skipped
+  // The bool values in array and non-extracted fields should be skipped
   const auto* bool_array = parser->getNestedValue("params.boolArray");
   EXPECT_EQ(bool_array, nullptr);
 
@@ -1075,7 +1187,7 @@ TEST_F(McpJsonParserTest, BoolInArrayAndAfterEarlyStop) {
 
 TEST_F(McpJsonParserTest, ArraySkippingWithRequiredFieldAfter) {
   // This test ensures that we hit the array_depth_ > 0 checks in all Render methods.
-  // We do this by requiring a field that comes AFTER the array, so early stop doesn't trigger.
+  // We do this by requiring a field that comes AFTER the array.
   McpParserConfig custom_config;
   std::vector<McpParserConfig::AttributeExtractionRule> rules = {
       McpParserConfig::AttributeExtractionRule("params.end_field"),
@@ -1152,7 +1264,7 @@ TEST_F(McpJsonParserTest, MethodBeforeJsonRpc) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
 
   const auto* name = parser_->getNestedValue("params.name");
   ASSERT_NE(name, nullptr);
@@ -1385,6 +1497,390 @@ TEST(McpParserConfigTest, MethodGroupEmptyGroupFallsBackToBuiltIn) {
 
   // Should fall back to built-in group
   EXPECT_EQ(config.getMethodGroup("tools/call"), "tool");
+}
+
+// Case sensitivity tests: verify key confusion attacks (e.g., "name" vs "Name") are prevented.
+// Wrong-cased top-level fields ("Jsonrpc", "Method") should not be recognized.
+TEST_F(McpJsonParserTest, CaseSensitiveTopLevelFieldsAreIgnored) {
+  std::string json = R"({
+    "Jsonrpc": "2.0",
+    "Method": "tools/call",
+    "Id": 1,
+    "params": {"name": "calculator"}
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+  auto finish_status = parser_->finishParse();
+
+  EXPECT_FALSE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), "");
+}
+
+// Both "method" and "Method" present — only lowercase "method" should be used.
+TEST_F(McpJsonParserTest, CaseSensitiveMethodFieldOnlyLowercaseRecognized) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "Method": "resources/read",
+    "params": {"name": "calculator"},
+    "id": 1
+  })";
+
+  parseJson(json);
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
+}
+
+// Both "name" and "Name" in params — only lowercase "name" should be extracted.
+TEST_F(McpJsonParserTest, CaseSensitiveParamsNameKeyConfusionAttack) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "allowed_tool",
+      "Name": "restricted_secret_tool",
+      "arguments": {"input": "data"}
+    },
+    "id": 3
+  })";
+
+  parseJson(json);
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
+
+  const auto* name_value = parser_->getNestedValue("params.name");
+  ASSERT_NE(name_value, nullptr);
+  EXPECT_EQ(name_value->string_value(), "allowed_tool");
+
+  // "params.Name"will not be extracted.
+  const auto* upper_name_value = parser_->getNestedValue("params.Name");
+  EXPECT_EQ(upper_name_value, nullptr);
+}
+
+// "Params" vs "params" — only the correctly-cased "params" object is used.
+TEST_F(McpJsonParserTest, CaseSensitiveParamsObjectKeyConfusion) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "Params": {
+      "name": "spoofed_tool"
+    },
+    "params": {
+      "name": "real_tool"
+    },
+    "id": 1
+  })";
+
+  parseJson(json);
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
+
+  const auto* name_value = parser_->getNestedValue("params.name");
+  ASSERT_NE(name_value, nullptr);
+  EXPECT_EQ(name_value->string_value(), "real_tool");
+}
+
+// Test duplicate "params" key at the root level.
+TEST_F(McpJsonParserTest, JppVulnerabilityFixed) {
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "get_weather"}, "params": {"name": "execute_shell", "arguments": {"cmd": "rm -rf /"}}})";
+
+  EXPECT_OK(parser_->parse(json));
+
+  // The duplicate "params" key should be detected
+  EXPECT_TRUE(parser_->hasDuplicateKeys());
+}
+
+// Test duplicate key at the top level (root object).
+TEST_F(McpJsonParserTest, DuplicateTopLevelKeyDetected) {
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "tool1"}, "id": 2})";
+
+  EXPECT_OK(parser_->parse(json));
+
+  // Duplicate "id" key at the root level should be detected
+  EXPECT_TRUE(parser_->hasDuplicateKeys());
+}
+
+// Test duplicate key within a nested object.
+TEST_F(McpJsonParserTest, DuplicateNestedKeyDetected) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "tool1",
+      "name": "tool2"
+    },
+    "id": 1
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+
+  // Duplicate "name" within the "params" object should be detected
+  EXPECT_TRUE(parser_->hasDuplicateKeys());
+}
+
+// Test that normal payloads without duplicates are clean.
+TEST_F(McpJsonParserTest, NoDuplicateKeysNormalPayload) {
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "calculator"}, "id": 1})";
+
+  EXPECT_OK(parser_->parse(json));
+
+  EXPECT_FALSE(parser_->hasDuplicateKeys());
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+}
+
+// Test duplicate key detection can be disabled via config.
+TEST_F(McpJsonParserTest, DuplicateKeyDetectionConfigurable) {
+  // Even with detection "disabled" in config, the parser still tracks duplicates.
+  // The config controls whether the filter rejects — but hasDuplicateKeys() still reports.
+  // This test verifies the flag is set regardless of config.
+  McpParserConfig custom_config = McpParserConfig::createDefault();
+  custom_config.setRejectDuplicateKeys(false);
+  auto parser = std::make_unique<McpJsonParser>(custom_config);
+
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "tool1"}, "params": {"name": "tool2"}})";
+
+  EXPECT_OK(parser->parse(json));
+
+  // The duplicate is still detected at the parser level
+  EXPECT_TRUE(parser->hasDuplicateKeys());
+}
+
+// Test last-key-wins semantics: when duplicate object keys exist, the last
+// occurrence's value should be what ends up in the metadata. This matches
+// nlohmann/json, Python json, and Go encoding/json behavior.
+TEST_F(McpJsonParserTest, DuplicateObjectKeyLastKeyWins) {
+  McpParserConfig custom_config = McpParserConfig::createDefault();
+  custom_config.setRejectDuplicateKeys(false);
+  auto parser = std::make_unique<McpJsonParser>(custom_config);
+
+  // Duplicate "params" key: second has "execute_shell", first has "get_weather"
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "get_weather"}, "params": {"name": "execute_shell"}})";
+
+  EXPECT_OK(parser->parse(json));
+  auto status = parser->finishParse();
+
+  // Verify duplicate was detected
+  EXPECT_TRUE(parser->hasDuplicateKeys());
+
+  // Verify last-key-wins: metadata should contain "execute_shell" (the last value),
+  // NOT "get_weather" (the first value)
+  const auto& metadata = parser->metadata();
+  const auto& fields = metadata.fields();
+  auto params_it = fields.find("params");
+  ASSERT_NE(params_it, fields.end());
+  const auto& params_fields = params_it->second.struct_value().fields();
+  auto name_it = params_fields.find("name");
+  ASSERT_NE(name_it, params_fields.end());
+  EXPECT_EQ(name_it->second.string_value(), "execute_shell");
+}
+
+// Test last-key-wins for primitive values (e.g., duplicate "id" key).
+TEST_F(McpJsonParserTest, DuplicatePrimitiveKeyLastKeyWins) {
+  McpParserConfig custom_config = McpParserConfig::createDefault();
+  custom_config.setRejectDuplicateKeys(false);
+  auto parser = std::make_unique<McpJsonParser>(custom_config);
+
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "tool"}, "id": 999})";
+
+  EXPECT_OK(parser->parse(json));
+  auto status = parser->finishParse();
+
+  EXPECT_TRUE(parser->hasDuplicateKeys());
+
+  // Last "id" should be 999, not 1
+  const auto& metadata = parser->metadata();
+  const auto& fields = metadata.fields();
+  auto id_it = fields.find("id");
+  ASSERT_NE(id_it, fields.end());
+  EXPECT_EQ(id_it->second.number_value(), 999);
+}
+
+// Test multi-chunk parsing detects duplicate keys across chunks.
+TEST_F(McpJsonParserTest, MultiChunkDuplicateKeyDetection) {
+  McpParserConfig config = McpParserConfig::createDefault();
+
+  auto parser = std::make_unique<McpJsonParser>(config);
+
+  // Chunk 1: Contains ALL required fields for tools/call (jsonrpc, method, params.name, id).
+  // The parser must continue processing until the root object closes.
+  std::string chunk1 =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "get_weather"}, "id": 1)";
+
+  EXPECT_OK(parser->parse(chunk1));
+  EXPECT_TRUE(parser->isValidMcpRequest());
+
+  // CRITICAL: The parser must NOT have stopped yet — the root object hasn't closed.
+  EXPECT_FALSE(parser->isParsingComplete());
+
+  // Chunk 2: Contains a duplicate "params" key (the JSON parameter pollution attack payload).
+  std::string chunk2 = R"(, "params": {"name": "execute_shell", "arguments": {"cmd": "rm -rf /"}})";
+
+  EXPECT_OK(parser->parse(chunk2));
+
+  // Still not done — root object hasn't closed yet
+  EXPECT_FALSE(parser->isParsingComplete());
+
+  // Chunk 3: Close the root object
+  std::string chunk3 = "}";
+
+  EXPECT_OK(parser->parse(chunk3));
+
+  // NOW the root object closed, parser should be done
+  EXPECT_TRUE(parser->isParsingComplete());
+
+  // The duplicate "params" key from chunk 2 must be detected
+  EXPECT_TRUE(parser->hasDuplicateKeys());
+
+  // Verify last-key-wins: metadata should contain "execute_shell" (from chunk 2),
+  // matching what a backend parser (nlohmann/json, Python json) would see.
+  auto status = parser->finishParse();
+  const auto& metadata = parser->metadata();
+  const auto& fields = metadata.fields();
+  auto params_it = fields.find("params");
+  ASSERT_NE(params_it, fields.end());
+  const auto& params_fields = params_it->second.struct_value().fields();
+  auto name_it = params_fields.find("name");
+  ASSERT_NE(name_it, params_fields.end());
+  EXPECT_EQ(name_it->second.string_value(), "execute_shell");
+}
+
+// Test duplicate "method" key is detected.
+TEST_F(McpJsonParserTest, DuplicateMethodKeyDetected) {
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "method": "resources/read", "id": 1, "params": {"name": "tool"}})";
+
+  EXPECT_OK(parser_->parse(json));
+  EXPECT_TRUE(parser_->hasDuplicateKeys());
+}
+
+// Test duplicate key in deeply nested object.
+TEST_F(McpJsonParserTest, DuplicateKeyInDeeplyNestedObject) {
+  McpParserConfig custom_config = McpParserConfig::createDefault();
+  custom_config.addMethodConfig("completion/complete",
+                                {McpParserConfig::AttributeExtractionRule("params.ref")});
+  auto parser = std::make_unique<McpJsonParser>(custom_config);
+
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "completion/complete",
+    "params": {
+      "ref": {
+        "type": "ref/resource",
+        "uri": "file:///doc.md",
+        "type": "ref/prompt"
+      }
+    },
+    "id": 1
+  })";
+
+  EXPECT_OK(parser->parse(json));
+
+  // Duplicate "type" within "params.ref" should be detected
+  EXPECT_TRUE(parser->hasDuplicateKeys());
+}
+
+// Test that multi-chunk JSON parameter pollution attacks are detected across chunk boundaries.
+TEST_F(McpJsonParserTest, MultiChunkJppDetected) {
+  // Chunk 1: contains all required fields but root object is still open
+  std::string chunk1 =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "get_weather"})";
+  // Chunk 2: duplicate params key
+  std::string chunk2 = R"(, "params": {"name": "execute_shell"}})";
+
+  EXPECT_OK(parser_->parse(chunk1));
+
+  // Parser should NOT have stopped — root object hasn't closed
+  EXPECT_FALSE(parser_->isParsingComplete());
+
+  EXPECT_OK(parser_->parse(chunk2));
+
+  // Now the duplicate "params" should be detected
+  EXPECT_TRUE(parser_->hasDuplicateKeys());
+}
+
+// Test that a valid, complete MCP JSON object followed by trailing garbage in the same data chunk
+// is correctly rejected by the parser.
+TEST_F(McpJsonParserTest, TrailingGarbageRejected) {
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "calculator"}, "id": 1} trailing garbage)";
+
+  // Parse should fail because of trailing garbage in the chunk.
+  auto status = parser_->parse(json);
+  EXPECT_FALSE(status.ok());
+}
+
+// Test that default config has correct security settings.
+TEST(McpParserConfigTest, DefaultSecuritySettings) {
+  McpParserConfig config = McpParserConfig::createDefault();
+
+  EXPECT_FALSE(config.rejectDuplicateKeys());
+}
+
+TEST_F(McpJsonParserTest, ValidJsonRpcResponse) {
+  std::string json =
+      R"({"jsonrpc":"2.0","id":1,"result":{"action":"accept","content":{"name":"test"}}})";
+
+  EXPECT_OK(parser_->parse(json));
+  ASSERT_TRUE(parser_->finishParse().ok());
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_TRUE(parser_->isResponse());
+  EXPECT_EQ(parser_->getMethod(), "");
+}
+
+TEST_F(McpJsonParserTest, ValidJsonRpcErrorResponse) {
+  std::string json =
+      R"({"jsonrpc":"2.0","id":1,"error":{"code":-32042,"message":"URL elicitation required"}})";
+
+  EXPECT_OK(parser_->parse(json));
+  ASSERT_TRUE(parser_->finishParse().ok());
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_TRUE(parser_->isResponse());
+  EXPECT_EQ(parser_->getMethod(), "");
+}
+
+TEST_F(McpJsonParserTest, ResponseNotConfusedWithRequest) {
+  std::string json = R"({"jsonrpc":"2.0","id":1,"result":{}})";
+
+  EXPECT_OK(parser_->parse(json));
+  ASSERT_TRUE(parser_->finishParse().ok());
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_TRUE(parser_->isResponse());
+
+  const auto& metadata = parser_->metadata();
+  auto id_it = metadata.fields().find("id");
+  ASSERT_NE(id_it, metadata.fields().end());
+  EXPECT_EQ(id_it->second.number_value(), 1);
+}
+
+TEST_F(McpJsonParserTest, ResponseWithStringResult) {
+  std::string json = R"({"jsonrpc":"2.0","id":1,"result":"ok"})";
+
+  EXPECT_OK(parser_->parse(json));
+  ASSERT_TRUE(parser_->finishParse().ok());
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_TRUE(parser_->isResponse());
+}
+
+TEST_F(McpJsonParserTest, NoMethodNoResultInvalid) {
+  std::string json = R"({"jsonrpc":"2.0","id":1})";
+
+  EXPECT_OK(parser_->parse(json));
+
+  EXPECT_FALSE(parser_->isValidMcpRequest());
+  EXPECT_FALSE(parser_->isResponse());
 }
 
 } // namespace

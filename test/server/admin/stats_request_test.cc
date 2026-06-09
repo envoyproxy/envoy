@@ -89,7 +89,7 @@ protected:
 
   Stats::SymbolTableImpl symbol_table_;
   Stats::StatNamePool pool_;
-  Stats::AllocatorImpl alloc_;
+  Stats::Allocator alloc_;
   NiceMock<Stats::MockSink> sink_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;

@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/matching/common_inputs/network/v3/network_inputs.pb.h"
 #include "envoy/extensions/matching/common_inputs/network/v3/network_inputs.pb.validate.h"
+#include "envoy/extensions/matching/http/dynamic_modules/v3/dynamic_modules.pb.h"
 #include "envoy/type/matcher/v3/http_inputs.pb.h"
 #include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
 
@@ -20,7 +21,13 @@ absl::Status RouteActionValidationVisitor::performDataInputValidation(
                                    FilterStateInput::default_instance())
           ->GetDescriptor()
           ->full_name());
-  if (type_url == request_header_input_name || type_url == filter_state_input_name) {
+  static const std::string dynamic_module_input_name = TypeUtil::descriptorFullNameToTypeUrl(
+      createReflectableMessage(envoy::extensions::matching::http::dynamic_modules::v3::
+                                   HttpDynamicModuleMatchInput::default_instance())
+          ->GetDescriptor()
+          ->full_name());
+  if (type_url == request_header_input_name || type_url == filter_state_input_name ||
+      type_url == dynamic_module_input_name) {
     return absl::OkStatus();
   }
 

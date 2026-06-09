@@ -2,7 +2,7 @@ bazel_skylib:
   project_name: "bazel-skylib"
   project_desc: "Common useful functions and rules for Bazel"
   project_url: "https://github.com/bazelbuild/bazel-skylib"
-  release_date: "2025-09-25"
+  release_date: "2025-12-16"
   use_category:
   - api
   license: "Apache-2.0"
@@ -11,7 +11,7 @@ com_envoyproxy_protoc_gen_validate:
   project_name: "protoc-gen-validate (PGV)"
   project_desc: "protoc plugin to generate polyglot message validators"
   project_url: "https://github.com/bufbuild/protoc-gen-validate"
-  release_date: "2025-12-04"
+  release_date: "2026-02-18"
   use_category:
   - api
   implied_untracked_deps:
@@ -33,7 +33,7 @@ com_github_chrusty_protoc_gen_jsonschema:
   - build
   license: "Apache-2.0"
   license_url: "https://github.com/norbjd/protoc-gen-jsonschema/blob/{version}/LICENSE"
-com_github_cncf_xds:
+xds:
   project_name: "xDS API"
   project_desc: "xDS API Working Group (xDS-WG)"
   project_url: "https://github.com/cncf/xds"
@@ -42,7 +42,7 @@ com_github_cncf_xds:
   - api
   license: "Apache-2.0"
   license_url: "https://github.com/cncf/xds/blob/{version}/LICENSE"
-com_github_openzipkin_zipkinapi:
+zipkin_api:
   project_name: "Zipkin API"
   project_desc: "Zipkin's language independent model and HTTP Api Definitions"
   project_url: "https://github.com/openzipkin/zipkin-api"
@@ -73,7 +73,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-01-20"
+  release_date: "2026-05-06"
   use_category:
   - build
   - controlplane
@@ -89,7 +89,7 @@ opentelemetry_proto:
   project_name: "OpenTelemetry Proto"
   project_desc: "Language Independent Interface Types For OpenTelemetry"
   project_url: "https://github.com/open-telemetry/opentelemetry-proto"
-  release_date: "2025-10-31"
+  release_date: "2026-03-09"
   use_category:
   - api
   license: "Apache-2.0"
@@ -116,7 +116,7 @@ rules_jvm_external:
   project_name: "Java Rules for Bazel"
   project_desc: "Bazel rules for Java"
   project_url: "https://github.com/bazelbuild/rules_jvm_external"
-  release_date: "2025-07-07"
+  release_date: "2026-02-04"
   use_category:
   - build
   license: "Apache-2.0"
@@ -128,5 +128,6 @@ rules_proto:
   release_date: "2024-12-18"
   use_category:
   - api
+  - test_only
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/rules_proto/blob/{version}/LICENSE"

@@ -26,22 +26,14 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/common/upstream/utility.h"
 #include "test/integration/clusters/custom_static_cluster.h"
-#include "test/mocks/access_log/mocks.h"
-#include "test/mocks/api/mocks.h"
 #include "test/mocks/config/xds_manager.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/runtime/mocks.h"
-#include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/overload_manager.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
-#include "test/test_common/registry.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -184,7 +176,10 @@ public:
   }
 
   OdCdsApiHandlePtr createOdCdsApiHandle(OdCdsApiSharedPtr odcds) {
-    return ClusterManagerImpl::OdCdsApiHandleImpl::create(*this, std::move(odcds));
+    // For tests, generate a unique key based on the pointer address.
+    uint64_t config_source_key = reinterpret_cast<uint64_t>(odcds.get());
+    odcds_subscriptions_.emplace(config_source_key, std::move(odcds));
+    return ClusterManagerImpl::OdCdsApiHandleImpl::create(*this, config_source_key);
   }
 
   void notifyExpiredDiscovery(absl::string_view name) {

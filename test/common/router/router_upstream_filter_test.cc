@@ -1,17 +1,15 @@
 #include "envoy/extensions/filters/http/router/v3/router.pb.h"
+#include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/router/router.h"
 #include "source/common/router/upstream_codec_filter.h"
 
 #include "test/common/http/common.h"
-#include "test/mocks/access_log/mocks.h"
-#include "test/mocks/filesystem/mocks.h"
+#include "test/integration/filters/test_filters.pb.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -36,8 +34,7 @@ public:
 
   // Filter
   RetryStatePtr createRetryState(const RetryPolicy&, Http::RequestHeaderMap&,
-                                 const Upstream::ClusterInfo&, const VirtualCluster*,
-                                 RouteStatsContextOptRef,
+                                 const Upstream::ClusterInfo&,
                                  Server::Configuration::CommonFactoryContext&, Event::Dispatcher&,
                                  Upstream::ResourcePriority) override {
     EXPECT_EQ(nullptr, retry_state_);
@@ -62,7 +59,7 @@ public:
     cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
     ON_CALL(*cluster_info_, name()).WillByDefault(ReturnRef(cluster_name));
     ON_CALL(*cluster_info_, observabilityName()).WillByDefault(ReturnRef(cluster_name));
-    ON_CALL(callbacks_.stream_info_, upstreamClusterInfo()).WillByDefault(Return(cluster_info_));
+    callbacks_.stream_info_.upstream_cluster_info_ = cluster_info_;
     EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_).Times(testing::AnyNumber());
     for (const auto& filter : upstream_filters) {
       *router_proto.add_upstream_http_filters() = filter;
@@ -154,13 +151,16 @@ public:
 };
 
 TEST_F(RouterUpstreamFilterTest, UpstreamFilter) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   HttpFilter add_header_filter;
   add_header_filter.set_name("add-header-filter");
+  test::integration::filters::AddHeaderEmptyFilterConfig add_header_config;
+  add_header_filter.mutable_typed_config()->PackFrom(add_header_config);
+
   HttpFilter codec_filter;
   codec_filter.set_name("envoy.filters.http.upstream_codec");
+  envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec upstream_codec_config;
+  codec_filter.mutable_typed_config()->PackFrom(upstream_codec_config);
+
   init({add_header_filter, codec_filter});
   auto headers = run();
   EXPECT_FALSE(headers.get(Http::LowerCaseString("x-header-to-add")).empty());

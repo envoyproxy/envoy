@@ -21,7 +21,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#extension: envoy.filters.http.mcp]
 
 // This filter will inspect and get attributes from MCP traffic.
-// [#next-free-field: 6]
+// [#next-free-field: 9]
 message Mcp {
   // Traffic handling mode for non-MCP traffic.
   enum TrafficMode {
@@ -33,6 +33,7 @@ message Mcp {
     // Valid MCP requests are:
     // - POST requests with JSON-RPC 2.0 messages
     // - GET requests for SSE streams (with Accept: text/event-stream)
+    // - DELETE requests for session termination (with MCP-Session-Id header)
     REJECT_NO_MCP = 1;
   }
 
@@ -52,6 +53,14 @@ message Mcp {
     DYNAMIC_METADATA_AND_FILTER_STATE = 3;
   }
 
+  message TraceContextPropagationConfig {
+    option (xds.annotations.v3.message_status).work_in_progress = true;
+  }
+
+  message BaggagePropagationConfig {
+    option (xds.annotations.v3.message_status).work_in_progress = true;
+  }
+
   // Configures how the filter handles non-MCP traffic.
   TrafficMode traffic_mode = 1 [(validate.rules).enum = {defined_only: true}];
 
@@ -60,9 +69,12 @@ message Mcp {
   // Defaults to false.
   bool clear_route_cache = 2;
 
-  // Maximum size of the request body to buffer for JSON-RPC validation.
-  // If the request body exceeds this size, the request is rejected with ``413 Payload Too Large``.
-  // This limit applies to both ``REJECT_NO_MCP`` and ``PASS_THROUGH`` modes to prevent unbounded buffering.
+  // Maximum size of the request body to buffer for JSON-RPC parsing.
+  // Only the first ``max_request_body_size`` bytes are parsed for MCP attribute extraction.
+  //
+  // When the body exceeds this limit:
+  // - In ``PASS_THROUGH`` mode: the request is allowed through with an ``is_exceeding_limit`` marker in the dynamic metadata, indicating that the MCP payload was only partially parsed.
+  // - In ``REJECT_NO_MCP`` mode: the request is rejected with ``400 Bad Request`` because the complete root JSON object must fit within the size limit.
   //
   // It defaults to 8KB (8192 bytes) and the maximum allowed value is 10MB (10485760 bytes).
   //
@@ -76,6 +88,33 @@ message Mcp {
   // Controls whether attributes are written to dynamic metadata, filter state, or both.
   // Default is DYNAMIC_METADATA when unspecified.
   RequestStorageMode request_storage_mode = 5 [(validate.rules).enum = {defined_only: true}];
+
+  // If set, extract and validate W3C trace context from the MCP request body
+  // (params._meta.traceparent & params._meta.tracestate) and propagate it in HTTP headers
+  // ``traceparent`` and ``tracestate`` (respectively).
+  //
+  // The traceparent and tracestate fields are validated and propagated according to the spec at
+  // ``https://www.w3.org/TR/trace-context/``.
+  //
+  // If unset (default), do not extract or inject trace context.
+  TraceContextPropagationConfig propagate_trace_context = 6;
+
+  // If set, extract and validate W3C baggage from the MCP request body (params._meta.baggage) and
+  // copy it to the HTTP header ``baggage``.
+  //
+  // The baggage field is validated according to the spec at ``https://www.w3.org/TR/baggage/``.
+
+  // Note that this is independent of ``propagate_trace_context``.
+  // Also note that if this is set, the downstream request's baggage header will be overwritten if
+  // the MCP request body contains a valid baggage field.
+  //
+  // If unset (default), do not extract or inject baggage.
+  BaggagePropagationConfig propagate_baggage = 7;
+
+  // When true, reject requests that contain duplicate JSON keys at any
+  // nesting level. RFC 8259 Section 4 states that names within an object SHOULD be
+  // unique. Defaults to false (last-key-wins / last-win).
+  google.protobuf.BoolValue reject_duplicate_keys = 8;
 }
 
 // Parser configuration with method-specific rules.

@@ -192,7 +192,7 @@ bool ProxyFilter::isProxying() {
 }
 
 Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  Router::RouteConstSharedPtr route = decoder_callbacks_->route();
+  const auto route = decoder_callbacks_->route();
   const Router::RouteEntry* route_entry = route ? route->routeEntry() : nullptr;
   if (!route_entry) {
     return Http::FilterHeadersStatus::Continue;
@@ -438,9 +438,9 @@ void ProxyFilter::addHostAddressToFilterState(
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       decoder_callbacks_->streamInfo().filterState();
 
-  filter_state->setData(
-      StreamInfo::UpstreamAddress::key(), std::make_unique<StreamInfo::UpstreamAddress>(address),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Request);
+  filter_state->setData(StreamInfo::UpstreamAddress::key(),
+                        std::make_unique<StreamInfo::UpstreamAddress>(address),
+                        StreamInfo::FilterState::LifeSpan::Request);
 }
 
 void ProxyFilter::onLoadClusterComplete() {

@@ -53,13 +53,15 @@ InstanceImpl::InstanceImpl(
     const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,
     absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
     absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
-        aws_iam_authenticator)
+        aws_iam_authenticator,
+    const std::string& local_zone)
     : cluster_name_(cluster_name), cm_(cm), client_factory_(client_factory),
       tls_(tls.allocateSlot()), config_(new Common::Redis::Client::ConfigImpl(config)), api_(api),
       stats_scope_(std::move(stats_scope)), redis_command_stats_(redis_command_stats),
       redis_cluster_stats_{REDIS_CLUSTER_STATS(POOL_COUNTER(*stats_scope_))},
       refresh_manager_(std::move(refresh_manager)), dns_cache_(dns_cache),
-      aws_iam_authenticator_(aws_iam_authenticator), aws_iam_config_(aws_iam_config) {}
+      aws_iam_authenticator_(aws_iam_authenticator), aws_iam_config_(aws_iam_config),
+      local_zone_(local_zone) {}
 
 void InstanceImpl::init() {
   // Note: `this` and `cluster_name` have a a lifetime of the filter.
@@ -121,7 +123,7 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(
       stats_scope_(parent->stats_scope_), redis_command_stats_(parent->redis_command_stats_),
       redis_cluster_stats_(parent->redis_cluster_stats_),
       refresh_manager_(parent->refresh_manager_), aws_iam_authenticator_(aws_iam_authenticator),
-      aws_iam_config_(aws_iam_config) {
+      aws_iam_config_(aws_iam_config), client_zone_(parent->localZone()) {
 
   cluster_update_handle_ = parent->cm_.addThreadLocalClusterUpdateCallbacks(*this);
   Upstream::ThreadLocalCluster* cluster = parent->cm_.getThreadLocalCluster(cluster_name_);
@@ -310,7 +312,7 @@ uint16_t InstanceImpl::ThreadLocalPool::shardSize() {
   unique_hosts.reserve(Envoy::Extensions::Clusters::Redis::MaxSlot);
   for (uint16_t size = 0; size < Envoy::Extensions::Clusters::Redis::MaxSlot; size++) {
     Clusters::Redis::RedisSpecifyShardContextImpl lb_context(
-        size, request, Common::Redis::Client::ReadPolicy::Primary);
+        size, request, Common::Redis::Client::ReadPolicy::Primary, client_zone_);
     Upstream::HostConstSharedPtr host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
         cluster_->loadBalancer().chooseHost(&lb_context));
     if (!host) {
@@ -333,7 +335,8 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
 
   Clusters::Redis::RedisLoadBalancerContextImpl lb_context(
       key, config_->enableHashtagging(), is_redis_cluster_, getRequest(request),
-      transaction.active_ ? Common::Redis::Client::ReadPolicy::Primary : config_->readPolicy());
+      transaction.active_ ? Common::Redis::Client::ReadPolicy::Primary : config_->readPolicy(),
+      client_zone_);
   Upstream::HostConstSharedPtr host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
       cluster_->loadBalancer().chooseHost(&lb_context));
   if (!host) {
@@ -356,7 +359,8 @@ InstanceImpl::ThreadLocalPool::makeRequestToShard(uint16_t shard_index, RespVari
 
   Clusters::Redis::RedisSpecifyShardContextImpl lb_context(
       shard_index, getRequest(request),
-      transaction.active_ ? Common::Redis::Client::ReadPolicy::Primary : config_->readPolicy());
+      transaction.active_ ? Common::Redis::Client::ReadPolicy::Primary : config_->readPolicy(),
+      client_zone_);
 
   Upstream::HostConstSharedPtr host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
       cluster_->loadBalancer().chooseHost(&lb_context));

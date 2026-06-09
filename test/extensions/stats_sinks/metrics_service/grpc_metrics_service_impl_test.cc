@@ -7,8 +7,6 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/mocks/thread_local/mocks.h"
-#include "test/test_common/simulated_time_system.h"
 
 #include "absl/strings/str_format.h"
 #include "io/prometheus/client/metrics.pb.h"

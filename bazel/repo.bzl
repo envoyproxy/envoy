@@ -66,23 +66,29 @@ def _envoy_repo_impl(repository_ctx):
     """
 
     # parse container information for use in RBE
-    json_result = repository_ctx.execute([
-        repository_ctx.path(repository_ctx.attr.yq),
-        repository_ctx.path(repository_ctx.attr.envoy_ci_config),
-        "-ojson",
-    ])
-    if json_result.return_code != 0:
-        fail("yq failed: {}".format(json_result.stderr))
-    repository_ctx.file("ci-config.json", json_result.stdout)
-    config_data = json.decode(repository_ctx.read("ci-config.json"))
+    ci_config = repository_ctx.read(repository_ctx.path(repository_ctx.attr.envoy_ci_config))
+    build_image = {}
+    in_build_image = False
+    for line in ci_config.split("\n"):
+        if line.strip() == "build-image:":
+            in_build_image = True
+            continue
+        if in_build_image:
+            if not line.strip() or line.startswith("  #"):
+                continue
+            if not line.startswith("  "):
+                break
+            parts = line.strip().split(": ", 1)
+            if len(parts) == 2:
+                build_image[parts[0]] = parts[1]
     repository_ctx.file("containers.bzl", CONTAINERS.format(
-        repo = config_data["build-image"]["repo"],
-        repo_gcr = config_data["build-image"]["repo-gcr"],
-        sha = config_data["build-image"]["sha"],
-        sha_gcc = config_data["build-image"]["sha-gcc"],
-        sha_mobile = config_data["build-image"]["sha-mobile"],
-        sha_worker = config_data["build-image"]["sha-worker"],
-        tag = config_data["build-image"]["tag"],
+        repo = build_image["repo"],
+        repo_gcr = build_image["repo-gcr"],
+        sha = build_image["sha"],
+        sha_gcc = build_image["sha-gcc"],
+        sha_mobile = build_image["sha-mobile"],
+        sha_worker = build_image["sha-worker"],
+        tag = build_image["tag"],
     ))
     repo_version_path = repository_ctx.path(repository_ctx.attr.envoy_version)
     api_version_path = repository_ctx.path(repository_ctx.attr.envoy_api_version)
@@ -93,7 +99,46 @@ def _envoy_repo_impl(repository_ctx):
     llvm_path = repository_ctx.os.environ.get("BAZEL_LLVM_PATH", "")
     local_llvm = "True" if llvm_path else "False"
 
-    repository_ctx.file("compiler.bzl", "LLVM_PATH = '%s'" % (llvm_path))
+    # When using a local LLVM, detect its version and library directory so that
+    # downstream BUILD files can reference the correct libclang-cpp.so and
+    # clang resource-dir paths without hardcoding a version.
+    llvm_version_local = ""
+    llvm_lib_dir = "lib"
+    if llvm_path:
+        result = repository_ctx.execute([llvm_path + "/bin/clang", "--version"])
+        if result.return_code == 0:
+            for line in result.stdout.split("\n"):
+                if "clang version" in line:
+                    llvm_version_local = line.split("clang version ")[1].split(" ")[0].strip()
+                    break
+        for directory in ["lib64", "lib"]:
+            if repository_ctx.path(llvm_path + "/" + directory + "/libclang-cpp.so").exists:
+                llvm_lib_dir = directory
+                break
+            entries = repository_ctx.execute(["ls", llvm_path + "/" + directory + "/"])
+            if entries.return_code == 0 and "libclang-cpp.so" in entries.stdout:
+                llvm_lib_dir = directory
+                break
+
+    # By default, even when local toolchain is used, we still use the hermetic
+    # sysroot, when it's undesirable, you can set this environment variable to True
+    # to fallback to the host libc.
+    #
+    # NOTE: The cleanest way to provide this environment variable would be via Bazel's
+    # repo_env flag. It's particularly important when using remote build execution (aka
+    # RBE), as host environment variables are not directly passed to remote workers.
+    local_sysroot = repository_ctx.os.environ.get("BAZEL_USE_HOST_SYSROOT", "False")
+
+    # Make sure to not pass the content of environment variable directly to the Bazel
+    # Starlark file - we should only accept a proper boolean value and nothing else.
+    local_sysroot = {"True": True, "False": False}.get(local_sysroot, False)
+
+    repository_ctx.file("compiler.bzl", """
+LLVM_PATH = '%s'
+LLVM_VERSION_LOCAL = '%s'
+LLVM_LIB_DIR = '%s'
+USE_LOCAL_SYSROOT = %s
+""" % (llvm_path, llvm_version_local, llvm_lib_dir, local_sysroot))
     repository_ctx.file("version.bzl", "VERSION = '%s'\nAPI_VERSION = '%s'" % (version, api_version))
     repository_ctx.file("path.bzl", "PATH = '%s'" % repo_version_path.dirname)
     repository_ctx.file("envoy_repo.py", "PATH = '%s'\nVERSION = '%s'\nAPI_VERSION = '%s'" % (repo_version_path.dirname, version, api_version))
@@ -114,6 +159,34 @@ config_setting(
     name = "use_local_llvm",
     flag_values = {
         ":use_local_llvm_flag": "True",
+    },
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "use_local_sysroot_flag",
+    build_setting_default = %s,
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "use_local_sysroot",
+    flag_values = {
+        ":use_local_sysroot_flag": "True",
+    },
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "use_hermetic_sysroot",
+    flag_values = {
+        ":use_local_sysroot_flag": "False",
     },
     constraint_values = [
         "@platforms//os:linux",
@@ -253,7 +326,7 @@ py_console_script_binary(
     data = [":envoy_repo.py"],
 )
 
-''' % local_llvm)
+''' % (local_llvm, local_sysroot))
 
 _envoy_repo = repository_rule(
     implementation = _envoy_repo_impl,
@@ -261,9 +334,8 @@ _envoy_repo = repository_rule(
         "envoy_version": attr.label(default = "@envoy//:VERSION.txt"),
         "envoy_api_version": attr.label(default = "@envoy//:API_VERSION.txt"),
         "envoy_ci_config": attr.label(default = "@envoy//:.github/config.yml"),
-        "yq": attr.label(default = "@yq"),
     },
-    environ = ["BAZEL_LLVM_PATH"],
+    environ = ["BAZEL_LLVM_PATH", "BAZEL_USE_HOST_SYSROOT"],
 )
 
 def envoy_repo():

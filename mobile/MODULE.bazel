@@ -22,3 +22,9 @@ local_path_override(
     module_name = "envoy_build_config",
     path = "envoy_build_config",
 )
+
+pip.parse(
+    hub_name = "pypi",
+    python_version = PYTHON_VERSION,
+    requirements_lock = "//:requirements.txt",
+)

@@ -41,7 +41,7 @@ envoy_cc_library(
         "//envoy/server:watchdog_interface",
         "//envoy/server/overload:thread_local_overload_state",
         "//envoy/thread:thread_interface",
-        "@com_google_absl//absl/functional:any_invocable",
+        "@abseil-cpp//absl/functional:any_invocable",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

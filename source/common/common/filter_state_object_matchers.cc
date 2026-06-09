@@ -13,8 +13,8 @@ namespace Envoy {
 namespace Matchers {
 
 FilterStateIpRangeMatcher::FilterStateIpRangeMatcher(
-    std::unique_ptr<Network::Address::IpList>&& ip_list)
-    : ip_list_(std::move(ip_list)) {}
+    std::unique_ptr<Network::Address::IpList>&& ip_list, bool invert_match)
+    : ip_list_(std::move(ip_list)), invert_match_(invert_match) {}
 
 bool FilterStateIpRangeMatcher::match(const StreamInfo::FilterState::Object& object) const {
   const Network::Address::InstanceAccessor* ip =
@@ -22,7 +22,8 @@ bool FilterStateIpRangeMatcher::match(const StreamInfo::FilterState::Object& obj
   if (ip == nullptr) {
     return false;
   }
-  return ip_list_->contains(*ip->getIp());
+  const bool matches = ip_list_->contains(*ip->getIp());
+  return invert_match_ ? !matches : matches;
 }
 
 FilterStateStringMatcher::FilterStateStringMatcher(StringMatcherPtr&& string_matcher)

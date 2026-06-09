@@ -124,6 +124,14 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
             }
           }
 
+          // If a HTTP health check has run, attach the last response code to the
+          // HDS report so the control plane can interpret richer health states.
+          auto http_status = host->lastHealthCheckHttpStatus();
+          if (http_status.has_value()) {
+            (*endpoint->mutable_health_metadata()->mutable_fields())["http_status_code"]
+                .set_number_value(http_status.value());
+          }
+
           // TODO(drewsortega): remove this once we are on v4 and endpoint_health_response is
           // removed. Copy this endpoint's health info to the legacy flat-list.
           response.mutable_endpoint_health_response()->add_endpoints_health()->MergeFrom(*endpoint);
@@ -184,6 +192,12 @@ envoy::config::cluster::v3::Cluster HdsDelegate::createClusterConfig(
   // Add healthchecks to cluster
   for (auto& health_check : cluster_health_check.health_checks()) {
     cluster_config.add_health_checks()->MergeFrom(health_check);
+    // gRPC health checking requires HTTP/2. Enable it on the cluster so that
+    // ClusterInfo gets the HTTP2 feature flag and the gRPC health checker
+    // passes validation.
+    if (health_check.has_grpc_health_check()) {
+      cluster_config.mutable_http2_protocol_options();
+    }
   }
 
   // Add transport_socket_match to cluster for use in host connections.
@@ -379,7 +393,8 @@ HdsCluster::HdsCluster(Server::Configuration::ServerFactoryContext& server_conte
           HostImpl::create(info_, "", std::move(address_or_error.value()), nullptr, nullptr, 1,
                            const_locality_shared_pool->getObject(locality_endpoints.locality()),
                            host.endpoint().health_check_config(), 0,
-                           envoy::config::core::v3::UNKNOWN),
+                           envoy::config::core::v3::UNKNOWN, {},
+                           host.endpoint().observability_name()),
           std::unique_ptr<HostImpl>));
       // Add this host/endpoint pointer to our flat list of endpoints for health checking.
       hosts_->push_back(endpoint);
@@ -498,7 +513,8 @@ void HdsCluster::updateHosts(
             HostImpl::create(info_, "", std::move(address_or_error.value()), nullptr, nullptr, 1,
                              const_locality_shared_pool->getObject(endpoints.locality()),
                              endpoint.endpoint().health_check_config(), 0,
-                             envoy::config::core::v3::UNKNOWN),
+                             envoy::config::core::v3::UNKNOWN, {},
+                             endpoint.endpoint().observability_name()),
             std::unique_ptr<HostImpl>));
 
         // Set the initial health status as in HdsCluster::initialize.

@@ -29,9 +29,9 @@ envoy_cc_contrib_extension(
         "//source/extensions/filters/common/expr:evaluator_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/filters/http/grpc_stats:config",
-        "@com_google_cel_cpp//eval/public:builtin_func_registrar",
-        "@com_google_cel_cpp//eval/public:cel_expr_builder_factory",
-        "@com_google_cel_cpp//parser",
+        "@cel-cpp//eval/public:builtin_func_registrar",
+        "@cel-cpp//eval/public:cel_expr_builder_factory",
+        "@cel-cpp//parser",
         "@envoy_api//contrib/envoy/extensions/filters/http/istio_stats/v3:pkg_cc_proto",
     ],
 )

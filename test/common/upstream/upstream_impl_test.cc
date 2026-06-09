@@ -38,17 +38,16 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/admin.h"
-#include "test/mocks/server/instance.h"
 #include "test/mocks/server/options.h"
-#include "test/mocks/ssl/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/health_checker.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/mocks/upstream/thread_aware_load_balancer.h"
+#include "test/mocks/upstream/transport_socket_match.h"
 #include "test/mocks/upstream/typed_load_balancer_factory.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
@@ -1871,18 +1870,42 @@ TEST_F(HostImplTest, Weight) {
 TEST_F(HostImplTest, HostLbPolicyData) {
   MockClusterMockPrioritySet cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
-  EXPECT_TRUE(!host->lbPolicyData().has_value());
+  EXPECT_EQ(0, host->lbPolicyDataCount());
 
   class TestLbPolicyData : public Upstream::HostLbPolicyData {
   public:
+    bool receivesOrcaLoadReport() const override { return false; }
     int foo = 42;
   };
+  class AnotherTestLbPolicyData : public Upstream::HostLbPolicyData {
+  public:
+    bool receivesOrcaLoadReport() const override { return false; }
+    int bar = 7;
+  };
 
-  host->setLbPolicyData(std::make_unique<TestLbPolicyData>());
-  EXPECT_TRUE(host->lbPolicyData().has_value());
+  host->addLbPolicyData(std::make_unique<TestLbPolicyData>());
+  EXPECT_EQ(1, host->lbPolicyDataCount());
   auto test_policy_data = host->typedLbPolicyData<TestLbPolicyData>();
   EXPECT_TRUE(test_policy_data.has_value());
   EXPECT_EQ(test_policy_data->foo, 42);
+
+  host->addLbPolicyData(std::make_unique<AnotherTestLbPolicyData>());
+  EXPECT_EQ(2, host->lbPolicyDataCount());
+  auto another_test_policy_data = host->typedLbPolicyData<AnotherTestLbPolicyData>();
+  EXPECT_TRUE(another_test_policy_data.has_value());
+  EXPECT_EQ(another_test_policy_data->bar, 7);
+
+  // First type is still retrievable after adding second.
+  auto first_again = host->typedLbPolicyData<TestLbPolicyData>();
+  EXPECT_TRUE(first_again.has_value());
+  EXPECT_EQ(first_again->foo, 42);
+
+  // Absent type returns empty.
+  class UnregisteredLbPolicyData : public Upstream::HostLbPolicyData {
+  public:
+    bool receivesOrcaLoadReport() const override { return false; }
+  };
+  EXPECT_FALSE(host->typedLbPolicyData<UnregisteredLbPolicyData>().has_value());
 }
 
 TEST_F(HostImplTest, HostnameCanaryAndLocality) {
@@ -1943,6 +1966,65 @@ TEST_F(HostImplTest, CreateConnection) {
       host->createConnection(dispatcher, options, transport_socket_options);
   EXPECT_EQ(connection, connection_data.connection_.get());
   EXPECT_EQ(host, connection->stream_info_.upstreamInfo()->upstreamHost());
+}
+
+TEST_F(HostImplTest, OrcaReportingAddressDefaultsToDataAddress) {
+  MockClusterMockPrioritySet cluster;
+  Network::Address::InstanceConstSharedPtr address =
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
+      cluster.info_, "", address, nullptr, nullptr, 1,
+      std::make_shared<const envoy::config::core::v3::Locality>(),
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
+      envoy::config::core::v3::UNKNOWN));
+  EXPECT_EQ(host->orcaReportingAddress(), host->address());
+}
+
+TEST_F(HostImplTest, CreateOrcaReportingConnectionDialsDataAddress) {
+  MockClusterMockPrioritySet cluster;
+  Network::Address::InstanceConstSharedPtr address =
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
+      cluster.info_, "", address, nullptr, nullptr, 1,
+      std::make_shared<const envoy::config::core::v3::Locality>(),
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
+      envoy::config::core::v3::UNKNOWN));
+
+  testing::StrictMock<Event::MockDispatcher> dispatcher;
+  auto* connection = new testing::StrictMock<Network::MockClientConnection>();
+  EXPECT_CALL(dispatcher, createClientConnection_(address, _, _, _)).WillOnce(Return(connection));
+  EXPECT_CALL(*connection, setBufferLimits(0));
+  EXPECT_CALL(*connection, connectionInfoSetter()).Times(testing::AnyNumber());
+  EXPECT_CALL(*connection, streamInfo()).Times(testing::AnyNumber());
+  Host::CreateConnectionData data =
+      host->createOrcaReportingConnection(dispatcher, /*transport_socket_options=*/nullptr,
+                                          /*metadata=*/nullptr);
+  EXPECT_EQ(data.host_description_.get(), host.get());
+}
+
+TEST_F(HostImplTest, CreateOrcaReportingConnectionWithMetadataResolvesTransportSocket) {
+  MockClusterMockPrioritySet cluster;
+  auto* matcher = new NiceMock<MockTransportSocketMatcher>();
+  cluster.info_->transport_socket_matcher_.reset(matcher);
+  Network::Address::InstanceConstSharedPtr address =
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  envoy::config::core::v3::Metadata orca_metadata;
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
+      cluster.info_, "", address, nullptr, nullptr, 1,
+      std::make_shared<const envoy::config::core::v3::Locality>(),
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
+      envoy::config::core::v3::UNKNOWN));
+  EXPECT_CALL(*matcher, resolve(&orca_metadata, _, _))
+      .WillOnce(Return(TransportSocketMatcher::MatchData(*matcher->socket_factory_, matcher->stats_,
+                                                         "orca-test")));
+  testing::StrictMock<Event::MockDispatcher> dispatcher;
+  auto* connection = new testing::StrictMock<Network::MockClientConnection>();
+  EXPECT_CALL(dispatcher, createClientConnection_(address, _, _, _)).WillOnce(Return(connection));
+  EXPECT_CALL(*connection, setBufferLimits(0));
+  EXPECT_CALL(*connection, connectionInfoSetter()).Times(testing::AnyNumber());
+  EXPECT_CALL(*connection, streamInfo()).Times(testing::AnyNumber());
+  host->createOrcaReportingConnection(dispatcher, /*transport_socket_options=*/nullptr,
+                                      &orca_metadata);
 }
 
 TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
@@ -2489,6 +2571,36 @@ TEST_F(StaticClusterImplTest, LoadAssignmentNonEmptyHostnameWithHealthChecks) {
   EXPECT_EQ("foo2",
             cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostnameForHealthChecks());
   EXPECT_FALSE(cluster->info()->addedViaApi());
+}
+
+TEST_F(StaticClusterImplTest, LoadAssignmentEndpointStatName) {
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            observability_name: shared.backend/a
+            address:
+              socket_address:
+                address: 10.0.0.1
+                port_value: 443
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
+
+  cluster->initialize([] { return absl::OkStatus(); });
+
+  ASSERT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ("shared.backend/a",
+            cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->observabilityName());
 }
 
 TEST_F(StaticClusterImplTest, LoadAssignmentMultiplePriorities) {
@@ -4181,6 +4293,83 @@ TEST(PrioritySet, Extend) {
   EXPECT_EQ(2, membership_changes);
 }
 
+// Adds 100 hosts to P0 and 50 hosts to P1.
+class TestMultiPriorityBatchUpdateCb : public PrioritySet::BatchUpdateCb {
+public:
+  TestMultiPriorityBatchUpdateCb(std::shared_ptr<MockClusterInfo> info) : info_(info) {}
+
+  void batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) override {
+    HostVectorSharedPtr hosts_p0 = std::make_shared<HostVector>();
+    for (int i = 0; i < 100; i++) {
+      hosts_p0->push_back(makeTestHost(info_, fmt::format("tcp://127.0.0.{}:80", i)));
+    }
+    HostsPerLocalitySharedPtr hosts_per_locality_p0 = std::make_shared<HostsPerLocalityImpl>();
+    host_update_cb.updateHosts(
+        0,
+        updateHostsParams(hosts_p0, hosts_per_locality_p0,
+                          std::make_shared<const HealthyHostVector>(*hosts_p0),
+                          hosts_per_locality_p0),
+        {}, *hosts_p0, {}, absl::nullopt, absl::nullopt);
+
+    HostVectorSharedPtr hosts_p1 = std::make_shared<HostVector>();
+    for (int i = 0; i < 50; i++) {
+      hosts_p1->push_back(makeTestHost(info_, fmt::format("tcp://127.1.0.{}:80", i)));
+    }
+    HostsPerLocalitySharedPtr hosts_per_locality_p1 = std::make_shared<HostsPerLocalityImpl>();
+    host_update_cb.updateHosts(
+        1,
+        updateHostsParams(hosts_p1, hosts_per_locality_p1,
+                          std::make_shared<const HealthyHostVector>(*hosts_p1),
+                          hosts_per_locality_p1),
+        {}, *hosts_p1, {}, absl::nullopt, absl::nullopt);
+  }
+
+  std::shared_ptr<MockClusterInfo> info_;
+};
+
+// Verify MemberUpdateCb fires once per batch while PriorityUpdateCb fires per priority.
+// This is important for consumers like load balancers that can coalesce work
+// by tracking dirty priorities in PriorityUpdateCb and refreshing in MemberUpdateCb.
+TEST(PrioritySet, BatchUpdateMemberCallbackFiresOnce) {
+  PrioritySetImpl priority_set;
+  priority_set.getOrCreateHostSet(0);
+
+  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+
+  uint32_t priority_cb_count = 0;
+  uint32_t member_cb_count = 0;
+  absl::flat_hash_set<uint32_t> dirty_priorities;
+
+  auto priority_update_cb = priority_set.addPriorityUpdateCb(
+      [&](uint32_t priority, const HostVector&, const HostVector&) {
+        priority_cb_count++;
+        dirty_priorities.insert(priority);
+        return absl::OkStatus();
+      });
+
+  auto member_update_cb = priority_set.addMemberUpdateCb([&](const HostVector&, const HostVector&) {
+    member_cb_count++;
+    EXPECT_EQ(2, dirty_priorities.size());
+    EXPECT_TRUE(dirty_priorities.contains(0));
+    EXPECT_TRUE(dirty_priorities.contains(1));
+    dirty_priorities.clear();
+  });
+
+  TestMultiPriorityBatchUpdateCb batch_update(info);
+  priority_set.batchHostUpdate(batch_update);
+
+  // PriorityUpdateCb fires once per priority (2 priorities updated).
+  EXPECT_EQ(2, priority_cb_count);
+  // MemberUpdateCb fires once for the entire batch.
+  EXPECT_EQ(1, member_cb_count);
+  // Dirty set was cleared inside MemberUpdateCb.
+  EXPECT_TRUE(dirty_priorities.empty());
+
+  // Final state should have all hosts.
+  EXPECT_EQ(100, priority_set.hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(50, priority_set.hostSetsPerPriority()[1]->hosts().size());
+}
+
 // Helper class used to test MainPrioritySetImpl.
 class TestMainPrioritySetImpl : public MainPrioritySetImpl {
 public:
@@ -4265,7 +4454,8 @@ public:
 
   class RetryBudgetTestClusterInfo : public ClusterInfoImpl {
   public:
-    static std::pair<absl::optional<double>, absl::optional<uint32_t>> getRetryBudgetParams(
+    static std::tuple<absl::optional<double>, absl::optional<uint64_t>, absl::optional<uint32_t>>
+    getRetryBudgetParams(
         const envoy::config::cluster::v3::CircuitBreakers::Thresholds& thresholds) {
       return ClusterInfoImpl::getRetryBudgetParams(thresholds);
     }
@@ -4313,6 +4503,49 @@ public:
     return nullptr;
   }
 };
+
+TEST_F(ClusterInfoImplTest, BufferHighWatermarkTimeoutConfigured) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 1234
+    per_connection_buffer_high_watermark_timeout: 7s
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  EXPECT_EQ(std::chrono::seconds(7), cluster->info()->perConnectionBufferHighWatermarkTimeout());
+}
+
+TEST_F(ClusterInfoImplTest, ZeroBufferHighWatermarkTimeout) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 1234
+    per_connection_buffer_high_watermark_timeout: 0s
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  EXPECT_EQ(std::chrono::milliseconds(0),
+            cluster->info()->perConnectionBufferHighWatermarkTimeout());
+}
 
 // Cluster metadata and common config retrieval.
 TEST_P(ParametrizedClusterInfoImplTest, Metadata) {
@@ -4382,37 +4615,53 @@ TEST_P(ParametrizedClusterInfoImplTest, RetryBudgetDefaultPopulation) {
       - priority: DEFAULT
         retry_budget:
           min_retry_concurrency: 123
+      # 5 - Budget interval set, expect budget default.
+      - priority: DEFAULT
+        retry_budget:
+          budget_interval: 0.2s
   )EOF";
 
   makeCluster(yaml);
   absl::optional<double> budget_percent;
+  absl::optional<uint64_t> budget_interval;
   absl::optional<uint32_t> min_retry_concurrency;
   auto threshold = cluster_config_.circuit_breakers().thresholds();
 
-  std::tie(budget_percent, min_retry_concurrency) =
+  std::tie(budget_percent, budget_interval, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[0]);
   EXPECT_EQ(budget_percent, absl::nullopt);
+  EXPECT_EQ(budget_interval, absl::nullopt);
   EXPECT_EQ(min_retry_concurrency, absl::nullopt);
 
-  std::tie(budget_percent, min_retry_concurrency) =
+  std::tie(budget_percent, budget_interval, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[1]);
   EXPECT_EQ(budget_percent, 20.0);
+  EXPECT_EQ(budget_interval, 0UL);
   EXPECT_EQ(min_retry_concurrency, 3UL);
 
-  std::tie(budget_percent, min_retry_concurrency) =
+  std::tie(budget_percent, budget_interval, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[2]);
   EXPECT_EQ(budget_percent, 20.0);
+  EXPECT_EQ(budget_interval, 0UL);
   EXPECT_EQ(min_retry_concurrency, 3UL);
 
-  std::tie(budget_percent, min_retry_concurrency) =
+  std::tie(budget_percent, budget_interval, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[3]);
   EXPECT_EQ(budget_percent, 42.0);
+  EXPECT_EQ(budget_interval, 0UL);
   EXPECT_EQ(min_retry_concurrency, 3UL);
 
-  std::tie(budget_percent, min_retry_concurrency) =
+  std::tie(budget_percent, budget_interval, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[4]);
   EXPECT_EQ(budget_percent, 20.0);
+  EXPECT_EQ(budget_interval, 0UL);
   EXPECT_EQ(min_retry_concurrency, 123UL);
+
+  std::tie(budget_percent, budget_interval, min_retry_concurrency) =
+      RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[5]);
+  EXPECT_EQ(budget_percent, 20.0);
+  EXPECT_EQ(budget_interval, 200UL);
+  EXPECT_EQ(min_retry_concurrency, 3UL);
 }
 
 TEST_P(ParametrizedClusterInfoImplTest, LoadStatsConflictWithPerEndpointStats) {
@@ -4523,6 +4772,131 @@ TEST_P(ParametrizedClusterInfoImplTest, BrokenTypedMetadata) {
   Registry::InjectFactory<ClusterTypedMetadataFactory> registered_factory(baz_factory);
   EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
                             "Cannot create a Baz when metadata is empty.");
+}
+
+// Cluster without stats matcher metadata: all stats are created normally.
+TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherNoMetadata) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  cluster->info()->trafficStats();
+  ASSERT_NE(nullptr, cluster);
+
+  // Without a stats matcher, both connection and request stats are created.
+  EXPECT_NE("", cluster->info()->statsScope().counterFromString("upstream_cx_total").name());
+  EXPECT_NE("", cluster->info()->statsScope().counterFromString("upstream_rq_total").name());
+}
+
+// Cluster with reject_all stats matcher: no stats are instantiated.
+TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherRejectAll) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    metadata:
+      typed_filter_metadata:
+        envoy.stats_matcher:
+          "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
+          reject_all: true
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  cluster->info()->trafficStats();
+  ASSERT_NE(nullptr, cluster);
+
+  // With reject_all, no stats are created for this cluster.
+  EXPECT_EQ("", cluster->info()->statsScope().counterFromString("upstream_cx_total").name());
+  EXPECT_EQ("", cluster->info()->statsScope().counterFromString("upstream_rq_total").name());
+}
+
+// Cluster with stats matcher inclusion list: only stats matching the prefix are created.
+TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherInclusionList) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    metadata:
+      typed_filter_metadata:
+        envoy.stats_matcher:
+          "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
+          inclusion_list:
+            patterns:
+              - prefix: "cluster.name.upstream_cx"
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  cluster->info()->trafficStats();
+  ASSERT_NE(nullptr, cluster);
+
+  // "upstream_cx_total" matches the inclusion prefix — accepted.
+  EXPECT_NE("", cluster->info()->statsScope().counterFromString("upstream_cx_total").name());
+  // "upstream_rq_total" does not match the inclusion prefix — rejected.
+  EXPECT_EQ("", cluster->info()->statsScope().counterFromString("upstream_rq_total").name());
+}
+
+// Cluster with stats matcher exclusion list: stats matching the prefix are not created.
+TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherExclusionList) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    metadata:
+      typed_filter_metadata:
+        envoy.stats_matcher:
+          "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
+          exclusion_list:
+            patterns:
+              - prefix: "cluster.name.upstream_rq"
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  cluster->info()->trafficStats();
+  ASSERT_NE(nullptr, cluster);
+
+  // "upstream_cx_total" does not match the exclusion prefix — accepted.
+  EXPECT_NE("", cluster->info()->statsScope().counterFromString("upstream_cx_total").name());
+  // "upstream_rq_total" matches the exclusion prefix — rejected.
+  EXPECT_EQ("", cluster->info()->statsScope().counterFromString("upstream_rq_total").name());
 }
 
 // Cluster extension protocol options fails validation when configured for an unregistered filter.

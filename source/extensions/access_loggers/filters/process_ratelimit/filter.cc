@@ -17,7 +17,8 @@ ProcessRateLimitFilter::ProcessRateLimitFilter(
     const envoy::extensions::access_loggers::filters::process_ratelimit::v3::ProcessRateLimitFilter&
         config)
     : setter_key_(reinterpret_cast<intptr_t>(this)),
-      cancel_cb_(std::make_shared<std::atomic<bool>>(false)), context_(context),
+      cancel_cb_(std::make_shared<std::atomic<bool>>(false)),
+      main_thread_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       stats_({ALL_PROCESS_RATELIMIT_FILTER_STATS(POOL_COUNTER_PREFIX(
           context.serverFactoryContext().scope(), "access_log.process_ratelimit."))}) {
   auto setter =
@@ -44,11 +45,10 @@ ProcessRateLimitFilter::~ProcessRateLimitFilter() {
   // The `cancel_cb_` is set to true to prevent the `limiter` from being set in
   // the `setter` from the main thread.
   cancel_cb_->store(true);
-  context_.serverFactoryContext().mainThreadDispatcher().post(
-      [limiter = std::move(rate_limiter_), setter_key = setter_key_] {
-        // remove the setter for this filter.
-        limiter->getSubscription()->removeSetter(setter_key);
-      });
+  main_thread_dispatcher_.post([limiter = std::move(rate_limiter_), setter_key = setter_key_] {
+    // remove the setter for this filter.
+    limiter->getSubscription()->removeSetter(setter_key);
+  });
 }
 
 bool ProcessRateLimitFilter::evaluate(const Formatter::Context&,

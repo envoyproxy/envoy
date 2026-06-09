@@ -18,6 +18,7 @@ public:
   virtual uint64_t maxTokens() const PURE;
   virtual uint64_t remainingTokens() const PURE;
   virtual uint64_t resetSeconds() const PURE;
+  virtual bool shadowMode() const PURE;
 };
 
 // Interface for a local rate limiter.
@@ -25,7 +26,8 @@ class LocalRateLimiter {
 public:
   struct Result {
     bool allowed{};
-    std::shared_ptr<const TokenBucketContext> token_bucket_context{};
+    std::shared_ptr<const TokenBucketContext> token_bucket_context;
+    RateLimit::XRateLimitOption x_ratelimit_option{};
   };
 
   virtual ~LocalRateLimiter() = default;

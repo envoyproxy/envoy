@@ -55,7 +55,7 @@ envoy_cc_benchmark_binary(
     rbe_pool = "6gig",
     deps = [
         "//source/common/network:address_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 
@@ -73,7 +73,7 @@ envoy_cc_benchmark_binary(
         "//source/common/network:lc_trie_lib",
         "//source/common/network:utility_lib",
         "//test/test_common:utility_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 
@@ -104,6 +104,7 @@ envoy_cc_test(
         "//source/common/network:connection_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
+        "//source/common/ssl:ssl_lib",
         "//source/common/stats:stats_lib",
         "//test/common/memory:memory_test_utility_lib",
         "//test/mocks/api:api_mocks",
@@ -162,9 +163,6 @@ envoy_cc_test(
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/ratelimit:ratelimit_mocks",
-        "//test/mocks/server:factory_context_mocks",
-        "//test/mocks/server:instance_mocks",
-        "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:host_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
@@ -313,7 +311,7 @@ envoy_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
-        "@com_github_google_quiche//:quic_test_tools_mock_syscall_wrapper_lib",
+        "@quiche//:quic_test_tools_mock_syscall_wrapper_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ]),
 )
@@ -354,6 +352,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         ":socket_option_test",
+        "//envoy/network:address_interface",
         "//test/test_common:environment_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -364,6 +363,7 @@ envoy_cc_test(
     srcs = ["socket_option_factory_test.cc"],
     rbe_pool = "6gig",
     deps = [
+        "//envoy/network:address_interface",
         "//source/common/network:address_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:socket_option_lib",
@@ -371,7 +371,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
-        "@com_google_absl//absl/strings:str_format",
+        "@abseil-cpp//absl/strings:str_format",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -428,7 +428,6 @@ envoy_cc_fuzz_test(
         "//source/common/stats:stats_lib",
         "//test/common/network:listener_impl_test_base_lib",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
@@ -456,7 +455,7 @@ envoy_cc_benchmark_binary(
     deps = [
         "//source/common/network:lc_trie_lib",
         "//source/common/network:utility_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 
@@ -486,7 +485,7 @@ envoy_cc_benchmark_binary(
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
         "//test/test_common:network_utility_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 

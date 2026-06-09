@@ -1,4 +1,4 @@
-load("@rules_python//python:defs.bzl", "py_binary")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
@@ -11,14 +11,29 @@ envoy_extension_package()
 
 envoy_cc_library(
     name = "dynamic_modules_lib",
-    srcs = ["dynamic_modules.cc"],
+    srcs = [
+        "background_fetch_manager.cc",
+        "dynamic_modules.cc",
+    ],
     hdrs = [
-        "abi.h",
+        "background_fetch_manager.h",
         "dynamic_modules.h",
     ],
+    external_deps = ["ssl"],
     deps = [
-        ":abi_version_lib",
         "//envoy/common:exception_lib",
+        "//envoy/init:manager_interface",
+        "//envoy/server:factory_context_interface",
+        "//envoy/singleton:manager_interface",
+        "//source/common/common:hex_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/config:remote_data_fetcher_lib",
+        "//source/extensions/common/wasm:remote_async_datasource_lib",
+        "//source/extensions/dynamic_modules/abi",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/dynamic_modules/v3:pkg_cc_proto",
     ],
 )
 
@@ -30,32 +45,68 @@ envoy_cc_library(
         "//envoy/server:factory_context_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/synchronization",
     ],
+    alwayslink = True,
 )
 
-py_binary(
-    name = "compute_abi_hash",
-    srcs = ["compute_abi_hash.py"],
-    visibility = ["//visibility:private"],
-)
-
-genrule(
-    name = "abi_version_header",
-    srcs = ["abi.h"],
-    outs = ["abi_version.h"],
-    cmd = """
-        PYPATH=$$(realpath $$(dirname $(PYTHON3)))
-        export PATH=$$PYPATH:$$PATH
-        ./$(location :compute_abi_hash) $(location abi.h) $(location abi_version.h)
-    """,
-    toolchains = ["@rules_python//python:current_py_toolchain"],
-    tools = [":compute_abi_hash"],
+go_library(
+    name = "go_sdk_shared",
+    srcs = [
+        "sdk/go/shared/http.go",
+        "sdk/go/shared/http_api.go",
+        "sdk/go/shared/listener_api.go",
+        "sdk/go/shared/listener_base.go",
+        "sdk/go/shared/network_api.go",
+        "sdk/go/shared/network_base.go",
+        "sdk/go/shared/stats_sink.go",
+        "sdk/go/shared/stats_sink_api.go",
+        "sdk/go/shared/types.go",
+    ],
+    cgo = True,
+    importpath = "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared",
     visibility = ["//visibility:public"],
 )
 
-envoy_cc_library(
-    name = "abi_version_lib",
-    hdrs = [
-        "abi_version.h",
+go_library(
+    name = "go_sdk",
+    srcs = ["sdk/go/sdk.go"],
+    cgo = True,
+    importpath = "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//source/extensions/dynamic_modules:go_sdk_shared",
+    ],
+)
+
+go_library(
+    name = "go_sdk_internal_buffer",
+    srcs = ["sdk/go/internal/buffer/buffer.go"],
+    importpath = "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/internal/buffer",
+    visibility = ["//visibility:public"],
+)
+
+go_library(
+    name = "go_sdk_abi",
+    srcs = [
+        "sdk/go/abi/internal.go",
+        "sdk/go/abi/listener.go",
+        "sdk/go/abi/network.go",
+        "//source/extensions/dynamic_modules/abi:abi.h",
+    ],
+    cgo = True,
+    clinkopts = select({
+        "//bazel:darwin_any": [
+            "-Wl,-undefined,dynamic_lookup",
+        ],
+        "//conditions:default": [],
+    }),
+    importpath = "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/abi",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//source/extensions/dynamic_modules:go_sdk",
+        "//source/extensions/dynamic_modules:go_sdk_internal_buffer",
+        "//source/extensions/dynamic_modules:go_sdk_shared",
     ],
 )

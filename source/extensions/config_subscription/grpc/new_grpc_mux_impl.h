@@ -78,11 +78,16 @@ public:
   // TODO(fredlas) remove this from the GrpcMux interface.
   void start() override;
 
-  absl::Status
-  updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_client,
-                  Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope& scope,
-                  BackOffStrategyPtr&& backoff_strategy,
-                  const envoy::config::core::v3::ApiConfigSource& ads_config_source) override;
+  absl::Status updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_client,
+                               Grpc::RawAsyncClientSharedPtr&& failover_async_client,
+                               Stats::Scope& scope, BackOffStrategyPtr&& backoff_strategy,
+                               const envoy::config::core::v3::ApiConfigSource& ads_config_source,
+                               std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>
+                                   load_stats_reporter_factory = nullptr) override;
+
+  // TODO(adisuissa): finish implementation.
+  Upstream::LoadStatsReporter* loadStatsReporter() const override { return nullptr; }
+  Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() override { return nullptr; }
 
   GrpcStreamInterface<envoy::service::discovery::v3::DeltaDiscoveryRequest,
                       envoy::service::discovery::v3::DeltaDiscoveryResponse>&
@@ -95,17 +100,16 @@ public:
                  grpc_stream_.get())
           ->currentStreamForTest();
     }
-    return *grpc_stream_.get();
+    return *grpc_stream_;
   }
 
   struct SubscriptionStuff {
-    SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info,
-                      const bool use_namespace_matching, Event::Dispatcher& dispatcher,
-                      CustomConfigValidators* config_validators,
+    SubscriptionStuff(const std::string& type_url, const bool use_namespace_matching,
+                      Event::Dispatcher& dispatcher, CustomConfigValidators* config_validators,
                       XdsConfigTrackerOptRef xds_config_tracker,
                       EdsResourcesCacheOptRef eds_resources_cache)
         : watch_map_(use_namespace_matching, type_url, config_validators, eds_resources_cache),
-          sub_state_(type_url, watch_map_, local_info, dispatcher, xds_config_tracker) {
+          sub_state_(type_url, watch_map_, dispatcher, xds_config_tracker) {
       // If eds resources cache is provided, then the type must be ClusterLoadAssignment.
       ASSERT(
           !eds_resources_cache.has_value() ||
@@ -114,7 +118,7 @@ public:
 
     WatchMap watch_map_;
     DeltaSubscriptionState sub_state_;
-    std::string control_plane_identifier_{};
+    std::string control_plane_identifier_;
 
     SubscriptionStuff(const SubscriptionStuff&) = delete;
     SubscriptionStuff& operator=(const SubscriptionStuff&) = delete;
@@ -219,7 +223,9 @@ private:
   CustomConfigValidatorsPtr config_validators_;
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
   XdsConfigTrackerOptRef xds_config_tracker_;
+  const bool skip_subsequent_node_;
   EdsResourcesCachePtr eds_resources_cache_;
+  bool first_request_on_stream_{true};
 
   // Used to track whether initial_resource_versions should be populated on the
   // next reconnection.

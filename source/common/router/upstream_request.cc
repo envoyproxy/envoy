@@ -74,6 +74,25 @@ public:
                                                           details);
   }
   void executeLocalReplyIfPrepared() override {}
+  // Returns true if the decoder filter chain should stop (local reply sent or downstream reset).
+  bool isAborted() {
+    return state().decoder_filter_chain_aborted_ || state().saw_downstream_reset_;
+  }
+  // Notifies all upstream callbacks that a host has been selected, returning true if the request
+  // was aborted by one of them.
+  bool notifyHostSelected() {
+    // host is guaranteed non-null: createConnPool() returns nullptr when the host is null,
+    // and the caller checks for that before creating the UpstreamRequest.
+    Upstream::HostDescriptionConstSharedPtr host = upstream_request_.conn_pool_->host();
+    ASSERT(host != nullptr);
+    for (auto* callback : upstream_request_.upstream_callbacks_) {
+      callback->onHostSelected(host);
+      if (isAborted()) {
+        return true;
+      }
+    }
+    return false;
+  }
   UpstreamRequest& upstream_request_;
 };
 
@@ -82,18 +101,18 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
                                  bool can_send_early_data, bool can_use_http3,
                                  bool enable_half_close)
     : parent_(parent), conn_pool_(std::move(conn_pool)),
-      stream_info_(parent_.callbacks()->dispatcher().timeSource(), nullptr,
+      stream_info_(parent_.callbacks()->dispatcher().timeSource(),
+                   parent_.callbacks()->connection().has_value()
+                       ? parent_.callbacks()->connection()->connectionInfoProviderSharedPtr()
+                       : nullptr,
                    StreamInfo::FilterState::LifeSpan::FilterChain),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
-      upstream_canary_(false), router_sent_end_stream_(false), encode_trailers_(false),
-      retried_(false), awaiting_headers_(true), outlier_detection_timeout_recorded_(false),
-      create_per_try_timeout_on_request_complete_(false), paused_for_connect_(false),
-      paused_for_websocket_(false), reset_stream_(false),
       record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()),
-      cleaned_up_(false), had_upstream_(false),
-      stream_options_({can_send_early_data, can_use_http3}), grpc_rq_success_deferred_(false),
-      enable_half_close_(enable_half_close) {
-  if (auto tracing_config = parent_.callbacks()->tracingConfig(); tracing_config.has_value()) {
+      stream_options_({can_send_early_data, can_use_http3}), enable_half_close_(enable_half_close) {
+  // Get tracing config once and reuse it.
+  auto tracing_config = parent_.callbacks()->tracingConfig();
+
+  if (tracing_config.has_value()) {
     if (tracing_config->spawnUpstreamSpan() || parent_.config().start_child_span_) {
       span_ = parent_.callbacks()->activeSpan().spawnChild(
           tracing_config.value().get(),
@@ -108,33 +127,42 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
 
   // The router checks that the connection pool is non-null before creating the upstream request.
   auto upstream_host = conn_pool_->host();
-  Tracing::HttpTraceContext trace_context(*parent_.downstreamHeaders());
-  Tracing::UpstreamContext upstream_context(upstream_host.get(),           // host_
-                                            &upstream_host->cluster(),     // cluster_
-                                            Tracing::ServiceType::Unknown, // service_type_
-                                            false                          // async_client_span_
-  );
 
-  if (span_ != nullptr) {
-    span_->injectContext(trace_context, upstream_context);
-  } else {
-    // No independent child span for current upstream request then inject the parent span's tracing
-    // context into the request headers.
-    // The injectContext() of the parent span may be called repeatedly when the request is retried.
-    parent_.callbacks()->activeSpan().injectContext(trace_context, upstream_context);
+  // Only inject trace context if propagation is not disabled.
+  // When noContextPropagation is true, spans are still reported but trace context
+  // headers (e.g., traceparent, X-B3-*) are not injected into upstream requests.
+  const bool no_context_propagation =
+      tracing_config.has_value() && tracing_config->noContextPropagation();
+
+  if (!no_context_propagation) {
+    Tracing::HttpTraceContext trace_context(*parent_.downstreamHeaders());
+    Tracing::UpstreamContext upstream_context(upstream_host.get(),           // host_
+                                              &upstream_host->cluster(),     // cluster_
+                                              Tracing::ServiceType::Unknown, // service_type_
+                                              false                          // async_client_span_
+    );
+
+    if (span_ != nullptr) {
+      span_->injectContext(trace_context, upstream_context);
+    } else {
+      // No independent child span for current upstream request then inject the parent span's
+      // tracing context into the request headers.
+      // The injectContext() of the parent span may be called repeatedly when the request is
+      // retried.
+      parent_.callbacks()->activeSpan().injectContext(trace_context, upstream_context);
+    }
   }
 
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
-  stream_info_.route_ = parent_.callbacks()->route();
+  stream_info_.route_ = parent_.callbacks()->routeSharedPtr();
   stream_info_.upstreamInfo()->setUpstreamHost(upstream_host);
   parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
 
   stream_info_.healthCheck(parent_.callbacks()->streamInfo().healthCheck());
   stream_info_.setIsShadow(parent_.callbacks()->streamInfo().isShadow());
-  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
-      parent_.callbacks()->streamInfo().upstreamClusterInfo();
-  if (cluster_info.has_value()) {
-    stream_info_.setUpstreamClusterInfo(*cluster_info);
+  if (const auto cluster_info = parent_.callbacks()->streamInfo().upstreamClusterInfo()) {
+    stream_info_.setUpstreamClusterInfo(
+        parent_.callbacks()->streamInfo().upstreamClusterInfoSharedPtr());
   }
 
   // Set up the upstream HTTP filter manager.
@@ -405,10 +433,17 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
     }
   }
 
-  // Kick off creation of the upstream connection immediately upon receiving headers.
-  // In future it may be possible for upstream HTTP filters to delay this, or influence connection
-  // creation but for now optimize for minimal latency and fetch the connection
-  // as soon as possible.
+  // Kick off creation of the upstream connection immediately upon receiving headers. In future it
+  // may be possible for upstream HTTP filters to delay this, or influence connection creation, but
+  // for now optimize for minimal latency and fetch the connection as soon as possible. As a first
+  // step in that direction, upstream HTTP filters can inspect the selected host and abort the
+  // request before the connection is initiated.
+  auto* upstream_fm = static_cast<UpstreamFilterManager*>(filter_manager_.get());
+  if (upstream_fm->notifyHostSelected()) {
+    ENVOY_LOG(debug, "upstream request aborted during onHostSelected");
+    return;
+  }
+
   conn_pool_->newStream(this);
 
   if (parent_.config().upstream_log_flush_interval_.has_value()) {
@@ -464,15 +499,18 @@ void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
                                     absl::string_view transport_failure_reason) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
-  if (span_ != nullptr) {
-    // Add tags about reset.
-    span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
-    span_->setTag(Tracing::Tags::get().ErrorReason, Http::Utility::resetReasonToString(reason));
+  if (reason != Http::StreamResetReason::RemoteResetNoError) {
+    if (span_ != nullptr) {
+      // Add tags about reset.
+      span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+      span_->setTag(Tracing::Tags::get().ErrorReason, Http::Utility::resetReasonToString(reason));
+    }
+
+    stream_info_.setResponseFlag(Filter::streamResetReasonToResponseFlag(reason));
   }
   clearRequestEncoder();
   awaiting_headers_ = false;
 
-  stream_info_.setResponseFlag(Filter::streamResetReasonToResponseFlag(reason));
   parent_.onUpstreamReset(reason, transport_failure_reason, *this);
 }
 
@@ -641,7 +679,8 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   onUpstreamHostSelected(host, true);
 
   if (info.downstreamAddressProvider().connectionID().has_value()) {
-    upstream_info.setUpstreamConnectionId(info.downstreamAddressProvider().connectionID().value());
+    uint64_t connection_id = info.downstreamAddressProvider().connectionID().value();
+    upstream_info.setUpstreamConnectionId(connection_id);
   }
 
   if (info.downstreamAddressProvider().interfaceName().has_value()) {
@@ -821,8 +860,12 @@ void UpstreamRequestFilterManagerCallbacks::resetStream(
   return upstream_request_.onResetStream(reset_reason, transport_failure_reason);
 }
 
-Upstream::ClusterInfoConstSharedPtr UpstreamRequestFilterManagerCallbacks::clusterInfo() {
+OptRef<const Upstream::ClusterInfo> UpstreamRequestFilterManagerCallbacks::clusterInfo() {
   return upstream_request_.parent_.callbacks()->clusterInfo();
+}
+
+Upstream::ClusterInfoConstSharedPtr UpstreamRequestFilterManagerCallbacks::clusterInfoSharedPtr() {
+  return upstream_request_.parent_.callbacks()->clusterInfoSharedPtr();
 }
 
 Http::Http1StreamEncoderOptionsOptRef

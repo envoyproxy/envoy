@@ -35,8 +35,8 @@ std::string SessionCodec::buildCompositeSessionId(
 }
 
 absl::StatusOr<SessionCodec::ParsedSession>
-SessionCodec::parseCompositeSessionId(const std::string& composite) {
-  std::vector<std::string> parts = absl::StrSplit(composite, '@');
+SessionCodec::parseCompositeSessionId(absl::string_view composite) {
+  std::vector<absl::string_view> parts = absl::StrSplit(composite, '@');
   if (parts.size() != 3) {
     return absl::InvalidArgumentError("Invalid session format");
   }
@@ -46,17 +46,18 @@ SessionCodec::parseCompositeSessionId(const std::string& composite) {
   result.subject = Base64::decode(parts[1]);
 
   if (parts[2].empty()) {
-    return absl::InvalidArgumentError("Empty backend sessions");
+    // No backend sessions (all backends are session-less).
+    return result;
   }
 
-  std::vector<std::string> backend_parts = absl::StrSplit(parts[2], ',');
+  std::vector<absl::string_view> backend_parts = absl::StrSplit(parts[2], ',');
   for (const auto& bp : backend_parts) {
     size_t colon = bp.find(':');
     if (colon == std::string::npos || colon == 0) {
       return absl::InvalidArgumentError("Invalid backend session format");
     }
-    std::string backend = bp.substr(0, colon);
-    std::string encoded_session = bp.substr(colon + 1);
+    absl::string_view backend = bp.substr(0, colon);
+    absl::string_view encoded_session = bp.substr(colon + 1);
     result.backend_sessions[backend] = Base64::decode(encoded_session);
   }
 

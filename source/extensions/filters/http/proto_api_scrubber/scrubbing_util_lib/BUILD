@@ -22,6 +22,6 @@ envoy_cc_library(
         "//source/common/http/matching:data_impl_lib",
         "//source/common/protobuf",
         "//source/extensions/filters/http/proto_api_scrubber:filter_config",
-        "@com_google_protoprocessinglib//proto_processing_lib/proto_scrubber",
+        "@proto-processing//proto_processing_lib/proto_scrubber",
     ],
 )

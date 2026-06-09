@@ -23,7 +23,7 @@ EXTENSION_LABEL_RE = re.compile(r'(//source/extensions/.*):')
 IGNORE_DEPS = set([
     'envoy',
     'envoy_api',
-    'envoy_api',
+    'envoy_repo',
     'platforms',
     'bazel_tools',
     'local_config_cc',
@@ -219,7 +219,8 @@ class Validator(object):
           DependencyError: on a dependency validation error.
         """
         # Validate that //source doesn't depend on test_only
-        queried_source_deps = await self._build_graph.query_external_deps('//source/...')
+        queried_source_deps = await self._build_graph.query_external_deps(
+            '//source/...', exclude=["//source/extensions/dynamic_modules/sdk/cpp/..."])
         expected_test_only_deps = self._dep_info.deps_by_use_category('test_only')
         bad_test_only_deps = expected_test_only_deps.intersection(queried_source_deps)
         if len(bad_test_only_deps) > 0:
@@ -229,6 +230,9 @@ class Validator(object):
         # test_only.
         marginal_test_deps = await self._build_graph.query_external_deps(
             '//test/...', exclude=['//source/...'])
+        # Disregard openssl since it's conditional on --config=openssl. Without
+        # this exclusion, it is falsely flagged as a test_only dependency.
+        marginal_test_deps = marginal_test_deps.difference(['openssl'])
         bad_test_deps = marginal_test_deps.difference(expected_test_only_deps)
         unknown_bad_test_deps = [dep for dep in bad_test_deps if not test_only_ignore(dep)]
         print(f'Validating {len(expected_test_only_deps)} test-only dependencies...')

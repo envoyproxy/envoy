@@ -51,7 +51,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/common/expr:evaluator_lib",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
-        "@com_google_cel_cpp//eval/public/structs:cel_proto_wrapper",
+        "@cel-cpp//eval/public/structs:cel_proto_wrapper",
     ],
 )
 
@@ -112,7 +112,7 @@ envoy_cc_benchmark_binary(
         "//test/mocks/upstream:host_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 

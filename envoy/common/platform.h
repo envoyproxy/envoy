@@ -16,9 +16,9 @@
 #include <winsock2.h>
 
 // These must follow afterwards
+#include <mstcpip.h>
 #include <mswsock.h>
 #include <ws2tcpip.h>
-#include <mstcpip.h>
 
 // This is introduced in Windows SDK 10.0.17063.0 which is required
 // to build Envoy on Windows (we will reevaluate whether earlier builds
@@ -151,6 +151,7 @@ struct msghdr {
 #define SOCKET_ERROR_BADF WSAEBADF
 #define SOCKET_ERROR_CONNRESET WSAECONNRESET
 #define SOCKET_ERROR_NETUNREACH WSAENETUNREACH
+#define SOCKET_ERROR_NOBUFS ENOBUFS
 
 #define HANDLE_ERROR_PERM ERROR_ACCESS_DENIED
 #define HANDLE_ERROR_INVALID ERROR_INVALID_HANDLE
@@ -269,6 +270,7 @@ typedef int signal_t;           // NOLINT(modernize-use-using)
 #define SOCKET_ERROR_BADF EBADF
 #define SOCKET_ERROR_CONNRESET ECONNRESET
 #define SOCKET_ERROR_NETUNREACH ENETUNREACH
+#define SOCKET_ERROR_NOBUFS ENOBUFS
 
 // Mapping POSIX file errors to common error names
 #define HANDLE_ERROR_PERM EACCES

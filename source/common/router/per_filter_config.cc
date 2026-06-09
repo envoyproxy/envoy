@@ -66,7 +66,7 @@ PerFilterConfigs::PerFilterConfigs(const Protobuf::Map<std::string, Protobuf::An
                                    ProtobufMessage::ValidationVisitor& validator,
                                    absl::Status& creation_status) {
 
-  std::string filter_config_type(
+  static const std::string filter_config_type(
       envoy::config::route::v3::FilterConfig::default_instance().GetTypeName());
 
   for (const auto& per_filter_config : typed_configs) {

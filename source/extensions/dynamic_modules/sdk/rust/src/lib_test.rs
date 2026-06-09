@@ -1,7 +1,7 @@
 #![allow(clippy::unnecessary_cast)]
 use crate::*;
 #[cfg(test)]
-use std::sync::atomic::AtomicBool; // This is used for testing the drop, not for the actual concurrency.
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize};
 
 #[test]
 fn test_loggers() {
@@ -261,7 +261,7 @@ fn test_envoy_dynamic_module_on_listener_filter_config_new_impl() {
     EnvoyListenerFilterConfigImpl,
     EnvoyListenerFilterImpl,
   > = |_, _, _| Some(Box::new(TestListenerFilterConfig));
-  let result = init_listener_filter_config(
+  let result = listener::init_listener_filter_config(
     &mut envoy_filter_config,
     "test_name",
     b"test_config",
@@ -275,7 +275,7 @@ fn test_envoy_dynamic_module_on_listener_filter_config_new_impl() {
 
   // None should result in null pointer.
   new_fn = |_, _, _| None;
-  let result = init_listener_filter_config(
+  let result = listener::init_listener_filter_config(
     &mut envoy_filter_config,
     "test_name",
     b"test_config",
@@ -306,7 +306,7 @@ fn test_envoy_dynamic_module_on_listener_filter_config_destroy() {
     EnvoyListenerFilterConfigImpl,
     EnvoyListenerFilterImpl,
   > = |_, _, _| Some(Box::new(TestListenerFilterConfig));
-  let config_ptr = init_listener_filter_config(
+  let config_ptr = listener::init_listener_filter_config(
     &mut EnvoyListenerFilterConfigImpl {
       raw: std::ptr::null_mut(),
     },
@@ -341,7 +341,7 @@ fn test_envoy_dynamic_module_on_listener_filter_new_destroy() {
   }
 
   let mut filter_config = TestListenerFilterConfig;
-  let result = envoy_dynamic_module_on_listener_filter_new_impl(
+  let result = listener::envoy_dynamic_module_on_listener_filter_new_impl(
     &mut EnvoyListenerFilterImpl {
       raw: std::ptr::null_mut(),
     },
@@ -380,9 +380,14 @@ fn test_envoy_dynamic_module_on_listener_filter_callbacks() {
     fn on_data(
       &mut self,
       _envoy_filter: &mut ELF,
+      _data_length: usize,
     ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
       ON_DATA_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
       abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
+    }
+
+    fn max_read_bytes(&mut self, _envoy_filter: &mut ELF) -> usize {
+      128
     }
 
     fn on_close(&mut self, _envoy_filter: &mut ELF) {
@@ -391,7 +396,7 @@ fn test_envoy_dynamic_module_on_listener_filter_callbacks() {
   }
 
   let mut filter_config = TestListenerFilterConfig;
-  let filter = envoy_dynamic_module_on_listener_filter_new_impl(
+  let filter = listener::envoy_dynamic_module_on_listener_filter_new_impl(
     &mut EnvoyListenerFilterImpl {
       raw: std::ptr::null_mut(),
     },
@@ -403,8 +408,12 @@ fn test_envoy_dynamic_module_on_listener_filter_callbacks() {
     abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
   );
   assert_eq!(
-    envoy_dynamic_module_on_listener_filter_on_data(std::ptr::null_mut(), filter),
+    envoy_dynamic_module_on_listener_filter_on_data(std::ptr::null_mut(), filter, 0),
     abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
+  );
+  assert_eq!(
+    envoy_dynamic_module_on_listener_filter_get_max_read_bytes(std::ptr::null_mut(), filter),
+    128
   );
   envoy_dynamic_module_on_listener_filter_on_close(std::ptr::null_mut(), filter);
   envoy_dynamic_module_on_listener_filter_destroy(filter);
@@ -412,6 +421,432 @@ fn test_envoy_dynamic_module_on_listener_filter_callbacks() {
   assert!(ON_ACCEPT_CALLED.load(std::sync::atomic::Ordering::SeqCst));
   assert!(ON_DATA_CALLED.load(std::sync::atomic::Ordering::SeqCst));
   assert!(ON_CLOSE_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+// =============================================================================
+// Listener Filter Metrics FFI stubs for testing.
+// =============================================================================
+
+/// Tracks the metrics defined and manipulated by listener filter metrics stubs.
+struct ListenerFilterMetricEntry {
+  name: String,
+  value: u64,
+}
+
+static LISTENER_FILTER_COUNTERS: std::sync::Mutex<Vec<ListenerFilterMetricEntry>> =
+  std::sync::Mutex::new(Vec::new());
+static LISTENER_FILTER_GAUGES: std::sync::Mutex<Vec<ListenerFilterMetricEntry>> =
+  std::sync::Mutex::new(Vec::new());
+static LISTENER_FILTER_HISTOGRAMS: std::sync::Mutex<Vec<ListenerFilterMetricEntry>> =
+  std::sync::Mutex::new(Vec::new());
+
+fn reset_listener_filter_metrics() {
+  LISTENER_FILTER_COUNTERS.lock().unwrap().clear();
+  LISTENER_FILTER_GAUGES.lock().unwrap().clear();
+  LISTENER_FILTER_HISTOGRAMS.lock().unwrap().clear();
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_config_define_counter(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+  counter_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      name.ptr as *const u8,
+      name.length,
+    ))
+  };
+  let mut counters = LISTENER_FILTER_COUNTERS.lock().unwrap();
+  let id = counters.len();
+  counters.push(ListenerFilterMetricEntry {
+    name: name_str.to_string(),
+    value: 0,
+  });
+  unsafe {
+    *counter_id_ptr = id;
+  }
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_increment_counter(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+  id: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let mut counters = LISTENER_FILTER_COUNTERS.lock().unwrap();
+  if id >= counters.len() {
+    return abi::envoy_dynamic_module_type_metrics_result::MetricNotFound;
+  }
+  counters[id].value += value;
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_config_define_gauge(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+  gauge_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      name.ptr as *const u8,
+      name.length,
+    ))
+  };
+  let mut gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+  let id = gauges.len();
+  gauges.push(ListenerFilterMetricEntry {
+    name: name_str.to_string(),
+    value: 0,
+  });
+  unsafe {
+    *gauge_id_ptr = id;
+  }
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_set_gauge(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+  id: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let mut gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+  if id >= gauges.len() {
+    return abi::envoy_dynamic_module_type_metrics_result::MetricNotFound;
+  }
+  gauges[id].value = value;
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_increment_gauge(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+  id: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let mut gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+  if id >= gauges.len() {
+    return abi::envoy_dynamic_module_type_metrics_result::MetricNotFound;
+  }
+  gauges[id].value += value;
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_decrement_gauge(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+  id: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let mut gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+  if id >= gauges.len() {
+    return abi::envoy_dynamic_module_type_metrics_result::MetricNotFound;
+  }
+  gauges[id].value = gauges[id].value.saturating_sub(value);
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_config_define_histogram(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+  histogram_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      name.ptr as *const u8,
+      name.length,
+    ))
+  };
+  let mut histograms = LISTENER_FILTER_HISTOGRAMS.lock().unwrap();
+  let id = histograms.len();
+  histograms.push(ListenerFilterMetricEntry {
+    name: name_str.to_string(),
+    value: 0,
+  });
+  unsafe {
+    *histogram_id_ptr = id;
+  }
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_record_histogram_value(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+  id: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let mut histograms = LISTENER_FILTER_HISTOGRAMS.lock().unwrap();
+  if id >= histograms.len() {
+    return abi::envoy_dynamic_module_type_metrics_result::MetricNotFound;
+  }
+  histograms[id].value = value;
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+// =============================================================================
+// Listener Filter Metrics Tests
+// =============================================================================
+
+#[test]
+fn test_listener_filter_config_define_and_increment_counter() {
+  reset_listener_filter_metrics();
+  let mut config = EnvoyListenerFilterConfigImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let counter_id = config.define_counter("test_counter");
+  assert!(counter_id.is_ok());
+  let counter_id = counter_id.unwrap();
+
+  // Verify the counter was registered with the correct name.
+  {
+    let counters = LISTENER_FILTER_COUNTERS.lock().unwrap();
+    assert_eq!(1, counters.len());
+    assert_eq!("test_counter", counters[0].name);
+    assert_eq!(0, counters[0].value);
+  }
+
+  // Increment the counter via the filter.
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  let result = filter.increment_counter(counter_id, 5);
+  assert!(result.is_ok());
+
+  // Verify the counter value was incremented.
+  {
+    let counters = LISTENER_FILTER_COUNTERS.lock().unwrap();
+    assert_eq!(5, counters[0].value);
+  }
+
+  // Increment again.
+  let result = filter.increment_counter(counter_id, 3);
+  assert!(result.is_ok());
+
+  {
+    let counters = LISTENER_FILTER_COUNTERS.lock().unwrap();
+    assert_eq!(8, counters[0].value);
+  }
+}
+
+#[test]
+fn test_listener_filter_config_define_multiple_counters() {
+  reset_listener_filter_metrics();
+  let mut config = EnvoyListenerFilterConfigImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let id1 = config.define_counter("counter_a").unwrap();
+  let id2 = config.define_counter("counter_b").unwrap();
+
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  filter.increment_counter(id1, 10).unwrap();
+  filter.increment_counter(id2, 20).unwrap();
+
+  let counters = LISTENER_FILTER_COUNTERS.lock().unwrap();
+  assert_eq!(2, counters.len());
+  assert_eq!(10, counters[0].value);
+  assert_eq!(20, counters[1].value);
+}
+
+#[test]
+fn test_listener_filter_counter_invalid_id() {
+  reset_listener_filter_metrics();
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Incrementing a counter with an invalid ID should return an error.
+  let result = filter.increment_counter(EnvoyCounterId(999), 1);
+  assert!(result.is_err());
+}
+
+#[test]
+fn test_listener_get_dynamic_metadata_string() {
+  let mut mock = listener::MockEnvoyListenerFilter::new();
+  mock
+    .expect_get_dynamic_metadata_string()
+    .withf(|namespace, key| namespace == "my.namespace" && key == "my_key")
+    .returning(|_, _| Some(EnvoyBuffer::new(b"my_value")));
+  assert_eq!(
+    mock
+      .get_dynamic_metadata_string("my.namespace", "my_key")
+      .unwrap()
+      .as_slice(),
+    b"my_value"
+  );
+}
+
+#[test]
+fn test_listener_get_dynamic_metadata_string_none() {
+  let mut mock = listener::MockEnvoyListenerFilter::new();
+  mock
+    .expect_get_dynamic_metadata_string()
+    .returning(|_, _| None);
+  assert!(mock.get_dynamic_metadata_string("missing", "key").is_none());
+}
+
+#[test]
+fn test_listener_filter_config_define_and_manipulate_gauge() {
+  reset_listener_filter_metrics();
+  let mut config = EnvoyListenerFilterConfigImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let gauge_id = config.define_gauge("test_gauge").unwrap();
+
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Set gauge value.
+  filter.set_gauge(gauge_id, 42).unwrap();
+  {
+    let gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+    assert_eq!(42, gauges[0].value);
+  }
+
+  // Increase gauge.
+  filter.increase_gauge(gauge_id, 8).unwrap();
+  {
+    let gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+    assert_eq!(50, gauges[0].value);
+  }
+
+  // Decrease gauge.
+  filter.decrease_gauge(gauge_id, 10).unwrap();
+  {
+    let gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+    assert_eq!(40, gauges[0].value);
+  }
+
+  // Set gauge to a new value.
+  filter.set_gauge(gauge_id, 0).unwrap();
+  {
+    let gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+    assert_eq!(0, gauges[0].value);
+  }
+}
+
+#[test]
+fn test_listener_filter_gauge_invalid_id() {
+  reset_listener_filter_metrics();
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // All gauge operations with an invalid ID should return an error.
+  assert!(filter.set_gauge(EnvoyGaugeId(999), 1).is_err());
+  assert!(filter.increase_gauge(EnvoyGaugeId(999), 1).is_err());
+  assert!(filter.decrease_gauge(EnvoyGaugeId(999), 1).is_err());
+}
+
+#[test]
+fn test_listener_filter_gauge_decrease_saturates_at_zero() {
+  reset_listener_filter_metrics();
+  let mut config = EnvoyListenerFilterConfigImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let gauge_id = config.define_gauge("saturating_gauge").unwrap();
+
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Set gauge to 5 and decrease by 10 - should saturate at 0.
+  filter.set_gauge(gauge_id, 5).unwrap();
+  filter.decrease_gauge(gauge_id, 10).unwrap();
+  {
+    let gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+    assert_eq!(0, gauges[0].value);
+  }
+}
+
+#[test]
+fn test_listener_filter_config_define_and_record_histogram() {
+  reset_listener_filter_metrics();
+  let mut config = EnvoyListenerFilterConfigImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let histogram_id = config.define_histogram("test_histogram").unwrap();
+
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Record a value in the histogram.
+  filter.record_histogram_value(histogram_id, 100).unwrap();
+  {
+    let histograms = LISTENER_FILTER_HISTOGRAMS.lock().unwrap();
+    assert_eq!(100, histograms[0].value);
+  }
+
+  // Record another value.
+  filter.record_histogram_value(histogram_id, 250).unwrap();
+  {
+    let histograms = LISTENER_FILTER_HISTOGRAMS.lock().unwrap();
+    assert_eq!(250, histograms[0].value);
+  }
+}
+
+#[test]
+fn test_listener_filter_histogram_invalid_id() {
+  reset_listener_filter_metrics();
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Recording a histogram value with an invalid ID should return an error.
+  let result = filter.record_histogram_value(EnvoyHistogramId(999), 1);
+  assert!(result.is_err());
+}
+
+#[test]
+fn test_listener_filter_define_all_metric_types() {
+  reset_listener_filter_metrics();
+  let mut config = EnvoyListenerFilterConfigImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Define one of each metric type.
+  let counter_id = config.define_counter("my_counter").unwrap();
+  let gauge_id = config.define_gauge("my_gauge").unwrap();
+  let histogram_id = config.define_histogram("my_histogram").unwrap();
+
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Exercise all metric types.
+  filter.increment_counter(counter_id, 1).unwrap();
+  filter.set_gauge(gauge_id, 42).unwrap();
+  filter.record_histogram_value(histogram_id, 100).unwrap();
+
+  // Verify all values.
+  {
+    let counters = LISTENER_FILTER_COUNTERS.lock().unwrap();
+    assert_eq!(1, counters[0].value);
+    assert_eq!("my_counter", counters[0].name);
+  }
+  {
+    let gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+    assert_eq!(42, gauges[0].value);
+    assert_eq!("my_gauge", gauges[0].name);
+  }
+  {
+    let histograms = LISTENER_FILTER_HISTOGRAMS.lock().unwrap();
+    assert_eq!(100, histograms[0].value);
+    assert_eq!("my_histogram", histograms[0].name);
+  }
 }
 
 // =============================================================================
@@ -437,7 +872,7 @@ fn test_envoy_dynamic_module_on_network_filter_config_new_impl() {
     EnvoyNetworkFilterConfigImpl,
     EnvoyNetworkFilterImpl,
   > = |_, _, _| Some(Box::new(TestNetworkFilterConfig));
-  let result = init_network_filter_config(
+  let result = network::init_network_filter_config(
     &mut envoy_filter_config,
     "test_name",
     b"test_config",
@@ -451,7 +886,7 @@ fn test_envoy_dynamic_module_on_network_filter_config_new_impl() {
 
   // None should result in null pointer.
   new_fn = |_, _, _| None;
-  let result = init_network_filter_config(
+  let result = network::init_network_filter_config(
     &mut envoy_filter_config,
     "test_name",
     b"test_config",
@@ -480,7 +915,7 @@ fn test_envoy_dynamic_module_on_network_filter_config_destroy() {
 
   let new_fn: NewNetworkFilterConfigFunction<EnvoyNetworkFilterConfigImpl, EnvoyNetworkFilterImpl> =
     |_, _, _| Some(Box::new(TestNetworkFilterConfig));
-  let config_ptr = init_network_filter_config(
+  let config_ptr = network::init_network_filter_config(
     &mut EnvoyNetworkFilterConfigImpl {
       raw: std::ptr::null_mut(),
     },
@@ -515,7 +950,7 @@ fn test_envoy_dynamic_module_on_network_filter_new_destroy() {
   }
 
   let mut filter_config = TestNetworkFilterConfig;
-  let result = envoy_dynamic_module_on_network_filter_new_impl(
+  let result = network::envoy_dynamic_module_on_network_filter_new_impl(
     &mut EnvoyNetworkFilterImpl {
       raw: std::ptr::null_mut(),
     },
@@ -582,7 +1017,7 @@ fn test_envoy_dynamic_module_on_network_filter_callbacks() {
   }
 
   let mut filter_config = TestNetworkFilterConfig;
-  let filter = envoy_dynamic_module_on_network_filter_new_impl(
+  let filter = network::envoy_dynamic_module_on_network_filter_new_impl(
     &mut EnvoyNetworkFilterImpl {
       raw: std::ptr::null_mut(),
     },
@@ -860,7 +1295,7 @@ fn test_envoy_dynamic_module_on_udp_listener_filter_config_new_impl() {
     EnvoyUdpListenerFilterConfigImpl,
     EnvoyUdpListenerFilterImpl,
   > = |_, _, _| Some(Box::new(TestUdpListenerFilterConfig));
-  let result = init_udp_listener_filter_config(
+  let result = udp_listener::init_udp_listener_filter_config(
     &mut envoy_filter_config,
     "test_name",
     b"test_config",
@@ -874,7 +1309,7 @@ fn test_envoy_dynamic_module_on_udp_listener_filter_config_new_impl() {
 
   // None should result in null pointer.
   new_fn = |_, _, _| None;
-  let result = init_udp_listener_filter_config(
+  let result = udp_listener::init_udp_listener_filter_config(
     &mut envoy_filter_config,
     "test_name",
     b"test_config",
@@ -905,7 +1340,7 @@ fn test_envoy_dynamic_module_on_udp_listener_filter_config_destroy() {
     EnvoyUdpListenerFilterConfigImpl,
     EnvoyUdpListenerFilterImpl,
   > = |_, _, _| Some(Box::new(TestUdpListenerFilterConfig));
-  let config_ptr = init_udp_listener_filter_config(
+  let config_ptr = udp_listener::init_udp_listener_filter_config(
     &mut EnvoyUdpListenerFilterConfigImpl {
       raw: std::ptr::null_mut(),
     },
@@ -940,7 +1375,7 @@ fn test_envoy_dynamic_module_on_udp_listener_filter_new_destroy() {
   }
 
   let mut filter_config = TestUdpListenerFilterConfig;
-  let result = envoy_dynamic_module_on_udp_listener_filter_new_impl(
+  let result = udp_listener::envoy_dynamic_module_on_udp_listener_filter_new_impl(
     &mut EnvoyUdpListenerFilterImpl {
       raw: std::ptr::null_mut(),
     },
@@ -976,7 +1411,7 @@ fn test_envoy_dynamic_module_on_udp_listener_filter_callbacks() {
   }
 
   let mut filter_config = TestUdpListenerFilterConfig;
-  let filter = envoy_dynamic_module_on_udp_listener_filter_new_impl(
+  let filter = udp_listener::envoy_dynamic_module_on_udp_listener_filter_new_impl(
     &mut EnvoyUdpListenerFilterImpl {
       raw: std::ptr::null_mut(),
     },
@@ -990,6 +1425,93 @@ fn test_envoy_dynamic_module_on_udp_listener_filter_callbacks() {
   envoy_dynamic_module_on_udp_listener_filter_destroy(filter);
 
   assert!(ON_DATA_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+// =============================================================================
+// Cluster Host Count FFI stubs and tests.
+// =============================================================================
+
+struct MockClusterHostCount {
+  total: usize,
+  healthy: usize,
+  degraded: usize,
+}
+
+static MOCK_CLUSTER_HOST_COUNT: std::sync::Mutex<Option<MockClusterHostCount>> =
+  std::sync::Mutex::new(None);
+
+fn reset_cluster_host_count_mock() {
+  *MOCK_CLUSTER_HOST_COUNT.lock().unwrap() = None;
+}
+
+fn set_cluster_host_count_mock(count: MockClusterHostCount) {
+  *MOCK_CLUSTER_HOST_COUNT.lock().unwrap() = Some(count);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  _cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+  _priority: u32,
+  total_count: *mut usize,
+  healthy_count: *mut usize,
+  degraded_count: *mut usize,
+) -> bool {
+  let guard = MOCK_CLUSTER_HOST_COUNT.lock().unwrap();
+  match &*guard {
+    Some(count) => {
+      if !total_count.is_null() {
+        unsafe {
+          *total_count = count.total;
+        }
+      }
+      if !healthy_count.is_null() {
+        unsafe {
+          *healthy_count = count.healthy;
+        }
+      }
+      if !degraded_count.is_null() {
+        unsafe {
+          *degraded_count = count.degraded;
+        }
+      }
+      true
+    },
+    None => false,
+  }
+}
+
+#[test]
+fn test_get_cluster_host_count_success() {
+  reset_cluster_host_count_mock();
+  set_cluster_host_count_mock(MockClusterHostCount {
+    total: 10,
+    healthy: 8,
+    degraded: 1,
+  });
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let result = filter.get_cluster_host_count("test_cluster", 0);
+  assert!(result.is_some());
+  let count = result.unwrap();
+  assert_eq!(count.total, 10);
+  assert_eq!(count.healthy, 8);
+  assert_eq!(count.degraded, 1);
+}
+
+#[test]
+fn test_get_cluster_host_count_not_found() {
+  reset_cluster_host_count_mock();
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let result = filter.get_cluster_host_count("nonexistent_cluster", 0);
+  assert!(result.is_none());
 }
 
 // =============================================================================
@@ -1173,7 +1695,7 @@ fn test_get_upstream_host_address_with_host() {
   let result = filter.get_upstream_host_address();
   assert!(result.is_some());
   let (addr, port) = result.unwrap();
-  assert_eq!(addr, "192.168.1.100");
+  assert_eq!(addr.as_slice(), b"192.168.1.100");
   assert_eq!(port, 8080);
 }
 
@@ -1223,7 +1745,7 @@ fn test_get_upstream_host_hostname_with_host() {
 
   let result = filter.get_upstream_host_hostname();
   assert!(result.is_some());
-  assert_eq!(result.unwrap(), "api.example.com");
+  assert_eq!(result.unwrap().as_slice(), b"api.example.com");
 }
 
 #[test]
@@ -1272,7 +1794,7 @@ fn test_get_upstream_host_cluster_with_host() {
 
   let result = filter.get_upstream_host_cluster();
   assert!(result.is_some());
-  assert_eq!(result.unwrap(), "backend_cluster");
+  assert_eq!(result.unwrap().as_slice(), b"backend_cluster");
 }
 
 #[test]
@@ -1367,16 +1889,19 @@ fn test_upstream_host_full_info() {
   let addr_result = filter.get_upstream_host_address();
   assert!(addr_result.is_some());
   let (addr, port) = addr_result.unwrap();
-  assert_eq!(addr, "10.20.30.40");
+  assert_eq!(addr.as_slice(), b"10.20.30.40");
   assert_eq!(port, 8443);
 
   let hostname_result = filter.get_upstream_host_hostname();
   assert!(hostname_result.is_some());
-  assert_eq!(hostname_result.unwrap(), "secure-backend.example.com");
+  assert_eq!(
+    hostname_result.unwrap().as_slice(),
+    b"secure-backend.example.com"
+  );
 
   let cluster_result = filter.get_upstream_host_cluster();
   assert!(cluster_result.is_some());
-  assert_eq!(cluster_result.unwrap(), "secure_cluster");
+  assert_eq!(cluster_result.unwrap().as_slice(), b"secure_cluster");
 }
 
 #[test]
@@ -1400,7 +1925,7 @@ fn test_upstream_host_partial_info() {
   let addr_result = filter.get_upstream_host_address();
   assert!(addr_result.is_some());
   let (addr, port) = addr_result.unwrap();
-  assert_eq!(addr, "192.168.0.1");
+  assert_eq!(addr.as_slice(), b"192.168.0.1");
   assert_eq!(port, 3000);
 
   // Hostname should be None.
@@ -1409,7 +1934,7 @@ fn test_upstream_host_partial_info() {
   // Cluster should be available.
   let cluster_result = filter.get_upstream_host_cluster();
   assert!(cluster_result.is_some());
-  assert_eq!(cluster_result.unwrap(), "partial_cluster");
+  assert_eq!(cluster_result.unwrap().as_slice(), b"partial_cluster");
 }
 
 #[test]
@@ -1429,7 +1954,7 @@ fn test_upstream_host_ipv6_address() {
   let addr_result = filter.get_upstream_host_address();
   assert!(addr_result.is_some());
   let (addr, port) = addr_result.unwrap();
-  assert_eq!(addr, "::1");
+  assert_eq!(addr.as_slice(), b"::1");
   assert_eq!(port, 8080);
 }
 
@@ -1450,8 +1975,37 @@ fn test_upstream_host_full_ipv6_address() {
   let addr_result = filter.get_upstream_host_address();
   assert!(addr_result.is_some());
   let (addr, port) = addr_result.unwrap();
-  assert_eq!(addr, "2001:0db8:85a3:0000:0000:8a2e:0370:7334");
+  assert_eq!(addr.as_slice(), b"2001:0db8:85a3:0000:0000:8a2e:0370:7334");
   assert_eq!(port, 443);
+}
+
+// =============================================================================
+// Network Dynamic Metadata String Tests
+// =============================================================================
+
+#[test]
+fn test_network_get_dynamic_metadata_string() {
+  let mut mock = network::MockEnvoyNetworkFilter::new();
+  mock
+    .expect_get_dynamic_metadata_string()
+    .withf(|namespace, key| namespace == "my.namespace" && key == "my_key")
+    .returning(|_, _| Some(EnvoyBuffer::new(b"my_value")));
+  assert_eq!(
+    mock
+      .get_dynamic_metadata_string("my.namespace", "my_key")
+      .unwrap()
+      .as_slice(),
+    b"my_value"
+  );
+}
+
+#[test]
+fn test_network_get_dynamic_metadata_string_none() {
+  let mut mock = network::MockEnvoyNetworkFilter::new();
+  mock
+    .expect_get_dynamic_metadata_string()
+    .returning(|_, _| None);
+  assert!(mock.get_dynamic_metadata_string("missing", "key").is_none());
 }
 
 // =============================================================================
@@ -1710,7 +2264,7 @@ fn test_network_filter_watermark_callbacks() {
   }
 
   let mut filter_config = TestNetworkFilterConfig;
-  let filter = envoy_dynamic_module_on_network_filter_new_impl(
+  let filter = network::envoy_dynamic_module_on_network_filter_new_impl(
     &mut EnvoyNetworkFilterImpl {
       raw: std::ptr::null_mut(),
     },
@@ -1731,4 +2285,5248 @@ fn test_network_filter_watermark_callbacks() {
 
   assert!(ON_ABOVE_HIGH_WATERMARK_CALLED.load(std::sync::atomic::Ordering::SeqCst));
   assert!(ON_BELOW_LOW_WATERMARK_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+// =============================================================================
+// Bootstrap Extension FFI stubs for testing.
+// =============================================================================
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete(
+  _ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(
+  _ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr,
+  _event_id: u64,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_http_callout(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _callout_id_out: *mut u64,
+  _cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+  _headers: *mut abi::envoy_dynamic_module_type_module_http_header,
+  _headers_size: usize,
+  _body: abi::envoy_dynamic_module_type_module_buffer,
+  _timeout_milliseconds: u64,
+) -> abi::envoy_dynamic_module_type_http_callout_init_result {
+  abi::envoy_dynamic_module_type_http_callout_init_result::CannotCreateRequest
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_get_counter_value(
+  _extension_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _value_ptr: *mut u64,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_get_gauge_value(
+  _extension_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _value_ptr: *mut u64,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_get_histogram_summary(
+  _extension_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _sample_count_ptr: *mut u64,
+  _sample_sum_ptr: *mut f64,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_iterate_counters(
+  _extension_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  _iterator_fn: abi::envoy_dynamic_module_type_counter_iterator_fn,
+  _user_data: *mut std::os::raw::c_void,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
+  _extension_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  _iterator_fn: abi::envoy_dynamic_module_type_gauge_iterator_fn,
+  _user_data: *mut std::os::raw::c_void,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_names_length: usize,
+  _counter_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_names_length: usize,
+  _gauge_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_names_length: usize,
+  _histogram_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_timer_new(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_timer_enable(
+  _timer_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr,
+  _delay_milliseconds: u64,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_timer_disable(
+  _timer_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(
+  _timer_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_timer_delete(
+  _timer_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _path: abi::envoy_dynamic_module_type_module_buffer,
+  _events: u32,
+) -> bool {
+  false
+}
+
+// Thread-local used by the test mock to capture the response body set via the callback.
+thread_local! {
+  static TEST_ADMIN_RESPONSE: std::cell::RefCell<String> =
+    const { std::cell::RefCell::new(String::new()) };
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  response_body: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  if !response_body.ptr.is_null() && response_body.length > 0 {
+    let s = unsafe {
+      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+        response_body.ptr as *const u8,
+        response_body.length,
+      ))
+    };
+    TEST_ADMIN_RESPONSE.with(|cell| {
+      *cell.borrow_mut() = s.to_string();
+    });
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _path_prefix: abi::envoy_dynamic_module_type_module_buffer,
+  _help_text: abi::envoy_dynamic_module_type_module_buffer,
+  _removable: bool,
+  _mutates_server_state: bool,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _path_prefix: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+) -> bool {
+  false
+}
+
+// =============================================================================
+// Bootstrap Extension Tests
+// =============================================================================
+
+#[test]
+fn test_bootstrap_extension_config_new_destroy() {
+  static DROPPED: AtomicBool = AtomicBool::new(false);
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+  impl Drop for TestBootstrapExtensionConfig {
+    fn drop(&mut self) {
+      DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+  assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_bootstrap_extension_new_destroy() {
+  static DROPPED: AtomicBool = AtomicBool::new(false);
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+  impl Drop for TestBootstrapExtension {
+    fn drop(&mut self) {
+      DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  let config: Box<dyn BootstrapExtensionConfig> = Box::new(TestBootstrapExtensionConfig);
+  let mut envoy_extension = bootstrap::EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  let extension_ptr =
+    bootstrap::envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
+  assert!(!extension_ptr.is_null());
+
+  envoy_dynamic_module_on_bootstrap_extension_destroy(extension_ptr);
+  assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_bootstrap_extension_drain_started() {
+  static DRAIN_CALLED: AtomicBool = AtomicBool::new(false);
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {
+    fn on_drain_started(&mut self, _envoy_extension: &mut dyn EnvoyBootstrapExtension) {
+      DRAIN_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  let config: Box<dyn BootstrapExtensionConfig> = Box::new(TestBootstrapExtensionConfig);
+  let mut envoy_extension = bootstrap::EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  let extension_ptr =
+    bootstrap::envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
+
+  envoy_dynamic_module_on_bootstrap_extension_drain_started(std::ptr::null_mut(), extension_ptr);
+
+  assert!(DRAIN_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+
+  envoy_dynamic_module_on_bootstrap_extension_destroy(extension_ptr);
+}
+
+#[test]
+fn test_bootstrap_extension_shutdown() {
+  static SHUTDOWN_CALLED: AtomicBool = AtomicBool::new(false);
+  static COMPLETION_CALLED: AtomicBool = AtomicBool::new(false);
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {
+    fn on_shutdown(
+      &mut self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+      completion: CompletionCallback,
+    ) {
+      SHUTDOWN_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+      completion.done();
+    }
+  }
+
+  unsafe extern "C" fn test_completion(context: *mut std::os::raw::c_void) {
+    let flag = &*(context as *const AtomicBool);
+    flag.store(true, std::sync::atomic::Ordering::SeqCst);
+  }
+
+  let config: Box<dyn BootstrapExtensionConfig> = Box::new(TestBootstrapExtensionConfig);
+  let mut envoy_extension = bootstrap::EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  let extension_ptr =
+    bootstrap::envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
+
+  envoy_dynamic_module_on_bootstrap_extension_shutdown(
+    std::ptr::null_mut(),
+    extension_ptr,
+    Some(test_completion),
+    &COMPLETION_CALLED as *const AtomicBool as *mut std::os::raw::c_void,
+  );
+
+  assert!(SHUTDOWN_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+  assert!(COMPLETION_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+
+  envoy_dynamic_module_on_bootstrap_extension_destroy(extension_ptr);
+}
+
+#[test]
+fn test_bootstrap_extension_shutdown_default_calls_completion() {
+  // Verify that the default on_shutdown implementation calls the completion callback.
+  static COMPLETION_CALLED: AtomicBool = AtomicBool::new(false);
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {
+    // Use the default on_shutdown implementation.
+  }
+
+  unsafe extern "C" fn test_completion(context: *mut std::os::raw::c_void) {
+    let flag = &*(context as *const AtomicBool);
+    flag.store(true, std::sync::atomic::Ordering::SeqCst);
+  }
+
+  let config: Box<dyn BootstrapExtensionConfig> = Box::new(TestBootstrapExtensionConfig);
+  let mut envoy_extension = bootstrap::EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  let extension_ptr =
+    bootstrap::envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
+
+  envoy_dynamic_module_on_bootstrap_extension_shutdown(
+    std::ptr::null_mut(),
+    extension_ptr,
+    Some(test_completion),
+    &COMPLETION_CALLED as *const AtomicBool as *mut std::os::raw::c_void,
+  );
+
+  assert!(COMPLETION_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+
+  envoy_dynamic_module_on_bootstrap_extension_destroy(extension_ptr);
+}
+
+#[test]
+fn test_bootstrap_extension_admin_request() {
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_admin_request(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      method: &str,
+      path: &str,
+      _body: &[u8],
+    ) -> (u32, String) {
+      (200, format!("method={} path={}", method, path))
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let method = "GET";
+  let path = "/test_admin?key=val";
+  let body = b"";
+
+  let method_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: method.as_ptr() as *mut _,
+    length: method.len(),
+  };
+  let path_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: path.as_ptr() as *mut _,
+    length: path.len(),
+  };
+  let body_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: body.as_ptr() as *mut _,
+    length: body.len(),
+  };
+
+  // Clear the test mock before calling.
+  TEST_ADMIN_RESPONSE.with(|cell| cell.borrow_mut().clear());
+
+  let status = unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_admin_request(
+      std::ptr::null_mut(),
+      config_ptr,
+      method_buf,
+      path_buf,
+      body_buf,
+    )
+  };
+
+  assert_eq!(status, 200);
+  TEST_ADMIN_RESPONSE.with(|cell| {
+    assert_eq!(*cell.borrow(), "method=GET path=/test_admin?key=val");
+  });
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_admin_request_default() {
+  // Verify that the default on_admin_request returns 404 with empty body.
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let method = "GET";
+  let path = "/test";
+  let body = b"";
+
+  let method_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: method.as_ptr() as *mut _,
+    length: method.len(),
+  };
+  let path_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: path.as_ptr() as *mut _,
+    length: path.len(),
+  };
+  let body_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: body.as_ptr() as *mut _,
+    length: body.len(),
+  };
+
+  // Clear the test mock before calling.
+  TEST_ADMIN_RESPONSE.with(|cell| cell.borrow_mut().clear());
+
+  let status = unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_admin_request(
+      std::ptr::null_mut(),
+      config_ptr,
+      method_buf,
+      path_buf,
+      body_buf,
+    )
+  };
+
+  assert_eq!(status, 404);
+  TEST_ADMIN_RESPONSE.with(|cell| {
+    assert!(cell.borrow().is_empty());
+  });
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_timer_fired_identity() {
+  // Verify that the timer identity passed to on_timer_fired matches the raw pointer.
+  static FIRED_TIMER_ID: AtomicUsize = AtomicUsize::new(0);
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_timer_fired(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      timer: &dyn EnvoyBootstrapExtensionTimer,
+    ) {
+      FIRED_TIMER_ID.store(timer.id(), std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  // Use two different fake pointer values as timer identities.
+  let fake_timer_a = 0xAAAA_usize as *mut std::os::raw::c_void;
+  let fake_timer_b = 0xBBBB_usize as *mut std::os::raw::c_void;
+
+  // Fire timer A and verify the recorded id matches.
+  FIRED_TIMER_ID.store(0, std::sync::atomic::Ordering::SeqCst);
+  envoy_dynamic_module_on_bootstrap_extension_timer_fired(
+    std::ptr::null_mut(),
+    config_ptr,
+    fake_timer_a,
+  );
+  assert_eq!(
+    FIRED_TIMER_ID.load(std::sync::atomic::Ordering::SeqCst),
+    fake_timer_a as usize
+  );
+
+  // Fire timer B and verify the recorded id matches a different value.
+  FIRED_TIMER_ID.store(0, std::sync::atomic::Ordering::SeqCst);
+  envoy_dynamic_module_on_bootstrap_extension_timer_fired(
+    std::ptr::null_mut(),
+    config_ptr,
+    fake_timer_b,
+  );
+  assert_eq!(
+    FIRED_TIMER_ID.load(std::sync::atomic::Ordering::SeqCst),
+    fake_timer_b as usize
+  );
+
+  // The two timer ids must be different.
+  assert_ne!(fake_timer_a as usize, fake_timer_b as usize);
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_file_changed() {
+  // Verify that path and events are correctly passed through on_file_changed.
+  static FIRED_PATH: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+  static FIRED_EVENTS: AtomicU32 = AtomicU32::new(0);
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_file_changed(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      path: &str,
+      events: u32,
+    ) {
+      *FIRED_PATH.lock().unwrap() = path.to_string();
+      FIRED_EVENTS.store(events, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  // Fire with MovedTo event.
+  let path = "test/path_a.txt";
+  let path_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: path.as_ptr() as *mut _,
+    length: path.len(),
+  };
+  envoy_dynamic_module_on_bootstrap_extension_file_changed(
+    std::ptr::null_mut(),
+    config_ptr,
+    path_buf,
+    FILE_WATCHER_EVENT_MOVED_TO,
+  );
+  assert_eq!(FIRED_PATH.lock().unwrap().as_str(), "test/path_a.txt");
+  assert_eq!(
+    FIRED_EVENTS.load(std::sync::atomic::Ordering::SeqCst),
+    FILE_WATCHER_EVENT_MOVED_TO
+  );
+
+  // Fire with Modified event on different path.
+  let path2 = "test/path_b.txt";
+  let path_buf2 = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: path2.as_ptr() as *mut _,
+    length: path2.len(),
+  };
+  envoy_dynamic_module_on_bootstrap_extension_file_changed(
+    std::ptr::null_mut(),
+    config_ptr,
+    path_buf2,
+    FILE_WATCHER_EVENT_MODIFIED,
+  );
+  assert_eq!(FIRED_PATH.lock().unwrap().as_str(), "test/path_b.txt");
+  assert_eq!(
+    FIRED_EVENTS.load(std::sync::atomic::Ordering::SeqCst),
+    FILE_WATCHER_EVENT_MODIFIED
+  );
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+// =============================================================================
+// Cert Validator callback stubs.
+// =============================================================================
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cert_validator_set_error_details(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
+  _error_details: abi::envoy_dynamic_module_type_module_buffer,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cert_validator_set_filter_state(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _value: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cert_validator_get_filter_state(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _value_out: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+// =============================================================================
+// Cert Validator tests.
+// =============================================================================
+
+#[test]
+fn test_cert_validator_config_new_and_destroy() {
+  struct TestCertValidatorConfig;
+  impl cert_validator::CertValidatorConfig for TestCertValidatorConfig {
+    fn do_verify_cert_chain(
+      &self,
+      _envoy_cert_validator: &cert_validator::EnvoyCertValidator,
+      _certs: &[&[u8]],
+      _host_name: &str,
+      _is_server: bool,
+    ) -> cert_validator::ValidationResult {
+      cert_validator::ValidationResult::successful()
+    }
+    fn get_ssl_verify_mode(&self, _handshaker_provides_certificates: bool) -> i32 {
+      0x03
+    }
+    fn update_digest(&self) -> &[u8] {
+      b"test"
+    }
+  }
+
+  let new_config_fn: NewCertValidatorConfigFunction =
+    |_name: &str, _config: &[u8]| -> Option<Box<dyn cert_validator::CertValidatorConfig>> {
+      Some(Box::new(TestCertValidatorConfig))
+    };
+
+  let config_ptr = cert_validator::init_cert_validator_config("test", b"config", &new_config_fn);
+  assert!(!config_ptr.is_null());
+
+  unsafe {
+    envoy_dynamic_module_on_cert_validator_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_cert_validator_do_verify_cert_chain_successful() {
+  struct TestCertValidatorConfig;
+  impl cert_validator::CertValidatorConfig for TestCertValidatorConfig {
+    fn do_verify_cert_chain(
+      &self,
+      _envoy_cert_validator: &cert_validator::EnvoyCertValidator,
+      certs: &[&[u8]],
+      host_name: &str,
+      _is_server: bool,
+    ) -> cert_validator::ValidationResult {
+      assert_eq!(certs.len(), 1);
+      assert_eq!(certs[0], b"cert_data");
+      assert_eq!(host_name, "example.com");
+      cert_validator::ValidationResult::successful()
+    }
+    fn get_ssl_verify_mode(&self, _handshaker_provides_certificates: bool) -> i32 {
+      0x03
+    }
+    fn update_digest(&self) -> &[u8] {
+      b"test"
+    }
+  }
+
+  let config: Box<dyn cert_validator::CertValidatorConfig> = Box::new(TestCertValidatorConfig);
+  let config_ptr = Box::into_raw(Box::new(config)) as *const ::std::os::raw::c_void;
+
+  let cert_data = b"cert_data";
+  let mut cert_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: cert_data.as_ptr() as *const _,
+    length: cert_data.len(),
+  };
+  let host_name = "example.com";
+  let host_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: host_name.as_ptr() as *const _,
+    length: host_name.len(),
+  };
+
+  let result = unsafe {
+    envoy_dynamic_module_on_cert_validator_do_verify_cert_chain(
+      std::ptr::null_mut(),
+      config_ptr,
+      &mut cert_buf as *mut _,
+      1,
+      host_name_buf,
+      false,
+    )
+  };
+  assert_eq!(
+    result.status,
+    abi::envoy_dynamic_module_type_cert_validator_validation_status::Successful
+  );
+  assert_eq!(
+    result.detailed_status,
+    abi::envoy_dynamic_module_type_cert_validator_client_validation_status::Validated
+  );
+  assert!(!result.has_tls_alert);
+
+  unsafe {
+    envoy_dynamic_module_on_cert_validator_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_cert_validator_do_verify_cert_chain_failed() {
+  struct TestCertValidatorConfig;
+  impl cert_validator::CertValidatorConfig for TestCertValidatorConfig {
+    fn do_verify_cert_chain(
+      &self,
+      _envoy_cert_validator: &cert_validator::EnvoyCertValidator,
+      _certs: &[&[u8]],
+      _host_name: &str,
+      _is_server: bool,
+    ) -> cert_validator::ValidationResult {
+      cert_validator::ValidationResult::failed(
+        cert_validator::ClientValidationStatus::Failed,
+        Some(42),
+        Some("test error".to_string()),
+      )
+    }
+    fn get_ssl_verify_mode(&self, _handshaker_provides_certificates: bool) -> i32 {
+      0x03
+    }
+    fn update_digest(&self) -> &[u8] {
+      b"test"
+    }
+  }
+
+  let config: Box<dyn cert_validator::CertValidatorConfig> = Box::new(TestCertValidatorConfig);
+  let config_ptr = Box::into_raw(Box::new(config)) as *const ::std::os::raw::c_void;
+
+  let cert_data = b"cert_data";
+  let mut cert_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: cert_data.as_ptr() as *const _,
+    length: cert_data.len(),
+  };
+  let host_name = "example.com";
+  let host_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: host_name.as_ptr() as *const _,
+    length: host_name.len(),
+  };
+
+  let result = unsafe {
+    envoy_dynamic_module_on_cert_validator_do_verify_cert_chain(
+      std::ptr::null_mut(),
+      config_ptr,
+      &mut cert_buf as *mut _,
+      1,
+      host_name_buf,
+      false,
+    )
+  };
+  assert_eq!(
+    result.status,
+    abi::envoy_dynamic_module_type_cert_validator_validation_status::Failed
+  );
+  assert_eq!(
+    result.detailed_status,
+    abi::envoy_dynamic_module_type_cert_validator_client_validation_status::Failed
+  );
+  assert!(result.has_tls_alert);
+  assert_eq!(result.tls_alert, 42);
+
+  unsafe {
+    envoy_dynamic_module_on_cert_validator_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_cert_validator_do_verify_cert_chain_with_null_certs_and_zero_count() {
+  // TLS handshake with no client certificate: Envoy may pass `(certs=null, certs_count=0)`.
+  // The FFI entry must accept this without dereferencing the null pointer.
+  struct TestCertValidatorConfig;
+  impl cert_validator::CertValidatorConfig for TestCertValidatorConfig {
+    fn do_verify_cert_chain(
+      &self,
+      _envoy_cert_validator: &cert_validator::EnvoyCertValidator,
+      certs: &[&[u8]],
+      _host_name: &str,
+      _is_server: bool,
+    ) -> cert_validator::ValidationResult {
+      assert!(certs.is_empty());
+      cert_validator::ValidationResult::successful()
+    }
+    fn get_ssl_verify_mode(&self, _handshaker_provides_certificates: bool) -> i32 {
+      0x03
+    }
+    fn update_digest(&self) -> &[u8] {
+      b"test"
+    }
+  }
+
+  let config: Box<dyn cert_validator::CertValidatorConfig> = Box::new(TestCertValidatorConfig);
+  let config_ptr = Box::into_raw(Box::new(config)) as *const ::std::os::raw::c_void;
+
+  let host_name = "example.com";
+  let host_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: host_name.as_ptr() as *const _,
+    length: host_name.len(),
+  };
+
+  let result = unsafe {
+    envoy_dynamic_module_on_cert_validator_do_verify_cert_chain(
+      std::ptr::null_mut(),
+      config_ptr,
+      std::ptr::null_mut(),
+      0,
+      host_name_buf,
+      false,
+    )
+  };
+  assert_eq!(
+    result.status,
+    abi::envoy_dynamic_module_type_cert_validator_validation_status::Successful
+  );
+
+  unsafe {
+    envoy_dynamic_module_on_cert_validator_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_cert_validator_do_verify_cert_chain_with_null_certs_and_nonzero_count_is_safe() {
+  // Caller-side contract violation: `(certs=null, certs_count > 0)`. The FFI entry must log
+  // and treat the cert list as empty rather than dereferencing the null pointer.
+  struct TestCertValidatorConfig;
+  impl cert_validator::CertValidatorConfig for TestCertValidatorConfig {
+    fn do_verify_cert_chain(
+      &self,
+      _envoy_cert_validator: &cert_validator::EnvoyCertValidator,
+      certs: &[&[u8]],
+      _host_name: &str,
+      _is_server: bool,
+    ) -> cert_validator::ValidationResult {
+      assert!(certs.is_empty());
+      cert_validator::ValidationResult::failed(
+        cert_validator::ClientValidationStatus::Failed,
+        None,
+        None,
+      )
+    }
+    fn get_ssl_verify_mode(&self, _handshaker_provides_certificates: bool) -> i32 {
+      0x03
+    }
+    fn update_digest(&self) -> &[u8] {
+      b"test"
+    }
+  }
+
+  let config: Box<dyn cert_validator::CertValidatorConfig> = Box::new(TestCertValidatorConfig);
+  let config_ptr = Box::into_raw(Box::new(config)) as *const ::std::os::raw::c_void;
+
+  let host_name = "example.com";
+  let host_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: host_name.as_ptr() as *const _,
+    length: host_name.len(),
+  };
+
+  let result = unsafe {
+    envoy_dynamic_module_on_cert_validator_do_verify_cert_chain(
+      std::ptr::null_mut(),
+      config_ptr,
+      std::ptr::null_mut(),
+      5,
+      host_name_buf,
+      false,
+    )
+  };
+  assert_eq!(
+    result.status,
+    abi::envoy_dynamic_module_type_cert_validator_validation_status::Failed
+  );
+
+  unsafe {
+    envoy_dynamic_module_on_cert_validator_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_cert_validator_filter_state_methods() {
+  // Test that EnvoyCertValidator filter state methods call the ABI functions correctly.
+  // In unit tests, the ABI functions are weak stubs that return false, so we verify
+  // the methods handle the failure case gracefully.
+  let envoy_validator = cert_validator::EnvoyCertValidator::new(std::ptr::null_mut());
+
+  // set_filter_state should return false because the weak stub returns false.
+  let result = envoy_validator.set_filter_state(b"key", b"value");
+  assert!(!result);
+
+  // get_filter_state should return None because the weak stub returns false.
+  let result = envoy_validator.get_filter_state(b"key");
+  assert!(result.is_none());
+}
+
+#[test]
+fn test_cert_validator_get_ssl_verify_mode() {
+  struct TestCertValidatorConfig;
+  impl cert_validator::CertValidatorConfig for TestCertValidatorConfig {
+    fn do_verify_cert_chain(
+      &self,
+      _envoy_cert_validator: &cert_validator::EnvoyCertValidator,
+      _certs: &[&[u8]],
+      _host_name: &str,
+      _is_server: bool,
+    ) -> cert_validator::ValidationResult {
+      cert_validator::ValidationResult::successful()
+    }
+    fn get_ssl_verify_mode(&self, handshaker_provides_certificates: bool) -> i32 {
+      if handshaker_provides_certificates {
+        0x01
+      } else {
+        0x03
+      }
+    }
+    fn update_digest(&self) -> &[u8] {
+      b"test"
+    }
+  }
+
+  let config: Box<dyn cert_validator::CertValidatorConfig> = Box::new(TestCertValidatorConfig);
+  let config_ptr = Box::into_raw(Box::new(config)) as *const ::std::os::raw::c_void;
+
+  let result =
+    unsafe { envoy_dynamic_module_on_cert_validator_get_ssl_verify_mode(config_ptr, false) };
+  assert_eq!(result, 0x03);
+
+  let result =
+    unsafe { envoy_dynamic_module_on_cert_validator_get_ssl_verify_mode(config_ptr, true) };
+  assert_eq!(result, 0x01);
+
+  unsafe {
+    envoy_dynamic_module_on_cert_validator_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_cert_validator_update_digest() {
+  struct TestCertValidatorConfig;
+  impl cert_validator::CertValidatorConfig for TestCertValidatorConfig {
+    fn do_verify_cert_chain(
+      &self,
+      _envoy_cert_validator: &cert_validator::EnvoyCertValidator,
+      _certs: &[&[u8]],
+      _host_name: &str,
+      _is_server: bool,
+    ) -> cert_validator::ValidationResult {
+      cert_validator::ValidationResult::successful()
+    }
+    fn get_ssl_verify_mode(&self, _handshaker_provides_certificates: bool) -> i32 {
+      0x03
+    }
+    fn update_digest(&self) -> &[u8] {
+      b"my_digest_data"
+    }
+  }
+
+  let config: Box<dyn cert_validator::CertValidatorConfig> = Box::new(TestCertValidatorConfig);
+  let config_ptr = Box::into_raw(Box::new(config)) as *const ::std::os::raw::c_void;
+
+  let mut out_data = abi::envoy_dynamic_module_type_module_buffer {
+    ptr: std::ptr::null(),
+    length: 0,
+  };
+  unsafe {
+    envoy_dynamic_module_on_cert_validator_update_digest(config_ptr, &mut out_data);
+  }
+  assert!(!out_data.ptr.is_null());
+  assert_eq!(out_data.length, 14);
+  let digest = unsafe { std::slice::from_raw_parts(out_data.ptr as *const u8, out_data.length) };
+  assert_eq!(digest, b"my_digest_data");
+
+  unsafe {
+    envoy_dynamic_module_on_cert_validator_config_destroy(config_ptr);
+  }
+}
+
+// =============================================================================
+// Load Balancer Metrics Tests
+// =============================================================================
+
+#[test]
+fn test_lb_config_define_counter() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_define_counter()
+    .with(mockall::predicate::eq("test_counter"))
+    .returning(|_| Ok(EnvoyCounterId(1)));
+  let result = mock_config.define_counter("test_counter");
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyCounterId(1));
+}
+
+#[test]
+fn test_lb_config_define_gauge() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_define_gauge()
+    .with(mockall::predicate::eq("test_gauge"))
+    .returning(|_| Ok(EnvoyGaugeId(1)));
+  let result = mock_config.define_gauge("test_gauge");
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyGaugeId(1));
+}
+
+#[test]
+fn test_lb_config_define_histogram() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_define_histogram()
+    .with(mockall::predicate::eq("test_histogram"))
+    .returning(|_| Ok(EnvoyHistogramId(1)));
+  let result = mock_config.define_histogram("test_histogram");
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyHistogramId(1));
+}
+
+#[test]
+fn test_lb_config_increment_counter() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_increment_counter()
+    .with(
+      mockall::predicate::eq(EnvoyCounterId(1)),
+      mockall::predicate::eq(5u64),
+    )
+    .returning(|_, _| Ok(()));
+  let result = mock_config.increment_counter(EnvoyCounterId(1), 5);
+  assert!(result.is_ok());
+}
+
+#[test]
+fn test_lb_config_increment_counter_invalid_id() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_increment_counter()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  let result = mock_config.increment_counter(EnvoyCounterId(999), 1);
+  assert!(result.is_err());
+}
+
+#[test]
+fn test_lb_config_gauge_operations() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_set_gauge()
+    .with(
+      mockall::predicate::eq(EnvoyGaugeId(1)),
+      mockall::predicate::eq(100u64),
+    )
+    .returning(|_, _| Ok(()));
+  mock_config
+    .expect_increase_gauge()
+    .with(
+      mockall::predicate::eq(EnvoyGaugeId(1)),
+      mockall::predicate::eq(10u64),
+    )
+    .returning(|_, _| Ok(()));
+  mock_config
+    .expect_decrease_gauge()
+    .with(
+      mockall::predicate::eq(EnvoyGaugeId(1)),
+      mockall::predicate::eq(5u64),
+    )
+    .returning(|_, _| Ok(()));
+
+  assert!(mock_config.set_gauge(EnvoyGaugeId(1), 100).is_ok());
+  assert!(mock_config.increase_gauge(EnvoyGaugeId(1), 10).is_ok());
+  assert!(mock_config.decrease_gauge(EnvoyGaugeId(1), 5).is_ok());
+}
+
+#[test]
+fn test_lb_config_gauge_invalid_id() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_set_gauge()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  mock_config
+    .expect_increase_gauge()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  mock_config
+    .expect_decrease_gauge()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+
+  assert!(mock_config.set_gauge(EnvoyGaugeId(999), 1).is_err());
+  assert!(mock_config.increase_gauge(EnvoyGaugeId(999), 1).is_err());
+  assert!(mock_config.decrease_gauge(EnvoyGaugeId(999), 1).is_err());
+}
+
+#[test]
+fn test_lb_config_record_histogram_value() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_record_histogram_value()
+    .with(
+      mockall::predicate::eq(EnvoyHistogramId(1)),
+      mockall::predicate::eq(42u64),
+    )
+    .returning(|_, _| Ok(()));
+  let result = mock_config.record_histogram_value(EnvoyHistogramId(1), 42);
+  assert!(result.is_ok());
+}
+
+#[test]
+fn test_lb_config_record_histogram_value_invalid_id() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_record_histogram_value()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  let result = mock_config.record_histogram_value(EnvoyHistogramId(999), 1);
+  assert!(result.is_err());
+}
+
+#[test]
+fn test_lb_config_define_all_metric_types_and_use() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_define_counter()
+    .returning(|_| Ok(EnvoyCounterId(1)));
+  mock_config
+    .expect_define_gauge()
+    .returning(|_| Ok(EnvoyGaugeId(1)));
+  mock_config
+    .expect_define_histogram()
+    .returning(|_| Ok(EnvoyHistogramId(1)));
+  mock_config
+    .expect_increment_counter()
+    .returning(|_, _| Ok(()));
+  mock_config.expect_set_gauge().returning(|_, _| Ok(()));
+  mock_config
+    .expect_record_histogram_value()
+    .returning(|_, _| Ok(()));
+
+  let counter_id = mock_config.define_counter("my_counter").unwrap();
+  let gauge_id = mock_config.define_gauge("my_gauge").unwrap();
+  let histogram_id = mock_config.define_histogram("my_histogram").unwrap();
+
+  assert!(mock_config.increment_counter(counter_id, 1).is_ok());
+  assert!(mock_config.set_gauge(gauge_id, 42).is_ok());
+  assert!(mock_config
+    .record_histogram_value(histogram_id, 100)
+    .is_ok());
+}
+
+#[test]
+fn test_lb_config_define_counter_vec() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_define_counter_vec()
+    .returning(|_, _| Ok(EnvoyCounterVecId(1)));
+  let result = mock_config.define_counter_vec("requests_total", &["method", "status"]);
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyCounterVecId(1));
+}
+
+#[test]
+fn test_lb_config_define_gauge_vec() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_define_gauge_vec()
+    .returning(|_, _| Ok(EnvoyGaugeVecId(1)));
+  let result = mock_config.define_gauge_vec("connections", &["backend"]);
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyGaugeVecId(1));
+}
+
+#[test]
+fn test_lb_config_define_histogram_vec() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_define_histogram_vec()
+    .returning(|_, _| Ok(EnvoyHistogramVecId(1)));
+  let result = mock_config.define_histogram_vec("latency", &["endpoint", "method"]);
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyHistogramVecId(1));
+}
+
+#[test]
+fn test_lb_config_increment_counter_vec() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_increment_counter_vec()
+    .returning(|_, _, _| Ok(()));
+  let result = mock_config.increment_counter_vec(EnvoyCounterVecId(1), &["GET", "200"], 1);
+  assert!(result.is_ok());
+}
+
+#[test]
+fn test_lb_config_set_gauge_vec() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_set_gauge_vec()
+    .returning(|_, _, _| Ok(()));
+  let result = mock_config.set_gauge_vec(EnvoyGaugeVecId(1), &["backend1"], 42);
+  assert!(result.is_ok());
+}
+
+#[test]
+fn test_lb_config_increase_gauge_vec() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_increase_gauge_vec()
+    .returning(|_, _, _| Ok(()));
+  let result = mock_config.increase_gauge_vec(EnvoyGaugeVecId(1), &["backend1"], 5);
+  assert!(result.is_ok());
+}
+
+#[test]
+fn test_lb_config_decrease_gauge_vec() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_decrease_gauge_vec()
+    .returning(|_, _, _| Ok(()));
+  let result = mock_config.decrease_gauge_vec(EnvoyGaugeVecId(1), &["backend1"], 3);
+  assert!(result.is_ok());
+}
+
+#[test]
+fn test_lb_config_record_histogram_value_vec() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_record_histogram_value_vec()
+    .returning(|_, _, _| Ok(()));
+  let result =
+    mock_config.record_histogram_value_vec(EnvoyHistogramVecId(1), &["endpoint1", "GET"], 150);
+  assert!(result.is_ok());
+}
+
+#[test]
+fn test_lb_config_vec_metric_invalid_id() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_increment_counter_vec()
+    .returning(|_, _, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  mock_config
+    .expect_set_gauge_vec()
+    .returning(|_, _, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  mock_config
+    .expect_record_histogram_value_vec()
+    .returning(|_, _, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+
+  assert!(mock_config
+    .increment_counter_vec(EnvoyCounterVecId(999), &["v1"], 1)
+    .is_err());
+  assert!(mock_config
+    .set_gauge_vec(EnvoyGaugeVecId(999), &["v1"], 1)
+    .is_err());
+  assert!(mock_config
+    .record_histogram_value_vec(EnvoyHistogramVecId(999), &["v1"], 1)
+    .is_err());
+}
+
+// =============================================================================
+// Load Balancer accessor tests
+// =============================================================================
+
+#[test]
+fn test_lb_get_cluster_name() {
+  let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
+  mock_lb
+    .expect_get_cluster_name()
+    .returning(|| Some(EnvoyBuffer::new(b"my_cluster")));
+  assert_eq!(
+    mock_lb.get_cluster_name().unwrap().as_slice(),
+    b"my_cluster"
+  );
+}
+
+#[test]
+fn test_lb_get_cluster_name_none() {
+  let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
+  mock_lb.expect_get_cluster_name().returning(|| None);
+  assert!(mock_lb.get_cluster_name().is_none());
+}
+
+#[test]
+fn test_lb_get_healthy_host_address() {
+  let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
+  mock_lb
+    .expect_get_healthy_host_address()
+    .withf(|priority, index| *priority == 0 && *index == 1)
+    .returning(|_, _| Some(EnvoyBuffer::new(b"10.0.0.1:8080")));
+  assert_eq!(
+    mock_lb.get_healthy_host_address(0, 1).unwrap().as_slice(),
+    b"10.0.0.1:8080"
+  );
+}
+
+#[test]
+fn test_lb_get_host_address() {
+  let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
+  mock_lb
+    .expect_get_host_address()
+    .returning(|_, _| Some(EnvoyBuffer::new(b"192.168.0.1:443")));
+  assert_eq!(
+    mock_lb.get_host_address(0, 0).unwrap().as_slice(),
+    b"192.168.0.1:443"
+  );
+}
+
+#[test]
+fn test_lb_get_host_address_none() {
+  let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
+  mock_lb.expect_get_host_address().returning(|_, _| None);
+  assert!(mock_lb.get_host_address(0, 0).is_none());
+}
+
+#[test]
+fn test_lb_get_host_locality() {
+  let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
+  mock_lb.expect_get_host_locality().returning(|_, _| {
+    Some((
+      EnvoyBuffer::new(b"us-east-1"),
+      EnvoyBuffer::new(b"us-east-1a"),
+      EnvoyBuffer::new(b"sub-1"),
+    ))
+  });
+  let (region, zone, sub_zone) = mock_lb.get_host_locality(0, 0).unwrap();
+  assert_eq!(region.as_slice(), b"us-east-1");
+  assert_eq!(zone.as_slice(), b"us-east-1a");
+  assert_eq!(sub_zone.as_slice(), b"sub-1");
+}
+
+#[test]
+fn test_lb_context_get_downstream_headers() {
+  let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
+  mock_lb
+    .expect_context_get_downstream_headers()
+    .returning(|| vec![(EnvoyBuffer::new(b"host"), EnvoyBuffer::new(b"example.com"))]);
+  let headers = mock_lb.context_get_downstream_headers();
+  assert_eq!(headers.len(), 1);
+  assert_eq!(headers[0].0.as_slice(), b"host");
+  assert_eq!(headers[0].1.as_slice(), b"example.com");
+}
+
+#[test]
+fn test_lb_context_get_downstream_header() {
+  let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
+  mock_lb
+    .expect_context_get_downstream_header()
+    .withf(|key, index| key == "host" && *index == 0)
+    .returning(|_, _| Some((EnvoyBuffer::new(b"example.com"), 1)));
+  let result = mock_lb.context_get_downstream_header("host", 0).unwrap();
+  assert_eq!(result.0.as_slice(), b"example.com");
+  assert_eq!(result.1, 1);
+}
+
+#[test]
+fn test_lb_context_get_override_host() {
+  let mut mock_lb = load_balancer::MockEnvoyLoadBalancer::new();
+  mock_lb
+    .expect_context_get_override_host()
+    .returning(|| Some((EnvoyBuffer::new(b"10.0.0.2:9090"), false)));
+  let result = mock_lb.context_get_override_host().unwrap();
+  assert_eq!(result.0.as_slice(), b"10.0.0.2:9090");
+  assert!(!result.1);
+}
+
+// =============================================================================
+// CatchUnwind Tests
+// =============================================================================
+
+static SEND_RESPONSE_STATUS_CODE: AtomicU32 = AtomicU32::new(0);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_send_response(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  status_code: u32,
+  _headers_vector: *mut abi::envoy_dynamic_module_type_module_http_header,
+  _headers_vector_size: usize,
+  _body: abi::envoy_dynamic_module_type_module_buffer,
+  _details: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  SEND_RESPONSE_STATUS_CODE.store(status_code, std::sync::atomic::Ordering::SeqCst);
+}
+
+static RESET_STREAM_CALLED: AtomicBool = AtomicBool::new(false);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_filter_reset_stream(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _reason: abi::envoy_dynamic_module_type_http_filter_stream_reset_reason,
+  _details: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  RESET_STREAM_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+static NETWORK_CLOSE_CALLED: AtomicBool = AtomicBool::new(false);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_close(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  _close_type: abi::envoy_dynamic_module_type_network_connection_close_type,
+) {
+  NETWORK_CLOSE_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+static LISTENER_CLOSE_SOCKET_CALLED: AtomicBool = AtomicBool::new(false);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_close_socket(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+  _details: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  LISTENER_CLOSE_SOCKET_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[test]
+fn test_catch_unwind_http_filter_panic() {
+  struct PanicFilter;
+  impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PanicFilter {
+    fn on_request_headers(
+      &mut self,
+      _envoy_filter: &mut EHF,
+      _end_of_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+      panic!("intentional panic in on_request_headers");
+    }
+  }
+
+  SEND_RESPONSE_STATUS_CODE.store(0, std::sync::atomic::Ordering::SeqCst);
+
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = HttpFilter::on_request_headers(&mut wrapper, &mut envoy_filter, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration,
+  );
+  assert_eq!(
+    SEND_RESPONSE_STATUS_CODE.load(std::sync::atomic::Ordering::SeqCst),
+    500,
+  );
+}
+
+#[test]
+fn test_catch_unwind_network_filter_panic() {
+  struct PanicFilter;
+  impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for PanicFilter {
+    fn on_read(
+      &mut self,
+      _envoy_filter: &mut ENF,
+      _data_length: usize,
+      _end_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+      panic!("intentional panic in on_read");
+    }
+  }
+
+  NETWORK_CLOSE_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+
+  let mut envoy_filter = network::EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = NetworkFilter::on_read(&mut wrapper, &mut envoy_filter, 0, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::StopIteration,
+  );
+  assert!(NETWORK_CLOSE_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_catch_unwind_listener_filter_panic() {
+  struct PanicFilter;
+  impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for PanicFilter {
+    fn on_accept(
+      &mut self,
+      _envoy_filter: &mut ELF,
+    ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+      panic!("intentional panic in on_accept");
+    }
+  }
+
+  LISTENER_CLOSE_SOCKET_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+
+  let mut envoy_filter = listener::EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = ListenerFilter::on_accept(&mut wrapper, &mut envoy_filter);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_listener_filter_status::StopIteration,
+  );
+  assert!(LISTENER_CLOSE_SOCKET_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_catch_unwind_http_response_headers_panic() {
+  struct PanicFilter;
+  impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PanicFilter {
+    fn on_response_headers(
+      &mut self,
+      _envoy_filter: &mut EHF,
+      _end_of_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+      panic!("intentional panic in on_response_headers");
+    }
+  }
+
+  RESET_STREAM_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = HttpFilter::on_response_headers(&mut wrapper, &mut envoy_filter, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration,
+  );
+  assert!(RESET_STREAM_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_catch_unwind_network_on_write_panic() {
+  struct PanicFilter;
+  impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for PanicFilter {
+    fn on_write(
+      &mut self,
+      _envoy_filter: &mut ENF,
+      _data_length: usize,
+      _end_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+      panic!("intentional panic in on_write");
+    }
+  }
+
+  NETWORK_CLOSE_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+
+  let mut envoy_filter = network::EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = NetworkFilter::on_write(&mut wrapper, &mut envoy_filter, 0, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::StopIteration,
+  );
+  assert!(NETWORK_CLOSE_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_catch_unwind_listener_on_data_panic() {
+  struct PanicFilter;
+  impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for PanicFilter {
+    fn on_data(
+      &mut self,
+      _envoy_filter: &mut ELF,
+      _data_length: usize,
+    ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+      panic!("intentional panic in on_data");
+    }
+  }
+
+  LISTENER_CLOSE_SOCKET_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+
+  let mut envoy_filter = listener::EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = ListenerFilter::on_data(&mut wrapper, &mut envoy_filter, 256);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_listener_filter_status::StopIteration,
+  );
+  assert!(LISTENER_CLOSE_SOCKET_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_catch_unwind_http_callout_done_after_poison_is_skipped() {
+  struct PanicFilter;
+  impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PanicFilter {
+    fn on_request_headers(
+      &mut self,
+      _envoy_filter: &mut EHF,
+      _end_of_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+      panic!("intentional panic in on_request_headers");
+    }
+  }
+
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = HttpFilter::on_request_headers(&mut wrapper, &mut envoy_filter, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration,
+  );
+
+  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+    HttpFilter::on_http_callout_done(
+      &mut wrapper,
+      &mut envoy_filter,
+      1,
+      abi::envoy_dynamic_module_type_http_callout_result::Success,
+      None,
+      None,
+    );
+  }));
+  assert!(
+    result.is_ok(),
+    "late on_http_callout_done should be skipped after CatchUnwind is poisoned",
+  );
+}
+
+#[test]
+fn test_catch_unwind_http_scheduled_after_poison_is_skipped() {
+  struct PanicFilter;
+  impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PanicFilter {
+    fn on_request_headers(
+      &mut self,
+      _envoy_filter: &mut EHF,
+      _end_of_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+      panic!("intentional panic in on_request_headers");
+    }
+  }
+
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = HttpFilter::on_request_headers(&mut wrapper, &mut envoy_filter, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration,
+  );
+
+  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+    HttpFilter::on_scheduled(&mut wrapper, &mut envoy_filter, 1);
+  }));
+  assert!(
+    result.is_ok(),
+    "late on_scheduled should be skipped after CatchUnwind is poisoned",
+  );
+}
+
+// =============================================================================
+// Cluster Extension FFI stubs for testing.
+// =============================================================================
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_add_hosts(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  _priority: u32,
+  _addresses: *const abi::envoy_dynamic_module_type_module_buffer,
+  _weights: *const u32,
+  _regions: *const abi::envoy_dynamic_module_type_module_buffer,
+  _zones: *const abi::envoy_dynamic_module_type_module_buffer,
+  _sub_zones: *const abi::envoy_dynamic_module_type_module_buffer,
+  _metadata_pairs: *const abi::envoy_dynamic_module_type_module_buffer,
+  _metadata_pairs_per_host: usize,
+  _count: usize,
+  _result_host_ptrs: *mut abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_remove_hosts(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  _host_envoy_ptrs: *const abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+  _count: usize,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_pre_init_complete(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_update_host_health(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  _host_envoy_ptr: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+  _health_status: abi::envoy_dynamic_module_type_host_health,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_find_host_by_address(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  _address: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_find_host_by_address(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _address: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _index: usize,
+  _is_added: bool,
+  _result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _host: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+  _details: *const std::ffi::c_char,
+  _details_length: usize,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_cluster_name(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_hosts_count(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_degraded_hosts_count(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_priority_set_size(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_host_address(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_host_weight(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+) -> u32 {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_health(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+) -> abi::envoy_dynamic_module_type_host_health {
+  abi::envoy_dynamic_module_type_host_health::Unhealthy
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_health_by_address(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _address: abi::envoy_dynamic_module_type_module_buffer,
+  _result: *mut abi::envoy_dynamic_module_type_host_health,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_address(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_weight(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+) -> u32 {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _stat: abi::envoy_dynamic_module_type_host_stat,
+) -> u64 {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_locality(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _region: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+  _zone: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+  _sub_zone: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_set_host_data(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _data: usize,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_data(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _data: *mut usize,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_metadata_string(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _filter_name: abi::envoy_dynamic_module_type_module_buffer,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_metadata_number(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _filter_name: abi::envoy_dynamic_module_type_module_buffer,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _result: *mut f64,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_metadata_bool(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _filter_name: abi::envoy_dynamic_module_type_module_buffer,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _result: *mut bool,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_locality_count(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_locality_host_count(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _locality_index: usize,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_locality_host_address(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _locality_index: usize,
+  _host_index: usize,
+  _result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_locality_weight(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _locality_index: usize,
+) -> u32 {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_scheduler_new(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_cluster_scheduler_module_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_scheduler_delete(
+  _scheduler_module_ptr: abi::envoy_dynamic_module_type_cluster_scheduler_module_ptr,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_scheduler_commit(
+  _scheduler_module_ptr: abi::envoy_dynamic_module_type_cluster_scheduler_module_ptr,
+  _event_id: u64,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_run_on_all_workers(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  _event_id: u64,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_worker_slot_set(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  _data_module_ptr: abi::envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_worker_slot_get(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr {
+  std::ptr::null_mut()
+}
+
+// Cluster config metrics FFI stubs for testing.
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_define_counter(
+  _cluster_config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_names_length: usize,
+  _counter_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_increment_counter(
+  _cluster_config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_define_gauge(
+  _cluster_config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_names_length: usize,
+  _gauge_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_set_gauge(
+  _cluster_config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_increment_gauge(
+  _cluster_config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_decrement_gauge(
+  _cluster_config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_define_histogram(
+  _cluster_config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_names_length: usize,
+  _histogram_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_record_histogram_value(
+  _cluster_config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_compute_hash_key(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _hash_out: *mut u64,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_size(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _result_headers: *mut abi::envoy_dynamic_module_type_envoy_http_header,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_downstream_header(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _result_buffer: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+  _index: usize,
+  _optional_size: *mut usize,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_host_selection_retry_count(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+) -> u32 {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_should_select_another_host(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_override_host(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _address: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+  _strict: *mut bool,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _result_buffer: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _host_envoy_ptr: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+  _stat: abi::envoy_dynamic_module_type_host_stat,
+) -> u64 {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_http_callout(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  _callout_id_out: *mut u64,
+  _cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+  _headers: *mut abi::envoy_dynamic_module_type_module_http_header,
+  _headers_size: usize,
+  _body: abi::envoy_dynamic_module_type_module_buffer,
+  _timeout_milliseconds: u64,
+) -> abi::envoy_dynamic_module_type_http_callout_init_result {
+  abi::envoy_dynamic_module_type_http_callout_init_result::CannotCreateRequest
+}
+
+// =============================================================================
+// Cluster Extension Rust SDK tests.
+// =============================================================================
+
+#[test]
+fn test_cluster_scheduler_mock() {
+  let mut mock_scheduler = cluster::MockEnvoyClusterScheduler::new();
+  mock_scheduler
+    .expect_commit()
+    .with(mockall::predicate::eq(42u64))
+    .times(1)
+    .return_const(());
+  mock_scheduler.commit(42);
+}
+
+#[test]
+fn test_cluster_mock_envoy_cluster_new_scheduler() {
+  let mut mock_cluster = cluster::MockEnvoyCluster::new();
+  mock_cluster.expect_new_scheduler().times(1).returning(|| {
+    let mut mock_scheduler = cluster::MockEnvoyClusterScheduler::new();
+    mock_scheduler.expect_commit().return_const(());
+    Box::new(mock_scheduler)
+  });
+  let scheduler = mock_cluster.new_scheduler();
+  scheduler.commit(100);
+}
+
+// =============================================================================
+// Cluster Metrics Tests
+// =============================================================================
+
+#[test]
+fn test_cluster_metrics_define_counter() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_define_counter()
+    .with(mockall::predicate::eq("test_counter"))
+    .returning(|_| Ok(EnvoyCounterId(1)));
+  let result = mock.define_counter("test_counter");
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyCounterId(1));
+}
+
+#[test]
+fn test_cluster_metrics_define_gauge() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_define_gauge()
+    .with(mockall::predicate::eq("test_gauge"))
+    .returning(|_| Ok(EnvoyGaugeId(1)));
+  let result = mock.define_gauge("test_gauge");
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyGaugeId(1));
+}
+
+#[test]
+fn test_cluster_metrics_define_histogram() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_define_histogram()
+    .with(mockall::predicate::eq("test_histogram"))
+    .returning(|_| Ok(EnvoyHistogramId(1)));
+  let result = mock.define_histogram("test_histogram");
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyHistogramId(1));
+}
+
+#[test]
+fn test_cluster_metrics_increment_counter() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_increment_counter()
+    .with(
+      mockall::predicate::eq(EnvoyCounterId(1)),
+      mockall::predicate::eq(5u64),
+    )
+    .returning(|_, _| Ok(()));
+  assert!(mock.increment_counter(EnvoyCounterId(1), 5).is_ok());
+}
+
+#[test]
+fn test_cluster_metrics_increment_counter_invalid_id() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_increment_counter()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  assert!(mock.increment_counter(EnvoyCounterId(999), 1).is_err());
+}
+
+#[test]
+fn test_cluster_metrics_gauge_operations() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_set_gauge()
+    .with(
+      mockall::predicate::eq(EnvoyGaugeId(1)),
+      mockall::predicate::eq(42u64),
+    )
+    .returning(|_, _| Ok(()));
+  mock
+    .expect_increase_gauge()
+    .with(
+      mockall::predicate::eq(EnvoyGaugeId(1)),
+      mockall::predicate::eq(10u64),
+    )
+    .returning(|_, _| Ok(()));
+  mock
+    .expect_decrease_gauge()
+    .with(
+      mockall::predicate::eq(EnvoyGaugeId(1)),
+      mockall::predicate::eq(5u64),
+    )
+    .returning(|_, _| Ok(()));
+  assert!(mock.set_gauge(EnvoyGaugeId(1), 42).is_ok());
+  assert!(mock.increase_gauge(EnvoyGaugeId(1), 10).is_ok());
+  assert!(mock.decrease_gauge(EnvoyGaugeId(1), 5).is_ok());
+}
+
+#[test]
+fn test_cluster_metrics_gauge_invalid_id() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_set_gauge()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  mock
+    .expect_increase_gauge()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  mock
+    .expect_decrease_gauge()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  assert!(mock.set_gauge(EnvoyGaugeId(999), 1).is_err());
+  assert!(mock.increase_gauge(EnvoyGaugeId(999), 1).is_err());
+  assert!(mock.decrease_gauge(EnvoyGaugeId(999), 1).is_err());
+}
+
+#[test]
+fn test_cluster_metrics_record_histogram_value() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_record_histogram_value()
+    .with(
+      mockall::predicate::eq(EnvoyHistogramId(1)),
+      mockall::predicate::eq(42u64),
+    )
+    .returning(|_, _| Ok(()));
+  assert!(mock.record_histogram_value(EnvoyHistogramId(1), 42).is_ok());
+}
+
+#[test]
+fn test_cluster_metrics_record_histogram_value_invalid_id() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_record_histogram_value()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  assert!(mock
+    .record_histogram_value(EnvoyHistogramId(999), 1)
+    .is_err());
+}
+
+#[test]
+fn test_cluster_metrics_define_all_metric_types_and_use() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_define_counter()
+    .returning(|_| Ok(EnvoyCounterId(1)));
+  mock
+    .expect_define_gauge()
+    .returning(|_| Ok(EnvoyGaugeId(1)));
+  mock
+    .expect_define_histogram()
+    .returning(|_| Ok(EnvoyHistogramId(1)));
+  mock.expect_increment_counter().returning(|_, _| Ok(()));
+  mock.expect_set_gauge().returning(|_, _| Ok(()));
+  mock
+    .expect_record_histogram_value()
+    .returning(|_, _| Ok(()));
+
+  let counter_id = mock.define_counter("c").unwrap();
+  let gauge_id = mock.define_gauge("g").unwrap();
+  let histogram_id = mock.define_histogram("h").unwrap();
+  assert!(mock.increment_counter(counter_id, 1).is_ok());
+  assert!(mock.set_gauge(gauge_id, 100).is_ok());
+  assert!(mock.record_histogram_value(histogram_id, 50).is_ok());
+}
+
+#[test]
+fn test_cluster_metrics_define_counter_vec() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_define_counter_vec()
+    .returning(|_, _| Ok(EnvoyCounterVecId(1)));
+  let result = mock.define_counter_vec("test_counter", &["region", "zone"]);
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyCounterVecId(1));
+}
+
+#[test]
+fn test_cluster_metrics_define_gauge_vec() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_define_gauge_vec()
+    .returning(|_, _| Ok(EnvoyGaugeVecId(1)));
+  let result = mock.define_gauge_vec("test_gauge", &["env"]);
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyGaugeVecId(1));
+}
+
+#[test]
+fn test_cluster_metrics_define_histogram_vec() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_define_histogram_vec()
+    .returning(|_, _| Ok(EnvoyHistogramVecId(1)));
+  let result = mock.define_histogram_vec("test_histogram", &["method"]);
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyHistogramVecId(1));
+}
+
+#[test]
+fn test_cluster_metrics_increment_counter_vec() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_increment_counter_vec()
+    .returning(|_, _, _| Ok(()));
+  assert!(mock
+    .increment_counter_vec(EnvoyCounterVecId(1), &["us-east-1"], 1)
+    .is_ok());
+}
+
+#[test]
+fn test_cluster_metrics_set_gauge_vec() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock.expect_set_gauge_vec().returning(|_, _, _| Ok(()));
+  assert!(mock
+    .set_gauge_vec(EnvoyGaugeVecId(1), &["prod"], 42)
+    .is_ok());
+}
+
+#[test]
+fn test_cluster_metrics_increase_gauge_vec() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock.expect_increase_gauge_vec().returning(|_, _, _| Ok(()));
+  assert!(mock
+    .increase_gauge_vec(EnvoyGaugeVecId(1), &["prod"], 10)
+    .is_ok());
+}
+
+#[test]
+fn test_cluster_metrics_decrease_gauge_vec() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock.expect_decrease_gauge_vec().returning(|_, _, _| Ok(()));
+  assert!(mock
+    .decrease_gauge_vec(EnvoyGaugeVecId(1), &["prod"], 5)
+    .is_ok());
+}
+
+#[test]
+fn test_cluster_metrics_record_histogram_value_vec() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_record_histogram_value_vec()
+    .returning(|_, _, _| Ok(()));
+  assert!(mock
+    .record_histogram_value_vec(EnvoyHistogramVecId(1), &["GET"], 100)
+    .is_ok());
+}
+
+#[test]
+fn test_cluster_metrics_vec_metric_invalid_id() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_increment_counter_vec()
+    .returning(|_, _, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  mock
+    .expect_set_gauge_vec()
+    .returning(|_, _, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  mock
+    .expect_record_histogram_value_vec()
+    .returning(|_, _, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  assert!(mock
+    .increment_counter_vec(EnvoyCounterVecId(999), &["v1"], 1)
+    .is_err());
+  assert!(mock
+    .set_gauge_vec(EnvoyGaugeVecId(999), &["v1"], 1)
+    .is_err());
+  assert!(mock
+    .record_histogram_value_vec(EnvoyHistogramVecId(999), &["v1"], 1)
+    .is_err());
+}
+
+// =================================================================================================
+// ClusterLbContext tests
+// =================================================================================================
+
+#[test]
+fn test_cluster_lb_context_compute_hash_key() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx.expect_compute_hash_key().returning(|| Some(42));
+  assert_eq!(mock_ctx.compute_hash_key(), Some(42));
+}
+
+#[test]
+fn test_cluster_lb_context_compute_hash_key_none() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx.expect_compute_hash_key().returning(|| None);
+  assert_eq!(mock_ctx.compute_hash_key(), None);
+}
+
+#[test]
+fn test_cluster_lb_context_get_downstream_headers_size() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx
+    .expect_get_downstream_headers_size()
+    .returning(|| 3);
+  assert_eq!(mock_ctx.get_downstream_headers_size(), 3);
+}
+
+#[test]
+fn test_cluster_lb_context_get_downstream_headers() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx.expect_get_downstream_headers().returning(|| {
+    vec![
+      (EnvoyBuffer::new(b":method"), EnvoyBuffer::new(b"GET")),
+      (EnvoyBuffer::new(b"host"), EnvoyBuffer::new(b"example.com")),
+    ]
+  });
+  let headers = mock_ctx.get_downstream_headers();
+  assert_eq!(headers.len(), 2);
+  assert_eq!(headers[0].0.as_slice(), b":method");
+  assert_eq!(headers[0].1.as_slice(), b"GET");
+  assert_eq!(headers[1].0.as_slice(), b"host");
+  assert_eq!(headers[1].1.as_slice(), b"example.com");
+}
+
+#[test]
+fn test_cluster_lb_context_get_downstream_headers_empty() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx.expect_get_downstream_headers().returning(Vec::new);
+  assert!(mock_ctx.get_downstream_headers().is_empty());
+}
+
+#[test]
+fn test_cluster_lb_context_get_downstream_header() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx
+    .expect_get_downstream_header()
+    .withf(|key, index| key == "host" && *index == 0)
+    .returning(|_, _| Some((EnvoyBuffer::new(b"example.com"), 1)));
+  let result = mock_ctx.get_downstream_header("host", 0).unwrap();
+  assert_eq!(result.0.as_slice(), b"example.com");
+  assert_eq!(result.1, 1);
+}
+
+#[test]
+fn test_cluster_lb_context_get_downstream_header_not_found() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx
+    .expect_get_downstream_header()
+    .returning(|_, _| None);
+  assert!(mock_ctx.get_downstream_header("missing", 0).is_none());
+}
+
+#[test]
+fn test_cluster_lb_context_get_host_selection_retry_count() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx
+    .expect_get_host_selection_retry_count()
+    .returning(|| 5);
+  assert_eq!(mock_ctx.get_host_selection_retry_count(), 5);
+}
+
+#[test]
+fn test_cluster_lb_context_should_select_another_host() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx
+    .expect_should_select_another_host()
+    .withf(|priority, index| *priority == 0 && *index == 1)
+    .returning(|_, _| true);
+  assert!(mock_ctx.should_select_another_host(0, 1));
+}
+
+#[test]
+fn test_cluster_lb_context_should_select_another_host_false() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx
+    .expect_should_select_another_host()
+    .returning(|_, _| false);
+  assert!(!mock_ctx.should_select_another_host(0, 0));
+}
+
+#[test]
+fn test_cluster_lb_context_get_override_host() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx
+    .expect_get_override_host()
+    .returning(|| Some((EnvoyBuffer::new(b"10.0.0.1:8080"), true)));
+  let result = mock_ctx.get_override_host().unwrap();
+  assert_eq!(result.0.as_slice(), b"10.0.0.1:8080");
+  assert!(result.1);
+}
+
+#[test]
+fn test_cluster_lb_context_get_override_host_non_strict() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx
+    .expect_get_override_host()
+    .returning(|| Some((EnvoyBuffer::new(b"10.0.0.2:9090"), false)));
+  let result = mock_ctx.get_override_host().unwrap();
+  assert_eq!(result.0.as_slice(), b"10.0.0.2:9090");
+  assert!(!result.1);
+}
+
+#[test]
+fn test_cluster_lb_context_get_override_host_none() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx.expect_get_override_host().returning(|| None);
+  assert!(mock_ctx.get_override_host().is_none());
+}
+
+#[test]
+fn test_cluster_lb_context_get_downstream_connection_sni() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx
+    .expect_get_downstream_connection_sni()
+    .returning(|| Some(EnvoyBuffer::new(b"example.com")));
+  assert_eq!(
+    mock_ctx.get_downstream_connection_sni().unwrap().as_slice(),
+    b"example.com"
+  );
+}
+
+#[test]
+fn test_cluster_lb_context_get_downstream_connection_sni_none() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx
+    .expect_get_downstream_connection_sni()
+    .returning(|| None);
+  assert!(mock_ctx.get_downstream_connection_sni().is_none());
+}
+
+#[test]
+fn test_cluster_lb_context_get_host_stat() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  let host_ptr = 0xDEADBEEF as abi::envoy_dynamic_module_type_cluster_host_envoy_ptr;
+  // Captured as usize because `*mut c_void` is !Send and `withf` requires a Send closure.
+  let host_ptr_addr = host_ptr as usize;
+  mock_ctx
+    .expect_get_host_stat()
+    .withf(move |h, s| {
+      *h as usize == host_ptr_addr && *s == abi::envoy_dynamic_module_type_host_stat::RqActive
+    })
+    .returning(|_, _| 42);
+  assert_eq!(
+    mock_ctx.get_host_stat(host_ptr, abi::envoy_dynamic_module_type_host_stat::RqActive),
+    42
+  );
+}
+
+#[test]
+fn test_cluster_lb_context_get_host_stat_null_host() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx.expect_get_host_stat().returning(|_, _| 0);
+  assert_eq!(
+    mock_ctx.get_host_stat(
+      std::ptr::null_mut(),
+      abi::envoy_dynamic_module_type_host_stat::RqActive,
+    ),
+    0
+  );
+}
+
+#[test]
+fn test_cluster_lb_get_cluster_name() {
+  let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
+  mock_lb
+    .expect_get_cluster_name()
+    .returning(|| Some(EnvoyBuffer::new(b"my_cluster")));
+  assert_eq!(
+    mock_lb.get_cluster_name().unwrap().as_slice(),
+    b"my_cluster"
+  );
+}
+
+#[test]
+fn test_cluster_lb_get_cluster_name_none() {
+  let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
+  mock_lb.expect_get_cluster_name().returning(|| None);
+  assert!(mock_lb.get_cluster_name().is_none());
+}
+
+#[test]
+fn test_cluster_lb_get_healthy_host_address() {
+  let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
+  mock_lb
+    .expect_get_healthy_host_address()
+    .withf(|priority, index| *priority == 0 && *index == 1)
+    .returning(|_, _| Some(EnvoyBuffer::new(b"10.0.0.1:8080")));
+  assert_eq!(
+    mock_lb.get_healthy_host_address(0, 1).unwrap().as_slice(),
+    b"10.0.0.1:8080"
+  );
+}
+
+#[test]
+fn test_cluster_lb_get_host_address() {
+  let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
+  mock_lb
+    .expect_get_host_address()
+    .returning(|_, _| Some(EnvoyBuffer::new(b"192.168.0.1:443")));
+  assert_eq!(
+    mock_lb.get_host_address(0, 0).unwrap().as_slice(),
+    b"192.168.0.1:443"
+  );
+}
+
+#[test]
+fn test_cluster_lb_get_host_address_none() {
+  let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
+  mock_lb.expect_get_host_address().returning(|_, _| None);
+  assert!(mock_lb.get_host_address(0, 0).is_none());
+}
+
+#[test]
+fn test_cluster_lb_get_host_locality() {
+  let mut mock_lb = cluster::MockEnvoyClusterLoadBalancer::new();
+  mock_lb.expect_get_host_locality().returning(|_, _| {
+    Some((
+      EnvoyBuffer::new(b"us-east-1"),
+      EnvoyBuffer::new(b"us-east-1a"),
+      EnvoyBuffer::new(b"sub-1"),
+    ))
+  });
+  let (region, zone, sub_zone) = mock_lb.get_host_locality(0, 0).unwrap();
+  assert_eq!(region.as_slice(), b"us-east-1");
+  assert_eq!(zone.as_slice(), b"us-east-1a");
+  assert_eq!(sub_zone.as_slice(), b"sub-1");
+}
+
+#[test]
+fn test_cluster_lb_choose_host_with_context() {
+  struct TestClusterLb;
+  impl cluster::ClusterLb for TestClusterLb {
+    fn choose_host(
+      &mut self,
+      context: Option<&dyn cluster::ClusterLbContext>,
+      _async_completion: Box<dyn cluster::EnvoyAsyncHostSelectionComplete>,
+    ) -> cluster::HostSelectionResult {
+      let ctx = context.expect("context should be Some");
+      assert_eq!(ctx.get_host_selection_retry_count(), 3);
+      assert_eq!(ctx.compute_hash_key(), Some(12345));
+      cluster::HostSelectionResult::Selected(0x1234 as *mut _)
+    }
+  }
+
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx
+    .expect_get_host_selection_retry_count()
+    .returning(|| 3);
+  mock_ctx.expect_compute_hash_key().returning(|| Some(12345));
+
+  let mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+
+  let mut lb = TestClusterLb;
+  let result = lb.choose_host(Some(&mock_ctx), Box::new(mock_completion));
+  match result {
+    cluster::HostSelectionResult::Selected(host) => assert_eq!(host, 0x1234 as *mut _),
+    _ => panic!("Expected Selected"),
+  }
+}
+
+#[test]
+fn test_cluster_lb_choose_host_without_context() {
+  struct TestClusterLb;
+  impl cluster::ClusterLb for TestClusterLb {
+    fn choose_host(
+      &mut self,
+      context: Option<&dyn cluster::ClusterLbContext>,
+      _async_completion: Box<dyn cluster::EnvoyAsyncHostSelectionComplete>,
+    ) -> cluster::HostSelectionResult {
+      assert!(context.is_none());
+      cluster::HostSelectionResult::NoHost
+    }
+  }
+
+  let mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+  let mut lb = TestClusterLb;
+  let result = lb.choose_host(None, Box::new(mock_completion));
+  match result {
+    cluster::HostSelectionResult::NoHost => {},
+    _ => panic!("Expected NoHost"),
+  }
+}
+
+#[test]
+fn test_cluster_lb_choose_host_async_pending() {
+  struct TestAsyncHandle {
+    cancelled: std::sync::Arc<std::sync::atomic::AtomicBool>,
+  }
+  impl cluster::AsyncHostSelectionHandle for TestAsyncHandle {
+    fn cancel(&mut self) {
+      self
+        .cancelled
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  struct TestAsyncLb {
+    cancelled: std::sync::Arc<std::sync::atomic::AtomicBool>,
+  }
+  impl cluster::ClusterLb for TestAsyncLb {
+    fn choose_host(
+      &mut self,
+      _context: Option<&dyn cluster::ClusterLbContext>,
+      _async_completion: Box<dyn cluster::EnvoyAsyncHostSelectionComplete>,
+    ) -> cluster::HostSelectionResult {
+      cluster::HostSelectionResult::AsyncPending(Box::new(TestAsyncHandle {
+        cancelled: self.cancelled.clone(),
+      }))
+    }
+  }
+
+  let cancelled = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+  let mut lb = TestAsyncLb {
+    cancelled: cancelled.clone(),
+  };
+  let mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+  let result = lb.choose_host(None, Box::new(mock_completion));
+  match result {
+    cluster::HostSelectionResult::AsyncPending(mut handle) => {
+      assert!(!cancelled.load(std::sync::atomic::Ordering::SeqCst));
+      handle.cancel();
+      assert!(cancelled.load(std::sync::atomic::Ordering::SeqCst));
+    },
+    _ => panic!("Expected AsyncPending"),
+  }
+}
+
+#[test]
+fn test_cluster_lb_context_full_workflow() {
+  struct SniBasedLb;
+  impl cluster::ClusterLb for SniBasedLb {
+    fn choose_host(
+      &mut self,
+      context: Option<&dyn cluster::ClusterLbContext>,
+      _async_completion: Box<dyn cluster::EnvoyAsyncHostSelectionComplete>,
+    ) -> cluster::HostSelectionResult {
+      let ctx = match context {
+        Some(c) => c,
+        None => return cluster::HostSelectionResult::NoHost,
+      };
+
+      let sni = match ctx.get_downstream_connection_sni() {
+        Some(s) => s,
+        None => return cluster::HostSelectionResult::NoHost,
+      };
+      assert_eq!(sni.as_slice(), b"backend.example.com");
+
+      let (host_header, _) = match ctx.get_downstream_header("host", 0) {
+        Some(h) => h,
+        None => return cluster::HostSelectionResult::NoHost,
+      };
+      assert_eq!(host_header.as_slice(), b"backend.example.com");
+
+      let hash = match ctx.compute_hash_key() {
+        Some(h) => h,
+        None => return cluster::HostSelectionResult::NoHost,
+      };
+      assert_eq!(hash, 99999);
+
+      if ctx.should_select_another_host(0, 0) {
+        return cluster::HostSelectionResult::NoHost;
+      }
+
+      cluster::HostSelectionResult::Selected(0xABCD as *mut _)
+    }
+  }
+
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx
+    .expect_get_downstream_connection_sni()
+    .returning(|| Some(EnvoyBuffer::new(b"backend.example.com")));
+  mock_ctx
+    .expect_get_downstream_header()
+    .withf(|key, index| key == "host" && *index == 0)
+    .returning(|_, _| Some((EnvoyBuffer::new(b"backend.example.com"), 1)));
+  mock_ctx.expect_compute_hash_key().returning(|| Some(99999));
+  mock_ctx
+    .expect_should_select_another_host()
+    .returning(|_, _| false);
+
+  let mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+  let mut lb = SniBasedLb;
+  let result = lb.choose_host(Some(&mock_ctx), Box::new(mock_completion));
+  match result {
+    cluster::HostSelectionResult::Selected(host) => assert_eq!(host, 0xABCD as *mut _),
+    _ => panic!("Expected Selected"),
+  }
+}
+
+// =================================================================================================
+// Async Host Selection Tests
+// =================================================================================================
+
+#[test]
+fn test_async_host_selection_complete_with_host() {
+  let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+  mock_completion
+    .expect_async_host_selection_complete()
+    .withf(|host, details| host.is_some() && details == "resolved")
+    .times(1)
+    .returning(|_, _| ());
+
+  mock_completion.async_host_selection_complete(Some(0x1234 as *mut _), "resolved");
+}
+
+#[test]
+fn test_async_host_selection_complete_no_host() {
+  let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+  mock_completion
+    .expect_async_host_selection_complete()
+    .withf(|host, details| host.is_none() && details == "dns_failure")
+    .times(1)
+    .returning(|_, _| ());
+
+  mock_completion.async_host_selection_complete(None, "dns_failure");
+}
+
+#[test]
+fn test_async_host_selection_complete_empty_details() {
+  let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+  mock_completion
+    .expect_async_host_selection_complete()
+    .withf(|host, details| host.is_none() && details.is_empty())
+    .times(1)
+    .returning(|_, _| ());
+
+  mock_completion.async_host_selection_complete(None, "");
+}
+
+#[test]
+fn test_async_host_selection_with_stored_completion() {
+  struct DnsResolvingLb {
+    pending_completion: Option<Box<dyn cluster::EnvoyAsyncHostSelectionComplete>>,
+  }
+  impl cluster::ClusterLb for DnsResolvingLb {
+    fn choose_host(
+      &mut self,
+      _context: Option<&dyn cluster::ClusterLbContext>,
+      async_completion: Box<dyn cluster::EnvoyAsyncHostSelectionComplete>,
+    ) -> cluster::HostSelectionResult {
+      self.pending_completion = Some(async_completion);
+      struct NoOpHandle;
+      impl cluster::AsyncHostSelectionHandle for NoOpHandle {
+        fn cancel(&mut self) {}
+      }
+      cluster::HostSelectionResult::AsyncPending(Box::new(NoOpHandle))
+    }
+  }
+
+  let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+  mock_completion
+    .expect_async_host_selection_complete()
+    .withf(|host, details| host == &Some(0xBEEF as *mut _) && details == "dns_resolved")
+    .times(1)
+    .returning(|_, _| ());
+
+  let mut lb = DnsResolvingLb {
+    pending_completion: None,
+  };
+  let result = lb.choose_host(None, Box::new(mock_completion));
+  assert!(matches!(
+    result,
+    cluster::HostSelectionResult::AsyncPending(_)
+  ));
+
+  // Simulate async DNS resolution completing.
+  let completion = lb.pending_completion.take().unwrap();
+  completion.async_host_selection_complete(Some(0xBEEF as *mut _), "dns_resolved");
+}
+
+#[test]
+fn test_bootstrap_extension_cluster_add_or_update() {
+  use std::sync::atomic::{AtomicBool, Ordering};
+  static CLUSTER_ADDED: AtomicBool = AtomicBool::new(false);
+  static CLUSTER_NAME_RECEIVED: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_cluster_add_or_update(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      cluster_name: &str,
+    ) {
+      CLUSTER_ADDED.store(true, Ordering::SeqCst);
+      *CLUSTER_NAME_RECEIVED.lock().unwrap() = cluster_name.to_string();
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let cluster_name = "test_cluster";
+  let cluster_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: cluster_name.as_ptr() as *const _,
+    length: cluster_name.len(),
+  };
+
+  CLUSTER_ADDED.store(false, Ordering::SeqCst);
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update(
+      std::ptr::null_mut(),
+      config_ptr,
+      cluster_name_buf,
+    );
+  }
+
+  assert!(CLUSTER_ADDED.load(Ordering::SeqCst));
+  assert_eq!(*CLUSTER_NAME_RECEIVED.lock().unwrap(), "test_cluster");
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_cluster_removal() {
+  use std::sync::atomic::{AtomicBool, Ordering};
+  static CLUSTER_REMOVED: AtomicBool = AtomicBool::new(false);
+  static REMOVED_CLUSTER_NAME: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_cluster_removal(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      cluster_name: &str,
+    ) {
+      CLUSTER_REMOVED.store(true, Ordering::SeqCst);
+      *REMOVED_CLUSTER_NAME.lock().unwrap() = cluster_name.to_string();
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let cluster_name = "removed_cluster";
+  let cluster_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: cluster_name.as_ptr() as *const _,
+    length: cluster_name.len(),
+  };
+
+  CLUSTER_REMOVED.store(false, Ordering::SeqCst);
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_cluster_removal(
+      std::ptr::null_mut(),
+      config_ptr,
+      cluster_name_buf,
+    );
+  }
+
+  assert!(CLUSTER_REMOVED.load(Ordering::SeqCst));
+  assert_eq!(*REMOVED_CLUSTER_NAME.lock().unwrap(), "removed_cluster");
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_cluster_lifecycle_default_noop() {
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let cluster_name = "test_cluster";
+  let cluster_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: cluster_name.as_ptr() as *const _,
+    length: cluster_name.len(),
+  };
+
+  // Calling cluster lifecycle hooks with default implementations should not panic.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update(
+      std::ptr::null_mut(),
+      config_ptr,
+      cluster_name_buf,
+    );
+    envoy_dynamic_module_on_bootstrap_extension_cluster_removal(
+      std::ptr::null_mut(),
+      config_ptr,
+      cluster_name_buf,
+    );
+  }
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_listener_add_or_update() {
+  use std::sync::atomic::{AtomicBool, Ordering};
+  static LISTENER_ADDED: AtomicBool = AtomicBool::new(false);
+  static LISTENER_NAME_RECEIVED: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_listener_add_or_update(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      listener_name: &str,
+    ) {
+      LISTENER_ADDED.store(true, Ordering::SeqCst);
+      *LISTENER_NAME_RECEIVED.lock().unwrap() = listener_name.to_string();
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let listener_name = "test_listener";
+  let listener_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: listener_name.as_ptr() as *const _,
+    length: listener_name.len(),
+  };
+
+  LISTENER_ADDED.store(false, Ordering::SeqCst);
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update(
+      std::ptr::null_mut(),
+      config_ptr,
+      listener_name_buf,
+    );
+  }
+
+  assert!(LISTENER_ADDED.load(Ordering::SeqCst));
+  assert_eq!(*LISTENER_NAME_RECEIVED.lock().unwrap(), "test_listener");
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_listener_removal() {
+  use std::sync::atomic::{AtomicBool, Ordering};
+  static LISTENER_REMOVED: AtomicBool = AtomicBool::new(false);
+  static REMOVED_LISTENER_NAME: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_listener_removal(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      listener_name: &str,
+    ) {
+      LISTENER_REMOVED.store(true, Ordering::SeqCst);
+      *REMOVED_LISTENER_NAME.lock().unwrap() = listener_name.to_string();
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let listener_name = "removed_listener";
+  let listener_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: listener_name.as_ptr() as *const _,
+    length: listener_name.len(),
+  };
+
+  LISTENER_REMOVED.store(false, Ordering::SeqCst);
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_listener_removal(
+      std::ptr::null_mut(),
+      config_ptr,
+      listener_name_buf,
+    );
+  }
+
+  assert!(LISTENER_REMOVED.load(Ordering::SeqCst));
+  assert_eq!(*REMOVED_LISTENER_NAME.lock().unwrap(), "removed_listener");
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_listener_lifecycle_default_noop() {
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let listener_name = "test_listener";
+  let listener_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: listener_name.as_ptr() as *const _,
+    length: listener_name.len(),
+  };
+
+  // Calling listener lifecycle hooks with default implementations should not panic.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update(
+      std::ptr::null_mut(),
+      config_ptr,
+      listener_name_buf,
+    );
+    envoy_dynamic_module_on_bootstrap_extension_listener_removal(
+      std::ptr::null_mut(),
+      config_ptr,
+      listener_name_buf,
+    );
+  }
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+// =============================================================================
+// MockEnvoyNetworkFilter Tests
+// =============================================================================
+
+#[test]
+fn test_mock_envoy_network_filter_on_new_connection() {
+  struct TestNetworkFilter;
+  impl NetworkFilter<network::MockEnvoyNetworkFilter> for TestNetworkFilter {
+    fn on_new_connection(
+      &mut self,
+      envoy_filter: &mut network::MockEnvoyNetworkFilter,
+    ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+      assert_eq!(envoy_filter.get_connection_id(), 42);
+      assert_eq!(
+        envoy_filter.get_remote_address(),
+        ("10.0.0.1".to_string(), 1234)
+      );
+      abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
+    }
+  }
+
+  let mut mock = network::MockEnvoyNetworkFilter::new();
+  mock.expect_get_connection_id().returning(|| 42);
+  mock
+    .expect_get_remote_address()
+    .returning(|| ("10.0.0.1".to_string(), 1234));
+
+  let mut filter = TestNetworkFilter;
+  assert_eq!(
+    filter.on_new_connection(&mut mock),
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
+  );
+}
+
+#[test]
+fn test_mock_envoy_network_filter_on_read() {
+  struct TestNetworkFilter;
+  impl NetworkFilter<network::MockEnvoyNetworkFilter> for TestNetworkFilter {
+    fn on_read(
+      &mut self,
+      envoy_filter: &mut network::MockEnvoyNetworkFilter,
+      data_length: usize,
+      _end_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+      envoy_filter.drain_read_buffer(data_length);
+      envoy_filter.append_write_buffer(b"response");
+      abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
+    }
+  }
+
+  let mut mock = network::MockEnvoyNetworkFilter::new();
+  mock
+    .expect_drain_read_buffer()
+    .with(mockall::predicate::eq(100))
+    .times(1)
+    .returning(|_| ());
+  mock
+    .expect_append_write_buffer()
+    .with(mockall::predicate::eq(b"response".as_slice()))
+    .times(1)
+    .returning(|_| ());
+
+  let mut filter = TestNetworkFilter;
+  assert_eq!(
+    filter.on_read(&mut mock, 100, false),
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
+  );
+}
+
+// =============================================================================
+// Access Logger unit tests
+// =============================================================================
+
+#[test]
+fn test_envoy_dynamic_module_on_access_logger_config_new_impl() {
+  struct TestAccessLoggerConfig;
+  impl access_log::AccessLoggerConfig for TestAccessLoggerConfig {
+    fn new(_ctx: &access_log::ConfigContext, _name: &str, _config: &[u8]) -> Result<Self, String> {
+      Ok(TestAccessLoggerConfig)
+    }
+    fn create_logger(
+      &self,
+      _metrics: access_log::MetricsContext,
+      _logger_envoy_ptr: *mut std::ffi::c_void,
+    ) -> Box<dyn access_log::AccessLogger> {
+      unimplemented!()
+    }
+  }
+
+  let ctx = access_log::ConfigContext::new(std::ptr::null_mut());
+  let mut new_fn: NewAccessLoggerConfigFunction = |_, _, _| Some(Box::new(TestAccessLoggerConfig));
+  let result = access_log::envoy_dynamic_module_on_access_logger_config_new_impl(
+    &ctx,
+    "test_logger",
+    b"test_config",
+    &new_fn,
+    std::ptr::null_mut(),
+  );
+  assert!(!result.is_null());
+
+  unsafe {
+    access_log::envoy_dynamic_module_on_access_logger_config_destroy(result);
+  }
+
+  // None should result in a null pointer (e.g. unknown logger name).
+  new_fn = |_, _, _| None;
+  let result = access_log::envoy_dynamic_module_on_access_logger_config_new_impl(
+    &ctx,
+    "test_logger",
+    b"test_config",
+    &new_fn,
+    std::ptr::null_mut(),
+  );
+  assert!(result.is_null());
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_access_logger_config_destroy() {
+  // This test ensures the wrapped trait object is dropped exactly once on `_destroy`.
+  static DROPPED: AtomicBool = AtomicBool::new(false);
+  struct TestAccessLoggerConfig;
+  impl access_log::AccessLoggerConfig for TestAccessLoggerConfig {
+    fn new(_ctx: &access_log::ConfigContext, _name: &str, _config: &[u8]) -> Result<Self, String> {
+      Ok(TestAccessLoggerConfig)
+    }
+    fn create_logger(
+      &self,
+      _metrics: access_log::MetricsContext,
+      _logger_envoy_ptr: *mut std::ffi::c_void,
+    ) -> Box<dyn access_log::AccessLogger> {
+      unimplemented!()
+    }
+  }
+  impl Drop for TestAccessLoggerConfig {
+    fn drop(&mut self) {
+      DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  let ctx = access_log::ConfigContext::new(std::ptr::null_mut());
+  let new_fn: NewAccessLoggerConfigFunction = |_, _, _| Some(Box::new(TestAccessLoggerConfig));
+  let config_ptr = access_log::envoy_dynamic_module_on_access_logger_config_new_impl(
+    &ctx,
+    "test_logger",
+    b"test_config",
+    &new_fn,
+    std::ptr::null_mut(),
+  );
+  assert!(!config_ptr.is_null());
+
+  unsafe {
+    access_log::envoy_dynamic_module_on_access_logger_config_destroy(config_ptr);
+  }
+  assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_access_logger_new_destroy() {
+  // Round-trip the per-worker logger to ensure both `_new` and `_destroy` correctly own and
+  // free the boxed trait object.
+  static LOGGER_DROPPED: AtomicBool = AtomicBool::new(false);
+
+  struct TestAccessLoggerConfig;
+  impl access_log::AccessLoggerConfig for TestAccessLoggerConfig {
+    fn new(_ctx: &access_log::ConfigContext, _name: &str, _config: &[u8]) -> Result<Self, String> {
+      Ok(TestAccessLoggerConfig)
+    }
+    fn create_logger(
+      &self,
+      _metrics: access_log::MetricsContext,
+      _logger_envoy_ptr: *mut std::ffi::c_void,
+    ) -> Box<dyn access_log::AccessLogger> {
+      Box::new(TestAccessLogger)
+    }
+  }
+
+  struct TestAccessLogger;
+  impl access_log::AccessLogger for TestAccessLogger {
+    fn log(&mut self, _ctx: &access_log::LogContext) {}
+  }
+  impl Drop for TestAccessLogger {
+    fn drop(&mut self) {
+      LOGGER_DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  let ctx = access_log::ConfigContext::new(std::ptr::null_mut());
+  let new_fn: NewAccessLoggerConfigFunction = |_, _, _| Some(Box::new(TestAccessLoggerConfig));
+  let config_ptr = access_log::envoy_dynamic_module_on_access_logger_config_new_impl(
+    &ctx,
+    "test_logger",
+    b"test_config",
+    &new_fn,
+    std::ptr::null_mut(),
+  );
+  assert!(!config_ptr.is_null());
+
+  let logger_ptr = unsafe {
+    access_log::envoy_dynamic_module_on_access_logger_new(config_ptr, std::ptr::null_mut())
+  };
+  assert!(!logger_ptr.is_null());
+
+  unsafe {
+    access_log::envoy_dynamic_module_on_access_logger_destroy(logger_ptr as *mut _);
+    access_log::envoy_dynamic_module_on_access_logger_config_destroy(config_ptr);
+  }
+  assert!(LOGGER_DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+// =================================================================================================
+// FFI panic-handling helpers
+// =================================================================================================
+
+#[test]
+fn test_panic_payload_to_string_handles_string_payload() {
+  let payload: Box<dyn std::any::Any + Send> = Box::new(String::from("formatted panic message"));
+  assert_eq!(panic_payload_to_string(payload), "formatted panic message");
+}
+
+#[test]
+fn test_panic_payload_to_string_handles_str_payload() {
+  let payload: Box<dyn std::any::Any + Send> = Box::new("static panic message");
+  assert_eq!(panic_payload_to_string(payload), "static panic message");
+}
+
+#[test]
+fn test_panic_payload_to_string_falls_back_for_unknown_payload() {
+  let payload: Box<dyn std::any::Any + Send> = Box::new(42_i32);
+  assert_eq!(
+    panic_payload_to_string(payload),
+    "<non-string panic payload>"
+  );
+}
+
+#[test]
+fn test_log_ffi_panic_handles_unknown_payload_without_panicking() {
+  // The logging path must not itself panic when the payload type is not recognized; otherwise
+  // the secondary panic would unwind across the FFI boundary that the outer `catch_unwind` is
+  // there to prevent.
+  let payload: Box<dyn std::any::Any + Send> = Box::new(42_i32);
+  log_ffi_panic("test_entry_point", payload);
+}
+
+#[test]
+fn test_outer_ffi_pattern_returns_fail_closed_pointer_on_panic() {
+  // Mirrors the exact `catch_unwind` + `unwrap_or_else` shape used by every FFI entry that
+  // returns a pointer, exercised end-to-end with the SDK's `log_ffi_panic` helper.
+  let result: *const std::ffi::c_void = std::panic::catch_unwind(std::panic::AssertUnwindSafe(
+    || -> *const std::ffi::c_void {
+      panic!("simulated factory panic");
+    },
+  ))
+  .unwrap_or_else(|payload| {
+    log_ffi_panic(
+      "test_outer_ffi_pattern_returns_fail_closed_pointer_on_panic",
+      payload,
+    );
+    std::ptr::null()
+  });
+  assert!(result.is_null());
+}
+
+#[test]
+fn test_outer_ffi_pattern_returns_fail_closed_bool_on_panic() {
+  // Mirrors the FFI shape used by entries that return a bool (e.g. `on_program_init`).
+  let result: bool = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> bool {
+    panic!("simulated factory panic");
+  }))
+  .unwrap_or_else(|payload| {
+    log_ffi_panic(
+      "test_outer_ffi_pattern_returns_fail_closed_bool_on_panic",
+      payload,
+    );
+    false
+  });
+  assert!(!result);
+}
+
+// Regression tests for the `*const EnvoyBuffer` / `*const (EnvoyBuffer, EnvoyBuffer)`
+// null-guard migration. Each test invokes a migrated FFI entry with `(null, 0)` for the
+// header- and body-array pairs and verifies that the trait callback receives the empty
+// representation (`None` or `Vec::new()`) without dereferencing the null pointer.
+
+#[test]
+fn test_http_filter_callout_done_with_null_buffers_yields_none() {
+  static GOT_NONE_HEADERS: AtomicBool = AtomicBool::new(false);
+  static GOT_NONE_BODY: AtomicBool = AtomicBool::new(false);
+
+  struct TestHttpFilterConfig;
+  impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for TestHttpFilterConfig {
+    fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+      Box::new(TestHttpFilter)
+    }
+  }
+
+  struct TestHttpFilter;
+  impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for TestHttpFilter {
+    fn on_http_callout_done(
+      &mut self,
+      _envoy_filter: &mut EHF,
+      _callout_id: u64,
+      _result: abi::envoy_dynamic_module_type_http_callout_result,
+      response_headers: Option<&[(EnvoyBuffer, EnvoyBuffer)]>,
+      response_body: Option<&[EnvoyBuffer]>,
+    ) {
+      if response_headers.is_none() {
+        GOT_NONE_HEADERS.store(true, std::sync::atomic::Ordering::SeqCst);
+      }
+      if response_body.is_none() {
+        GOT_NONE_BODY.store(true, std::sync::atomic::Ordering::SeqCst);
+      }
+    }
+  }
+
+  let filter_config = TestHttpFilterConfig;
+  let filter = envoy_dynamic_module_on_http_filter_new_impl(
+    &mut EnvoyHttpFilterImpl {
+      raw_ptr: std::ptr::null_mut(),
+    },
+    &filter_config,
+  );
+
+  unsafe {
+    http::envoy_dynamic_module_on_http_filter_http_callout_done(
+      std::ptr::null_mut(),
+      filter,
+      1,
+      abi::envoy_dynamic_module_type_http_callout_result::Success,
+      std::ptr::null(),
+      0,
+      std::ptr::null(),
+      0,
+    );
+    envoy_dynamic_module_on_http_filter_destroy(filter);
+  }
+
+  assert!(GOT_NONE_HEADERS.load(std::sync::atomic::Ordering::SeqCst));
+  assert!(GOT_NONE_BODY.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_network_filter_callout_done_with_null_buffers_yields_empty_vecs() {
+  static GOT_EMPTY_HEADERS: AtomicBool = AtomicBool::new(false);
+  static GOT_EMPTY_BODY: AtomicBool = AtomicBool::new(false);
+
+  struct TestNetworkFilterConfig;
+  impl<ENF: EnvoyNetworkFilter> NetworkFilterConfig<ENF> for TestNetworkFilterConfig {
+    fn new_network_filter(&self, _envoy: &mut ENF) -> Box<dyn NetworkFilter<ENF>> {
+      Box::new(TestNetworkFilter)
+    }
+  }
+
+  struct TestNetworkFilter;
+  impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for TestNetworkFilter {
+    fn on_http_callout_done(
+      &mut self,
+      _envoy_filter: &mut ENF,
+      _callout_id: u64,
+      _result: abi::envoy_dynamic_module_type_http_callout_result,
+      headers: Vec<(EnvoyBuffer, EnvoyBuffer)>,
+      body_chunks: Vec<EnvoyBuffer>,
+    ) {
+      if headers.is_empty() {
+        GOT_EMPTY_HEADERS.store(true, std::sync::atomic::Ordering::SeqCst);
+      }
+      if body_chunks.is_empty() {
+        GOT_EMPTY_BODY.store(true, std::sync::atomic::Ordering::SeqCst);
+      }
+    }
+  }
+
+  let filter_config = TestNetworkFilterConfig;
+  let filter = network::envoy_dynamic_module_on_network_filter_new_impl(
+    &mut EnvoyNetworkFilterImpl {
+      raw: std::ptr::null_mut(),
+    },
+    &filter_config,
+  );
+
+  unsafe {
+    network::envoy_dynamic_module_on_network_filter_http_callout_done(
+      std::ptr::null_mut(),
+      filter,
+      1,
+      abi::envoy_dynamic_module_type_http_callout_result::Success,
+      std::ptr::null(),
+      0,
+      std::ptr::null(),
+      0,
+    );
+    envoy_dynamic_module_on_network_filter_destroy(filter);
+  }
+
+  assert!(GOT_EMPTY_HEADERS.load(std::sync::atomic::Ordering::SeqCst));
+  assert!(GOT_EMPTY_BODY.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_listener_filter_callout_done_with_null_buffers_yields_empty_vecs() {
+  static GOT_EMPTY_HEADERS: AtomicBool = AtomicBool::new(false);
+  static GOT_EMPTY_BODY: AtomicBool = AtomicBool::new(false);
+
+  struct TestListenerFilterConfig;
+  impl<ELF: EnvoyListenerFilter> ListenerFilterConfig<ELF> for TestListenerFilterConfig {
+    fn new_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn ListenerFilter<ELF>> {
+      Box::new(TestListenerFilter)
+    }
+  }
+
+  struct TestListenerFilter;
+  impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for TestListenerFilter {
+    fn on_http_callout_done(
+      &mut self,
+      _envoy_filter: &mut ELF,
+      _callout_id: u64,
+      _result: abi::envoy_dynamic_module_type_http_callout_result,
+      response_headers: Vec<(EnvoyBuffer, EnvoyBuffer)>,
+      response_body: Vec<EnvoyBuffer>,
+    ) {
+      if response_headers.is_empty() {
+        GOT_EMPTY_HEADERS.store(true, std::sync::atomic::Ordering::SeqCst);
+      }
+      if response_body.is_empty() {
+        GOT_EMPTY_BODY.store(true, std::sync::atomic::Ordering::SeqCst);
+      }
+    }
+  }
+
+  let filter_config = TestListenerFilterConfig;
+  let filter = listener::envoy_dynamic_module_on_listener_filter_new_impl(
+    &mut EnvoyListenerFilterImpl {
+      raw: std::ptr::null_mut(),
+    },
+    &filter_config,
+  );
+
+  unsafe {
+    listener::envoy_dynamic_module_on_listener_filter_http_callout_done(
+      std::ptr::null_mut(),
+      filter,
+      1,
+      abi::envoy_dynamic_module_type_http_callout_result::Success,
+      std::ptr::null(),
+      0,
+      std::ptr::null(),
+      0,
+    );
+    envoy_dynamic_module_on_listener_filter_destroy(filter);
+  }
+
+  assert!(GOT_EMPTY_HEADERS.load(std::sync::atomic::Ordering::SeqCst));
+  assert!(GOT_EMPTY_BODY.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_bootstrap_extension_callout_done_with_null_buffers_yields_none() {
+  static GOT_NONE_HEADERS: AtomicBool = AtomicBool::new(false);
+  static GOT_NONE_BODY: AtomicBool = AtomicBool::new(false);
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_http_callout_done(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      _callout_id: u64,
+      _result: abi::envoy_dynamic_module_type_http_callout_result,
+      response_headers: Option<&[(EnvoyBuffer, EnvoyBuffer)]>,
+      response_body: Option<&[EnvoyBuffer]>,
+    ) {
+      if response_headers.is_none() {
+        GOT_NONE_HEADERS.store(true, std::sync::atomic::Ordering::SeqCst);
+      }
+      if response_body.is_none() {
+        GOT_NONE_BODY.store(true, std::sync::atomic::Ordering::SeqCst);
+      }
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  unsafe {
+    bootstrap::envoy_dynamic_module_on_bootstrap_extension_http_callout_done(
+      std::ptr::null_mut(),
+      config_ptr,
+      1,
+      abi::envoy_dynamic_module_type_http_callout_result::Success,
+      std::ptr::null(),
+      0,
+      std::ptr::null(),
+      0,
+    );
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+
+  assert!(GOT_NONE_HEADERS.load(std::sync::atomic::Ordering::SeqCst));
+  assert!(GOT_NONE_BODY.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_cluster_callout_done_with_null_buffers_yields_none() {
+  use cluster::{Cluster, ClusterLb, EnvoyCluster, EnvoyClusterLoadBalancer};
+
+  static GOT_NONE_HEADERS: AtomicBool = AtomicBool::new(false);
+  static GOT_NONE_BODY: AtomicBool = AtomicBool::new(false);
+
+  struct TestCluster;
+  impl Cluster for TestCluster {
+    fn on_init(&mut self, _envoy_cluster: &dyn EnvoyCluster) {}
+    fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
+      unimplemented!("not exercised by this test")
+    }
+
+    fn on_http_callout_done(
+      &mut self,
+      _envoy_cluster: &dyn EnvoyCluster,
+      _callout_id: u64,
+      _result: abi::envoy_dynamic_module_type_http_callout_result,
+      response_headers: Option<&[(EnvoyBuffer, EnvoyBuffer)]>,
+      response_body: Option<&[EnvoyBuffer]>,
+    ) {
+      if response_headers.is_none() {
+        GOT_NONE_HEADERS.store(true, std::sync::atomic::Ordering::SeqCst);
+      }
+      if response_body.is_none() {
+        GOT_NONE_BODY.store(true, std::sync::atomic::Ordering::SeqCst);
+      }
+    }
+  }
+
+  // Construct the cluster_module_ptr directly without going through the factory chain;
+  // the FFI entry only requires a `*mut Box<dyn Cluster>`, which is what the SDK's
+  // `wrap_into_c_void_ptr!` produces internally.
+  let test_cluster: Box<dyn Cluster> = Box::new(TestCluster);
+  let cluster_ptr =
+    Box::into_raw(Box::new(test_cluster)) as abi::envoy_dynamic_module_type_cluster_module_ptr;
+  let cluster_envoy_ptr = std::ptr::null_mut::<std::os::raw::c_void>()
+    as abi::envoy_dynamic_module_type_cluster_envoy_ptr;
+
+  unsafe {
+    cluster::envoy_dynamic_module_on_cluster_http_callout_done(
+      cluster_envoy_ptr,
+      cluster_ptr,
+      1,
+      abi::envoy_dynamic_module_type_http_callout_result::Success,
+      std::ptr::null(),
+      0,
+      std::ptr::null(),
+      0,
+    );
+
+    drop(Box::from_raw(cluster_ptr as *mut Box<dyn Cluster>));
+  }
+
+  assert!(GOT_NONE_HEADERS.load(std::sync::atomic::Ordering::SeqCst));
+  assert!(GOT_NONE_BODY.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+// =============================================================================
+// Matcher Header Retrieval FFI stubs and tests.
+// =============================================================================
+
+const MOCK_MATCHER_HEADERS: [(&[u8], &[u8]); 2] =
+  [(b":path", b"/index"), (b"content-type", b"text/plain")];
+
+// The size stub derives its count from the fixture so it can never disagree with the number of
+// entries the fill stub writes.
+static MOCK_MATCHER_MAP_EMPTY: AtomicBool = AtomicBool::new(false);
+static MOCK_MATCHER_FILL_SUCCEEDS: AtomicBool = AtomicBool::new(true);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_matcher_get_headers_size(
+  _matcher_input_envoy_ptr: abi::envoy_dynamic_module_type_matcher_input_envoy_ptr,
+  _header_type: abi::envoy_dynamic_module_type_http_header_type,
+) -> usize {
+  if MOCK_MATCHER_MAP_EMPTY.load(std::sync::atomic::Ordering::SeqCst) {
+    0
+  } else {
+    MOCK_MATCHER_HEADERS.len()
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_matcher_get_headers(
+  _matcher_input_envoy_ptr: abi::envoy_dynamic_module_type_matcher_input_envoy_ptr,
+  _header_type: abi::envoy_dynamic_module_type_http_header_type,
+  result_headers: *mut abi::envoy_dynamic_module_type_envoy_http_header,
+) -> bool {
+  if !MOCK_MATCHER_FILL_SUCCEEDS.load(std::sync::atomic::Ordering::SeqCst) {
+    return false;
+  }
+  for (i, (key, value)) in MOCK_MATCHER_HEADERS.iter().enumerate() {
+    unsafe {
+      *result_headers.add(i) = abi::envoy_dynamic_module_type_envoy_http_header {
+        key_ptr: key.as_ptr() as *mut _,
+        key_length: key.len(),
+        value_ptr: value.as_ptr() as *mut _,
+        value_length: value.len(),
+      };
+    }
+  }
+  true
+}
+
+#[test]
+fn test_matcher_get_all_headers() {
+  let ctx = crate::matcher::MatchContext::new(std::ptr::null_mut());
+
+  // A populated map yields every key-value pair in fill order.
+  MOCK_MATCHER_MAP_EMPTY.store(false, std::sync::atomic::Ordering::SeqCst);
+  MOCK_MATCHER_FILL_SUCCEEDS.store(true, std::sync::atomic::Ordering::SeqCst);
+  let headers = ctx
+    .get_all_headers(abi::envoy_dynamic_module_type_http_header_type::RequestHeader)
+    .expect("header map is available");
+  assert_eq!(
+    headers,
+    vec![
+      (b":path".as_slice(), b"/index".as_slice()),
+      (b"content-type".as_slice(), b"text/plain".as_slice()),
+    ]
+  );
+
+  // An empty map returns None without invoking the fill callback.
+  MOCK_MATCHER_MAP_EMPTY.store(true, std::sync::atomic::Ordering::SeqCst);
+  assert!(ctx
+    .get_all_headers(abi::envoy_dynamic_module_type_http_header_type::RequestHeader)
+    .is_none());
+
+  // A failed fill returns None rather than exposing the uninitialized capacity.
+  MOCK_MATCHER_MAP_EMPTY.store(false, std::sync::atomic::Ordering::SeqCst);
+  MOCK_MATCHER_FILL_SUCCEEDS.store(false, std::sync::atomic::Ordering::SeqCst);
+  assert!(ctx
+    .get_all_headers(abi::envoy_dynamic_module_type_http_header_type::RequestHeader)
+    .is_none());
+}
+
+// =============================================================================
+// Stats Sink unit tests
+// =============================================================================
+
+// Canned snapshot data returned by the stubbed snapshot callbacks below.
+const STUB_COUNTERS: [(&str, u64, u64); 2] = [("counter_0", 10, 5), ("counter_1", 20, 0)];
+const STUB_GAUGES: [(&str, u64); 1] = [("gauge_0", 42)];
+const STUB_TEXT_READOUTS: [(&str, &str); 1] = [("text_0", "value_0")];
+
+// Counts stub_write invocations on the calling thread so tests can assert the grow-and-retry
+// behavior (each ABI getter call writes its name once, plus a value for text readouts). It is
+// thread-local so it stays correct even if tests run in parallel.
+thread_local! {
+  static STUB_WRITE_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+fn reset_stub_write_calls() {
+  STUB_WRITE_CALLS.with(|c| c.set(0));
+}
+
+fn stub_write_calls() -> usize {
+  STUB_WRITE_CALLS.with(|c| c.get())
+}
+
+// Mirrors Envoy's snprintf-style name writer. It copies up to `capacity` bytes with no null
+// terminator and reports the full source length, exercising the SDK's grow-and-retry path.
+//
+// # Safety
+// `buffer` must point to at least `capacity` writable bytes and `size_out` must be valid.
+unsafe fn stub_write(
+  src: &str,
+  buffer: *mut std::ffi::c_char,
+  capacity: usize,
+  size_out: *mut usize,
+) {
+  STUB_WRITE_CALLS.with(|c| c.set(c.get() + 1));
+  let bytes = src.as_bytes();
+  let copy = bytes.len().min(capacity);
+  if copy > 0 {
+    std::ptr::copy_nonoverlapping(bytes.as_ptr(), buffer as *mut u8, copy);
+  }
+  *size_out = bytes.len();
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_count(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+) -> usize {
+  STUB_COUNTERS.len()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_counter(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+  index: usize,
+  name_buffer: *mut std::ffi::c_char,
+  name_buffer_capacity: usize,
+  name_size: *mut usize,
+  value_out: *mut u64,
+  delta_out: *mut u64,
+) -> bool {
+  if index >= STUB_COUNTERS.len() {
+    return false;
+  }
+  let (name, value, delta) = STUB_COUNTERS[index];
+  unsafe {
+    stub_write(name, name_buffer, name_buffer_capacity, name_size);
+    *value_out = value;
+    *delta_out = delta;
+  }
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_count(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+) -> usize {
+  STUB_GAUGES.len()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+  index: usize,
+  name_buffer: *mut std::ffi::c_char,
+  name_buffer_capacity: usize,
+  name_size: *mut usize,
+  value_out: *mut u64,
+) -> bool {
+  if index >= STUB_GAUGES.len() {
+    return false;
+  }
+  let (name, value) = STUB_GAUGES[index];
+  unsafe {
+    stub_write(name, name_buffer, name_buffer_capacity, name_size);
+    *value_out = value;
+  }
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_count(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+) -> usize {
+  STUB_TEXT_READOUTS.len()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+  index: usize,
+  name_buffer: *mut std::ffi::c_char,
+  name_buffer_capacity: usize,
+  name_size: *mut usize,
+  value_buffer: *mut std::ffi::c_char,
+  value_buffer_capacity: usize,
+  value_size: *mut usize,
+) -> bool {
+  if index >= STUB_TEXT_READOUTS.len() {
+    return false;
+  }
+  let (name, value) = STUB_TEXT_READOUTS[index];
+  unsafe {
+    stub_write(name, name_buffer, name_buffer_capacity, name_size);
+    stub_write(value, value_buffer, value_buffer_capacity, value_size);
+  }
+  true
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_stat_sink_config_new_impl() {
+  struct TestStatSink;
+  impl stats_sink::StatSink for TestStatSink {
+    fn on_flush(&self, _snapshot: &stats_sink::MetricSnapshot<'_>) {}
+    fn on_histogram_complete(&self, _name: EnvoyBuffer<'_>, _value: u64) {}
+  }
+
+  let mut envoy_config = stats_sink::EnvoyStatSinkConfig::new(std::ptr::null_mut());
+  let mut new_fn: NewStatSinkConfigFunction = |_, _, _| Some(Box::new(TestStatSink));
+  let result = stats_sink::envoy_dynamic_module_on_stat_sink_config_new_impl(
+    "test_sink",
+    b"config",
+    &mut envoy_config,
+    &new_fn,
+  );
+  assert!(!result.is_null());
+  unsafe {
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_destroy(result);
+  }
+
+  // None should result in a null pointer (for example an unknown sink name).
+  new_fn = |_, _, _| None;
+  let result = stats_sink::envoy_dynamic_module_on_stat_sink_config_new_impl(
+    "test_sink",
+    b"config",
+    &mut envoy_config,
+    &new_fn,
+  );
+  assert!(result.is_null());
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_stat_sink_config_destroy() {
+  // Ensure the wrapped trait object is dropped exactly once on destroy.
+  static DROPPED: AtomicBool = AtomicBool::new(false);
+  struct TestStatSink;
+  impl stats_sink::StatSink for TestStatSink {
+    fn on_flush(&self, _snapshot: &stats_sink::MetricSnapshot<'_>) {}
+    fn on_histogram_complete(&self, _name: EnvoyBuffer<'_>, _value: u64) {}
+  }
+  impl Drop for TestStatSink {
+    fn drop(&mut self) {
+      DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  let new_fn: NewStatSinkConfigFunction = |_, _, _| Some(Box::new(TestStatSink));
+  let mut envoy_config = stats_sink::EnvoyStatSinkConfig::new(std::ptr::null_mut());
+  let config_ptr = stats_sink::envoy_dynamic_module_on_stat_sink_config_new_impl(
+    "test_sink",
+    b"config",
+    &mut envoy_config,
+    &new_fn,
+  );
+  assert!(!config_ptr.is_null());
+  unsafe {
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_destroy(config_ptr);
+  }
+  assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_metric_snapshot_reads_all_entry_types() {
+  let mut dummy = 0u8;
+  let snapshot = stats_sink::MetricSnapshot::new(&mut dummy as *mut _ as *mut std::ffi::c_void);
+
+  // A single reusable buffer, starting empty, serves every read and is grown by the SDK.
+  let mut name = Vec::new();
+
+  assert_eq!(snapshot.counter_count(), 2);
+  let counter = snapshot.counter(0, &mut name).unwrap();
+  assert_eq!(name.as_slice(), b"counter_0");
+  assert_eq!(counter.value, 10);
+  assert_eq!(counter.delta, 5);
+  let counter = snapshot.counter(1, &mut name).unwrap();
+  assert_eq!(name.as_slice(), b"counter_1");
+  assert_eq!(counter.value, 20);
+  assert_eq!(counter.delta, 0);
+  // An out-of-range read returns None and leaves the buffer untouched.
+  assert!(snapshot.counter(2, &mut name).is_none());
+  assert_eq!(name.as_slice(), b"counter_1");
+
+  assert_eq!(snapshot.gauge_count(), 1);
+  let value = snapshot.gauge(0, &mut name).unwrap();
+  assert_eq!(name.as_slice(), b"gauge_0");
+  assert_eq!(value, 42);
+  // An out-of-range read returns None and leaves the buffer untouched.
+  assert!(snapshot.gauge(1, &mut name).is_none());
+  assert_eq!(name.as_slice(), b"gauge_0");
+
+  assert_eq!(snapshot.text_readout_count(), 1);
+  let mut text_value = Vec::new();
+  assert!(snapshot.text_readout(0, &mut name, &mut text_value));
+  assert_eq!(name.as_slice(), b"text_0");
+  assert_eq!(text_value.as_slice(), b"value_0");
+  // An out-of-range read returns false and leaves both buffers untouched.
+  assert!(!snapshot.text_readout(1, &mut name, &mut text_value));
+  assert_eq!(name.as_slice(), b"text_0");
+  assert_eq!(text_value.as_slice(), b"value_0");
+}
+
+#[test]
+fn test_metric_snapshot_reuses_buffer_without_reallocating() {
+  let mut dummy = 0u8;
+  let snapshot = stats_sink::MetricSnapshot::new(&mut dummy as *mut _ as *mut std::ffi::c_void);
+
+  // A buffer larger than the name is reused in place. Its length is set to the name length, not
+  // the capacity, and no reallocation occurs.
+  let mut name = Vec::with_capacity(64);
+  let ptr_before = name.as_ptr();
+  snapshot.counter(0, &mut name).unwrap();
+  assert_eq!(name.as_slice(), b"counter_0");
+  assert_eq!(name.as_ptr(), ptr_before);
+  assert!(name.capacity() >= 64);
+
+  // The next read overwrites the same buffer with a different name.
+  snapshot.counter(1, &mut name).unwrap();
+  assert_eq!(name.as_slice(), b"counter_1");
+  assert_eq!(name.as_ptr(), ptr_before);
+}
+
+#[test]
+fn test_metric_snapshot_grows_then_reuses_buffer() {
+  let mut dummy = 0u8;
+  let snapshot = stats_sink::MetricSnapshot::new(&mut dummy as *mut _ as *mut std::ffi::c_void);
+
+  // Starting empty forces a length query (writes nothing) followed by a grow-and-retry, so the
+  // getter is invoked twice for the first name.
+  let mut name = Vec::new();
+  reset_stub_write_calls();
+  snapshot.counter(0, &mut name).unwrap();
+  assert_eq!(name.as_slice(), b"counter_0");
+  assert!(name.capacity() >= b"counter_0".len());
+  assert_eq!(stub_write_calls(), 2);
+
+  // The grown buffer is large enough for the next equal-length name, so it is reused in place with
+  // a single getter call and no reallocation.
+  let ptr_after_grow = name.as_ptr();
+  reset_stub_write_calls();
+  snapshot.counter(1, &mut name).unwrap();
+  assert_eq!(name.as_slice(), b"counter_1");
+  assert_eq!(name.as_ptr(), ptr_after_grow);
+  assert_eq!(stub_write_calls(), 1);
+}
+
+#[test]
+fn test_metric_snapshot_text_readout_grows_both_buffers() {
+  let mut dummy = 0u8;
+  let snapshot = stats_sink::MetricSnapshot::new(&mut dummy as *mut _ as *mut std::ffi::c_void);
+
+  // Both buffers start empty, so the first getter call truncates both. The SDK grows both and
+  // retries, giving two getter calls that each write a name and a value, for four stub_write calls.
+  let mut name = Vec::new();
+  let mut value = Vec::new();
+  reset_stub_write_calls();
+  assert!(snapshot.text_readout(0, &mut name, &mut value));
+  assert_eq!(name.as_slice(), b"text_0");
+  assert_eq!(value.as_slice(), b"value_0");
+  assert_eq!(stub_write_calls(), 4);
+}
+
+#[test]
+fn test_metric_snapshot_text_readout_grows_name_only() {
+  let mut dummy = 0u8;
+  let snapshot = stats_sink::MetricSnapshot::new(&mut dummy as *mut _ as *mut std::ffi::c_void);
+
+  // The name buffer is too small but the value buffer already fits, so only the name is grown and
+  // retried. The value buffer keeps its allocation, proving the value side is not regrown.
+  let mut name = Vec::with_capacity(2);
+  let mut value = Vec::with_capacity(16);
+  let value_ptr_before = value.as_ptr();
+  reset_stub_write_calls();
+  assert!(snapshot.text_readout(0, &mut name, &mut value));
+  assert_eq!(name.as_slice(), b"text_0");
+  assert_eq!(value.as_slice(), b"value_0");
+  assert_eq!(value.as_ptr(), value_ptr_before);
+  assert!(name.capacity() >= b"text_0".len());
+  assert_eq!(stub_write_calls(), 4);
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_stat_sink_flush_reads_snapshot() {
+  static SEEN_COUNTERS: std::sync::Mutex<Vec<(String, u64, u64)>> =
+    std::sync::Mutex::new(Vec::new());
+  struct RecordingStatSink;
+  impl stats_sink::StatSink for RecordingStatSink {
+    fn on_flush(&self, snapshot: &stats_sink::MetricSnapshot<'_>) {
+      let mut seen = SEEN_COUNTERS.lock().unwrap();
+      let mut name = Vec::new();
+      for index in 0..snapshot.counter_count() {
+        if let Some(counter) = snapshot.counter(index, &mut name) {
+          seen.push((
+            String::from_utf8_lossy(&name).into_owned(),
+            counter.value,
+            counter.delta,
+          ));
+        }
+      }
+    }
+    fn on_histogram_complete(&self, _name: EnvoyBuffer<'_>, _value: u64) {}
+  }
+
+  let sink: Box<dyn stats_sink::StatSink> = Box::new(RecordingStatSink);
+  let config_ptr = Box::into_raw(Box::new(sink)) as *const std::ffi::c_void;
+  let mut dummy = 0u8;
+  unsafe {
+    stats_sink::envoy_dynamic_module_on_stat_sink_flush(
+      config_ptr,
+      &mut dummy as *mut _ as *mut std::ffi::c_void,
+    );
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_destroy(config_ptr);
+  }
+
+  let seen = SEEN_COUNTERS.lock().unwrap();
+  assert_eq!(
+    *seen,
+    vec![
+      ("counter_0".to_string(), 10, 5),
+      ("counter_1".to_string(), 20, 0),
+    ]
+  );
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_stat_sink_on_histogram_complete_passes_name_and_value() {
+  static SEEN: std::sync::Mutex<Vec<(String, u64)>> = std::sync::Mutex::new(Vec::new());
+  struct RecordingStatSink;
+  impl stats_sink::StatSink for RecordingStatSink {
+    fn on_flush(&self, _snapshot: &stats_sink::MetricSnapshot<'_>) {}
+    fn on_histogram_complete(&self, name: EnvoyBuffer<'_>, value: u64) {
+      let name = String::from_utf8_lossy(name.as_slice()).into_owned();
+      SEEN.lock().unwrap().push((name, value));
+    }
+  }
+
+  let sink: Box<dyn stats_sink::StatSink> = Box::new(RecordingStatSink);
+  let config_ptr = Box::into_raw(Box::new(sink)) as *const std::ffi::c_void;
+  let name = "my_histogram";
+  let name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: name.as_ptr() as *const _,
+    length: name.len(),
+  };
+  unsafe {
+    stats_sink::envoy_dynamic_module_on_stat_sink_on_histogram_complete(config_ptr, name_buf, 123);
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_destroy(config_ptr);
+  }
+
+  let seen = SEEN.lock().unwrap();
+  assert_eq!(*seen, vec![("my_histogram".to_string(), 123)]);
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_stat_sink_flush_recovers_from_panic() {
+  // A panic in on_flush must be caught at the FFI boundary so it never unwinds into Envoy.
+  struct PanicStatSink;
+  impl stats_sink::StatSink for PanicStatSink {
+    fn on_flush(&self, _snapshot: &stats_sink::MetricSnapshot<'_>) {
+      panic!("intentional panic in on_flush");
+    }
+    fn on_histogram_complete(&self, _name: EnvoyBuffer<'_>, _value: u64) {}
+  }
+
+  let sink: Box<dyn stats_sink::StatSink> = Box::new(PanicStatSink);
+  let config_ptr = Box::into_raw(Box::new(sink)) as *const std::ffi::c_void;
+  let mut dummy = 0u8;
+  unsafe {
+    stats_sink::envoy_dynamic_module_on_stat_sink_flush(
+      config_ptr,
+      &mut dummy as *mut _ as *mut std::ffi::c_void,
+    );
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_stat_sink_on_histogram_complete_recovers_from_panic() {
+  // on_histogram_complete runs on worker threads, so a panic must be caught at the FFI boundary.
+  struct PanicStatSink;
+  impl stats_sink::StatSink for PanicStatSink {
+    fn on_flush(&self, _snapshot: &stats_sink::MetricSnapshot<'_>) {}
+    fn on_histogram_complete(&self, _name: EnvoyBuffer<'_>, _value: u64) {
+      panic!("intentional panic in on_histogram_complete");
+    }
+  }
+
+  let sink: Box<dyn stats_sink::StatSink> = Box::new(PanicStatSink);
+  let config_ptr = Box::into_raw(Box::new(sink)) as *const std::ffi::c_void;
+  let name = "my_histogram";
+  let name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: name.as_ptr() as *const _,
+    length: name.len(),
+  };
+  unsafe {
+    stats_sink::envoy_dynamic_module_on_stat_sink_on_histogram_complete(config_ptr, name_buf, 456);
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_destroy(config_ptr);
+  }
+}
+
+// Recording stubs and shared state for the stats sink gauge and scheduler callbacks. Tests that
+// exercise these callbacks must hold STAT_SINK_TEST_LOCK and call reset_stat_sink_stubs() so the
+// shared state is deterministic despite the parallel test runner.
+static STAT_SINK_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+static SS_DEFINE_GAUGE_NAMES: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+static SS_SET_GAUGE_CALLS: std::sync::Mutex<Vec<(usize, u64)>> = std::sync::Mutex::new(Vec::new());
+static SS_DEFINE_GAUGE_FROZEN: AtomicBool = AtomicBool::new(false);
+static SS_SCHEDULER_COMMITS: std::sync::Mutex<Vec<u64>> = std::sync::Mutex::new(Vec::new());
+static SS_SCHEDULER_NEW_COUNT: AtomicUsize = AtomicUsize::new(0);
+static SS_SCHEDULER_DELETE_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+fn reset_stat_sink_stubs() {
+  SS_DEFINE_GAUGE_NAMES.lock().unwrap().clear();
+  SS_SET_GAUGE_CALLS.lock().unwrap().clear();
+  SS_DEFINE_GAUGE_FROZEN.store(false, std::sync::atomic::Ordering::SeqCst);
+  SS_SCHEDULER_COMMITS.lock().unwrap().clear();
+  SS_SCHEDULER_NEW_COUNT.store(0, std::sync::atomic::Ordering::SeqCst);
+  SS_SCHEDULER_DELETE_COUNT.store(0, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_config_define_gauge(
+  _config: abi::envoy_dynamic_module_type_stat_sink_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+  gauge_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  if SS_DEFINE_GAUGE_FROZEN.load(std::sync::atomic::Ordering::SeqCst) {
+    return abi::envoy_dynamic_module_type_metrics_result::Frozen;
+  }
+  let name = unsafe { std::slice::from_raw_parts(name.ptr as *const u8, name.length) };
+  let mut names = SS_DEFINE_GAUGE_NAMES.lock().unwrap();
+  names.push(String::from_utf8_lossy(name).into_owned());
+  unsafe { *gauge_id_ptr = names.len() }; // 1-based ID, mirroring the host.
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_config_set_gauge(
+  _config: abi::envoy_dynamic_module_type_stat_sink_config_envoy_ptr,
+  gauge_id: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let defined = SS_DEFINE_GAUGE_NAMES.lock().unwrap().len();
+  if gauge_id == 0 || gauge_id > defined {
+    return abi::envoy_dynamic_module_type_metrics_result::MetricNotFound;
+  }
+  SS_SET_GAUGE_CALLS.lock().unwrap().push((gauge_id, value));
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_config_scheduler_new(
+  _config: abi::envoy_dynamic_module_type_stat_sink_config_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr {
+  SS_SCHEDULER_NEW_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+  // Allocate a token so commit and delete receive a real, non-null pointer just like the host.
+  Box::into_raw(Box::new(0u8)) as *mut std::ffi::c_void
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_config_scheduler_commit(
+  _scheduler: abi::envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr,
+  event_id: u64,
+) {
+  SS_SCHEDULER_COMMITS.lock().unwrap().push(event_id);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_config_scheduler_delete(
+  scheduler: abi::envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr,
+) {
+  SS_SCHEDULER_DELETE_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+  unsafe { drop(Box::from_raw(scheduler as *mut u8)) };
+}
+
+#[test]
+fn test_metric_snapshot_to_owned_copies_all_entries() {
+  // This drives only the read-only snapshot getter stubs, not the shared SS_* state, so unlike the
+  // gauge and scheduler tests below it does not need STAT_SINK_TEST_LOCK.
+  let mut dummy = 0u8;
+  let snapshot = stats_sink::MetricSnapshot::new(&mut dummy as *mut _ as *mut std::ffi::c_void);
+  let owned = snapshot.to_owned();
+
+  assert_eq!(
+    owned.counters,
+    vec![
+      stats_sink::OwnedCounter {
+        name: "counter_0".to_string(),
+        value: 10,
+        delta: 5,
+      },
+      stats_sink::OwnedCounter {
+        name: "counter_1".to_string(),
+        value: 20,
+        delta: 0,
+      },
+    ]
+  );
+  assert_eq!(
+    owned.gauges,
+    vec![stats_sink::OwnedGauge {
+      name: "gauge_0".to_string(),
+      value: 42,
+    }]
+  );
+  assert_eq!(
+    owned.text_readouts,
+    vec![stats_sink::OwnedTextReadout {
+      name: "text_0".to_string(),
+      value: "value_0".to_string(),
+    }]
+  );
+
+  // The owned snapshot is Send, so it can be moved to another thread for aggregation.
+  let handle = std::thread::spawn(move || owned.counters.iter().map(|c| c.value).sum::<u64>());
+  assert_eq!(handle.join().unwrap(), 30);
+}
+
+#[test]
+fn test_envoy_stat_sink_config_define_and_set_gauge() {
+  let _guard = STAT_SINK_TEST_LOCK.lock().unwrap();
+  reset_stat_sink_stubs();
+
+  let mut config = stats_sink::EnvoyStatSinkConfig::new(std::ptr::null_mut());
+  assert_eq!(config.define_gauge("gauge_a").unwrap(), EnvoyGaugeId(1));
+  assert_eq!(config.define_gauge("gauge_b").unwrap(), EnvoyGaugeId(2));
+  assert_eq!(
+    *SS_DEFINE_GAUGE_NAMES.lock().unwrap(),
+    vec!["gauge_a", "gauge_b"]
+  );
+
+  config.set_gauge(EnvoyGaugeId(2), 99).unwrap();
+  assert_eq!(*SS_SET_GAUGE_CALLS.lock().unwrap(), vec![(2, 99)]);
+
+  // An unknown gauge id is rejected, whether zero or past the last defined gauge.
+  assert_eq!(
+    config.set_gauge(EnvoyGaugeId(0), 1),
+    Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound)
+  );
+  assert_eq!(
+    config.set_gauge(EnvoyGaugeId(3), 1),
+    Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound)
+  );
+
+  // Defining a gauge after stat creation is frozen is rejected.
+  SS_DEFINE_GAUGE_FROZEN.store(true, std::sync::atomic::Ordering::SeqCst);
+  assert_eq!(
+    config.define_gauge("too_late"),
+    Err(abi::envoy_dynamic_module_type_metrics_result::Frozen)
+  );
+}
+
+#[test]
+fn test_envoy_stat_sink_config_scheduler_mock() {
+  // The scheduler is a trait so module authors can unit test their off-thread logic with a mock.
+  use crate::stats_sink::EnvoyStatSinkConfigScheduler;
+  let mut mock_scheduler = stats_sink::MockEnvoyStatSinkConfigScheduler::new();
+  mock_scheduler
+    .expect_commit()
+    .with(mockall::predicate::eq(42u64))
+    .times(1)
+    .return_const(());
+  mock_scheduler.commit(42);
+}
+
+#[test]
+fn test_envoy_stat_sink_config_scheduler_commit_and_delete() {
+  use crate::stats_sink::EnvoyStatSinkConfigScheduler;
+  let _guard = STAT_SINK_TEST_LOCK.lock().unwrap();
+  reset_stat_sink_stubs();
+
+  let config = stats_sink::EnvoyStatSinkConfig::new(std::ptr::null_mut());
+  let scheduler = config.new_config_scheduler();
+  assert_eq!(
+    SS_SCHEDULER_NEW_COUNT.load(std::sync::atomic::Ordering::SeqCst),
+    1
+  );
+  scheduler.commit(7);
+
+  // The scheduler is Send, so it can be moved to a worker thread and committed from there.
+  let handle = std::thread::spawn(move || {
+    scheduler.commit(8);
+    // The scheduler is dropped here, which must delete the Envoy-side resource.
+  });
+  handle.join().unwrap();
+
+  assert_eq!(
+    SS_SCHEDULER_DELETE_COUNT.load(std::sync::atomic::Ordering::SeqCst),
+    1
+  );
+  assert_eq!(*SS_SCHEDULER_COMMITS.lock().unwrap(), vec![7, 8]);
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_stat_sink_config_scheduled_invokes_hook() {
+  let _guard = STAT_SINK_TEST_LOCK.lock().unwrap();
+  reset_stat_sink_stubs();
+  // Pretend a single gauge was defined during configuration so the publish below succeeds.
+  SS_DEFINE_GAUGE_NAMES
+    .lock()
+    .unwrap()
+    .push("aggregated".to_string());
+
+  struct PublishingStatSink;
+  impl stats_sink::StatSink for PublishingStatSink {
+    fn on_flush(&self, _snapshot: &stats_sink::MetricSnapshot<'_>) {}
+    fn on_histogram_complete(&self, _name: EnvoyBuffer<'_>, _value: u64) {}
+    fn on_config_scheduled(
+      &self,
+      envoy_config: &mut stats_sink::EnvoyStatSinkConfig,
+      event_id: u64,
+    ) {
+      envoy_config.set_gauge(EnvoyGaugeId(1), event_id).unwrap();
+    }
+  }
+
+  let sink: Box<dyn stats_sink::StatSink> = Box::new(PublishingStatSink);
+  let config_ptr = Box::into_raw(Box::new(sink)) as *const std::ffi::c_void;
+  unsafe {
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_scheduled(
+      std::ptr::null_mut(),
+      config_ptr,
+      55,
+    );
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_destroy(config_ptr);
+  }
+
+  assert_eq!(*SS_SET_GAUGE_CALLS.lock().unwrap(), vec![(1, 55)]);
+}
+
+#[test]
+fn test_stat_sink_default_on_config_scheduled_is_noop() {
+  let _guard = STAT_SINK_TEST_LOCK.lock().unwrap();
+  reset_stat_sink_stubs();
+
+  struct DefaultStatSink;
+  impl stats_sink::StatSink for DefaultStatSink {
+    fn on_flush(&self, _snapshot: &stats_sink::MetricSnapshot<'_>) {}
+    fn on_histogram_complete(&self, _name: EnvoyBuffer<'_>, _value: u64) {}
+  }
+
+  let sink: Box<dyn stats_sink::StatSink> = Box::new(DefaultStatSink);
+  let config_ptr = Box::into_raw(Box::new(sink)) as *const std::ffi::c_void;
+  unsafe {
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_scheduled(
+      std::ptr::null_mut(),
+      config_ptr,
+      1,
+    );
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_destroy(config_ptr);
+  }
+
+  assert!(SS_SET_GAUGE_CALLS.lock().unwrap().is_empty());
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_stat_sink_config_scheduled_recovers_from_panic() {
+  // A panic in on_config_scheduled runs on the main thread, so it must be caught at the FFI
+  // boundary so it never unwinds into Envoy.
+  struct PanicStatSink;
+  impl stats_sink::StatSink for PanicStatSink {
+    fn on_flush(&self, _snapshot: &stats_sink::MetricSnapshot<'_>) {}
+    fn on_histogram_complete(&self, _name: EnvoyBuffer<'_>, _value: u64) {}
+    fn on_config_scheduled(
+      &self,
+      _envoy_config: &mut stats_sink::EnvoyStatSinkConfig,
+      _event_id: u64,
+    ) {
+      panic!("intentional panic in on_config_scheduled");
+    }
+  }
+
+  let sink: Box<dyn stats_sink::StatSink> = Box::new(PanicStatSink);
+  let config_ptr = Box::into_raw(Box::new(sink)) as *const std::ffi::c_void;
+  unsafe {
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_scheduled(
+      std::ptr::null_mut(),
+      config_ptr,
+      1,
+    );
+    stats_sink::envoy_dynamic_module_on_stat_sink_config_destroy(config_ptr);
+  }
+}
+
+// =============================================================================
+// Transport Socket Tests
+// =============================================================================
+
+#[test]
+fn test_transport_socket_io_result_conversions() {
+  let keep = IoResult::keep_open(7, true);
+  assert_eq!(keep.action, PostIoAction::KeepOpen);
+  assert_eq!(keep.bytes_processed, 7);
+  assert!(keep.end_stream_read);
+
+  let close = IoResult::close(3, false);
+  assert_eq!(close.action, PostIoAction::Close);
+  assert_eq!(close.bytes_processed, 3);
+  assert!(!close.end_stream_read);
+
+  // Round-trip through the ABI representation in both directions.
+  let abi_result: abi::envoy_dynamic_module_type_transport_socket_io_result = keep.into();
+  assert_eq!(abi_result.bytes_processed, 7);
+  assert!(abi_result.end_stream_read);
+  assert_eq!(IoResult::from(abi_result), keep);
+}
+
+#[test]
+fn test_transport_socket_post_io_action_conversions() {
+  for action in [PostIoAction::KeepOpen, PostIoAction::Close] {
+    let abi_action: abi::envoy_dynamic_module_type_transport_socket_post_io_action = action.into();
+    assert_eq!(PostIoAction::from(abi_action), action);
+  }
+}
+
+#[test]
+fn test_transport_socket_io_status_conversions() {
+  assert_eq!(
+    IoStatus::from(abi::envoy_dynamic_module_type_transport_socket_io_status::Success),
+    IoStatus::Success
+  );
+  assert_eq!(
+    IoStatus::from(abi::envoy_dynamic_module_type_transport_socket_io_status::Again),
+    IoStatus::Again
+  );
+  assert_eq!(
+    IoStatus::from(abi::envoy_dynamic_module_type_transport_socket_io_status::Error),
+    IoStatus::Error
+  );
+}
+
+#[test]
+fn test_transport_socket_connection_event_conversions() {
+  for event in [
+    ConnectionEvent::RemoteClose,
+    ConnectionEvent::LocalClose,
+    ConnectionEvent::Connected,
+    ConnectionEvent::ConnectedZeroRtt,
+  ] {
+    let abi_event: abi::envoy_dynamic_module_type_network_connection_event = event.into();
+    assert_eq!(ConnectionEvent::from(abi_event), event);
+  }
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_transport_socket_hooks() {
+  static DROPPED: AtomicBool = AtomicBool::new(false);
+
+  struct TestConfig;
+  impl TransportSocketFactoryConfig<EnvoyTransportSocketImpl> for TestConfig {
+    fn new_transport_socket(
+      &self,
+      _envoy: &mut EnvoyTransportSocketImpl,
+    ) -> Box<dyn TransportSocket<EnvoyTransportSocketImpl>> {
+      Box::new(TestSocket)
+    }
+  }
+
+  // The hooks below pass a null Envoy pointer, so the socket must never call back into Envoy.
+  struct TestSocket;
+  impl Drop for TestSocket {
+    fn drop(&mut self) {
+      DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+  impl TransportSocket<EnvoyTransportSocketImpl> for TestSocket {
+    fn on_set_callbacks(&mut self, _envoy: &mut EnvoyTransportSocketImpl) {}
+    fn on_connected(&mut self, _envoy: &mut EnvoyTransportSocketImpl) {}
+    fn on_do_read(&mut self, _envoy: &mut EnvoyTransportSocketImpl) -> IoResult {
+      IoResult::keep_open(0, true)
+    }
+    fn on_do_write(
+      &mut self,
+      _envoy: &mut EnvoyTransportSocketImpl,
+      _end_stream: bool,
+    ) -> IoResult {
+      IoResult::close(0, false)
+    }
+    fn on_close(
+      &mut self,
+      _envoy: &mut EnvoyTransportSocketImpl,
+      _event: ConnectionEvent,
+      _abort_reset: bool,
+    ) {
+    }
+    fn get_protocol(&self, _envoy: &mut EnvoyTransportSocketImpl) -> String {
+      "test-proto".to_string()
+    }
+    fn get_failure_reason(&self, _envoy: &mut EnvoyTransportSocketImpl) -> String {
+      "test-failure".to_string()
+    }
+    fn can_flush_close(&self, _envoy: &mut EnvoyTransportSocketImpl) -> bool {
+      true
+    }
+    fn start_secure_transport(&mut self, _envoy: &mut EnvoyTransportSocketImpl) -> bool {
+      true
+    }
+  }
+
+  let config: Box<dyn TransportSocketFactoryConfig<EnvoyTransportSocketImpl>> =
+    Box::new(TestConfig);
+  let config_ptr = wrap_into_c_void_ptr!(config);
+  let socket_ptr = unsafe {
+    transport_socket::envoy_dynamic_module_on_transport_socket_new(config_ptr, std::ptr::null_mut())
+  };
+  assert!(!socket_ptr.is_null());
+
+  unsafe {
+    transport_socket::envoy_dynamic_module_on_transport_socket_set_callbacks(
+      std::ptr::null_mut(),
+      socket_ptr,
+    );
+    transport_socket::envoy_dynamic_module_on_transport_socket_on_connected(
+      std::ptr::null_mut(),
+      socket_ptr,
+    );
+
+    let read = transport_socket::envoy_dynamic_module_on_transport_socket_do_read(
+      std::ptr::null_mut(),
+      socket_ptr,
+    );
+    assert_eq!(
+      read.action,
+      abi::envoy_dynamic_module_type_transport_socket_post_io_action::KeepOpen
+    );
+    assert!(read.end_stream_read);
+
+    let write = transport_socket::envoy_dynamic_module_on_transport_socket_do_write(
+      std::ptr::null_mut(),
+      socket_ptr,
+      true,
+    );
+    assert_eq!(
+      write.action,
+      abi::envoy_dynamic_module_type_transport_socket_post_io_action::Close
+    );
+
+    assert!(
+      transport_socket::envoy_dynamic_module_on_transport_socket_can_flush_close(
+        std::ptr::null_mut(),
+        socket_ptr,
+      )
+    );
+    assert!(
+      transport_socket::envoy_dynamic_module_on_transport_socket_start_secure_transport(
+        std::ptr::null_mut(),
+        socket_ptr,
+      )
+    );
+
+    let mut protocol_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    transport_socket::envoy_dynamic_module_on_transport_socket_get_protocol(
+      std::ptr::null_mut(),
+      socket_ptr,
+      &mut protocol_buf,
+    );
+    let protocol = std::slice::from_raw_parts(protocol_buf.ptr as *const u8, protocol_buf.length);
+    assert_eq!(protocol, b"test-proto");
+
+    let mut failure_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    transport_socket::envoy_dynamic_module_on_transport_socket_get_failure_reason(
+      std::ptr::null_mut(),
+      socket_ptr,
+      &mut failure_buf,
+    );
+    let failure = std::slice::from_raw_parts(failure_buf.ptr as *const u8, failure_buf.length);
+    assert_eq!(failure, b"test-failure");
+
+    transport_socket::envoy_dynamic_module_on_transport_socket_close(
+      std::ptr::null_mut(),
+      socket_ptr,
+      abi::envoy_dynamic_module_type_network_connection_event::LocalClose,
+      false,
+    );
+
+    transport_socket::envoy_dynamic_module_on_transport_socket_destroy(socket_ptr);
+    transport_socket::envoy_dynamic_module_on_transport_socket_factory_config_destroy(config_ptr);
+  }
+
+  assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+// =============================================================================
+// MockEnvoyTransportSocket Tests
+// =============================================================================
+
+#[test]
+fn test_mock_envoy_transport_socket_do_read() {
+  struct EchoTransportSocket;
+  impl TransportSocket<transport_socket::MockEnvoyTransportSocket> for EchoTransportSocket {
+    fn on_set_callbacks(&mut self, _envoy: &mut transport_socket::MockEnvoyTransportSocket) {}
+    fn on_connected(&mut self, _envoy: &mut transport_socket::MockEnvoyTransportSocket) {}
+    fn on_do_read(&mut self, envoy: &mut transport_socket::MockEnvoyTransportSocket) -> IoResult {
+      let mut buffer = [0u8; 8];
+      let (status, n) = envoy.io_read(&mut buffer);
+      assert_eq!(status, IoStatus::Success);
+      envoy.read_buffer_add(&buffer[..n]);
+      IoResult::keep_open(n, false)
+    }
+    fn on_do_write(
+      &mut self,
+      _envoy: &mut transport_socket::MockEnvoyTransportSocket,
+      _end_stream: bool,
+    ) -> IoResult {
+      IoResult::keep_open(0, false)
+    }
+    fn on_close(
+      &mut self,
+      _envoy: &mut transport_socket::MockEnvoyTransportSocket,
+      _event: ConnectionEvent,
+      _abort_reset: bool,
+    ) {
+    }
+    fn get_protocol(&self, _envoy: &mut transport_socket::MockEnvoyTransportSocket) -> String {
+      String::new()
+    }
+    fn get_failure_reason(
+      &self,
+      _envoy: &mut transport_socket::MockEnvoyTransportSocket,
+    ) -> String {
+      String::new()
+    }
+    fn can_flush_close(&self, _envoy: &mut transport_socket::MockEnvoyTransportSocket) -> bool {
+      true
+    }
+    fn start_secure_transport(
+      &mut self,
+      _envoy: &mut transport_socket::MockEnvoyTransportSocket,
+    ) -> bool {
+      false
+    }
+  }
+
+  let mut mock = transport_socket::MockEnvoyTransportSocket::new();
+  mock.expect_io_read().times(1).returning(|buffer| {
+    buffer[..5].copy_from_slice(b"hello");
+    (IoStatus::Success, 5)
+  });
+  mock
+    .expect_read_buffer_add()
+    .with(mockall::predicate::eq(b"hello".as_slice()))
+    .times(1)
+    .returning(|_| ());
+
+  let mut socket = EchoTransportSocket;
+  assert_eq!(socket.on_do_read(&mut mock), IoResult::keep_open(5, false));
 }

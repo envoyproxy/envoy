@@ -218,6 +218,7 @@ public:
   bool skipXffAppend() const override { return skip_xff_append_; }
   const std::string& via() const override { return via_; }
   Http::ForwardClientCertType forwardClientCert() const override { return forward_client_cert_; }
+  Http::ClientCertFormat clientCertFormat() const override { return forward_client_cert_format_; }
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
   }
@@ -278,6 +279,12 @@ public:
   bool addProxyProtocolConnectionState() const override {
     return add_proxy_protocol_connection_state_;
   }
+  const absl::flat_hash_set<uint32_t>& httpsDestinationPorts() const override {
+    return https_destination_ports_;
+  }
+  const absl::flat_hash_set<uint32_t>& httpDestinationPorts() const override {
+    return http_destination_ports_;
+  }
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
@@ -312,6 +319,7 @@ private:
   const bool skip_xff_append_;
   const std::string via_;
   Http::ForwardClientCertType forward_client_cert_;
+  Http::ClientCertFormat forward_client_cert_format_{};
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Matcher::MatchTreePtr<Http::HttpMatchingData> forward_client_cert_matcher_;
   Config::ConfigProviderManager* scoped_routes_config_provider_manager_;
@@ -376,6 +384,8 @@ private:
   const bool append_local_overload_;
   const bool append_x_forwarded_port_;
   const bool add_proxy_protocol_connection_state_;
+  const absl::flat_hash_set<uint32_t> https_destination_ports_;
+  const absl::flat_hash_set<uint32_t> http_destination_ports_;
 };
 
 /**

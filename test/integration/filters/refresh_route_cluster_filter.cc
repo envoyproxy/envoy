@@ -7,6 +7,7 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 namespace Envoy {
 
@@ -20,13 +21,13 @@ public:
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
     initial_cluster_ = decoder_callbacks_->route()->routeEntry()->clusterName();
-    has_initial_cluster_info_ = decoder_callbacks_->clusterInfo() != nullptr;
+    has_initial_cluster_info_ = decoder_callbacks_->clusterInfo().has_value();
 
     headers.setCopy(Http::LowerCaseString("env"), "prod");
     decoder_callbacks_->downstreamCallbacks()->refreshRouteCluster();
 
     refreshed_cluster_ = decoder_callbacks_->route()->routeEntry()->clusterName();
-    has_refreshed_cluster_info_ = decoder_callbacks_->clusterInfo() != nullptr;
+    has_refreshed_cluster_info_ = decoder_callbacks_->clusterInfo().has_value();
 
     return Http::FilterHeadersStatus::Continue;
   }
@@ -50,9 +51,13 @@ private:
   bool has_refreshed_cluster_info_{};
 };
 
-class RefreshRouteClusterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class RefreshRouteClusterConfig
+    : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<
+          test::integration::filters::RefreshRouteClusterConfig> {
 public:
-  RefreshRouteClusterConfig() : EmptyHttpFilterConfig("refresh-route-cluster") {}
+  RefreshRouteClusterConfig()
+      : UniqueEmptyHttpFilterConfig<test::integration::filters::RefreshRouteClusterConfig>(
+            "refresh-route-cluster") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&, Server::Configuration::FactoryContext&) override {

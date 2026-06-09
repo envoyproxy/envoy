@@ -68,14 +68,14 @@ void DefaultTlsCertificateSelector::populateServerNamesMap(const Ssl::TlsContext
     // of CN-ID if the presented identifiers include a DNS-ID, SRV-ID,
     // URI-ID, or any application-specific identifier types supported by the
     // client.
-    X509_NAME* cert_subject = X509_get_subject_name(ctx.cert_chain_.get());
+    const X509_NAME* cert_subject = X509_get_subject_name(ctx.cert_chain_.get());
     const int cn_index = X509_NAME_get_index_by_NID(cert_subject, NID_commonName, -1);
     if (cn_index >= 0) {
-      X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(cert_subject, cn_index);
+      const X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(cert_subject, cn_index);
       if (cn_entry) {
-        ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
+        const ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
         if (ASN1_STRING_length(cn_asn1) > 0) {
-          std::string subject_cn(reinterpret_cast<const char*>(ASN1_STRING_data(cn_asn1)),
+          std::string subject_cn(reinterpret_cast<const char*>(ASN1_STRING_get0_data(cn_asn1)),
                                  ASN1_STRING_length(cn_asn1));
           populate(subject_cn);
         }

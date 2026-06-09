@@ -61,6 +61,7 @@ public:
   void addReadFilter(ReadFilterSharedPtr filter) override;
   void removeReadFilter(ReadFilterSharedPtr filter) override;
   bool initializeReadFilters() override;
+  void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
   const ConnectionSocketPtr& getSocket() const override { return socket_; }
 
@@ -103,8 +104,9 @@ public:
   }
   void write(Buffer::Instance& data, bool end_stream) override;
   void setBufferLimits(uint32_t limit) override;
+  void setBufferHighWatermarkTimeout(std::chrono::milliseconds timeout) override;
   uint32_t bufferLimit() const override { return read_buffer_limit_; }
-  bool aboveHighWatermark() const override { return write_buffer_above_high_watermark_; }
+  bool aboveHighWatermark() const override { return above_high_watermark_count_ > 0; }
   const ConnectionSocket::OptionsSharedPtr& socketOptions() const override {
     return socket_->options();
   }
@@ -167,6 +169,13 @@ public:
   StreamInfo::DetectedCloseType detectedCloseType() const override { return detected_close_type_; }
 
 protected:
+  // Indicates if the access log has been written. This is used to ensure that the access log is
+  // written exactly once, even if close() is called multiple times.
+  bool access_log_written_{false};
+
+  // Write access log if it hasn't been written yet.
+  void ensureAccessLogWritten();
+
   // A convenience function which returns true if
   // 1) The read disable count is zero or
   // 2) The read disable count is one due to the read buffer being overrun.
@@ -236,6 +245,10 @@ private:
 
   void closeInternal(ConnectionCloseType type);
 
+  void onBufferHighWatermarkTimeout();
+  void scheduleBufferHighWatermarkTimeout();
+  void maybeCancelBufferHighWatermarkTimeout();
+
   static std::atomic<uint64_t> next_global_id_;
 
   std::list<BytesSentCb> bytes_sent_callbacks_;
@@ -249,20 +262,21 @@ private:
   Buffer::Instance* current_write_buffer_{};
   uint32_t read_disable_count_{0};
   StreamInfo::DetectedCloseType detected_close_type_{StreamInfo::DetectedCloseType::Normal};
-  bool write_buffer_above_high_watermark_ : 1;
-  bool detect_early_close_ : 1;
-  bool enable_half_close_ : 1;
-  bool read_end_stream_raised_ : 1;
-  bool read_end_stream_ : 1;
-  bool write_end_stream_ : 1;
-  bool current_write_end_stream_ : 1;
-  bool dispatch_buffered_data_ : 1;
+  std::chrono::milliseconds buffer_high_watermark_timeout_{};
+  Event::TimerPtr buffer_high_watermark_timer_{nullptr};
+  bool detect_early_close_ : 1 = true;
+  bool enable_half_close_ : 1 = false;
+  bool read_end_stream_raised_ : 1 = false;
+  bool read_end_stream_ : 1 = false;
+  bool write_end_stream_ : 1 = false;
+  bool current_write_end_stream_ : 1 = false;
+  bool dispatch_buffered_data_ : 1 = false;
   // True if the most recent call to the transport socket's doRead method invoked
   // setTransportSocketIsReadable to schedule read resumption after yielding due to
   // shouldDrainReadBuffer(). When true, readDisable must schedule read resumption when
   // read_disable_count_ == 0 to ensure that read resumption happens when remaining bytes are held
   // in transport socket internal buffers.
-  bool transport_wants_read_ : 1;
+  bool transport_wants_read_ : 1 = false;
   bool enable_close_through_filter_manager_ : 1;
 };
 
@@ -315,8 +329,25 @@ public:
                        const Network::ConnectionSocket::OptionsSharedPtr& options,
                        const Network::TransportSocketOptionsConstSharedPtr& transport_options);
 
+  ~ClientConnectionImpl() override;
+
   // Network::ClientConnection
   void connect() override;
+
+protected:
+  void setDetectedCloseType(StreamInfo::DetectedCloseType close_type) override {
+    ConnectionImpl::setDetectedCloseType(close_type);
+    if (stream_info_.upstreamInfo() != nullptr) {
+      stream_info_.upstreamInfo()->setUpstreamDetectedCloseType(close_type);
+    }
+  }
+
+  void setLocalCloseReason(absl::string_view reason) override {
+    ConnectionImpl::setLocalCloseReason(reason);
+    if (stream_info_.upstreamInfo() != nullptr) {
+      stream_info_.upstreamInfo()->setUpstreamLocalCloseReason(reason);
+    }
+  }
 
 private:
   void onConnected() override;

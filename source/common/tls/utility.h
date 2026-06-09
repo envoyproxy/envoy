@@ -50,6 +50,20 @@ bool labelWildcardMatch(absl::string_view dns_label, absl::string_view pattern);
 std::string getSerialNumberFromCertificate(X509& cert);
 
 /**
+ * Computes the SHA-256 digest of a certificate and returns it as a hex-encoded string.
+ * @param cert the certificate
+ * @return std::string the hex-encoded SHA-256 digest of the certificate.
+ */
+std::string getSha256DigestFromCertificate(X509& cert);
+
+/**
+ * Computes the SHA-1 digest of a certificate and returns it as a hex-encoded string.
+ * @param cert the certificate
+ * @return std::string the hex-encoded SHA-1 digest of the certificate.
+ */
+std::string getSha1DigestFromCertificate(X509& cert);
+
+/**
  * Maps a stack of x509 certificates to a vector of strings extracted from the certificates.
  * @param stack the stack of certificates
  * @param field_extractor the function to extract the field from each certificate.
@@ -166,6 +180,20 @@ absl::string_view getErrorDescription(int err);
  * @return the error details
  */
 std::string getX509VerificationErrorInfo(X509_STORE_CTX* ctx);
+
+/**
+ * Returns a list of all Subject Alternative Names from the certificate.
+ * @param cert the certificate
+ * @return std::vector returns the list of subject alternate names as strings.
+ */
+std::vector<std::string> getCertificateSansForLogging(X509* cert);
+
+/**
+ * Returns a list of all CRL Distribution Points from the certificate.
+ * @param cert the certificate
+ * @return std::vector returns the list of CRL distribution points as strings.
+ */
+std::vector<std::string> getCertificateCrlDpsForLogging(X509* cert);
 
 } // namespace Utility
 } // namespace Tls

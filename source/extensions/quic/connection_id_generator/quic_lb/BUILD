@@ -23,9 +23,9 @@ envoy_cc_library(
         "//source/common/config:datasource_lib",
         "//source/common/quic:envoy_quic_connection_id_generator_factory_interface",
         "//source/common/quic:envoy_quic_utils_lib",
-        "@com_github_google_quiche//:quic_load_balancer_config_lib",
-        "@com_github_google_quiche//:quic_load_balancer_encoder_lib",
-        "@com_github_google_quiche//:quic_load_balancer_server_id_lib",
+        "@quiche//:quic_load_balancer_config_lib",
+        "@quiche//:quic_load_balancer_encoder_lib",
+        "@quiche//:quic_load_balancer_server_id_lib",
         "@envoy_api//envoy/extensions/quic/connection_id_generator/quic_lb/v3:pkg_cc_proto",
     ]),
 )

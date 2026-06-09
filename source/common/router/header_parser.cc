@@ -94,10 +94,16 @@ HeadersToAddEntry::HeadersToAddEntry(const HeaderValue& header_value,
 
 absl::StatusOr<HeaderParserPtr>
 HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add) {
+  return configure(headers_to_add, Formatter::CommandParserPtrVector{});
+}
+
+absl::StatusOr<HeaderParserPtr>
+HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add,
+                        const Formatter::CommandParserPtrVector& command_parsers) {
   HeaderParserPtr header_parser(new HeaderParser());
   header_parser->headers_to_add_.reserve(headers_to_add.size());
   for (const auto& header_value_option : headers_to_add) {
-    auto entry_or_error = HeadersToAddEntry::create(header_value_option);
+    auto entry_or_error = HeadersToAddEntry::create(header_value_option, command_parsers);
     RETURN_IF_NOT_OK_REF(entry_or_error.status());
     header_parser->headers_to_add_.emplace_back(
         Http::LowerCaseString(header_value_option.header().key()),

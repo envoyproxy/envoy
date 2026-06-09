@@ -151,6 +151,12 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
                                                const Http::ResponseTrailerMap* response_trailers,
                                                const StreamInfo::StreamInfo& stream_info,
                                                const Config& tracing_config) {
+  // Early exit if tags are not needed
+  if (!span.exportedSpan()) {
+    span.finishSpan();
+    return;
+  }
+
   // Pre response data.
   if (request_headers) {
     if (request_headers->RequestId()) {
@@ -236,11 +242,9 @@ void HttpTracerUtility::setCommonTags(Span& span, const StreamInfo::StreamInfo& 
   span.setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
 
   // Cluster info.
-  if (auto cluster_info = stream_info.upstreamClusterInfo();
-      cluster_info.has_value() && cluster_info.value() != nullptr) {
-    span.setTag(Tracing::Tags::get().UpstreamCluster, cluster_info.value()->name());
-    span.setTag(Tracing::Tags::get().UpstreamClusterName,
-                cluster_info.value()->observabilityName());
+  if (const auto cluster_info = stream_info.upstreamClusterInfo()) {
+    span.setTag(Tracing::Tags::get().UpstreamCluster, cluster_info->name());
+    span.setTag(Tracing::Tags::get().UpstreamClusterName, cluster_info->observabilityName());
   }
 
   setSpanHttpStatusCode(span, stream_info);

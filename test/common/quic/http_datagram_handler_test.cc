@@ -70,8 +70,7 @@ protected:
 };
 
 TEST_F(HttpDatagramHandlerTest, Http3DatagramToCapsule) {
-  EXPECT_CALL(stream_decoder_,
-              decodeData(BufferStringEqual(capsule_fragment_), /*end_stream=*/false));
+  EXPECT_CALL(stream_decoder_, decodeData(BufferString(capsule_fragment_), /*end_stream=*/false));
   http_datagram_handler_.OnHttp3Datagram(kStreamId, datagram_payload_);
 }
 
@@ -87,7 +86,7 @@ TEST_F(HttpDatagramHandlerTest, CapsuleToHttp3Datagram) {
 
 TEST_F(HttpDatagramHandlerTest, ReceiveCapsuleWithUnknownType) {
   EXPECT_CALL(stream_decoder_,
-              decodeData(BufferStringEqual(unknown_capsule_fragment_), /*end_stream=*/false));
+              decodeData(BufferString(unknown_capsule_fragment_), /*end_stream=*/false));
   std::string payload = absl::HexStringToBytes("a1a2a3a4a5a6a7a8");
   quiche::UnknownCapsule capsule{0x17u, payload};
   http_datagram_handler_.OnUnknownCapsule(kStreamId, capsule);

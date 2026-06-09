@@ -55,7 +55,7 @@ void TcpStatsSocket::onConnected() {
   transport_socket_->onConnected();
 }
 
-void TcpStatsSocket::closeSocket(Network::ConnectionEvent event) {
+void TcpStatsSocket::closeSocket(Network::ConnectionEvent event, bool abort_reset) {
   // Record final values.
   recordStats();
 
@@ -71,7 +71,7 @@ void TcpStatsSocket::closeSocket(Network::ConnectionEvent event) {
     timer_->disableTimer();
   }
 
-  transport_socket_->closeSocket(event);
+  transport_socket_->closeSocket(event, abort_reset);
 }
 
 absl::optional<struct tcp_info> TcpStatsSocket::querySocketInfo() {

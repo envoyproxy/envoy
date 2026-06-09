@@ -45,6 +45,6 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/common/protobuf:create_reflectable_message_lib",
         "//source/common/protobuf:utility_lib",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )

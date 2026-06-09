@@ -21,10 +21,12 @@ Config::createCommonProtocolInputFactoryCb(const Protobuf::Message& config,
   // This assumes that the environment remains stable during the process lifetime.
   auto* value = getenv(environment_config.name().data());
   if (value != nullptr) {
-    return [s = std::string(value)]() { return std::make_unique<Input>(s); };
+    return [s = std::string(value)]() {
+      return std::make_unique<Input>(absl::make_optional<absl::string_view>(s));
+    };
   }
 
-  return []() { return std::make_unique<Input>(absl::monostate()); };
+  return []() { return std::make_unique<Input>(absl::nullopt); };
 }
 
 /**

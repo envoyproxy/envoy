@@ -20,8 +20,7 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/dynamic_forward_proxy:config",
-        "//test/mocks/server:factory_context_mocks",
-        "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "@envoy_api//envoy/extensions/filters/http/dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )
@@ -52,6 +51,11 @@ envoy_proto_library(
     srcs = ["test_resolver.proto"],
 )
 
+envoy_proto_library(
+    name = "modify_host_filter_proto",
+    srcs = ["modify_host_filter.proto"],
+)
+
 envoy_cc_test_library(
     name = "test_resolver_lib",
     srcs = ["test_resolver.cc"],
@@ -70,6 +74,7 @@ envoy_cc_test_library(
     name = "modify_host_filter_lib",
     srcs = ["modify_host_filter.cc"],
     deps = [
+        ":modify_host_filter_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -103,6 +108,7 @@ envoy_extension_cc_test(
         "//source/extensions/network/dns_resolver/getaddrinfo:config",
         "//test/integration:http_integration_lib",
         "//test/integration/filters:stream_info_to_headers_filter_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -115,7 +121,6 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "legacy_proxy_filter_integration_test",
-    size = "large",
     srcs = ["proxy_filter_integration_test.cc"],
     args = [
         "--runtime-feature-disable-for-tests=envoy.reloadable_features.dfp_cluster_resolves_hosts",
@@ -124,7 +129,7 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_names = ["envoy.filters.http.dynamic_forward_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_small",
     # TODO(envoyproxy/windows-dev): Diagnose failure shown on clang-cl build, see:
     #   https://gist.github.com/wrowe/a152cb1d12c2f751916122aed39d8517
     tags = ["fails_on_clang_cl"],
@@ -139,6 +144,7 @@ envoy_extension_cc_test(
         "//source/extensions/network/dns_resolver/getaddrinfo:config",
         "//test/integration:http_integration_lib",
         "//test/integration/filters:stream_info_to_headers_filter_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

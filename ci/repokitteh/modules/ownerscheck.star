@@ -59,7 +59,11 @@ def _get_relevant_specs(specs, changed_files):
     for spec in specs:
         path_match = spec["path"]
 
+        path_exclude = spec.get("path_exclude", "")
+
         files = [f for f in changed_files if match(path_match, f["filename"])]
+        if path_exclude and files:
+            files = [f for f in files if not match(path_exclude, f["filename"])]
         allow_global_approval = spec.get("allow_global_approval", True)
         status_label = spec.get("github_status_label", "")
         if files:

@@ -176,6 +176,7 @@ TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateNetworkFilter) {
   EXPECT_CALL(conn_handler_, incNumConnections());
   EXPECT_CALL(filter_chain_factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
   EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes());
+  EXPECT_CALL(listener_config_, perConnectionBufferHighWatermarkTimeout());
   internal_listener_->onAccept(Network::ConnectionSocketPtr{accepted_socket});
   EXPECT_CALL(conn_handler_, decNumConnections());
   connection->close(Network::ConnectionCloseType::NoFlush);
@@ -224,6 +225,7 @@ TEST_F(ActiveInternalListenerTest, DestroyListenerCloseAllConnections) {
   EXPECT_CALL(conn_handler_, incNumConnections());
   EXPECT_CALL(filter_chain_factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
   EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes());
+  EXPECT_CALL(listener_config_, perConnectionBufferHighWatermarkTimeout());
   internal_listener_->onAccept(Network::ConnectionSocketPtr{accepted_socket});
 
   EXPECT_CALL(conn_handler_, decNumConnections());
@@ -307,6 +309,9 @@ public:
       return hand_off_restored_destination_connections_;
     }
     uint32_t perConnectionBufferLimitBytes() const override { return 0; }
+    std::chrono::milliseconds perConnectionBufferHighWatermarkTimeout() const override {
+      return std::chrono::milliseconds::zero();
+    }
     std::chrono::milliseconds listenerFiltersTimeout() const override {
       return listener_filters_timeout_;
     }

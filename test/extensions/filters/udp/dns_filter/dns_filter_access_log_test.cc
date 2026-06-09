@@ -1,7 +1,6 @@
 #include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.h"
 #include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.validate.h"
 
-#include "source/common/common/logger.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_access_log.h"
@@ -9,7 +8,6 @@
 #include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
 
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/server/instance.h"
 #include "test/mocks/server/listener_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
@@ -35,7 +33,7 @@ namespace {
 using ResponseValidator = Utils::DnsResponseValidator;
 
 Api::IoCallUint64Result makeNoError(uint64_t rc) {
-  return Api::IoCallUint64Result(rc, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+  return {rc, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 }
 
 // Test access logger that captures formatted output using DNS custom commands

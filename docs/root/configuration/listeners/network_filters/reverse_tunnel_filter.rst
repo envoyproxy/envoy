@@ -14,3 +14,8 @@ Configuration notes:
 
 - **HTTP method**: ``request_method`` uses :ref:`RequestMethod <envoy_v3_api_enum_config.core.v3.RequestMethod>`. If not specified, it defaults to ``GET``.
 - In this version, the filter does not perform additional request validation against filter state or metadata.
+- **Tenant isolation**: ``enable_tenant_isolation`` scopes cached reverse connections by tenant.
+  When enabled, the filter derives composite identifiers of the form ``<tenant>:<node>`` and
+  ``<tenant>:<cluster>`` so that the same node or cluster identifier can be reused across tenants.
+  To avoid ambiguity, handshake requests that contain the ``:`` delimiter in any of the reverse
+  tunnel headers are rejected. This option is disabled by default for backwards compatibility.

@@ -83,7 +83,7 @@ public:
               });
         },
         stats_,
-        [this](google::jwt_verify::JwksPtr&& jwks) { out_jwks_array_.push_back(std::move(jwks)); });
+        [this](Envoy::JwtVerify::JwksPtr&& jwks) { out_jwks_array_.push_back(std::move(jwks)); });
 
     if (initManagerUsed()) {
       init_target_handle_->initialize(init_watcher_);
@@ -95,7 +95,7 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   JwtAuthnFilterStats stats_;
   std::vector<Common::JwksFetcher::JwksReceiver*> fetch_receiver_array_;
-  std::vector<google::jwt_verify::JwksPtr> out_jwks_array_;
+  std::vector<Envoy::JwtVerify::JwksPtr> out_jwks_array_;
 
   Init::TargetHandlePtr init_target_handle_;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
@@ -145,7 +145,7 @@ TEST_P(JwksAsyncFetcherTest, TestGoodFetch) {
 
   // Trigger the Jwks response
   EXPECT_EQ(fetch_receiver_array_.size(), 1);
-  auto jwks = google::jwt_verify::Jwks::createFrom(PublicKey, google::jwt_verify::Jwks::JWKS);
+  auto jwks = Envoy::JwtVerify::Jwks::createFrom(PublicKey, Envoy::JwtVerify::Jwks::JWKS);
   fetch_receiver_array_[0]->onJwksSuccess(std::move(jwks));
 
   // Output 1 jwks.
@@ -198,7 +198,7 @@ TEST_P(JwksAsyncFetcherTest, TestGoodFetchAndRefresh) {
   setupAsyncFetcher(config);
   // Initial fetch is successful
   EXPECT_EQ(fetch_receiver_array_.size(), 1);
-  auto jwks = google::jwt_verify::Jwks::createFrom(PublicKey, google::jwt_verify::Jwks::JWKS);
+  auto jwks = Envoy::JwtVerify::Jwks::createFrom(PublicKey, Envoy::JwtVerify::Jwks::JWKS);
   fetch_receiver_array_[0]->onJwksSuccess(std::move(jwks));
 
   // Output 1 jwks.
@@ -213,7 +213,7 @@ TEST_P(JwksAsyncFetcherTest, TestGoodFetchAndRefresh) {
 
   // refetch again after cache duration interval: successful.
   EXPECT_EQ(fetch_receiver_array_.size(), 2);
-  auto jwks1 = google::jwt_verify::Jwks::createFrom(PublicKey, google::jwt_verify::Jwks::JWKS);
+  auto jwks1 = Envoy::JwtVerify::Jwks::createFrom(PublicKey, Envoy::JwtVerify::Jwks::JWKS);
   fetch_receiver_array_[1]->onJwksSuccess(std::move(jwks1));
 
   // Output 2 jwks.

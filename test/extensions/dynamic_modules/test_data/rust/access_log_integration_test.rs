@@ -1,13 +1,19 @@
 //! Integration test module for access logger dynamic modules.
 //!
-//! This module implements a simple access logger that records log events and flush calls.
+//! This module exercises the unified `declare_all_init_functions!` registration: a single
+//! `.so` registers both an HTTP filter factory and an access-logger factory that dispatches
+//! to different implementations by `logger_name`. The C++ side rejects unknown logger names
+//! at config load time when the factory returns `None`.
 
 use envoy_proxy_dynamic_modules_rust_sdk::access_log::*;
 use envoy_proxy_dynamic_modules_rust_sdk::*;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-declare_init_functions!(init, new_nop_http_filter_config_fn);
-declare_access_logger!(TestAccessLoggerConfig);
+declare_all_init_functions!(
+  init,
+  http: new_nop_http_filter_config_fn,
+  access_logger: new_access_logger_config_fn,
+);
 
 /// Global counter for log events.
 static LOG_COUNT: AtomicU32 = AtomicU32::new(0);
@@ -21,13 +27,29 @@ fn init() -> bool {
   true
 }
 
-/// Dummy HTTP filter config function (required by declare_init_functions).
+/// Dummy HTTP filter config function (required by declare_all_init_functions).
 fn new_nop_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
   _envoy_filter_config: &mut EC,
   _name: &str,
   _config: &[u8],
 ) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
   None
+}
+
+/// Access logger factory function: dispatches to the correct config implementation based on
+/// `logger_name`. Returning `None` for an unknown name causes Envoy to reject the access-log
+/// configuration at config load time.
+fn new_access_logger_config_fn(
+  ctx: &ConfigContext,
+  name: &str,
+  config: &[u8],
+) -> Option<Box<dyn AccessLoggerConfig>> {
+  match name {
+    "test_logger" => TestAccessLoggerConfig::new(ctx, name, config)
+      .ok()
+      .map(|c| Box::new(c) as Box<dyn AccessLoggerConfig>),
+    _ => None,
+  }
 }
 
 /// Access logger configuration.
@@ -91,6 +113,127 @@ impl AccessLogger for TestAccessLogger {
     // Test worker id.
     let worker_id = ctx.get_worker_index();
     assert_eq!(worker_id, 0);
+
+    // Test response flags.
+    let _response_flags = ctx.response_flags();
+    let _has_flag =
+      ctx.has_response_flag(abi::envoy_dynamic_module_type_response_flag::NoRouteFound);
+
+    // Test attempt count.
+    let _attempt_count = ctx.attempt_count();
+
+    // Test address accessors.
+    let _downstream_remote = ctx.downstream_remote_address();
+    let _downstream_local = ctx.downstream_local_address();
+    let _upstream_remote = ctx.upstream_remote_address();
+    let _upstream_local = ctx.upstream_local_address();
+
+    // Test upstream info.
+    let _upstream_failure = ctx.upstream_transport_failure_reason();
+
+    // Test TLS/connection info.
+    let _tls_version = ctx.downstream_tls_version();
+    let _peer_subject = ctx.downstream_peer_subject();
+    let _peer_digest = ctx.downstream_peer_cert_digest();
+
+    // Test request ID and metadata.
+    let _request_id = ctx.request_id();
+    let _filter_state = ctx.get_filter_state("test_key");
+
+    // Test tracing (stubs that always return None).
+    let _trace_id = ctx.get_trace_id();
+    let _span_id = ctx.get_span_id();
+
+    // Test connection termination details.
+    let _termination_details = ctx.connection_termination_details();
+
+    // Test direct address accessors.
+    let _direct_remote = ctx.downstream_direct_remote_address();
+    let _direct_local = ctx.downstream_direct_local_address();
+
+    // Test extended downstream TLS fields.
+    let _tls_cipher = ctx.downstream_tls_cipher();
+    let _tls_session_id = ctx.downstream_tls_session_id();
+    let _peer_issuer = ctx.downstream_peer_issuer();
+    let _peer_serial = ctx.downstream_peer_serial();
+    let _peer_sha1 = ctx.downstream_peer_fingerprint_1();
+    let _local_subject = ctx.downstream_local_subject();
+
+    // Test upstream connection/TLS fields.
+    let _upstream_conn_id = ctx.upstream_connection_id();
+    let _upstream_tls_ver = ctx.upstream_tls_version();
+    let _upstream_cipher = ctx.upstream_tls_cipher();
+    let _upstream_session = ctx.upstream_tls_session_id();
+    let _upstream_subject = ctx.upstream_peer_subject();
+    let _upstream_issuer = ctx.upstream_peer_issuer();
+
+    // Test downstream certificate status and validity.
+    let _cert_presented = ctx.downstream_peer_cert_presented();
+    let _cert_validated = ctx.downstream_peer_cert_validated();
+    let _cert_v_start = ctx.downstream_peer_cert_v_start();
+    let _cert_v_end = ctx.downstream_peer_cert_v_end();
+
+    // Test downstream SAN accessors.
+    let _ds_peer_uri = ctx.downstream_peer_uri_san();
+    let _ds_local_uri = ctx.downstream_local_uri_san();
+    let _ds_peer_dns = ctx.downstream_peer_dns_san();
+    let _ds_local_dns = ctx.downstream_local_dns_san();
+
+    // Test upstream extended certificate fields.
+    let _us_local_subj = ctx.upstream_local_subject();
+    let _us_peer_digest = ctx.upstream_peer_cert_digest();
+    let _us_cert_v_start = ctx.upstream_peer_cert_v_start();
+    let _us_cert_v_end = ctx.upstream_peer_cert_v_end();
+
+    // Test upstream SAN accessors.
+    let _us_peer_uri = ctx.upstream_peer_uri_san();
+    let _us_local_uri = ctx.upstream_local_uri_san();
+    let _us_peer_dns = ctx.upstream_peer_dns_san();
+    let _us_local_dns = ctx.upstream_local_dns_san();
+
+    // Test response trailer access.
+    let _response_trailer = ctx.get_response_trailer("x-trailer");
+
+    // Test bulk header access.
+    let request_headers =
+      ctx.get_all_headers(abi::envoy_dynamic_module_type_http_header_type::RequestHeader);
+    assert!(!request_headers.is_empty());
+    let _response_headers =
+      ctx.get_all_headers(abi::envoy_dynamic_module_type_http_header_type::ResponseHeader);
+    let _response_trailers =
+      ctx.get_all_headers(abi::envoy_dynamic_module_type_http_header_type::ResponseTrailer);
+
+    // Test generic attribute accessors.
+    let _attr_protocol =
+      ctx.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::RequestProtocol);
+    let _attr_route =
+      ctx.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::XdsRouteName);
+    let _attr_resp_code =
+      ctx.get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ResponseCode);
+    let _attr_conn_id =
+      ctx.get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ConnectionId);
+    let _attr_mtls =
+      ctx.get_attribute_bool(abi::envoy_dynamic_module_type_attribute_id::ConnectionMtls);
+
+    // Test access log type.
+    let log_type = ctx.log_type();
+    assert_eq!(log_type.as_str(), "DownstreamEnd");
+
+    // Test JA3/JA4 fingerprint accessors.
+    let _ja3 = ctx.ja3_hash();
+    let _ja4 = ctx.ja4_hash();
+
+    // Test downstream transport failure reason.
+    let _ds_transport_failure = ctx.downstream_transport_failure_reason();
+
+    // Test header byte size accessors.
+    let _req_header_bytes = ctx.request_headers_bytes();
+    let _resp_header_bytes = ctx.response_headers_bytes();
+    let _resp_trailer_bytes = ctx.response_trailers_bytes();
+
+    // Test upstream protocol and connection pool ready duration.
+    let _upstream_protocol = ctx.upstream_protocol();
+    let _pool_ready_duration = ctx.upstream_connection_pool_ready_duration_ns();
   }
 
   fn flush(&mut self) {

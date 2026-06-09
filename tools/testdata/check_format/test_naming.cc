@@ -1,7 +1,5 @@
 namespace Envoy {
 
-TEST_F(FooBar, testSomething) {
-
-}
+TEST_F(FooBar, testSomething) {}
 
 } // namespace Envoy

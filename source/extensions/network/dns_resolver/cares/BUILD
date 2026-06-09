@@ -25,6 +25,6 @@ envoy_cc_extension(
         "//source/common/network:utility_lib",
         "//source/common/network/dns_resolver:dns_factory_util_lib",
         "//source/common/runtime:runtime_features_lib",
-        "@com_github_cares_cares//:ares",
+        "@c-ares//:ares",
     ],
 )

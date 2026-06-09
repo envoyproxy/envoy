@@ -27,7 +27,7 @@
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/fuzz/utility.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/retry_priority.h"
 #include "test/mocks/upstream/retry_priority_factory.h"
 #include "test/mocks/upstream/test_retry_host_predicate_factory.h"
@@ -173,12 +173,12 @@ protected:
   }
 
   std::string virtualHostName(const Route* route) {
-    Stats::StatName name = route->virtualHost()->statName();
+    Stats::StatName name = route->virtualHost().statName();
     return factory_context_.scope().symbolTable().toString(name);
   }
 
   std::string virtualClusterName(const Route* route, Http::TestRequestHeaderMapImpl& headers) {
-    Stats::StatName name = route->virtualHost()->virtualCluster(headers)->statName();
+    Stats::StatName name = route->virtualHost().virtualCluster(headers)->statName();
     return factory_context_.scope().symbolTable().toString(name);
   }
 
@@ -360,6 +360,124 @@ class RouteMatcherTest : public testing::Test,
                          public ConfigImplTestBase,
                          public TestScopedRuntime {};
 
+TEST(RouteMatchContextTest, BasicPathAndQuery) {
+  Http::TestRequestHeaderMapImpl headers{{":path", "/foo?a=1&b=2"}};
+  RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
+
+  EXPECT_EQ(ctx.path(), "/foo?a=1&b=2");
+  EXPECT_EQ(ctx.pathWithoutQuery(), "/foo");
+  EXPECT_EQ(ctx.sanitizedPath(), "/foo?a=1&b=2");
+  EXPECT_EQ(ctx.sanitizedPathWithoutQuery(), "/foo");
+  EXPECT_EQ(ctx.queryParams().getFirstValue("a").value(), "1");
+  EXPECT_EQ(ctx.queryParams().getFirstValue("b").value(), "2");
+}
+
+TEST(RouteMatchContextTest, PathWithFragment) {
+  Http::TestRequestHeaderMapImpl headers{{":path", "/foo?x=1#section"}};
+  RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
+
+  EXPECT_EQ(ctx.pathWithoutQuery(), "/foo");
+  EXPECT_EQ(ctx.sanitizedPathWithoutQuery(), "/foo");
+}
+
+TEST(RouteMatchContextTest, NoQueryString) {
+  Http::TestRequestHeaderMapImpl headers{{":path", "/foo/bar"}};
+  RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
+
+  EXPECT_EQ(ctx.path(), "/foo/bar");
+  EXPECT_EQ(ctx.pathWithoutQuery(), "/foo/bar");
+  EXPECT_FALSE(ctx.queryParams().getFirstValue("any").has_value());
+}
+
+TEST(RouteMatchContextTest, SanitizedPathStripsPathParams) {
+  Http::TestRequestHeaderMapImpl headers{{":path", "/foo;env=prod;ver=2?a=1"}};
+  RouteMatchContext ctx(headers, /*ignore_path_params=*/true);
+
+  EXPECT_EQ(ctx.sanitizedPath(), "/foo");
+  EXPECT_EQ(ctx.sanitizedPathWithoutQuery(), "/foo");
+  // Raw accessors are unaffected.
+  EXPECT_EQ(ctx.path(), "/foo;env=prod;ver=2?a=1");
+  EXPECT_EQ(ctx.pathWithoutQuery(), "/foo;env=prod;ver=2");
+}
+
+TEST(RouteMatchContextTest, SanitizedPathNoOpWhenNotConfigured) {
+  Http::TestRequestHeaderMapImpl headers{{":path", "/foo;env=prod?a=1"}};
+  RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
+
+  EXPECT_EQ(ctx.sanitizedPath(), "/foo;env=prod?a=1");
+  EXPECT_EQ(ctx.sanitizedPathWithoutQuery(), "/foo;env=prod");
+}
+
+TEST(RouteMatchContextTest, IsGrpc) {
+  {
+    Http::TestRequestHeaderMapImpl headers{{":path", "/pkg.Svc/Method"},
+                                           {"content-type", "application/grpc"}};
+    RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
+    EXPECT_TRUE(ctx.isGrpc());
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers{{":path", "/foo"}, {"content-type", "application/json"}};
+    RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
+    EXPECT_FALSE(ctx.isGrpc());
+  }
+}
+
+TEST(RouteMatchContextTest, Cookies) {
+  Http::TestRequestHeaderMapImpl headers{{":path", "/foo"}, {"cookie", "session=abc; user=xyz"}};
+  RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
+
+  const auto& cookies = ctx.cookies();
+  EXPECT_EQ(cookies.at("session"), "abc");
+  EXPECT_EQ(cookies.at("user"), "xyz");
+  EXPECT_EQ(cookies.size(), 2);
+}
+
+TEST(RouteMatchContextTest, NoCookies) {
+  Http::TestRequestHeaderMapImpl headers{{":path", "/foo"}};
+  RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
+
+  EXPECT_TRUE(ctx.cookies().empty());
+}
+
+// Regression test: route 1 checks cookie "session" (no match), route 2 checks
+// cookie "user" (match). With the old filtered-cache bug, route 1's evaluation
+// would cache only {"session": ...}, causing route 2 to miss "user" and fail.
+TEST_F(RouteMatcherTest, CookiesCachedAcrossDifferentNameSets) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: cookie
+    domains: ["*"]
+    routes:
+      - match:
+          prefix: "/"
+          cookies:
+            - name: session
+              string_match:
+                exact: expected
+        route: { cluster: session-cluster }
+      - match:
+          prefix: "/"
+          cookies:
+            - name: user
+              string_match:
+                exact: xyz
+        route: { cluster: user-cluster }
+      - match:
+          prefix: "/"
+        route: { cluster: default }
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters(
+      {"session-cluster", "user-cluster", "default"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  // session=other → route 1 misses; user=xyz → route 2 matches.
+  auto headers = genHeaders("www.example.com", "/foo", "GET");
+  headers.addCopy("cookie", "session=other; user=xyz");
+  EXPECT_EQ("user-cluster", config.route(headers, 0)->routeEntry()->clusterName());
+}
+
 TEST_F(RouteMatcherTest, TestConnectRoutes) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -461,9 +579,9 @@ virtual_hosts:
     EXPECT_EQ("http://bat4.com/new_path", redirect->newUri(headers));
   }
 
-  stream_info.filterState()->setData(
-      Router::OriginalConnectPort::key(), std::make_unique<Router::OriginalConnectPort>(10),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
+  stream_info.filterState()->setData(Router::OriginalConnectPort::key(),
+                                     std::make_unique<Router::OriginalConnectPort>(10),
+                                     StreamInfo::FilterState::LifeSpan::Request);
   // Port addition for CONNECT without port
   {
     Http::TestRequestHeaderMapImpl headers =
@@ -1252,7 +1370,6 @@ virtual_hosts:
     auto address_obj = std::make_unique<Network::Address::InstanceAccessor>(
         Envoy::Network::Utility::parseInternetAddressNoThrow("10.0.0.1", 443, false));
     stream_info.filterState()->setData("envoy.address", std::move(address_obj),
-                                       StreamInfo::FilterState::StateType::ReadOnly,
                                        StreamInfo::FilterState::LifeSpan::Request);
     EXPECT_EQ("filter_state_cluster",
               config.route(genHeaders("foo.com", "/", "GET"), stream_info, 0)
@@ -2361,7 +2478,6 @@ protected:
         std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
             Envoy::StreamInfo::FilterState::LifeSpan::FilterChain));
     filter_state->setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
-                          StreamInfo::FilterState::StateType::ReadOnly,
                           StreamInfo::FilterState::LifeSpan::FilterChain);
     ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
     ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
@@ -3532,13 +3648,10 @@ public:
       : filter_state_(std::make_shared<StreamInfo::FilterStateImpl>(
             StreamInfo::FilterState::LifeSpan::FilterChain)) {
 
-    filter_state_->setData("null-value", nullptr, StreamInfo::FilterState::StateType::ReadOnly,
-                           StreamInfo::FilterState::LifeSpan::FilterChain);
+    filter_state_->setData("null-value", nullptr, StreamInfo::FilterState::LifeSpan::FilterChain);
     filter_state_->setData("nonhashable", std::make_unique<NonHashable>(),
-                           StreamInfo::FilterState::StateType::ReadOnly,
                            StreamInfo::FilterState::LifeSpan::FilterChain);
     filter_state_->setData("hashable", std::make_unique<HashableObj>(),
-                           StreamInfo::FilterState::StateType::ReadOnly,
                            StreamInfo::FilterState::LifeSpan::FilterChain);
   }
   class NonHashable : public StreamInfo::FilterState::Object {};
@@ -3780,9 +3893,9 @@ virtual_hosts:
     route->routeEntry()->rateLimitPolicy();
     route->routeEntry()->retryPolicy();
     route->routeEntry()->shadowPolicies();
-    route->virtualHost()->virtualCluster(headers);
+    route->virtualHost().virtualCluster(headers);
     route->virtualHost();
-    route->virtualHost()->rateLimitPolicy();
+    route->virtualHost().rateLimitPolicy();
     route->routeEntry()->pathMatchCriterion();
     route->routeEntry()->hedgePolicy();
     route->routeEntry()->maxGrpcTimeout();
@@ -4422,7 +4535,7 @@ virtual_hosts:
 
   EXPECT_TRUE(config.route(genHeaders("www.example.com", "/foo", "GET"), 0)
                   ->virtualHost()
-                  ->includeIsTimeoutRetryHeader());
+                  .includeIsTimeoutRetryHeader());
 }
 
 TEST_F(RouteMatcherTest, NoIsTimeoutRetryHeader) {
@@ -4442,7 +4555,7 @@ virtual_hosts:
 
   EXPECT_FALSE(config.route(genHeaders("www.example.com", "/foo", "GET"), 0)
                    ->virtualHost()
-                   ->includeIsTimeoutRetryHeader());
+                   .includeIsTimeoutRetryHeader());
 }
 
 TEST_F(RouteMatcherTest, ClusterNotFoundResponseCode) {
@@ -4961,6 +5074,7 @@ virtual_hosts:
         per_try_idle_timeout: 5s
         num_retries: 3
         retry_on: 5xx,gateway-error,connect-failure,reset
+        refresh_cluster_on_retry: true
   )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
@@ -5021,6 +5135,14 @@ virtual_hosts:
                 ->routeEntry()
                 ->retryPolicy()
                 ->retryOn());
+  EXPECT_FALSE(config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                   ->routeEntry()
+                   ->retryPolicy()
+                   ->refreshClusterOnRetry());
+  EXPECT_TRUE(config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                  ->routeEntry()
+                  ->retryPolicy()
+                  ->refreshClusterOnRetry());
 }
 
 class TestRetryOptionsPredicateFactory : public Upstream::RetryOptionsPredicateFactory {
@@ -7221,6 +7343,219 @@ TEST_F(RouteMatcherTest, WeightedClusterInvalidConfigWithInvalidHttpHeader) {
                           EnvoyException, "Proto constraint validation failed.*");
 }
 
+// Tests for WeightedClusterEntry::refreshRouteCluster which allows re-selecting a different
+// weighted cluster (e.g. for retries).
+TEST_F(RouteMatcherTest, WeightedClusterRefreshRouteClusters) {
+  const std::string yaml = R"EOF(
+      virtual_hosts:
+        - name: www1
+          domains: ["www1.lyft.com"]
+          routes:
+            - match: { prefix: "/" }
+              route:
+                weighted_clusters:
+                  clusters:
+                    - name: cluster1
+                      weight: 30
+                    - name: cluster2
+                      weight: 30
+                    - name: cluster3
+                      weight: 40
+      )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"cluster1", "cluster2", "cluster3"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  // With random_value=0: cluster1 selected (range [0,30) of total 100).
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www1.lyft.com", "/foo", "GET");
+  RouteConstSharedPtr route = config.route(headers, 0);
+  ASSERT_NE(nullptr, route);
+  const RouteEntry* route_entry = route->routeEntry();
+  EXPECT_EQ("cluster1", route_entry->clusterName());
+
+  // First refresh: cluster1 is marked used. Eligible: cluster2 (wt=30), cluster3 (wt=40).
+  // random_value=0, 0 % 70 = 0 → [0,30) → cluster2.
+  route_entry->refreshRouteCluster(headers, stream_info);
+  EXPECT_EQ("cluster2", route_entry->clusterName());
+
+  // Second refresh: cluster2 is now marked used. Eligible: cluster3 (wt=40) only.
+  // random_value=0, 0 % 40 = 0 → cluster3.
+  route_entry->refreshRouteCluster(headers, stream_info);
+  EXPECT_EQ("cluster3", route_entry->clusterName());
+
+  // Third refresh: all 3 clusters used → reset pool.
+  // Now full list is eligible, random_value=0 → cluster1 again.
+  route_entry->refreshRouteCluster(headers, stream_info);
+  EXPECT_EQ("cluster1", route_entry->clusterName());
+
+  // Fourth refresh after reset: cluster1 marked used again → cluster2.
+  route_entry->refreshRouteCluster(headers, stream_info);
+  EXPECT_EQ("cluster2", route_entry->clusterName());
+}
+
+// Two equal-weight clusters: refresh always picks the other cluster and cycles.
+TEST_F(RouteMatcherTest, WeightedClusterRefreshRouteClustersTwoCluster) {
+  const std::string yaml = R"EOF(
+      virtual_hosts:
+        - name: www1
+          domains: ["www1.lyft.com"]
+          routes:
+            - match: { prefix: "/" }
+              route:
+                weighted_clusters:
+                  clusters:
+                    - name: cluster1
+                      weight: 50
+                    - name: cluster2
+                      weight: 50
+      )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"cluster1", "cluster2"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  // random_value=0 → cluster1.
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www1.lyft.com", "/foo", "GET");
+  RouteConstSharedPtr route = config.route(headers, 0);
+  const RouteEntry* route_entry = route->routeEntry();
+  EXPECT_EQ("cluster1", route_entry->clusterName());
+
+  // After one refresh, the only unused cluster is cluster2.
+  route_entry->refreshRouteCluster(headers, stream_info);
+  EXPECT_EQ("cluster2", route_entry->clusterName());
+
+  // After second refresh, all clusters exhausted → reset → cluster1.
+  route_entry->refreshRouteCluster(headers, stream_info);
+  EXPECT_EQ("cluster1", route_entry->clusterName());
+}
+
+// A single cluster: refresh exhausts the single-cluster pool immediately, resets,
+// and re-selects the same cluster.
+TEST_F(RouteMatcherTest, WeightedClusterRefreshRouteClustersOneCluster) {
+  const std::string yaml = R"EOF(
+      virtual_hosts:
+        - name: www1
+          domains: ["www1.lyft.com"]
+          routes:
+            - match: { prefix: "/" }
+              route:
+                weighted_clusters:
+                  clusters:
+                    - name: cluster1
+                      weight: 100
+      )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"cluster1"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www1.lyft.com", "/foo", "GET");
+  RouteConstSharedPtr route = config.route(headers, 0);
+  const RouteEntry* route_entry = route->routeEntry();
+  EXPECT_EQ("cluster1", route_entry->clusterName());
+
+  // Refresh: pool immediately exhausted and reset → only option is cluster1.
+  route_entry->refreshRouteCluster(headers, stream_info);
+  EXPECT_EQ("cluster1", route_entry->clusterName());
+
+  route_entry->refreshRouteCluster(headers, stream_info);
+  EXPECT_EQ("cluster1", route_entry->clusterName());
+}
+
+// Cluster-header mode: refreshing reads the cluster name from the request header again.
+TEST_F(RouteMatcherTest, WeightedClusterRefreshRouteClustersClusterHeader) {
+  const std::string yaml = R"EOF(
+      virtual_hosts:
+        - name: www1
+          domains: ["www1.lyft.com"]
+          routes:
+            - match: { prefix: "/" }
+              route:
+                weighted_clusters:
+                  clusters:
+                    - cluster_header: x-cluster
+                      weight: 30
+                    - name: cluster1
+                      weight: 30
+                    - name: cluster2
+                      weight: 40
+      )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"dynamic", "cluster1", "cluster2"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  // random_value=0 with x-cluster="dynamic" header → cluster at index 0 (header-based), name
+  // "dynamic".
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www1.lyft.com", "/foo", "GET");
+  headers.addCopy("x-cluster", "dynamic");
+  RouteConstSharedPtr route = config.route(headers, 0);
+  const RouteEntry* route_entry = route->routeEntry();
+  EXPECT_EQ("dynamic", route_entry->clusterName());
+
+  // First refresh: header cluster (idx=0) marked used. Eligible: cluster1 (wt=30), cluster2
+  // (wt=40). 0%70=0 → [0,30) → clusterIndex=1 → cluster1 (static name).
+  route_entry->refreshRouteCluster(headers, stream_info);
+  EXPECT_EQ("cluster1", route_entry->clusterName());
+
+  // Second refresh: cluster1 (idx=1) marked used. Eligible: cluster2 (wt=40) only.
+  route_entry->refreshRouteCluster(headers, stream_info);
+  EXPECT_EQ("cluster2", route_entry->clusterName());
+
+  // Third refresh: all clusters exhausted → reset → back to header cluster "dynamic".
+  route_entry->refreshRouteCluster(headers, stream_info);
+  EXPECT_EQ("dynamic", route_entry->clusterName());
+}
+
+// Refreshes on different RouteConstSharedPtrs from the same config are independent:
+// each entry tracks its own used-cluster state.
+TEST_F(RouteMatcherTest, WeightedClusterRefreshRouteClustersIndependentPerEntry) {
+  const std::string yaml = R"EOF(
+      virtual_hosts:
+        - name: www1
+          domains: ["www1.lyft.com"]
+          routes:
+            - match: { prefix: "/" }
+              route:
+                weighted_clusters:
+                  clusters:
+                    - name: cluster1
+                      weight: 50
+                    - name: cluster2
+                      weight: 50
+      )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"cluster1", "cluster2"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www1.lyft.com", "/foo", "GET");
+  RouteConstSharedPtr route_a = config.route(headers, 0);
+  RouteConstSharedPtr route_b = config.route(headers, 0);
+
+  const RouteEntry* entry_a = route_a->routeEntry();
+  const RouteEntry* entry_b = route_b->routeEntry();
+
+  EXPECT_EQ("cluster1", entry_a->clusterName());
+  EXPECT_EQ("cluster1", entry_b->clusterName());
+
+  // Refresh entry_a: it picks cluster2, entry_b is unaffected.
+  entry_a->refreshRouteCluster(headers, stream_info);
+  EXPECT_EQ("cluster2", entry_a->clusterName());
+  EXPECT_EQ("cluster1", entry_b->clusterName());
+
+  // Refresh entry_b independently: it also picks cluster2.
+  entry_b->refreshRouteCluster(headers, stream_info);
+  EXPECT_EQ("cluster2", entry_a->clusterName());
+  EXPECT_EQ("cluster2", entry_b->clusterName());
+}
+
 TEST(NullConfigImplTest, All) {
   NullConfigImpl config;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -7547,7 +7882,7 @@ virtual_hosts:
                         creation_status_);
 
   const Router::CorsPolicy* cors_policy =
-      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->virtualHost()->corsPolicy();
+      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->virtualHost().corsPolicy();
 
   EXPECT_EQ(cors_policy->enabled(), false);
   EXPECT_EQ(cors_policy->shadowEnabled(), true);
@@ -8244,6 +8579,73 @@ virtual_hosts:
   EXPECT_EQ(creation_status_.message(), "response body size is 4097 bytes; maximum is 4096");
 }
 
+// Test that responseContentType() returns the correct content type based on body_format config.
+TEST_F(RouteConfigurationV2, DirectResponseBodyFormatContentType) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: direct
+    domains: [example.com]
+    routes:
+      - match: { prefix: "/html" }
+        direct_response:
+          status: 200
+          body_format:
+            text_format_source:
+              inline_string: "Hello"
+            content_type: "text/html"
+      - match: { prefix: "/json" }
+        direct_response:
+          status: 200
+          body_format:
+            json_format:
+              key: "value"
+      - match: { prefix: "/text" }
+        direct_response:
+          status: 200
+          body_format:
+            text_format_source:
+              inline_string: "Hello"
+      - match: { prefix: "/nobody" }
+        direct_response:
+          status: 200
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  // Explicit content_type in body_format should be returned.
+  {
+    const auto* direct_response =
+        config.route(genHeaders("example.com", "/html", "GET"), 0)->directResponseEntry();
+    ASSERT_NE(nullptr, direct_response);
+    EXPECT_EQ("text/html", direct_response->responseContentType());
+  }
+
+  // json_format without explicit content_type should return "application/json".
+  {
+    const auto* direct_response =
+        config.route(genHeaders("example.com", "/json", "GET"), 0)->directResponseEntry();
+    ASSERT_NE(nullptr, direct_response);
+    EXPECT_EQ("application/json", direct_response->responseContentType());
+  }
+
+  // text_format without explicit content_type should return empty string.
+  {
+    const auto* direct_response =
+        config.route(genHeaders("example.com", "/text", "GET"), 0)->directResponseEntry();
+    ASSERT_NE(nullptr, direct_response);
+    EXPECT_EQ("", direct_response->responseContentType());
+  }
+
+  // No body_format at all should return empty string.
+  {
+    const auto* direct_response =
+        config.route(genHeaders("example.com", "/nobody", "GET"), 0)->directResponseEntry();
+    ASSERT_NE(nullptr, direct_response);
+    EXPECT_EQ("", direct_response->responseContentType());
+  }
+}
+
 // Test loading broken config throws EnvoyException.
 TEST_F(RouteConfigurationV2, BrokenTypedMetadata) {
   const std::string yaml = R"EOF(
@@ -8309,12 +8711,12 @@ virtual_hosts:
   EXPECT_NE(nullptr, typed_metadata.get<Baz>(baz_factory.name()));
   EXPECT_EQ("bluh", typed_metadata.get<Baz>(baz_factory.name())->name);
 
-  EXPECT_EQ("bar", symbol_table_->toString(route->virtualHost()->statName()));
-  EXPECT_EQ("foo", route->virtualHost()->routeConfig().name());
+  EXPECT_EQ("bar", symbol_table_->toString(route->virtualHost().statName()));
+  EXPECT_EQ("foo", route->virtualHost().routeConfig().name());
 
   // Get metadata of virtual host.
-  const auto& vh_metadata = route->virtualHost()->metadata();
-  const auto& vh_typed_metadata = route->virtualHost()->typedMetadata();
+  const auto& vh_metadata = route->virtualHost().metadata();
+  const auto& vh_typed_metadata = route->virtualHost().typedMetadata();
 
   EXPECT_EQ(
       "test_vh_value",
@@ -8323,8 +8725,8 @@ virtual_hosts:
   EXPECT_EQ("vh_bluh", vh_typed_metadata.get<Baz>(baz_factory.name())->name);
 
   // Get metadata of route configuration.
-  const auto& config_metadata = route->virtualHost()->routeConfig().metadata();
-  const auto& config_typed_metadata = route->virtualHost()->routeConfig().typedMetadata();
+  const auto& config_metadata = route->virtualHost().routeConfig().metadata();
+  const auto& config_typed_metadata = route->virtualHost().routeConfig().typedMetadata();
 
   EXPECT_EQ("test_config_value",
             Envoy::Config::Metadata::metadataValue(&config_metadata, "com.bar.foo", "baz")
@@ -9936,7 +10338,7 @@ virtual_hosts:
             retry_priority:
               name: envoy.test_retry_priority
               typed_config:
-                "@type": type.googleapis.com/google.protobuf.Struct
+                "@type": type.googleapis.com/test.mocks.upstream.TestRetryPriorityConfig
   )EOF";
 
   Upstream::MockRetryPriority priority{{}, {}};
@@ -12122,7 +12524,7 @@ virtual_hosts:
                         creation_status_);
 
   const auto& shared_config = dynamic_cast<const CommonConfigImpl&>(
-      config.route(genHeaders("bat.com", "/", "GET"), 0)->virtualHost()->routeConfig());
+      config.route(genHeaders("bat.com", "/", "GET"), 0)->virtualHost().routeConfig());
 
   EXPECT_EQ(config.mostSpecificHeaderMutationsWins(),
             shared_config.mostSpecificHeaderMutationsWins());

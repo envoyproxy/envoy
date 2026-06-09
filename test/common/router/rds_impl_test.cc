@@ -19,15 +19,14 @@
 #include "source/server/admin/admin.h"
 #endif
 #include "test/mocks/init/mocks.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/matcher/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/utility.h"
 #include "test/test_common/test_runtime.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

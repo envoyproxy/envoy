@@ -19,6 +19,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/protobuf:message_validator_lib",
         "//source/extensions/retry/priority/previous_priorities:config",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:host_set_mocks",
         "//test/mocks/upstream:priority_set_mocks",

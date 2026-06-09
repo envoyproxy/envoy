@@ -23,6 +23,17 @@ public:
       const envoy::extensions::filters::http::admission_control::v3::AdmissionControl& proto_config,
       const std::string& stats_prefix, DualInfo dual_info,
       Server::Configuration::ServerFactoryContext& context) override;
+
+  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+      const envoy::extensions::filters::http::admission_control::v3::AdmissionControl& proto_config,
+      const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& context) override;
+
+private:
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactory(
+      const envoy::extensions::filters::http::admission_control::v3::AdmissionControl& proto_config,
+      const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context,
+      Stats::Scope& scope);
 };
 
 using UpstreamAdmissionControlFilterFactory = AdmissionControlFilterFactory;

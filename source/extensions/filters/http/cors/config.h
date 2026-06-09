@@ -23,6 +23,11 @@ public:
       const envoy::extensions::filters::http::cors::v3::Cors& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 
+  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+      const envoy::extensions::filters::http::cors::v3::Cors& proto_config,
+      const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& context) override;
+
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::cors::v3::CorsPolicy& policy,

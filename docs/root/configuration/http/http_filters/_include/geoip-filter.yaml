@@ -38,6 +38,7 @@ static_resources:
                       region: "x-geo-region"
                       city: "x-geo-city"
                       asn: "x-geo-asn"
+                      asn_org: "x-geo-asn-org"
                   city_db_path: "geoip/GeoLite2-City-Test.mmdb"
                   isp_db_path: "geoip/GeoIP2-ISP-Test.mmdb"
                   asn_db_path: "geoip/GeoLite2-ASN-Test.mmdb"

@@ -23,6 +23,18 @@ Http::FilterFactoryCb LocalRateLimitFilterConfig::createFilterFactoryFromProtoTy
   };
 }
 
+Http::FilterFactoryCb
+LocalRateLimitFilterConfig::createFilterFactoryFromProtoWithServerContextTyped(
+    const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& proto_config,
+    const std::string&, Server::Configuration::ServerFactoryContext& context) {
+
+  FilterConfigSharedPtr filter_config =
+      std::make_shared<FilterConfig>(proto_config, context, context.scope());
+  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<Filter>(filter_config));
+  };
+}
+
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 LocalRateLimitFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& proto_config,

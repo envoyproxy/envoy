@@ -44,13 +44,18 @@ public:
       handshake_request_path_ =
           std::string(ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH);
     }
+    if (config.has_http_handshake()) {
+      additional_headers_ = {config.http_handshake().additional_headers().begin(),
+                             config.http_handshake().additional_headers().end()};
+      use_http_upgrade_ = config.http_handshake().use_http_upgrade();
+    }
     ENVOY_LOG(debug,
               "ReverseTunnelInitiatorExtension: creating downstream reverse connection "
               "socket interface with stat_prefix: {}",
               stat_prefix_);
   }
 
-  void onServerInitialized() override;
+  void onServerInitialized(Server::Instance&) override;
   void onWorkerThreadInitialized() override;
 
   /**
@@ -106,6 +111,19 @@ public:
   const std::string& handshakeRequestPath() const { return handshake_request_path_; }
 
   /**
+   * @return reference to the additional headers to include in the handshake request.
+   */
+  const std::vector<envoy::config::core::v3::HeaderValueOption>&
+  handshakeAdditionalHeaders() const {
+    return additional_headers_;
+  }
+
+  /**
+   * @return whether the handshake is negotiated as an HTTP/1.1 Upgrade exchange.
+   */
+  bool handshakeUsesHttpUpgrade() const { return use_http_upgrade_; }
+
+  /**
    * Increment handshake stats for reverse tunnel connections (per-worker only).
    * Only tracks stats if enable_detailed_stats flag is true.
    * @param cluster_id the cluster identifier for the connection
@@ -134,6 +152,8 @@ private:
   std::string stat_prefix_; // Reverse connection stats prefix
   bool enable_detailed_stats_{false};
   std::string handshake_request_path_;
+  std::vector<envoy::config::core::v3::HeaderValueOption> additional_headers_;
+  bool use_http_upgrade_{false};
 
   /**
    * Update per-worker connection stats for debugging purposes.

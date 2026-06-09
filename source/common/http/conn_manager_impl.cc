@@ -133,6 +133,10 @@ ConnectionManagerImpl::ConnectionManagerImpl(
           overload_manager.getLoadShedPoint(Server::LoadShedPointName::get().HcmDecodeHeaders)),
       hcm_ondata_creating_codec_(
           overload_manager.getLoadShedPoint(Server::LoadShedPointName::get().HcmCodecCreation)),
+      should_send_go_away_on_dispatch_(overload_manager.getLoadShedPoint(
+          Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch)),
+      should_send_go_away_and_close_on_dispatch_(overload_manager.getLoadShedPoint(
+          Server::LoadShedPointName::get().H2ServerGoAwayAndCloseOnDispatch)),
       overload_stop_accepting_requests_ref_(
           overload_state_.getState(Server::OverloadActionNames::get().StopAcceptingRequests)),
       overload_disable_keepalive_ref_(
@@ -155,6 +159,13 @@ ConnectionManagerImpl::ConnectionManagerImpl(
   ENVOY_LOG_ONCE_IF(trace, hcm_ondata_creating_codec_ == nullptr,
                     "LoadShedPoint envoy.load_shed_points.hcm_ondata_creating_codec is not found. "
                     "Is it configured?");
+  ENVOY_LOG_ONCE_IF(trace, should_send_go_away_on_dispatch_ == nullptr,
+                    "LoadShedPoint envoy.load_shed_points.http2_server_go_away_on_dispatch is not "
+                    "found. Is it configured?");
+  ENVOY_LOG_ONCE_IF(
+      trace, should_send_go_away_and_close_on_dispatch_ == nullptr,
+      "LoadShedPoint envoy.load_shed_points.http2_server_go_away_and_close_on_dispatch is not "
+      "found. Is it configured?");
 }
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
@@ -190,7 +201,6 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
         std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
             read_callbacks_->connection().connectionInfoProvider().remoteAddress(),
             read_callbacks_->connection().connectionInfoProvider().localAddress()}),
-        StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
   }
 
@@ -515,6 +525,20 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
     createCodec(data);
   }
 
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_fix_goaway_loadshed_point")) {
+    if (should_send_go_away_and_close_on_dispatch_ != nullptr &&
+        should_send_go_away_and_close_on_dispatch_->shouldShedLoad()) {
+      sendGoAwayAndClose(/*graceful=*/false);
+      handleCodecOverloadError(
+          "Load shed point http2_server_go_away_and_close_on_dispatch triggered");
+      return Network::FilterStatus::StopIteration;
+    }
+    if (should_send_go_away_on_dispatch_ != nullptr &&
+        should_send_go_away_on_dispatch_->shouldShedLoad()) {
+      sendGoAwayAndClose(/*graceful=*/true);
+    }
+  }
+
   bool redispatch;
   do {
     redispatch = false;
@@ -663,6 +687,11 @@ void ConnectionManagerImpl::doConnectionClose(
 
     stats_.named_.downstream_cx_destroy_active_rq_.inc();
     user_agent_.onConnectionDestroy(event, true);
+    // Record the downstream connection end time point for COMMON_DURATION access logging.
+    for (auto& stream : streams_) {
+      stream->filter_manager_.streamInfo().downstreamTiming().onDownstreamConnectionEnd(
+          time_source_);
+    }
     // Note that resetAllStreams() does not actually write anything to the wire. It just resets
     // all upstream streams and their filter stacks. Thus, there are no issues around recursive
     // entry.
@@ -795,7 +824,7 @@ void ConnectionManagerImpl::onDrainTimeout() {
 }
 
 void ConnectionManagerImpl::sendGoAwayAndClose(bool graceful) {
-  ENVOY_CONN_LOG(trace, "connection manager sendGoAwayAndClose was triggerred from filters.",
+  ENVOY_CONN_LOG(trace, "connection manager sendGoAwayAndClose was triggered.",
                  read_callbacks_->connection());
   if (go_away_sent_) {
     return;
@@ -904,6 +933,10 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 
   filter_manager_.streamInfo().setShouldSchemeMatchUpstream(
       connection_manager.config_->shouldSchemeMatchUpstream());
+
+  // Record the downstream connection begin time point for COMMON_DURATION access logging.
+  filter_manager_.streamInfo().downstreamTiming().setDownstreamConnectionBegin(
+      connection_manager_.read_callbacks_->connection().streamInfo().startTimeMonotonic());
 
   // TODO(chaoqin-li1123): can this be moved to the on demand filter?
   auto factory = Envoy::Config::Utility::getFactoryByName<RouteConfigUpdateRequesterFactory>(
@@ -1492,7 +1525,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
     filter_manager_.streamInfo().filterState()->setData(
         Router::OriginalConnectPort::key(),
         std::make_unique<Router::OriginalConnectPort>(optional_port.value()),
-        StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
+        StreamInfo::FilterState::LifeSpan::Request);
   }
 
   if (!state_.is_internally_created_) { // Only sanitize headers on first pass.
@@ -2243,6 +2276,11 @@ bool ConnectionManagerImpl::ActiveStream::spawnUpstreamSpan() const {
   return connection_manager_tracing_config_->spawn_upstream_span_;
 }
 
+bool ConnectionManagerImpl::ActiveStream::noContextPropagation() const {
+  ASSERT(connection_manager_tracing_config_.has_value());
+  return connection_manager_tracing_config_->no_context_propagation_;
+}
+
 const Router::RouteEntry::UpgradeMap* ConnectionManagerImpl::ActiveStream::upgradeMap() {
   // We must check if the 'cached_route_' optional is populated since this function can be called
   // early via sendLocalReply(), before the cached route is populated.
@@ -2270,7 +2308,16 @@ OptRef<const Tracing::Config> ConnectionManagerImpl::ActiveStream::tracingConfig
 
 const ScopeTrackedObject& ConnectionManagerImpl::ActiveStream::scope() { return *this; }
 
-Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStream::clusterInfo() {
+OptRef<const Upstream::ClusterInfo> ConnectionManagerImpl::ActiveStream::clusterInfo() {
+  // NOTE: Refreshing route caches clusterInfo as well.
+  if (!cached_route_.has_value()) {
+    refreshCachedRoute();
+  }
+
+  return makeOptRefFromPtr(cached_cluster_info_.value().get());
+}
+
+Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStream::clusterInfoSharedPtr() {
   // NOTE: Refreshing route caches clusterInfo as well.
   if (!cached_route_.has_value()) {
     refreshCachedRoute();
@@ -2279,8 +2326,17 @@ Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStream::cluster
   return cached_cluster_info_.value();
 }
 
-Router::RouteConstSharedPtr
+OptRef<const Router::Route>
 ConnectionManagerImpl::ActiveStream::route(const Router::RouteCallback& cb) {
+  if (cached_route_.has_value()) {
+    return makeOptRefFromPtr(cached_route_.value().get());
+  }
+  refreshCachedRoute(cb);
+  return makeOptRefFromPtr(cached_route_.value().get());
+}
+
+Router::RouteConstSharedPtr
+ConnectionManagerImpl::ActiveStream::routeSharedPtr(const Router::RouteCallback& cb) {
   if (cached_route_.has_value()) {
     return cached_route_.value();
   }
@@ -2291,7 +2347,7 @@ ConnectionManagerImpl::ActiveStream::route(const Router::RouteCallback& cb) {
 void ConnectionManagerImpl::ActiveStream::setRoute(Router::RouteConstSharedPtr route) {
   Router::VirtualHostRoute vhost_route;
   if (route != nullptr) {
-    vhost_route.vhost = route->virtualHost();
+    vhost_route.vhost = route->virtualHostSharedPtr();
     vhost_route.route = std::move(route);
   }
   setVirtualHostRoute(std::move(vhost_route));

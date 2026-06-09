@@ -734,7 +734,7 @@ TEST(DefaultCertValidatorTest, TestUnexpectedSanMatcherType) {
       std::make_unique<DefaultCertValidator>(mock_context_config.get(), ssl_stats, context);
   auto ctx = std::vector<SSL_CTX*>();
   EXPECT_THAT(validator->initializeSslContexts(ctx, false, *store.rootScope()).status().message(),
-              testing::ContainsRegex("Failed to create string SAN matcher of type.*"));
+              testing::ContainsRegex("Unhandled case in createStringSanMatcher.*"));
 }
 
 TEST(DefaultCertValidatorTest, TestInitializeSslContextFailure) {
@@ -849,8 +849,9 @@ TEST(DefaultCertValidatorTest, TestCertificateValidationErrorDetailsForSanFailur
   // Validation should fail because the SAN doesn't match
   EXPECT_EQ(Ssl::ClientValidationStatus::Failed, status);
 
-  // The error_details should be populated with a meaningful error message
-  EXPECT_EQ(error_details, "verify cert failed: SAN matcher");
+  // The error_details should be populated with a meaningful error message including cert SANs
+  EXPECT_EQ(error_details,
+            "verify cert failed: SAN matcher, certificate SANs are [server1.example.com]");
 }
 
 // Test that TestSslExtendedSocketInfo properly stores and retrieves certificate validation errors.

@@ -74,6 +74,7 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
         "//envoy/upstream:cluster_manager_interface",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
         "//source/common/event:real_time_system_lib",
@@ -89,6 +90,8 @@ envoy_cc_library(
         "//source/common/tls:ssl_handshaker_lib",
         "//source/common/upstream:load_balancer_context_base_lib",
         "//source/extensions/bootstrap/reverse_tunnel/common:reverse_connection_utility_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/common:rping_interceptor_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

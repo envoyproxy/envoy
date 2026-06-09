@@ -14,7 +14,7 @@ go_library(
     deps = [
         "//contrib/golang/common/go/api",
         "//contrib/golang/filters/http/source/go/pkg/http",
-        "@com_github_cncf_xds_go//xds/type/v3:type",
         "@org_golang_google_protobuf//types/known/anypb",
+        "@xds_go//xds/type/v3:type",
     ],
 )

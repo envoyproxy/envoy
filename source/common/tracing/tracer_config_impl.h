@@ -44,12 +44,14 @@ public:
                                  envoy::type::v3::FractionalPercent overall_sampling,
                                  Formatter::FormatterPtr operation,
                                  Formatter::FormatterPtr upstream_operation,
-                                 uint32_t max_path_tag_length, bool verbose)
+                                 uint32_t max_path_tag_length, bool verbose,
+                                 bool no_context_propagation = false)
       : operation_name_(operation_name), custom_tags_(std::move(custom_tags)),
         client_sampling_(std::move(client_sampling)), random_sampling_(std::move(random_sampling)),
         overall_sampling_(std::move(overall_sampling)), operation_(std::move(operation)),
         upstream_operation_(std::move(upstream_operation)),
-        max_path_tag_length_(max_path_tag_length), verbose_(verbose) {}
+        max_path_tag_length_(max_path_tag_length), verbose_(verbose),
+        no_context_propagation_(no_context_propagation) {}
 
   ConnectionManagerTracingConfig() = default;
 
@@ -62,6 +64,7 @@ public:
   bool verbose() const { return verbose_; }
   uint32_t maxPathTagLength() const { return max_path_tag_length_; }
   bool spawnUpstreamSpan() const { return spawn_upstream_span_; }
+  bool noContextPropagation() const { return no_context_propagation_; }
 
   // TODO(wbpcode): keep this field be public for compatibility. Then the HCM needn't change much
   // code to use this config.
@@ -75,6 +78,7 @@ public:
   uint32_t max_path_tag_length_{};
   bool verbose_{};
   bool spawn_upstream_span_{};
+  bool no_context_propagation_{};
 };
 
 using ConnectionManagerTracingConfigPtr = std::unique_ptr<ConnectionManagerTracingConfig>;

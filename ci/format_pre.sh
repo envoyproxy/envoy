@@ -45,6 +45,26 @@ trap_errors () {
 trap trap_errors ERR
 trap exit 1 INT
 
+# TODO(phlax): Remove this once migration to bzlmod is complete
+CURRENT=dep-names
+
+check_legacy_dep_names () {
+    local legacy="$1"
+    local new="$2"
+    local matches
+    matches="$(git grep -l "$legacy" -- ':!*.patch' ':!*repositories.bzl' ':!ci/format_pre.sh' || :)"
+    if [[ -n "$matches" ]]; then
+        echo "ERROR: Found references to '$legacy' that should use '@${new}' instead:"
+        echo ""
+        git grep -l "$legacy" -- ':!*.patch' ':!*repositories.bzl' ':!ci/format_pre.sh'
+        echo ""
+        echo "Please replace '@${legacy}//' with '@${new}//' in the above files."
+        return 1
+    fi
+}
+
+check_legacy_dep_names com_google_absl abseil-cpp
+check_legacy_dep_names com_github_cncf_xds xds
 
 CURRENT=check
 # This test runs code check with:
@@ -52,11 +72,18 @@ CURRENT=check
 # see: /tools/code/BUILD
 bazel "${BAZEL_STARTUP_OPTIONS[@]}" test "${BAZEL_BUILD_OPTIONS[@]}" //tools/code:check_test
 
-CURRENT=configs
-bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //configs:example_configs_validation
-
 CURRENT=spelling
 bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/spelling:check_spelling_pedantic -- --mark check --target_root="$PWD"
+
+CURRENT=rustfmt
+RUSTFMT_PRE="$(git diff | md5sum)"
+bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" @rules_rust//:rustfmt
+RUSTFMT_POST="$(git diff | md5sum)"
+if [[ "$RUSTFMT_PRE" != "$RUSTFMT_POST" ]]; then
+    echo "ERROR: rustfmt produced changes — Rust code is unformatted." >&2
+    echo "Run: bazel run @rules_rust//:rustfmt" >&2
+    false
+fi
 
 CURRENT=check_format
 bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code_format:check_format -- fix --fail_on_diff

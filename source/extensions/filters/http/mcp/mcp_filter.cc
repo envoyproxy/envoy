@@ -1,12 +1,33 @@
 #include "source/extensions/filters/http/mcp/mcp_filter.h"
 
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include "envoy/buffer/buffer.h"
+#include "envoy/http/codes.h"
+#include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
+#include "envoy/stream_info/filter_state.h"
+
+#include "source/common/common/logger.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/common/protobuf/utility.h"
+#include "source/common/tracing/tracing_validation.h"
+#include "source/extensions/filters/common/mcp/constants.h"
 #include "source/extensions/filters/common/mcp/filter_state.h"
+#include "source/extensions/filters/http/mcp/mcp_json_parser.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,9 +37,64 @@ namespace Mcp {
 using FilterStateObject = Filters::Common::Mcp::FilterStateObject;
 
 namespace {
+
+const Http::LowerCaseString kMcpSessionId{
+    std::string(Filters::Common::Mcp::McpConstants::MCP_SESSION_ID_HEADER)};
+
 McpFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
   const std::string final_prefix = absl::StrCat(prefix, "mcp.");
   return McpFilterStats{MCP_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+}
+
+const Http::LowerCaseString& traceparentHeader() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "traceparent");
+}
+
+const Http::LowerCaseString& tracestateHeader() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "tracestate");
+}
+
+const Http::LowerCaseString& baggageHeader() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "baggage");
+}
+
+void injectTraceContext(const Protobuf::Map<std::string, Protobuf::Value>& meta_fields,
+                        Http::RequestHeaderMap& headers) {
+  const auto& tp_it = meta_fields.find("traceparent");
+  if (tp_it == meta_fields.end() || tp_it->second.kind_case() != Protobuf::Value::kStringValue) {
+    return;
+  }
+
+  const std::string& tp = tp_it->second.string_value();
+  if (!Envoy::Tracing::isValidTraceParent(tp)) {
+    return;
+  }
+
+  headers.remove(traceparentHeader());
+  headers.remove(tracestateHeader());
+
+  headers.setCopy(traceparentHeader(), tp);
+
+  const auto& ts_it = meta_fields.find("tracestate");
+  if (ts_it != meta_fields.end() && ts_it->second.kind_case() == Protobuf::Value::kStringValue) {
+    const std::string& ts = ts_it->second.string_value();
+    if (Envoy::Tracing::isValidTraceState(ts)) {
+      headers.setCopy(tracestateHeader(), ts);
+    }
+  }
+}
+
+void injectBaggage(const Protobuf::Map<std::string, Protobuf::Value>& meta_fields,
+                   Http::RequestHeaderMap& headers) {
+  const auto& bg_it = meta_fields.find("baggage");
+  if (bg_it == meta_fields.end() || bg_it->second.kind_case() != Protobuf::Value::kStringValue) {
+    return;
+  }
+
+  const std::string& bg = bg_it->second.string_value();
+  if (Envoy::Tracing::isValidBaggage(bg)) {
+    headers.setCopy(baggageHeader(), bg);
+  }
 }
 } // namespace
 
@@ -26,14 +102,34 @@ McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3
                                  const std::string& stats_prefix, Stats::Scope& scope)
     : traffic_mode_(proto_config.traffic_mode()),
       clear_route_cache_(proto_config.clear_route_cache()),
+      propagate_trace_context_(proto_config.has_propagate_trace_context()
+                                   ? absl::make_optional(proto_config.propagate_trace_context())
+                                   : absl::nullopt),
+      propagate_baggage_(proto_config.has_propagate_baggage()
+                             ? absl::make_optional(proto_config.propagate_baggage())
+                             : absl::nullopt),
       max_request_body_size_(proto_config.has_max_request_body_size()
                                  ? proto_config.max_request_body_size().value()
                                  : 8192), // Default: 8KB
       request_storage_mode_(proto_config.request_storage_mode()),
+      metadata_namespace_(Filters::Common::Mcp::metadataNamespace()),
       parser_config_(proto_config.has_parser_config()
                          ? McpParserConfig::fromProto(proto_config.parser_config())
                          : McpParserConfig::createDefault()),
-      stats_(generateStats(stats_prefix, scope)) {}
+      stats_(generateStats(stats_prefix, scope)) {
+
+  parser_config_.setRejectDuplicateKeys(proto_config.has_reject_duplicate_keys()
+                                            ? proto_config.reject_duplicate_keys().value()
+                                            : false); // Default: last-key-wins / last-win
+}
+
+bool McpFilter::isValidMcpDeleteRequest(const Http::RequestHeaderMap& headers) const {
+  // DELETE is only meaningful for MCP session termination when MCP-Session-Id is present.
+  if (headers.getMethodValue() != Http::Headers::get().MethodValues.Delete) {
+    return false;
+  }
+  return !headers.get(kMcpSessionId).empty();
+}
 
 bool McpFilter::isValidMcpSseRequest(const Http::RequestHeaderMap& headers) const {
   // Check if this is a GET request for SSE stream
@@ -48,8 +144,9 @@ bool McpFilter::isValidMcpSseRequest(const Http::RequestHeaderMap& headers) cons
   }
 
   for (size_t i = 0; i < accepts.size(); ++i) {
-    if (absl::StrContains(accepts[i]->value().getStringView(),
-                          Http::Headers::get().ContentTypeValues.TextEventStream)) {
+    const absl::string_view value = accepts[i]->value().getStringView();
+    if (absl::StrContains(value, Http::Headers::get().ContentTypeValues.TextEventStream) ||
+        absl::StrContains(value, "*/*")) {
       return true;
     }
   }
@@ -58,10 +155,18 @@ bool McpFilter::isValidMcpSseRequest(const Http::RequestHeaderMap& headers) cons
 }
 
 bool McpFilter::isValidMcpPostRequest(const Http::RequestHeaderMap& headers) const {
-  // Check if this is a POST request with JSON content
+  // Check if this is a POST request with JSON content.
+  // Content-Type is JSON if it is exactly "application/json" or starts with
+  // "application/json" followed by ';' or ' ' (for parameters like charset).
+  // This rejects related but distinct types like application/json-patch+json.
+  const absl::string_view content_type = headers.getContentTypeValue();
+  const auto& json_ct = Http::Headers::get().ContentTypeValues.Json;
+  bool is_json_content_type =
+      absl::StartsWith(content_type, json_ct) &&
+      (content_type.size() == json_ct.size() || content_type[json_ct.size()] == ';' ||
+       content_type[json_ct.size()] == ' ');
   bool is_post_request =
-      headers.getMethodValue() == Http::Headers::get().MethodValues.Post &&
-      headers.getContentTypeValue() == Http::Headers::get().ContentTypeValues.Json;
+      headers.getMethodValue() == Http::Headers::get().MethodValues.Post && is_json_content_type;
 
   if (!is_post_request) {
     return false;
@@ -78,6 +183,10 @@ bool McpFilter::isValidMcpPostRequest(const Http::RequestHeaderMap& headers) con
 
   for (size_t i = 0; i < accepts.size(); ++i) {
     const absl::string_view value = accepts[i]->value().getStringView();
+    if (absl::StrContains(value, "*/*")) {
+      has_sse = true;
+      has_json = true;
+    }
     if (!has_sse &&
         absl::StrContains(value, Http::Headers::get().ContentTypeValues.TextEventStream)) {
       has_sse = true;
@@ -118,6 +227,12 @@ uint32_t McpFilter::getMaxRequestBodySize() const {
 
 Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                    bool end_stream) {
+  if (isValidMcpDeleteRequest(headers)) {
+    is_mcp_request_ = true;
+    ENVOY_LOG(debug, "valid MCP DELETE session-termination request, passing through");
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   if (isValidMcpSseRequest(headers)) {
     is_mcp_request_ = true;
     ENVOY_LOG(debug, "valid MCP SSE request, passing through");
@@ -133,7 +248,7 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
       // Need to buffer the body to check for JSON-RPC 2.0
       is_mcp_request_ = true;
 
-      // Set the buffer limit - Envoy will automatically send 413 if exceeded
+      // Set the buffer limit.
       const uint32_t max_size = getMaxRequestBodySize();
       if (max_size > 0) {
         decoder_callbacks_->setBufferLimit(max_size);
@@ -170,59 +285,69 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
     return Http::FilterDataStatus::Continue;
   }
 
-  size_t buffer_size = data.length();
-
-  ENVOY_LOG(trace, "decodeData: buffer_size={}, already_parsed={}", buffer_size, bytes_parsed_);
+  ENVOY_LOG(trace, "decodeData: buffer_size={}, already_parsed={}, end_stream={}", data.length(),
+            bytes_parsed_, end_stream);
 
   const uint32_t max_size = getMaxRequestBodySize();
-  size_t to_parse = buffer_size - bytes_parsed_;
-  if (max_size > 0) {
-    if (bytes_parsed_ >= max_size) {
-      config_->stats().body_too_large_.inc();
-      handleParseError("request body is too large.");
-      return Http::FilterDataStatus::StopIterationNoBuffer;
+  uint32_t bytes_parsed_in_this_call = 0;
+
+  for (const Buffer::RawSlice& slice : data.getRawSlices()) {
+    const char* start = static_cast<const char*>(slice.mem_);
+    size_t len = slice.len_;
+
+    if (max_size > 0) {
+      len = std::min(len, static_cast<size_t>(max_size - bytes_parsed_));
     }
-    size_t remaining_limit = max_size - bytes_parsed_;
-    to_parse = std::min(to_parse, remaining_limit);
+
+    if (len > 0) {
+      auto status = parser_->parse({start, len});
+      bytes_parsed_ += len;
+      bytes_parsed_in_this_call += len;
+
+      if (!status.ok()) {
+        config_->stats().invalid_json_.inc();
+        decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "not a valid JSON", nullptr,
+                                           absl::nullopt, "mcp_filter_not_jsonrpc");
+        return Http::FilterDataStatus::StopIterationNoBuffer;
+      }
+
+      if (parser_->isParsingComplete()) {
+        ENVOY_LOG(debug, "mcp parse complete: found all fields");
+        return completeParsing();
+      }
+    }
+
+    if (max_size > 0 && bytes_parsed_ == max_size) {
+      break;
+    }
   }
 
-  // Linearize the buffer and create a string_view to avoid copying.
-  // Also ensure we don't linearize more than the buffer contains.
-  size_t linearize_size = std::min(bytes_parsed_ + to_parse, buffer_size);
-  const char* linearized = static_cast<const char*>(data.linearize(linearize_size));
-  absl::string_view parse_view(linearized + bytes_parsed_, to_parse);
+  // If we are here, parsing is not yet complete (root object hasn't closed).
+  const bool size_limit_hit = (max_size > 0 && bytes_parsed_ == max_size);
+  const bool truncated_by_limit =
+      size_limit_hit && (bytes_parsed_in_this_call < data.length() || !end_stream);
 
-  // The partial parser will return an OK status if the requirements are not satisfied.
-  // It will potentially be a bad status due to the partial parse if all the requirements
-  // are extracted.
-  auto status = parser_->parse(parse_view);
-  bytes_parsed_ += to_parse;
-
-  if (parser_->isAllFieldsCollected()) {
-    ENVOY_LOG(debug, "mcp early parse termination: found all fields");
-    return completeParsing();
-  }
-
-  // A non-JSON data is received
-  if (!status.ok()) {
-    decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "not a valid JSON", nullptr,
-                                       absl::nullopt, "mcp_filter_not_jsonrpc");
-    return Http::FilterDataStatus::StopIterationNoBuffer;
-  }
-
-  // If we are here, we haven't collected all fields yet.
-  bool size_limit_hit = (max_size > 0 && bytes_parsed_ >= max_size);
   if (end_stream || size_limit_hit) {
+    if (truncated_by_limit) {
+      is_exceeding_limit_ = true;
+    }
     auto final_status = parser_->finishParse();
     if (!final_status.ok()) {
-      config_->stats().body_too_large_.inc();
+      if (truncated_by_limit && !shouldRejectRequest()) {
+        // PASS_THROUGH mode: size limit caused truncation, allow through.
+        ENVOY_LOG(debug, "size limit hit in PASS_THROUGH mode; proceeding with partial parse");
+        return completeParsing();
+      }
+      if (truncated_by_limit) {
+        config_->stats().body_too_large_.inc();
+      }
       handleParseError("reached end_stream or configured body size, don't get enough data.");
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
     return completeParsing();
   }
 
-  return Http::FilterDataStatus::StopIterationAndBuffer;
+  return Http::FilterDataStatus::StopIterationAndWatermark;
 }
 
 void McpFilter::handleParseError(absl::string_view error_msg) {
@@ -240,6 +365,15 @@ Http::FilterDataStatus McpFilter::completeParsing() {
 
   ENVOY_LOG(debug, "parsing complete: is_mcp={}, bytes_parsed={}", is_mcp_request_, bytes_parsed_);
 
+  // Check for duplicate keys — reject if configured.
+  if (parser_->hasDuplicateKeys() && config_->rejectDuplicateKeys()) {
+    ENVOY_LOG(warn, "rejecting request with duplicate JSON keys");
+    config_->stats().duplicate_keys_rejected_.inc();
+    decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "duplicate JSON keys detected",
+                                       nullptr, absl::nullopt, "mcp_filter_duplicate_keys");
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+
   if (!is_mcp_request_ && shouldRejectRequest()) {
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
                                        "request must be a valid JSON-RPC 2.0 message for MCP",
@@ -249,6 +383,13 @@ Http::FilterDataStatus McpFilter::completeParsing() {
 
   Protobuf::Struct metadata = parser_->metadata();
 
+  // For JSON-RPC responses (no method field), set a synthetic method so the
+  // router can identify and dispatch them.
+  if (is_mcp_request_ && parser_->isResponse()) {
+    (*metadata.mutable_fields())["method"].set_string_value(
+        std::string(Filters::Common::Mcp::McpConstants::Methods::JSONRPC_RESPONSE));
+  }
+
   const std::string& group_metadata_key = config_->parserConfig().groupMetadataKey();
   if (!group_metadata_key.empty()) {
     std::string method_group = config_->parserConfig().getMethodGroup(parser_->getMethod());
@@ -256,19 +397,44 @@ Http::FilterDataStatus McpFilter::completeParsing() {
     ENVOY_LOG(debug, "MCP filter set method group: {}={}", group_metadata_key, method_group);
   }
 
-  if (!metadata.fields().empty()) {
+  // Handle tracing field extraction and header injection.
+  if (config_->propagateTraceContext().has_value() || config_->propagateBaggage().has_value()) {
+    const Protobuf::Value* meta_value = parser_->getNestedValue(
+        std::string(Filters::Common::Mcp::McpConstants::Paths::PARAMS_META));
+    auto headers = decoder_callbacks_->requestHeaders();
+    if (meta_value != nullptr && meta_value->has_struct_value() && headers.has_value()) {
+      const auto& meta_fields = meta_value->struct_value().fields();
+      if (config_->propagateTraceContext().has_value()) {
+        injectTraceContext(meta_fields, *headers);
+      }
+      if (config_->propagateBaggage().has_value()) {
+        injectBaggage(meta_fields, *headers);
+      }
+    }
+  }
+
+  const bool has_metadata = !metadata.fields().empty();
+  const bool should_store_metadata = has_metadata || is_exceeding_limit_;
+
+  if (should_store_metadata) {
     if (config_->shouldStoreToFilterState()) {
-      auto filter_state_obj =
-          std::make_shared<FilterStateObject>(parser_->getMethod(), metadata, is_mcp_request_);
+      auto filter_state_obj = std::make_shared<FilterStateObject>(
+          parser_->getMethod(), metadata, is_mcp_request_, is_exceeding_limit_);
       decoder_callbacks_->streamInfo().filterState()->setData(
           std::string(FilterStateObject::FilterStateKey), std::move(filter_state_obj),
-          StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request,
+          StreamInfo::FilterState::LifeSpan::Request,
           StreamInfo::StreamSharingMayImpactPooling::None);
     }
 
     if (config_->shouldStoreToDynamicMetadata()) {
-      decoder_callbacks_->streamInfo().setDynamicMetadata(std::string(MetadataKeys::FilterName),
-                                                          metadata);
+      (*metadata.mutable_fields())[std::string(Filters::Common::Mcp::McpConstants::IS_MCP_REQUEST)]
+          .set_bool_value(is_mcp_request_);
+      if (is_exceeding_limit_) {
+        (*metadata.mutable_fields())[std::string(
+                                         Filters::Common::Mcp::McpConstants::IS_EXCEEDING_LIMIT)]
+            .set_bool_value(true);
+      }
+      decoder_callbacks_->streamInfo().setDynamicMetadata(config_->metadataNamespace(), metadata);
       ENVOY_LOG(debug, "MCP filter set dynamic metadata: {}", metadata.DebugString());
     }
 

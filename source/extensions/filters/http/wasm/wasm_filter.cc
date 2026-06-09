@@ -17,6 +17,12 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Was
           config.config(), context.serverFactoryContext(), context.scope(), context.initManager(),
           envoy::config::core::v3::TrafficDirection::OUTBOUND, nullptr, false) {}
 
+FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& config,
+                           Server::Configuration::ServerFactoryContext& context)
+    : Extensions::Common::Wasm::PluginConfig(
+          config.config(), context, context.scope(), context.initManager(),
+          envoy::config::core::v3::TrafficDirection::OUTBOUND, nullptr, false) {}
+
 } // namespace Wasm
 } // namespace HttpFilters
 } // namespace Extensions

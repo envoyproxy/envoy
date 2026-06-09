@@ -323,7 +323,7 @@ cc_proto_descriptor_library_aspect = aspect(
         "_descriptor": attr.label_list(
             default = [
                 Label("//bazel/cc_proto_descriptor_library:file_descriptor_info"),
-                Label("@com_google_absl//absl/base:core_headers"),
+                Label("@abseil-cpp//absl/base:core_headers"),
             ],
         ),
     }),

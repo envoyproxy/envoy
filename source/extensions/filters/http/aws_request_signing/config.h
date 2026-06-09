@@ -25,20 +25,28 @@ class AwsRequestSigningFilterFactory
 public:
   AwsRequestSigningFilterFactory() : DualFactoryBase("envoy.filters.http.aws_request_signing") {}
 
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoHelper(
+      const AwsRequestSigningProtoConfig& proto_config, const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& server_context, Stats::Scope& scope) const;
+
 private:
+  absl::StatusOr<Envoy::Extensions::Common::Aws::SignerPtr>
+  createSigner(const AwsRequestSigningProtoConfig& config,
+               Server::Configuration::ServerFactoryContext& server_context) const;
+
   absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProtoTyped(const AwsRequestSigningProtoConfig& proto_config,
                                     const std::string& stats_prefix, DualInfo dual_info,
                                     Server::Configuration::ServerFactoryContext& context) override;
 
+  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+      const AwsRequestSigningProtoConfig& proto_config, const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& context) override;
+
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(const AwsRequestSigningProtoPerRouteConfig& per_route_config,
                                        Server::Configuration::ServerFactoryContext& context,
                                        ProtobufMessage::ValidationVisitor&) override;
-
-  absl::StatusOr<Envoy::Extensions::Common::Aws::SignerPtr>
-  createSigner(const AwsRequestSigningProtoConfig& config,
-               Server::Configuration::ServerFactoryContext& server_context);
 };
 
 using UpstreamAwsRequestSigningFilterFactory = AwsRequestSigningFilterFactory;

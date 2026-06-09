@@ -22,6 +22,10 @@ private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::thrift_to_metadata::v3::ThriftToMetadata&,
       const std::string&, Server::Configuration::FactoryContext&) override;
+
+  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+      const envoy::extensions::filters::http::thrift_to_metadata::v3::ThriftToMetadata&,
+      const std::string&, Server::Configuration::ServerFactoryContext&) override;
 };
 
 } // namespace ThriftToMetadata

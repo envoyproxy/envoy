@@ -27,7 +27,7 @@ envoy_cmake(
         "Python_EXECUTABLE": "$$EXT_BUILD_ROOT/$(PYTHON3)",
     } | select({
         # FIPS builds use libcrypto.a/libssl.a
-        "//bazel:boringssl_fips": {
+        "//bazel:using_fips_ssl": {
             "OPENSSL_CRYPTO_LIBRARY": "$$EXT_BUILD_DEPS/lib/libcrypto.a",
         },
         # Non-FIPS builds use libcrypto_internal.a/libssl_internal.a
@@ -48,15 +48,15 @@ envoy_cmake(
         "-G",
         "Ninja",
     ],
-    lib_source = "@com_github_intel_ipp_crypto_crypto_mb//:all",
+    lib_source = "@ipp-crypto//:all",
     out_static_libs = ["libcrypto_mb.a"],
     tags = ["skip_on_windows"],
     target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
     toolchains = ["@rules_python//python:current_py_toolchain"],
     visibility = ["//visibility:private"],
     working_directory = "sources/ippcp/crypto_mb",
-    # Use boringssl alias to select fips vs non-fips version.
-    deps = ["//bazel:boringssl"],
+    # Use ssl label_flag to select the SSL library.
+    deps = ["//bazel:ssl"],
 )
 
 envoy_cc_library(

@@ -18,8 +18,8 @@ envoy_cc_library(
     deps = [
         "//source/common/common:minimal_logger_lib",
         "//source/common/version:version_lib",
-        "@com_google_absl//absl/debugging:stacktrace",
-        "@com_google_absl//absl/debugging:symbolize",
+        "@abseil-cpp//absl/debugging:stacktrace",
+        "@abseil-cpp//absl/debugging:symbolize",
     ],
 )
 
@@ -146,7 +146,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/watchdog:abort_action_config",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/watchdog/v3:pkg_cc_proto",
     ],
@@ -239,8 +239,8 @@ envoy_cc_library(
         "//envoy/filesystem:filesystem_interface",
         "//source/common/common:logger_lib",
         "//source/common/filesystem:filesystem_lib",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -301,9 +301,9 @@ envoy_cc_library(
         "//source/common/stats:stats_lib",
         "//source/common/stats:tag_utility_lib",
         "//source/common/version:version_lib",
-        "@com_github_mirror_tclap//:tclap",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@tclap",
     ],
 )
 
@@ -329,7 +329,7 @@ envoy_cc_library(
         "//source/common/event:scaled_range_timer_manager_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/server:resource_monitor_config_lib",
-        "@com_google_absl//absl/container:node_hash_set",
+        "@abseil-cpp//absl/container:node_hash_set",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
     ],
 )
@@ -442,8 +442,8 @@ envoy_cc_library(
         "//source/common/upstream:cluster_manager_lib",
         "//source/common/version:version_lib",
         "//source/server/admin:admin_lib",
-        "@com_google_absl//absl/container:node_hash_map",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/container:node_hash_map",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],

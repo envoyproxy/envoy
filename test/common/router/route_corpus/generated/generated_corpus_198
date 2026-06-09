@@ -1,0 +1,53 @@
+goo.gle/debugproto
+config {
+  virtual_hosts {
+    name: "connect-proxy"
+    domains: "*"
+    routes {
+      match {
+        connect_matcher {
+        }
+      }
+      route {
+        cluster: "some-cluster"
+        upgrade_configs {
+          upgrade_type: "CONNECT"
+        }
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "example.com"
+  }
+  headers {
+    key: ":method"
+    value: "CONNECT"
+  }
+  headers {
+    key: ":scheme"
+    value: "http"
+  }
+  headers {
+    key: "x-safe"
+    value: "safe"
+  }
+  headers {
+    key: "x-global-nope"
+    value: "global"
+  }
+  headers {
+    key: "x-vhost-nope"
+    value: "vhost"
+  }
+  headers {
+    key: "x-route-nope"
+    value: "route"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+}

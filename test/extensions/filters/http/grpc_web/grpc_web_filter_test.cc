@@ -422,7 +422,8 @@ TEST_P(GrpcWebFilterTest, StatsNoCluster) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", requestContentType()},
       {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
-  EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillOnce(Return(nullptr));
+  decoder_callbacks_.cluster_info_ = nullptr;
+  EXPECT_CALL(decoder_callbacks_, clusterInfoSharedPtr());
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_FALSE(doStatTracking());

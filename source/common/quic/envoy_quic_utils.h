@@ -195,7 +195,7 @@ Network::ConnectionSocketPtr createConnectionSocket(
 
 // Convert a cert in string form to X509 object.
 // Return nullptr if the bytes passed cannot be passed.
-bssl::UniquePtr<X509> parseDERCertificate(const std::string& der_bytes, std::string* error_details);
+bssl::UniquePtr<X509> parseDERCertificate(absl::string_view der_bytes, std::string* error_details);
 
 // Deduce the suitable signature algorithm according to the public key.
 // Return the sign algorithm id works with the public key; If the public key is
@@ -220,6 +220,9 @@ void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProto
 
 // Extract the two ECN bits from the TOS byte in the IP header.
 quic::QuicEcnCodepoint getQuicEcnCodepointFromTosByte(uint8_t tos_byte);
+
+// Register TLS certificate compression algorithms (RFC 8879) for QUIC.
+void registerCertCompression(SSL_CTX* ssl_ctx);
 
 } // namespace Quic
 } // namespace Envoy

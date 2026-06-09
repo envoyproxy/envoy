@@ -1,6 +1,7 @@
 #include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
+#include "envoy/upstream/load_stats_reporter.h"
 
 #include "source/common/config/decoded_resource_impl.h"
 #include "source/common/config/utility.h"
@@ -73,6 +74,7 @@ GrpcMuxImpl::GrpcMuxImpl(GrpcMuxContext& grpc_mux_context)
       xds_resources_delegate_(grpc_mux_context.xds_resources_delegate_),
       eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)),
       target_xds_authority_(grpc_mux_context.target_xds_authority_),
+      load_stats_reporter_factory_(grpc_mux_context.load_stats_reporter_factory_),
       dynamic_update_callback_handle_(
           grpc_mux_context.local_info_.contextProvider().addDynamicContextUpdateCallback(
               [this](absl::string_view resource_type_url) {
@@ -298,11 +300,12 @@ GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
   return watch;
 }
 
-absl::Status
-GrpcMuxImpl::updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_client,
-                             Grpc::RawAsyncClientSharedPtr&& failover_async_client,
-                             Stats::Scope& scope, BackOffStrategyPtr&& backoff_strategy,
-                             const envoy::config::core::v3::ApiConfigSource& ads_config_source) {
+absl::Status GrpcMuxImpl::updateMuxSource(
+    Grpc::RawAsyncClientSharedPtr&& primary_async_client,
+    Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope& scope,
+    BackOffStrategyPtr&& backoff_strategy,
+    const envoy::config::core::v3::ApiConfigSource& ads_config_source,
+    std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory) {
   // Process the rate limit settings.
   absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
       Utility::parseRateLimitSettings(ads_config_source);
@@ -318,6 +321,9 @@ GrpcMuxImpl::updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_clien
   grpc_stream_ = createGrpcStreamObject(std::move(primary_async_client),
                                         std::move(failover_async_client), service_method, scope,
                                         std::move(backoff_strategy), *rate_limit_settings_or_error);
+
+  load_stats_reporter_factory_ = std::move(load_stats_reporter_factory);
+
   // No need to update the config_validators_ as they may contain some state
   // that needs to be kept across different GrpcMux objects.
 
@@ -652,6 +658,27 @@ void GrpcMuxImpl::drainRequests() {
   grpc_stream_->maybeUpdateQueueSizeStat(request_queue_->size());
 }
 
+Upstream::LoadStatsReporter* GrpcMuxImpl::maybeCreateLoadStatsReporter() {
+  if (!lrs_server_ && load_stats_reporter_factory_ &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_lrs_server_self_ads")) {
+    ENVOY_LOG(info, "Creating self-hosted LRS reporter for xDS-gRPC-Mux (target-authority: {})",
+              target_xds_authority_);
+    lrs_server_ = load_stats_reporter_factory_();
+    if (!lrs_server_) {
+      ENVOY_LOG(warn,
+                "Failed to create self-hosted LRS reporter, not using an xDS-based LRS server");
+      return nullptr;
+    }
+    ENVOY_LOG(
+        debug,
+        "Successfully created self-hosted LRS reporter for xDS-gRPC-Mux (target-authority: {})",
+        target_xds_authority_);
+  }
+  return lrs_server_.get();
+}
+
+Upstream::LoadStatsReporter* GrpcMuxImpl::loadStatsReporter() const { return lrs_server_.get(); }
+
 // A factory class for creating GrpcMuxImpl so it does not have to be
 // hard-compiled into cluster_manager_impl.cc
 class GrpcMuxFactory : public MuxFactory {
@@ -665,7 +692,9 @@ public:
          const envoy::config::core::v3::ApiConfigSource& ads_config,
          const LocalInfo::LocalInfo& local_info, CustomConfigValidatorsPtr&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
-         XdsResourcesDelegateOptRef xds_resources_delegate) override {
+         XdsResourcesDelegateOptRef xds_resources_delegate,
+         std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory)
+      override {
     absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
         Utility::parseRateLimitSettings(ads_config);
     THROW_IF_NOT_OK_REF(rate_limit_settings_or_error.status());
@@ -685,7 +714,8 @@ public:
         /*backoff_strategy_=*/std::move(backoff_strategy),
         /*target_xds_authority_=*/Config::Utility::getGrpcControlPlane(ads_config).value_or(""),
         /*eds_resources_cache_=*/std::make_unique<EdsResourcesCacheImpl>(dispatcher),
-        /*skip_subsequent_node_=*/ads_config.set_node_on_first_message_only()};
+        /*skip_subsequent_node_=*/ads_config.set_node_on_first_message_only(),
+        /*load_stats_reporter_factory_=*/load_stats_reporter_factory};
     return std::make_shared<Config::GrpcMuxImpl>(grpc_mux_context);
   }
 };
