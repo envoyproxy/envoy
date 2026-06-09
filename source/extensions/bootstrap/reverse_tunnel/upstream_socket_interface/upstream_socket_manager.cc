@@ -280,10 +280,10 @@ UpstreamSocketManager::getConnectionSocket(const std::string& node_id) {
     }
   }
 
-  auto& start_time = fd_to_start_time_map_[fd];
-  auto end_time = dispatcher_.timeSource().monotonicTime();
-  if (auto extension = getUpstreamExtension()) {
-    extension->updateUpgradeTime(start_time, end_time);
+  auto start_time = findStartTime(fd);
+  auto extension = getUpstreamExtension();
+  if (extension && start_time.has_value()) {
+    extension->updateUpgradeTime(*start_time, dispatcher_.timeSource().monotonicTime());
   }
   fd_to_start_time_map_.erase(fd);
 
@@ -447,10 +447,10 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
     fd_to_ping_send_timer_map_.erase(fd);
 
     // Update the cx_idle_expire_time_ histogram with this info.
-    auto& start_time = fd_to_start_time_map_[fd];
-    auto end_time = dispatcher_.timeSource().monotonicTime();
-    if (auto extension = getUpstreamExtension()) {
-      extension->updateIdleExpireTime(start_time, end_time);
+    auto start_time = findStartTime(fd);
+    auto extension = getUpstreamExtension();
+    if (extension && start_time.has_value()) {
+      extension->updateIdleExpireTime(*start_time, dispatcher_.timeSource().monotonicTime());
     }
     fd_to_start_time_map_.erase(fd);
 
@@ -763,6 +763,16 @@ UpstreamSocketManager::~UpstreamSocketManager() {
   if (it != socket_managers_.end()) {
     socket_managers_.erase(it);
   }
+}
+
+OptRef<const MonotonicTime> UpstreamSocketManager::findStartTime(int fd) const {
+  auto it = fd_to_start_time_map_.find(fd);
+  if (it == fd_to_start_time_map_.end()) {
+    ENVOY_LOG(error, "reverse_tunnel: findStartTime: fd {} not found in fd_to_start_time_map_.",
+              fd);
+    return {};
+  }
+  return it->second;
 }
 
 } // namespace ReverseConnection.

@@ -17,6 +17,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -57,6 +58,10 @@ protected:
         .WillRepeatedly(testing::ReturnNew<NiceMock<Event::MockTimer>>());
     EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, _))
         .WillRepeatedly(testing::ReturnNew<NiceMock<Event::MockFileEvent>>());
+
+    auto time_sys = std::make_unique<Event::SimulatedTimeSystem>();
+    time_sys->setMonotonicTime(std::chrono::milliseconds(1000));
+    dispatcher_.time_system_ = std::move(time_sys);
 
     // Create the socket manager with real extension.
     socket_manager_ = std::make_unique<UpstreamSocketManager>(dispatcher_, extension_.get());
@@ -242,6 +247,8 @@ protected:
         stream_info.filterState().getDataReadOnly<StreamInfo::UInt64Accessor>(key);
     return accessor != nullptr ? accessor->value() : 0;
   }
+
+  OptRef<const MonotonicTime> findStartTime(int fd) { return socket_manager_->findStartTime(fd); }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   NiceMock<ThreadLocal::MockInstance> thread_local_;
@@ -1976,6 +1983,21 @@ TEST_F(TestUpstreamSocketManager, DestructorEmitsDeferredCloseLogs) {
 
   socket_manager_.reset(); // Triggers destructor.
   extension_->setTestOnlyAccessLogs({});
+}
+
+TEST_F(TestUpstreamSocketManager, FindStartTimeReturnsNulloptIfNotFound) {
+  EXPECT_EQ(findStartTime(123).has_value(), false);
+}
+
+TEST_F(TestUpstreamSocketManager, FindStartTimeReturnsValueIfFound) {
+  auto socket = createMockSocket(123);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval);
+  EXPECT_EQ(findStartTime(123).has_value(), true);
+  EXPECT_EQ(*findStartTime(123), MonotonicTime(std::chrono::milliseconds(1000)));
 }
 
 } // namespace ReverseConnection.

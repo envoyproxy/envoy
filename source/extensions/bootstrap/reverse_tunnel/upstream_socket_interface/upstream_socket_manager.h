@@ -189,6 +189,8 @@ private:
    */
   void rearmPingSendTimer(int fd);
 
+  OptRef<const MonotonicTime> findStartTime(int fd) const;
+
   // Thread local dispatcher instance.
   Event::Dispatcher& dispatcher_;
   Random::RandomGeneratorPtr random_generator_;

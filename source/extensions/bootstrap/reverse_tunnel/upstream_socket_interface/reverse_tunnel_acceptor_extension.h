@@ -25,6 +25,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/socket_interface.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_lifecycle_info.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -243,21 +244,15 @@ public:
     }
   }
 
-  uint64_t diffMs(Envoy::MonotonicTime& start, Envoy::MonotonicTime& end) {
-    ASSERT(start <= end, "Invalid the start of the period must be before the end");
-    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-    return ms.count();
-  }
-
-  void updateIdleExpireTime(Envoy::MonotonicTime& start, Envoy::MonotonicTime& end) {
+  void updateIdleExpireTime(const Envoy::MonotonicTime& start, const Envoy::MonotonicTime& end) {
     if (auto registry = getLocalRegistry()) {
-      registry->cx_idle_expire_time_->recordValue(diffMs(start, end));
+      registry->cx_idle_expire_time_->recordValue(ReverseConnectionUtility::diffMs(start, end));
     }
   }
 
-  void updateUpgradeTime(Envoy::MonotonicTime& start, Envoy::MonotonicTime& end) {
+  void updateUpgradeTime(const Envoy::MonotonicTime& start, const Envoy::MonotonicTime& end) {
     if (auto registry = getLocalRegistry()) {
-      registry->cx_upgrade_time_->recordValue(diffMs(start, end));
+      registry->cx_upgrade_time_->recordValue(ReverseConnectionUtility::diffMs(start, end));
     }
   }
 

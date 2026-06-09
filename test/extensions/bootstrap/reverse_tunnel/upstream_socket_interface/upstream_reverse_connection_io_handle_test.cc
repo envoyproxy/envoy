@@ -87,8 +87,8 @@ protected:
 };
 
 TEST_F(UpstreamReverseConnectionIOHandleTest, ConnectReturnsSuccess) {
-  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(
-      createMockSocket(), "test-cluster", tls_registry_.get());
+  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(),
+                                                                   "test-cluster", *tls_registry_);
   auto address = Network::Utility::parseInternetAddressNoThrow("127.0.0.1", 8080);
 
   auto result = io_handle_->connect(address);
@@ -98,16 +98,16 @@ TEST_F(UpstreamReverseConnectionIOHandleTest, ConnectReturnsSuccess) {
 }
 
 TEST_F(UpstreamReverseConnectionIOHandleTest, GetSocketReturnsConstReference) {
-  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(
-      createMockSocket(), "test-cluster", tls_registry_.get());
+  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(),
+                                                                   "test-cluster", *tls_registry_);
   const auto& socket = io_handle_->getSocket();
 
   EXPECT_NE(&socket, nullptr);
 }
 
 TEST_F(UpstreamReverseConnectionIOHandleTest, ShutdownIgnoredWhenOwned) {
-  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(
-      createMockSocket(), "test-cluster", tls_registry_.get());
+  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(),
+                                                                   "test-cluster", *tls_registry_);
   auto result = io_handle_->shutdown(SHUT_RDWR);
   EXPECT_EQ(result.return_value_, 0);
   EXPECT_EQ(result.errno_, 0);
@@ -115,8 +115,8 @@ TEST_F(UpstreamReverseConnectionIOHandleTest, ShutdownIgnoredWhenOwned) {
 
 // Test close() notifies the socket manager via the stored registry.
 TEST_F(UpstreamReverseConnectionIOHandleTest, CloseWithSocketManagerNotification) {
-  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(
-      createMockSocket(), "test-cluster", tls_registry_.get());
+  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(),
+                                                                   "test-cluster", *tls_registry_);
 
   auto result = io_handle_->close();
 
@@ -126,8 +126,8 @@ TEST_F(UpstreamReverseConnectionIOHandleTest, CloseWithSocketManagerNotification
 
 // Test close() when owned_socket_ is nullptr.
 TEST_F(UpstreamReverseConnectionIOHandleTest, CloseWithoutOwnedSocket) {
-  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(
-      createMockSocket(), "test-cluster", tls_registry_.get());
+  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(),
+                                                                   "test-cluster", *tls_registry_);
 
   // Release the owned socket without closing/invalidating the fd.
   io_handle_->releaseSocketForTest();
@@ -141,8 +141,8 @@ TEST_F(UpstreamReverseConnectionIOHandleTest, CloseWithoutOwnedSocket) {
 
 // Test shutdown() when owned_socket_ is nullptr.
 TEST_F(UpstreamReverseConnectionIOHandleTest, ShutdownWhenNotOwned) {
-  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(
-      createMockSocket(), "test-cluster", tls_registry_.get());
+  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(),
+                                                                   "test-cluster", *tls_registry_);
 
   // Release the owned socket without closing/invalidating the fd.
   io_handle_->releaseSocketForTest();
@@ -156,8 +156,8 @@ TEST_F(UpstreamReverseConnectionIOHandleTest, ReadConsumesFullRping) {
   int fds[2];
   ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
 
-  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(
-      createSocketWithFd(fds[0]), "test-cluster", tls_registry_.get());
+  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createSocketWithFd(fds[0]),
+                                                                   "test-cluster", *tls_registry_);
 
   const std::string rping = std::string(ReverseConnectionUtility::PING_MESSAGE);
   ASSERT_EQ(write(fds[1], rping.data(), rping.size()), static_cast<ssize_t>(rping.size()));
@@ -176,8 +176,8 @@ TEST_F(UpstreamReverseConnectionIOHandleTest, ReadConsumesRpingAndReturnsTrailin
   int fds[2];
   ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
 
-  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(
-      createSocketWithFd(fds[0]), "test-cluster", tls_registry_.get());
+  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createSocketWithFd(fds[0]),
+                                                                   "test-cluster", *tls_registry_);
 
   const std::string rping = std::string(ReverseConnectionUtility::PING_MESSAGE);
   const std::string payload = " value";
@@ -198,8 +198,8 @@ TEST_F(UpstreamReverseConnectionIOHandleTest, OnPingMessageIsNoOpAndDoesNotWrite
   int fds[2];
   ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
 
-  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(
-      createSocketWithFd(fds[0]), "test-cluster", tls_registry_.get());
+  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createSocketWithFd(fds[0]),
+                                                                   "test-cluster", *tls_registry_);
 
   const std::string rping = std::string(ReverseConnectionUtility::PING_MESSAGE);
   ASSERT_EQ(write(fds[1], rping.data(), rping.size()), static_cast<ssize_t>(rping.size()));
@@ -224,8 +224,8 @@ TEST_F(UpstreamReverseConnectionIOHandleTest, NonRpingFirstDisablesPingModeThenR
   int fds[2];
   ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
 
-  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(
-      createSocketWithFd(fds[0]), "test-cluster", tls_registry_.get());
+  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createSocketWithFd(fds[0]),
+                                                                   "test-cluster", *tls_registry_);
 
   const std::string non_rping = "HELLO";
   ASSERT_EQ(write(fds[1], non_rping.data(), non_rping.size()),
@@ -259,8 +259,8 @@ TEST_F(UpstreamReverseConnectionIOHandleTest, PostUpgradeLifetimeHistogramRecord
   mock_histogram.unit_ = Stats::Histogram::Unit::Milliseconds;
   tls_registry_->cx_post_upgrade_lifetime_ = &mock_histogram;
 
-  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(
-      createMockSocket(), "test-cluster", tls_registry_.get());
+  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(),
+                                                                   "test-cluster", *tls_registry_);
 
   // Destroying the IO handle calls complete(), which records the duration.
   EXPECT_CALL(mock_histogram, recordValue(_));
@@ -273,8 +273,8 @@ TEST_F(UpstreamReverseConnectionIOHandleTest,
   mock_histogram.unit_ = Stats::Histogram::Unit::Milliseconds;
   tls_registry_->cx_post_upgrade_lifetime_ = &mock_histogram;
 
-  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(
-      createMockSocket(), "test-cluster", tls_registry_.get());
+  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(),
+                                                                   "test-cluster", *tls_registry_);
 
   // During the handle's active lifetime, no recording should happen.
   EXPECT_CALL(mock_histogram, recordValue(_)).Times(0);
