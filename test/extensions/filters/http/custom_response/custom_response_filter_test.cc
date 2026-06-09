@@ -233,7 +233,7 @@ TEST_F(CustomResponseFilterTest, InvalidSchemeRedirect) {
       stats_store_.findCounterByString("stats.custom_response_invalid_uri").value().get().value());
 }
 
-TEST_F(CustomResponseFilterTest, PathRedirectFormat) {
+TEST_F(CustomResponseFilterTest, PathRewrite) {
   createConfig(R"EOF(
   custom_response_matcher:
     on_no_match:
@@ -264,7 +264,7 @@ TEST_F(CustomResponseFilterTest, PathRedirectFormat) {
   EXPECT_EQ("redirect.example.com", request_headers.getHostValue());
 }
 
-TEST_F(CustomResponseFilterTest, PathRedirectFormatInvalid) {
+TEST_F(CustomResponseFilterTest, PathRewriteInvalid) {
   EXPECT_THROW_WITH_REGEX(createConfig(R"EOF(
   custom_response_matcher:
     on_no_match:

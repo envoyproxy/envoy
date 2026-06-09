@@ -9287,7 +9287,7 @@ virtual_hosts:
 }
 
 // Test path_rewrite: substitution-based redirect path.
-TEST_F(RouteConfigurationV2, RedirectPathRedirectFormat) {
+TEST_F(RouteConfigurationV2, RedirectPathRewrite) {
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: redirect
@@ -9341,7 +9341,7 @@ virtual_hosts:
 }
 
 // path_rewrite with a bad format string is rejected at config load time.
-TEST_F(RouteConfigurationV2, RedirectPathRedirectFormatInvalid) {
+TEST_F(RouteConfigurationV2, RedirectPathRewriteInvalid) {
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: redirect
@@ -9352,15 +9352,13 @@ virtual_hosts:
           path_rewrite: "/new/%INVALID_COMMAND_WITH_NO_CLOSING"
   )EOF";
 
-  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false,
-                        creation_status_);
-  EXPECT_FALSE(creation_status_.ok());
-  EXPECT_THAT(creation_status_.message(),
-              testing::HasSubstr("Failed to create path_rewrite formatter"));
+  EXPECT_THROW_WITH_REGEX(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_,
+                                         false, creation_status_),
+                          EnvoyException, "Failed to create path_rewrite formatter");
 }
 
 // Test path_rewrite with CEL expressions.
-TEST_F(RouteConfigurationV2, RedirectPathRedirectFormatCEL) {
+TEST_F(RouteConfigurationV2, RedirectPathRewriteCEL) {
   ScopedThreadLocalServerContextSetter server_context_setter(factory_context_);
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -9416,7 +9414,7 @@ virtual_hosts:
 
 // %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% requires real stream info with a populated
 // connection. Passing a StreamInfoImpl with a known remote address produces the correct path.
-TEST_F(RouteConfigurationV2, RedirectPathRedirectFormatDownstreamAddress) {
+TEST_F(RouteConfigurationV2, RedirectPathRewriteDownstreamAddress) {
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: redirect

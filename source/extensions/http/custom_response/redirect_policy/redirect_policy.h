@@ -10,7 +10,6 @@
 #include "envoy/stats/stats.h"
 
 #include "source/common/config/utility.h"
-#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/header_parser.h"
 #include "source/extensions/filters/http/custom_response/policy.h"

@@ -47,8 +47,6 @@
 #include "source/common/router/matcher_visitor.h"
 #include "source/common/router/weighted_cluster_specifier.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/common/stream_info/filter_state_impl.h"
-#include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/early_data/default_early_data_policy.h"
@@ -178,27 +176,37 @@ getClusterSpecifierPluginByTheProto(const envoy::config::route::v3::ClusterSpeci
   return factory->createClusterSpecifierPlugin(*config, factory_context);
 }
 
-::Envoy::Http::Utility::RedirectConfig
+absl::StatusOr<std::unique_ptr<::Envoy::Http::Utility::RedirectConfig>>
 createRedirectConfig(const envoy::config::route::v3::Route& route, Regex::Engine& regex_engine) {
-  ::Envoy::Http::Utility::RedirectConfig redirect_config{
-      route.redirect().scheme_redirect(),
-      route.redirect().host_redirect(),
-      route.redirect().port_redirect() ? ":" + std::to_string(route.redirect().port_redirect())
-                                       : "",
-      route.redirect().path_redirect(),
-      route.redirect().prefix_rewrite(),
-      route.redirect().has_regex_rewrite() ? route.redirect().regex_rewrite().substitution() : "",
-      route.redirect().has_regex_rewrite()
-          ? THROW_OR_RETURN_VALUE(Regex::Utility::parseRegex(
-                                      route.redirect().regex_rewrite().pattern(), regex_engine),
-                                  Regex::CompiledMatcherPtr)
-          : nullptr,
-      nullptr,
-      route.redirect().path_redirect().find('?') != absl::string_view::npos,
-      route.redirect().https_redirect(),
-      route.redirect().strip_query()};
+  std::unique_ptr<::Envoy::Http::Utility::RedirectConfig> redirect_config =
+      std::make_unique<::Envoy::Http::Utility::RedirectConfig>(
+          ::Envoy::Http::Utility::RedirectConfig{
+              route.redirect().scheme_redirect(), route.redirect().host_redirect(),
+              route.redirect().port_redirect()
+                  ? ":" + std::to_string(route.redirect().port_redirect())
+                  : "",
+              route.redirect().path_redirect(), route.redirect().prefix_rewrite(),
+              route.redirect().has_regex_rewrite() ? route.redirect().regex_rewrite().substitution()
+                                                   : "",
+              route.redirect().has_regex_rewrite()
+                  ? THROW_OR_RETURN_VALUE(
+                        Regex::Utility::parseRegex(route.redirect().regex_rewrite().pattern(),
+                                                   regex_engine),
+                        Regex::CompiledMatcherPtr)
+                  : nullptr,
+              nullptr, route.redirect().path_redirect().find('?') != absl::string_view::npos,
+              route.redirect().https_redirect(), route.redirect().strip_query()});
   if (route.redirect().has_regex_rewrite()) {
-    ASSERT(redirect_config.prefix_rewrite_redirect_.empty());
+    ASSERT(redirect_config->prefix_rewrite_redirect_.empty());
+  }
+  if (!route.redirect().path_rewrite().empty()) {
+    absl::StatusOr<Formatter::FormatterPtr> formatter_or =
+        Envoy::Formatter::FormatterImpl::create(route.redirect().path_rewrite(), true);
+    if (!formatter_or.ok()) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("Failed to create path_rewrite formatter: ", formatter_or.status()));
+    }
+    redirect_config->path_rewrite_formatter_ = std::move(formatter_or.value());
   }
   return redirect_config;
 }
@@ -503,10 +511,11 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
       optional_timeouts_(buildOptionalTimeouts(route.route())), loader_(factory_context.runtime()),
       runtime_(loadRuntimeData(route.match())),
-      redirect_config_(route.has_redirect()
-                           ? std::make_unique<::Envoy::Http::Utility::RedirectConfig>(
-                                 createRedirectConfig(route, factory_context.regexEngine()))
-                           : nullptr),
+      redirect_config_(
+          route.has_redirect()
+              ? THROW_OR_RETURN_VALUE(createRedirectConfig(route, factory_context.regexEngine()),
+                                      std::unique_ptr<::Envoy::Http::Utility::RedirectConfig>)
+              : nullptr),
       hedge_policy_(buildHedgePolicy(vhost->hedgePolicy(), route.route())),
       internal_redirect_policy_(
           THROW_OR_RETURN_VALUE(buildInternalRedirectPolicy(route.route(), validator, route.name()),
@@ -774,17 +783,6 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
               "`strip_query` is set to true, but `path_redirect` contains query string and it will "
               "not be stripped: {}",
               redirect_config_->path_redirect_);
-  }
-
-  if (redirect_config_ != nullptr && !route.redirect().path_rewrite().empty()) {
-    auto formatter_or =
-        Envoy::Formatter::FormatterImpl::create(route.redirect().path_rewrite(), true);
-    if (!formatter_or.ok()) {
-      creation_status = absl::InvalidArgumentError(
-          absl::StrCat("Failed to create path_rewrite formatter: ", formatter_or.status()));
-      return;
-    }
-    redirect_config_->path_rewrite_formatter_ = std::move(formatter_or.value());
   }
 
   if (!route.stat_prefix().empty()) {
