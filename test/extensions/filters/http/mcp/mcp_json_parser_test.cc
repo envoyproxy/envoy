@@ -1825,6 +1825,64 @@ TEST(McpParserConfigTest, DefaultSecuritySettings) {
   EXPECT_FALSE(config.rejectDuplicateKeys());
 }
 
+TEST_F(McpJsonParserTest, ValidJsonRpcResponse) {
+  std::string json =
+      R"({"jsonrpc":"2.0","id":1,"result":{"action":"accept","content":{"name":"test"}}})";
+
+  EXPECT_OK(parser_->parse(json));
+  ASSERT_TRUE(parser_->finishParse().ok());
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_TRUE(parser_->isResponse());
+  EXPECT_EQ(parser_->getMethod(), "");
+}
+
+TEST_F(McpJsonParserTest, ValidJsonRpcErrorResponse) {
+  std::string json =
+      R"({"jsonrpc":"2.0","id":1,"error":{"code":-32042,"message":"URL elicitation required"}})";
+
+  EXPECT_OK(parser_->parse(json));
+  ASSERT_TRUE(parser_->finishParse().ok());
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_TRUE(parser_->isResponse());
+  EXPECT_EQ(parser_->getMethod(), "");
+}
+
+TEST_F(McpJsonParserTest, ResponseNotConfusedWithRequest) {
+  std::string json = R"({"jsonrpc":"2.0","id":1,"result":{}})";
+
+  EXPECT_OK(parser_->parse(json));
+  ASSERT_TRUE(parser_->finishParse().ok());
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_TRUE(parser_->isResponse());
+
+  const auto& metadata = parser_->metadata();
+  auto id_it = metadata.fields().find("id");
+  ASSERT_NE(id_it, metadata.fields().end());
+  EXPECT_EQ(id_it->second.number_value(), 1);
+}
+
+TEST_F(McpJsonParserTest, ResponseWithStringResult) {
+  std::string json = R"({"jsonrpc":"2.0","id":1,"result":"ok"})";
+
+  EXPECT_OK(parser_->parse(json));
+  ASSERT_TRUE(parser_->finishParse().ok());
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_TRUE(parser_->isResponse());
+}
+
+TEST_F(McpJsonParserTest, NoMethodNoResultInvalid) {
+  std::string json = R"({"jsonrpc":"2.0","id":1})";
+
+  EXPECT_OK(parser_->parse(json));
+
+  EXPECT_FALSE(parser_->isValidMcpRequest());
+  EXPECT_FALSE(parser_->isResponse());
+}
+
 } // namespace
 } // namespace Mcp
 } // namespace HttpFilters

@@ -11,6 +11,7 @@ package(default_visibility = [
     "//test/extensions/dynamic_modules/listener:__pkg__",
     "//test/extensions/dynamic_modules/network:__pkg__",
     "//test/extensions/dynamic_modules/stat_sink:__pkg__",
+    "//test/extensions/transport_sockets/dynamic_modules:__pkg__",
     "//test/extensions/upstreams/http/dynamic_modules:__pkg__",
 ])
 
@@ -69,3 +70,5 @@ test_program(name = "cluster_integration_test")
 test_program(name = "cluster_filter_state_test")
 
 test_program(name = "stat_sink_integration_test")
+
+test_program(name = "transport_socket_integration_test")

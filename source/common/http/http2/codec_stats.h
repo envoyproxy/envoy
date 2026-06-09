@@ -14,6 +14,7 @@ namespace Http2 {
  * All stats for the HTTP/2 codec. @see stats_macros.h
  */
 #define ALL_HTTP2_CODEC_STATS(COUNTER, GAUGE)                                                      \
+  COUNTER(cookies_total_bytes_too_large)                                                           \
   COUNTER(dropped_headers_with_underscores)                                                        \
   COUNTER(goaway_sent)                                                                             \
   COUNTER(header_overflow)                                                                         \
