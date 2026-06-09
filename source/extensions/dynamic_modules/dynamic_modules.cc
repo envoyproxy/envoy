@@ -290,9 +290,11 @@ absl::StatusOr<DynamicModulePtr> newStaticModule(const absl::string_view module_
   return dynamic_module;
 }
 
-absl::StatusOr<DynamicModuleLoadResult> newDynamicModuleByConfig(
-    const ProtoDynamicModuleConfig& config, Server::Configuration::CommonFactoryContext& context,
-    OptRef<Init::Manager> init_manager, std::function<void(DynamicModulePtr)> on_loaded) {
+absl::StatusOr<DynamicModuleLoadResult>
+newDynamicModuleByConfig(const ProtoDynamicModuleConfig& config,
+                         OptRef<Server::Configuration::CommonFactoryContext> context,
+                         OptRef<Init::Manager> init_manager,
+                         std::function<void(DynamicModulePtr)> on_loaded) {
 
   if (!config.has_module()) {
     // Name-based dynamic module loading: look up the module by name under the search path.
@@ -328,8 +330,13 @@ absl::StatusOr<DynamicModuleLoadResult> newDynamicModuleByConfig(
         "Only local file path or remote HTTP source is supported for module sources");
   }
 
-  // Remote HTTP source. The cache management, NACK background fetch, and asynchronous fetch paths
-  // below all use the factory context.
+  // Remote HTTP source: every remaining path (cache management, NACK background fetch, and the
+  // asynchronous fetch itself) needs the factory context, so reject remote sources for callers that
+  // cannot supply one.
+  if (!context.has_value()) {
+    return absl::InvalidArgumentError("Remote module sources require a factory context");
+  }
+
   const absl::string_view sha256 = config.module().remote().sha256();
 
   // Check if a previously fetched module with the same SHA256 already exists on disk.
@@ -356,7 +363,7 @@ absl::StatusOr<DynamicModuleLoadResult> newDynamicModuleByConfig(
       auto dynamic_module =
           newDynamicModule(cached_path, config.do_not_close(), config.load_globally());
       if (dynamic_module.ok()) {
-        BackgroundFetchManager::singleton(context.singletonManager())->erase(sha256);
+        BackgroundFetchManager::singleton(context->singletonManager())->erase(sha256);
         return DynamicModuleLoadResult{std::move(dynamic_module.value()), nullptr};
       }
       // File exists, hash matches, but failed to load — re-fetching the same SHA256 would
@@ -369,8 +376,8 @@ absl::StatusOr<DynamicModuleLoadResult> newDynamicModuleByConfig(
   // In NACK mode, reject the config and kick off a background fetch. The control
   // plane will retry, and the next attempt picks up the cached file above.
   if (config.nack_on_cache_miss()) {
-    BackgroundFetchManager::singleton(context.singletonManager())
-        ->fetchIfNeeded(sha256, context.clusterManager(), config.module().remote());
+    BackgroundFetchManager::singleton(context->singletonManager())
+        ->fetchIfNeeded(sha256, context->clusterManager(), config.module().remote());
     return absl::InvalidArgumentError(
         absl::StrCat("Remote module not cached; background fetch in progress. SHA256: ", sha256));
   }
@@ -396,8 +403,8 @@ absl::StatusOr<DynamicModuleLoadResult> newDynamicModuleByConfig(
   std::weak_ptr<AsyncLoadingState> weak_state = async_state;
 
   async_state->remote_provider = std::make_unique<RemoteAsyncDataProvider>(
-      context.clusterManager(), *init_manager, config.module().remote(),
-      context.mainThreadDispatcher(), context.api().randomGenerator(),
+      context->clusterManager(), *init_manager, config.module().remote(),
+      context->mainThreadDispatcher(), context->api().randomGenerator(),
       /*allow_empty=*/true, [weak_state, config](const std::string& data) {
         auto state = weak_state.lock();
         if (!state) {

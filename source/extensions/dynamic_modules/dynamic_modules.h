@@ -204,16 +204,17 @@ struct DynamicModuleLoadResult {
  * sourcing strategies (local file, statically linked by name, and remote HTTP source with on-disk
  * caching and optional asynchronous fetch) behind a single entry point.
  *
- * The local-file and by-name paths are fully synchronous and use only the config. The remote HTTP
- * source path uses the context (only the members shared by all extension points,
- * CommonFactoryContext, are needed), and the asynchronous fetch additionally requires an init
- * manager and an on_loaded callback; if either of those is missing, a remote source is rejected
- * with an error.
+ * The local-file and by-name paths are fully synchronous and require neither a factory context nor
+ * an init manager, so extension points that have no access to a factory context (such as the
+ * upstream HTTP conn-pool factory) can call this with only the config. The remote HTTP source path
+ * requires a context, and the asynchronous fetch additionally requires an init manager and an
+ * on_loaded callback; if any of those is missing, a remote source is rejected with an error.
  *
  * @param config the dynamic module configuration describing where to source the module from.
  * @param context the factory context, used to access the singleton, cluster, dispatcher and random
- * generator needed for remote fetches and background caching. Only used for the remote HTTP source
- * path; ignored for local-file and by-name sources.
+ * generator needed for remote fetches and background caching. Only the members shared by all
+ * extension points (CommonFactoryContext) are required. May be absent; in that case a remote source
+ * is rejected with an error while local-file and by-name sources still load.
  * @param init_manager the init manager used to register the asynchronous remote fetch target. May
  * be absent; in that case a remote source that is not already cached is rejected with an error.
  * @param on_loaded invoked on the main thread with the loaded module once an asynchronous remote
@@ -225,7 +226,7 @@ struct DynamicModuleLoadResult {
  */
 absl::StatusOr<DynamicModuleLoadResult>
 newDynamicModuleByConfig(const ProtoDynamicModuleConfig& config,
-                         Server::Configuration::CommonFactoryContext& context,
+                         OptRef<Server::Configuration::CommonFactoryContext> context = {},
                          OptRef<Init::Manager> init_manager = {},
                          std::function<void(DynamicModulePtr)> on_loaded = nullptr);
 

@@ -410,20 +410,20 @@ protected:
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
 };
 
-// Neither name nor module set: the config is rejected.
+// Neither name nor module set: the config is rejected. No context is needed for this path.
 TEST_F(NewDynamicModuleByConfigTest, NoModuleNorName) {
   ProtoDynamicModuleConfig config;
-  auto result = newDynamicModuleByConfig(config, context_);
+  auto result = newDynamicModuleByConfig(config);
   EXPECT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(),
               testing::HasSubstr("Either 'name' or 'module' must be specified"));
 }
 
-// By-name loading succeeds synchronously (the context is unused on this path).
+// By-name loading succeeds synchronously and requires no context (the contextless caller path).
 TEST_F(NewDynamicModuleByConfigTest, ByNameSuccess) {
   ProtoDynamicModuleConfig config;
   config.set_name("no_op");
-  auto result = newDynamicModuleByConfig(config, context_);
+  auto result = newDynamicModuleByConfig(config);
   ASSERT_TRUE(result.ok()) << result.status().message();
   EXPECT_NE(result->loaded_, nullptr);
   EXPECT_EQ(result->async_, nullptr);
@@ -433,16 +433,16 @@ TEST_F(NewDynamicModuleByConfigTest, ByNameSuccess) {
 TEST_F(NewDynamicModuleByConfigTest, ByNameFailure) {
   ProtoDynamicModuleConfig config;
   config.set_name("nonexistent_module");
-  auto result = newDynamicModuleByConfig(config, context_);
+  auto result = newDynamicModuleByConfig(config);
   EXPECT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to load dynamic module"));
 }
 
-// Local-file loading succeeds synchronously (the context is unused on this path).
+// Local-file loading succeeds synchronously and requires no context (the contextless caller path).
 TEST_F(NewDynamicModuleByConfigTest, LocalFileSuccess) {
   ProtoDynamicModuleConfig config;
   config.mutable_module()->mutable_local()->set_filename(testSharedObjectPath("no_op", "c"));
-  auto result = newDynamicModuleByConfig(config, context_);
+  auto result = newDynamicModuleByConfig(config);
   ASSERT_TRUE(result.ok()) << result.status().message();
   EXPECT_NE(result->loaded_, nullptr);
   EXPECT_EQ(result->async_, nullptr);
@@ -452,7 +452,7 @@ TEST_F(NewDynamicModuleByConfigTest, LocalFileSuccess) {
 TEST_F(NewDynamicModuleByConfigTest, LocalFileFailure) {
   ProtoDynamicModuleConfig config;
   config.mutable_module()->mutable_local()->set_filename("/nonexistent/path/to/module.so");
-  auto result = newDynamicModuleByConfig(config, context_);
+  auto result = newDynamicModuleByConfig(config);
   EXPECT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to load dynamic module"));
 }
@@ -461,10 +461,18 @@ TEST_F(NewDynamicModuleByConfigTest, LocalFileFailure) {
 TEST_F(NewDynamicModuleByConfigTest, ModuleWithoutLocalFileOrRemoteRejected) {
   ProtoDynamicModuleConfig config;
   config.mutable_module()->mutable_local()->set_inline_bytes("AAAA");
-  auto result = newDynamicModuleByConfig(config, context_);
+  auto result = newDynamicModuleByConfig(config);
   EXPECT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(),
               testing::HasSubstr("Only local file path or remote HTTP source is supported"));
+}
+
+// A remote source without a factory context is rejected (the contextless caller cannot fetch).
+TEST_F(NewDynamicModuleByConfigTest, RemoteWithoutContextRejected) {
+  auto result = newDynamicModuleByConfig(makeRemoteConfig("abc123"));
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result.status().message(),
+              testing::HasSubstr("Remote module sources require a factory context"));
 }
 
 // A cached file whose contents match the expected SHA256 is loaded directly (cache hit).
