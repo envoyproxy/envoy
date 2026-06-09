@@ -113,9 +113,11 @@ downstream_tls_context:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
 enable_resumption:
   value: false
+enable_early_data:
+  value: false
 )EOF");
 
-  verifyQuicServerTransportSocketFactory(yaml, true, false);
+  verifyQuicServerTransportSocketFactory(yaml, false, false);
 }
 
 TEST_F(QuicServerTransportSocketFactoryConfigTest, ResumptionExplicitlyEnabled) {
@@ -135,6 +137,29 @@ enable_resumption:
 )EOF");
 
   verifyQuicServerTransportSocketFactory(yaml, true, true);
+}
+
+TEST_F(QuicServerTransportSocketFactoryConfigTest, ResumptionDisabledEarlyDataEnabledInvalid) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+enable_resumption:
+  value: false
+enable_early_data:
+  value: true
+)EOF");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      verifyQuicServerTransportSocketFactory(yaml, true, false), EnvoyException,
+      "QUIC early data is enabled but resumption is disabled. Early data requires resumption.");
 }
 
 TEST_F(QuicServerTransportSocketFactoryConfigTest, ClientAuthUnsupported) {

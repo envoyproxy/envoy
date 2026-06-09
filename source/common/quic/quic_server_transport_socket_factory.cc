@@ -29,10 +29,18 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
     return absl::InvalidArgumentError("TLS Client Authentication is not supported over QUIC");
   }
 
+  const bool enable_early_data =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_early_data, true);
+  const bool enable_resumption =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_resumption, true);
+
+  if (!enable_resumption && enable_early_data) {
+    return absl::InvalidArgumentError(
+        "QUIC early data is enabled but resumption is disabled. Early data requires resumption.");
+  }
+
   auto factory_or_error = QuicServerTransportSocketFactory::create(
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_early_data, true),
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_resumption, true),
-      context.statsScope(), std::move(server_config),
+      enable_early_data, enable_resumption, context.statsScope(), std::move(server_config),
       context.serverFactoryContext().sslContextManager());
   RETURN_IF_NOT_OK(factory_or_error.status());
   (*factory_or_error)->initialize();
