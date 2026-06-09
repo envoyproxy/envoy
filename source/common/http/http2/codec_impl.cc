@@ -992,10 +992,6 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       per_stream_buffer_limit_(http2_options.initial_stream_window_size().value()),
       stream_error_on_invalid_http_messaging_(
           http2_options.override_stream_error_on_invalid_http_message().value()),
-      protocol_constraints_(stats, http2_options,
-                            Runtime::runtimeFeatureEnabled(
-                                "envoy.reloadable_features.http2_flood_protection_active_streams")),
-      dispatching_(false), raised_goaway_(false), random_(random_generator),
       max_cookie_size_bytes_(
           runtime.has_value() ? runtime->snapshot().getInteger(
                                     "envoy.reloadable_features.http2_max_cookies_size_in_kb", 0) *
