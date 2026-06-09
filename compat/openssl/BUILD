@@ -1,4 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
+load("//bazel:toolchains.bzl", "LIBCLANG_CPP", "LIBLLVM")
 load("//compat/openssl:bazel/rules.bzl", "mapping_func_filegroup", "patched_bssl_filegroup")
 
 licenses(["notice"])  # Apache 2
@@ -174,7 +175,7 @@ genrule(
         done
 
         # Set up LD_LIBRARY_PATH for libclang-cpp.so
-        LLVM_LIB_DIR=$$(dirname $(location @llvm_toolchain_llvm//:lib/libclang-cpp.so.18.1))
+        LLVM_LIB_DIR=$$(dirname $(location """ + LIBCLANG_CPP + """))
         export LD_LIBRARY_PATH="$$LLVM_LIB_DIR$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}"
 
         # Run the prefixer with absolute source path and relative output path
@@ -186,11 +187,22 @@ genrule(
             --include "$$CLANG_INCLUDE_DIR" \
             --output $(RULEDIR) \
             --prefix ossl 2>&1
+
+        # Some distros (e.g. Fedora) use multiarch OpenSSL headers where
+        # configuration.h dispatches to platform-specific files like
+        # configuration-x86_64.h. Flatten by replacing configuration.h
+        # with the platform-specific content, stripping the include guard.
+        OSSL_DIR=$(RULEDIR)/include/ossl/openssl
+        PLATFORM_CFG="$$OSSL_DIR/configuration-$$(uname -m).h"
+        if [ -f "$$PLATFORM_CFG" ]; then
+            sed '/openssl_conf_multilib_redirection_h/,/#endif/d;/#error/d' \
+                "$$PLATFORM_CFG" > "$$OSSL_DIR/configuration.h"
+        fi
     """,
     tools = [
         "//compat/openssl/prefixer",
-        "@llvm_toolchain_llvm//:lib/libclang-cpp.so.18.1",
-    ],
+        LIBCLANG_CPP,
+    ] + ([LIBLLVM] if LIBLLVM else []),
     visibility = ["//visibility:private"],
 )
 

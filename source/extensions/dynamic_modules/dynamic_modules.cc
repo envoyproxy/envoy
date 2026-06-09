@@ -6,12 +6,15 @@
 #include <cerrno>
 #include <fstream>
 #include <string>
+#include <system_error>
 
 #include "envoy/common/exception.h"
 
 #include "source/common/common/hex.h"
+#include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
+#include "source/extensions/dynamic_modules/background_fetch_manager.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
@@ -285,6 +288,139 @@ absl::StatusOr<DynamicModulePtr> newStaticModule(const absl::string_view module_
                         "Static module ABI version {} matched.", abi_version);
   }
   return dynamic_module;
+}
+
+absl::StatusOr<DynamicModuleLoadResult> newDynamicModuleByConfig(
+    const ProtoDynamicModuleConfig& config, Server::Configuration::ServerFactoryContext& context,
+    OptRef<Init::Manager> init_manager, std::function<void(DynamicModulePtr)> on_loaded) {
+
+  if (!config.has_module()) {
+    // Name-based dynamic module loading: look up the module by name under the search path.
+    if (config.name().empty()) {
+      return absl::InvalidArgumentError(
+          "Either 'name' or 'module' must be specified in dynamic_module_config");
+    }
+    auto dynamic_module =
+        newDynamicModuleByName(config.name(), config.do_not_close(), config.load_globally());
+    if (!dynamic_module.ok()) {
+      return absl::InvalidArgumentError("Failed to load dynamic module: " +
+                                        std::string(dynamic_module.status().message()));
+    }
+    return DynamicModuleLoadResult{std::move(dynamic_module.value()), nullptr};
+  }
+
+  // Data source-based dynamic module loading: load the module from the specified data source, which
+  // may be a local file path or a remote HTTP URL. If the source is remote.
+
+  if (!config.module().local().filename().empty()) {
+    // Module specified by local file path.
+    auto dynamic_module = newDynamicModule(config.module().local().filename(),
+                                           config.do_not_close(), config.load_globally());
+    if (!dynamic_module.ok()) {
+      return absl::InvalidArgumentError("Failed to load dynamic module: " +
+                                        std::string(dynamic_module.status().message()));
+    }
+    return DynamicModuleLoadResult{std::move(dynamic_module.value()), nullptr};
+  }
+
+  if (!config.module().has_remote()) {
+    return absl::InvalidArgumentError(
+        "Only local file path or remote HTTP source is supported for module sources");
+  }
+
+  const absl::string_view sha256 = config.module().remote().sha256();
+
+  // Check if a previously fetched module with the same SHA256 already exists on disk.
+  // newDynamicModuleFromBytes writes to a deterministic path based on SHA256, so the
+  // filesystem itself acts as the cache.
+  auto cached_path = moduleTempPath(sha256);
+  if (std::filesystem::exists(cached_path)) {
+    // Re-verify SHA256 of the cached file before dlopen. The cache path is in /tmp, which
+    // may be writable by other processes (co-tenant containers, shared hosts); without this
+    // check, an attacker who pre-populates ``/tmp/envoy_dynamic_module_<expected_sha>.so``
+    // with a malicious shared object turns the cache-hit fast path into arbitrary code
+    // execution. The fetch path that wrote the cached file already verified the hash, but
+    // we cannot trust that the file was not replaced between writes.
+    const auto verify_status = verifyFileSha256(cached_path, sha256);
+    if (!verify_status.ok()) {
+      // Tampered or corrupted cache entry — remove it and fall through to the fetch path
+      // below so the legitimate remote source can re-supply correct bytes.
+      std::error_code ec;
+      std::filesystem::remove(cached_path, ec);
+      ENVOY_LOG_MISC(warn, "dynamic_modules: removed cached file failing SHA256 verification: {}",
+                     verify_status.message());
+      // Fall through to the fetch logic below.
+    } else {
+      auto dynamic_module =
+          newDynamicModule(cached_path, config.do_not_close(), config.load_globally());
+      if (dynamic_module.ok()) {
+        BackgroundFetchManager::singleton(context.singletonManager())->erase(sha256);
+        return DynamicModuleLoadResult{std::move(dynamic_module.value()), nullptr};
+      }
+      // File exists, hash matches, but failed to load — re-fetching the same SHA256 would
+      // produce identical bytes, so there is no point in falling through.
+      return absl::InvalidArgumentError("Cached remote module failed to load: " +
+                                        std::string(dynamic_module.status().message()));
+    }
+  }
+
+  // In NACK mode, reject the config and kick off a background fetch. The control
+  // plane will retry, and the next attempt picks up the cached file above.
+  if (config.nack_on_cache_miss()) {
+    BackgroundFetchManager::singleton(context.singletonManager())
+        ->fetchIfNeeded(sha256, context.clusterManager(), config.module().remote());
+    return absl::InvalidArgumentError(
+        "Remote module not cached; background fetch in progress. SHA256: " + std::string(sha256));
+  }
+
+  // No cached file — need async fetch, which requires init_manager.
+  if (!init_manager.has_value()) {
+    return absl::InvalidArgumentError("Remote module sources require an init manager");
+  }
+
+  // No on_loaded callback means the caller does not support asynchronous loading, so reject the
+  // config rather than silently failing to load the module.
+  if (!on_loaded) {
+    return absl::InvalidArgumentError("Remote module sources require an on_loaded callback");
+  }
+
+  // Shared state holding the RemoteAsyncDataProvider (to keep the fetch alive for its duration,
+  // including retries) and the on_loaded callback invoked once the module is loaded.
+  auto async_state = std::make_shared<AsyncLoadingState>();
+  async_state->on_loaded = std::move(on_loaded);
+
+  // Use a weak_ptr in the callback to break the reference cycle:
+  // async_state -> remote_provider -> callback -> async_state.
+  std::weak_ptr<AsyncLoadingState> weak_state = async_state;
+
+  async_state->remote_provider = std::make_unique<RemoteAsyncDataProvider>(
+      context.clusterManager(), *init_manager, config.module().remote(),
+      context.mainThreadDispatcher(), context.api().randomGenerator(),
+      /*allow_empty=*/true, [weak_state, config](const std::string& data) {
+        auto state = weak_state.lock();
+        if (!state) {
+          return;
+        }
+        if (data.empty()) {
+          ENVOY_LOG_TO_LOGGER(
+              Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
+              "Remote dynamic module fetch returned empty data; module will not be loaded");
+          return;
+        }
+        auto module_or_error = newDynamicModuleFromBytes(
+            data, config.module().remote().sha256(), config.do_not_close(), config.load_globally());
+        if (!module_or_error.ok()) {
+          ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules),
+                              error, "Failed to load remote dynamic module from bytes: {}",
+                              module_or_error.status().message());
+          return;
+        }
+        if (state->on_loaded) {
+          state->on_loaded(std::move(module_or_error.value()));
+        }
+      });
+
+  return DynamicModuleLoadResult{nullptr, std::move(async_state)};
 }
 
 } // namespace DynamicModules

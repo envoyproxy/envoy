@@ -11,9 +11,10 @@ sphinx-rtd-theme>=3.0.2
 
 # Shared dependencies (also in main workspace)
 aio.run.runner
-envoy.base.utils>=0.6.5
-envoy.code.check>=0.6.4
+envoy.base.utils>=0.6.7
+envoy.code.check>=0.6.6
 frozendict>=2.3.7
 jinja2
 packaging
+pyjwt[crypto]==2.13.0
 pyyaml
