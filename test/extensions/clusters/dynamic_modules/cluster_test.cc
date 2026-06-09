@@ -1297,6 +1297,28 @@ TEST_F(DynamicModuleClusterTest, WorkerSlotGetReturnsNullptrWhenSlotAllocatedBut
   EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_worker_slot_get(cluster.get()));
 }
 
+// Test cluster_get_name returns the cluster's CDS name from the cluster-side context.
+TEST_F(DynamicModuleClusterTest, ClusterGetNameReturnsCdsName) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  envoy_dynamic_module_type_envoy_buffer buffer{nullptr, 0};
+  envoy_dynamic_module_callback_cluster_get_name(cluster.get(), &buffer);
+  EXPECT_EQ("test_cluster", absl::string_view(buffer.ptr, buffer.length));
+}
+
+// Test cluster_get_name tolerates null arguments.
+TEST_F(DynamicModuleClusterTest, ClusterGetNameNullArgs) {
+  envoy_dynamic_module_type_envoy_buffer buffer{reinterpret_cast<const char*>(0x1), 1};
+  envoy_dynamic_module_callback_cluster_get_name(nullptr, &buffer);
+  EXPECT_EQ(nullptr, buffer.ptr);
+  EXPECT_EQ(0u, buffer.length);
+  // Must not crash with a null result.
+  envoy_dynamic_module_callback_cluster_get_name(nullptr, nullptr);
+}
+
 // Test the DynamicModuleClusterHandle destructor dispatches to main thread.
 TEST_F(DynamicModuleClusterTest, HandleDestructorDispatchesToMainThread) {
   auto result = createCluster(makeYamlConfig("cluster_no_op"));

@@ -416,6 +416,10 @@ pub trait EnvoyCluster: Send + Sync {
     &self,
   ) -> abi::envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr;
 
+  /// This cluster's CDS name (`ClusterInfo::name()`). Available in any cluster-side callback.
+  /// Empty when the host Envoy predates this ABI (symbol absent).
+  fn get_cluster_name(&self) -> String;
+
   /// Sends an HTTP request to the specified cluster and asynchronously delivers the response
   /// via [`Cluster::on_http_callout_done`].
   ///
@@ -1002,6 +1006,23 @@ impl EnvoyCluster for EnvoyClusterImpl {
     &self,
   ) -> abi::envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr {
     unsafe { abi::envoy_dynamic_module_callback_cluster_worker_slot_get(self.raw) }
+  }
+
+  fn get_cluster_name(&self) -> String {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_get_name(self.raw, &mut result);
+    }
+    if result.ptr.is_null() || result.length == 0 {
+      String::new()
+    } else {
+      unsafe {
+        crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length).into_owned()
+      }
+    }
   }
 
   fn send_http_callout<'a>(

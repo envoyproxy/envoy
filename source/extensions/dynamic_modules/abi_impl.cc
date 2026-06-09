@@ -808,6 +808,16 @@ envoy_dynamic_module_callback_cluster_worker_slot_get(envoy_dynamic_module_type_
   return nullptr;
 }
 
+__attribute__((weak)) void
+envoy_dynamic_module_callback_cluster_get_name(envoy_dynamic_module_type_cluster_envoy_ptr,
+                                               envoy_dynamic_module_type_envoy_buffer* result) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_get_name: not implemented in this context");
+  if (result != nullptr) {
+    result->ptr = nullptr;
+    result->length = 0;
+  }
+}
+
 __attribute__((weak)) envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_cluster_config_define_counter(
     envoy_dynamic_module_type_cluster_config_envoy_ptr, envoy_dynamic_module_type_module_buffer,
