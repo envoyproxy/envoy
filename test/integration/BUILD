@@ -1754,8 +1754,16 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
+        "//envoy/http:codes_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/common/runtime:runtime_features_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/config:v2_link_hacks",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+        "//test/integration/filters:test_filters_proto_cc_proto",
         "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
     ],
 )
