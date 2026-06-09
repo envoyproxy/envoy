@@ -251,7 +251,7 @@ public:
       absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
           aws_iam_authenticator,
       Common::Redis::RespProtocolVersion upstream_protocol_version,
-      Stats::Counter* upstream_resp3_hello_failure = nullptr) PURE;
+      Stats::Counter* upstream_resp3_hello_failure) PURE;
 };
 
 // A MULTI command sent when starting a transaction.

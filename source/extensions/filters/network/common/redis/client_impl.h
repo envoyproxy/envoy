@@ -87,7 +87,7 @@ public:
       absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
           aws_iam_authenticator,
       Common::Redis::RespProtocolVersion upstream_protocol_version,
-      Stats::Counter* upstream_resp3_hello_failure = nullptr);
+      Stats::Counter* upstream_resp3_hello_failure);
 
   ClientImpl(
       Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
@@ -98,7 +98,7 @@ public:
       absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
           aws_iam_authenticator,
       Common::Redis::RespProtocolVersion upstream_protocol_version,
-      Stats::Counter* upstream_resp3_hello_failure = nullptr);
+      Stats::Counter* upstream_resp3_hello_failure);
   ~ClientImpl() override;
 
   // Client
@@ -325,7 +325,7 @@ public:
       absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
           aws_iam_authenticator,
       Common::Redis::RespProtocolVersion upstream_protocol_version,
-      Stats::Counter* upstream_resp3_hello_failure = nullptr) override;
+      Stats::Counter* upstream_resp3_hello_failure) override;
 
   static ClientFactoryImpl instance_;
 

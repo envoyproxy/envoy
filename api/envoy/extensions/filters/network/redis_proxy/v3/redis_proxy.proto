@@ -393,9 +393,11 @@ message RedisProxy {
   // RESP protocol version supported on this listener.
   enum ProtocolVersion {
     // Default. The listener speaks RESP2 on both downstream connections and
-    // every routed upstream conn pool. Pre-RESP3 behavior end-to-end: no
-    // ``HELLO 3`` to upstream, downstream ``HELLO 3`` rejected with
-    // ``-NOPROTO``.
+    // every routed upstream conn pool: no ``HELLO 3`` is sent upstream and a
+    // downstream ``HELLO 3`` is rejected with ``-NOPROTO``. (RESP3-aware
+    // handling such as the local ``HELLO`` reply, ``CLIENT SETINFO`` /
+    // ``SETNAME`` acceptance, and the RESP3 decoder is always present; this
+    // value only controls the negotiated wire version.)
     RESP2 = 0;
 
     // The listener speaks RESP3 on both downstream connections and every

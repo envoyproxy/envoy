@@ -321,7 +321,7 @@ TEST_F(RedisHealthCheckerTest, PingWithAuth) {
   interval_timer_->invokeCallback();
 
   // Failure, invalid auth
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   response = std::make_unique<NetworkFilters::Common::Redis::RespValue>();
@@ -369,7 +369,7 @@ TEST_F(RedisHealthCheckerTest, ExistsWithAuth) {
   interval_timer_->invokeCallback();
 
   // Failure, invalid auth
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   response = std::make_unique<NetworkFilters::Common::Redis::RespValue>();
@@ -415,7 +415,7 @@ TEST_F(RedisHealthCheckerTest, PingAndVariousFailures) {
   interval_timer_->invokeCallback();
 
   // Failure
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   response = std::make_unique<NetworkFilters::Common::Redis::RespValue>();
@@ -483,8 +483,8 @@ TEST_F(RedisHealthCheckerTest, FailuresLogging) {
   interval_timer_->invokeCallback();
 
   // Failure
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
-  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, false));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
+  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, false, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   response = std::make_unique<NetworkFilters::Common::Redis::RespValue>();
@@ -494,7 +494,7 @@ TEST_F(RedisHealthCheckerTest, FailuresLogging) {
   interval_timer_->invokeCallback();
 
   // Fail again
-  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, false));
+  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, false, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   response = std::make_unique<NetworkFilters::Common::Redis::RespValue>();
@@ -529,8 +529,8 @@ TEST_F(RedisHealthCheckerTest, LogInitialFailure) {
   client_->runLowWatermarkCallbacks();
 
   // Redis failure via disconnect
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
-  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
+  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   pool_callbacks_->onFailure();
@@ -591,7 +591,7 @@ TEST_F(RedisHealthCheckerTest, Exists) {
   interval_timer_->invokeCallback();
 
   // Failure, exists
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   response = std::make_unique<NetworkFilters::Common::Redis::RespValue>();
@@ -688,7 +688,7 @@ TEST_F(RedisHealthCheckerTest, NoConnectionReuse) {
   interval_timer_->invokeCallback();
 
   // The connection will close on failure.
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   EXPECT_CALL(*client_, close());

@@ -1,6 +1,7 @@
 #include "source/extensions/filters/network/common/redis/utility.h"
 
-#include "source/common/common/utility.h"
+#include <memory>
+#include <string>
 
 namespace Envoy {
 namespace Extensions {
@@ -32,9 +33,12 @@ AuthRequest::AuthRequest(const std::string& username, const std::string& passwor
 }
 
 RespValuePtr makeError(const std::string& error) {
-  Common::Redis::RespValuePtr response(new RespValue());
+  auto response = std::make_unique<RespValue>();
   response->type(Common::Redis::RespType::Error);
-  response->asString() = error;
+  // ``makeError`` echoes attacker-influenced text (unknown command / option / subcommand) into a
+  // length-prefix-free RESP inline error, so it shares the codec's control-byte sanitizer (single
+  // source of truth) to strip CR/LF and other control bytes.
+  response->asString() = sanitizeControlBytes(error);
   return response;
 }
 

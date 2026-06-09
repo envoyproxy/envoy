@@ -123,10 +123,10 @@ TEST_F(AwsIamAuthenticatorTest, CredentialPendingAuthentication) {
       .WillOnce(testing::DoAll(testing::SaveArg<0>(&capture), testing::Return(true)));
   // We should get a write from the auth command
   EXPECT_CALL(*mock_connection, write(_, _)).Times(0);
-  Envoy::Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client =
-      factory.create(host, dispatcher, config, redis_command_stats, *stats.rootScope(), "username",
-                     "password", false, aws_iam_config, authenticator,
-                     Envoy::Extensions::NetworkFilters::Common::Redis::RespProtocolVersion::Resp2);
+  Envoy::Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client = factory.create(
+      host, dispatcher, config, redis_command_stats, *stats.rootScope(), "username", "password",
+      false, aws_iam_config, authenticator,
+      Envoy::Extensions::NetworkFilters::Common::Redis::RespProtocolVersion::Resp2, nullptr);
 
   Common::Redis::RespValue request1;
   Client::MockClientCallbacks callbacks;

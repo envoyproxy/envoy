@@ -144,68 +144,25 @@ original Redis command except possibly in failure scenarios.
 
 RESP Protocol
 ^^^^^^^^^^^^^
-Envoy redis proxy supports RESP2 and RESP3. There is a single configuration knob: the
-listener's :ref:`RedisProxy.protocol_version
+Envoy redis proxy supports RESP2 and RESP3, selected by the listener's
+:ref:`RedisProxy.protocol_version
 <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.protocol_version>`.
-This is the sole source of truth for both downstream connections and every routed upstream
-conn pool on the listener — there is no separate per-cluster RESP knob and no implicit
-floor across clusters. On the upstream-routed data path, downstream and upstream speak the
-same RESP version (locally-emitted replies — AUTH/QUIT/NOPROTO — are encoded in the
-downstream-negotiated version regardless).
+This single knob governs both downstream connections and every routed upstream conn pool —
+there is no separate per-cluster RESP knob and no implicit floor across clusters.
 
-When ``protocol_version`` is ``RESP2`` (the default), the listener behaves end-to-end as
-pre-RESP3 Envoy: no ``HELLO 3`` is sent upstream, and a downstream ``HELLO 3`` is rejected
-with ``-NOPROTO``.
+The listener pins one RESP version end-to-end rather than translating between them, because
+RESP2 and RESP3 diverge structurally: some replies have no transparent mapping (for example
+``ZRANGE WITHSCORES`` is a flat array under RESP2 but a nested array of pairs under RESP3).
+The proxy therefore does not cross-encode upstream responses — a reply is always emitted
+downstream in the RESP version it arrived in. Unsolicited RESP3 ``Push`` frames from upstream
+are dropped rather than forwarded downstream (the proxy routes no Push-producing feature on
+ordinary request/response connections, and forwarding one would desynchronize the reply FIFO).
 
-When ``protocol_version`` is ``RESP3``:
-
-* Every routed upstream Redis-compatible backend must support ``HELLO 3`` / RESP3 (e.g.
-  Redis 6.0+, where RESP3 was introduced). Misconfigured upstreams will fail every
-  connection's HELLO 3 negotiation, surfaced as ``upstream_resp3_hello_failure`` stat
-  increments.
-* The upstream client sends ``HELLO 3`` (combined with ``AUTH`` when static credentials
-  or AWS IAM authentication are configured) on every new upstream connection. User
-  requests submitted before negotiation completes are buffered on the client and replayed
-  in order once both ``HELLO`` and any required ``READONLY`` (for non-Primary read
-  policies) succeed. If the upstream rejects RESP3 the connection is closed and the
-  buffered requests fail upstream so the caller can retry on a fresh connection that will
-  reattempt negotiation.
-* Downstream clients must perform an explicit ``HELLO 3`` handshake before any data
-  command. Any command other than ``HELLO``, ``AUTH`` or ``QUIT`` arriving on a
-  connection that has not yet negotiated RESP3 is rejected ``-NOPROTO`` — including
-  unknown commands, which surface as ``-NOPROTO`` rather than the splitter's usual
-  ``ERR unknown command`` so the operator-facing error always points to "client failed to
-  handshake" rather than masking the missing handshake.
-* Both explicit ``HELLO N`` and bare ``HELLO`` are exact-matched against the listener's
-  ``protocol_version``: bare ``HELLO`` on a fresh ``RESP3`` listener is rejected because
-  the connection's current version (default ``2``) does not match the required ``3``.
-  After a successful ``HELLO 3``, bare ``HELLO`` reaffirms the negotiated version.
-
-Downstream ``HELLO N AUTH <user> <pass>`` is supported with both locally configured
-credentials (``downstream_auth_passwords`` / ``downstream_auth_username`` on
-:ref:`RedisProxy <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy>`)
-and an external auth provider. The local-credentials path validates inline and emits the
-``HELLO`` Map (or ``WRONGPASS``) synchronously; the external-auth path defers the round
-trip and emits the deferred ``HELLO`` Map (or error) when the provider responds. Any
-commands received while the external auth check is in flight are held on the filter's
-auth-pending queue and dispatched after the auth result resolves, preserving wire
-ordering.
-
-Unsolicited RESP3 ``Push`` frames received from upstream are not delivered downstream:
-the upstream client drops them silently before they reach the encoder. ``Push`` is an
-in-spec RESP3 frame, but the Redis proxy does not route any Push-producing feature on
-ordinary request/response connections (``SUBSCRIBE`` / ``PSUBSCRIBE`` forwarding and
-``CLIENT TRACKING`` are out of scope), so a well-behaved upstream should not send Push
-frames on these connections in steady state. Dropping preserves the ``pending_requests_``
-FIFO — popping a request for a Push would desynchronize the next ordinary reply against
-its issuing request.
-
-The proxy does not cross-encode upstream responses between RESP2 and RESP3. Because the
-listener forces the upstream-routed data path to a single RESP version, an upstream reply
-is always emitted downstream in the same RESP version it arrived; no transparent reshaping
-(e.g. RESP3 Map → flat RESP2 array) is attempted, which avoids structural divergence such
-as ``ZRANGE WITHSCORES`` returning nested pair arrays under RESP3 vs flat arrays under
-RESP2.
+For the full ``HELLO 3`` negotiation, ``-NOPROTO`` gating of pre-handshake data commands,
+downstream ``HELLO N AUTH`` handling, the locally-synthesized ``HELLO`` reply, and the
+``upstream_resp3_hello_failure`` stat, see the :ref:`RESP protocol version
+<config_network_filters_redis_proxy_protocol_version>` section of the Redis proxy filter
+configuration.
 
 INFO command
 ^^^^^^^^^^^^

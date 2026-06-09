@@ -21,19 +21,16 @@ namespace NetworkFilters {
 namespace RedisProxy {
 
 namespace {
-// Collect every cluster name referenced by a route: the primary cluster, the
-// read-command-policy cluster, and every mirror cluster. Used to drive
-// upstream connection-pool creation.
-inline void addAllReferencedClusters(
+inline void addUniqueClusters(
     absl::flat_hash_set<std::string>& clusters,
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes::Route&
         route) {
   clusters.emplace(route.cluster());
-  if (route.has_read_command_policy()) {
-    clusters.emplace(route.read_command_policy().cluster());
-  }
   for (auto& mirror : route.request_mirror_policy()) {
     clusters.emplace(mirror.cluster());
+  }
+  if (route.has_read_command_policy()) {
+    clusters.emplace(route.read_command_policy().cluster());
   }
 }
 } // namespace
@@ -55,6 +52,11 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
       context);
 
+  auto filter_config = std::make_shared<ProxyFilterConfig>(
+      proto_config, context.scope(), context.drainDecision(), server_context.runtime(),
+      server_context.api(), context.serverFactoryContext().timeSource(), cache_manager_factory);
+  const Common::Redis::RespProtocolVersion protocol_version = filter_config->protocolVersion();
+
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes prefix_routes(
       proto_config.prefix_routes());
 
@@ -65,54 +67,27 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
 
   absl::flat_hash_set<std::string> unique_clusters;
   for (auto& route : prefix_routes.routes()) {
-    addAllReferencedClusters(unique_clusters, route);
+    addUniqueClusters(unique_clusters, route);
   }
-  // Only fold the catch-all route into the unique-cluster set when one is
-  // actually configured. ``prefix_routes.catch_all_route()`` returns a
-  // default-constructed Route message when has_catch_all_route() is false,
-  // which would insert "" into unique_clusters and try to allocate an
-  // upstream pool keyed on the empty string.
-  if (prefix_routes.has_catch_all_route()) {
-    addAllReferencedClusters(unique_clusters, prefix_routes.catch_all_route());
-  }
-
-  // Resolve each cluster's info up front and capture the cluster ``OptRef``
-  // (input to AWS IAM lookup below). One ClusterManager lookup per cluster —
-  // the per-conn-pool loop reuses the captured ``OptRef`` instead of re-resolving.
-  struct ResolvedCluster {
-    std::string name;
-    Upstream::ClusterConstOptRef optref;
-  };
-  std::vector<ResolvedCluster> resolved_clusters;
-  resolved_clusters.reserve(unique_clusters.size());
-  for (const auto& cluster_name : unique_clusters) {
-    auto cluster_optref = server_context.clusterManager().clusters().getCluster(cluster_name);
-    resolved_clusters.push_back({cluster_name, cluster_optref});
-  }
-
-  auto filter_config = std::make_shared<ProxyFilterConfig>(
-      proto_config, context.scope(), context.drainDecision(), server_context.runtime(),
-      server_context.api(), context.serverFactoryContext().timeSource(), cache_manager_factory);
-  const Common::Redis::RespProtocolVersion protocol_version = filter_config->protocolVersion();
+  addUniqueClusters(unique_clusters, prefix_routes.catch_all_route());
 
   auto redis_command_stats =
       Common::Redis::RedisCommandStats::createRedisCommandStats(context.scope().symbolTable());
 
   Upstreams upstreams;
-  for (const auto& resolved : resolved_clusters) {
-    const std::string& cluster = resolved.name;
+  for (auto& cluster : unique_clusters) {
 
     // Create the AWS IAM authenticator if required
     absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator;
     absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config;
-    if (resolved.optref.has_value()) {
+    auto cluster_optref = server_context.clusterManager().clusters().getCluster(cluster);
+    if (cluster_optref.has_value()) {
       // Does our cluster have an AwsIam element available? If so, create a new authenticator for
       // this connection pool.
-      aws_iam_config =
-          ProtocolOptionsConfigImpl::awsIamConfig(resolved.optref.value().get().info());
+      aws_iam_config = ProtocolOptionsConfigImpl::awsIamConfig(cluster_optref.value().get().info());
       if (aws_iam_config.has_value()) {
-        if (!ProtocolOptionsConfigImpl::authUsername(resolved.optref.value().get().info(),
+        if (!ProtocolOptionsConfigImpl::authUsername(cluster_optref.value().get().info(),
                                                      context.serverFactoryContext().api())
                  .empty()) {
           aws_iam_authenticator = Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorFactory::

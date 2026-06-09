@@ -286,10 +286,9 @@ TEST_F(RedisClientImplTest, BatchWithTimerFiring) {
 }
 
 TEST_F(RedisClientImplTest, BatchWithTimerCancelledByBufferFlush) {
-  // Expanding on the previous test, let's the flush buffer is filled by two requests.
-  // In this test, we make a single request that doesn't fill the buffer, and the timer
-  // starts. However, a second request comes in, which should cancel the timer, such
-  // that it is never invoked.
+  // The flush buffer is filled by two requests. We make a single request that does not fill
+  // the buffer, and the timer starts. A second request then comes in, which should cancel the
+  // timer such that it is never invoked.
   InSequence s;
 
   setup(std::make_shared<ConfigBufferSizeGTSingleRequest>());
@@ -1361,14 +1360,11 @@ TEST_F(RedisClientImplTest, RemoveFailedHost) {
 // flush_timer_->enabled() call.
 
 namespace {
-[[maybe_unused]] Common::Redis::RespValue makeBareHello3Request() {
-  return Utility::makeRequest("HELLO", {"3"});
-}
-[[maybe_unused]] Common::Redis::RespValue makeHello3AuthRequest(const std::string& user,
-                                                                const std::string& pass) {
+Common::Redis::RespValue makeBareHello3Request() { return Utility::makeRequest("HELLO", {"3"}); }
+Common::Redis::RespValue makeHello3AuthRequest(const std::string& user, const std::string& pass) {
   return Utility::makeRequest("HELLO", {"3", "AUTH", user, pass});
 }
-[[maybe_unused]] Common::Redis::RespValuePtr makeHelloMapReply(int64_t proto_value) {
+Common::Redis::RespValuePtr makeHelloMapReply(int64_t proto_value) {
   auto reply = std::make_unique<Common::Redis::RespValue>();
   reply->type(Common::Redis::RespType::Map);
   std::vector<Common::Redis::RespValue> kv(2);
@@ -2250,7 +2246,7 @@ TEST(RedisClientFactoryImplTest, Basic) {
   ClientPtr client =
       factory.create(host, dispatcher, config, redis_command_stats, *stats_.rootScope(),
                      auth_username, auth_password, false, absl::nullopt, absl::nullopt,
-                     Common::Redis::RespProtocolVersion::Resp2);
+                     Common::Redis::RespProtocolVersion::Resp2, nullptr);
   client->close();
 }
 } // namespace Client

@@ -16,6 +16,7 @@
 
 #include "absl/container/fixed_array.h"
 #include "absl/strings/numbers.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,16 +24,9 @@ namespace NetworkFilters {
 namespace Common {
 namespace Redis {
 
-// Maximum number of elements allowed in a single RESP aggregate type (Array, Map, Set, Push).
-// Prevents unbounded memory allocation from malicious or malformed input.
-static constexpr uint64_t kMaxRespElements = 1048576; // 1M
-
-// Maximum byte length for a single bulk string ($), blob error (!), or
-// verbatim string (=). Matches Redis's own ``proto-max-bulk-len`` default
-// of 512 MiB. Reject before the body-read loop so that an attacker-supplied
-// length header cannot drive unbounded `std::string::append` growth on a
-// single message.
-static constexpr uint64_t kMaxBulkStringLength = 512ULL * 1024 * 1024;
+// Decoder DoS-defense limits (kMaxRespElements, kMaxBulkStringLength, kMaxDoubleTokenLength,
+// kMaxBigNumberTokenLength, kMaxConsecutiveAttributes, kMaxNestingDepth, kMaxTotalElements) are
+// public constants on DecoderImpl in codec_impl.h so tests can reference them by name.
 
 namespace {
 
@@ -50,9 +44,7 @@ std::string formatDoubleForWire(double value) {
   return fmt::format("{:.17g}", value);
 }
 
-} // namespace
-
-bool isValidResp3BigNumber(const std::string& value) {
+bool isValidResp3BigNumber(absl::string_view value) {
   if (value.empty()) {
     return false;
   }
@@ -74,9 +66,11 @@ bool isValidResp3BigNumber(const std::string& value) {
   return true;
 }
 
-bool isValidResp3VerbatimString(const std::string& value) {
+bool isValidResp3VerbatimString(absl::string_view value) {
   return value.size() >= 4 && value[3] == ':';
 }
+
+} // namespace
 
 std::string RespValue::toString() const {
   switch (type_) {
@@ -860,18 +854,13 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
         if (c < '0' || c > '9') {
           throw ProtocolError("invalid integer character");
         } else {
-          // Pre-multiply overflow guard: the post-LF semantic checks
-          // (kMaxRespElements, kMaxTotalElements, Map *2 cap) all read the
-          // accumulated value AFTER it was assigned, so a uint64_t wrap during
-          // accumulation would silently slip past every later check. Reject
-          // here on the digit that would push us over uint64_t::max.
-          constexpr uint64_t kMax = std::numeric_limits<uint64_t>::max();
-          const uint64_t digit = static_cast<uint64_t>(c - '0');
-          if (pending_integer_.integer_ > kMax / 10 ||
-              (pending_integer_.integer_ == kMax / 10 && digit > kMax % 10)) {
+          const uint64_t next_digit = c - '0';
+          if (pending_integer_.integer_ > std::numeric_limits<uint64_t>::max() / 10 ||
+              (pending_integer_.integer_ == std::numeric_limits<uint64_t>::max() / 10 &&
+               next_digit > std::numeric_limits<uint64_t>::max() % 10)) {
             throw ProtocolError("integer overflow");
           }
-          pending_integer_.integer_ = (pending_integer_.integer_ * 10) + digit;
+          pending_integer_.integer_ = (pending_integer_.integer_ * 10) + next_digit;
           pending_integer_.digit_seen_ = true;
         }
       }
@@ -929,12 +918,9 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
             throw ProtocolError("total element count exceeds maximum");
           }
           total_elements_ += pending_integer_.integer_;
-          // Bound nesting depth BEFORE the push so that the post-push depth
-          // can never exceed kMaxNestingDepth. Counter includes the root
-          // frame: a current depth equal to kMaxNestingDepth is already at
-          // the cap, and pushing one more would land at kMaxNestingDepth+1
-          // — rejected here. (The previous ``> kMaxNestingDepth`` check was
-          // off-by-one and let one extra frame through.)
+          // Bound nesting depth BEFORE the push so the post-push depth can never exceed
+          // kMaxNestingDepth. The counter includes the root frame, so a depth already equal
+          // to kMaxNestingDepth is at the cap and the next push is rejected here.
           if (pending_value_stack_depth_ >= kMaxNestingDepth) {
             throw ProtocolError("nesting depth exceeds maximum");
           }
@@ -1098,14 +1084,21 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
         state_ = State::LF;
       } else {
         // Double accumulates into the cap-guarded scratch buffer; everything else appends
-        // directly to its asString().
-        if (pending_value_stack_.front().value_->type() == RespType::Double) {
-          if (pending_double_buf_.size() >= 64) {
+        // directly to its asString(). Double and BigNumber are length-capped to bound
+        // unbounded CRLF-less line growth (Double tightly; BigNumber generously since it is
+        // arbitrary-precision).
+        RespValue& current_value = *pending_value_stack_.front().value_;
+        if (current_value.type() == RespType::Double) {
+          if (pending_double_buf_.size() >= kMaxDoubleTokenLength) {
             throw ProtocolError("double value too long");
           }
           pending_double_buf_.push_back(buffer[0]);
         } else {
-          pending_value_stack_.front().value_->asString().push_back(buffer[0]);
+          if (current_value.type() == RespType::BigNumber &&
+              current_value.asString().size() >= kMaxBigNumberTokenLength) {
+            throw ProtocolError("big number value too long");
+          }
+          current_value.asString().push_back(buffer[0]);
         }
       }
 
@@ -1141,7 +1134,7 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
       if (pending_value_stack_.empty()) {
         if (was_attribute) {
           // Root-level attribute discarded. Parse the actual value next.
-          pending_value_root_.reset(new RespValue());
+          pending_value_root_ = std::make_unique<RespValue>();
           pending_value_stack_.push_front({pending_value_root_.get(), 0});
           pending_value_stack_depth_ = 1;
           state_ = State::ValueStart;
@@ -1246,13 +1239,13 @@ void EncoderImpl::encode(const RespValue& value, Buffer::Instance& out) {
   }
   case RespType::BlobError: {
     // RESP2 inline error has no length prefix, so embedded CR/LF in the message
-    // would desynchronize the parser. sanitizeErrorForResp2() replaces those
-    // with spaces. RESP3 blob error is length-prefixed and tolerates embedded
-    // CR/LF.
+    // would desynchronize the parser. sanitizeControlBytes() replaces those (and
+    // any other control byte) with spaces. RESP3 blob error is length-prefixed
+    // and tolerates embedded CR/LF.
     if (protocol_version_ == RespProtocolVersion::Resp3) {
       encodeBlobError(value.asString(), out);
     } else {
-      encodeError(sanitizeErrorForResp2(value.asString()), out);
+      encodeError(sanitizeControlBytes(value.asString()), out);
     }
     break;
   }
@@ -1311,38 +1304,6 @@ void EncoderImpl::encode(const RespValue& value, Buffer::Instance& out) {
     break;
   }
   }
-}
-
-std::string EncoderImpl::sanitizeErrorForResp2(absl::string_view input) {
-  // RESP2 inline errors have no length prefix; the wire reader scans until
-  // CRLF. We must strip CR and LF to keep the framing intact, AND strip
-  // other ASCII control bytes (NUL, BEL, ESC, etc.) that downstream loggers
-  // and terminals treat specially. A hostile BlobError supplied by the
-  // upstream otherwise becomes a log-injection / terminal-escape vector
-  // once a downstream client logs the message.
-  // Fast path: if no character needs replacement, copy the input once
-  // and skip the per-byte rewrite loop plus the output-buffer
-  // second allocation.
-  bool needs_sanitize = false;
-  for (unsigned char c : input) {
-    if (c < 0x20 || c == 0x7f) {
-      needs_sanitize = true;
-      break;
-    }
-  }
-  if (!needs_sanitize) {
-    return std::string(input);
-  }
-  std::string out;
-  out.reserve(input.size());
-  for (unsigned char c : input) {
-    if (c < 0x20 || c == 0x7f) {
-      out.push_back(' ');
-    } else {
-      out.push_back(static_cast<char>(c));
-    }
-  }
-  return out;
 }
 
 void EncoderImpl::encodeAggregate(char prefix, const std::vector<RespValue>& array,

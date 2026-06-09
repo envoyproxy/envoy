@@ -8,8 +8,6 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/network/common/redis/codec.h"
 
-#include "absl/strings/string_view.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -27,6 +25,36 @@ public:
 
   // RedisProxy::Decoder
   void decode(Buffer::Instance& data) override;
+
+  // DoS-defense limits applied to a single decoded message. Exposed for tests so limit-boundary
+  // cases reference them by name instead of hardcoding these implementation values; they are not a
+  // stability contract for callers.
+  //
+  // Maximum elements in one aggregate (``*``/``%``/``~``/``>``). Bounds per-aggregate allocation;
+  // matches upstream's array size upper bound (``MaxArraySize``).
+  static constexpr uint64_t kMaxRespElements = 2000000;
+  // Maximum bytes for a single bulk string ($), blob error (!), or verbatim string (=). Matches
+  // Redis's ``proto-max-bulk-len`` default of 512 MiB; rejected before the body-read loop so an
+  // attacker-supplied length header cannot drive unbounded ``std::string::append`` growth.
+  static constexpr uint64_t kMaxBulkStringLength = 512ULL * 1024 * 1024;
+  // Maximum bytes of a RESP3 Double (``,``) payload. A double is a small fixed-width scalar, so 64
+  // bytes is plenty; the cap exists to bound unbounded CRLF-less line growth.
+  static constexpr size_t kMaxDoubleTokenLength = 64;
+  // Maximum bytes of a RESP3 BigNumber (``(``) payload. BigNumber is arbitrary-precision, so a long
+  // value is not malformed; the cap (16 KiB, room for a ~54k-bit integer) only bounds unbounded
+  // CRLF-less line growth without rejecting legitimate values.
+  static constexpr size_t kMaxBigNumberTokenLength = 16ULL * 1024;
+  // Cap on consecutive RESP3 Attributes (|0\r\n|0\r\n...) to defeat empty-attribute floods.
+  static constexpr uint32_t kMaxConsecutiveAttributes = 32;
+  // Cap on aggregate nesting depth. Without this, ``*1\r\n*1\r\n...`` grows pending_value_stack_
+  // without bound even though each level's own kMaxRespElements check passes trivially. Tracked in
+  // a counter because std::forward_list has no O(1) size(). Matches upstream's
+  // ``MaxArrayNestingDepth``.
+  static constexpr uint32_t kMaxNestingDepth = 128;
+  // Cap on cumulative RespValue slots reserved across all aggregate levels of one root value. No
+  // upstream equivalent: an additional defense against multiplicative growth (kMaxNestingDepth *
+  // kMaxRespElements element headers) that no single per-aggregate / per-depth limit catches.
+  static constexpr uint64_t kMaxTotalElements = 4ULL * 1024ULL * 1024ULL;
 
 private:
   enum class State {
@@ -86,22 +114,9 @@ private:
   // Scratch buffer for the RESP3 Double payload bytes (``,`` re-uses the SimpleString
   // accumulator). Validated and moved into ``RespValue::asString()`` at ValueComplete.
   std::string pending_double_buf_;
-  // Guard against DoS via chains of empty RESP3 Attributes (|0\r\n|0\r\n...).
-  static constexpr uint32_t kMaxConsecutiveAttributes = 32;
-  uint32_t consecutive_attributes_{0};
-  // Cap aggregate nesting depth. Without this, a hostile peer can send
-  // *1\r\n*1\r\n*1\r\n... and grow pending_value_stack_ without bound,
-  // even though each level's own kMaxRespElements check passes trivially.
-  // We track depth in a counter rather than calling size() because
-  // std::forward_list does not support O(1) size().
-  static constexpr uint32_t kMaxNestingDepth = 32;
-  uint32_t pending_value_stack_depth_{0};
-  // Cap the total number of RespValue slots reserved across all aggregate
-  // levels of one root-level value. Multiplicative growth (32 * 1M) without
-  // this cap can demand tens of GB of memory before any single per-aggregate
-  // limit fires.
-  static constexpr uint64_t kMaxTotalElements = 4ULL * 1024ULL * 1024ULL;
-  uint64_t total_elements_{0};
+  uint32_t consecutive_attributes_{0};    // counts toward kMaxConsecutiveAttributes
+  uint32_t pending_value_stack_depth_{0}; // counts toward kMaxNestingDepth
+  uint64_t total_elements_{0};            // counts toward kMaxTotalElements
 };
 
 /**
@@ -142,14 +157,6 @@ private:
   void encodeSet(const std::vector<RespValue>& array, Buffer::Instance& out);
   void encodePush(const std::vector<RespValue>& array, Buffer::Instance& out);
   void encodeNull(Buffer::Instance& out);
-
-  // RESP2 inline errors have no length prefix, so a hostile BlobError message
-  // can both desynchronize downstream parsers (via embedded CR/LF) and inject
-  // terminal escapes / log delimiters into a downstream's logger (via NUL,
-  // BEL, ESC, DEL, ...). Strip ALL ASCII control bytes (< 0x20 or 0x7f),
-  // replacing each with a space, before emitting via encodeError(). Not
-  // needed for RESP3 wire forms because BlobError is length-prefixed.
-  static std::string sanitizeErrorForResp2(absl::string_view input);
 };
 
 } // namespace Redis

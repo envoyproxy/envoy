@@ -44,6 +44,8 @@ public:
                                           uint32_t) override {
     return AuthAttempt::Denied;
   }
+  uint32_t currentDownstreamRespVersion() const override { return 2; }
+  absl::optional<uint32_t> takePendingHelloAuthVersion() override { return absl::nullopt; }
 
 private:
   Common::Redis::Client::NoOpTransaction transaction_;

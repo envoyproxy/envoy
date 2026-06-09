@@ -406,31 +406,11 @@ credentials:
   EXPECT_EQ("default_password", credentials9.password);
 }
 
-// =============================================================================
-// Listener-level RedisProxy.protocol_version conversion tests.
-// =============================================================================
-
-TEST(RedisProxyProtocolVersionTest, DefaultIsResp2) {
-  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config;
-  EXPECT_EQ(Common::Redis::RespProtocolVersion::Resp2,
-            toCodecRespVersion(proto_config.protocol_version()));
-}
-
-TEST(RedisProxyProtocolVersionTest, ExplicitResp2) {
-  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config;
-  proto_config.set_protocol_version(
-      envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::RESP2);
-  EXPECT_EQ(Common::Redis::RespProtocolVersion::Resp2,
-            toCodecRespVersion(proto_config.protocol_version()));
-}
-
-TEST(RedisProxyProtocolVersionTest, ExplicitResp3) {
-  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config;
-  proto_config.set_protocol_version(
-      envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::RESP3);
-  EXPECT_EQ(Common::Redis::RespProtocolVersion::Resp3,
-            toCodecRespVersion(proto_config.protocol_version()));
-}
+// The proto ``protocol_version`` → ``ProxyFilterConfig::protocolVersion()`` read (which
+// config.cc forwards to the conn pool) is unit-pinned by
+// RedisProxyFilterConfigTest.ProtocolVersionDefaultsToResp2 / .ProtocolVersionResp3IsHonored in
+// proxy_filter_test.cc; its observable RESP2 vs RESP3 effect is covered end-to-end by the
+// RESP2/RESP3 fixtures in proxy_filter_test.cc and redis_proxy_integration_test.cc.
 
 } // namespace RedisProxy
 } // namespace NetworkFilters

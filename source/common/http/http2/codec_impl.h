@@ -15,6 +15,7 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/server/overload/overload_manager.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -153,7 +154,8 @@ public:
   ConnectionImpl(Network::Connection& connection, CodecStats& stats,
                  Random::RandomGenerator& random_generator,
                  const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-                 const uint32_t max_headers_kb, const uint32_t max_headers_count);
+                 const uint32_t max_headers_kb, const uint32_t max_headers_count,
+                 OptRef<Runtime::Loader> runtime = absl::nullopt);
 
   ~ConnectionImpl() override;
 
@@ -441,6 +443,7 @@ protected:
     // to determine whether we should continue processing that data.
     absl::optional<StreamResetReason> reset_reason_;
     HeaderString cookies_;
+    uint32_t cookie_count_;
     bool local_end_stream_sent_ : 1 = false;
     bool remote_end_stream_ : 1 = false;
     bool remote_rst_ : 1 = false;
@@ -735,6 +738,7 @@ protected:
   bool allow_metadata_;
   uint64_t max_metadata_size_;
   const bool stream_error_on_invalid_http_messaging_;
+  const uint64_t max_cookie_size_bytes_{0};
 
   // Status for any errors encountered by the nghttp2 callbacks.
   // nghttp2 library uses single return code to indicate callback failure and
@@ -861,7 +865,8 @@ public:
                        const uint32_t max_request_headers_count,
                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                            headers_with_underscores_action,
-                       Server::OverloadManager& overload_manager);
+                       Server::OverloadManager& overload_manager,
+                       OptRef<Runtime::Loader> runtime = absl::nullopt);
 
 private:
   // ConnectionImpl

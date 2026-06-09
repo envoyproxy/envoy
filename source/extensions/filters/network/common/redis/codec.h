@@ -29,6 +29,34 @@ inline uint32_t toWireRespVersion(RespProtocolVersion version) {
   return version == RespProtocolVersion::Resp3 ? 3u : 2u;
 }
 
+// Replace every ASCII control byte (< 0x20 or DEL 0x7f) in ``input`` with a space, returning a
+// sanitized copy. RESP inline errors (``-<text>\r\n``) and the RESP2 down-converted form of a
+// RESP3 BlobError have no length prefix, so an embedded CR/LF would desynchronize the downstream
+// parser and other control bytes can inject terminal escapes / log delimiters once a client logs
+// the message; attacker-influenced error text (echoed commands/options, upstream BlobError
+// payloads) is therefore stripped. A single detection scan runs either way; when it finds no
+// control bytes (the common case) the input is returned as-is, skipping the rewrite pass and its
+// extra allocation.
+inline std::string sanitizeControlBytes(const std::string& input) {
+  const auto is_control = [](unsigned char c) { return c < 0x20 || c == 0x7f; };
+  bool needs_sanitize = false;
+  for (unsigned char c : input) {
+    if (is_control(c)) {
+      needs_sanitize = true;
+      break;
+    }
+  }
+  if (!needs_sanitize) {
+    return input;
+  }
+  std::string out;
+  out.reserve(input.size());
+  for (unsigned char c : input) {
+    out.push_back(is_control(c) ? ' ' : static_cast<char>(c));
+  }
+  return out;
+}
+
 /**
  * All RESP types as defined here: https://redis.io/topics/protocol with the exception of
  * CompositeArray. CompositeArray is an internal type that behaves like an Array type. Its first
@@ -273,7 +301,7 @@ public:
    * RESP2 base types (Array, BulkString, Integer, SimpleString, Error) are
    * encoded identically in both versions and are unaffected by this setting.
    */
-  virtual void setProtocolVersion(RespProtocolVersion) {}
+  virtual void setProtocolVersion(RespProtocolVersion) PURE;
 };
 
 using EncoderPtr = std::unique_ptr<Encoder>;

@@ -146,15 +146,10 @@ void localResponse(SplitCallbacks& callbacks, std::string response) {
 }
 } // namespace
 
-// Build the HELLO reply locally. Uses Common::Redis::Utility helpers for each RespValue piece.
-// The reply is typed as Map so that a RESP3-negotiated downstream gets `%7\r\n...`; for RESP2
-// downstreams the encoder converts the Map to a `*14\r\n...` flat array automatically.
-// The `id` field is hardcoded to 0 — the proxy has no Redis CLIENT ID to expose (CLIENT ID is
-// rejected by the splitter; its semantics over a multiplexed proxy are ambiguous, since each
-// downstream connection fans out across many upstream connections). See
-// https://redis.io/commands/hello/ for the field set. Defined at namespace scope (not in the
-// anon namespace) because ProxyFilter calls it directly when emitting a deferred HELLO reply
-// after external auth completes for HELLO N AUTH ...
+// Build the HELLO reply locally as a Map: a RESP3 downstream gets `%7\r\n...`; the encoder
+// down-converts to a `*14\r\n...` flat array for RESP2. `id` is hardcoded to 0 — a multiplexed
+// proxy has no single Redis CLIENT ID to expose. At namespace scope (not anonymous) because
+// ProxyFilter also calls it to emit the deferred HELLO reply after external `HELLO N AUTH`.
 Common::Redis::RespValuePtr buildHelloReply(uint32_t downstream_version) {
   auto reply = std::make_unique<Common::Redis::RespValue>();
   reply->type(Common::Redis::RespType::Map);
@@ -1096,6 +1091,130 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
   }
 }
 
+// HELLO is handled BEFORE the connectionAllowed gate so that ``HELLO N AUTH <user> <pass>`` can
+// authenticate inline (RESP3 clients like lettuce/node-redis v4+/redis-py protocol=3 expect to
+// authenticate via HELLO; running the auth gate first would NOAUTH every such first command). Bare
+// HELLO still respects the gate; only HELLO with AUTH options bypasses it because the AUTH options
+// are what authenticate the connection.
+//
+// ``HELLO N`` and bare HELLO (inherits ``currentDownstreamRespVersion()``) must match
+// ``protocol_version`` exactly. Answered locally; the HELLO N AUTH + external auth path defers via
+// ``attemptDownstreamAuthInline`` returning ImplOwnsResponse.
+SplitRequestPtr InstanceImpl::handleHelloCommand(const Common::Redis::RespValue& request,
+                                                 SplitCallbacks& callbacks) {
+  const auto& args = request.asArray();
+  const uint32_t required_version = Common::Redis::toWireRespVersion(callbacks.protocolVersion());
+  uint32_t requested_version = callbacks.currentDownstreamRespVersion();
+  bool explicit_version = false;
+  std::string auth_user;
+  std::string auth_pass;
+  bool has_auth_option = false;
+
+  // args[0] is "hello". args[1], if present, is the protover. args[2..] is
+  // an optional sequence of option groups: AUTH <u> <p> | SETNAME <n>.
+  size_t i = 1;
+  if (i < args.size()) {
+    const std::string& proto_arg = args[i].asString();
+    int64_t proto_ver = 0;
+    if (!absl::SimpleAtoi(proto_arg, &proto_ver) || proto_ver < 2 || proto_ver > 3) {
+      callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().UnsupportedProtocol));
+      return nullptr;
+    }
+    requested_version = static_cast<uint32_t>(proto_ver);
+    explicit_version = true;
+    ++i;
+  }
+
+  // Exact-match: explicit N from args[1], bare HELLO from currentDownstreamRespVersion().
+  if (requested_version != required_version) {
+    callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().UnsupportedProtocol));
+    return nullptr;
+  }
+
+  // Parse remaining options. Only AUTH (3 tokens) and SETNAME (2 tokens)
+  // are recognized; SETNAME is accepted and ignored because the proxy has
+  // no per-client identity tracking. Anything else is a syntax error. A
+  // repeated AUTH or SETNAME is rejected rather than silently last-wins,
+  // matching real Redis's HELLO option parsing.
+  bool seen_setname = false;
+  while (i < args.size()) {
+    const std::string opt = absl::AsciiStrToUpper(args[i].asString());
+    if (opt == kHelloOptionAuth) {
+      if (i + 2 >= args.size()) {
+        callbacks.onResponse(Common::Redis::Utility::makeError(
+            "ERR Syntax error: HELLO AUTH requires <username> <password>"));
+        return nullptr;
+      }
+      if (has_auth_option) {
+        callbacks.onResponse(Common::Redis::Utility::makeError(
+            "ERR Syntax error: HELLO AUTH specified more than once"));
+        return nullptr;
+      }
+      auth_user = args[i + 1].asString();
+      auth_pass = args[i + 2].asString();
+      has_auth_option = true;
+      i += 3;
+    } else if (opt == kHelloOptionSetname) {
+      if (i + 1 >= args.size()) {
+        callbacks.onResponse(Common::Redis::Utility::makeError(
+            "ERR Syntax error: HELLO SETNAME requires a <clientname>"));
+        return nullptr;
+      }
+      if (seen_setname) {
+        callbacks.onResponse(Common::Redis::Utility::makeError(
+            "ERR Syntax error: HELLO SETNAME specified more than once"));
+        return nullptr;
+      }
+      seen_setname = true;
+      // The ``HELLO N SETNAME <name>`` option is accepted but the name is intentionally
+      // discarded — the proxy does not expose ``CLIENT LIST`` / ``CLIENT ID`` identity
+      // state (those ``CLIENT`` subcommands are rejected elsewhere in this dispatcher;
+      // their semantics over a multiplexed proxy are ambiguous), so there is no observable
+      // consumer for the name. Accepted purely so RESP3 clients that include ``SETNAME``
+      // in their ``HELLO`` handshake do not error out.
+      i += 2;
+    } else {
+      callbacks.onResponse(Common::Redis::Utility::makeError(
+          fmt::format("ERR Syntax error: unknown HELLO option '{}'", args[i].asString())));
+      return nullptr;
+    }
+  }
+
+  if (has_auth_option) {
+    using AuthAttempt = CommandSplitter::SplitCallbacks::AuthAttempt;
+    switch (callbacks.attemptDownstreamAuthInline(auth_user, auth_pass, requested_version)) {
+    case AuthAttempt::Allowed:
+      // Fall through to HELLO reply emission below.
+      break;
+    case AuthAttempt::Denied:
+      callbacks.onResponse(
+          Common::Redis::Utility::makeError("WRONGPASS invalid username-password pair"));
+      return nullptr;
+    case AuthAttempt::ImplOwnsResponse:
+      // The implementation owns the response; the splitter emits nothing here and yields control.
+      // Either external auth is in flight — the impl later emits the deferred HELLO reply (Map on
+      // success, error on failure) plus the downstream RESP version flip, and ProxyFilter queues
+      // any pipelined requests from this onData() pass via external_auth_call_status_ until that
+      // round trip resolves — or the impl already emitted a final error synchronously (HELLO AUTH
+      // with no downstream credentials configured), in which case nothing is pending.
+      return nullptr;
+    }
+  } else if (!callbacks.connectionAllowed()) {
+    // Bare HELLO (no AUTH option) still requires prior authentication on
+    // an auth-required listener.
+    callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().AuthRequiredError));
+    return nullptr;
+  }
+
+  // Flip the downstream encoder first so the reply is encoded in the newly
+  // negotiated version. For bare HELLO, this is a no-op (same version).
+  if (explicit_version) {
+    callbacks.setDownstreamRespVersion(requested_version);
+  }
+  callbacks.onResponse(buildHelloReply(requested_version));
+  return nullptr;
+}
+
 SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
                                           SplitCallbacks& callbacks, Event::Dispatcher& dispatcher,
                                           const StreamInfo::StreamInfo& stream_info) {
@@ -1137,113 +1256,10 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     return nullptr;
   }
 
-  // HELLO is handled BEFORE the connectionAllowed gate so that ``HELLO N AUTH <user> <pass>``
-  // can authenticate inline (RESP3 clients like lettuce/node-redis v4+/redis-py protocol=3
-  // expect to authenticate via HELLO; running the auth gate first would NOAUTH every such
-  // first command). Bare HELLO still respects the gate; only HELLO with AUTH options bypasses
-  // it because the AUTH options are what authenticate the connection.
-  //
-  // ``HELLO N`` and bare HELLO (inherits ``currentDownstreamRespVersion()``) must match
-  // ``protocol_version`` exactly. Answered locally; the HELLO N AUTH + external auth path
-  // defers via ``attemptDownstreamAuthInline`` returning Pending.
+  // HELLO has its own gate with inline-AUTH support; see InstanceImpl::handleHelloCommand. It runs
+  // before the connectionAllowed gate so a ``HELLO N AUTH ...`` can authenticate inline.
   if (command_name == Common::Redis::SupportedCommands::hello()) {
-    const auto& args = request->asArray();
-    const uint32_t required_version = Common::Redis::toWireRespVersion(callbacks.protocolVersion());
-    uint32_t requested_version = callbacks.currentDownstreamRespVersion();
-    bool explicit_version = false;
-    std::string auth_user;
-    std::string auth_pass;
-    bool has_auth_option = false;
-
-    // args[0] is "hello". args[1], if present, is the protover. args[2..] is
-    // an optional sequence of option groups: AUTH <u> <p> | SETNAME <n>.
-    size_t i = 1;
-    if (i < args.size()) {
-      const std::string& proto_arg = args[i].asString();
-      int64_t proto_ver = 0;
-      if (!absl::SimpleAtoi(proto_arg, &proto_ver) || proto_ver < 2 || proto_ver > 3) {
-        callbacks.onResponse(
-            Common::Redis::Utility::makeError(Response::get().UnsupportedProtocol));
-        return nullptr;
-      }
-      requested_version = static_cast<uint32_t>(proto_ver);
-      explicit_version = true;
-      ++i;
-    }
-
-    // Exact-match: explicit N from args[1], bare HELLO from currentDownstreamRespVersion().
-    if (requested_version != required_version) {
-      callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().UnsupportedProtocol));
-      return nullptr;
-    }
-
-    // Parse remaining options. Only AUTH (3 tokens) and SETNAME (2 tokens)
-    // are recognized; SETNAME is accepted and ignored because the proxy has
-    // no per-client identity tracking. Anything else is a syntax error.
-    while (i < args.size()) {
-      const std::string opt = absl::AsciiStrToUpper(args[i].asString());
-      if (opt == kHelloOptionAuth) {
-        if (i + 2 >= args.size()) {
-          callbacks.onResponse(Common::Redis::Utility::makeError(
-              "ERR Syntax error: HELLO AUTH requires <username> <password>"));
-          return nullptr;
-        }
-        auth_user = args[i + 1].asString();
-        auth_pass = args[i + 2].asString();
-        has_auth_option = true;
-        i += 3;
-      } else if (opt == kHelloOptionSetname) {
-        if (i + 1 >= args.size()) {
-          callbacks.onResponse(Common::Redis::Utility::makeError(
-              "ERR Syntax error: HELLO SETNAME requires a <clientname>"));
-          return nullptr;
-        }
-        // The ``HELLO N SETNAME <name>`` option is accepted but the name is intentionally
-        // discarded — the proxy does not expose ``CLIENT LIST`` / ``CLIENT ID`` identity
-        // state (those ``CLIENT`` subcommands are rejected elsewhere in this dispatcher;
-        // their semantics over a multiplexed proxy are ambiguous), so there is no observable
-        // consumer for the name. Accepted purely so RESP3 clients that include ``SETNAME``
-        // in their ``HELLO`` handshake do not error out.
-        i += 2;
-      } else {
-        callbacks.onResponse(Common::Redis::Utility::makeError(
-            fmt::format("ERR Syntax error: unknown HELLO option '{}'", args[i].asString())));
-        return nullptr;
-      }
-    }
-
-    if (has_auth_option) {
-      using AuthAttempt = CommandSplitter::SplitCallbacks::AuthAttempt;
-      switch (callbacks.attemptDownstreamAuthInline(auth_user, auth_pass, requested_version)) {
-      case AuthAttempt::Allowed:
-        // Fall through to HELLO reply emission below.
-        break;
-      case AuthAttempt::Denied:
-        callbacks.onResponse(
-            Common::Redis::Utility::makeError("WRONGPASS invalid username-password pair"));
-        return nullptr;
-      case AuthAttempt::Pending:
-        // External auth is in flight. The implementation owns the deferred HELLO reply (Map
-        // on success, error on failure) plus the downstream RESP version flip; the splitter
-        // emits nothing here and yields control. Subsequent pipelined requests in this
-        // onData() pass are queued by ProxyFilter via external_auth_call_status_ until the
-        // round trip resolves.
-        return nullptr;
-      }
-    } else if (!callbacks.connectionAllowed()) {
-      // Bare HELLO (no AUTH option) still requires prior authentication on
-      // an auth-required listener.
-      callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().AuthRequiredError));
-      return nullptr;
-    }
-
-    // Flip the downstream encoder first so the reply is encoded in the newly
-    // negotiated version. For bare HELLO, this is a no-op (same version).
-    if (explicit_version) {
-      callbacks.setDownstreamRespVersion(requested_version);
-    }
-    callbacks.onResponse(buildHelloReply(requested_version));
-    return nullptr;
+    return handleHelloCommand(*request, callbacks);
   }
 
   // QUIT bypasses the auth gate (matches real Redis — clients can always close gracefully).
@@ -1276,8 +1292,17 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
       return nullptr;
     }
     const std::string subcommand = absl::AsciiStrToLower(request->asArray()[1].asString());
-    if (subcommand == "setinfo" || subcommand == "setname") {
-      Common::Redis::RespValuePtr ok(new Common::Redis::RespValue());
+    // ``CLIENT SETNAME <name>`` (3 tokens) and ``CLIENT SETINFO <attr> <value>`` (4 tokens)
+    // are accepted and discarded. Enforce the exact token count so a malformed handshake gets
+    // a syntax error rather than a misleading +OK.
+    if (subcommand == "setname" || subcommand == "setinfo") {
+      const size_t expected = subcommand == "setname" ? 3 : 4;
+      if (request->asArray().size() != expected) {
+        callbacks.onResponse(Common::Redis::Utility::makeError(
+            fmt::format("ERR wrong number of arguments for 'client|{}' command", subcommand)));
+        return nullptr;
+      }
+      auto ok = std::make_unique<Common::Redis::RespValue>();
       ok->type(Common::Redis::RespType::SimpleString);
       ok->asString() = "OK";
       callbacks.onResponse(std::move(ok));

@@ -399,6 +399,29 @@ TEST_F(RedisEncoderDecoderImplTest, NestedArray) {
   EXPECT_EQ(value, *decoded_values_[0]);
 }
 
+// Feed a frame exercising the RESP3 parser states (Boolean, Double, Attribute, Map, Push) one
+// byte at a time. Each new parser state must resume correctly across slice boundaries.
+TEST_F(RedisEncoderDecoderImplTest, Resp3TypesSegmentedDecode) {
+  // |1\r\n+k\r\n+v\r\n  : attribute (discarded), then the real value:
+  // %2\r\n+b\r\n#t\r\n+d\r\n,3.14\r\n  : Map{ b: true, d: 3.14 }
+  const std::string frame = "|1\r\n+k\r\n+v\r\n%2\r\n+b\r\n#t\r\n+d\r\n,3.14\r\n";
+  for (char c : frame) {
+    Buffer::OwnedImpl temp_buffer(&c, 1);
+    decoder_.decode(temp_buffer);
+    EXPECT_EQ(0UL, temp_buffer.length());
+  }
+  ASSERT_EQ(1UL, decoded_values_.size());
+  ASSERT_EQ(RespType::Map, decoded_values_[0]->type());
+  const auto& arr = decoded_values_[0]->asArray();
+  ASSERT_EQ(4UL, arr.size());
+  EXPECT_EQ("b", arr[0].asString());
+  EXPECT_EQ(RespType::Boolean, arr[1].type());
+  EXPECT_TRUE(arr[1].asBoolean());
+  EXPECT_EQ("d", arr[2].asString());
+  ASSERT_EQ(RespType::Double, arr[3].type());
+  EXPECT_EQ("3.14", arr[3].asString());
+}
+
 TEST_F(RedisEncoderDecoderImplTest, NullArray) {
   buffer_.add("*-1\r\n");
   decoder_.decode(buffer_);
@@ -407,17 +430,17 @@ TEST_F(RedisEncoderDecoderImplTest, NullArray) {
 
 TEST_F(RedisEncoderDecoderImplTest, InvalidType) {
   buffer_.add("^");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "invalid value type");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, InvalidInteger) {
   buffer_.add(":-a");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "invalid integer character");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, InvalidIntegerExpectLF) {
   buffer_.add(":-123\ra");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "expected new line");
 }
 
 // Empty integer/length lines must be rejected — without the digit_seen_ guard, ``:\r\n``,
@@ -511,64 +534,107 @@ TEST_F(RedisEncoderDecoderImplTest, ToStringResp3Types) {
 // double-quoted forms.
 TEST_F(RedisEncoderDecoderImplTest, InlineCommandUnbalancedDoubleQuote) {
   buffer_.add("\"hello\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "unbalanced quotes in request");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, InlineCommandUnbalancedSingleQuote) {
   buffer_.add("'hello\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "unbalanced quotes in request");
 }
 
-// Cumulative-element budget on Map: a single Map declaring N pairs counts as 2*N elements
-// against kMaxTotalElements. With kMaxTotalElements=4M and a Map count > 2M, the post-multiply
-// 2N exceeds the cap and the parser must reject.
+// Cumulative-element budget on Map: a Map declaring N pairs counts as 2*N elements against
+// ``kMaxTotalElements``. Walk five nested 800k arrays (consumes 4M of budget) and then declare
+// a Map whose 2N count is below ``kMaxRespElements`` but pushes the cumulative total over
+// ``kMaxTotalElements``. The cumulative check must reject before the element vector is
+// allocated. (A single Map whose 2N storage size exceeds ``kMaxRespElements`` would hit the
+// per-aggregate cap first — see ``Resp3MapCountExceedsMax``.)
 TEST_F(RedisEncoderDecoderImplTest, MapTotalElementBudgetExceeded) {
-  // 2_500_000 pairs → 5M elements > 4M cap.
-  buffer_.add("%2500000\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  // Five nested *800k = 4_000_000 budget. Remaining = 4_194_304 - 4_000_000 = 194_304.
+  // %97_200 → 2N = 194_400 > 194_304 → total-budget reject. 194_400 < kMaxRespElements (2M).
+  std::string trip;
+  for (int i = 0; i < 5; ++i) {
+    trip += "*800000\r\n";
+  }
+  trip += "%97200\r\n";
+  buffer_.add(trip);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "total element count exceeds maximum");
 }
 
-// Map nesting depth: an outer Map containing nested Maps that push past kMaxNestingDepth
-// (32) is rejected at the pre-push check.
+// Map nesting depth: an outer Map containing nested Maps that reach kMaxNestingDepth is rejected
+// at the pre-push check.
 TEST_F(RedisEncoderDecoderImplTest, MapNestingDepthExceeded) {
-  // Build a chain of "%1\r\n$1\r\nk\r\n" — each opens a Map of one pair where the value will
-  // be the next Map. Need 33 levels to exceed the 32 cap.
+  // Build a chain of "%1\r\n$1\r\nk\r\n" — each opens a Map of one pair whose value is the next
+  // Map. The root frame counts toward depth, so a chain of kMaxNestingDepth aggregates drives the
+  // pre-push check to the cap and is rejected, like the array NestingDepthRejected test.
   std::string nested;
-  for (int i = 0; i < 33; ++i) {
+  for (uint32_t i = 0; i < DecoderImpl::kMaxNestingDepth; ++i) {
     nested += "%1\r\n$1\r\nk\r\n";
   }
   buffer_.add(nested);
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "nesting depth exceeds maximum");
+}
+
+TEST_F(RedisEncoderDecoderImplTest, MapNestingDepthAtBoundaryAccepted) {
+  // (kMaxNestingDepth - 1) nested single-pair Maps drive the stack to a depth of exactly
+  // kMaxNestingDepth: the last accepted push happens when the pre-push depth is
+  // kMaxNestingDepth - 1, producing a post-push depth of exactly kMaxNestingDepth. One additional
+  // aggregate would be rejected (see MapNestingDepthExceeded). A leaf value for the innermost Map
+  // lets the whole chain complete.
+  std::string nested;
+  for (uint32_t i = 0; i < DecoderImpl::kMaxNestingDepth - 1; ++i) {
+    nested += "%1\r\n$1\r\nk\r\n";
+  }
+  nested += ":1\r\n"; // innermost Map's value: a leaf integer, completing the chain
+  buffer_.add(nested);
+  decoder_.decode(buffer_);
+  ASSERT_EQ(1U, decoded_values_.size());
+  EXPECT_EQ(RespType::Map, decoded_values_[0]->type());
 }
 
 TEST_F(RedisEncoderDecoderImplTest, IntegerWithNoDigitsRejected) {
   buffer_.add(":\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "integer with no digits");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, NegativeIntegerWithNoDigitsRejected) {
   buffer_.add(":-\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "integer with no digits");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, ArrayCountWithNoDigitsRejected) {
   buffer_.add("*\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "integer with no digits");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, BulkStringLengthWithNoDigitsRejected) {
   buffer_.add("$\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "integer with no digits");
+}
+
+// The RESP3 count/length headers share the integer-parse path, so a missing digit must be
+// rejected by the same ``digit_seen_`` guard rather than coerced to 0.
+TEST_F(RedisEncoderDecoderImplTest, Resp3HeadersWithNoDigitsRejected) {
+  for (const char* frame : {"%\r\n", "~\r\n", ">\r\n", "!\r\n", "=\r\n"}) {
+    SCOPED_TRACE(frame);
+    Buffer::OwnedImpl buffer;
+    buffer.add(frame);
+    DecoderImpl decoder(*this);
+    EXPECT_THROW_WITH_MESSAGE(decoder.decode(buffer), ProtocolError, "integer with no digits");
+  }
 }
 
 TEST_F(RedisEncoderDecoderImplTest, InvalidBulkStringExpectCR) {
   buffer_.add("$1\r\nab");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "expected carriage return");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, InvalidBulkStringExpectLF) {
   buffer_.add("$1\r\na\ra");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "expected new line");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, InlineCommandSingleWord) {
@@ -928,65 +994,75 @@ TEST_F(RedisEncoderDecoderImplTest, InterleaveInlineCommand) {
 
 TEST_F(RedisEncoderDecoderImplTest, InvalidInlineCommandQuoting1) {
   buffer_.add("\"\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "unbalanced quotes in request");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, InvalidInlineCommandQuoting2) {
   buffer_ = Buffer::OwnedImpl();
   buffer_.add("\"\"\"\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "unbalanced quotes in request");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, InvalidInlineCommandQuoting3) {
   buffer_ = Buffer::OwnedImpl();
   buffer_.add("\"foo\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "unbalanced quotes in request");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, InvalidInlineCommandQuoting4) {
   buffer_ = Buffer::OwnedImpl();
   buffer_.add("\" foo\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "unbalanced quotes in request");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, InvalidInlineCommandQuoting5) {
   buffer_ = Buffer::OwnedImpl();
   buffer_.add("\"fo\"o\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "unbalanced quotes in request");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, InvalidInlineCommandSingleQuoting1) {
   buffer_.add("'\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "unbalanced quotes in request");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, InvalidInlineCommandSingleQuoting2) {
   buffer_ = Buffer::OwnedImpl();
   buffer_.add("'''\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "unbalanced quotes in request");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, InvalidInlineCommandSingleQuoting3) {
   buffer_ = Buffer::OwnedImpl();
   buffer_.add("'foo\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "unbalanced quotes in request");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, InvalidInlineCommandSingleQuoting4) {
   buffer_ = Buffer::OwnedImpl();
   buffer_.add("' foo\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "unbalanced quotes in request");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, InvalidInlineCommandSingleQuoting5) {
   buffer_ = Buffer::OwnedImpl();
   buffer_.add("'fo'o\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "unbalanced quotes in request");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, InvalidInterjectedInlineCommand) {
   buffer_.add("*1\r\nECHO\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "invalid value type");
 }
 
 // RESP3 Boolean tests
@@ -994,15 +1070,15 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3BooleanTrue) {
   // Decode #t\r\n
   buffer_.add("#t\r\n");
   decoder_.decode(buffer_);
+  ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::Boolean, decoded_values_[0]->type());
   EXPECT_TRUE(decoded_values_[0]->asBoolean());
   EXPECT_EQ("true", decoded_values_[0]->toString());
   EXPECT_EQ(0UL, buffer_.length());
 
-  // Encode round-trip. The encoder defaults to RESP2 under the HTTP-style
-  // split; RESP3 native wire form is only emitted when the encoder is
-  // explicitly put in RESP3 mode (matching how real downstream connections
-  // flip after HELLO 3 negotiation).
+  // Encode round-trip. The encoder defaults to RESP2; the RESP3 native wire form is only
+  // emitted after it is explicitly put in RESP3 mode (matching how a real downstream
+  // connection flips after HELLO 3 negotiation).
   encoder_.setProtocolVersion(RespProtocolVersion::Resp3);
   Buffer::OwnedImpl out;
   encoder_.encode(*decoded_values_[0], out);
@@ -1012,6 +1088,7 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3BooleanTrue) {
 TEST_F(RedisEncoderDecoderImplTest, Resp3BooleanFalse) {
   buffer_.add("#f\r\n");
   decoder_.decode(buffer_);
+  ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::Boolean, decoded_values_[0]->type());
   EXPECT_FALSE(decoded_values_[0]->asBoolean());
   EXPECT_EQ("false", decoded_values_[0]->toString());
@@ -1024,13 +1101,14 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3BooleanFalse) {
 
 TEST_F(RedisEncoderDecoderImplTest, Resp3BooleanInvalid) {
   buffer_.add("#x\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "invalid boolean value");
 }
 
 // RESP3 Double pass-through: payload stored as raw bytes; round-trip is byte-identical.
 TEST_F(RedisEncoderDecoderImplTest, Resp3Double) {
   buffer_.add(",3.14\r\n");
   decoder_.decode(buffer_);
+  ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::Double, decoded_values_[0]->type());
   EXPECT_EQ("3.14", decoded_values_[0]->asString());
   EXPECT_DOUBLE_EQ(3.14, decoded_values_[0]->asDouble());
@@ -1041,22 +1119,36 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3Double) {
   EXPECT_EQ(",3.14\r\n", out.toString());
 }
 
-// Non-canonical-but-parseable representation survives intact.
+// Non-canonical-but-parseable representations survive intact, byte-for-byte. Each of these forms
+// changes under a parse-then-reformat round-trip ({:.17g}) — 3.140 and 1.2300 carry trailing
+// zeros, +1e2 a leading sign and exponent, .5 an omitted integer part — so preserving them proves
+// the decoder stores the raw wire bytes rather than re-synthesizing from the parsed double.
 TEST_F(RedisEncoderDecoderImplTest, Resp3DoublePreservesUpstreamRepresentation) {
-  buffer_.add(",3.1400000000000001\r\n");
+  const std::vector<std::string> raw_forms = {"3.140", "+1e2", ".5", "1.2300"};
+  std::string frame;
+  for (const std::string& raw : raw_forms) {
+    frame += "," + raw + "\r\n";
+  }
+  buffer_.add(frame);
   decoder_.decode(buffer_);
-  EXPECT_EQ("3.1400000000000001", decoded_values_[0]->asString());
+  ASSERT_EQ(raw_forms.size(), decoded_values_.size());
 
   encoder_.setProtocolVersion(RespProtocolVersion::Resp3);
-  Buffer::OwnedImpl out;
-  encoder_.encode(*decoded_values_[0], out);
-  EXPECT_EQ(",3.1400000000000001\r\n", out.toString());
+  for (size_t i = 0; i < raw_forms.size(); ++i) {
+    SCOPED_TRACE(raw_forms[i]);
+    EXPECT_EQ(RespType::Double, decoded_values_[i]->type());
+    EXPECT_EQ(raw_forms[i], decoded_values_[i]->asString());
+    Buffer::OwnedImpl out;
+    encoder_.encode(*decoded_values_[i], out);
+    EXPECT_EQ("," + raw_forms[i] + "\r\n", out.toString());
+  }
 }
 
 // RESP2 down-conversion wraps the raw payload as a bulk string (length = payload bytes).
 TEST_F(RedisEncoderDecoderImplTest, Resp3DoubleDownconvertsToBulkStringVerbatim) {
   buffer_.add(",3.14\r\n");
   decoder_.decode(buffer_);
+  ASSERT_EQ(1UL, decoded_values_.size());
 
   encoder_.setProtocolVersion(RespProtocolVersion::Resp2);
   Buffer::OwnedImpl out;
@@ -1067,6 +1159,7 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3DoubleDownconvertsToBulkStringVerbatim)
 TEST_F(RedisEncoderDecoderImplTest, Resp3DoubleNegative) {
   buffer_.add(",-1.5\r\n");
   decoder_.decode(buffer_);
+  ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::Double, decoded_values_[0]->type());
   EXPECT_EQ("-1.5", decoded_values_[0]->asString());
   EXPECT_DOUBLE_EQ(-1.5, decoded_values_[0]->asDouble());
@@ -1075,6 +1168,7 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3DoubleNegative) {
 TEST_F(RedisEncoderDecoderImplTest, Resp3DoubleInf) {
   buffer_.add(",inf\r\n");
   decoder_.decode(buffer_);
+  ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::Double, decoded_values_[0]->type());
   EXPECT_TRUE(std::isinf(decoded_values_[0]->asDouble()));
 }
@@ -1083,6 +1177,7 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3DoubleInf) {
 TEST_F(RedisEncoderDecoderImplTest, Resp3BigNumber) {
   buffer_.add("(3492890328409238509324850943850943825024385\r\n");
   decoder_.decode(buffer_);
+  ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::BigNumber, decoded_values_[0]->type());
   EXPECT_EQ("3492890328409238509324850943850943825024385", decoded_values_[0]->asString());
   EXPECT_EQ("(big)3492890328409238509324850943850943825024385", decoded_values_[0]->toString());
@@ -1097,6 +1192,7 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3BigNumber) {
 TEST_F(RedisEncoderDecoderImplTest, Resp3Null) {
   buffer_.add("_\r\n");
   decoder_.decode(buffer_);
+  ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::Null, decoded_values_[0]->type());
   EXPECT_EQ("null", decoded_values_[0]->toString());
 }
@@ -1105,6 +1201,7 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3Null) {
 TEST_F(RedisEncoderDecoderImplTest, Resp3BlobError) {
   buffer_.add("!12\r\nSYNTAX error\r\n");
   decoder_.decode(buffer_);
+  ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::BlobError, decoded_values_[0]->type());
   EXPECT_EQ("SYNTAX error", decoded_values_[0]->asString());
   EXPECT_EQ("!(SYNTAX error)", decoded_values_[0]->toString());
@@ -1119,6 +1216,7 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3BlobError) {
 TEST_F(RedisEncoderDecoderImplTest, Resp3VerbatimString) {
   buffer_.add("=15\r\ntxt:Some string\r\n");
   decoder_.decode(buffer_);
+  ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::VerbatimString, decoded_values_[0]->type());
   EXPECT_EQ("txt:Some string", decoded_values_[0]->asString());
   EXPECT_EQ("=txt:Some string", decoded_values_[0]->toString());
@@ -1134,6 +1232,7 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3Map) {
   // %2\r\n+first\r\n:1\r\n+second\r\n:2\r\n
   buffer_.add("%2\r\n+first\r\n:1\r\n+second\r\n:2\r\n");
   decoder_.decode(buffer_);
+  ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::Map, decoded_values_[0]->type());
   // Map stores 4 elements (2 key-value pairs)
   EXPECT_EQ(4UL, decoded_values_[0]->asArray().size());
@@ -1152,6 +1251,7 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3Map) {
 TEST_F(RedisEncoderDecoderImplTest, Resp3EmptyMap) {
   buffer_.add("%0\r\n");
   decoder_.decode(buffer_);
+  ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::Map, decoded_values_[0]->type());
   EXPECT_EQ(0UL, decoded_values_[0]->asArray().size());
   EXPECT_EQ("{}", decoded_values_[0]->toString());
@@ -1166,6 +1266,7 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3EmptyMap) {
 TEST_F(RedisEncoderDecoderImplTest, Resp3Set) {
   buffer_.add("~3\r\n+a\r\n+b\r\n+c\r\n");
   decoder_.decode(buffer_);
+  ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::Set, decoded_values_[0]->type());
   EXPECT_EQ(3UL, decoded_values_[0]->asArray().size());
   EXPECT_EQ("a", decoded_values_[0]->asArray()[0].asString());
@@ -1186,6 +1287,7 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3Push) {
   // Push message format for pub/sub: >3\r\n$7\r\nmessage\r\n$5\r\nhello\r\n$5\r\nworld\r\n
   buffer_.add(">3\r\n$7\r\nmessage\r\n$5\r\nhello\r\n$5\r\nworld\r\n");
   decoder_.decode(buffer_);
+  ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::Push, decoded_values_[0]->type());
   EXPECT_EQ(3UL, decoded_values_[0]->asArray().size());
   EXPECT_EQ("message", decoded_values_[0]->asArray()[0].asString());
@@ -1202,6 +1304,7 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3Push) {
 TEST_F(RedisEncoderDecoderImplTest, Resp3PushSubscribeAck) {
   buffer_.add(">3\r\n$9\r\nsubscribe\r\n$5\r\nhello\r\n:1\r\n");
   decoder_.decode(buffer_);
+  ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::Push, decoded_values_[0]->type());
   EXPECT_EQ(3UL, decoded_values_[0]->asArray().size());
   EXPECT_EQ("subscribe", decoded_values_[0]->asArray()[0].asString());
@@ -1215,7 +1318,7 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3AttributeParsedAndDiscarded) {
   // Attribute with 1 key-value pair, followed by actual value "+OK\r\n"
   buffer_.add("|1\r\n+key\r\n+val\r\n+OK\r\n");
   decoder_.decode(buffer_);
-  EXPECT_EQ(1UL, decoded_values_.size());
+  ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::SimpleString, decoded_values_[0]->type());
   EXPECT_EQ("OK", decoded_values_[0]->asString());
 }
@@ -1316,7 +1419,7 @@ TEST_F(RedisRespValueTest, Resp3TypeEquality) {
 TEST_F(RedisEncoderDecoderImplTest, Resp3MultipleValues) {
   buffer_.add("#t\r\n,3.14\r\n_\r\n");
   decoder_.decode(buffer_);
-  EXPECT_EQ(3UL, decoded_values_.size());
+  ASSERT_EQ(3UL, decoded_values_.size());
   EXPECT_EQ(RespType::Boolean, decoded_values_[0]->type());
   EXPECT_EQ(RespType::Double, decoded_values_[1]->type());
   EXPECT_EQ(RespType::Null, decoded_values_[2]->type());
@@ -1327,6 +1430,7 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3NestedTypes) {
   // Map with one entry: key="ch", value=Push[message, ch, hello]
   buffer_.add("%1\r\n$2\r\nch\r\n>3\r\n$7\r\nmessage\r\n$2\r\nch\r\n$5\r\nhello\r\n");
   decoder_.decode(buffer_);
+  ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::Map, decoded_values_[0]->type());
   EXPECT_EQ(2UL, decoded_values_[0]->asArray().size());
   EXPECT_EQ("ch", decoded_values_[0]->asArray()[0].asString());
@@ -1336,22 +1440,23 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3NestedTypes) {
 
 TEST_F(RedisEncoderDecoderImplTest, Resp3InvalidBigNumber) {
   buffer_.add("(123abc\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "invalid big number value");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, Resp3NegativeBlobErrorLengthRejected) {
   buffer_.add("!-1\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "invalid negative length");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, Resp3NegativeVerbatimStringLengthRejected) {
   buffer_.add("=-1\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "invalid negative length");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, Resp3InvalidVerbatimStringPrefixRejected) {
   buffer_.add("=8\r\ntxthello\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "invalid verbatim string value");
 }
 
 // RESP3 Attribute: root-level attribute is parsed and discarded
@@ -1359,7 +1464,7 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3AttributeRootDiscarded) {
   // |1\r\n+key\r\n+val\r\n followed by the actual value +OK\r\n
   buffer_.add("|1\r\n+key\r\n+val\r\n+OK\r\n");
   decoder_.decode(buffer_);
-  EXPECT_EQ(1UL, decoded_values_.size());
+  ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::SimpleString, decoded_values_[0]->type());
   EXPECT_EQ("OK", decoded_values_[0]->asString());
 }
@@ -1370,7 +1475,7 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3AttributeNestedInArray) {
   // *2\r\n |1\r\n+k\r\n+v\r\n :42\r\n :99\r\n
   buffer_.add("*2\r\n|1\r\n+k\r\n+v\r\n:42\r\n:99\r\n");
   decoder_.decode(buffer_);
-  EXPECT_EQ(1UL, decoded_values_.size());
+  ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
   EXPECT_EQ(2UL, decoded_values_[0]->asArray().size());
   EXPECT_EQ(42, decoded_values_[0]->asArray()[0].asInteger());
@@ -1381,21 +1486,9 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3AttributeNestedInArray) {
 TEST_F(RedisEncoderDecoderImplTest, Resp3AttributeEmpty) {
   buffer_.add("|0\r\n$3\r\nfoo\r\n");
   decoder_.decode(buffer_);
-  EXPECT_EQ(1UL, decoded_values_.size());
+  ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::BulkString, decoded_values_[0]->type());
   EXPECT_EQ("foo", decoded_values_[0]->asString());
-}
-
-// RESP3 Attribute chain DoS protection
-TEST_F(RedisEncoderDecoderImplTest, Resp3AttributeChainLimit) {
-  // 33 consecutive empty attributes exceed the limit of 32
-  std::string payload;
-  for (int i = 0; i < 33; i++) {
-    payload += "|0\r\n";
-  }
-  payload += "+OK\r\n";
-  buffer_.add(payload);
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
 }
 
 // Negative counts for RESP3 aggregate types produce Null
@@ -1405,29 +1498,29 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3AttributeChainLimit) {
 // frames past callers that expect the documented type.
 TEST_F(RedisEncoderDecoderImplTest, Resp3NegativeMapCountRejected) {
   buffer_.add("%-1\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "invalid negative count");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, Resp3NegativeSetCountRejected) {
   buffer_.add("~-1\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "invalid negative count");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, Resp3NegativePushCountRejected) {
   buffer_.add(">-1\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "invalid negative count");
 }
 
 // Only ``$-1`` and ``*-1`` are the RESP-defined null forms. Other negative
 // counts/lengths are malformed and must be rejected.
 TEST_F(RedisEncoderDecoderImplTest, BulkStringNegativeTwoRejected) {
   buffer_.add("$-2\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "invalid negative length");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, ArrayNegativeTwoRejected) {
   buffer_.add("*-2\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "invalid negative count");
 }
 
 // The valid null forms for RESP2 still work after the tightening.
@@ -1465,6 +1558,7 @@ TEST_F(RedisEncoderDecoderImplTest, NullEncodingResp2VsResp3) {
 TEST_F(RedisEncoderDecoderImplTest, Resp3DoubleNaN) {
   buffer_.add(",nan\r\n");
   decoder_.decode(buffer_);
+  ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::Double, decoded_values_[0]->type());
   EXPECT_TRUE(std::isnan(decoded_values_[0]->asDouble()));
 
@@ -1477,6 +1571,7 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3DoubleNaN) {
 TEST_F(RedisEncoderDecoderImplTest, Resp3DoubleNegativeInf) {
   buffer_.add(",-inf\r\n");
   decoder_.decode(buffer_);
+  ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::Double, decoded_values_[0]->type());
   EXPECT_TRUE(std::isinf(decoded_values_[0]->asDouble()));
   EXPECT_LT(decoded_values_[0]->asDouble(), 0);
@@ -1489,44 +1584,42 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3DoubleNegativeInf) {
 
 TEST_F(RedisEncoderDecoderImplTest, Resp3DoubleInvalid) {
   buffer_.add(",abc\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
-}
-
-TEST_F(RedisEncoderDecoderImplTest, Resp3DoubleTooLong) {
-  std::string payload = ",";
-  payload += std::string(65, '1'); // 65 chars exceeds 64 limit
-  payload += "\r\n";
-  buffer_.add(payload);
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "invalid double value");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, Resp3BigNumberPositive) {
   buffer_.add("(+12345\r\n");
   decoder_.decode(buffer_);
+  ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::BigNumber, decoded_values_[0]->type());
   EXPECT_EQ("+12345", decoded_values_[0]->asString());
 }
 
 TEST_F(RedisEncoderDecoderImplTest, Resp3ArrayCountExceedsMax) {
-  // 1048577 exceeds kMaxRespElements (1048576)
-  buffer_.add("*1048577\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  // 2000001 exceeds kMaxRespElements (2000000)
+  buffer_.add("*2000001\r\n");
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "element count exceeds maximum");
 }
 
-TEST_F(RedisEncoderDecoderImplTest, Resp3MapCountOverflow) {
-  // Map count that would overflow when doubled
-  buffer_.add("%9223372036854775807\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+// Per-aggregate cap on Map: a Map header whose post-multiply 2N exceeds ``kMaxRespElements``
+// is rejected at the first cap (before the cumulative cap). ``%1_500_000`` → 3M > 2M.
+TEST_F(RedisEncoderDecoderImplTest, Resp3MapCountExceedsMax) {
+  buffer_.add("%1500000\r\n");
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "element count exceeds maximum");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, Resp3SetCountExceedsMax) {
-  buffer_.add("~1048577\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  buffer_.add("~2000001\r\n");
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "element count exceeds maximum");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, Resp3PushCountExceedsMax) {
-  buffer_.add(">1048577\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  buffer_.add(">2000001\r\n");
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "element count exceeds maximum");
 }
 
 // Pre-multiply integer overflow guards. uint64_t::max is 20 digits
@@ -1536,22 +1629,22 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3PushCountExceedsMax) {
 // in the integer accumulator.
 TEST_F(RedisEncoderDecoderImplTest, Resp2ArrayCountIntegerOverflow) {
   buffer_.add("*9999999999999999999999999\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "integer overflow");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, Resp2BulkStringLengthIntegerOverflow) {
   buffer_.add("$9999999999999999999999999\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "integer overflow");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, Resp3MapCountIntegerOverflow) {
   buffer_.add("%9999999999999999999999999\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "integer overflow");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, Resp3SetCountIntegerOverflow) {
   buffer_.add("~9999999999999999999999999\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "integer overflow");
 }
 
 // Signed RESP integer (`:N\r\n`) range checks. The accumulator is uint64_t
@@ -1560,31 +1653,34 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3SetCountIntegerOverflow) {
 TEST_F(RedisEncoderDecoderImplTest, RespIntegerInt64MaxAccepted) {
   buffer_.add(":9223372036854775807\r\n");
   decoder_.decode(buffer_);
+  ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::Integer, decoded_values_[0]->type());
   EXPECT_EQ(std::numeric_limits<int64_t>::max(), decoded_values_[0]->asInteger());
 }
 
 TEST_F(RedisEncoderDecoderImplTest, RespIntegerInt64MaxPlusOneRejected) {
   buffer_.add(":9223372036854775808\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "integer out of range");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, RespIntegerInt64MinAccepted) {
   buffer_.add(":-9223372036854775808\r\n");
   decoder_.decode(buffer_);
+  ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::Integer, decoded_values_[0]->type());
   EXPECT_EQ(std::numeric_limits<int64_t>::min(), decoded_values_[0]->asInteger());
 }
 
 TEST_F(RedisEncoderDecoderImplTest, RespIntegerInt64MinMinusOneRejected) {
   buffer_.add(":-9223372036854775809\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "integer out of range");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, RespIntegerNegativeZeroAcceptedAsZero) {
   // Wire "-0" → 0. Tolerate for backward-compat with senders that emit it.
   buffer_.add(":-0\r\n");
   decoder_.decode(buffer_);
+  ASSERT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::Integer, decoded_values_[0]->type());
   EXPECT_EQ(0, decoded_values_[0]->asInteger());
 }
@@ -1595,27 +1691,30 @@ TEST_F(RedisEncoderDecoderImplTest, RespIntegerNegativeZeroAcceptedAsZero) {
 TEST_F(RedisEncoderDecoderImplTest, BulkStringLengthAboveCapRejected) {
   // 512 MiB + 1 byte.
   buffer_.add("$536870913\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "bulk string length exceeds maximum");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, VerbatimStringLengthAboveCapRejected) {
   buffer_.add("=536870913\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "bulk string length exceeds maximum");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, BlobErrorLengthAboveCapRejected) {
   buffer_.add("!536870913\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "bulk string length exceeds maximum");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, Resp3BigNumberLoneSign) {
   buffer_.add("(-\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "invalid big number value");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, Resp3BigNumberLonePositiveSign) {
   buffer_.add("(+\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "invalid big number value");
 }
 
 // =============================================================================
@@ -1920,48 +2019,88 @@ TEST_F(RespEncoderDownconversionTest, Resp3TargetLeavesResp3TypesIntact) {
 // round-trip path the wire-level fixtures above don't exercise directly.
 
 TEST_F(RedisEncoderDecoderImplTest, AttributeNestedDiscardedBeforeValue) {
-  // Inside a 1-element array: attribute annotating a simple string.
-  // Trailing +OK keeps the parser exercise unambiguous about consumption order.
-  buffer_.add("*1\r\n|1\r\n+meta\r\n+OK\r\n+OK\r\n");
+  // Inside a 1-element array, an attribute (|1) annotates the value that follows it. The attribute
+  // and its key/value payload must be discarded, leaving only the post-attribute value as the sole
+  // array element. Distinct strings make the discard unambiguous: were the parser to surface the
+  // attribute's value ("meta-val") — or leave its bytes unconsumed as a spurious extra root — the
+  // assertions below would catch it.
+  buffer_.add("*1\r\n|1\r\n+meta-key\r\n+meta-val\r\n+real\r\n");
   decoder_.decode(buffer_);
-  ASSERT_GE(decoded_values_.size(), 1U);
+  ASSERT_EQ(1U, decoded_values_.size());
   EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
   ASSERT_EQ(1U, decoded_values_[0]->asArray().size());
   EXPECT_EQ(RespType::SimpleString, decoded_values_[0]->asArray()[0].type());
-  EXPECT_EQ("OK", decoded_values_[0]->asArray()[0].asString());
+  EXPECT_EQ("real", decoded_values_[0]->asArray()[0].asString());
 }
 
 TEST_F(RedisEncoderDecoderImplTest, AttributeFloodRejected) {
-  // 33 consecutive attributes should trip the kMaxConsecutiveAttributes guard.
+  // One more than kMaxConsecutiveAttributes consecutive attributes trips the flood guard.
   std::string flood;
-  for (int i = 0; i < 33; ++i) {
+  for (uint32_t i = 0; i < DecoderImpl::kMaxConsecutiveAttributes + 1; ++i) {
     flood += "|0\r\n";
   }
   flood += "+OK\r\n";
   buffer_.add(flood);
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "too many consecutive RESP3 attributes");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, MapCountOverflowRejected) {
   // A map count that would overflow when doubled for the flat 2N layout.
   // uint64_max/2 + 1 pairs -> element count would wrap.
   buffer_.add("%9223372036854775808\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "map element count overflow");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, VerbatimStringMissingColonRejected) {
   // RESP3 verbatim strings require a 3-char format prefix + ':' at byte 3.
   buffer_.add("=6\r\ntxtXXX\r\n");
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "invalid verbatim string value");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, DoubleTooLongRejected) {
-  // The accumulator for double digits is capped at 64 bytes.
+  // The Double payload is capped at kMaxDoubleTokenLength — a double is a small fixed-width
+  // scalar, so anything longer is outside the accepted scalar-token bound used to protect against
+  // unterminated growth. One byte over the cap trips the guard.
   std::string long_double = ",";
-  long_double.append(65, '9');
+  long_double.append(DecoderImpl::kMaxDoubleTokenLength + 1, '9');
   long_double += "\r\n";
   buffer_.add(long_double);
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "double value too long");
+}
+
+TEST_F(RedisEncoderDecoderImplTest, DoubleAtBoundaryAccepted) {
+  // A Double payload of exactly kMaxDoubleTokenLength bytes is accepted; one byte over the cap is
+  // what trips the guard (see DoubleTooLongRejected). An all-digit token is a valid (large) double.
+  const std::string digits(DecoderImpl::kMaxDoubleTokenLength, '9');
+  buffer_.add("," + digits + "\r\n");
+  decoder_.decode(buffer_);
+  ASSERT_EQ(1U, decoded_values_.size());
+  EXPECT_EQ(RespType::Double, decoded_values_[0]->type());
+  EXPECT_EQ(digits, decoded_values_[0]->asString());
+}
+
+TEST_F(RedisEncoderDecoderImplTest, BigNumberTooLongRejected) {
+  // BigNumber is arbitrary-precision, so a long value is not malformed; the payload is capped at
+  // kMaxBigNumberTokenLength purely to bound unbounded CRLF-less line growth. Exceed the cap by
+  // one byte to trip the guard.
+  std::string long_bignum = "(";
+  long_bignum.append(DecoderImpl::kMaxBigNumberTokenLength + 1, '9');
+  long_bignum += "\r\n";
+  buffer_.add(long_bignum);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "big number value too long");
+}
+
+TEST_F(RedisEncoderDecoderImplTest, BigNumberAtBoundaryAccepted) {
+  // A BigNumber payload of exactly kMaxBigNumberTokenLength bytes is accepted; one byte over the
+  // cap is what trips the guard (see BigNumberTooLongRejected).
+  const std::string digits(DecoderImpl::kMaxBigNumberTokenLength, '9');
+  buffer_.add("(" + digits + "\r\n");
+  decoder_.decode(buffer_);
+  ASSERT_EQ(1U, decoded_values_.size());
+  EXPECT_EQ(RespType::BigNumber, decoded_values_[0]->type());
+  EXPECT_EQ(digits, decoded_values_[0]->asString());
 }
 
 TEST_F(RedisEncoderDecoderImplTest, NullArrayDecodesToNull) {
@@ -1981,27 +2120,28 @@ TEST_F(RedisEncoderDecoderImplTest, Resp3NullDecodesToNull) {
 }
 
 TEST_F(RedisEncoderDecoderImplTest, NestingDepthRejected) {
-  // 32 nested ``*1`` frames: the pre-push check
-  // (``pending_value_stack_depth_ >= kMaxNestingDepth``) rejects the 32nd ``*1`` because
-  // the prior frames (root setup at depth=1 plus 30 successful nested-array pushes)
-  // already drove the depth counter to ``kMaxNestingDepth`` (= 32). No 33rd-level push
-  // happens; the counter is never incremented past 32.
+  // 128 nested ``*1`` frames: the pre-push check
+  // (``pending_value_stack_depth_ >= kMaxNestingDepth``) rejects the 128th ``*1`` because
+  // the prior frames (root setup at depth=1 plus 126 successful nested-array pushes)
+  // already drove the depth counter to ``kMaxNestingDepth`` (= 128). No 129th-level push
+  // happens; the counter is never incremented past 128.
   std::string deep;
-  for (int i = 0; i < 32; ++i) {
+  for (uint32_t i = 0; i < DecoderImpl::kMaxNestingDepth; ++i) {
     deep += "*1\r\n";
   }
   deep += "+x\r\n";
   buffer_.add(deep);
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "nesting depth exceeds maximum");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, NestingDepthAtBoundaryAccepted) {
-  // 31 nested *1 frames + leaf reach a stack depth of 32 (root + 31 pushes),
+  // 127 nested *1 frames + leaf reach a stack depth of 128 (root + 127 pushes),
   // which is exactly kMaxNestingDepth. The pre-push check
-  // (depth >= kMaxNestingDepth) lets the 31st push through (depth was 31
-  // before) and rejects a 32nd push (depth 32 already at the cap).
+  // (depth >= kMaxNestingDepth) lets the 127th push through (depth was 127
+  // before) and rejects a 128th push (depth 128 already at the cap).
   std::string deep;
-  for (int i = 0; i < 31; ++i) {
+  for (uint32_t i = 0; i < DecoderImpl::kMaxNestingDepth - 1; ++i) {
     deep += "*1\r\n";
   }
   deep += "+x\r\n";
@@ -2011,32 +2151,45 @@ TEST_F(RedisEncoderDecoderImplTest, NestingDepthAtBoundaryAccepted) {
 }
 
 TEST_F(RedisEncoderDecoderImplTest, TotalElementBudgetRejected) {
-  // Stack five 800k aggregates: each is below the per-aggregate 1M cap, but
-  // the running budget reaches 4M after the fifth, so the sixth (any size)
-  // is rejected by the cumulative check before its element vector is
-  // allocated.
-  // Nesting works because the parser accepts a nested aggregate as the
-  // first element of its parent — we don't need to provide actual leaf
-  // bytes for the budget check to fire.
+  // Stack five 800k aggregates: each is below the per-aggregate 2M cap, but the running budget
+  // reaches 4M after the fifth (only ~194k of the 4_194_304 kMaxTotalElements remains). A sixth
+  // 800k aggregate exceeds that remainder, so the cumulative check rejects it before its element
+  // vector is allocated.
+  // Nesting works because the parser accepts a nested aggregate as the first element of its
+  // parent — we don't need to provide actual leaf bytes for the budget check to fire.
   std::string trip;
   for (int i = 0; i < 5; ++i) {
     trip += "*800000\r\n";
   }
   trip += "*800001\r\n";
   buffer_.add(trip);
-  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "total element count exceeds maximum");
 }
 
 TEST_F(RedisEncoderDecoderImplTest, TotalElementBudgetResetsBetweenRootValues) {
-  // First root value uses up most of the budget; second root value should
-  // start fresh.
-  buffer_.add("*900000\r\n");
-  // Don't actually wait for 900000 elements; this will hang until they
-  // arrive. Use a smaller value that completes synchronously.
-  buffer_.drain(buffer_.length());
-  buffer_.add("+ok\r\n+ok\r\n");
+  // The cumulative-element budget must reset to zero at the start of each top-level value, so a
+  // pipelined second request is judged on its own size rather than inheriting the first request's
+  // spend. Root 1 is a tiny array that completes and leaves total_elements_ at 3. Root 2 then
+  // stacks the same five 800k aggregates as TotalElementBudgetRejected plus a final 194_304
+  // aggregate, summing to exactly kMaxTotalElements (4_000_000 + 194_304 = 4_194_304). That final
+  // declaration is accepted ONLY if the budget reset when root 2 began; without the reset, root 1's
+  // leftover 3 pushes the running total one past the cap and it throws. Root 2's leaves are never
+  // supplied — the budget check fires at declaration, so we assert root 2 was admitted (no throw)
+  // and is still awaiting its elements rather than completing.
+  buffer_.add("*3\r\n+a\r\n+b\r\n+c\r\n");
+  std::string root2;
+  for (int i = 0; i < 5; ++i) {
+    root2 += "*800000\r\n";
+  }
+  root2 += "*194304\r\n";
+  buffer_.add(root2);
   decoder_.decode(buffer_);
-  EXPECT_EQ(2U, decoded_values_.size());
+  // Root 1 fully decoded; root 2 accepted all declarations (proving the reset) and awaits elements,
+  // so it has not yet been emitted.
+  ASSERT_EQ(1U, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(3U, decoded_values_[0]->asArray().size());
 }
 
 TEST_F(RedisEncoderDecoderImplTest, MapStorageIsFlat2N) {
@@ -2046,6 +2199,33 @@ TEST_F(RedisEncoderDecoderImplTest, MapStorageIsFlat2N) {
   ASSERT_EQ(1U, decoded_values_.size());
   EXPECT_EQ(RespType::Map, decoded_values_[0]->type());
   EXPECT_EQ(4U, decoded_values_[0]->asArray().size());
+}
+
+TEST_F(RedisEncoderDecoderImplTest, EncodeMapOddSizedTripsEnvoyBug) {
+  // A Map RespValue must store a flat 2N key/value vector. An odd-sized array is a caller bug;
+  // encodeMap trips ENVOY_BUG (fatal in debug; release-safe truncate-to-even in production) rather
+  // than emitting a frame whose declared count omits the trailing element and shifts the decoder.
+  RespValue map;
+  map.type(RespType::Map);
+  RespValue k, v, orphan;
+  k.type(RespType::SimpleString);
+  k.asString() = "k";
+  v.type(RespType::SimpleString);
+  v.asString() = "v";
+  orphan.type(RespType::SimpleString);
+  orphan.asString() = "orphan";
+  map.asArray() = {k, v, orphan};
+
+  Buffer::OwnedImpl out;
+  encoder_.setProtocolVersion(RespProtocolVersion::Resp3);
+  EXPECT_ENVOY_BUG(encoder_.encode(map, out), "Map storage must have even length");
+#if defined(NDEBUG) || defined(ENVOY_CONFIG_COVERAGE)
+  // Where ENVOY_BUG is non-fatal (release / coverage builds), the encode continues past the bug and
+  // emits the release-safe, truncated-to-even Map — the orphan element is dropped, leaving a
+  // correctly framed 1-pair Map. In a debug build EXPECT_ENVOY_BUG aborts the encode before this
+  // point (it is a death test), so the output check only applies in non-debug builds.
+  EXPECT_EQ("%1\r\n+k\r\n+v\r\n", out.toString());
+#endif
 }
 
 } // namespace Redis

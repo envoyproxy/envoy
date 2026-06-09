@@ -9,6 +9,7 @@
 
 #include "test/test_common/printers.h"
 
+#include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {

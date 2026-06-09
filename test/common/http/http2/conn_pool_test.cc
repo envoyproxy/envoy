@@ -2111,6 +2111,48 @@ TEST_F(Http2ConnPoolImplTest, RequestTrackingConnectionFailureNoMetric) {
   EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_remote_.value());
 }
 
+/**
+ * Verify that if a request is synchronously reset during onPoolReady(),
+ * it does not trigger recursive reentrant crashes in ConnPoolImplBase in the H2 pool.
+ */
+TEST_F(Http2ConnPoolImplTest, ReentrancySynchronousResetInPoolReady) {
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(1);
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.conn_pool_fix_reentrancy", "true"}});
+
+  InSequence s;
+
+  // 1. Create a client and a pending request.
+  expectClientCreate();
+  ActiveTestRequest r(*this, 0, false);
+
+  // 2. Expect the H2 client connection to be created, and expect onPoolReady.
+  // We override the onPoolReady callback to synchronously reset the stream!
+  EXPECT_CALL(*test_clients_[0].codec_, newStream(_))
+      .WillOnce(DoAll(SaveArgAddress(&r.inner_decoder_), ReturnRef(r.inner_encoder_)));
+
+  bool already_called = false;
+  EXPECT_CALL(r.callbacks_.pool_ready_, ready()).WillRepeatedly(Invoke([&]() {
+    if (already_called) {
+      ADD_FAILURE() << "Recursive onPoolReady call detected! Core pool reentrant bug is active!";
+      return;
+    }
+    already_called = true;
+    ASSERT_NE(r.callbacks_.outer_encoder_, nullptr);
+    r.callbacks_.outer_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+  }));
+
+  // 3. Connect the client. This will trigger onPoolReady -> resetStream -> onStreamClosed ->
+  // onUpstreamReady recursively.
+  expectClientConnect(0);
+
+  // 4. Verify that the connection is successfully closed.
+  EXPECT_CALL(*this, onClientDestroy());
+  test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
 } // namespace Http2
 } // namespace Http
 } // namespace Envoy

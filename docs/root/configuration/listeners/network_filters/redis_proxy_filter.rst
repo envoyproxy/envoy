@@ -28,6 +28,7 @@ following statistics:
   downstream_cx_tx_bytes_total, Counter, Total bytes sent
   downstream_cx_drain_close, Counter, Number of connections closed due to draining
   downstream_rq_active, Gauge, Total active requests
+  downstream_rq_noproto, Counter, "Data commands rejected ``-NOPROTO`` for arriving before the ``HELLO 3`` handshake on a ``protocol_version: RESP3`` listener"
   downstream_rq_total, Counter, Total requests
 
 
@@ -124,9 +125,10 @@ is no separate per-cluster RESP knob, and no implicit floor across clusters. On 
 upstream-routed data path, downstream and upstream speak the same RESP version (locally
 emitted replies — AUTH/QUIT/NOPROTO — are encoded in the downstream-negotiated version).
 
-When ``protocol_version`` is unset or ``RESP2`` (the default), the listener behaves end-to-end
-as pre-RESP3 Envoy: no ``HELLO 3`` is sent upstream, and a downstream ``HELLO 3`` is rejected
-with ``-NOPROTO``.
+When ``protocol_version`` is unset or ``RESP2`` (the default), the negotiated wire version is
+RESP2: no ``HELLO 3`` is sent upstream, and a downstream ``HELLO 3`` is rejected with
+``-NOPROTO``. (RESP3-aware handling — the local ``HELLO`` reply, ``CLIENT SETINFO`` /
+``SETNAME`` acceptance, and the RESP3 decoder — is always present regardless of this value.)
 
 When ``protocol_version`` is ``RESP3``:
 
@@ -155,6 +157,16 @@ Downstream ``HELLO N AUTH <user> <pass>`` is supported with both locally configu
 credentials (``downstream_auth_passwords`` / ``downstream_auth_username``) and an external
 auth provider; the latter defers the round trip and emits the deferred ``HELLO`` Map (or
 error) when the provider responds.
+
+The ``HELLO`` reply returned to the downstream client is **synthesized locally** by the proxy;
+it is not proxied from, and does not reflect, any upstream Redis server. Several fields therefore
+carry fixed proxy-specific values rather than a backend's: ``server`` is ``envoy-redis-proxy``,
+``version`` is a fixed Redis-compatibility version (``7.0.0``) advertised for client-library
+compatibility rather than the Envoy build version, ``id`` is ``0``, ``mode`` is ``standalone``,
+``role`` is ``master``, and ``modules`` is empty. Only ``proto`` is dynamic — it reflects the
+negotiated version (``2`` or ``3``). Clients that key behavior off these fields (for example a
+server ``version`` gate or the connection ``id``) must not expect them to match the upstream
+Redis the data commands are routed to.
 
 The proxy does not cross-encode upstream responses between RESP2 and RESP3. Because the
 listener forces the upstream-routed data path to a single RESP version, an upstream reply

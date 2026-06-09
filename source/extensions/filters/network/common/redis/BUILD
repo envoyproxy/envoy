@@ -47,6 +47,8 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
+        "@abseil-cpp//absl/container:fixed_array",
+        "@abseil-cpp//absl/strings",
     ],
 )
 

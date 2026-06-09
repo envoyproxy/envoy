@@ -31,6 +31,7 @@
 #include "source/extensions/filters/network/redis_proxy/conn_pool.h"
 
 #include "absl/container/node_hash_map.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {

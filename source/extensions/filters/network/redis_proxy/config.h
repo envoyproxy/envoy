@@ -15,7 +15,6 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/extensions/filters/network/common/factory_base.h"
-#include "source/extensions/filters/network/common/redis/codec.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -153,15 +152,6 @@ private:
       MessageUtil, MessageUtil>
       credentials_;
 };
-
-// Proto-to-codec conversion. The proto enum encodes RESP3 as 1; never pass it to
-// ``Common::Redis::toRespProtocolVersion(uint32_t)`` (which expects the wire integer 3).
-inline Common::Redis::RespProtocolVersion toCodecRespVersion(
-    envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ProtocolVersion v) {
-  return v == envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::RESP3
-             ? Common::Redis::RespProtocolVersion::Resp3
-             : Common::Redis::RespProtocolVersion::Resp2;
-}
 
 /**
  * Config registration for the redis proxy filter. @see NamedNetworkFilterConfigFactory.

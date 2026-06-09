@@ -31,6 +31,7 @@ namespace RedisProxy {
   COUNTER(downstream_cx_rx_bytes_total)                                                            \
   COUNTER(downstream_cx_total)                                                                     \
   COUNTER(downstream_cx_tx_bytes_total)                                                            \
+  COUNTER(downstream_rq_noproto)                                                                   \
   COUNTER(downstream_rq_total)                                                                     \
   GAUGE(downstream_cx_active, Accumulate)                                                          \
   GAUGE(downstream_cx_rx_bytes_buffered, Accumulate)                                               \
@@ -154,13 +155,15 @@ private:
       return parent_.downstream_resp_version_;
     }
 
-    // Stamp of the downstream RESP version at request creation. Set in the
-    // PendingRequest constructor's member init list from the parent filter's
-    // current downstream_resp_version_; the inline default of 2 is just a
-    // belt-and-braces match for the parent filter's own initial value (see
-    // ProxyFilter::downstream_resp_version_) so reading this field on a
-    // partially-constructed PendingRequest can never see uninitialized memory.
-    uint32_t resp_version_at_creation_{2};
+    absl::optional<uint32_t> takePendingHelloAuthVersion() override {
+      auto version = pending_hello_auth_version_;
+      pending_hello_auth_version_.reset();
+      return version;
+    }
+
+    // Downstream RESP version captured at request creation, set in the constructor from the
+    // parent filter's current downstream_resp_version_.
+    uint32_t resp_version_at_creation_;
     ProxyFilter& parent_;
     // This value is set when the request is on hold, waiting for an external auth response.
     Common::Redis::RespValuePtr pending_request_value_;
@@ -182,7 +185,7 @@ private:
   // Inline-auth path used by HELLO N AUTH ... handling. Local-credentials case returns
   // Allowed (flipping connection_allowed_) or Denied. External-auth case stashes
   // ``requested_version`` on ``request`` and kicks off ``authenticateExternal``, returning
-  // ``Pending``; ``onAuthenticateExternal`` then emits the deferred HELLO Map / error.
+  // ``ImplOwnsResponse``; ``onAuthenticateExternal`` then emits the deferred HELLO Map / error.
   CommandSplitter::SplitCallbacks::AuthAttempt
   attemptDownstreamAuthInline(PendingRequest& request, const std::string& username,
                               const std::string& password, uint32_t requested_version);
@@ -200,12 +203,13 @@ private:
   Network::ReadFilterCallbacks* callbacks_{};
   std::list<PendingRequest> pending_requests_;
   bool connection_allowed_;
-  // Each fresh downstream connection starts in RESP2 — matches real Redis,
-  // which serves a legacy client that never sends HELLO over RESP2 even when
-  // the server is RESP3-capable. ``setDownstreamRespVersion`` mutates this in
-  // place when a client's ``HELLO`` negotiates a new version (which must
-  // exactly match ``ProxyFilterConfig::protocolVersion()`` — see
-  // ``SplitCallbacks::protocolVersion``).
+  // Per-connection negotiated downstream RESP version, held as the wire integer (2 or 3) so
+  // it compares directly against the ``HELLO N`` argument. This is distinct from the
+  // listener-policy type ``Common::Redis::RespProtocolVersion`` returned by
+  // ``ProxyFilterConfig::protocolVersion()``; the two are bridged by ``toWireRespVersion`` /
+  // ``toRespProtocolVersion`` at the boundaries. Starts at 2 (a legacy client never sends
+  // HELLO) and is flipped by ``setDownstreamRespVersion`` when a ``HELLO N`` whose ``N``
+  // matches the listener policy succeeds.
   uint32_t downstream_resp_version_{2};
   Common::Redis::Client::Transaction transaction_;
   bool connection_quit_;

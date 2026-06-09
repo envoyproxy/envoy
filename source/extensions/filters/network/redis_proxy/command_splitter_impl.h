@@ -152,9 +152,9 @@ public:
   Common::Redis::RespProtocolVersion protocolVersion() const override {
     return callbacks_.protocolVersion();
   }
-  AuthAttempt attemptDownstreamAuthInline(const std::string& u, const std::string& p,
+  AuthAttempt attemptDownstreamAuthInline(const std::string& username, const std::string& password,
                                           uint32_t requested_version) override {
-    return callbacks_.attemptDownstreamAuthInline(u, p, requested_version);
+    return callbacks_.attemptDownstreamAuthInline(username, password, requested_version);
   }
   // Forward the version state through the decorator so any command answered through this
   // wrapper is encoded against the real filter's per-connection RESP version, not the
@@ -163,6 +163,9 @@ public:
   // wrapped command that observes the version.)
   uint32_t currentDownstreamRespVersion() const override {
     return callbacks_.currentDownstreamRespVersion();
+  }
+  absl::optional<uint32_t> takePendingHelloAuthVersion() override {
+    return callbacks_.takePendingHelloAuthVersion();
   }
 
   // RedisProxy::CommandSplitter::SplitRequest
@@ -538,6 +541,11 @@ private:
   void addHandler(Stats::Scope& scope, const std::string& stat_prefix, const std::string& name,
                   bool latency_in_micros, CommandHandler& handler);
   void onInvalidRequest(SplitCallbacks& callbacks);
+  // Handle a downstream ``HELLO`` command: protocol-version exact-match, AUTH/SETNAME option
+  // parsing, inline-auth dispatch, and the local HELLO reply. Always terminal (returns nullptr);
+  // factored out of ``makeRequest`` to keep that dispatcher readable.
+  SplitRequestPtr handleHelloCommand(const Common::Redis::RespValue& request,
+                                     SplitCallbacks& callbacks);
 
   RouterPtr router_;
   CommandHandlerFactory<SimpleRequest> simple_command_handler_;

@@ -727,15 +727,15 @@ TEST_F(RedisSingleServerRequestTest, HelloWithAuthOptionDeniedEmitsWrongpass) {
   EXPECT_EQ(3u, callbacks_.last_inline_auth_requested_version_);
 }
 
-// Pending (external auth in flight): splitter emits NO response and yields control. The
+// ImplOwnsResponse (external auth in flight): splitter emits NO response and yields control. The
 // implementation behind attemptDownstreamAuthInline (ProxyFilter in production) is responsible
 // for emitting the deferred HELLO Map (success) or error (failure) when the async auth
-// completes. Verifies the splitter's no-emit / nullptr-handle contract for the Pending case;
-// the deferred-reply emission contract is covered in proxy_filter_test.cc.
-TEST_F(RedisSingleServerRequestTest, HelloWithAuthOptionPendingEmitsNothing) {
+// completes. Verifies the splitter's no-emit / nullptr-handle contract for the ImplOwnsResponse
+// case; the deferred-reply emission contract is covered in proxy_filter_test.cc.
+TEST_F(RedisSingleServerRequestTest, HelloWithAuthOptionImplOwnsResponseEmitsNothing) {
   InSequence s;
   callbacks_.protocol_version_ = Common::Redis::RespProtocolVersion::Resp3;
-  callbacks_.inline_auth_attempt_ = CommandSplitter::SplitCallbacks::AuthAttempt::Pending;
+  callbacks_.inline_auth_attempt_ = CommandSplitter::SplitCallbacks::AuthAttempt::ImplOwnsResponse;
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"hello", "3", "AUTH", "alice", "secret"});
@@ -819,6 +819,43 @@ TEST_F(RedisSingleServerRequestTest, HelloWithUnknownOptionEmitsSyntaxError) {
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_err)));
   handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
   EXPECT_EQ(nullptr, handle_);
+}
+
+// A repeated HELLO AUTH option is a syntax error (not silent last-wins), matching real Redis.
+TEST_F(RedisSingleServerRequestTest, HelloDuplicateAuthOptionEmitsSyntaxError) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"hello", "2", "AUTH", "u1", "p1", "AUTH", "u2", "p2"});
+
+  Common::Redis::RespValue expected_err;
+  expected_err.type(Common::Redis::RespType::Error);
+  expected_err.asString() = "ERR Syntax error: HELLO AUTH specified more than once";
+
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_err)));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+  // The duplicate option is rejected during parse, before any credential check: the inline-auth
+  // path must not be reached even though valid AUTH args were supplied.
+  EXPECT_EQ(0, callbacks_.inline_auth_attempt_count_);
+}
+
+// A repeated HELLO SETNAME option is a syntax error.
+TEST_F(RedisSingleServerRequestTest, HelloDuplicateSetnameOptionEmitsSyntaxError) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"hello", "2", "SETNAME", "a", "SETNAME", "b"});
+
+  Common::Redis::RespValue expected_err;
+  expected_err.type(Common::Redis::RespType::Error);
+  expected_err.asString() = "ERR Syntax error: HELLO SETNAME specified more than once";
+
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_err)));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+  // Parse-time rejection precedes any auth handling here too.
+  EXPECT_EQ(0, callbacks_.inline_auth_attempt_count_);
 }
 
 // Non-numeric protocol version: -NOPROTO. The protocol-version parse runs before the
@@ -1068,7 +1105,7 @@ TEST_F(RedisSingleServerRequestTest, HelloAuthInlineDenied) {
   handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
   EXPECT_EQ(nullptr, handle_);
   // Denied auth must NOT flip the version state.
-  EXPECT_NE(3U, callbacks_.downstream_resp_version_);
+  EXPECT_EQ(2U, callbacks_.downstream_resp_version_);
 }
 
 // HELLO 3 SETNAME <name>: accepted, name is ignored. The reply is the
@@ -1177,6 +1214,63 @@ TEST_F(RedisSingleServerRequestTest, ClientUnsupportedSubcommandRejected) {
   Common::Redis::RespValue expected_err;
   expected_err.type(Common::Redis::RespType::Error);
   expected_err.asString() = "ERR CLIENT subcommand 'LIST' is not supported by the proxy";
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_err)));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+}
+
+// CLIENT SETNAME requires exactly one argument; missing or extra args are a syntax error.
+TEST_F(RedisSingleServerRequestTest, ClientSetnameWrongArgCount) {
+  for (const std::vector<std::string>& args :
+       {std::vector<std::string>{"client", "SETNAME"},
+        std::vector<std::string>{"client", "SETNAME", "a", "b"}}) {
+    Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+    makeBulkStringArray(*request, args);
+
+    Common::Redis::RespValue expected_err;
+    expected_err.type(Common::Redis::RespType::Error);
+    expected_err.asString() = "ERR wrong number of arguments for 'client|setname' command";
+
+    EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+    EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_err)));
+    handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+    EXPECT_EQ(nullptr, handle_);
+  }
+}
+
+// CLIENT ``SETINFO`` requires exactly two arguments (``<attr> <value>``).
+TEST_F(RedisSingleServerRequestTest, ClientSetinfoWrongArgCount) {
+  for (const std::vector<std::string>& args :
+       {std::vector<std::string>{"client", "SETINFO", "lib-name"},
+        std::vector<std::string>{"client", "SETINFO", "lib-name", "v", "extra"}}) {
+    Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+    makeBulkStringArray(*request, args);
+
+    Common::Redis::RespValue expected_err;
+    expected_err.type(Common::Redis::RespType::Error);
+    expected_err.asString() = "ERR wrong number of arguments for 'client|setinfo' command";
+
+    EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+    EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_err)));
+    handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+    EXPECT_EQ(nullptr, handle_);
+  }
+}
+
+// An unsupported CLIENT subcommand echoes the client-supplied name into the error; control
+// bytes (CR/LF, ESC) in that name must be sanitized so they cannot break the inline-error
+// framing or inject terminal escapes downstream (Utility::makeError sanitization).
+TEST_F(RedisSingleServerRequestTest, ClientSubcommandErrorSanitizesControlBytes) {
+  InSequence s;
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"client", std::string("EVIL\r\n\x1b[31m")});
+
+  Common::Redis::RespValue expected_err;
+  expected_err.type(Common::Redis::RespType::Error);
+  // Each control byte (\r \n ESC) replaced by a space; the literal "[31m" tail is harmless.
+  expected_err.asString() = "ERR CLIENT subcommand 'EVIL   [31m' is not supported by the proxy";
 
   EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_err)));

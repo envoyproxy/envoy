@@ -140,16 +140,23 @@ public:
   // HELLO N AUTH ... must set inline_auth_attempt_ explicitly before driving the request —
   // the default ``Denied`` keeps tests that do not exercise HELLO AUTH safe (a stray
   // attempt fails loudly with a WRONGPASS reply rather than silently emitting nothing,
-  // which the deferred ``Pending`` case would).
+  // which the deferred ``ImplOwnsResponse`` case would).
   AuthAttempt attemptDownstreamAuthInline(const std::string& username, const std::string& password,
                                           uint32_t requested_version) override {
+    ++inline_auth_attempt_count_;
     last_inline_auth_username_ = username;
     last_inline_auth_password_ = password;
     last_inline_auth_requested_version_ = requested_version;
     return inline_auth_attempt_;
   }
+  absl::optional<uint32_t> takePendingHelloAuthVersion() override {
+    auto version = pending_hello_auth_version_;
+    pending_hello_auth_version_.reset();
+    return version;
+  }
 
   uint32_t downstream_resp_version_{2};
+  absl::optional<uint32_t> pending_hello_auth_version_;
   // Defaults to RESP2 listener — matches the proto default. Tests covering the RESP3-listener
   // path drive this to Resp3.
   Common::Redis::RespProtocolVersion protocol_version_{Common::Redis::RespProtocolVersion::Resp2};
@@ -157,6 +164,9 @@ public:
   std::string last_inline_auth_username_;
   std::string last_inline_auth_password_;
   uint32_t last_inline_auth_requested_version_{0};
+  // Number of times attemptDownstreamAuthInline was invoked. Lets tests assert the inline-auth
+  // path was NOT taken (e.g. a duplicate HELLO option must error before any auth attempt).
+  int inline_auth_attempt_count_{0};
 
 private:
   Common::Redis::Client::NoOpTransaction transaction_;

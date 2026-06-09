@@ -348,10 +348,9 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
     connect_or_op_timer_->disableTimer();
   } else if (event == Network::ConnectionEvent::Connected) {
     connected_ = true;
-    // Pre-refactor this asserted pending_requests_ non-empty because initialize() always queued
-    // AUTH/READONLY synchronously before connect(). With the WaitingForAwsToken path, init may
-    // queue NOTHING until the IAM token arrives — so just enable the op timer when there is
-    // something to time, and leave it alone otherwise.
+    // IAM token acquisition can leave init with no pending request until the token arrives, so
+    // only arm the op timer when there is an in-flight request to time; otherwise leave it for
+    // the request that follows.
     if (!pending_requests_.empty()) {
       connect_or_op_timer_->enableTimer(config_->opTimeout());
     }
@@ -497,7 +496,8 @@ void ClientImpl::sendResp3InitCommands(const std::string& auth_username,
   std::vector<std::string> hello_args = {"3"};
   // Mirror RESP2 AUTH semantics: send credentials when EITHER username or password is set.
   // Username-only is a valid Redis 6 ACL configuration (an ACL user with no password); RESP2
-  // sends bare AUTH for it, RESP3 must do the same via HELLO 3 AUTH.
+  // authenticates it as AUTH <user> <empty-password>, and RESP3 mirrors that via HELLO 3 AUTH
+  // <user> <empty-password>.
   if (!auth_username.empty() || !auth_password.empty()) {
     hello_args.push_back("AUTH");
     // Redis 6 ACL synonym: AUTH-with-just-password is equivalent to AUTH default <pass>.

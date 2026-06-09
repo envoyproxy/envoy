@@ -305,6 +305,9 @@ TEST_F(RedisProxyFilterConfigTest, ProtocolVersionDefaultsToResp2) {
   EXPECT_EQ(Common::Redis::RespProtocolVersion::Resp2, config.protocolVersion());
 }
 
+// ``protocol_version: RESP3`` is read into ProxyFilterConfig::protocolVersion(), which
+// config.cc forwards verbatim to ConnPool::InstanceImpl (and on to ClientFactory — see
+// conn_pool_impl_test). Pins the proto → conn-pool wiring at its source.
 TEST_F(RedisProxyFilterConfigTest, ProtocolVersionResp3IsHonored) {
   const std::string yaml_string = R"EOF(
   prefix_routes:
@@ -459,6 +462,43 @@ TEST_F(RedisProxyFilterTestWithTwoCallbacks, OutOfOrderResponseWithDrainClose) {
   request_callbacks1_->onResponse(std::move(response1));
 
   EXPECT_EQ(1UL, config_->stats_.downstream_cx_drain_close_.value());
+}
+
+// Covers the setProtocolVersion(Resp2) true branch of the onResponse re-stamp: a reply produced
+// for a request that was created while the connection was RESP2 must be encoded in RESP2 even
+// after the connection later upgrades to RESP3, then the encoder must be restored to RESP3.
+TEST_F(RedisProxyFilterTestWithTwoCallbacks, ResponseReStampedToCreationVersionAcrossHello3) {
+  Buffer::OwnedImpl fake_data;
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data)))
+      .WillOnce(Invoke(this, &RedisProxyFilterTestWithTwoCallbacks::decodeHelper));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+
+  // Both requests were created while downstream was RESP2, so each carries
+  // resp_version_at_creation_ == 2. request2 now negotiates HELLO 3: the connection flips to RESP3
+  // and request2 is re-stamped to 3, but request1 (created earlier) stays at 2. The encoder flip
+  // performed here is swallowed by the NiceMock — it is asserted in the HELLO tests, not this one.
+  request_callbacks2_->setDownstreamRespVersion(3);
+
+  // request1's reply was produced for a RESP2 client. Although the connection is now RESP3, that
+  // reply must be encoded in RESP2 (request1's creation version), and the encoder restored to RESP3
+  // immediately afterward for the live connection.
+  Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
+  {
+    InSequence s;
+    EXPECT_CALL(*encoder_, setProtocolVersion(Common::Redis::RespProtocolVersion::Resp2));
+    EXPECT_CALL(*encoder_, encode(Ref(*response1), _));
+    EXPECT_CALL(*encoder_, setProtocolVersion(Common::Redis::RespProtocolVersion::Resp3));
+    EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+  }
+  request_callbacks1_->onResponse(std::move(response1));
+
+  // request2's own reply was created at RESP3 (== the current downstream version), so onResponse
+  // encodes it directly with no version flip.
+  Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
+  Common::Redis::RespValue* response2_ptr = response2.get();
+  EXPECT_CALL(*encoder_, encode(Ref(*response2_ptr), _));
+  EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+  request_callbacks2_->onResponse(std::move(response2));
 }
 
 TEST_F(RedisProxyFilterTestWithTwoCallbacks, OutOfOrderResponseDownstreamDisconnectBeforeFlush) {
@@ -665,6 +705,8 @@ TEST_F(RedisProxyFilterResp3Test, GetBeforeHelloRejectedNoproto) {
   EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+  // The pre-HELLO gate bumps the operational counter.
+  EXPECT_EQ(1UL, config_->stats_.downstream_rq_noproto_.value());
 }
 
 // RESP3 listener + ``BOGUSCMD`` before HELLO → ``-NOPROTO`` (NOT the splitter's
@@ -945,10 +987,11 @@ TEST_F(RedisProxyFilterWithAuthPasswordTest, AttemptInlineAuthDeniedWithWrongLoc
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
 
-// ``HELLO N AUTH ...`` against a listener with NO downstream credentials configured returns
-// ``Denied`` immediately at the early-out in ``attemptDownstreamAuthInline``. Uses the default
-// test fixture (no auth_password configured) rather than the auth-password subclass.
-TEST_F(RedisProxyFilterTest, AttemptInlineAuthDeniedWithoutAnyConfiguredCreds) {
+// ``HELLO N AUTH ...`` against a listener with NO downstream credentials configured emits the
+// same "no username-password pair is set" ERR as a username+password AUTH command and returns
+// ``ImplOwnsResponse`` (the implementation owns the response). Default fixture (no auth
+// configured).
+TEST_F(RedisProxyFilterTest, AttemptInlineAuthNoConfiguredCredsEmitsNoUsernamePasswordPairError) {
   InSequence s;
 
   Buffer::OwnedImpl fake_data;
@@ -960,14 +1003,22 @@ TEST_F(RedisProxyFilterTest, AttemptInlineAuthDeniedWithoutAnyConfiguredCreds) {
       .WillOnce(Invoke([&](const Common::Redis::RespValue&,
                            CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
                            const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
-        EXPECT_EQ(CommandSplitter::SplitCallbacks::AuthAttempt::Denied,
-                  callbacks.attemptDownstreamAuthInline("alice", "secret", 3));
-        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
-        reply->type(Common::Redis::RespType::Error);
-        reply->asString() = "WRONGPASS invalid username-password pair";
-        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        Common::Redis::RespValue reply;
+        reply.type(Common::Redis::RespType::Error);
+        reply.asString() = "ERR Client sent AUTH, but no username-password pair is set";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(reply)), _));
         EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-        callbacks.onResponse(std::move(reply));
+        // The impl emits the error itself and returns ImplOwnsResponse; the splitter emits nothing.
+        // connectionAllowed() stays true throughout — this fixture configures no downstream auth,
+        // so the connection was never gated; the HELLO AUTH is rejected because no downstream
+        // username/password credentials are configured to validate it against. Assert the state
+        // before and after to pin that the no-credentials path does not flip connection_allowed_.
+        // Query the filter, not the PendingRequest: attemptDownstreamAuthInline emits the error via
+        // onResponse, which pops and destroys this request, so ``callbacks`` dangles afterward.
+        EXPECT_TRUE(filter_->connectionAllowed());
+        EXPECT_EQ(CommandSplitter::SplitCallbacks::AuthAttempt::ImplOwnsResponse,
+                  callbacks.attemptDownstreamAuthInline("alice", "secret", 3));
+        EXPECT_TRUE(filter_->connectionAllowed());
         return nullptr;
       }));
 
@@ -1195,6 +1246,129 @@ TEST_F(RedisProxyFilterWithAuthAclTest, AuthAclPasswordIncorrect) {
         callbacks.onAuth("someusername", "wrongpassword");
         // callbacks cannot be accessed now.
         EXPECT_FALSE(filter_->connectionAllowed());
+        return nullptr;
+      }));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+}
+
+// ``HELLO N AUTH <user> <pass>`` against a listener with a configured username+password
+// reaches the local-credentials check in ``attemptDownstreamAuthInline``: matching creds →
+// Allowed + connection_allowed_.
+TEST_F(RedisProxyFilterWithAuthAclTest, AttemptInlineAuthConfiguredUsernameCorrect) {
+  InSequence s;
+
+  Buffer::OwnedImpl fake_data;
+  Common::Redis::RespValuePtr request(new Common::Redis::RespValue());
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    decoder_callbacks_->onRespValue(std::move(request));
+  }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_FALSE(callbacks.connectionAllowed());
+        EXPECT_EQ(CommandSplitter::SplitCallbacks::AuthAttempt::Allowed,
+                  callbacks.attemptDownstreamAuthInline("someusername", "somepassword", 3));
+        EXPECT_TRUE(filter_->connectionAllowed());
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::SimpleString);
+        reply->asString() = "OK";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onResponse(std::move(reply));
+        return nullptr;
+      }));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+}
+
+// Same fixture, wrong password → Denied, connection stays disallowed.
+TEST_F(RedisProxyFilterWithAuthAclTest, AttemptInlineAuthConfiguredUsernameWrongPassword) {
+  InSequence s;
+
+  Buffer::OwnedImpl fake_data;
+  Common::Redis::RespValuePtr request(new Common::Redis::RespValue());
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    decoder_callbacks_->onRespValue(std::move(request));
+  }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_EQ(CommandSplitter::SplitCallbacks::AuthAttempt::Denied,
+                  callbacks.attemptDownstreamAuthInline("someusername", "wrongpassword", 3));
+        EXPECT_FALSE(filter_->connectionAllowed());
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::Error);
+        reply->asString() = "WRONGPASS invalid username-password pair";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onResponse(std::move(reply));
+        return nullptr;
+      }));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+}
+
+// Same fixture, configured username but the client supplies a DIFFERENT username → Denied. The
+// ``username == configured`` comparison short-circuits before the password is examined, so a
+// correct password does not rescue a wrong username. Covers the false branch of the
+// configured-username comparison.
+TEST_F(RedisProxyFilterWithAuthAclTest, AttemptInlineAuthConfiguredUsernameWrongUsername) {
+  InSequence s;
+
+  Buffer::OwnedImpl fake_data;
+  Common::Redis::RespValuePtr request(new Common::Redis::RespValue());
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    decoder_callbacks_->onRespValue(std::move(request));
+  }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        // Correct password, wrong username: still Denied.
+        EXPECT_EQ(CommandSplitter::SplitCallbacks::AuthAttempt::Denied,
+                  callbacks.attemptDownstreamAuthInline("wronguser", "somepassword", 3));
+        EXPECT_FALSE(filter_->connectionAllowed());
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::Error);
+        reply->asString() = "WRONGPASS invalid username-password pair";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onResponse(std::move(reply));
+        return nullptr;
+      }));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+}
+
+// Same fixture, configured username but the client supplies an EMPTY username → Denied. With a
+// username configured, an empty inline-AUTH username is NOT promoted to the ``default`` synonym
+// (that promotion only applies when NO username is configured), so ``"" == "someusername"`` is
+// false and the connection is refused even with the correct password. Pins the empty-username
+// sub-case of the configured-username comparison.
+TEST_F(RedisProxyFilterWithAuthAclTest, AttemptInlineAuthConfiguredUsernameEmptyUsername) {
+  InSequence s;
+
+  Buffer::OwnedImpl fake_data;
+  Common::Redis::RespValuePtr request(new Common::Redis::RespValue());
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    decoder_callbacks_->onRespValue(std::move(request));
+  }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_EQ(CommandSplitter::SplitCallbacks::AuthAttempt::Denied,
+                  callbacks.attemptDownstreamAuthInline("", "somepassword", 3));
+        EXPECT_FALSE(filter_->connectionAllowed());
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::Error);
+        reply->asString() = "WRONGPASS invalid username-password pair";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onResponse(std::move(reply));
         return nullptr;
       }));
 
@@ -1876,7 +2050,7 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration,
         EXPECT_CALL(*encoder_, setProtocolVersion(Common::Redis::RespProtocolVersion::Resp3));
         EXPECT_CALL(*encoder_, encode(Eq(ByRef(*expected_hello)), _));
         EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-        EXPECT_EQ(CommandSplitter::SplitCallbacks::AuthAttempt::Pending,
+        EXPECT_EQ(CommandSplitter::SplitCallbacks::AuthAttempt::ImplOwnsResponse,
                   callbacks.attemptDownstreamAuthInline("alice", "secret", 3));
         EXPECT_TRUE(filter_->connectionAllowed());
         return nullptr;
@@ -1915,7 +2089,7 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration,
         reply->asString() = "WRONGPASS rejected";
         EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
         EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-        EXPECT_EQ(CommandSplitter::SplitCallbacks::AuthAttempt::Pending,
+        EXPECT_EQ(CommandSplitter::SplitCallbacks::AuthAttempt::ImplOwnsResponse,
                   callbacks.attemptDownstreamAuthInline("alice", "wrong", 3));
         // Failed HELLO AUTH must NOT flip connection_allowed_ to true. A subsequent ordinary
         // command on this connection still hits the auth gate.
@@ -1988,7 +2162,7 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration,
 
                   callback.onAuthenticateExternal(pending_request, std::move(auth_response));
                 })));
-        EXPECT_EQ(CommandSplitter::SplitCallbacks::AuthAttempt::Pending,
+        EXPECT_EQ(CommandSplitter::SplitCallbacks::AuthAttempt::ImplOwnsResponse,
                   callbacks.attemptDownstreamAuthInline("alice", "secret", 3));
         return nullptr;
       }));
@@ -2015,7 +2189,7 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, HelloAuthPendingCanceledOn
         // Capture the auth-callback args but DO NOT fire the callback synchronously — the
         // round trip is "in flight" when the connection closes.
         EXPECT_CALL(*external_auth_client_, authenticateExternal(_, _, _, "alice", "secret"));
-        EXPECT_EQ(CommandSplitter::SplitCallbacks::AuthAttempt::Pending,
+        EXPECT_EQ(CommandSplitter::SplitCallbacks::AuthAttempt::ImplOwnsResponse,
                   callbacks.attemptDownstreamAuthInline("alice", "secret", 3));
         return nullptr;
       }));
@@ -2024,9 +2198,12 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, HelloAuthPendingCanceledOn
   // Connection close before the auth callback fires — onEvent's existing
   // external_auth_call_status_ branch invokes auth_client_->cancel() to release the in-flight
   // round trip, then drains pending_requests_. The HELLO PendingRequest's request_handle_ is
-  // nullptr (the splitter returned nullptr in the Pending case) so the drain pop is a no-op
-  // beyond destruction. No encode / write expectations are set: the filter must NOT emit
-  // anything on the closed connection (the deferred HELLO Map would have raced the close).
+  // nullptr (the splitter returned nullptr in the ImplOwnsResponse case) so the drain pop is a
+  // no-op beyond destruction. The filter must NOT emit anything on the closed connection (the
+  // deferred HELLO Map would otherwise race the close), pinned here with Times(0) expectations so
+  // a regression cannot hide behind the NiceMock.
+  EXPECT_CALL(*encoder_, encode(_, _)).Times(0);
+  EXPECT_CALL(filter_callbacks_.connection_, write(_, _)).Times(0);
   EXPECT_CALL(*external_auth_client_, cancel());
   filter_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
@@ -2066,11 +2243,10 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration,
                   EXPECT_CALL(*encoder_, encode(Eq(ByRef(*expected_hello)), _));
                   EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
 
-                  // Both held GETs must hit the splitter. Each one's lambda holds the request
-                  // upstream (returns a non-null handle) so neither gets popped by a
-                  // synchronous onResponse — that exercises the pre-fix bug shape (after k1
-                  // dispatched, it would still be the front with no pending_request_value_,
-                  // so the front-only loop would have stopped).
+                  // Both held GETs must hit the splitter. Each lambda holds its request
+                  // upstream (returns a non-null handle) so neither is popped by a synchronous
+                  // onResponse — k1 stays at the front with no pending_request_value_, so a
+                  // scan that only inspects the front would miss k2.
                   Common::Redis::RespValuePtr get1_request(new Common::Redis::RespValue());
                   Common::Redis::RespValuePtr get2_request(new Common::Redis::RespValue());
                   auto get1_handle = new CommandSplitter::MockSplitRequest();
@@ -2089,7 +2265,7 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration,
 
                   callback.onAuthenticateExternal(pending_request, std::move(auth_response));
                 })));
-        EXPECT_EQ(CommandSplitter::SplitCallbacks::AuthAttempt::Pending,
+        EXPECT_EQ(CommandSplitter::SplitCallbacks::AuthAttempt::ImplOwnsResponse,
                   callbacks.attemptDownstreamAuthInline("alice", "secret", 3));
         return nullptr;
       }));
@@ -2101,11 +2277,9 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration,
   filter_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-// Older outstanding GET decoded BEFORE the HELLO AUTH (and still in flight when external auth
-// completes) used to block the front-only drain loop: pending_requests_.front() was that
-// older GET (no pending_request_value_), so the loop exited immediately and the held GET
-// pipelined AFTER the HELLO never got resumed. The full-list scan walks past the in-flight
-// entry and finds the held one.
+// A held GET pipelined AFTER a HELLO AUTH must resume even when an older GET (decoded BEFORE
+// the HELLO) is still in flight at the front of pending_requests_. resumeAuthHeldRequests
+// walks past the in-flight front entry to find the held one.
 TEST_F(RedisProxyFilterWithExternalAuthAndExpiration,
        HelloAuthHeldRequestResumesEvenWithPriorOutstandingRequest) {
   InSequence s;
@@ -2156,10 +2330,9 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration,
                   EXPECT_CALL(*encoder_,
                               setProtocolVersion(Common::Redis::RespProtocolVersion::Resp3));
 
-                  // The held GET dispatched after HELLO is the property under test: even
-                  // though front is the old in-flight GET (no pending_request_value_) and
-                  // would have stopped the front-only loop, the full-list scan finds and
-                  // dispatches the held GET.
+                  // Property under test: the held GET dispatched after HELLO is found and
+                  // dispatched even though the front entry is the old in-flight GET (no
+                  // pending_request_value_), because the scan walks the full list.
                   EXPECT_CALL(splitter_, makeRequest_(Ref(*held_get), _, _, _))
                       .WillOnce(Return(held_handle));
 
@@ -2167,7 +2340,7 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration,
 
                   callback.onAuthenticateExternal(pending_request, std::move(auth_response));
                 })));
-        EXPECT_EQ(CommandSplitter::SplitCallbacks::AuthAttempt::Pending,
+        EXPECT_EQ(CommandSplitter::SplitCallbacks::AuthAttempt::ImplOwnsResponse,
                   callbacks.attemptDownstreamAuthInline("alice", "secret", 3));
         return nullptr;
       }));
@@ -2178,8 +2351,8 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration,
   // Cancel expectations declared LAST, after every other sequence-bound expectation has been
   // declared (the inside-lambda ones run during the second onData). They fire in
   // pending_requests_ FIFO order during the RemoteClose drain: old_handle first, then
-  // held_handle. The HELLO entry has no handle (splitter returned nullptr in the Pending
-  // case) so no cancel for it.
+  // held_handle. The HELLO entry has no handle (splitter returned nullptr in the
+  // ImplOwnsResponse case) so no cancel for it.
   EXPECT_CALL(*old_handle, cancel());
   EXPECT_CALL(*held_handle, cancel());
   filter_->onEvent(Network::ConnectionEvent::RemoteClose);
@@ -2247,7 +2420,7 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration,
 
                   callback.onAuthenticateExternal(pending_request, std::move(auth_response));
                 })));
-        EXPECT_EQ(CommandSplitter::SplitCallbacks::AuthAttempt::Pending,
+        EXPECT_EQ(CommandSplitter::SplitCallbacks::AuthAttempt::ImplOwnsResponse,
                   callbacks.attemptDownstreamAuthInline("alice", "secret", 3));
         return nullptr;
       }));
@@ -2293,7 +2466,7 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, HelloAuthExternalAuthExpir
         EXPECT_CALL(*encoder_, setProtocolVersion(Common::Redis::RespProtocolVersion::Resp3));
         EXPECT_CALL(*encoder_, encode(Eq(ByRef(*expected_hello)), _));
         EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-        EXPECT_EQ(CommandSplitter::SplitCallbacks::AuthAttempt::Pending,
+        EXPECT_EQ(CommandSplitter::SplitCallbacks::AuthAttempt::ImplOwnsResponse,
                   callbacks.attemptDownstreamAuthInline("alice", "secret", 3));
         EXPECT_TRUE(filter_->connectionAllowed());
         time_source_.advanceTimeWait(std::chrono::hours(2));

@@ -237,6 +237,11 @@ public:
     return conn_pool_impl->redis_cluster_stats_.connection_rate_limited_;
   }
 
+  Stats::Counter& upstreamResp3HelloFailure() {
+    InstanceImpl* conn_pool_impl = dynamic_cast<InstanceImpl*>(conn_pool_.get());
+    return conn_pool_impl->redis_cluster_stats_.upstream_resp3_hello_failure_;
+  }
+
   // Common::Redis::Client::ClientFactory
   Common::Redis::Client::ClientPtr
   create(Upstream::HostConstSharedPtr host, Event::Dispatcher&,
@@ -1818,7 +1823,9 @@ TEST_F(RedisConnPoolImplTest, ClientFactoryReceivesResp3OnNormalRequestPath) {
 
   EXPECT_EQ(Common::Redis::RespProtocolVersion::Resp3, last_upstream_protocol_version_);
   EXPECT_FALSE(last_is_transaction_client_);
-  EXPECT_NE(nullptr, last_upstream_resp3_hello_failure_);
+  // The counter handed to the client factory must be the cluster's
+  // upstream_resp3_hello_failure counter (same object, not just non-null).
+  EXPECT_EQ(&upstreamResp3HelloFailure(), last_upstream_resp3_hello_failure_);
 
   EXPECT_CALL(active_request, cancel());
   EXPECT_CALL(callbacks, onFailure_());
@@ -1859,7 +1866,9 @@ TEST_F(RedisConnPoolImplTest, ClientFactoryReceivesResp3OnTransactionClientPath)
 
   EXPECT_EQ(Common::Redis::RespProtocolVersion::Resp3, last_upstream_protocol_version_);
   EXPECT_TRUE(last_is_transaction_client_);
-  EXPECT_NE(nullptr, last_upstream_resp3_hello_failure_);
+  // The counter handed to the client factory must be the cluster's
+  // upstream_resp3_hello_failure counter (same object, not just non-null).
+  EXPECT_EQ(&upstreamResp3HelloFailure(), last_upstream_resp3_hello_failure_);
 
   EXPECT_CALL(active_request, cancel());
   EXPECT_CALL(callbacks, onFailure_());
