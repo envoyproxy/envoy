@@ -128,7 +128,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
 
   // Resolve fingerprint if bound token is requested. Note client_cert_fingerprint_ remains
   // absl::nullopt by default for unbound tokens.
-  if (audience_.has_bound_jwt()) {
+  if (audience_.has_bound_jwt() || audience_.has_bound_access_token()) {
     client_cert_fingerprint_ = getClientCertFingerprint(cluster);
     if (!client_cert_fingerprint_.has_value()) {
       ENVOY_LOG(warn,
@@ -137,7 +137,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
       decoder_callbacks_->sendLocalReply(
           Http::Code::InternalServerError,
           "Failed to fetch bound token: client certificate fingerprint is unavailable.", nullptr,
-          absl::nullopt, "bound_jwt_fingerprint_unavailable");
+          absl::nullopt, "bound_token_fingerprint_unavailable");
       return FilterHeadersStatus::StopAllIterationAndWatermark;
     }
   }
@@ -155,7 +155,9 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
   request_header_map_ = &hdrs;
 
   // Execute token-type specific fetch calls.
-  if (audience_.has_bound_jwt()) {
+  if (audience_.has_bound_access_token()) {
+    client_->fetchBoundAccessToken(audience_, client_cert_fingerprint_.value(), *this);
+  } else if (audience_.has_bound_jwt()) {
     client_->fetchBoundJwt(audience_, client_cert_fingerprint_.value(), *this);
   } else if (audience_.has_access_token()) {
     client_->fetchUnboundAccessToken(audience_, *this);

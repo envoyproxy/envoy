@@ -190,6 +190,54 @@ TEST_P(DynamicModuleHttpFilterHeaderTest, GetHeaderValue) {
   EXPECT_EQ(result_buffer.length, 0);
 }
 
+TEST_P(DynamicModuleHttpFilterHeaderTest, GetHeaderValues) {
+  envoy_dynamic_module_type_http_header_type header_type = GetParam();
+
+  // The header map is not available.
+  std::string key = "multi";
+  envoy_dynamic_module_type_envoy_buffer result_buffers[2] = {{nullptr, 0}, {nullptr, 0}};
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_header_values(
+      filter_.get(), header_type, {key.data(), key.size()}, result_buffers));
+
+  std::initializer_list<std::pair<std::string, std::string>> headers = {
+      {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
+  Http::TestRequestHeaderMapImpl request_headers{headers};
+  Http::TestRequestTrailerMapImpl request_trailers{headers};
+  Http::TestResponseHeaderMapImpl response_headers{headers};
+  Http::TestResponseTrailerMapImpl response_trailers{headers};
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestHeaderMap>(request_headers)));
+  EXPECT_CALL(decoder_callbacks_, requestTrailers())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestTrailerMap>(request_trailers)));
+  EXPECT_CALL(encoder_callbacks_, responseHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseHeaderMap>(response_headers)));
+  EXPECT_CALL(encoder_callbacks_, responseTrailers())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseTrailerMap>(response_trailers)));
+
+  // All values for a multi-value key are filled in a single call.
+  result_buffers[0] = {nullptr, 0};
+  result_buffers[1] = {nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_header_values(
+      filter_.get(), header_type, {key.data(), key.size()}, result_buffers));
+  EXPECT_EQ(std::string(result_buffers[0].ptr, result_buffers[0].length), "value1");
+  EXPECT_EQ(std::string(result_buffers[1].ptr, result_buffers[1].length), "value2");
+
+  // A single-value key fills exactly one entry.
+  key = "single";
+  result_buffers[0] = {nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_header_values(
+      filter_.get(), header_type, {key.data(), key.size()}, result_buffers));
+  EXPECT_EQ(std::string(result_buffers[0].ptr, result_buffers[0].length), "value");
+
+  // A key with no values leaves the map present but fills nothing.
+  key = "nonexistent";
+  result_buffers[0] = {nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_header_values(
+      filter_.get(), header_type, {key.data(), key.size()}, result_buffers));
+  EXPECT_EQ(result_buffers[0].ptr, nullptr);
+  EXPECT_EQ(result_buffers[0].length, 0);
+}
+
 TEST_P(DynamicModuleHttpFilterHeaderTest, AddHeaderValue) {
   envoy_dynamic_module_type_http_header_type header_type = GetParam();
 
@@ -2269,6 +2317,40 @@ TEST(ABIImpl, GetAttributes) {
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
       &filter, envoy_dynamic_module_type_attribute_id_ConnectionId, &result_number));
   EXPECT_EQ(result_number, 8386);
+}
+
+// When the request header map is present but a typed header is absent, the attribute must be
+// reported as unset rather than an empty string.
+TEST(ABIImpl, GetAttributesAbsentTypedHeaders) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  filter.setDecoderFilterCallbacks(callbacks);
+
+  std::initializer_list<std::pair<std::string, std::string>> headers = {{":path", "/only/path"}};
+  Http::TestRequestHeaderMapImpl request_headers{headers};
+  EXPECT_CALL(callbacks, requestHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestHeaderMap>(request_headers)));
+
+  envoy_dynamic_module_type_envoy_buffer result_buffer = {nullptr, 0};
+
+  // The present header is still returned.
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_RequestPath, &result_buffer));
+  EXPECT_EQ(std::string(result_buffer.ptr, result_buffer.length), "/only/path");
+
+  // The absent typed headers return false rather than an empty string.
+  for (const auto attribute_id : {envoy_dynamic_module_type_attribute_id_RequestHost,
+                                  envoy_dynamic_module_type_attribute_id_RequestMethod,
+                                  envoy_dynamic_module_type_attribute_id_RequestScheme,
+                                  envoy_dynamic_module_type_attribute_id_RequestUserAgent}) {
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+        &filter, attribute_id, &result_buffer));
+  }
+
+  // Referer uses the custom-header lookup path and is also absent here.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_RequestReferer, &result_buffer));
 }
 
 TEST(ABIImpl, HttpCallout) {

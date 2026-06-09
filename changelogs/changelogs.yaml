@@ -70,6 +70,8 @@ areas:
     title: load_report
   logging:
     title: logging
+  mcp_router:
+    title: mcp_router
   mysql_proxy:
     title: mysql_proxy
   network_ext_proc:
