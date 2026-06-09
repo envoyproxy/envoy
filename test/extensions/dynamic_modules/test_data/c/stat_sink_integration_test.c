@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "source/extensions/dynamic_modules/abi/abi.h"
@@ -51,6 +52,65 @@ void envoy_dynamic_module_on_stat_sink_flush(
       envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_count(snapshot_envoy_ptr);
   const size_t gauge_count =
       envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_count(snapshot_envoy_ptr);
+
+  // Decode each name straight into a stack buffer to exercise the module-provided
+  // buffer API. Names longer than the buffer are simply truncated here.
+  char name_buf[256];
+  size_t name_size = 0;
+  uint64_t value = 0;
+  uint64_t delta = 0;
+  for (size_t i = 0; i < counter_count; i++) {
+    envoy_dynamic_module_callback_stat_sink_snapshot_get_counter(
+        snapshot_envoy_ptr, i, name_buf, sizeof(name_buf), &name_size, &value, &delta);
+  }
+
+  // Look for the always-present "server.uptime" gauge to prove a name round-trips through the buffer
+  // API. A small stack buffer is tried first, then a heap retry when the name does not fit, which
+  // exercises the truncation-and-retry contract.
+  static const char kUptime[] = "server.uptime";
+  const size_t uptime_len = sizeof(kUptime) - 1;
+  int found_uptime = 0;
+  for (size_t i = 0; i < gauge_count; i++) {
+    char small[8];
+    size_t needed = 0;
+    if (!envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge(
+            snapshot_envoy_ptr, i, small, sizeof(small), &needed, &value)) {
+      continue;
+    }
+    const char* full = small;
+    char* heap = NULL;
+    if (needed > sizeof(small)) {
+      heap = (char*)malloc(needed);
+      if (heap == NULL) {
+        continue;
+      }
+      size_t heap_size = 0;
+      envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge(snapshot_envoy_ptr, i, heap, needed,
+                                                                 &heap_size, &value);
+      full = heap;
+    }
+    if (needed == uptime_len && memcmp(full, kUptime, uptime_len) == 0) {
+      found_uptime = 1;
+    }
+    free(heap); // free(NULL) is a no-op.
+  }
+
+  // Read back any text readouts to exercise the dual-buffer (name and value) getter during flush.
+  const size_t text_readout_count =
+      envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_count(snapshot_envoy_ptr);
+  char tr_name[256];
+  char tr_value[256];
+  size_t tr_name_size = 0;
+  size_t tr_value_size = 0;
+  for (size_t i = 0; i < text_readout_count; i++) {
+    envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(
+        snapshot_envoy_ptr, i, tr_name, sizeof(tr_name), &tr_name_size, tr_value, sizeof(tr_value),
+        &tr_value_size);
+  }
+
+  if (found_uptime) {
+    log_info("stat sink integration test: found gauge server.uptime");
+  }
 
   char buf[128];
   int n = snprintf(buf, sizeof(buf),

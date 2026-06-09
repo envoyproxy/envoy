@@ -777,7 +777,7 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
         Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()),
         context_.serverFactoryContext().api().randomGenerator(), http2_options_,
         maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),
-        overload_manager);
+        overload_manager, context_.serverFactoryContext().runtime());
   case CodecType::HTTP3:
 #ifdef ENVOY_ENABLE_QUIC
     return Config::Utility::getAndCheckFactoryByName<QuicHttpServerConnectionFactory>(
@@ -797,7 +797,8 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
         connection, data, callbacks, context_.scope(),
         context_.serverFactoryContext().api().randomGenerator(), http1_codec_stats_,
         http2_codec_stats_, http1_settings_, http2_options_, maxRequestHeadersKb(),
-        maxRequestHeadersCount(), headersWithUnderscoresAction(), overload_manager);
+        maxRequestHeadersCount(), headersWithUnderscoresAction(), overload_manager,
+        context_.serverFactoryContext().runtime());
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
 }

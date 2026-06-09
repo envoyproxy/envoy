@@ -95,6 +95,20 @@ bool getHeaderValueImpl(HeadersMapOptConstRef map, envoy_dynamic_module_type_mod
   return true;
 }
 
+bool getHeaderValuesImpl(HeadersMapOptConstRef map, envoy_dynamic_module_type_module_buffer key,
+                         envoy_dynamic_module_type_envoy_buffer* result_buffer) {
+  if (!map.has_value()) {
+    return false;
+  }
+  absl::string_view key_view(key.ptr, key.length);
+  const auto values = map->get(Envoy::Http::LowerCaseString(key_view));
+  for (size_t i = 0; i < values.size(); i++) {
+    const auto value = values[i]->value().getStringView();
+    result_buffer[i] = {.ptr = const_cast<char*>(value.data()), .length = value.size()};
+  }
+  return true;
+}
+
 bool addHeaderValueImpl(HeadersMapOptRef map, envoy_dynamic_module_type_module_buffer key,
                         envoy_dynamic_module_type_module_buffer value) {
   if (!map.has_value()) {
@@ -152,6 +166,18 @@ bool headerAsAttribute(HeadersMapOptConstRef map, const Envoy::Http::LowerCaseSt
   auto lower_header = header.get();
   return getHeaderValueImpl(map, {.ptr = lower_header.data(), .length = lower_header.size()},
                             result, 0, nullptr);
+}
+
+// A null entry means the header is absent, in which case we leave the attribute unset rather than
+// reporting it as an empty string.
+bool headerEntryAsAttribute(const Envoy::Http::HeaderEntry* entry,
+                            envoy_dynamic_module_type_envoy_buffer* result) {
+  if (entry == nullptr) {
+    return false;
+  }
+  const absl::string_view value = entry->value().getStringView();
+  *result = {.ptr = const_cast<char*>(value.data()), .length = value.size()};
+  return true;
 }
 
 const Buffer::Instance* getBufferByType(DynamicModuleHttpFilter* filter,
@@ -697,6 +723,15 @@ bool envoy_dynamic_module_callback_http_get_header(
   DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   return getHeaderValueImpl(getHeaderMapByType(filter, header_type), key, result, index,
                             optional_size);
+}
+
+bool envoy_dynamic_module_callback_http_get_header_values(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer) {
+  DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  return getHeaderValuesImpl(getHeaderMapByType(filter, header_type), key, result_buffer);
 }
 
 bool envoy_dynamic_module_callback_http_add_header(
@@ -1472,19 +1507,23 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestPath: {
-    ok = headerAsAttribute(filter->requestHeaders(), Envoy::Http::Headers::get().Path, result);
+    RequestHeaderMapOptRef headers = filter->requestHeaders();
+    ok = headers.has_value() && headerEntryAsAttribute(headers->Path(), result);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestHost: {
-    ok = headerAsAttribute(filter->requestHeaders(), Envoy::Http::Headers::get().Host, result);
+    RequestHeaderMapOptRef headers = filter->requestHeaders();
+    ok = headers.has_value() && headerEntryAsAttribute(headers->Host(), result);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestMethod: {
-    ok = headerAsAttribute(filter->requestHeaders(), Envoy::Http::Headers::get().Method, result);
+    RequestHeaderMapOptRef headers = filter->requestHeaders();
+    ok = headers.has_value() && headerEntryAsAttribute(headers->Method(), result);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestScheme: {
-    ok = headerAsAttribute(filter->requestHeaders(), Envoy::Http::Headers::get().Scheme, result);
+    RequestHeaderMapOptRef headers = filter->requestHeaders();
+    ok = headers.has_value() && headerEntryAsAttribute(headers->Scheme(), result);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestReferer: {
@@ -1493,7 +1532,8 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestUserAgent: {
-    ok = headerAsAttribute(filter->requestHeaders(), Envoy::Http::Headers::get().UserAgent, result);
+    RequestHeaderMapOptRef headers = filter->requestHeaders();
+    ok = headers.has_value() && headerEntryAsAttribute(headers->UserAgent(), result);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestUrlPath: {

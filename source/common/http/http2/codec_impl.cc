@@ -10,6 +10,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
+#include "envoy/runtime/runtime.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/cleanup.h"
@@ -139,6 +140,7 @@ public:
   const absl::string_view too_many_headers = "http2.too_many_headers";
   // The total size of headers exceeded the configured limits
   const absl::string_view header_list_size_too_large = "http2.header_list_size_too_large";
+  const absl::string_view cookies_total_bytes_too_large = "http2.cookies_total_bytes_too_large";
   // Envoy detected an HTTP/2 frame flood from the server.
   const absl::string_view outbound_frame_flood = "http2.outbound_frames_flood";
   // Envoy detected an inbound HTTP/2 frame flood.
@@ -983,12 +985,18 @@ void ConnectionImpl::StreamImpl::setAccount(Buffer::BufferMemoryAccountSharedPtr
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stats,
                                Random::RandomGenerator& random_generator,
                                const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-                               const uint32_t max_headers_kb, const uint32_t max_headers_count)
+                               const uint32_t max_headers_kb, const uint32_t max_headers_count,
+                               OptRef<Runtime::Loader> runtime)
     : stats_(stats), connection_(connection), max_headers_kb_(max_headers_kb),
       max_headers_count_(max_headers_count),
       per_stream_buffer_limit_(http2_options.initial_stream_window_size().value()),
       stream_error_on_invalid_http_messaging_(
           http2_options.override_stream_error_on_invalid_http_message().value()),
+      max_cookie_size_bytes_(
+          runtime.has_value() ? runtime->snapshot().getInteger(
+                                    "envoy.reloadable_features.http2_max_cookies_size_in_kb", 0) *
+                                    1024
+                              : 0),
       protocol_constraints_(stats, http2_options), random_(random_generator),
       last_received_data_time_(connection_.dispatcher().timeSource().monotonicTime()) {
   if (http2_options.has_use_oghttp2_codec()) {
@@ -1680,6 +1688,12 @@ int ConnectionImpl::saveHeader(int32_t stream_id, HeaderString&& name, HeaderStr
   }
 
   stream->saveHeader(std::move(name), std::move(value));
+  const uint64_t total_cookie_size = stream->cookies_.size();
+  if (max_cookie_size_bytes_ > 0 && total_cookie_size > max_cookie_size_bytes_) {
+    stream->setDetails(Http2ResponseCodeDetails::get().cookies_total_bytes_too_large);
+    stats_.cookies_total_bytes_too_large_.inc();
+    return ERR_TEMPORAL_CALLBACK_FAILURE;
+  }
   uint64_t headers_size = stream->headers().byteSize();
   uint64_t headers_count = stream->headers().size();
 
@@ -2406,9 +2420,9 @@ ServerConnectionImpl::ServerConnectionImpl(
     const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action,
-    Server::OverloadManager& overload_manager)
+    Server::OverloadManager& overload_manager, OptRef<Runtime::Loader> runtime)
     : ConnectionImpl(connection, stats, random_generator, http2_options, max_request_headers_kb,
-                     max_request_headers_count),
+                     max_request_headers_count, runtime),
       callbacks_(callbacks), headers_with_underscores_action_(headers_with_underscores_action),
       should_send_go_away_on_dispatch_(overload_manager.getLoadShedPoint(
           Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch)),

@@ -7,6 +7,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::ContainsRegex;
 using testing::HasSubstr;
 
 namespace Envoy {
@@ -104,6 +105,34 @@ TEST_P(AccessLogIntegrationTest, DownstreamDetectedCloseType) {
   testRouterDownstreamDisconnectBeforeRequestComplete();
   std::string log = waitForAccessLog(access_log_name_);
   EXPECT_THAT(log, HasSubstr("CLOSE_TYPE=Normal"));
+}
+
+// COMMON_DURATION populates the downstream connection time points for HTTP. When the connection
+// closes with an active stream, DS_CX_END is recorded so the connection duration renders as a
+// number instead of "-".
+TEST_P(AccessLogIntegrationTest, CommonDurationDownstreamConnectionActiveAtClose) {
+  useAccessLog("cx=%COMMON_DURATION(DS_CX_BEG:DS_CX_END:us)%");
+  testRouterDownstreamDisconnectBeforeRequestComplete();
+  std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, ContainsRegex("cx=[0-9]+"));
+}
+
+// COMMON_DURATION DS_CX_BEG is populated for completed HTTP requests, while DS_CX_END renders as
+// "-" until the downstream connection closes.
+TEST_P(AccessLogIntegrationTest, CommonDurationDownstreamConnectionCompletedRequest) {
+  useAccessLog("rq=%COMMON_DURATION(DS_CX_BEG:DS_RX_END:us)% "
+               "cx=%COMMON_DURATION(DS_CX_BEG:DS_CX_END:us)%");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, ContainsRegex("rq=[0-9]+"));
+  EXPECT_THAT(log, HasSubstr("cx=-"));
 }
 
 TEST_P(AccessLogIntegrationTest, ShouldReplaceInvalidUtf8) {

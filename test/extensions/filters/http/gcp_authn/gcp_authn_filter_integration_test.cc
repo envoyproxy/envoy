@@ -188,6 +188,37 @@ public:
     EXPECT_TRUE(request_->complete());
   }
 
+  void waitForGcpAuthnServerResponseBoundAccessToken(const std::string& expected_fingerprint) {
+    AssertionResult result =
+        fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_gcp_authn_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = fake_gcp_authn_connection_->waitForNewStream(*dispatcher_, request_);
+    RELEASE_ASSERT(result, result.message());
+
+    std::string expected_path =
+        absl::StrCat("/computeMetadata/v1/instance/service-accounts/default/token"
+                     "?client_certificate_sha256=",
+                     expected_fingerprint);
+
+    // Need to wait for headers complete before reading headers value.
+    result = request_->waitForHeadersComplete();
+    RELEASE_ASSERT(result, result.message());
+
+    EXPECT_EQ(request_->headers().Host()->value(), "metadata.google.internal");
+    EXPECT_EQ(request_->headers().Path()->value(), expected_path);
+
+    // Send response headers with end_stream false because we want to add response body next.
+    request_->encodeHeaders(default_response_headers_, false);
+    // Send response data with end_stream true.
+    const std::string json_body = absl::StrCat(R"({"access_token": ")", MockTokenString,
+                                               R"(", "expires_in": 3600, "token_type": "Bearer"})");
+    request_->encodeData(json_body, true);
+    result = request_->waitForEndStream(*dispatcher_);
+    RELEASE_ASSERT(result, result.message());
+    // Verify the proxied request was received upstream, as expected.
+    EXPECT_TRUE(request_->complete());
+  }
+
   // Send the request to destination upstream cluster
   void sendRequestToDestinationAndValidateResponse(
       bool with_audience, bool with_configured_token_header = false,
@@ -494,6 +525,128 @@ TEST_P(GcpAuthnFilterIntegrationTest, BoundJwtCacheHit) {
   // Send request directly to destination and validate it has the cached GoodTokenStr.
   sendRequestToDestinationAndValidateResponse(/*with_audience=*/true,
                                               /*with_configured_token_header=*/false, GoodTokenStr);
+  cleanup();
+
+  // Verify request has been routed to gcp_authn exactly 1 time (since the second was a cache hit).
+  EXPECT_EQ(test_server_->counter("cluster.gcp_authn.upstream_cx_total")->value(), 1);
+  EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 2);
+}
+
+TEST_P(GcpAuthnFilterIntegrationTest, BoundAccessTokenSuccess) {
+  // Instruct the integration test framework that the upstream destination cluster uses TLS.
+  upstream_tls_ = true;
+
+  // Initialize config, but do not add standard audience metadata yet.
+  initializeConfig(/*add_audience=*/false);
+
+  // Configure cluster_0 to use TLS with client cert, and add bound_access_token audience metadata.
+  // The GCP Authn filter will statically retrieve Envoy's client certificate configuration
+  // from this UpstreamTlsContext to compute its fingerprint for the bound Access Token.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
+
+    // Add bound_access_token audience metadata
+    envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+    audience.mutable_bound_access_token();
+    (*cluster_0->mutable_metadata()->mutable_typed_filter_metadata())
+        [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+            .PackFrom(audience);
+  });
+
+  config_helper_.configureUpstreamTls(
+      /*use_alpn=*/false, /*http3=*/false, /*alternate_protocol_cache_config=*/absl::nullopt,
+      [](envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context) {
+        const std::string rundir = TestEnvironment::runfilesDirectory();
+        auto* certs = tls_context.mutable_common_tls_context()->add_tls_certificates();
+        certs->mutable_certificate_chain()->set_filename(
+            rundir + "/test/config/integration/certs/clientcert.pem");
+        certs->mutable_private_key()->set_filename(rundir +
+                                                   "/test/config/integration/certs/clientkey.pem");
+      });
+
+  // Initialize the HTTP integration test framework.
+  HttpIntegrationTest::initialize();
+
+  // Initiate client connection.
+  initiateClientConnection();
+
+  // Compute the expected client certificate fingerprint.
+  CertFingerprinterImpl fingerprinter;
+  const std::string cert_path =
+      TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem");
+  const std::string cert_pem = TestEnvironment::readFileToStringForTest(cert_path);
+  const std::string expected_fingerprint = fingerprinter.getFingerprintFromPem(cert_pem).value();
+
+  // Wait for the metadata server call and verify the path contains the fingerprint query
+  // parameter.
+  waitForGcpAuthnServerResponseBoundAccessToken(expected_fingerprint);
+
+  // Verify the token is appended to cluster_0's upstream call, and clean up.
+  sendRequestToDestinationAndValidateResponse(/*with_audience=*/true);
+  cleanup();
+
+  // Verify request has been routed to both upstream clusters.
+  EXPECT_GE(test_server_->counter("cluster.gcp_authn.upstream_cx_total")->value(), 1);
+  EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
+}
+
+TEST_P(GcpAuthnFilterIntegrationTest, BoundAccessTokenCacheHit) {
+  // Instruct the integration test framework that the upstream destination cluster uses TLS.
+  upstream_tls_ = true;
+
+  // Initialize config, but do not add standard audience metadata yet.
+  initializeConfig(/*add_audience=*/false);
+
+  // Configure cluster_0 to use TLS with client cert, and add bound_access_token audience metadata.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
+
+    // Add bound_access_token audience metadata
+    envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+    audience.mutable_bound_access_token();
+    (*cluster_0->mutable_metadata()->mutable_typed_filter_metadata())
+        [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+            .PackFrom(audience);
+  });
+
+  config_helper_.configureUpstreamTls(
+      /*use_alpn=*/false, /*http3=*/false, /*alternate_protocol_cache_config=*/absl::nullopt,
+      [](envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context) {
+        const std::string rundir = TestEnvironment::runfilesDirectory();
+        auto* certs = tls_context.mutable_common_tls_context()->add_tls_certificates();
+        certs->mutable_certificate_chain()->set_filename(
+            rundir + "/test/config/integration/certs/clientcert.pem");
+        certs->mutable_private_key()->set_filename(rundir +
+                                                   "/test/config/integration/certs/clientkey.pem");
+      });
+
+  // Initialize the HTTP integration test framework.
+  HttpIntegrationTest::initialize();
+
+  // Compute the expected client certificate fingerprint.
+  CertFingerprinterImpl fingerprinter;
+  const std::string cert_path =
+      TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem");
+  const std::string cert_pem = TestEnvironment::readFileToStringForTest(cert_path);
+  const std::string expected_fingerprint = fingerprinter.getFingerprintFromPem(cert_pem).value();
+
+  // First request: Cache Miss.
+  initiateClientConnection();
+
+  // Wait for the metadata server call and verify the path contains the fingerprint query
+  // parameter.
+  waitForGcpAuthnServerResponseBoundAccessToken(expected_fingerprint);
+
+  // Verify the token is appended to cluster_0's upstream call, and clean up.
+  sendRequestToDestinationAndValidateResponse(/*with_audience=*/true);
+  cleanup();
+
+  // Second request: Cache Hit.
+  initiateClientConnection();
+
+  // We should NOT receive any metadata server connection/stream!
+  // Send request directly to destination and validate it has the cached token.
+  sendRequestToDestinationAndValidateResponse(/*with_audience=*/true);
   cleanup();
 
   // Verify request has been routed to gcp_authn exactly 1 time (since the second was a cache hit).

@@ -19,7 +19,7 @@ backend without requiring a custom Envoy build.
 
    Dynamic modules run in-process with the same privileges as Envoy. Only
    load modules you trust. This extension is currently under active
-   development; capabilities and ABI are expected to evolve.
+   development. Capabilities and ABI are expected to evolve.
 
 Configuration example
 ---------------------
