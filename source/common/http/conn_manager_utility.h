@@ -5,6 +5,7 @@
 
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/tracing/trace_reason.h"
 
 #include "source/common/http/conn_manager_impl.h"
@@ -46,7 +47,7 @@ public:
                   uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
                   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                       headers_with_underscores_action,
-                  Server::OverloadManager& overload_manager);
+                  Server::OverloadManager& overload_manager, Runtime::Loader& runtime);
 
   /* The result after calling mutateRequestHeaders(), containing the final remote address. Note that
    * an extension used for detecting the original IP of the request might decide it should be
