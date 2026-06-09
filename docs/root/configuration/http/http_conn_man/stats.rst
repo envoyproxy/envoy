@@ -163,6 +163,7 @@ On the upstream side all http2 statistics are rooted at ``cluster.<name>.http2.`
    :header: Name, Type, Description
    :widths: 1, 1, 2
 
+   ``cookies_total_bytes_too_large``, Counter, Total number of streams reset due to the re-assembled ``cookie`` header exceeding the ``envoy.reloadable_features.http2_max_cookies_size_in_kb`` runtime value.
    ``dropped_headers_with_underscores``, Counter, Total number of dropped headers with names containing underscores. This action is configured by setting the :ref:`headers_with_underscores_action config setting <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.headers_with_underscores_action>`.
    ``goaway_sent``, Counter, Total number ``GOAWAY`` frames that have been submitted to the codec to send.
    ``header_overflow``, Counter, Total number of connections reset due to the headers being larger than the :ref:`configured value <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.max_request_headers_kb>`.
