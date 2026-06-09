@@ -244,7 +244,7 @@ public:
     server_ = std::make_unique<TestServerConnectionImpl>(
         server_connection_, server_callbacks_, *server_stats_store_.rootScope(),
         server_http2_options_, random_, max_request_headers_kb_, max_request_headers_count_,
-        headers_with_underscores_action_);
+        headers_with_underscores_action_, runtime_);
     server_wrapper_ = std::make_unique<ConnectionWrapper>(server_.get());
     createHeaderValidator();
     request_encoder_ = &client_->newStream(response_decoder_);
@@ -425,6 +425,7 @@ public:
 #endif
   }
 
+  NiceMock<Runtime::MockLoader> runtime_;
   TestScopedRuntime scoped_runtime_;
   absl::optional<const Http2SettingsTuple> client_settings_;
   absl::optional<const Http2SettingsTuple> server_settings_;
@@ -4841,6 +4842,27 @@ TEST(CodecChoiceTest, ProtocolOptionNotSpecified) {
       max_request_headers_kb, max_response_headers_count, ProdNghttp2SessionFactory::get());
 
   EXPECT_FALSE(client2->useOghttp2Library());
+}
+
+TEST_P(Http2CodecImplTest, DownstreamRequestCookieSizeLimit) {
+  EXPECT_CALL(runtime_.snapshot_,
+              getInteger("envoy.reloadable_features.http2_max_cookies_size_in_kb", 0))
+      .WillRepeatedly(Return(1)); // 1 KB limit
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  request_headers.addCopy("cookie", std::string(1025, 'a')); // Exceeds 1KB
+
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _));
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  if (http2_implementation_ != Http2Impl::Oghttp2) {
+    EXPECT_EQ(1, server_stats_store_.counter("http2.cookies_total_bytes_too_large").value());
+  }
 }
 
 #ifdef NDEBUG
