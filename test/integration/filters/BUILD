@@ -30,6 +30,11 @@ envoy_proto_library(
     srcs = ["test_listener_filter.proto"],
 )
 
+envoy_proto_library(
+    name = "test_filters_proto",
+    srcs = ["test_filters.proto"],
+)
+
 envoy_cc_test_library(
     name = "test_listener_filter_lib",
     srcs = [
