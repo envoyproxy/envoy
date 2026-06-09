@@ -3409,6 +3409,13 @@ __attribute__((weak)) void envoy_dynamic_module_callback_transport_socket_io_shu
                "not implemented in this context");
 }
 
+__attribute__((weak)) int envoy_dynamic_module_callback_transport_socket_get_fd(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_transport_socket_get_fd: "
+               "not implemented in this context");
+  return -1;
+}
+
 __attribute__((weak)) void envoy_dynamic_module_callback_transport_socket_read_buffer_add(
     envoy_dynamic_module_type_transport_socket_envoy_ptr, const char*, size_t) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_transport_socket_read_buffer_add: "
@@ -3428,6 +3435,13 @@ __attribute__((weak)) void envoy_dynamic_module_callback_transport_socket_write_
                "not implemented in this context");
 }
 
+__attribute__((weak)) size_t envoy_dynamic_module_callback_transport_socket_write_buffer_length(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_transport_socket_write_buffer_length: "
+               "not implemented in this context");
+  return 0;
+}
+
 __attribute__((weak)) void envoy_dynamic_module_callback_transport_socket_raise_event(
     envoy_dynamic_module_type_transport_socket_envoy_ptr,
     envoy_dynamic_module_type_network_connection_event) {
@@ -3445,6 +3459,12 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_transport_socket_should
 __attribute__((weak)) void envoy_dynamic_module_callback_transport_socket_set_is_readable(
     envoy_dynamic_module_type_transport_socket_envoy_ptr) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_transport_socket_set_is_readable: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_transport_socket_set_is_writable(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_transport_socket_set_is_writable: "
                "not implemented in this context");
 }
 

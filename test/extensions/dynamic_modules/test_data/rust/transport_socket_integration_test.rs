@@ -2,7 +2,8 @@
 //!
 //! It applies a symmetric XOR transform to the raw connection bytes. The same transform runs on
 //! both reads and writes, so a peer that echoes the transformed bytes observes the original
-//! plaintext. A zero key behaves as a passthrough.
+//! plaintext. A zero key behaves as a passthrough. On connect it validates the native socket
+//! descriptor.
 
 use envoy_proxy_dynamic_modules_rust_sdk::*;
 
@@ -71,8 +72,12 @@ impl<ETS: EnvoyTransportSocket> TransportSocket<ETS> for XorTransportSocket {
   fn on_set_callbacks(&mut self, _envoy: &mut ETS) {}
 
   fn on_connected(&mut self, envoy: &mut ETS) {
-    // A real secure transport finishes its handshake here. Mirror that by inspecting the
-    // connection endpoints and flushing any buffered output before signaling readiness.
+    // A real secure transport finishes its handshake here. Mirror that by validating the native
+    // socket descriptor (which a transport such as kTLS needs for setsockopt), inspecting the
+    // connection endpoints, and flushing any buffered output before signaling readiness.
+    if envoy.get_fd().is_none() {
+      self.failure_reason = "missing socket fd".to_string();
+    }
     let (remote, _) = envoy.get_remote_address();
     let (local, _) = envoy.get_local_address();
     if !remote.is_empty() && !local.is_empty() {
@@ -109,15 +114,16 @@ impl<ETS: EnvoyTransportSocket> TransportSocket<ETS> for XorTransportSocket {
   }
 
   fn on_do_write(&mut self, envoy: &mut ETS, end_stream: bool) -> IoResult {
-    // Snapshot and transform the whole write buffer once. The transform is position-independent so
-    // partial writes are handled by draining only the bytes the socket accepted.
+    // Snapshot and transform the whole write buffer once. The transform is byte-for-byte, so the
+    // number of bytes to send equals the length Envoy reports for its write buffer.
+    let pending = envoy.write_buffer_length();
     self.write_scratch.clear();
     envoy.copy_write_buffer(&mut self.write_scratch);
     apply_xor(&mut self.write_scratch, self.key);
 
     let mut written = 0;
     let action = loop {
-      if written == self.write_scratch.len() {
+      if written == pending {
         if end_stream && !self.write_shutdown {
           envoy.io_shutdown_write();
           self.write_shutdown = true;

@@ -1279,6 +1279,7 @@ WEAK_STUB(TransportSocketIoWrite,
           envoy_dynamic_module_callback_transport_socket_io_write(nullptr, nullptr, 0, nullptr))
 WEAK_STUB(TransportSocketIoShutdownWrite,
           envoy_dynamic_module_callback_transport_socket_io_shutdown_write(nullptr))
+WEAK_STUB(TransportSocketGetFd, envoy_dynamic_module_callback_transport_socket_get_fd(nullptr))
 WEAK_STUB(TransportSocketReadBufferAdd,
           envoy_dynamic_module_callback_transport_socket_read_buffer_add(nullptr, nullptr, 0))
 WEAK_STUB(TransportSocketWriteBufferDrain,
@@ -1286,6 +1287,8 @@ WEAK_STUB(TransportSocketWriteBufferDrain,
 WEAK_STUB(TransportSocketWriteBufferGetSlices,
           envoy_dynamic_module_callback_transport_socket_write_buffer_get_slices(nullptr, nullptr,
                                                                                  nullptr))
+WEAK_STUB(TransportSocketWriteBufferLength,
+          envoy_dynamic_module_callback_transport_socket_write_buffer_length(nullptr))
 WEAK_STUB(TransportSocketRaiseEvent,
           envoy_dynamic_module_callback_transport_socket_raise_event(
               nullptr, envoy_dynamic_module_type_network_connection_event_Connected))
@@ -1293,6 +1296,8 @@ WEAK_STUB(TransportSocketShouldDrainReadBuffer,
           envoy_dynamic_module_callback_transport_socket_should_drain_read_buffer(nullptr))
 WEAK_STUB(TransportSocketSetIsReadable,
           envoy_dynamic_module_callback_transport_socket_set_is_readable(nullptr))
+WEAK_STUB(TransportSocketSetIsWritable,
+          envoy_dynamic_module_callback_transport_socket_set_is_writable(nullptr))
 WEAK_STUB(TransportSocketFlushWriteBuffer,
           envoy_dynamic_module_callback_transport_socket_flush_write_buffer(nullptr))
 WEAK_STUB(TransportSocketGetRemoteAddress,

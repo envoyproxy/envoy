@@ -7530,3 +7530,72 @@ fn test_mock_envoy_transport_socket_do_read() {
   let mut socket = EchoTransportSocket;
   assert_eq!(socket.on_do_read(&mut mock), IoResult::keep_open(5, false));
 }
+
+#[test]
+fn test_mock_envoy_transport_socket_fd_and_write_rearm() {
+  // Exercises the raw socket callbacks a transport such as kTLS relies on. It reads the descriptor
+  // on connect and, when it defers buffered bytes for its own reasons, re-arms the writable
+  // notification so the write is retried later.
+  struct ProbeTransportSocket {
+    fd: Option<i32>,
+  }
+  impl TransportSocket<transport_socket::MockEnvoyTransportSocket> for ProbeTransportSocket {
+    fn on_set_callbacks(&mut self, _envoy: &mut transport_socket::MockEnvoyTransportSocket) {}
+    fn on_connected(&mut self, envoy: &mut transport_socket::MockEnvoyTransportSocket) {
+      self.fd = envoy.get_fd();
+    }
+    fn on_do_read(&mut self, _envoy: &mut transport_socket::MockEnvoyTransportSocket) -> IoResult {
+      IoResult::keep_open(0, false)
+    }
+    fn on_do_write(
+      &mut self,
+      envoy: &mut transport_socket::MockEnvoyTransportSocket,
+      _end_stream: bool,
+    ) -> IoResult {
+      // A transport that defers the buffered bytes re-arms instead of sending, so it is driven
+      // again on a later iteration.
+      if envoy.write_buffer_length() > 0 {
+        envoy.set_is_writable();
+      }
+      IoResult::keep_open(0, false)
+    }
+    fn on_close(
+      &mut self,
+      _envoy: &mut transport_socket::MockEnvoyTransportSocket,
+      _event: ConnectionEvent,
+      _abort_reset: bool,
+    ) {
+    }
+    fn get_protocol(&self, _envoy: &mut transport_socket::MockEnvoyTransportSocket) -> String {
+      String::new()
+    }
+    fn get_failure_reason(
+      &self,
+      _envoy: &mut transport_socket::MockEnvoyTransportSocket,
+    ) -> String {
+      String::new()
+    }
+    fn can_flush_close(&self, _envoy: &mut transport_socket::MockEnvoyTransportSocket) -> bool {
+      true
+    }
+    fn start_secure_transport(
+      &mut self,
+      _envoy: &mut transport_socket::MockEnvoyTransportSocket,
+    ) -> bool {
+      false
+    }
+  }
+
+  let mut mock = transport_socket::MockEnvoyTransportSocket::new();
+  mock.expect_get_fd().times(1).returning(|| Some(7));
+  mock.expect_write_buffer_length().times(1).returning(|| 3);
+  mock.expect_set_is_writable().times(1).returning(|| ());
+
+  let mut socket = ProbeTransportSocket { fd: None };
+  socket.on_connected(&mut mock);
+  assert_eq!(socket.fd, Some(7));
+  assert_eq!(
+    socket.on_do_write(&mut mock, false),
+    IoResult::keep_open(0, false)
+  );
+}

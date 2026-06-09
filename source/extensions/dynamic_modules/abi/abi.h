@@ -12359,6 +12359,19 @@ void envoy_dynamic_module_callback_transport_socket_io_shutdown_write(
     envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
 
 /**
+ * envoy_dynamic_module_callback_transport_socket_get_fd returns the native OS file descriptor of
+ * the underlying socket. A module that performs raw socket operations such as installing kernel TLS
+ * with setsockopt uses this descriptor. It is only meaningful for transports backed by an OS
+ * socket. The descriptor is owned by Envoy and is only valid while the connection is open, so the
+ * module must not close it or use it after the connection closes.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @return the native file descriptor, or -1 if it is unavailable.
+ */
+int envoy_dynamic_module_callback_transport_socket_get_fd(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
+
+/**
  * envoy_dynamic_module_callback_transport_socket_read_buffer_add appends data to the connection
  * read buffer.
  *
@@ -12397,6 +12410,16 @@ void envoy_dynamic_module_callback_transport_socket_write_buffer_get_slices(
     envoy_dynamic_module_type_envoy_buffer* slices, size_t* slices_count);
 
 /**
+ * envoy_dynamic_module_callback_transport_socket_write_buffer_length returns the number of bytes
+ * currently queued in the connection write buffer.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @return the length of the write buffer in bytes, or zero when there is no active write buffer.
+ */
+size_t envoy_dynamic_module_callback_transport_socket_write_buffer_length(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
+
+/**
  * envoy_dynamic_module_callback_transport_socket_raise_event raises a connection event on the
  * connection (e.g., Connected after TLS handshake). Raising a close event can synchronously
  * re-enter the module through on_close, so the caller must not rely on any state after this
@@ -12426,6 +12449,17 @@ bool envoy_dynamic_module_callback_transport_socket_should_drain_read_buffer(
  * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
  */
 void envoy_dynamic_module_callback_transport_socket_set_is_readable(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_set_is_writable schedules another write on a
+ * future event loop iteration. A module calls this when it defers buffered bytes for its own
+ * reasons rather than because the socket reported it would block. After a write reports it would
+ * block, Envoy re-arms the writable notification on its own, so this call is not needed then.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ */
+void envoy_dynamic_module_callback_transport_socket_set_is_writable(
     envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
 
 /**
