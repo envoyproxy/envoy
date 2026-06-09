@@ -1,14 +1,84 @@
+#include <memory>
+#include <string>
+
+#include "envoy/http/codes.h"
+#include "envoy/http/filter.h"
+#include "envoy/registry/registry.h"
 #include "envoy/service/runtime/v3/rtds.pb.h"
+
+#include "source/common/runtime/runtime_features.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/v2_link_hacks.h"
+#include "test/extensions/filters/http/common/empty_http_filter_config.h"
+#include "test/integration/filters/test_filters.pb.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace {
+
+constexpr char RuntimeFeatureFilterName[] = "rtds-runtime-feature-test";
+constexpr char RuntimeFeaturePath[] = "/runtime-feature";
+constexpr char TestRuntimeFeature[] = "envoy.reloadable_features.test_feature_false";
+
+MATCHER_P(RuntimeStatusFilterResponds, expected_status, "") {
+  if (arg == nullptr) {
+    *result_listener << "response is null";
+    return false;
+  }
+  if (!arg->complete()) {
+    *result_listener << "response is incomplete";
+    return false;
+  }
+
+  const std::string expected_status_string = std::to_string(expected_status);
+  const std::string actual_status{arg->headers().getStatusValue()};
+  if (actual_status != expected_status_string) {
+    *result_listener << "status was " << actual_status;
+    return false;
+  }
+
+  return true;
+}
+
+class RuntimeFeatureTestFilter : public Http::PassThroughFilter {
+public:
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
+    if (!headers.Path() || headers.getPathValue() != RuntimeFeaturePath) {
+      return Http::FilterHeadersStatus::Continue;
+    }
+
+    const Http::Code code = Runtime::runtimeFeatureEnabled(TestRuntimeFeature)
+                                ? Http::Code::NoContent
+                                : static_cast<Http::Code>(418);
+    decoder_callbacks_->sendLocalReply(code, "", nullptr, absl::nullopt, "");
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+};
+
+class RuntimeFeatureTestFilterConfig
+    : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<
+          test::integration::filters::RuntimeFeatureTestFilterConfig> {
+public:
+  RuntimeFeatureTestFilterConfig() : UniqueEmptyHttpFilterConfig(RuntimeFeatureFilterName) {}
+
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
+    return [](Http::FilterChainFactoryCallbacks& callbacks) {
+      callbacks.addStreamFilter(std::make_shared<RuntimeFeatureTestFilter>());
+    };
+  }
+};
+
+static Registry::RegisterFactory<RuntimeFeatureTestFilterConfig,
+                                 Server::Configuration::NamedHttpFilterConfigFactory>
+    register_runtime_feature_test_filter_;
 
 // TODO(fredlas) set_node_on_first_message_only was true; the delta+SotW unification
 //               work restores it here.
@@ -78,6 +148,46 @@ admin:
                      api_type, Platform::null_device_path);
 }
 
+void addRuntimeFeatureListener(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                               Network::Address::IpVersion ip_version) {
+  auto* listener = bootstrap.mutable_static_resources()->add_listeners();
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+name: http
+address:
+  socket_address:
+    address: "{}"
+    port_value: 0
+filter_chains:
+- filters:
+  - name: http
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+      stat_prefix: config_test
+      delayed_close_timeout:
+        nanos: 10000000
+      http_filters:
+      - name: rtds-runtime-feature-test
+        typed_config:
+          "@type": type.googleapis.com/test.integration.filters.RuntimeFeatureTestFilterConfig
+      - name: envoy.filters.http.router
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+      codec_type: HTTP2
+      route_config:
+        name: route_config_0
+        virtual_hosts:
+        - name: integration
+          domains: ["*"]
+          routes:
+          - match:
+              prefix: "/"
+            direct_response:
+              status: 418
+)EOF",
+                                        Network::Test::getLoopbackAddressString(ip_version)),
+                            *listener);
+}
+
 class RtdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {
 public:
   RtdsIntegrationTest()
@@ -134,6 +244,11 @@ public:
       return entries->getObject(key).value()->getString("final_value").value();
     }
     return "";
+  }
+
+  BufferingStreamDecoderPtr requestToRuntimeStatusFilter() {
+    return IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", RuntimeFeaturePath, "",
+                                              downstreamProtocol(), version_);
   }
 
   uint32_t initial_load_success_{};
@@ -267,6 +382,55 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   EXPECT_EQ(3, test_server_->gauge("runtime.num_layers")->value());
 }
 
+TEST_P(RtdsIntegrationTest, RtdsOverrideRemovalClearsRuntimeFeature) {
+  config_helper_.addConfigModifier(
+      [ip_version = ipVersion()](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        addRuntimeFeatureListener(bootstrap, ip_version);
+      });
+  initialize();
+  acceptXdsConnection();
+
+  EXPECT_THAT(requestToRuntimeStatusFilter(), RuntimeStatusFilterResponds(418))
+      << "[before RTDS override]";
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_layer"},
+                                      {"some_rtds_layer"}, {}, true));
+  auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_rtds_layer
+    layer:
+      envoy.reloadable_features.test_feature_false: true
+  )EOF");
+  sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
+      Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
+  test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 1);
+
+  EXPECT_THAT(requestToRuntimeStatusFilter(), RuntimeStatusFilterResponds(204))
+      << "[after RTDS override]";
+  EXPECT_EQ("true", getRuntimeKey(TestRuntimeFeature));
+  EXPECT_EQ(initial_keys_ + 1, test_server_->gauge("runtime.num_keys")->value());
+
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "1", {"some_rtds_layer"}, {}, {}));
+  some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_rtds_layer
+    layer: {}
+  )EOF");
+  sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
+      Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "2");
+  test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 2);
+
+  EXPECT_EQ("", getRuntimeKey(TestRuntimeFeature));
+  EXPECT_THAT(requestToRuntimeStatusFilter(), RuntimeStatusFilterResponds(418))
+      << "[after RTDS override removal]";
+
+  EXPECT_EQ(0, test_server_->counter("runtime.load_error")->value());
+  EXPECT_EQ(0, test_server_->counter("runtime.update_failure")->value());
+  EXPECT_EQ(initial_load_success_ + 2, test_server_->counter("runtime.load_success")->value());
+  EXPECT_EQ(2, test_server_->counter("runtime.update_success")->value());
+  EXPECT_EQ(initial_keys_, test_server_->gauge("runtime.num_keys")->value());
+  EXPECT_EQ(3, test_server_->gauge("runtime.num_layers")->value());
+}
+
 // Test Rtds update with Resource wrapper.
 TEST_P(RtdsIntegrationTest, RtdsUpdate) {
   initialize();
@@ -307,6 +471,7 @@ TEST_P(RtdsIntegrationTest, RtdsUpdate) {
 // This test uses health checking of the first cluster to make primary cluster initialization to
 // complete asynchronously.
 TEST_P(RtdsIntegrationTest, RtdsAfterAsyncPrimaryClusterInitialization) {
+  autonomous_upstream_ = true;
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     // Enable health checking for the first cluster.
     auto* dummy_cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
@@ -330,10 +495,8 @@ TEST_P(RtdsIntegrationTest, RtdsAfterAsyncPrimaryClusterInitialization) {
   EXPECT_EQ("yar", getRuntimeKey("bar"));
   EXPECT_EQ("", getRuntimeKey("baz"));
 
-  // Respond to the initial health check, which should complete initialization of primary clusters.
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-  test_server_->waitForGaugeEq("cluster.dummy_cluster.membership_healthy", 1);
+  // Wait for the initial health check, which should complete initialization of primary clusters.
+  test_server_->waitForCounterGe("cluster.dummy_cluster.health_check.success", 1);
 
   // After this xDS connection should be established. Verify that dynamic runtime values are loaded.
   acceptXdsConnection();

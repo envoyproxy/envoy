@@ -68,6 +68,31 @@ public:
   }
 };
 
+template <class ProtoType>
+class UniqueEmptyHttpFilterConfig : public Server::Configuration::NamedHttpFilterConfigFactory {
+public:
+  virtual absl::StatusOr<Http::FilterFactoryCb>
+  createFilter(const std::string& stat_prefix, Server::Configuration::FactoryContext& context) PURE;
+
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message&, const std::string& stat_prefix,
+                               Server::Configuration::FactoryContext& context) override {
+    return createFilter(stat_prefix, context);
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new ProtoType()};
+  }
+
+  std::string name() const override { return name_; }
+
+protected:
+  UniqueEmptyHttpFilterConfig(const std::string& name) : name_(name) {}
+
+private:
+  const std::string name_;
+};
+
 } // namespace Common
 } // namespace HttpFilters
 } // namespace Extensions

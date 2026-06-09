@@ -258,6 +258,7 @@ private:
   Init::WatcherImpl init_watcher_;
   Init::ManagerImpl init_manager_{"RTDS"};
   std::vector<RtdsSubscriptionPtr> subscriptions_;
+  absl::node_hash_map<std::string, bool> runtime_feature_defaults_;
   Upstream::ClusterManager* cm_{};
   Stats::Store& store_;
 
