@@ -8,19 +8,11 @@ namespace Quic {
 
 EnvoyTlsServerHandshaker::EnvoyTlsServerHandshaker(
     quic::QuicSession* session, const quic::QuicCryptoServerConfig* crypto_config,
-    Ssl::ServerContextSharedPtr pinned_ssl_ctx, bool disable_resumption, bool ticket_support_active)
+    Ssl::ServerContextSharedPtr pinned_ssl_ctx, bool disable_resumption)
     : TlsServerHandshaker(session, crypto_config), pinned_ssl_ctx_(std::move(pinned_ssl_ctx)) {
   SSL_set_ex_data(ssl(), handshakerExDataIndex(), this);
-
-  // When Envoy ticket processing is active, guard against the pinned
-  // context lacking keys even if the factory config snapshot said keys
-  // exist. For connections where only key log is enabled, leave ticket
-  // / resumption behavior untouched.
-  if (disable_resumption ||
-      (ticket_support_active &&
-       (pinnedServerContext() == nullptr || !pinnedServerContext()->hasSessionTicketKeys()))) {
-    const bool disabled = DisableResumption();
-    ASSERT(disabled);
+  if (disable_resumption) {
+    DisableResumption();
   }
 }
 
