@@ -54,6 +54,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/http/http2:codec_lib",
         "//test/mocks:common_lib",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:overload_manager_mocks",
         "@com_github_google_quiche//:http2_adapter",
         "@com_google_absl//absl/types:optional",
