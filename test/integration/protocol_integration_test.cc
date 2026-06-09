@@ -2388,6 +2388,26 @@ TEST_P(DownstreamProtocolIntegrationTest, CookiesAreSubjectToHeaderMapSizeLimit)
   }
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, DownstreamCookieSizeLimit) {
+  if (downstreamProtocol() != Http::CodecType::HTTP2) {
+    return;
+  }
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_max_cookies_size_in_kb", "1");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "sni.lyft.com"},
+                                                 {"cookie", std::string(1025, 'a')}};
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http2.cookies_total_bytes_too_large"));
+}
+
 TEST_P(DownstreamProtocolIntegrationTest, CookiesAreSubjectToHeaderMapCountLimit) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   uint32_t max_count = 2010;
