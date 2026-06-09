@@ -45,6 +45,7 @@ envoy_extension_cc_test(
     extension_names = [
         "envoy.clusters.reverse_connection",
         "envoy.filters.network.reverse_tunnel",
+        "envoy.filters.network.reverse_tunnel_drain_aware_http_connection_manager",
         "envoy.filters.http.lua",
         "envoy.bootstrap.reverse_tunnel.upstream_socket_interface",
         "envoy.bootstrap.reverse_tunnel.downstream_socket_interface",
@@ -64,6 +65,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/filters/network/reverse_tunnel:config",
+        "//source/extensions/filters/network/reverse_tunnel/drain_aware_hcm:drain_aware_config",
         "//source/extensions/transport_sockets/tls:config",
         "//test/integration:http_integration_lib",
         "//test/integration:integration_lib",

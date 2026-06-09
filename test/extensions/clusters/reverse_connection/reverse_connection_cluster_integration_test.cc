@@ -2,6 +2,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/clusters/reverse_connection/v3/reverse_connection.pb.h"
 #include "envoy/extensions/filters/http/lua/v3/lua.pb.h"
+#include "envoy/extensions/filters/network/reverse_tunnel/v3/drain_aware_hcm.pb.h"
 #include "envoy/extensions/filters/network/reverse_tunnel/v3/reverse_tunnel.pb.h"
 #include "envoy/extensions/transport_sockets/internal_upstream/v3/internal_upstream.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
@@ -1269,6 +1270,266 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
   // Wait for listeners to be fully stopped before test cleanup.
   test_server_->waitForCounter("listener_manager.listener_stopped", Eq(3),
                                std::chrono::milliseconds(5000));
+}
+
+// Test drain-aware HCM reconnection behavior end-to-end:
+// 1. Connection-level drain: max_connection_duration expires while a stream is active. The wrapper
+//    swallows the phase-1 shutdownNotice and calls reestablishConnection(), opening a replacement
+//    tunnel (handshake 1 → 2). After drain_timeout the HCM's goAway() emits the single GOAWAY
+//    (upstream_cx_close_notify 0 → 1). The in-flight request still completes on the old connection.
+// 2. Listener-level drain on an IDLE connection: after probing the replacement tunnel to create
+//    its wrapper, failing health checks makes drainClose() true. The wrapper's poll timer detects
+//    this with no active stream and schedules the final GOAWAY after drain_timeout
+//    (upstream_cx_close_notify 1 → 2) — the case the HCM never notices on its own.
+TEST_P(ReverseConnectionClusterIntegrationTest, DrainAwareHcmReconnectionOnMaxDuration) {
+  DISABLE_IF_ADMIN_DISABLED;
+
+  const uint32_t tunnel_listener_port = tunnelListenerPort();
+  const std::string loopback_addr = loopbackAddress();
+
+  config_helper_.addConfigModifier([tunnel_listener_port, loopback_addr](
+                                       envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()->clear_listeners();
+
+    // --- Tunnel acceptor listener (upstream side) ---
+    auto* tunnel_listener = bootstrap.mutable_static_resources()->add_listeners();
+    tunnel_listener->set_name("tunnel_listener");
+    tunnel_listener->mutable_address()->mutable_socket_address()->set_address(loopback_addr);
+    tunnel_listener->mutable_address()->mutable_socket_address()->set_port_value(
+        tunnel_listener_port);
+
+    auto* tunnel_chain = tunnel_listener->add_filter_chains();
+    auto* rt_filter = tunnel_chain->add_filters();
+    rt_filter->set_name("envoy.filters.network.reverse_tunnel");
+
+    envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel rt_config;
+    rt_config.mutable_ping_interval()->set_seconds(60);
+    rt_config.set_auto_close_connections(true);
+    rt_config.set_request_path("/reverse_connections/request");
+    rt_config.set_request_method(envoy::config::core::v3::GET);
+    rt_filter->mutable_typed_config()->PackFrom(rt_config);
+
+    // --- Egress listener ---
+    auto* egress_listener = bootstrap.mutable_static_resources()->add_listeners();
+    egress_listener->set_name("egress_listener");
+    auto* egress_address = egress_listener->mutable_address()->mutable_socket_address();
+    egress_address->set_address(loopback_addr);
+    egress_address->set_port_value(0);
+
+    auto* egress_chain = egress_listener->add_filter_chains();
+    auto* egress_hcm_filter = egress_chain->add_filters();
+    egress_hcm_filter->set_name("envoy.filters.network.http_connection_manager");
+
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
+        egress_hcm;
+    egress_hcm.set_stat_prefix("egress_http");
+    egress_hcm.set_codec_type(envoy::extensions::filters::network::http_connection_manager::v3::
+                                  HttpConnectionManager::AUTO);
+
+    auto* egress_route_config = egress_hcm.mutable_route_config();
+    egress_route_config->set_name("local_route");
+    auto* egress_virtual_host = egress_route_config->add_virtual_hosts();
+    egress_virtual_host->set_name("backend");
+    egress_virtual_host->add_domains("*");
+
+    auto* egress_route = egress_virtual_host->add_routes();
+    egress_route->mutable_match()->set_prefix("/");
+    egress_route->mutable_route()->set_cluster("reverse_connection_cluster");
+    egress_route->mutable_route()->mutable_timeout()->set_seconds(30);
+
+    auto* egress_router = egress_hcm.add_http_filters();
+    egress_router->set_name("envoy.filters.http.router");
+    egress_router->mutable_typed_config()->PackFrom(
+        envoy::extensions::filters::http::router::v3::Router());
+
+    egress_hcm_filter->mutable_typed_config()->PackFrom(egress_hcm);
+
+    // --- Initiator listener using DrainAwareHttpConnectionManager ---
+    auto* init_listener = bootstrap.mutable_static_resources()->add_listeners();
+    init_listener->set_name("reverse_conn_listener");
+    init_listener->set_stat_prefix("reverse_conn_listener");
+    init_listener->mutable_listener_filters_timeout()->set_seconds(0);
+
+    auto* init_address = init_listener->mutable_address()->mutable_socket_address();
+    init_address->set_address("rc://test-node-id:test-cluster-id:test-tenant-id@tunnel_cluster:1");
+    init_address->set_port_value(0);
+    init_address->set_resolver_name("envoy.resolvers.reverse_connection");
+
+    auto* init_chain = init_listener->add_filter_chains();
+    auto* init_hcm_filter = init_chain->add_filters();
+    init_hcm_filter->set_name(
+        "envoy.filters.network.reverse_tunnel_drain_aware_http_connection_manager");
+
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
+        init_hcm;
+    init_hcm.set_stat_prefix("reverse_conn_initiator");
+    init_hcm.set_codec_type(envoy::extensions::filters::network::http_connection_manager::v3::
+                                HttpConnectionManager::AUTO);
+    // 3s max_connection_duration: triggers the drain sequence on the active connection.
+    init_hcm.mutable_common_http_protocol_options()->mutable_max_connection_duration()->set_seconds(
+        3);
+    // 2s drain_timeout: the wrapper swallows the phase-1 shutdownNotice, so the final GOAWAY is
+    // emitted this long after the drain starts. Kept short to keep the test fast.
+    init_hcm.mutable_drain_timeout()->set_seconds(2);
+
+    auto* init_route_config = init_hcm.mutable_route_config();
+    init_route_config->set_name("local_route");
+    auto* init_virtual_host = init_route_config->add_virtual_hosts();
+    init_virtual_host->set_name("backend");
+    init_virtual_host->add_domains("*");
+
+    // Direct response for probe requests — forces the H2 codec (and thus the
+    // DrainAwareServerConnection wrapper + its drain-poll timer) to be created on a tunnel
+    // connection without needing a real upstream.
+    auto* probe_route = init_virtual_host->add_routes();
+    probe_route->mutable_match()->set_prefix("/probe");
+    probe_route->mutable_direct_response()->set_status(200);
+    probe_route->mutable_direct_response()->mutable_body()->set_inline_string("ok");
+
+    auto* init_route = init_virtual_host->add_routes();
+    init_route->mutable_match()->set_prefix("/");
+    init_route->mutable_route()->set_cluster("cluster_0");
+    init_route->mutable_route()->mutable_timeout()->set_seconds(30);
+
+    auto* init_router = init_hcm.add_http_filters();
+    init_router->set_name("envoy.filters.http.router");
+    init_router->mutable_typed_config()->PackFrom(
+        envoy::extensions::filters::http::router::v3::Router());
+
+    envoy::extensions::filters::network::reverse_tunnel::v3::DrainAwareHttpConnectionManager
+        drain_aware_config;
+    *drain_aware_config.mutable_hcm_config() = init_hcm;
+    init_hcm_filter->mutable_typed_config()->PackFrom(drain_aware_config);
+
+    // --- Reverse connection cluster ---
+    auto* rc_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    rc_cluster->set_name("reverse_connection_cluster");
+    rc_cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+    rc_cluster->mutable_connect_timeout()->set_seconds(5);
+
+    auto* cluster_type = rc_cluster->mutable_cluster_type();
+    cluster_type->set_name("envoy.clusters.reverse_connection");
+
+    envoy::extensions::clusters::reverse_connection::v3::ReverseConnectionClusterConfig rc_config;
+    rc_config.set_host_id_format("%REQ(x-computed-host-id)%");
+    rc_config.mutable_cleanup_interval()->set_seconds(60);
+    cluster_type->mutable_typed_config()->PackFrom(rc_config);
+
+    envoy::extensions::upstreams::http::v3::HttpProtocolOptions http_options;
+    http_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+    (*rc_cluster->mutable_typed_extension_protocol_options())
+        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+            .PackFrom(http_options);
+
+    // --- Tunnel cluster ---
+    auto* tunnel_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    tunnel_cluster->set_name("tunnel_cluster");
+    tunnel_cluster->set_type(envoy::config::cluster::v3::Cluster::STATIC);
+    tunnel_cluster->mutable_connect_timeout()->set_seconds(5);
+    tunnel_cluster->mutable_load_assignment()->set_cluster_name("tunnel_cluster");
+
+    auto* tunnel_locality = tunnel_cluster->mutable_load_assignment()->add_endpoints();
+    auto* tunnel_lb_endpoint = tunnel_locality->add_lb_endpoints();
+    auto* tunnel_endpoint = tunnel_lb_endpoint->mutable_endpoint();
+    auto* tunnel_addr = tunnel_endpoint->mutable_address()->mutable_socket_address();
+    tunnel_addr->set_address(loopback_addr);
+    tunnel_addr->set_port_value(tunnel_listener_port);
+  });
+
+  // Immediate drain strategy + zero drain time so that, once health checks fail, the listener's
+  // drainClose() returns true right away (no probabilistic gradual-drain delay).
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+  setDrainTime(std::chrono::seconds(0));
+
+  initialize();
+  registerTestServerPorts({"tunnel_listener", "egress_listener"});
+
+  // --- Phase 1: Wait for the initial tunnel to establish. ---
+  ENVOY_LOG_MISC(info, "Phase 1: Waiting for initial reverse tunnel connection.");
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1),
+                               std::chrono::milliseconds(5000));
+  test_server_->waitForCounter("listener.reverse_conn_listener.downstream_cx_total", Ge(1),
+                               std::chrono::milliseconds(5000));
+  test_server_->waitForGauge("reverse_tunnel_acceptor.nodes.test-node-id", Ge(1));
+
+  // --- Phase 2: Send a long-running request that outlasts max_connection_duration (3s). ---
+  // When max_connection_duration fires while this stream is active, the HCM starts
+  // startDrainSequence() → shutdownNotice() → GOAWAY sent to responder.
+  ENVOY_LOG_MISC(info, "Phase 2: Sending long-running request to hold connection active past "
+                       "max_connection_duration (3s).");
+  codec_client_ = makeHttpConnection(lookupPort("egress_listener"));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/slow"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-computed-host-id", "test-node-id"}};
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  // Wait for the request to arrive at the fake upstream (but DON'T respond yet).
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  ENVOY_LOG_MISC(info, "Request in-flight. Waiting for max_connection_duration drain to fire.");
+
+  // max_connection_duration (3s) fires → HCM drain → shutdownNotice (GOAWAY) sent →
+  // upstream_cx_close_notify increments.
+  test_server_->waitForCounter("cluster.reverse_connection_cluster.upstream_cx_close_notify", Ge(1),
+                               std::chrono::milliseconds(10000));
+
+  ENVOY_LOG_MISC(info, "upstream_cx_close_notify=1. reestablishConnection() should have "
+                       "triggered a new tunnel handshake.");
+
+  // Verify a new connection was established (handshake count 1 → 2).
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(2),
+                               std::chrono::milliseconds(10000));
+  ENVOY_LOG_MISC(info, "New tunnel established (handshake_accepted >= 2).");
+
+  // Complete the in-flight request — it should still succeed on the old (draining) connection.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  ENVOY_LOG_MISC(info, "In-flight request completed successfully on draining connection.");
+
+  // --- Phase 3: Force the new (replacement) tunnel to create its H2 codec. ---
+  // The DrainAwareServerConnection wrapper (and its drain-poll timer) only exists once the H2
+  // codec is created, which happens lazily on first traffic. Send a probe (direct_response) so the
+  // wrapper exists on the new connection, then let the connection go idle again.
+  ENVOY_LOG_MISC(info, "Phase 3: Probing new tunnel to instantiate the drain-aware wrapper.");
+  auto probe_response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/probe"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-computed-host-id", "test-node-id"}});
+  ASSERT_TRUE(probe_response->waitForEndStream());
+  EXPECT_TRUE(probe_response->complete());
+  EXPECT_EQ("200", probe_response->headers().getStatusValue());
+
+  // --- Phase 4: Drain the listener while the replacement connection is idle. ---
+  // The wrapper's drain-poll timer detects the listener drain (drainClose()==true) even though no
+  // stream is active, and schedules the final GOAWAY after drain_timeout (2s). This proves an idle
+  // reverse tunnel is drained gracefully — the case the HCM itself never notices.
+  ENVOY_LOG_MISC(info, "Phase 4: Failing health check to drain the idle replacement connection.");
+  BufferingStreamDecoderPtr hc_fail_response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/healthcheck/fail", "", Http::CodecType::HTTP1, GetParam());
+  EXPECT_TRUE(hc_fail_response->complete());
+  EXPECT_EQ("200", hc_fail_response->headers().getStatusValue());
+
+  // The idle connection's GOAWAY arrives after drain_timeout (2s) — bump from 1 to 2. Allow a
+  // generous window (poll interval + drain_timeout + propagation).
+  test_server_->waitForCounter("cluster.reverse_connection_cluster.upstream_cx_close_notify", Ge(2),
+                               std::chrono::milliseconds(8000));
+
+  ENVOY_LOG_MISC(info, "Drain-aware HCM reconnection test completed successfully.");
+
+  // Cleanup: close test client, then close fake upstream from Phase 2.
+  codec_client_->close();
+  if (fake_upstream_connection_) {
+    ASSERT_TRUE(fake_upstream_connection_->close());
+  }
 }
 
 } // namespace

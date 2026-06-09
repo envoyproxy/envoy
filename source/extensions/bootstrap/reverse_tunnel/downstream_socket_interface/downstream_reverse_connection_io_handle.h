@@ -38,6 +38,13 @@ public:
   Api::IoCallUint64Result close() override;
   Api::SysCallIntResult shutdown(int how) override;
 
+  /**
+   * Trigger immediate reconnection for this reverse connection slot. Called by the
+   * drain-aware HCM when a connection is being gracefully drained but the listener
+   * is still healthy — ensures the reverse tunnel pool stays at target capacity.
+   */
+  void reestablishConnection();
+
   // RPING Interceptor overrides.
   // Send the RPING response from here.
   void onPingMessage() override;

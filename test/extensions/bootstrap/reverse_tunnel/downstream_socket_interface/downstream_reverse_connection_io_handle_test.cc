@@ -165,6 +165,32 @@ protected:
                                                                  connection_key);
   }
 
+  // Helpers to access private members via friend access (friend doesn't extend to TEST_F bodies).
+  void injectHostConnectionInfo(const std::string& host_address, const std::string& cluster_name,
+                                const std::string& connection_key,
+                                uint32_t target_connection_count) {
+    ReverseConnectionIOHandle::HostConnectionInfo host_info;
+    host_info.host_address = host_address;
+    host_info.cluster_name = cluster_name;
+    host_info.connection_keys.insert(connection_key);
+    host_info.target_connection_count = target_connection_count;
+    io_handle_->host_to_conn_info_map_[host_address] = host_info;
+  }
+
+  NiceMock<Event::MockTimer>* injectReconnectTimer() {
+    auto* timer = new NiceMock<Event::MockTimer>();
+    io_handle_->rev_conn_retry_timer_.reset(timer);
+    return timer;
+  }
+
+  bool hostHasConnectionKey(const std::string& host_address, const std::string& connection_key) {
+    auto it = io_handle_->host_to_conn_info_map_.find(host_address);
+    if (it == io_handle_->host_to_conn_info_map_.end()) {
+      return false;
+    }
+    return it->second.connection_keys.count(connection_key) > 0;
+  }
+
   // Test fixtures.
   std::unique_ptr<NiceMock<Network::MockConnectionSocket>> mock_socket_;
   NiceMock<Network::MockIoHandle>* mock_io_handle_; // Raw pointer, managed by socket
@@ -611,6 +637,33 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, DoubleShutdownCallNoDoubleClose)
   handle.reset();
 
   ::close(fds[1]);
+}
+
+// Verify reestablishConnection() with an unknown key does not crash.
+// The parent's onDownstreamConnectionClosed returns early when the key is not in the map.
+TEST_F(DownstreamReverseConnectionIOHandleTest, ReestablishConnectionUnknownKeyNoCrash) {
+  auto handle = createHandle(io_handle_.get(), "unknown_key");
+  EXPECT_NO_THROW(handle->reestablishConnection());
+}
+
+// Verify reestablishConnection() triggers the reconnect timer when the key exists in the parent.
+TEST_F(DownstreamReverseConnectionIOHandleTest, ReestablishConnectionTriggersReconnectTimer) {
+  const std::string connection_key = "reestablish_test_key";
+  const std::string host_address = "10.0.0.1:8080";
+  const std::string cluster_name = "remote-cluster";
+
+  // Set up the parent's internal state via fixture helpers (uses friend access).
+  injectHostConnectionInfo(host_address, cluster_name, connection_key, 2);
+  auto* reconnect_timer = injectReconnectTimer();
+
+  // Expect the timer to be armed with 0ms (immediate reconnection on next event loop).
+  EXPECT_CALL(*reconnect_timer, enableTimer(std::chrono::milliseconds(0), _));
+
+  auto handle = createHandle(io_handle_.get(), connection_key);
+  handle->reestablishConnection();
+
+  // Verify the connection key was removed from the parent's map.
+  EXPECT_FALSE(hostHasConnectionKey(host_address, connection_key));
 }
 
 } // namespace ReverseConnection

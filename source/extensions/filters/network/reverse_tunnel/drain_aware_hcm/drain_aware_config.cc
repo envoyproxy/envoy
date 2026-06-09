@@ -30,8 +30,11 @@ Http::ServerConnectionPtr DrainAwareHttpConnectionManagerConfig::createCodec(
   // Use the listener-level DrainDecision, NOT serverFactoryContext().drainManager().
   // /drain_listeners fires the listener-level drain decision; the server-wide drain manager
   // only fires on hot-restart / full server shutdown.
-  return std::make_unique<DrainAwareServerConnection>(std::move(codec), connection.dispatcher(),
-                                                      factory_context_.drainDecision());
+  // Pass the HCM drain_timeout so the proactive (idle-connection) drain uses the same graceful
+  // window between shutdownNotice and the final goAway as a normal HCM-driven drain.
+  return std::make_unique<DrainAwareServerConnection>(
+      std::move(codec), factory_context_.drainDecision(), connection.getSocket()->ioHandle(),
+      connection.dispatcher(), drainTimeout());
 }
 
 absl::StatusOr<Network::FilterFactoryCb>

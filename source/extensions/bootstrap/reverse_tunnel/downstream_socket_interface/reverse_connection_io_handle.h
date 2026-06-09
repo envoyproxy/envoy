@@ -286,11 +286,15 @@ public:
                              const std::string& connection_key);
 
   /**
-   * Handle downstream connection closure and update internal maps so that the next
-   * maintenance cycle re-initiates the connection.
+   * Handle downstream connection closure and update internal maps.
    * @param connection_key the unique key identifying the closed connection.
+   * @param start_new_connection if true, immediately schedule reconnection via the retry timer
+   *        (0ms delay) rather than waiting for the next maintenance cycle. Used when a healthy
+   *        connection is being drained for connection-level reasons (e.g. max requests) and the
+   *        pool should stay at capacity.
    */
-  void onDownstreamConnectionClosed(const std::string& connection_key);
+  void onDownstreamConnectionClosed(const std::string& connection_key,
+                                    bool start_new_connection = false);
 
   /**
    * Get reference to the cluster manager.

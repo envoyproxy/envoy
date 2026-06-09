@@ -770,7 +770,8 @@ void ReverseConnectionIOHandle::removeConnectionState(const std::string& host_ad
             connection_key, host_address, cluster_name);
 }
 
-void ReverseConnectionIOHandle::onDownstreamConnectionClosed(const std::string& connection_key) {
+void ReverseConnectionIOHandle::onDownstreamConnectionClosed(const std::string& connection_key,
+                                                             bool start_new_connection) {
   ENVOY_LOG(debug, "reverse_tunnel: Downstream connection closed: {}", connection_key);
 
   // Find the host for this connection key.
@@ -805,8 +806,14 @@ void ReverseConnectionIOHandle::onDownstreamConnectionClosed(const std::string& 
   // Remove connection state tracking.
   removeConnectionState(host_address, cluster_name, connection_key);
 
-  // The next call to maintainClusterConnections() will detect the missing connection
-  // and re-initiate it automatically.
+  if (start_new_connection) {
+    // Use a 0ms timer to schedule reconnection on the next event loop iteration, avoiding
+    // re-entrant calls into connection setup from within the close path.
+    return rev_conn_retry_timer_->enableTimer(std::chrono::milliseconds(0));
+  }
+
+  // No immediate reconnection requested — the next periodic maintainClusterConnections()
+  // call will detect the deficit and re-initiate.
   ENVOY_LOG(debug,
             "reverse_tunnel: Connection closure recorded for host {} in cluster {}. "
             "Next maintenance cycle will re-initiate if needed.",

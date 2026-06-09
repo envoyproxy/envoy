@@ -226,6 +226,9 @@ filter_chains:
         stat_prefix: reverse_connection_hcm
         codec_type: HTTP2
         http2_protocol_options: {{}}
+        # Small drain_timeout so the wrapper's proactive goAway (sent drain_timeout after the
+        # listener drain is detected) fires promptly, well before the 1s listener drain completes.
+        drain_timeout: 0.1s
         route_config:
           name: local_route
           virtual_hosts:

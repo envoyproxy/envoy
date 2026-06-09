@@ -88,6 +88,11 @@ Api::SysCallIntResult DownstreamReverseConnectionIOHandle::shutdown(int how) {
   return Api::SysCallIntResult{0, 0};
 }
 
+void DownstreamReverseConnectionIOHandle::reestablishConnection() {
+  ENVOY_LOG(info, "DownstreamReverseConnectionIOHandle: reestablishing connection for FD: {}", fd_);
+  parent_->onDownstreamConnectionClosed(connection_key_, true);
+}
+
 } // namespace ReverseConnection
 } // namespace Bootstrap
 } // namespace Extensions
