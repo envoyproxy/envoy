@@ -94,8 +94,7 @@ Http::Code TcmallocProfilingHandler::handlerHeapDump(Http::ResponseHeaderMap&,
 }
 
 Http::Code TcmallocProfilingHandler::handlerPeakHeapDump(Http::ResponseHeaderMap&,
-                                                         Buffer::Instance& response,
-                                                         AdminStream&) {
+                                                         Buffer::Instance& response, AdminStream&) {
   auto dump_result = Profiler::TcmallocProfiler::tcmallocPeakHeapProfile();
 
   if (dump_result.ok()) {
