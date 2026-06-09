@@ -52,6 +52,12 @@ public:
 
   bool textContentStreamingEnabled(absl::string_view tool_name) const;
 
+  bool traceContextExtraction() const { return proto_config_.has_trace_context_extraction(); }
+
+  bool toolsListChanged() const { return proto_config_.tool_config().list_changed(); }
+
+  const std::string& serverDescription() const { return proto_config_.server_info().description(); }
+
 private:
   struct ToolEntry {
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule http_rule;

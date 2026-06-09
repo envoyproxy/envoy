@@ -242,6 +242,24 @@ public:
   std::string toString(const StatName& stat_name) const;
 
   /**
+   * Serializes stat_name to the same period-delimited form as toString() directly into a
+   * caller-provided buffer, without allocating. This lets callers that already own a buffer, such
+   * as stats sinks during flush, avoid the per-name std::string allocation that toString() incurs.
+   *
+   * At most buffer_size bytes are written and no null terminator is added. The symbol-table lock is
+   * acquired once for the call, so this suits periodic operations such as the stats flush rather
+   * than the request hot path.
+   *
+   * @param stat_name the stat name to serialize.
+   * @param buffer the destination buffer. May be null only if buffer_size is 0, which makes this a
+   *               length query that writes nothing.
+   * @param buffer_size the capacity of buffer in bytes.
+   * @return the total number of bytes the full name requires. If the return value is greater than
+   *         buffer_size the output was truncated and the caller may retry with a larger buffer.
+   */
+  size_t serializeToBuffer(const StatName& stat_name, char* buffer, size_t buffer_size) const;
+
+  /**
    * @return uint64_t the number of symbols in the symbol table.
    */
   uint64_t numSymbols() const;
@@ -573,6 +591,9 @@ protected:
   StatNameStorage() = default;
 };
 
+// Backing store for empty StatName constructor; the 0 indicates there are 0 bytes in the encoding.
+constexpr uint8_t EmptyStatNameData[] = {0};
+
 /**
  * Efficiently represents a stat name using a variable-length array of uint8_t.
  * This class does not own the backing store for this array; the backing-store
@@ -590,7 +611,7 @@ public:
   explicit StatName(const SymbolTable::Storage size_and_data) : size_and_data_(size_and_data) {}
 
   // Constructs an empty StatName object.
-  StatName() = default;
+  StatName() : size_and_data_(EmptyStatNameData) {}
 
   /**
    * Defines default hash function so StatName can be used as a key in an absl
@@ -616,10 +637,6 @@ public:
   bool operator==(const StatName& rhs) const {
     if (size_and_data_ == rhs.size_and_data_) {
       return true;
-    }
-
-    if (size_and_data_ == nullptr || rhs.size_and_data_ == nullptr) {
-      return empty() && rhs.empty();
     }
 
     return dataAsStringView() == rhs.dataAsStringView();
@@ -682,7 +699,7 @@ public:
   bool empty() const {
     // Avoid a full varint decode: it is sufficient to know the first byte,
     // since 0x00 uniquely encodes zero
-    return size_and_data_ == nullptr || size_and_data_[0] == 0;
+    return size_and_data_[0] == 0;
   }
 
   /**
@@ -702,14 +719,11 @@ private:
    * this method so the decode happens in exactly one place.
    */
   absl::string_view dataAsStringView() const {
-    if (size_and_data_ == nullptr) {
-      return {};
-    }
     const auto [data_size, prefix_size] = SymbolTable::Encoding::decodeNumber(size_and_data_);
     return {reinterpret_cast<const char*>(size_and_data_ + prefix_size), data_size};
   }
 
-  const uint8_t* size_and_data_{nullptr};
+  const uint8_t* size_and_data_;
 };
 
 StatName StatNameStorageBase::statName() const { return StatName(bytes_.get()); }

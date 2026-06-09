@@ -11,7 +11,6 @@ filegroup(
         "current/**/*.rst",
     ]) + [
         "changelogs.yaml",
-        "current.yaml",
     ],
     visibility = ["//visibility:public"],
 )

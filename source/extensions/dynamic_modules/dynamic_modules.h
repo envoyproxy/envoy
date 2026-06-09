@@ -1,8 +1,15 @@
 #pragma once
 
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <string>
+
+#include "envoy/extensions/dynamic_modules/v3/dynamic_modules.pb.h"
+#include "envoy/init/manager.h"
+#include "envoy/server/factory_context.h"
+
+#include "source/extensions/common/wasm/remote_async_datasource.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
@@ -10,6 +17,8 @@
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
+
+using ProtoDynamicModuleConfig = envoy::extensions::dynamic_modules::v3::DynamicModuleConfig;
 
 /**
  * A class for loading and managing dynamic modules. This corresponds to a single dlopen handle
@@ -162,6 +171,56 @@ std::filesystem::path moduleTempPath(absl::string_view sha256);
  */
 absl::Status verifyFileSha256(const std::filesystem::path& path,
                               absl::string_view expected_sha256_hex);
+
+/**
+ * Holds the state required to keep an in-flight asynchronous remote module fetch alive. This is
+ * returned (inside DynamicModuleLoadResult) when newDynamicModuleByConfig() needs to fetch the
+ * module from a remote source. The caller must keep this object alive until the fetch completes.
+ */
+struct AsyncLoadingState {
+  // Keeps the remote data provider alive for the duration of the fetch (including retries).
+  RemoteAsyncDataProviderPtr remote_provider;
+  // Invoked on the main thread with the loaded module once the remote fetch succeeds. This is the
+  // on_loaded callback that was passed to newDynamicModuleByConfig().
+  std::function<void(DynamicModulePtr)> on_loaded;
+};
+using AsyncLoadingStateSharedPtr = std::shared_ptr<AsyncLoadingState>;
+
+/**
+ * The result of newDynamicModuleByConfig(). Exactly one of the two members is populated:
+ *  - loaded_ is set when the module was loaded synchronously (local file, by name, or remote
+ *    cache hit). The caller takes ownership of the module and can use it immediately.
+ *  - async_ is set when the module is being fetched asynchronously from a remote source. The
+ *    on_loaded callback supplied to newDynamicModuleByConfig() is invoked once the fetch
+ *    completes; the caller must keep async_ alive until then.
+ */
+struct DynamicModuleLoadResult {
+  DynamicModulePtr loaded_;
+  AsyncLoadingStateSharedPtr async_;
+};
+
+/**
+ * Loads a dynamic module described by the given configuration. This consolidates all the module
+ * sourcing strategies (local file, statically linked by name, and remote HTTP source with on-disk
+ * caching and optional asynchronous fetch) behind a single entry point.
+ *
+ * @param config the dynamic module configuration describing where to source the module from.
+ * @param context the server factory context, used to access the singleton, cluster, dispatcher and
+ * random generator needed for remote fetches and background caching.
+ * @param init_manager the init manager used to register the asynchronous remote fetch target. May
+ * be nullptr; in that case a remote source that is not already cached is rejected with an error.
+ * @param on_loaded invoked on the main thread with the loaded module once an asynchronous remote
+ * fetch completes successfully. Only used for the asynchronous remote path; ignored for the
+ * synchronous paths (where the module is returned directly via DynamicModuleLoadResult::loaded_).
+ * May be empty if the caller does not support asynchronous loading.
+ * @return the load result on success, or an error status if the configuration is invalid or the
+ * module failed to load.
+ */
+absl::StatusOr<DynamicModuleLoadResult>
+newDynamicModuleByConfig(const ProtoDynamicModuleConfig& config,
+                         Server::Configuration::ServerFactoryContext& context,
+                         OptRef<Init::Manager> init_manager = {},
+                         std::function<void(DynamicModulePtr)> on_loaded = nullptr);
 
 } // namespace DynamicModules
 } // namespace Extensions

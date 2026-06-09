@@ -197,7 +197,11 @@ pub trait EnvoyListenerFilter {
 
   /// Get the string-typed dynamic metadata value with the given namespace and key value.
   /// Returns None if the metadata is not found or is the wrong type.
-  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<String>;
+  fn get_dynamic_metadata_string<'a>(
+    &'a self,
+    namespace: &str,
+    key: &str,
+  ) -> Option<EnvoyBuffer<'a>>;
 
   /// Set the string-typed dynamic metadata value with the given namespace and key value.
   fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str);
@@ -793,7 +797,7 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
     }
   }
 
-  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<String> {
+  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<EnvoyBuffer<'_>> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
@@ -807,9 +811,7 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
       )
     };
     if success && !result.ptr.is_null() && result.length > 0 {
-      let value_str =
-        unsafe { crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length) };
-      Some(value_str.into_owned())
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
     } else {
       None
     }
@@ -922,34 +924,20 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
       return Vec::new();
     }
 
-    let mut protocol_buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
-      abi::envoy_dynamic_module_type_envoy_buffer {
-        ptr: std::ptr::null(),
-        length: 0,
-      };
-      size
-    ];
+    let mut protocol_buffers: Vec<EnvoyBuffer> = Vec::with_capacity(size);
     let ok = unsafe {
       abi::envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols(
         self.raw,
-        protocol_buffers.as_mut_ptr(),
+        protocol_buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
     if !ok {
       return Vec::new();
     }
-
+    unsafe {
+      protocol_buffers.set_len(size);
+    }
     protocol_buffers
-      .iter()
-      .take(size)
-      .map(|buf| {
-        if !buf.ptr.is_null() && buf.length > 0 {
-          unsafe { EnvoyBuffer::new_from_raw(buf.ptr as *const _, buf.length) }
-        } else {
-          EnvoyBuffer::default()
-        }
-      })
-      .collect()
   }
 
   fn set_requested_application_protocols<'a>(&mut self, protocols: &'a [&'a str]) {
@@ -1029,34 +1017,20 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
       return Vec::new();
     }
 
-    let mut sans_buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
-      abi::envoy_dynamic_module_type_envoy_buffer {
-        ptr: std::ptr::null(),
-        length: 0,
-      };
-      size
-    ];
+    let mut sans_buffers: Vec<EnvoyBuffer> = Vec::with_capacity(size);
     let ok = unsafe {
       abi::envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans(
         self.raw,
-        sans_buffers.as_mut_ptr(),
+        sans_buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
     if !ok {
       return Vec::new();
     }
-
+    unsafe {
+      sans_buffers.set_len(size);
+    }
     sans_buffers
-      .iter()
-      .take(size)
-      .map(|buf| {
-        if !buf.ptr.is_null() && buf.length > 0 {
-          unsafe { EnvoyBuffer::new_from_raw(buf.ptr as *const _, buf.length) }
-        } else {
-          EnvoyBuffer::default()
-        }
-      })
-      .collect()
   }
 
   fn get_ssl_dns_sans(&self) -> Vec<EnvoyBuffer<'_>> {
@@ -1066,34 +1040,20 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
       return Vec::new();
     }
 
-    let mut sans_buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
-      abi::envoy_dynamic_module_type_envoy_buffer {
-        ptr: std::ptr::null(),
-        length: 0,
-      };
-      size
-    ];
+    let mut sans_buffers: Vec<EnvoyBuffer> = Vec::with_capacity(size);
     let ok = unsafe {
       abi::envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans(
         self.raw,
-        sans_buffers.as_mut_ptr(),
+        sans_buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
     if !ok {
       return Vec::new();
     }
-
+    unsafe {
+      sans_buffers.set_len(size);
+    }
     sans_buffers
-      .iter()
-      .take(size)
-      .map(|buf| {
-        if !buf.ptr.is_null() && buf.length > 0 {
-          unsafe { EnvoyBuffer::new_from_raw(buf.ptr as *const _, buf.length) }
-        } else {
-          EnvoyBuffer::default()
-        }
-      })
-      .collect()
   }
 
   fn get_ssl_subject(&self) -> Option<EnvoyBuffer<'_>> {

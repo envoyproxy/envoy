@@ -10,6 +10,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
+#include "envoy/runtime/runtime.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/cleanup.h"
@@ -137,6 +138,9 @@ public:
   const absl::string_view oghttp2_err_unknown_ = "http2.unknown.oghttp2.error";
   // The number of headers (or trailers) exceeded the configured limits
   const absl::string_view too_many_headers = "http2.too_many_headers";
+  // The total size of headers exceeded the configured limits
+  const absl::string_view header_list_size_too_large = "http2.header_list_size_too_large";
+  const absl::string_view cookies_total_bytes_too_large = "http2.cookies_total_bytes_too_large";
   // Envoy detected an HTTP/2 frame flood from the server.
   const absl::string_view outbound_frame_flood = "http2.outbound_frames_flood";
   // Envoy detected an inbound HTTP/2 frame flood.
@@ -303,7 +307,12 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
       pending_send_data_(parent_.connection_.dispatcher().getWatermarkFactory().createBuffer(
           [this]() -> void { this->pendingSendBufferLowWatermark(); },
           [this]() -> void { this->pendingSendBufferHighWatermark(); },
-          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })) {
+          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
+      cookie_count_(0), local_end_stream_sent_(false), remote_end_stream_(false),
+      remote_rst_(false), data_deferred_(false), received_noninformational_headers_(false),
+      pending_receive_buffer_high_watermark_called_(false),
+      pending_send_buffer_high_watermark_called_(false), reset_due_to_messaging_error_(false),
+      extend_stream_lifetime_flag_(false) {
   parent_.stats_.streams_active_.inc();
   if (buffer_limit > 0) {
     setWriteBufferWatermarks(buffer_limit);
@@ -744,7 +753,9 @@ void ConnectionImpl::StreamImpl::pendingSendBufferLowWatermark() {
 }
 
 void ConnectionImpl::StreamImpl::saveHeader(HeaderString&& name, HeaderString&& value) {
-  if (!Utility::reconstituteCrumbledCookies(name, value, cookies_)) {
+  if (Utility::reconstituteCrumbledCookies(name, value, cookies_)) {
+    cookie_count_++;
+  } else {
     headers().addViaMove(std::move(name), std::move(value));
   }
 }
@@ -974,12 +985,18 @@ void ConnectionImpl::StreamImpl::setAccount(Buffer::BufferMemoryAccountSharedPtr
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stats,
                                Random::RandomGenerator& random_generator,
                                const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-                               const uint32_t max_headers_kb, const uint32_t max_headers_count)
+                               const uint32_t max_headers_kb, const uint32_t max_headers_count,
+                               OptRef<Runtime::Loader> runtime)
     : stats_(stats), connection_(connection), max_headers_kb_(max_headers_kb),
       max_headers_count_(max_headers_count),
       per_stream_buffer_limit_(http2_options.initial_stream_window_size().value()),
       stream_error_on_invalid_http_messaging_(
           http2_options.override_stream_error_on_invalid_http_message().value()),
+      max_cookie_size_bytes_(
+          runtime.has_value() ? runtime->snapshot().getInteger(
+                                    "envoy.reloadable_features.http2_max_cookies_size_in_kb", 0) *
+                                    1024
+                              : 0),
       protocol_constraints_(stats, http2_options), random_(random_generator),
       last_received_data_time_(connection_.dispatcher().timeSource().monotonicTime()) {
   if (http2_options.has_use_oghttp2_codec()) {
@@ -1671,16 +1688,33 @@ int ConnectionImpl::saveHeader(int32_t stream_id, HeaderString&& name, HeaderStr
   }
 
   stream->saveHeader(std::move(name), std::move(value));
+  const uint64_t total_cookie_size = stream->cookies_.size();
+  if (max_cookie_size_bytes_ > 0 && total_cookie_size > max_cookie_size_bytes_) {
+    stream->setDetails(Http2ResponseCodeDetails::get().cookies_total_bytes_too_large);
+    stats_.cookies_total_bytes_too_large_.inc();
+    return ERR_TEMPORAL_CALLBACK_FAILURE;
+  }
+  uint64_t headers_size = stream->headers().byteSize();
+  uint64_t headers_count = stream->headers().size();
 
-  if (stream->headers().byteSize() > max_headers_kb_ * 1024 ||
-      stream->headers().size() > max_headers_count_) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_include_cookies_in_limits")) {
+    headers_size += stream->cookies_.size();
+    headers_count += stream->cookie_count_;
+  }
+
+  if (headers_size > max_headers_kb_ * 1024) {
+    stream->setDetails(Http2ResponseCodeDetails::get().header_list_size_too_large);
+    stats_.header_list_size_too_large_.inc();
+    return ERR_TEMPORAL_CALLBACK_FAILURE;
+  }
+  if (headers_count > max_headers_count_) {
     stream->setDetails(Http2ResponseCodeDetails::get().too_many_headers);
     stats_.header_overflow_.inc();
     // This will cause the library to reset/close the stream.
     return ERR_TEMPORAL_CALLBACK_FAILURE;
-  } else {
-    return 0;
   }
+
+  return 0;
 }
 
 Status ConnectionImpl::sendPendingFrames() {
@@ -2095,6 +2129,9 @@ ConnectionImpl::Http2Options::Http2Options(
   og_options_.allow_different_host_and_authority = true;
   og_options_.allow_obs_text =
       !PROTOBUF_GET_WRAPPED_OR_DEFAULT(http2_options, disallow_obs_text, false);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_include_cookies_in_limits")) {
+    og_options_.enforce_max_header_list_bytes = true;
+  }
   if (!PROTOBUF_GET_WRAPPED_OR_DEFAULT(http2_options, enable_huffman_encoding, true)) {
     if (http2_options.has_hpack_table_size() && http2_options.hpack_table_size().value() == 0) {
       og_options_.compression_option = http2::adapter::OgHttp2Session::Options::DISABLE_COMPRESSION;
@@ -2383,9 +2420,9 @@ ServerConnectionImpl::ServerConnectionImpl(
     const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action,
-    Server::OverloadManager& overload_manager)
+    Server::OverloadManager& overload_manager, OptRef<Runtime::Loader> runtime)
     : ConnectionImpl(connection, stats, random_generator, http2_options, max_request_headers_kb,
-                     max_request_headers_count),
+                     max_request_headers_count, runtime),
       callbacks_(callbacks), headers_with_underscores_action_(headers_with_underscores_action),
       should_send_go_away_on_dispatch_(overload_manager.getLoadShedPoint(
           Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch)),
