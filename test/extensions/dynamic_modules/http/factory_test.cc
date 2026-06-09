@@ -541,6 +541,52 @@ filter_config:
   }
 }
 
+TEST(DynamicModuleConfigFactory, MalformedFilterConfig) {
+  TestEnvironment::setEnvVar(
+      "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+      TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c"),
+      1);
+
+  Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
+
+  // A filter_config Any that claims to be a StringValue but whose bytes are not valid wire format
+  // (a truncated length-delimited field) makes knownAnyToBytes fail after the module itself has
+  // loaded successfully. This must be set programmatically because a filter_config parsed from YAML
+  // is always valid.
+  auto set_malformed = [](auto& proto_config) {
+    proto_config.mutable_dynamic_module_config()->set_name("no_op");
+    proto_config.set_filter_name("foo");
+    auto* any = proto_config.mutable_filter_config();
+    any->set_type_url("type.googleapis.com/google.protobuf.StringValue");
+    any->set_value("\x0a");
+  };
+
+  // createFilterFactory path -> config_init_error.
+  {
+    NiceMock<Server::Configuration::MockFactoryContext> context;
+    envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
+    set_malformed(proto_config);
+
+    auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
+    EXPECT_FALSE(result.ok());
+    auto& server_scope = context.server_factory_context_.scope();
+    EXPECT_EQ(1U, failureCounter(server_scope, "config_init_error", "foo"));
+    EXPECT_EQ(0U, failureCounter(server_scope, "module_load_error", "foo"));
+  }
+
+  // createRouteSpecificFilterConfig path -> per_route_config_error.
+  {
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
+    envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilterPerRoute proto_config;
+    set_malformed(proto_config);
+
+    auto result = factory.createRouteSpecificFilterConfig(
+        proto_config, context, ProtobufMessage::getNullValidationVisitor());
+    EXPECT_FALSE(result.ok());
+    EXPECT_EQ(1U, failureCounter(context.scope(), "per_route_config_error", "foo"));
+  }
+}
+
 } // namespace HttpFilters
 } // namespace DynamicModules
 } // namespace Extensions
