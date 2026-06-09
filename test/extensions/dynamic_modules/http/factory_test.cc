@@ -1,5 +1,6 @@
 #include "envoy/extensions/filters/http/dynamic_modules/v3/dynamic_modules.pb.h"
 
+#include "source/common/stats/utility.h"
 #include "source/extensions/filters/http/dynamic_modules/factory.h"
 
 #include "test/extensions/dynamic_modules/util.h"
@@ -10,6 +11,20 @@ namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
 namespace HttpFilters {
+
+namespace {
+
+// Reads the value of a ``dynamic_modules.<leaf>`` failure counter tagged with the given filter
+// name.
+uint64_t failureCounter(Stats::Scope& scope, absl::string_view leaf, absl::string_view filter) {
+  Stats::StatNameDynamicPool pool(scope.symbolTable());
+  Stats::StatNameTagVector tags{{pool.add("config_name"), pool.add(filter)}};
+  return Stats::Utility::counterFromElements(
+             scope, {Stats::DynamicName("dynamic_modules"), Stats::DynamicName(leaf)}, tags)
+      .value();
+}
+
+} // namespace
 
 TEST(DynamicModuleConfigFactory, Overrides) {
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
@@ -56,6 +71,14 @@ filter_config:
 
   EXPECT_CALL(callbacks, addStreamFilter(testing::_));
   factory_cb(callbacks);
+
+  // No config-load failure stats should be emitted on the happy path. The failure counters live on
+  // the server scope (so they survive a rejected listener config), not the listener scope.
+  auto& server_scope = context.server_factory_context_.scope();
+  EXPECT_EQ(0U, failureCounter(server_scope, "module_load_error", "foo"));
+  EXPECT_EQ(0U, failureCounter(server_scope, "config_init_error", "foo"));
+  EXPECT_EQ(0U, failureCounter(server_scope, "remote_fetch_error", "foo"));
+  EXPECT_EQ(0U, failureCounter(server_scope, "per_route_config_error", "foo"));
 }
 
 TEST(DynamicModuleConfigFactory, LoadOKPerRoute) {
@@ -379,6 +402,11 @@ filter_config:
   EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
   EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to load dynamic module:"));
 
+  // A module that cannot be loaded at all bumps the module_load_error counter, tagged with the
+  // filter name. The counter is on the server scope, which outlives the rejected listener config.
+  EXPECT_EQ(1U,
+            failureCounter(context.server_factory_context_.scope(), "module_load_error", "foo"));
+
   // Test cases for missing symbols.
   std::vector<std::pair<std::string, std::string>> test_cases = {
       {"no_http_config_new", "envoy_dynamic_module_on_http_filter_config_new"},
@@ -418,6 +446,39 @@ filter_config:
         testing::HasSubstr(fmt::format("Failed to resolve symbol {}", missing_symbol_name)));
   }
 
+  // The module loads fine in each of these cases (dlopen + program_init succeed); the failure is in
+  // resolving the HTTP filter ABI symbols during config initialization, so config_init_error is
+  // bumped once per case while module_load_error stays at its earlier value. All cases share the
+  // same filter name "foo", so they accumulate on the one config_init_error{filter="foo"} series.
+  EXPECT_EQ(test_cases.size(),
+            failureCounter(context.server_factory_context_.scope(), "config_init_error", "foo"));
+  EXPECT_EQ(1U,
+            failureCounter(context.server_factory_context_.scope(), "module_load_error", "foo"));
+
+  // A module that loads and exposes every symbol but whose on_http_filter_config_new returns null
+  // also bumps config_init_error.
+  {
+    NiceMock<Server::Configuration::MockFactoryContext> init_fail_context;
+    const std::string yaml = R"EOF(
+dynamic_module_config:
+    name: http_filter_config_new_fail
+filter_name: foo
+filter_config:
+    "@type": "type.googleapis.com/google.protobuf.StringValue"
+    value: "bar"
+)EOF";
+    envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
+    TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+    auto result = factory.createFilterFactoryFromProto(proto_config, "", init_fail_context);
+    EXPECT_FALSE(result.ok());
+    EXPECT_THAT(result.status().message(),
+                testing::HasSubstr("Failed to initialize dynamic module"));
+    auto& server_scope = init_fail_context.server_factory_context_.scope();
+    EXPECT_EQ(1U, failureCounter(server_scope, "config_init_error", "foo"));
+    EXPECT_EQ(0U, failureCounter(server_scope, "module_load_error", "foo"));
+  }
+
   auto symbol_err = [](const std::string& symbol) {
     return fmt::format("Failed to resolve symbol {}", symbol);
   };
@@ -441,6 +502,7 @@ filter_config:
     EXPECT_FALSE(result.ok());
     EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to load dynamic module:"));
+    EXPECT_EQ(1U, failureCounter(context.scope(), "per_route_config_error", "foo"));
   }
 
   std::vector<std::pair<std::string, std::string>> per_route_test_cases = {
@@ -474,6 +536,8 @@ filter_config:
     EXPECT_FALSE(result.ok());
     EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_THAT(result.status().message(), testing::HasSubstr(expected_error));
+    // A fresh context is used per iteration, so the per-route failure counter is exactly one.
+    EXPECT_EQ(1U, failureCounter(context.scope(), "per_route_config_error", "foo"));
   }
 }
 

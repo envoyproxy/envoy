@@ -38,6 +38,7 @@ envoy_cc_test(
     name = "factory_test",
     srcs = ["factory_test.cc"],
     data = [
+        "//test/extensions/dynamic_modules/test_data/c:http_filter_config_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:http_filter_per_route_config_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:no_http_config_destroy",
         "//test/extensions/dynamic_modules/test_data/c:no_http_config_new",
