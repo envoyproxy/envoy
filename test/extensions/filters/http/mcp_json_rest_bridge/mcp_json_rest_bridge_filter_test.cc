@@ -1910,6 +1910,39 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsCallPerRouteConfigOverridesStaticTool) 
   EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
             Http::FilterDataStatus::StopIterationNoBuffer);
 }
+TEST_F(McpJsonRestBridgeFilterTest, ToolsListPerRouteConfigOverridesStaticConfig) {
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
+  proto_config.mutable_tool_config()->mutable_tool_list_http_rule()->set_get("/static/path");
+
+  auto config = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
+  filter_ = std::make_unique<McpJsonRestBridgeFilter>(config);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute
+      override_config;
+  override_config.mutable_tool_config()->mutable_tool_list_http_rule()->set_get(
+      "/override/path");
+
+  McpJsonRestBridgePerRouteConfig override(override_config);
+
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig)
+      .WillByDefault(testing::Return(&override));
+
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(testing::Return(Http::RequestHeaderMapOptRef(request_headers_)));
+
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl request_body(R"json({"jsonrpc":"2.0","id":12,"method":"tools/list"})json");
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+  EXPECT_THAT(request_headers_.getPathValue(), StrEq("/override/path"));
+  EXPECT_THAT(request_headers_.getMethodValue(), StrEq("GET"));
+}
+
 } // namespace
 } // namespace McpJsonRestBridge
 } // namespace HttpFilters
