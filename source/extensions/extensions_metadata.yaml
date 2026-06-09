@@ -1099,6 +1099,13 @@ envoy.filters.upstream_network.reverse_tunnel_lifecycle:
   status: wip
   type_urls:
   - google.protobuf.Empty
+envoy.formatter.all_headers:
+  categories:
+  - envoy.formatter
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.formatter.all_headers.v3.AllHeaders
 envoy.formatter.cel:
   categories:
   - envoy.formatter

@@ -514,6 +514,7 @@ EXTENSIONS = {
     # Formatter
     #
 
+    "envoy.formatter.all_headers":                       "//source/extensions/formatter/all_headers:config",
     "envoy.formatter.cel":                              "//source/extensions/formatter/cel:config",
     "envoy.formatter.dynamic_modules":                  "//source/extensions/formatter/dynamic_modules:config",
     "envoy.formatter.file_content":                     "//source/extensions/formatter/file_content:config",

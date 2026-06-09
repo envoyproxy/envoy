@@ -303,6 +303,7 @@ proto_library(
         "//envoy/extensions/filters/udp/udp_proxy/session/dynamic_forward_proxy/v3:pkg",
         "//envoy/extensions/filters/udp/udp_proxy/session/http_capsule/v3:pkg",
         "//envoy/extensions/filters/udp/udp_proxy/v3:pkg",
+        "//envoy/extensions/formatter/all_headers/v3:pkg",
         "//envoy/extensions/formatter/cel/v3:pkg",
         "//envoy/extensions/formatter/dynamic_modules/v3:pkg",
         "//envoy/extensions/formatter/file_content/v3:pkg",

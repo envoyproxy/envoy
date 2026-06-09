@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package envoy.extensions.formatter.all_headers.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.formatter.all_headers.v3";
+option java_outer_classname = "AllHeadersProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/formatter/all_headers/v3;all_headersv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Formatter extension for printing all request or response headers]
+// [#extension: envoy.formatter.all_headers]
+
+// AllHeaders formatter extension implements REQ_ALL_HEADERS and RESP_ALL_HEADERS command
+// operators that serialize all HTTP request or response headers into a JSON object.
+// This is useful for security observability and threat detection where logging all headers
+// is needed without enumerating each header individually in the access log configuration.
+// See :ref:`here <config_access_log>` for more information on access log configuration.
+
+// %REQ_ALL_HEADERS%
+//   Serializes all HTTP request headers as a JSON object. Each header name becomes a key
+//   and the header value becomes the corresponding string value. Repeated headers are
+//   comma-joined per RFC 7230. Pseudo-headers (e.g. ``:method``, ``:path``) are included.
+
+// %RESP_ALL_HEADERS%
+//   Serializes all HTTP response headers as a JSON object. Same behavior as
+//   REQ_ALL_HEADERS but operates on response headers.
+
+// Configuration for the all headers formatter.
+message AllHeaders {
+  // Truncate individual header values longer than this many bytes. 0 means unlimited.
+  uint32 max_value_bytes = 1;
+
+  // Header names to exclude from output (case-insensitive).
+  // Recommended: ["authorization", "cookie", "set-cookie"] to avoid logging sensitive data.
+  repeated string exclude_headers = 2;
+}

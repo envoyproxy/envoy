@@ -1815,6 +1815,58 @@ Current supported substitution commands include:
   TCP/UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
+``%REQ_ALL_HEADERS%``
+  HTTP
+    Serializes all HTTP request headers as a JSON object. Each header name becomes a
+    lowercase key and the header value becomes the corresponding string value. Repeated
+    headers with the same name are comma-joined per RFC 7230. Pseudo-headers
+    (``:method``, ``:path``, ``:authority``) are included. When no request headers are
+    available, ``"-"`` appears in the access log (or ``null`` in JSON format).
+
+    .. note::
+
+      ``set-cookie`` headers are not safely comma-joinable per RFC 6265. If you need
+      to log ``set-cookie`` values faithfully, consider excluding them via
+      ``exclude_headers`` and logging them separately with ``%RESP(set-cookie)%``.
+
+    When used with ``json_format``, the output is a nested JSON object rather than a flat
+    string, allowing downstream log consumers to parse individual headers without
+    additional deserialization.
+
+    This formatter is an extension, which must be explicitly configured with:
+
+    .. validated-code-block:: yaml
+      :type-name: envoy.config.core.v3.TypedExtensionConfig
+
+      name: envoy.formatter.all_headers
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.formatter.all_headers.v3.AllHeaders
+        max_value_bytes: 256
+        exclude_headers:
+          - "authorization"
+          - "cookie"
+          - "set-cookie"
+
+    Configuration options:
+
+    - ``max_value_bytes``: Truncate individual header values longer than this many bytes.
+      ``0`` means unlimited (default).
+    - ``exclude_headers``: List of header names (case-insensitive) to omit from the output.
+      It is recommended to exclude sensitive headers such as ``authorization``, ``cookie``,
+      and ``set-cookie``.
+
+  TCP/UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
+``%RESP_ALL_HEADERS%``
+  HTTP
+    Serializes all HTTP response headers as a JSON object. Behavior is the same as
+    ``%REQ_ALL_HEADERS%`` but operates on response headers. Shares the same extension
+    configuration (``envoy.formatter.all_headers``).
+
+  TCP/UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
 ``%FILE_CONTENT(X:Y):Z%``
   Evaluates to the content of the file at path ``X``. The file is reloaded whenever it changes.
 
