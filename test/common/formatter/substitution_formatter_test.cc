@@ -1813,6 +1813,50 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
       }
     }
   }
+
+  {
+    // DS_CX_BEG resolves to the downstream connection begin and DS_CX_END to the connection end.
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    MockTimeSystem time_system;
+
+    EXPECT_CALL(time_system, monotonicTime)
+        .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(1000000))));
+    stream_info.start_time_monotonic_ = time_system.monotonicTime();
+
+    // DS_CX_END is unset until the downstream connection closes.
+    StreamInfoFormatter unset_format("COMMON_DURATION", "DS_CX_BEG:DS_CX_END:us");
+    EXPECT_EQ(absl::nullopt, unset_format.format({}, stream_info));
+    EXPECT_THAT(unset_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
+
+    EXPECT_CALL(time_system, monotonicTime)
+        .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(4000000))));
+    stream_info.downstream_timing_.onDownstreamConnectionEnd(time_system);
+
+    StreamInfoFormatter duration_format("COMMON_DURATION", "DS_CX_BEG:DS_CX_END:us");
+    EXPECT_EQ("3000", duration_format.format({}, stream_info));
+    EXPECT_THAT(duration_format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::numberValue(3000)));
+  }
+
+  {
+    // DS_CX_BEG uses the downstream connection begin time point when set, instead of the stream
+    // start time, so the connection duration reflects the whole connection for HTTP.
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    MockTimeSystem time_system;
+
+    stream_info.start_time_monotonic_ = MonotonicTime(std::chrono::nanoseconds(1000000));
+    stream_info.downstream_timing_.setDownstreamConnectionBegin(
+        MonotonicTime(std::chrono::nanoseconds(500000)));
+
+    EXPECT_CALL(time_system, monotonicTime)
+        .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(4000000))));
+    stream_info.downstream_timing_.onDownstreamConnectionEnd(time_system);
+
+    StreamInfoFormatter duration_format("COMMON_DURATION", "DS_CX_BEG:DS_CX_END:us");
+    EXPECT_EQ("3500", duration_format.format({}, stream_info));
+    EXPECT_THAT(duration_format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::numberValue(3500)));
+  }
 }
 
 TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {

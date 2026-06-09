@@ -201,41 +201,6 @@ TEST_F(RouteEntryImplTest, RoutePerFilterConfigWithUnknownType) {
  * unexpected type is used to find the filter factory. But the extension lookup by name is enabled
  * and the mock filter is found.
  */
-TEST_F(RouteEntryImplTest, RoutePerFilterConfigWithUnknownTypeButEnableExtensionLookupByName) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
-  ON_CALL(filter_config_, createEmptyRouteConfigProto()).WillByDefault(Invoke([]() {
-    return std::make_unique<Protobuf::Struct>();
-  }));
-  Registry::InjectFactory<NamedFilterConfigFactory> registration(filter_config_);
-
-  ON_CALL(filter_config_, createRouteSpecificFilterConfig(_, _, _))
-      .WillByDefault(
-          Invoke([this](const Protobuf::Message&, Server::Configuration::ServerFactoryContext&,
-                        ProtobufMessage::ValidationVisitor&) {
-            auto route_config = std::make_shared<RouteConfig>();
-            route_config_map_.emplace(filter_config_.name(), route_config);
-            return route_config;
-          }));
-
-  const std::string yaml_config = R"EOF(
-    cluster: cluster_0
-    per_filter_config:
-      envoy.filters.generic.mock_filter:
-        # The mock filter is registered with the type of google.protobuf.Struct.
-        # So the google.protobuf.Value cannot be used to find the mock filter.
-        "@type": type.googleapis.com/xds.type.v3.TypedStruct
-        type_url: type.googleapis.com/google.protobuf.Value
-        value:
-          value: { "key_0": "value_0" }
-  )EOF";
-
-  initialize(yaml_config);
-
-  EXPECT_EQ(route_->perFilterConfig("envoy.filters.generic.mock_filter"),
-            route_config_map_.at("envoy.filters.generic.mock_filter").get());
-}
 
 /**
  * Test the case where there is no route level proto available for the filter.

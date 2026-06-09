@@ -372,6 +372,22 @@ TEST_P(DynamicModuleHttpLanguageTests, DynamicMetadataCallbacks) {
   key = ns_res_header->second.fields().find("key");
   ASSERT_NE(key, ns_res_header->second.fields().end());
   EXPECT_EQ(key->second.number_value(), 123);
+  // Multiple string entries set in one namespace via the batch setter. The batch SDK wrapper is
+  // Rust-only, so scope these assertions to the rust parameterization like the other language
+  // guards in the dynamic_modules integration tests.
+  if (GetParam() == "rust") {
+    auto ns_req_header_batch = metadata.filter_metadata().find("ns_req_header_batch");
+    ASSERT_NE(ns_req_header_batch, metadata.filter_metadata().end());
+    auto batch_k1 = ns_req_header_batch->second.fields().find("k1");
+    ASSERT_NE(batch_k1, ns_req_header_batch->second.fields().end());
+    EXPECT_EQ(batch_k1->second.string_value(), "v1");
+    auto batch_k2 = ns_req_header_batch->second.fields().find("k2");
+    ASSERT_NE(batch_k2, ns_req_header_batch->second.fields().end());
+    EXPECT_EQ(batch_k2->second.string_value(), "v2");
+    // The empty batch must not have created a namespace.
+    EXPECT_EQ(metadata.filter_metadata().find("ns_req_header_batch_empty"),
+              metadata.filter_metadata().end());
+  }
   auto ns_req_body = metadata.filter_metadata().find("ns_req_body");
   ASSERT_NE(ns_req_body, metadata.filter_metadata().end());
   key = ns_req_body->second.fields().find("key");

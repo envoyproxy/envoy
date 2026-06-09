@@ -53,6 +53,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "trace_context_test",
+    srcs = ["trace_context_test.cc"],
+    deps = [
+        "//source/extensions/filters/http/mcp_json_rest_bridge:trace_context_lib",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_cc_test(
     name = "sse_response_extractor_test",
     srcs = ["sse_response_extractor_test.cc"],
     deps = [

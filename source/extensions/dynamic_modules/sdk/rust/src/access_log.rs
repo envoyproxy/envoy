@@ -1160,37 +1160,21 @@ impl LogContext {
       return Vec::new();
     }
 
-    let mut headers = vec![
-      abi::envoy_dynamic_module_type_envoy_http_header {
-        key_ptr: ptr::null_mut(),
-        key_length: 0,
-        value_ptr: ptr::null_mut(),
-        value_length: 0,
-      };
-      count
-    ];
-
+    let mut headers: Vec<(EnvoyBuffer, EnvoyBuffer)> = Vec::with_capacity(count);
     let success = unsafe {
       abi::envoy_dynamic_module_callback_access_logger_get_headers(
         self.envoy_ptr,
         header_type,
-        headers.as_mut_ptr(),
+        headers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
       )
     };
-
     if !success {
       return Vec::new();
     }
-
+    unsafe {
+      headers.set_len(count);
+    }
     headers
-      .iter()
-      .map(|h| unsafe {
-        (
-          EnvoyBuffer::new_from_raw(h.key_ptr as *const u8, h.key_length),
-          EnvoyBuffer::new_from_raw(h.value_ptr as *const u8, h.value_length),
-        )
-      })
-      .collect()
   }
 
   /// Helper to retrieve an `EnvoyBuffer` from an ABI callback.
@@ -1226,28 +1210,20 @@ impl LogContext {
       return Vec::new();
     }
 
-    let mut buffers = vec![
-      abi::envoy_dynamic_module_type_envoy_buffer {
-        ptr: ptr::null_mut(),
-        length: 0,
-      };
-      count
-    ];
-
-    if !unsafe { data_cb(self.envoy_ptr, buffers.as_mut_ptr()) } {
+    let mut buffers: Vec<EnvoyBuffer> = Vec::with_capacity(count);
+    if !unsafe {
+      data_cb(
+        self.envoy_ptr,
+        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
+      )
+    } {
       return Vec::new();
     }
-
+    unsafe {
+      buffers.set_len(count);
+    }
+    buffers.retain(|buf| !buf.as_slice().is_empty());
     buffers
-      .iter()
-      .filter_map(|buf| {
-        if buf.ptr.is_null() || buf.length == 0 {
-          None
-        } else {
-          Some(unsafe { EnvoyBuffer::new_from_raw(buf.ptr as *const u8, buf.length) })
-        }
-      })
-      .collect()
   }
 }
 

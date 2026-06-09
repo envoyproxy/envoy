@@ -5,8 +5,8 @@
 //! connections in Envoy.
 
 use crate::{abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, wrap_into_c_void_ptr};
+use mockall::*;
 use std::cell::RefCell;
-use std::ffi::c_void;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 /// What should happen to the connection after a transport socket read or write completes.
@@ -89,6 +89,29 @@ impl From<abi::envoy_dynamic_module_type_transport_socket_post_io_action> for Po
   }
 }
 
+/// Outcome of a raw socket read or write performed via [`EnvoyTransportSocket::io_read`] and
+/// [`EnvoyTransportSocket::io_write`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IoStatus {
+  /// Bytes were transferred. For a read with a non-empty buffer, zero bytes means the peer closed
+  /// the read side.
+  Success,
+  /// The socket would block. The caller should stop and retry later.
+  Again,
+  /// The operation failed. The caller should close the connection.
+  Error,
+}
+
+impl From<abi::envoy_dynamic_module_type_transport_socket_io_status> for IoStatus {
+  fn from(value: abi::envoy_dynamic_module_type_transport_socket_io_status) -> Self {
+    match value {
+      abi::envoy_dynamic_module_type_transport_socket_io_status::Success => IoStatus::Success,
+      abi::envoy_dynamic_module_type_transport_socket_io_status::Again => IoStatus::Again,
+      abi::envoy_dynamic_module_type_transport_socket_io_status::Error => IoStatus::Error,
+    }
+  }
+}
+
 /// Connection lifecycle events forwarded through the transport socket surface.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConnectionEvent {
@@ -137,39 +160,36 @@ impl From<abi::envoy_dynamic_module_type_network_connection_event> for Connectio
 }
 
 /// Envoy-side operations available to an in-module transport socket implementation.
+#[automock]
 pub trait EnvoyTransportSocket {
-  /// Returns the raw I/O handle for the connection, if one is exposed to the module.
-  fn get_io_handle(&self) -> Option<*mut c_void>;
-  /// Returns the native OS file descriptor for the I/O handle, or `None` if unavailable.
-  fn io_handle_fd(&self, io_handle: *mut c_void) -> Option<i32>;
-  /// Reads from the raw I/O handle into `buffer`. Returns `Ok(bytes_read)` on success.
-  fn io_handle_read(&self, io_handle: *mut c_void, buffer: &mut [u8]) -> Result<usize, i64>;
-  /// Writes to the raw I/O handle from `data`. Returns `Ok(bytes_written)` on success.
-  fn io_handle_write(&self, io_handle: *mut c_void, data: &[u8]) -> Result<usize, i64>;
-  /// Drains `length` bytes from the start of the read buffer.
-  fn read_buffer_drain(&self, length: usize);
+  /// Reads raw bytes from the underlying socket into `buffer`. Returns the status and the number of
+  /// bytes read. When `buffer` is non-empty, a `Success` status with zero bytes means the peer
+  /// closed the read side.
+  fn io_read(&self, buffer: &mut [u8]) -> (IoStatus, usize);
+  /// Writes raw bytes to the underlying socket from `data`. Returns the status and the number of
+  /// bytes written.
+  fn io_write(&self, data: &[u8]) -> (IoStatus, usize);
+  /// Shuts down the write side of the underlying socket so the peer observes end of stream.
+  fn io_shutdown_write(&self);
   /// Appends `data` to the read buffer.
   fn read_buffer_add(&self, data: &[u8]);
-  /// Returns the current length of the read buffer.
-  fn read_buffer_length(&self) -> usize;
+  /// Appends the current contents of the write buffer to `out`.
+  fn copy_write_buffer(&self, out: &mut Vec<u8>);
   /// Drains `length` bytes from the start of the write buffer.
   fn write_buffer_drain(&self, length: usize);
-  /// Fills `slices_out` with up to its length write-buffer slices. Returns how many slices were
-  /// written.
-  fn write_buffer_get_slices(
-    &self,
-    slices_out: &mut [abi::envoy_dynamic_module_type_envoy_buffer],
-  ) -> usize;
-  /// Returns the current length of the write buffer.
-  fn write_buffer_length(&self) -> usize;
   /// Raises `event` on the underlying connection.
   fn raise_event(&self, event: ConnectionEvent);
   /// Returns whether Envoy expects the read buffer to be drained for flow-control reasons.
   fn should_drain_read_buffer(&self) -> bool;
   /// Requests that a future event-loop iteration schedules a read.
   fn set_is_readable(&self);
-  /// Flushes pending write data toward the transport.
+  /// Requests that the connection flush its write buffer, for example after queuing handshake
+  /// bytes outside of a write step.
   fn flush_write_buffer(&self);
+  /// Returns the remote (peer) address as `(address, port)`. The address is empty when unavailable.
+  fn get_remote_address(&self) -> (String, u32);
+  /// Returns the local address as `(address, port)`. The address is empty when unavailable.
+  fn get_local_address(&self) -> (String, u32);
 }
 
 /// Envoy transport socket handle implemented with ABI callbacks into Envoy.
@@ -182,70 +202,61 @@ impl EnvoyTransportSocketImpl {
   pub fn new(raw: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr) -> Self {
     Self { raw }
   }
+
+  /// Shared body for the local and remote address callbacks.
+  fn get_address(
+    &self,
+    callback: unsafe extern "C" fn(
+      abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
+      *mut abi::envoy_dynamic_module_type_envoy_buffer,
+      *mut u32,
+    ) -> bool,
+  ) -> (String, u32) {
+    let mut address = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let mut port: u32 = 0;
+    let available = unsafe { callback(self.raw, &mut address, &mut port) };
+    if !available || address.length == 0 || address.ptr.is_null() {
+      return (String::new(), 0);
+    }
+    let address =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(address.ptr as *const u8, address.length) };
+    (address.into_owned(), port)
+  }
 }
 
-// SAFETY: The raw pointer is an opaque handle to an Envoy-side transport socket that is only used
-// on the connection's thread as required by the ABI.
-unsafe impl Send for EnvoyTransportSocketImpl {}
-unsafe impl Sync for EnvoyTransportSocketImpl {}
-
-#[allow(clippy::not_unsafe_ptr_arg_deref)]
 impl EnvoyTransportSocket for EnvoyTransportSocketImpl {
-  fn get_io_handle(&self) -> Option<*mut c_void> {
-    let p = unsafe { abi::envoy_dynamic_module_callback_transport_socket_get_io_handle(self.raw) };
-    if p.is_null() {
-      None
-    } else {
-      Some(p)
-    }
-  }
-
-  fn io_handle_fd(&self, io_handle: *mut c_void) -> Option<i32> {
-    let fd = unsafe { abi::envoy_dynamic_module_callback_transport_socket_io_handle_fd(io_handle) };
-    if fd < 0 {
-      None
-    } else {
-      Some(fd)
-    }
-  }
-
-  fn io_handle_read(&self, io_handle: *mut c_void, buffer: &mut [u8]) -> Result<usize, i64> {
+  fn io_read(&self, buffer: &mut [u8]) -> (IoStatus, usize) {
     let mut bytes_read: usize = 0;
-    let rc = unsafe {
-      abi::envoy_dynamic_module_callback_transport_socket_io_handle_read(
-        io_handle,
+    let status = unsafe {
+      abi::envoy_dynamic_module_callback_transport_socket_io_read(
+        self.raw,
         buffer.as_mut_ptr().cast(),
         buffer.len(),
         &mut bytes_read,
       )
     };
-    if rc == 0 {
-      Ok(bytes_read)
-    } else {
-      Err(rc)
-    }
+    (status.into(), bytes_read)
   }
 
-  fn io_handle_write(&self, io_handle: *mut c_void, data: &[u8]) -> Result<usize, i64> {
+  fn io_write(&self, data: &[u8]) -> (IoStatus, usize) {
     let mut bytes_written: usize = 0;
-    let rc = unsafe {
-      abi::envoy_dynamic_module_callback_transport_socket_io_handle_write(
-        io_handle,
+    let status = unsafe {
+      abi::envoy_dynamic_module_callback_transport_socket_io_write(
+        self.raw,
         data.as_ptr().cast(),
         data.len(),
         &mut bytes_written,
       )
     };
-    if rc == 0 {
-      Ok(bytes_written)
-    } else {
-      Err(rc)
-    }
+    (status.into(), bytes_written)
   }
 
-  fn read_buffer_drain(&self, length: usize) {
+  fn io_shutdown_write(&self) {
     unsafe {
-      abi::envoy_dynamic_module_callback_transport_socket_read_buffer_drain(self.raw, length);
+      abi::envoy_dynamic_module_callback_transport_socket_io_shutdown_write(self.raw);
     }
   }
 
@@ -262,45 +273,46 @@ impl EnvoyTransportSocket for EnvoyTransportSocketImpl {
     }
   }
 
-  fn read_buffer_length(&self) -> usize {
-    unsafe { abi::envoy_dynamic_module_callback_transport_socket_read_buffer_length(self.raw) }
+  fn copy_write_buffer(&self, out: &mut Vec<u8>) {
+    let mut count: usize = 0;
+    unsafe {
+      abi::envoy_dynamic_module_callback_transport_socket_write_buffer_get_slices(
+        self.raw,
+        std::ptr::null_mut(),
+        &mut count,
+      );
+    }
+    if count == 0 {
+      return;
+    }
+    let mut slices = vec![
+      abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: std::ptr::null(),
+        length: 0,
+      };
+      count
+    ];
+    let mut filled = count;
+    unsafe {
+      abi::envoy_dynamic_module_callback_transport_socket_write_buffer_get_slices(
+        self.raw,
+        slices.as_mut_ptr(),
+        &mut filled,
+      );
+    }
+    for slice in &slices[..filled.min(count)] {
+      if slice.ptr.is_null() || slice.length == 0 {
+        continue;
+      }
+      let bytes = unsafe { std::slice::from_raw_parts(slice.ptr as *const u8, slice.length) };
+      out.extend_from_slice(bytes);
+    }
   }
 
   fn write_buffer_drain(&self, length: usize) {
     unsafe {
       abi::envoy_dynamic_module_callback_transport_socket_write_buffer_drain(self.raw, length);
     }
-  }
-
-  fn write_buffer_get_slices(
-    &self,
-    slices_out: &mut [abi::envoy_dynamic_module_type_envoy_buffer],
-  ) -> usize {
-    if slices_out.is_empty() {
-      return 0;
-    }
-    let mut total: usize = 0;
-    unsafe {
-      abi::envoy_dynamic_module_callback_transport_socket_write_buffer_get_slices(
-        self.raw,
-        std::ptr::null_mut(),
-        &mut total,
-      );
-    }
-    let want = total.min(slices_out.len());
-    let mut count = want;
-    unsafe {
-      abi::envoy_dynamic_module_callback_transport_socket_write_buffer_get_slices(
-        self.raw,
-        slices_out.as_mut_ptr(),
-        &mut count,
-      );
-    }
-    count
-  }
-
-  fn write_buffer_length(&self) -> usize {
-    unsafe { abi::envoy_dynamic_module_callback_transport_socket_write_buffer_length(self.raw) }
   }
 
   fn raise_event(&self, event: ConnectionEvent) {
@@ -327,22 +339,30 @@ impl EnvoyTransportSocket for EnvoyTransportSocketImpl {
       abi::envoy_dynamic_module_callback_transport_socket_flush_write_buffer(self.raw);
     }
   }
+
+  fn get_remote_address(&self) -> (String, u32) {
+    self.get_address(abi::envoy_dynamic_module_callback_transport_socket_get_remote_address)
+  }
+
+  fn get_local_address(&self) -> (String, u32) {
+    self.get_address(abi::envoy_dynamic_module_callback_transport_socket_get_local_address)
+  }
 }
 
 /// In-module factory configuration for transport sockets created from this module.
 ///
-/// This trait must be implemented by the module. Implementations must be `Send + Sync` because
-/// they are shared across threads during configuration loading.
-pub trait TransportSocketFactoryConfig<ETS: EnvoyTransportSocket + ?Sized>: Send + Sync {
+/// This trait must be implemented by the module. Implementations must be `Sync` since they are
+/// accessed from worker threads.
+pub trait TransportSocketFactoryConfig<ETS: EnvoyTransportSocket + ?Sized>: Sync {
   /// Creates a new transport socket instance for a connection.
   fn new_transport_socket(&self, envoy: &mut ETS) -> Box<dyn TransportSocket<ETS>>;
 }
 
 /// In-module transport socket instance for a single connection.
 ///
-/// Implementations must be `Send` because connection ownership may move across worker contexts
-/// according to Envoy threading rules for transport sockets.
-pub trait TransportSocket<ETS: EnvoyTransportSocket + ?Sized>: Send {
+/// All the event hooks are called on the same thread as the one that the [`TransportSocket`] is
+/// created via the [`TransportSocketFactoryConfig::new_transport_socket`] method.
+pub trait TransportSocket<ETS: EnvoyTransportSocket + ?Sized> {
   /// Called when Envoy installs callbacks on the transport socket.
   fn on_set_callbacks(&mut self, envoy: &mut ETS);
   /// Called when the transport reports that the connection is established.
@@ -351,17 +371,22 @@ pub trait TransportSocket<ETS: EnvoyTransportSocket + ?Sized>: Send {
   fn on_do_read(&mut self, envoy: &mut ETS) -> IoResult;
   /// Performs an encrypt/write step from the write buffer.
   fn on_do_write(&mut self, envoy: &mut ETS, end_stream: bool) -> IoResult;
-  /// Called when the transport socket is closed.
-  fn on_close(&mut self, envoy: &mut ETS, event: ConnectionEvent);
+  /// Called when the transport socket is closed. When `abort_reset` is true the connection is being
+  /// torn down with a TCP reset and any graceful shutdown should be skipped.
+  fn on_close(&mut self, envoy: &mut ETS, event: ConnectionEvent, abort_reset: bool);
   /// Returns the negotiated application protocol, if any.
   fn get_protocol(&self, envoy: &mut ETS) -> String;
   /// Returns a human-readable failure reason, if any.
   fn get_failure_reason(&self, envoy: &mut ETS) -> String;
   /// Returns whether the socket may flush and close.
   fn can_flush_close(&self, envoy: &mut ETS) -> bool;
+  /// Instructs the socket to begin using secure transport, as used by the STARTTLS pattern. Returns
+  /// whether the socket switched to secure transport. Sockets that do not support this return
+  /// false.
+  fn start_secure_transport(&mut self, envoy: &mut ETS) -> bool;
 }
 
-// -- Internal Implementation Types --
+// Internal Implementation Types
 
 thread_local! {
   static GET_PROTOCOL_BUF: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
@@ -392,7 +417,7 @@ fn fill_string_buffer_out(
   });
 }
 
-// -- FFI Event Hook Implementations --
+// Transport Socket Event Hook Implementations
 
 /// # Safety
 ///
@@ -579,7 +604,6 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_do_read(
 pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_do_write(
   transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
   transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
-  _write_buffer_length: usize,
   end_stream: bool,
 ) -> abi::envoy_dynamic_module_type_transport_socket_io_result {
   catch_unwind(AssertUnwindSafe(|| {
@@ -603,11 +627,14 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_close(
   transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
   transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
   event: abi::envoy_dynamic_module_type_network_connection_event,
+  abort_reset: bool,
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let wrapper = unsafe { &mut *(transport_socket_module_ptr as *mut TransportSocketWrapper) };
     let mut envoy = EnvoyTransportSocketImpl::new(transport_socket_envoy_ptr);
-    wrapper.socket.on_close(&mut envoy, event.into());
+    wrapper
+      .socket
+      .on_close(&mut envoy, event.into(), abort_reset);
   }))
   .map_err(|panic| {
     crate::log_ffi_panic("envoy_dynamic_module_on_transport_socket_close", panic);
@@ -679,6 +706,29 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_can_flush_clos
   .unwrap_or_else(|panic| {
     crate::log_ffi_panic(
       "envoy_dynamic_module_on_transport_socket_can_flush_close",
+      panic,
+    );
+    false
+  })
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_start_secure_transport(
+  transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
+  transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
+) -> bool {
+  catch_unwind(AssertUnwindSafe(|| {
+    let wrapper = unsafe { &mut *(transport_socket_module_ptr as *mut TransportSocketWrapper) };
+    let mut envoy = EnvoyTransportSocketImpl::new(transport_socket_envoy_ptr);
+    wrapper.socket.start_secure_transport(&mut envoy)
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_transport_socket_start_secure_transport",
       panic,
     );
     false
