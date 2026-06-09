@@ -37,6 +37,7 @@ envoy_cc_library(
         ":transport_socket_lib",
         "//envoy/api:io_error_interface",
         "//envoy/buffer:buffer_interface",
+        "//envoy/event:file_event_interface",
         "//envoy/network:address_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:transport_socket_interface",
