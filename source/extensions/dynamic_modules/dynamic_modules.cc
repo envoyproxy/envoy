@@ -291,7 +291,7 @@ absl::StatusOr<DynamicModulePtr> newStaticModule(const absl::string_view module_
 }
 
 absl::StatusOr<DynamicModuleLoadResult> newDynamicModuleByConfig(
-    const ProtoDynamicModuleConfig& config, Server::Configuration::ServerFactoryContext& context,
+    const ProtoDynamicModuleConfig& config, Server::Configuration::CommonFactoryContext& context,
     OptRef<Init::Manager> init_manager, std::function<void(DynamicModulePtr)> on_loaded) {
 
   if (!config.has_module()) {
@@ -303,22 +303,22 @@ absl::StatusOr<DynamicModuleLoadResult> newDynamicModuleByConfig(
     auto dynamic_module =
         newDynamicModuleByName(config.name(), config.do_not_close(), config.load_globally());
     if (!dynamic_module.ok()) {
-      return absl::InvalidArgumentError("Failed to load dynamic module: " +
-                                        std::string(dynamic_module.status().message()));
+      return absl::InvalidArgumentError(
+          absl::StrCat("Failed to load dynamic module: ", dynamic_module.status().message()));
     }
     return DynamicModuleLoadResult{std::move(dynamic_module.value()), nullptr};
   }
 
   // Data source-based dynamic module loading: load the module from the specified data source, which
-  // may be a local file path or a remote HTTP URL. If the source is remote.
+  // may be a local file path or a remote HTTP URL.
 
   if (!config.module().local().filename().empty()) {
     // Module specified by local file path.
     auto dynamic_module = newDynamicModule(config.module().local().filename(),
                                            config.do_not_close(), config.load_globally());
     if (!dynamic_module.ok()) {
-      return absl::InvalidArgumentError("Failed to load dynamic module: " +
-                                        std::string(dynamic_module.status().message()));
+      return absl::InvalidArgumentError(
+          absl::StrCat("Failed to load dynamic module: ", dynamic_module.status().message()));
     }
     return DynamicModuleLoadResult{std::move(dynamic_module.value()), nullptr};
   }
@@ -328,6 +328,8 @@ absl::StatusOr<DynamicModuleLoadResult> newDynamicModuleByConfig(
         "Only local file path or remote HTTP source is supported for module sources");
   }
 
+  // Remote HTTP source. The cache management, NACK background fetch, and asynchronous fetch paths
+  // below all use the factory context.
   const absl::string_view sha256 = config.module().remote().sha256();
 
   // Check if a previously fetched module with the same SHA256 already exists on disk.
@@ -359,8 +361,8 @@ absl::StatusOr<DynamicModuleLoadResult> newDynamicModuleByConfig(
       }
       // File exists, hash matches, but failed to load — re-fetching the same SHA256 would
       // produce identical bytes, so there is no point in falling through.
-      return absl::InvalidArgumentError("Cached remote module failed to load: " +
-                                        std::string(dynamic_module.status().message()));
+      return absl::InvalidArgumentError(
+          absl::StrCat("Cached remote module failed to load: ", dynamic_module.status().message()));
     }
   }
 
@@ -370,7 +372,7 @@ absl::StatusOr<DynamicModuleLoadResult> newDynamicModuleByConfig(
     BackgroundFetchManager::singleton(context.singletonManager())
         ->fetchIfNeeded(sha256, context.clusterManager(), config.module().remote());
     return absl::InvalidArgumentError(
-        "Remote module not cached; background fetch in progress. SHA256: " + std::string(sha256));
+        absl::StrCat("Remote module not cached; background fetch in progress. SHA256: ", sha256));
   }
 
   // No cached file — need async fetch, which requires init_manager.

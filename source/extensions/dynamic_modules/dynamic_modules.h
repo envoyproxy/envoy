@@ -204,11 +204,18 @@ struct DynamicModuleLoadResult {
  * sourcing strategies (local file, statically linked by name, and remote HTTP source with on-disk
  * caching and optional asynchronous fetch) behind a single entry point.
  *
+ * The local-file and by-name paths are fully synchronous and use only the config. The remote HTTP
+ * source path uses the context (only the members shared by all extension points,
+ * CommonFactoryContext, are needed), and the asynchronous fetch additionally requires an init
+ * manager and an on_loaded callback; if either of those is missing, a remote source is rejected
+ * with an error.
+ *
  * @param config the dynamic module configuration describing where to source the module from.
- * @param context the server factory context, used to access the singleton, cluster, dispatcher and
- * random generator needed for remote fetches and background caching.
+ * @param context the factory context, used to access the singleton, cluster, dispatcher and random
+ * generator needed for remote fetches and background caching. Only used for the remote HTTP source
+ * path; ignored for local-file and by-name sources.
  * @param init_manager the init manager used to register the asynchronous remote fetch target. May
- * be nullptr; in that case a remote source that is not already cached is rejected with an error.
+ * be absent; in that case a remote source that is not already cached is rejected with an error.
  * @param on_loaded invoked on the main thread with the loaded module once an asynchronous remote
  * fetch completes successfully. Only used for the asynchronous remote path; ignored for the
  * synchronous paths (where the module is returned directly via DynamicModuleLoadResult::loaded_).
@@ -218,7 +225,7 @@ struct DynamicModuleLoadResult {
  */
 absl::StatusOr<DynamicModuleLoadResult>
 newDynamicModuleByConfig(const ProtoDynamicModuleConfig& config,
-                         Server::Configuration::ServerFactoryContext& context,
+                         Server::Configuration::CommonFactoryContext& context,
                          OptRef<Init::Manager> init_manager = {},
                          std::function<void(DynamicModulePtr)> on_loaded = nullptr);
 
