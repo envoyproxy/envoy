@@ -443,7 +443,10 @@ struct DownstreamTiming {
     ASSERT(!last_downstream_header_rx_byte_received_);
     last_downstream_header_rx_byte_received_ = time_source.monotonicTime();
   }
-  void setDownstreamConnectionBegin(MonotonicTime time) { downstream_connection_begin_ = time; }
+  void setDownstreamConnectionBegin(MonotonicTime time) {
+    ASSERT(!downstream_connection_begin_);
+    downstream_connection_begin_ = time;
+  }
   void onDownstreamConnectionEnd(TimeSource& time_source) {
     // Record only the first close so the connection duration is not inflated.
     if (!downstream_connection_end_) {
