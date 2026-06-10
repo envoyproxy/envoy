@@ -7,7 +7,9 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/stream_info/uint64_accessor_impl.h"
 #include "source/extensions/io_socket/user_space/file_event_impl.h"
+#include "source/extensions/io_socket/user_space/filter_state_keys.h"
 
 #include "absl/types/optional.h"
 
@@ -371,10 +373,11 @@ Api::SysCallIntResult IoHandleImpl::shutdown(int how) {
 
 void PassthroughStateImpl::initialize(
     std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
-    const StreamInfo::FilterState::Objects& filter_state_objects) {
+    const StreamInfo::FilterState::Objects& filter_state_objects, uint64_t connection_id) {
   ASSERT(state_ == State::Created);
   metadata_ = std::move(metadata);
   filter_state_objects_ = filter_state_objects;
+  connection_id_ = connection_id;
   state_ = State::Initialized;
 }
 void PassthroughStateImpl::mergeInto(envoy::config::core::v3::Metadata& metadata,
@@ -388,8 +391,15 @@ void PassthroughStateImpl::mergeInto(envoy::config::core::v3::Metadata& metadata
     filter_state.setData(object.name_, object.data_, StreamInfo::FilterState::LifeSpan::Connection,
                          object.stream_sharing_);
   }
+  if (connection_id_.has_value()) {
+    filter_state.setData(ConnectionIdFilterStateKey,
+                         std::make_shared<StreamInfo::UInt64AccessorImpl>(*connection_id_),
+                         StreamInfo::FilterState::LifeSpan::Connection,
+                         StreamInfo::StreamSharingMayImpactPooling::None);
+  }
   metadata_ = nullptr;
   filter_state_objects_.clear();
+  connection_id_ = absl::nullopt;
   state_ = State::Done;
 }
 

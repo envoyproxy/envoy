@@ -15,7 +15,8 @@ void InternalSocket::setTransportSocketCallbacks(Network::TransportSocketCallbac
   transport_socket_->setTransportSocketCallbacks(callbacks);
   auto* io_handle = dynamic_cast<IoSocket::UserSpace::IoHandle*>(&callbacks.ioHandle());
   if (io_handle != nullptr && io_handle->passthroughState()) {
-    io_handle->passthroughState()->initialize(std::move(metadata_), filter_state_objects_);
+    io_handle->passthroughState()->initialize(std::move(metadata_), filter_state_objects_,
+                                              callbacks.connection().id());
   }
   metadata_ = nullptr;
   filter_state_objects_.clear();

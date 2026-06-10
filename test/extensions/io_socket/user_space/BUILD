@@ -34,9 +34,11 @@ envoy_extension_cc_test(
     extension_names = ["envoy.io_socket.user_space"],
     rbe_pool = "6gig",
     deps = [
+        "//envoy/stream_info:uint64_accessor_interface",
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/stream_info:filter_state_lib",
+        "//source/extensions/io_socket/user_space:filter_state_keys_lib",
         "//source/extensions/io_socket/user_space:io_handle_impl_lib",
         "//test/mocks/event:event_mocks",
     ],
