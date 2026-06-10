@@ -41,6 +41,7 @@ using testing::AnyNumber;
 using testing::AtLeast;
 using testing::ElementsAre;
 using testing::EndsWith;
+using testing::Ge;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
@@ -4887,6 +4888,107 @@ TEST_P(Http2CodecImplTest, InvalidHeadersFrameInvalid) {
   }
 }
 #endif
+
+TEST_P(Http2CodecImplTest, HeaderListSizeTooLargeHistogram) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.http2_record_histograms", true);
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.http2_include_cookies_in_limits", false);
+  max_request_headers_kb_ = 5;
+  initialize();
+  if (http2_implementation_ == Http2Impl::Oghttp2) {
+    GTEST_SKIP();
+  }
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  for (int i = 0; i < 60; i++) {
+    request_headers.addCopy("cookie", std::string(100, 'a'));
+  }
+
+  // Request should succeed since cookie size is not counted toward size limit.
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  std::vector<uint64_t> header_sizes =
+      server_stats_store_.histogramValues("http2.header_list_size", false);
+  EXPECT_EQ(header_sizes.size(), 1);
+  EXPECT_THAT(header_sizes, ElementsAre(Ge(6000)));
+}
+
+TEST_P(Http2CodecImplTest, CookieSizeHistogram) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.http2_record_histograms", true);
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.http2_include_cookies_in_limits", false);
+  max_request_headers_kb_ = 5;
+  initialize();
+  if (http2_implementation_ == Http2Impl::Oghttp2) {
+    GTEST_SKIP();
+  }
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  for (int i = 0; i < 60; i++) {
+    request_headers.addCopy("cookie", std::string(100, 'a'));
+  }
+
+  // Request should succeed since cookie size is not counted toward size limit.
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  auto cookie_sizes = server_stats_store_.histogramValues("http2.cookie_size", false);
+  EXPECT_EQ(cookie_sizes.size(), 1);
+  EXPECT_THAT(cookie_sizes, ElementsAre(Ge(6000)));
+}
+
+TEST_P(Http2CodecImplTest, TooManyHeadersHistogram) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.http2_record_histograms", true);
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.http2_include_cookies_in_limits", false);
+  max_request_headers_count_ = 10;
+  max_request_headers_kb_ = 100;
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  for (int i = 0; i < 10; i++) {
+    request_headers.addCopy(absl::StrCat("header", i), "value");
+  }
+
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset, _));
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  auto header_counts = server_stats_store_.histogramValues("http2.header_count", false);
+  EXPECT_EQ(header_counts.size(), 1);
+  EXPECT_THAT(header_counts, ElementsAre(Ge(10)));
+}
+
+TEST_P(Http2CodecImplTest, TooManyCookiesHistogram) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.http2_record_histograms", true);
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.http2_include_cookies_in_limits", false);
+  max_request_headers_count_ = 10;
+  max_request_headers_kb_ = 100;
+  initialize();
+  if (http2_implementation_ == Http2Impl::Oghttp2) {
+    GTEST_SKIP();
+  }
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  for (int i = 0; i < 10; i++) {
+    request_headers.addCopy("cookie", "value");
+  }
+
+  // Request should succeed since cookie size is not counted toward size limit.
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  std::vector<uint64_t> cookie_counts =
+      server_stats_store_.histogramValues("http2.cookie_count", false);
+  EXPECT_EQ(cookie_counts.size(), 1);
+  EXPECT_THAT(cookie_counts, ElementsAre(Ge(10)));
+}
 
 } // namespace Http2
 } // namespace Http
