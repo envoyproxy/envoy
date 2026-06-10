@@ -2,6 +2,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 #include "source/extensions/filters/http/dynamic_modules/filter_config.h"
@@ -21,7 +22,12 @@ absl::StatusOr<Http::FilterFactoryCb> buildFilterFactoryCallback(
   std::string config;
   if (proto_config.has_filter_config()) {
     auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.filter_config());
-    RETURN_IF_NOT_OK_REF(config_or_error.status());
+    if (!config_or_error.ok()) {
+      Extensions::DynamicModules::incrementLoadFailure(
+          context.scope(), proto_config.filter_name(),
+          Extensions::DynamicModules::ConfigInitErrorStat);
+      return config_or_error.status();
+    }
     config = std::move(config_or_error.value());
   }
 
@@ -39,6 +45,9 @@ absl::StatusOr<Http::FilterFactoryCb> buildFilterFactoryCallback(
               std::move(dynamic_module), scope, context);
 
   if (!filter_config.ok()) {
+    Extensions::DynamicModules::incrementLoadFailure(
+        context.scope(), proto_config.filter_name(),
+        Extensions::DynamicModules::ConfigInitErrorStat);
     return absl::InvalidArgumentError("Failed to create filter config: " +
                                       std::string(filter_config.status().message()));
   }
@@ -113,8 +122,11 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
     state->filter_factory_cb = cb_or_error.value();
   };
 
+  // The shared loader emits the load-level failure counters (module_load_error /
+  // remote_fetch_error) itself, tagged with the filter name; on a non-ok status we just propagate
+  // it without double-counting.
   auto load_result = Extensions::DynamicModules::newDynamicModuleByConfig(
-      module_config, context, init_manager, std::move(on_loaded));
+      module_config, context, init_manager, std::move(on_loaded), proto_config.filter_name());
   RETURN_IF_NOT_OK_REF(load_result.status());
 
   // Synchronous load (local file, by name, or remote cache hit): build the factory now.
@@ -148,13 +160,21 @@ DynamicModuleConfigFactory::createFilterFactoryFromProtoWithServerContextTyped(
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 DynamicModuleConfigFactory::createRouteSpecificFilterConfigTyped(
-    const RouteConfigProto& proto_config, Server::Configuration::ServerFactoryContext&,
+    const RouteConfigProto& proto_config, Server::Configuration::ServerFactoryContext& context,
     ProtobufMessage::ValidationVisitor&) {
 
   const auto& module_config = proto_config.dynamic_module_config();
+
+  absl::string_view filter_name = proto_config.filter_name();
+  if (filter_name.empty()) {
+    filter_name = proto_config.per_route_config_name();
+  }
+
   auto dynamic_module = Extensions::DynamicModules::newDynamicModuleByName(
       module_config.name(), module_config.do_not_close(), module_config.load_globally());
   if (!dynamic_module.ok()) {
+    Extensions::DynamicModules::incrementLoadFailure(
+        context.scope(), filter_name, Extensions::DynamicModules::PerRouteConfigErrorStat);
     return absl::InvalidArgumentError("Failed to load dynamic module: " +
                                       std::string(dynamic_module.status().message()));
   }
@@ -162,13 +182,12 @@ DynamicModuleConfigFactory::createRouteSpecificFilterConfigTyped(
   std::string config;
   if (proto_config.has_filter_config()) {
     auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.filter_config());
-    RETURN_IF_NOT_OK_REF(config_or_error.status());
+    if (!config_or_error.ok()) {
+      Extensions::DynamicModules::incrementLoadFailure(
+          context.scope(), filter_name, Extensions::DynamicModules::PerRouteConfigErrorStat);
+      return config_or_error.status();
+    }
     config = std::move(config_or_error.value());
-  }
-
-  absl::string_view filter_name = proto_config.filter_name();
-  if (filter_name.empty()) {
-    filter_name = proto_config.per_route_config_name();
   }
 
   absl::StatusOr<Envoy::Extensions::DynamicModules::HttpFilters::
@@ -178,6 +197,8 @@ DynamicModuleConfigFactory::createRouteSpecificFilterConfigTyped(
               filter_name, config, std::move(dynamic_module.value()));
 
   if (!filter_config.ok()) {
+    Extensions::DynamicModules::incrementLoadFailure(
+        context.scope(), filter_name, Extensions::DynamicModules::PerRouteConfigErrorStat);
     return absl::InvalidArgumentError("Failed to create pre-route filter config: " +
                                       std::string(filter_config.status().message()));
   }
