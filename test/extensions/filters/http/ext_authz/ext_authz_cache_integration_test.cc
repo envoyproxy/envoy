@@ -12,11 +12,11 @@
 #include "source/extensions/filters/http/ext_authz/auth_cache.h"
 
 #include "test/integration/http_integration.h"
-#include "test/test_common/utility.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/utility.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "gtest/gtest.h"
-#include "google/protobuf/struct.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -27,7 +27,7 @@ namespace ExtAuthz {
 struct SimpleInMemoryCacheStorage {
   absl::Mutex mutex;
   // Map path -> Response.
-  std::unordered_map<std::string, Filters::Common::ExtAuthz::Response> map ABSL_GUARDED_BY(mutex);
+  absl::flat_hash_map<std::string, Filters::Common::ExtAuthz::Response> map ABSL_GUARDED_BY(mutex);
 };
 
 class SimpleInMemoryCache : public AuthCache {
@@ -57,8 +57,8 @@ public:
     cb(nullptr);
   }
 
-  void insert(const Filters::Common::ExtAuthz::Response& response,
-              Tracing::Span&, const StreamInfo::StreamInfo&) override {
+  void insert(const Filters::Common::ExtAuthz::Response& response, Tracing::Span&,
+              const StreamInfo::StreamInfo&) override {
     if (current_key_.empty()) {
       return;
     }
@@ -83,10 +83,12 @@ public:
     return std::make_unique<SimpleInMemoryCache>(storage_);
   }
 
-  std::string name() const override { return "envoy.filters.http.ext_authz.cache.simple_in_memory"; }
+  std::string name() const override {
+    return "envoy.filters.http.ext_authz.cache.simple_in_memory";
+  }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<google::protobuf::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
 
   void clear() {
@@ -111,7 +113,8 @@ public:
 
   void initialize() override {
     cache_factory_.clear();
-    inject_cache_factory_ = std::make_unique<Registry::InjectFactory<AuthCacheFactory>>(cache_factory_);
+    inject_cache_factory_ =
+        std::make_unique<Registry::InjectFactory<AuthCacheFactory>>(cache_factory_);
 
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Add ext_authz cluster by merging from cluster_0 (backend)
@@ -129,7 +132,7 @@ public:
       // Configure the cache
       auto* cache_config = ext_authz_proto.mutable_cache();
       cache_config->set_name("envoy.filters.http.ext_authz.cache.simple_in_memory");
-      cache_config->mutable_typed_config()->PackFrom(google::protobuf::Struct());
+      cache_config->mutable_typed_config()->PackFrom(Protobuf::Struct());
 
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
       ext_authz_filter.set_name("envoy.filters.http.ext_authz");
@@ -142,9 +145,7 @@ public:
     HttpIntegrationTest::initialize();
   }
 
-  void TearDown() override {
-    cleanup();
-  }
+  void TearDown() override { cleanup(); }
 
   void cleanup() {
     if (fake_ext_authz_connection_ != nullptr) {
@@ -166,10 +167,8 @@ TEST_F(ExtAuthzCacheIntegrationTest, CacheMissThenHit) {
 
   // --- Request 1: Cache Miss ---
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
-                                         {":path", "/cache-me"},
-                                         {":scheme", "http"},
-                                         {":authority", "host"}};
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"}, {":path", "/cache-me"}, {":scheme", "http"}, {":authority", "host"}};
   auto response1 = codec_client_->makeHeaderOnlyRequest(headers);
 
   // Wait for ext_authz check request on fake authz upstream (fake_upstreams_[1])
