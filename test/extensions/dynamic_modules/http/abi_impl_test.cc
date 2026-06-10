@@ -2734,6 +2734,28 @@ TEST(ABIImpl, ConfigStats) {
                 filter_config.get(), invalid_stat_id, nullptr, 0, 10),
             envoy_dynamic_module_type_metrics_result_MetricNotFound);
 
+  // test using invalid stat id with labels present, which resolves against the *Vec lookups
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_increment_counter(
+                filter_config.get(), invalid_stat_id, counter_vec_labels_values.data(),
+                counter_vec_labels_values.size(), 10),
+            envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_increment_gauge(
+                filter_config.get(), invalid_stat_id, gauge_vec_labels_values.data(),
+                gauge_vec_labels_values.size(), 10),
+            envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_decrement_gauge(
+                filter_config.get(), invalid_stat_id, gauge_vec_labels_values.data(),
+                gauge_vec_labels_values.size(), 10),
+            envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_set_gauge(
+                filter_config.get(), invalid_stat_id, gauge_vec_labels_values.data(),
+                gauge_vec_labels_values.size(), 10),
+            envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_record_histogram_value(
+                filter_config.get(), invalid_stat_id, histogram_vec_labels_values.data(),
+                histogram_vec_labels_values.size(), 10),
+            envoy_dynamic_module_type_metrics_result_MetricNotFound);
+
   // test using invalid labels
   const std::string label_value = "invalid_value";
   std::vector<envoy_dynamic_module_type_module_buffer> invalid_labels = {
@@ -2746,6 +2768,14 @@ TEST(ABIImpl, ConfigStats) {
       envoy_dynamic_module_type_metrics_result_InvalidLabels);
   EXPECT_EQ(
       envoy_dynamic_module_callback_http_filter_config_increment_gauge(
+          filter_config.get(), gauge_vec_id, invalid_labels.data(), invalid_labels.size(), 10),
+      envoy_dynamic_module_type_metrics_result_InvalidLabels);
+  EXPECT_EQ(
+      envoy_dynamic_module_callback_http_filter_config_decrement_gauge(
+          filter_config.get(), gauge_vec_id, invalid_labels.data(), invalid_labels.size(), 10),
+      envoy_dynamic_module_type_metrics_result_InvalidLabels);
+  EXPECT_EQ(
+      envoy_dynamic_module_callback_http_filter_config_set_gauge(
           filter_config.get(), gauge_vec_id, invalid_labels.data(), invalid_labels.size(), 10),
       envoy_dynamic_module_type_metrics_result_InvalidLabels);
   EXPECT_EQ(
