@@ -24,8 +24,7 @@ absl::StatusOr<Http::FilterFactoryCb> buildFilterFactoryCallback(
     auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.filter_config());
     if (!config_or_error.ok()) {
       Extensions::DynamicModules::incrementLoadFailure(
-          context.scope(), proto_config.filter_name(),
-          Extensions::DynamicModules::ConfigInitErrorStat);
+          context, proto_config.filter_name(), Extensions::DynamicModules::ConfigInitErrorStat);
       return config_or_error.status();
     }
     config = std::move(config_or_error.value());
@@ -46,8 +45,7 @@ absl::StatusOr<Http::FilterFactoryCb> buildFilterFactoryCallback(
 
   if (!filter_config.ok()) {
     Extensions::DynamicModules::incrementLoadFailure(
-        context.scope(), proto_config.filter_name(),
-        Extensions::DynamicModules::ConfigInitErrorStat);
+        context, proto_config.filter_name(), Extensions::DynamicModules::ConfigInitErrorStat);
     return absl::InvalidArgumentError("Failed to create filter config: " +
                                       std::string(filter_config.status().message()));
   }
@@ -126,22 +124,21 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
   // remote_fetch_error) itself, tagged with the filter name; on a non-ok status we just propagate
   // it without double-counting.
   auto load_result = Extensions::DynamicModules::newDynamicModuleByConfig(
-      module_config, context, init_manager, std::move(on_loaded), proto_config.filter_name());
+      module_config, proto_config.filter_name(), context, init_manager, std::move(on_loaded));
   RETURN_IF_NOT_OK_REF(load_result.status());
 
   // Synchronous load (local file, by name, or remote cache hit): build the factory now.
-  if (load_result->loaded_ != nullptr) {
-    return buildFilterFactoryCallback(std::move(load_result->loaded_), proto_config, context,
-                                      scope);
+  if (load_result->loaded != nullptr) {
+    return buildFilterFactoryCallback(std::move(load_result->loaded), proto_config, context, scope);
   }
 
-  ASSERT(load_result->async_ != nullptr, "Async loading state must be populated for async loads");
+  ASSERT(load_result->async != nullptr, "Async loading state must be populated for async loads");
 
   // Asynchronous remote fetch in progress: keep the loading state alive and return a fail-open
   // factory that becomes active once the fetch completes. If the fetch fails (network error, bad
   // data, etc.), filter_factory_cb remains empty and this lambda is a no-op — the filter is not
   // installed and requests pass through, consistent with how Wasm remote data providers behave.
-  async_state->loading_state = std::move(load_result->async_);
+  async_state->loading_state = std::move(load_result->async);
   return [async_state](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     if (async_state->filter_factory_cb) {
       async_state->filter_factory_cb(callbacks);
@@ -174,7 +171,7 @@ DynamicModuleConfigFactory::createRouteSpecificFilterConfigTyped(
       module_config.name(), module_config.do_not_close(), module_config.load_globally());
   if (!dynamic_module.ok()) {
     Extensions::DynamicModules::incrementLoadFailure(
-        context.scope(), filter_name, Extensions::DynamicModules::PerRouteConfigErrorStat);
+        context, filter_name, Extensions::DynamicModules::PerRouteConfigErrorStat);
     return absl::InvalidArgumentError("Failed to load dynamic module: " +
                                       std::string(dynamic_module.status().message()));
   }
@@ -184,7 +181,7 @@ DynamicModuleConfigFactory::createRouteSpecificFilterConfigTyped(
     auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.filter_config());
     if (!config_or_error.ok()) {
       Extensions::DynamicModules::incrementLoadFailure(
-          context.scope(), filter_name, Extensions::DynamicModules::PerRouteConfigErrorStat);
+          context, filter_name, Extensions::DynamicModules::PerRouteConfigErrorStat);
       return config_or_error.status();
     }
     config = std::move(config_or_error.value());
@@ -198,7 +195,7 @@ DynamicModuleConfigFactory::createRouteSpecificFilterConfigTyped(
 
   if (!filter_config.ok()) {
     Extensions::DynamicModules::incrementLoadFailure(
-        context.scope(), filter_name, Extensions::DynamicModules::PerRouteConfigErrorStat);
+        context, filter_name, Extensions::DynamicModules::PerRouteConfigErrorStat);
     return absl::InvalidArgumentError("Failed to create pre-route filter config: " +
                                       std::string(filter_config.status().message()));
   }

@@ -188,15 +188,15 @@ using AsyncLoadingStateSharedPtr = std::shared_ptr<AsyncLoadingState>;
 
 /**
  * The result of newDynamicModuleByConfig(). Exactly one of the two members is populated:
- *  - loaded_ is set when the module was loaded synchronously (local file, by name, or remote
+ *  - loaded is set when the module was loaded synchronously (local file, by name, or remote
  *    cache hit). The caller takes ownership of the module and can use it immediately.
- *  - async_ is set when the module is being fetched asynchronously from a remote source. The
+ *  - async is set when the module is being fetched asynchronously from a remote source. The
  *    on_loaded callback supplied to newDynamicModuleByConfig() is invoked once the fetch
- *    completes; the caller must keep async_ alive until then.
+ *    completes; the caller must keep async alive until then.
  */
 struct DynamicModuleLoadResult {
-  DynamicModulePtr loaded_;
-  AsyncLoadingStateSharedPtr async_;
+  DynamicModulePtr loaded;
+  AsyncLoadingStateSharedPtr async;
 };
 
 /**
@@ -211,6 +211,9 @@ struct DynamicModuleLoadResult {
  * on_loaded callback; if any of those is missing, a remote source is rejected with an error.
  *
  * @param config the dynamic module configuration describing where to source the module from.
+ * @param stat_name the configured name of the extension instance using the module (e.g.
+ * ``filter_name``, ``transport_socket_name``, ``lb_policy_name``). Falls back to ``default`` if
+ * empty.
  * @param context the factory context, used to access the singleton, cluster, dispatcher and random
  * generator needed for remote fetches and background caching. Only the members shared by all
  * extension points (CommonFactoryContext) are required. May be absent; in that case a remote source
@@ -219,16 +222,13 @@ struct DynamicModuleLoadResult {
  * be absent; in that case a remote source that is not already cached is rejected with an error.
  * @param on_loaded invoked on the main thread with the loaded module once an asynchronous remote
  * fetch completes successfully. Only used for the asynchronous remote path; ignored for the
- * synchronous paths (where the module is returned directly via DynamicModuleLoadResult::loaded_).
+ * synchronous paths (where the module is returned directly via DynamicModuleLoadResult::loaded).
  * May be empty if the caller does not support asynchronous loading.
- * @param stat_name the configured name of the extension instance using the module (e.g.
- * ``filter_name``); used as the ``config_name`` tag on the ``dynamic_modules.*`` load-failure
- * counters emitted on the server scope. May be empty.
  * @return the load result on success, or an error status if the configuration is invalid or the
  * module failed to load.
  */
 absl::StatusOr<DynamicModuleLoadResult>
-newDynamicModuleByConfig(const ProtoDynamicModuleConfig& config,
+newDynamicModuleByConfig(const ProtoDynamicModuleConfig& config, absl::string_view stat_name,
                          OptRef<Server::Configuration::CommonFactoryContext> context = {},
                          OptRef<Init::Manager> init_manager = {},
                          std::function<void(DynamicModulePtr)> on_loaded = nullptr);

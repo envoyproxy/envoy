@@ -24,11 +24,11 @@ AccessLog::InstanceSharedPtr DynamicModuleAccessLogFactory::createAccessLogInsta
   // Access loggers do not support remote module sources, so no init manager or async callback is
   // passed; only the synchronous local-file and by-name paths can succeed here.
   auto load_result = Extensions::DynamicModules::newDynamicModuleByConfig(
-      module_config, context.serverFactoryContext());
+      module_config, proto_config.logger_name(), context.serverFactoryContext());
   if (!load_result.ok()) {
     throw EnvoyException(std::string(load_result.status().message()));
   }
-  auto dynamic_module = std::move(load_result->loaded_);
+  auto dynamic_module = std::move(load_result->loaded);
 
   // Use knownAnyToBytes() to properly handle StringValue/BytesValue/Struct types.
   std::string logger_config_str;

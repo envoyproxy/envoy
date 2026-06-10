@@ -22,12 +22,13 @@ DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
   const auto& module_config = proto_config.dynamic_module_config();
   // Input matchers do not support remote module sources, so no init manager or async callback is
   // passed; only the synchronous local-file and by-name paths can succeed here.
-  auto load_result = Extensions::DynamicModules::newDynamicModuleByConfig(module_config, context);
+  auto load_result = Extensions::DynamicModules::newDynamicModuleByConfig(
+      module_config, proto_config.matcher_name(), context);
   if (!load_result.ok()) {
     throw EnvoyException(std::string(load_result.status().message()));
   }
 
-  auto dynamic_module = std::move(load_result->loaded_);
+  auto dynamic_module = std::move(load_result->loaded);
 
   // Resolve required symbols.
   auto on_config_new = dynamic_module->getFunctionPointer<OnMatcherConfigNewType>(

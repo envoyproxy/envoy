@@ -31,11 +31,12 @@ absl::StatusOr<BridgeConfigSharedPtr> getOrCreateBridgeConfig(
   // The upstream HTTP conn-pool factory has no factory context to thread through here, so it is not
   // passed: only the synchronous local-file and by-name module sources are supported, while remote
   // sources are rejected by newDynamicModuleByConfig.
-  auto load_result = Envoy::Extensions::DynamicModules::newDynamicModuleByConfig(module_config);
+  auto load_result = Envoy::Extensions::DynamicModules::newDynamicModuleByConfig(
+      module_config, proto_config.bridge_name());
   if (!load_result.ok()) {
     return load_result.status();
   }
-  auto dynamic_module = std::move(load_result->loaded_);
+  auto dynamic_module = std::move(load_result->loaded);
 
   std::string bridge_config_bytes;
   if (proto_config.has_bridge_config()) {

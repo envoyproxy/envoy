@@ -18,12 +18,13 @@ DynamicModuleUdpListenerFilterConfigFactory::createFilterFactoryFromProto(
   // UDP listener filters do not support remote module sources, so no init manager or async callback
   // is passed; only the synchronous local-file and by-name paths can succeed here.
   auto load_result = Extensions::DynamicModules::newDynamicModuleByConfig(
-      proto_config.dynamic_module_config(), context.serverFactoryContext());
+      proto_config.dynamic_module_config(), proto_config.filter_name(),
+      context.serverFactoryContext());
   if (!load_result.ok()) {
     throw EnvoyException(std::string(load_result.status().message()));
   }
 
-  auto dynamic_module = std::move(load_result->loaded_);
+  auto dynamic_module = std::move(load_result->loaded);
 
   auto filter_config = std::make_shared<DynamicModuleUdpListenerFilterConfig>(
       proto_config, std::move(dynamic_module), context.scope());

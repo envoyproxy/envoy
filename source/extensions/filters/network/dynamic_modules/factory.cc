@@ -19,9 +19,9 @@ DynamicModuleNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
   // Network filters do not support remote module sources, so no init manager or async callback is
   // passed; only the synchronous local-file and by-name paths can succeed here.
   auto load_result = Extensions::DynamicModules::newDynamicModuleByConfig(
-      module_config, context.serverFactoryContext());
+      module_config, proto_config.filter_name(), context.serverFactoryContext());
   RETURN_IF_NOT_OK_REF(load_result.status());
-  auto dynamic_module = std::move(load_result->loaded_);
+  auto dynamic_module = std::move(load_result->loaded);
 
   std::string config;
   if (proto_config.has_filter_config()) {

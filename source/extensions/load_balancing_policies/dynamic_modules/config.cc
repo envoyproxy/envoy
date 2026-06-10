@@ -69,10 +69,10 @@ Factory::loadConfig(Server::Configuration::ServerFactoryContext& context,
 
   // Load balancing policies do not support remote module sources, so no init manager or async
   // callback is passed; only the synchronous local-file and by-name paths can succeed here.
-  auto load_result =
-      Envoy::Extensions::DynamicModules::newDynamicModuleByConfig(module_config, context);
+  auto load_result = Envoy::Extensions::DynamicModules::newDynamicModuleByConfig(
+      module_config, typed_config.lb_policy_name(), context);
   RETURN_IF_NOT_OK_REF(load_result.status());
-  auto dynamic_module = std::move(load_result->loaded_);
+  auto dynamic_module = std::move(load_result->loaded);
 
   // Use configured metrics namespace or fall back to the default.
   const std::string metrics_namespace = module_config.metrics_namespace().empty()

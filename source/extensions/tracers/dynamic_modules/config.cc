@@ -22,11 +22,11 @@ Tracing::DriverSharedPtr DynamicModuleTracerFactory::createTracerDriver(
   // Tracers do not support remote module sources, so no init manager or async callback is passed;
   // only the synchronous local-file and by-name paths can succeed here.
   auto load_result = Extensions::DynamicModules::newDynamicModuleByConfig(
-      module_config, context.serverFactoryContext());
+      module_config, proto_config.tracer_name(), context.serverFactoryContext());
   if (!load_result.ok()) {
     throw EnvoyException(std::string(load_result.status().message()));
   }
-  auto dynamic_module = std::move(load_result->loaded_);
+  auto dynamic_module = std::move(load_result->loaded);
 
   std::string tracer_config_str;
   if (proto_config.has_tracer_config()) {

@@ -880,9 +880,9 @@ DynamicModuleClusterFactory::createClusterWithConfig(
   // can succeed here.
   const auto& module_config = proto_config.dynamic_module_config();
   auto load_result = Envoy::Extensions::DynamicModules::newDynamicModuleByConfig(
-      module_config, context.serverFactoryContext());
+      module_config, proto_config.cluster_name(), context.serverFactoryContext());
   RETURN_IF_NOT_OK_REF(load_result.status());
-  auto dynamic_module = std::move(load_result->loaded_);
+  auto dynamic_module = std::move(load_result->loaded);
 
   // Create the cluster configuration.
   auto config_or_error = DynamicModuleClusterConfig::create(

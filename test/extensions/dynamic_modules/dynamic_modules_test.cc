@@ -416,7 +416,7 @@ protected:
 // Neither name nor module set: the config is rejected. No context is needed for this path.
 TEST_F(NewDynamicModuleByConfigTest, NoModuleNorName) {
   ProtoDynamicModuleConfig config;
-  auto result = newDynamicModuleByConfig(config);
+  auto result = newDynamicModuleByConfig(config, "test_module");
   EXPECT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(),
               testing::HasSubstr("Either 'name' or 'module' must be specified"));
@@ -426,17 +426,17 @@ TEST_F(NewDynamicModuleByConfigTest, NoModuleNorName) {
 TEST_F(NewDynamicModuleByConfigTest, ByNameSuccess) {
   ProtoDynamicModuleConfig config;
   config.set_name("no_op");
-  auto result = newDynamicModuleByConfig(config);
+  auto result = newDynamicModuleByConfig(config, "test_module");
   ASSERT_TRUE(result.ok()) << result.status().message();
-  EXPECT_NE(result->loaded_, nullptr);
-  EXPECT_EQ(result->async_, nullptr);
+  EXPECT_NE(result->loaded, nullptr);
+  EXPECT_EQ(result->async, nullptr);
 }
 
 // By-name loading of a missing module reports a load error.
 TEST_F(NewDynamicModuleByConfigTest, ByNameFailure) {
   ProtoDynamicModuleConfig config;
   config.set_name("nonexistent_module");
-  auto result = newDynamicModuleByConfig(config);
+  auto result = newDynamicModuleByConfig(config, "test_module");
   EXPECT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to load dynamic module"));
 }
@@ -445,17 +445,17 @@ TEST_F(NewDynamicModuleByConfigTest, ByNameFailure) {
 TEST_F(NewDynamicModuleByConfigTest, LocalFileSuccess) {
   ProtoDynamicModuleConfig config;
   config.mutable_module()->mutable_local()->set_filename(testSharedObjectPath("no_op", "c"));
-  auto result = newDynamicModuleByConfig(config);
+  auto result = newDynamicModuleByConfig(config, "test_module");
   ASSERT_TRUE(result.ok()) << result.status().message();
-  EXPECT_NE(result->loaded_, nullptr);
-  EXPECT_EQ(result->async_, nullptr);
+  EXPECT_NE(result->loaded, nullptr);
+  EXPECT_EQ(result->async, nullptr);
 }
 
 // Local-file loading of a missing path reports a load error.
 TEST_F(NewDynamicModuleByConfigTest, LocalFileFailure) {
   ProtoDynamicModuleConfig config;
   config.mutable_module()->mutable_local()->set_filename("/nonexistent/path/to/module.so");
-  auto result = newDynamicModuleByConfig(config);
+  auto result = newDynamicModuleByConfig(config, "test_module");
   EXPECT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to load dynamic module"));
 }
@@ -464,7 +464,7 @@ TEST_F(NewDynamicModuleByConfigTest, LocalFileFailure) {
 TEST_F(NewDynamicModuleByConfigTest, ModuleWithoutLocalFileOrRemoteRejected) {
   ProtoDynamicModuleConfig config;
   config.mutable_module()->mutable_local()->set_inline_bytes("AAAA");
-  auto result = newDynamicModuleByConfig(config);
+  auto result = newDynamicModuleByConfig(config, "test_module");
   EXPECT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(),
               testing::HasSubstr("Only local file path or remote HTTP source is supported"));
@@ -472,7 +472,7 @@ TEST_F(NewDynamicModuleByConfigTest, ModuleWithoutLocalFileOrRemoteRejected) {
 
 // A remote source without a factory context is rejected (the context-less caller cannot fetch).
 TEST_F(NewDynamicModuleByConfigTest, RemoteWithoutContextRejected) {
-  auto result = newDynamicModuleByConfig(makeRemoteConfig("abc123"));
+  auto result = newDynamicModuleByConfig(makeRemoteConfig("abc123"), "test_module");
   EXPECT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(),
               testing::HasSubstr("Remote module sources require a factory context"));
@@ -487,10 +487,10 @@ TEST_F(NewDynamicModuleByConfigTest, RemoteCacheHitLoads) {
   std::filesystem::copy_file(module_path, cached,
                              std::filesystem::copy_options::overwrite_existing);
 
-  auto result = newDynamicModuleByConfig(makeRemoteConfig(sha), context_);
+  auto result = newDynamicModuleByConfig(makeRemoteConfig(sha), "test_module", context_);
   ASSERT_TRUE(result.ok()) << result.status().message();
-  EXPECT_NE(result->loaded_, nullptr);
-  EXPECT_EQ(result->async_, nullptr);
+  EXPECT_NE(result->loaded, nullptr);
+  EXPECT_EQ(result->async, nullptr);
 
   std::filesystem::remove(cached);
 }
@@ -507,7 +507,7 @@ TEST_F(NewDynamicModuleByConfigTest, RemoteCacheHitTamperedRemoved) {
   }
   ASSERT_TRUE(std::filesystem::exists(cached));
 
-  auto result = newDynamicModuleByConfig(makeRemoteConfig(expected_sha), context_);
+  auto result = newDynamicModuleByConfig(makeRemoteConfig(expected_sha), "test_module", context_);
   EXPECT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(),
               testing::HasSubstr("Remote module sources require an init manager"));
@@ -527,7 +527,7 @@ TEST_F(NewDynamicModuleByConfigTest, RemoteCacheHitValidShaButLoadFails) {
     out << garbage;
   }
 
-  auto result = newDynamicModuleByConfig(makeRemoteConfig(sha), context_);
+  auto result = newDynamicModuleByConfig(makeRemoteConfig(sha), "test_module", context_);
   EXPECT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(), testing::HasSubstr("Cached remote module failed to load"));
 
@@ -543,7 +543,7 @@ TEST_F(NewDynamicModuleByConfigTest, RemoteNackOnCacheMiss) {
   config.set_nack_on_cache_miss(true);
   // The cluster is not initialized in the mock, so the background fetch fails fast; the config is
   // still rejected as a cache miss.
-  auto result = newDynamicModuleByConfig(config, context_);
+  auto result = newDynamicModuleByConfig(config, "test_module", context_);
   EXPECT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(), testing::HasSubstr("not cached"));
 }
@@ -553,7 +553,7 @@ TEST_F(NewDynamicModuleByConfigTest, RemoteNoCacheNoInitManager) {
   const std::string sha = "1111111111111111111111111111111111111111111111111111111111111111";
   std::filesystem::remove(moduleTempPath(sha));
 
-  auto result = newDynamicModuleByConfig(makeRemoteConfig(sha), context_);
+  auto result = newDynamicModuleByConfig(makeRemoteConfig(sha), "test_module", context_);
   EXPECT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(),
               testing::HasSubstr("Remote module sources require an init manager"));
@@ -565,8 +565,9 @@ TEST_F(NewDynamicModuleByConfigTest, RemoteNoOnLoadedCallbackRejected) {
   std::filesystem::remove(moduleTempPath(sha));
 
   NiceMock<Init::MockManager> init_manager;
-  auto result = newDynamicModuleByConfig(makeRemoteConfig(sha), context_, init_manager,
-                                         /*on_loaded=*/nullptr);
+  auto result =
+      newDynamicModuleByConfig(makeRemoteConfig(sha), "test_module", context_, init_manager,
+                               /*on_loaded=*/nullptr);
   EXPECT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(),
               testing::HasSubstr("Remote module sources require an on_loaded callback"));
@@ -581,12 +582,12 @@ TEST_F(NewDynamicModuleByConfigTest, RemoteAsyncReturnsAsyncState) {
   NiceMock<Init::MockManager> init_manager;
   bool on_loaded_called = false;
   auto result =
-      newDynamicModuleByConfig(makeRemoteConfig(sha), context_, init_manager,
+      newDynamicModuleByConfig(makeRemoteConfig(sha), "test_module", context_, init_manager,
                                [&on_loaded_called](DynamicModulePtr) { on_loaded_called = true; });
   ASSERT_TRUE(result.ok()) << result.status().message();
-  EXPECT_EQ(result->loaded_, nullptr);
-  ASSERT_NE(result->async_, nullptr);
-  EXPECT_NE(result->async_->remote_provider, nullptr);
+  EXPECT_EQ(result->loaded, nullptr);
+  ASSERT_NE(result->async, nullptr);
+  EXPECT_NE(result->async->remote_provider, nullptr);
   // The fetch has not been initialized, so the callback has not run yet.
   EXPECT_FALSE(on_loaded_called);
 }
@@ -608,10 +609,12 @@ uint64_t configLoadFailureValue(Stats::Scope& scope, absl::string_view leaf,
 TEST(DynamicModuleStats, IncrementConfigLoadFailure) {
   Stats::IsolatedStoreImpl store;
   Stats::Scope& scope = *store.rootScope();
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context, scope()).WillByDefault(testing::ReturnRef(scope));
 
   // Repeated failures with the same config_name accumulate on one series.
-  incrementLoadFailure(scope, "my-filter", ModuleLoadErrorStat);
-  incrementLoadFailure(scope, "my-filter", ModuleLoadErrorStat);
+  incrementLoadFailure(context, "my-filter", ModuleLoadErrorStat);
+  incrementLoadFailure(context, "my-filter", ModuleLoadErrorStat);
   EXPECT_EQ(2U, configLoadFailureValue(scope, ModuleLoadErrorStat, "my-filter"));
 
   // Distinct leaves and distinct config_names are independent series.
@@ -619,8 +622,12 @@ TEST(DynamicModuleStats, IncrementConfigLoadFailure) {
   EXPECT_EQ(0U, configLoadFailureValue(scope, ModuleLoadErrorStat, "other"));
 
   // An empty config_name falls back to "default".
-  incrementLoadFailure(scope, "", RemoteFetchErrorStat);
+  incrementLoadFailure(context, "", RemoteFetchErrorStat);
   EXPECT_EQ(1U, configLoadFailureValue(scope, RemoteFetchErrorStat, "default"));
+
+  // An absent context is a no-op (the context-less caller path).
+  incrementLoadFailure(absl::nullopt, "my-filter", ModuleLoadErrorStat);
+  EXPECT_EQ(2U, configLoadFailureValue(scope, ModuleLoadErrorStat, "my-filter"));
 }
 
 } // namespace DynamicModules
