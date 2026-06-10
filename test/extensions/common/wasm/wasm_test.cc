@@ -678,8 +678,8 @@ TEST_P(WasmCommonTest, RemoteCode) {
     vm_configuration_bytes.set_value(vm_configuration);
     vm_config->mutable_configuration()->PackFrom(vm_configuration_bytes);
     std::string sha256 = Extensions::Common::Wasm::sha256(code);
-    std::string sha256Hex = Hex::encode(
-        absl::Span<const uint8_t>(reinterpret_cast<const uint8_t*>(&*sha256.begin()), sha256.size()));
+    std::string sha256Hex = Hex::encode(absl::Span<const uint8_t>(
+        reinterpret_cast<const uint8_t*>(&*sha256.begin()), sha256.size()));
     vm_config->mutable_code()->mutable_remote()->set_sha256(sha256Hex);
     vm_config->mutable_code()->mutable_remote()->mutable_http_uri()->set_uri(
         "http://example.com/test.wasm");

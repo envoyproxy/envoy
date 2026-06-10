@@ -71,8 +71,7 @@ ClientCodecFrameInjector::ClientCodecFrameInjector() : CodecFrameInjector("serve
       .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
         ENVOY_LOG_MISC(trace, "client write: {}",
                        Hex::encode(absl::Span<const uint8_t>(
-                           static_cast<uint8_t*>(data.linearize(data.length())),
-                           data.length())));
+                           static_cast<uint8_t*>(data.linearize(data.length())), data.length())));
         data.drain(data.length());
       }));
 }
@@ -88,8 +87,7 @@ ServerCodecFrameInjector::ServerCodecFrameInjector() : CodecFrameInjector("clien
       .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
         ENVOY_LOG_MISC(trace, "server write: {}",
                        Hex::encode(absl::Span<const uint8_t>(
-                           static_cast<uint8_t*>(data.linearize(data.length())),
-                           data.length())));
+                           static_cast<uint8_t*>(data.linearize(data.length())), data.length())));
         data.drain(data.length());
       }));
 }
