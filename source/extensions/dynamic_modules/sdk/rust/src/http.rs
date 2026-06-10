@@ -393,10 +393,10 @@ pub trait EnvoyHttpFilterConfig {
   ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
 
   /// Increment the counter vec with the given id from the config context.
-  fn increment_counter_vec<'a>(
+  fn increment_counter_vec(
     &self,
     id: EnvoyCounterVecId,
-    labels: &[&'a str],
+    labels: &[&str],
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
 
@@ -408,10 +408,10 @@ pub trait EnvoyHttpFilterConfig {
   ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
 
   /// Increase the gauge vec with the given id from the config context.
-  fn increase_gauge_vec<'a>(
+  fn increase_gauge_vec(
     &self,
     id: EnvoyGaugeVecId,
-    labels: &[&'a str],
+    labels: &[&str],
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
 
@@ -423,10 +423,10 @@ pub trait EnvoyHttpFilterConfig {
   ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
 
   /// Decrease the gauge vec with the given id from the config context.
-  fn decrease_gauge_vec<'a>(
+  fn decrease_gauge_vec(
     &self,
     id: EnvoyGaugeVecId,
-    labels: &[&'a str],
+    labels: &[&str],
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
 
@@ -438,10 +438,10 @@ pub trait EnvoyHttpFilterConfig {
   ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
 
   /// Set the value of the gauge vec with the given id from the config context.
-  fn set_gauge_vec<'a>(
+  fn set_gauge_vec(
     &self,
     id: EnvoyGaugeVecId,
-    labels: &[&'a str],
+    labels: &[&str],
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
 
@@ -453,10 +453,10 @@ pub trait EnvoyHttpFilterConfig {
   ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
 
   /// Record a value in the histogram vec with the given id from the config context.
-  fn record_histogram_value_vec<'a>(
+  fn record_histogram_value_vec(
     &self,
     id: EnvoyHistogramVecId,
-    labels: &[&'a str],
+    labels: &[&str],
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
 
