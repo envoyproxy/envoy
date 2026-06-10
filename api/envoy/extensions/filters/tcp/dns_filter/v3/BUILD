@@ -1,0 +1,13 @@
+load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
+
+licenses(["notice"])  # Apache 2
+
+api_proto_package(
+    deps = [
+        "//envoy/annotations:pkg",
+        "//envoy/config/accesslog/v3:pkg",
+        "//envoy/config/core/v3:pkg",
+        "//envoy/data/dns/v3:pkg",
+        "@xds//udpa/annotations:pkg",
+    ],
+)
