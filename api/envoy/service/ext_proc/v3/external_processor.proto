@@ -139,7 +139,7 @@ message ProcessingRequest {
   // [#not-implemented-hide:]
   message ClientWindowUpdate {
     // Window update for sidestream-to-upstream.
-    int64 window_increment_sidesteram_to_upstream = 1;
+    int64 window_increment_sidestream_to_upstream = 1;
 
     // Window update for sidestream-to-downstream.
     int64 window_increment_sidestream_to_downstream = 2;
