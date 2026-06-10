@@ -266,6 +266,7 @@ EXTENSIONS = {
     "envoy.filters.network.ratelimit":                            "//source/extensions/filters/network/ratelimit:config",
     "envoy.filters.network.rbac":                                 "//source/extensions/filters/network/rbac:config",
     "envoy.filters.network.redis_proxy":                          "//source/extensions/filters/network/redis_proxy:config",
+    "envoy.filters.network.tcp_dns_filter":                        "//source/extensions/filters/network/tcp_dns_filter:config",
     "envoy.filters.network.tcp_proxy":                            "//source/extensions/filters/network/tcp_proxy:config",
     "envoy.filters.network.thrift_proxy":                         "//source/extensions/filters/network/thrift_proxy:config",
     "envoy.filters.network.set_filter_state":                     "//source/extensions/filters/network/set_filter_state:config",
