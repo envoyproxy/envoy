@@ -42,6 +42,11 @@ Http::TestResponseHeaderMapImpl upgradeFailedResponseHeaders() {
   return Http::TestResponseHeaderMapImpl{{":status", "500"}};
 }
 
+Http::TestResponseHeaderMapImpl upgradeFailedResponseHeadersWithUpgradeHeaders() {
+  return Http::TestResponseHeaderMapImpl{
+      {":status", "500"}, {"connection", "upgrade"}, {"upgrade", "websocket"}};
+}
+
 template <class ProxiedHeaders, class OriginalHeaders>
 void commonValidate(ProxiedHeaders& proxied_headers, const OriginalHeaders& original_headers) {
   // If no content length is specified, the HTTP1 codec will add a chunked encoding header.
@@ -724,6 +729,41 @@ TEST_P(WebsocketIntegrationTest, Http1UpgradeStatus5OOWithFilterChain) {
   // The upgrade should be paused, but the response header is proxied back to downstream.
   performUpgrade(upgradeRequestHeaders(), in_correct_status_response_headers, true);
   EXPECT_EQ("500", response_->headers().Status()->value().getStringView());
+
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(0));
+  test_server_->waitForGauge("http.config_test.downstream_cx_upgrades_active", Eq(1));
+  codec_client_->close();
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+}
+
+// Test Websocket Upgrade in HTTP1 with 500 response code and upgrade headers.
+// The upgrade headers should be stripped.
+TEST_P(WebsocketIntegrationTest, Http1UpgradeStatus5OOWithUpgradeHeadersWithFilterChain) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.websocket_allow_4xx_5xx_through_filter_chain", "true"}});
+
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.addConfigModifier(setRouteUsingWebsocket());
+  initialize();
+
+  auto response_headers = upgradeFailedResponseHeadersWithUpgradeHeaders();
+
+  // The upgrade should be paused, and the response header is proxied back to downstream
+  // but upgrade headers should be stripped.
+  performUpgrade(upgradeRequestHeaders(), response_headers, true);
+  EXPECT_EQ("500", response_->headers().Status()->value().getStringView());
+  EXPECT_EQ(nullptr, response_->headers().Upgrade());
+
+  if (response_->headers().Connection() != nullptr) {
+    EXPECT_FALSE(Envoy::StringUtil::caseFindToken(response_->headers().getConnectionValue(), ",",
+                                                  Http::Headers::get().ConnectionValues.Upgrade));
+  }
 
   test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(0));
   test_server_->waitForGauge("http.config_test.downstream_cx_upgrades_active", Eq(1));

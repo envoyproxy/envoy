@@ -173,6 +173,10 @@ void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&
                    "envoy.reloadable_features.websocket_allow_4xx_5xx_through_filter_chain") &&
                status >= 400) {
       maybeEndDecode(end_stream);
+      headers->removeUpgrade();
+      Http::Utility::removeConnectionUpgrade(
+          *headers,
+          Envoy::StringUtil::CaseUnorderedSet{Http::Headers::get().ConnectionValues.Upgrade});
       filter_.callbacks_->encodeHeaders(std::move(headers), end_stream,
                                         StreamInfo::ResponseCodeDetails::get().ViaUpstream);
       return;
