@@ -99,6 +99,27 @@ def _envoy_repo_impl(repository_ctx):
     llvm_path = repository_ctx.os.environ.get("BAZEL_LLVM_PATH", "")
     local_llvm = "True" if llvm_path else "False"
 
+    # When using a local LLVM, detect its version and library directory so that
+    # downstream BUILD files can reference the correct libclang-cpp.so and
+    # clang resource-dir paths without hardcoding a version.
+    llvm_version_local = ""
+    llvm_lib_dir = "lib"
+    if llvm_path:
+        result = repository_ctx.execute([llvm_path + "/bin/clang", "--version"])
+        if result.return_code == 0:
+            for line in result.stdout.split("\n"):
+                if "clang version" in line:
+                    llvm_version_local = line.split("clang version ")[1].split(" ")[0].strip()
+                    break
+        for directory in ["lib64", "lib"]:
+            if repository_ctx.path(llvm_path + "/" + directory + "/libclang-cpp.so").exists:
+                llvm_lib_dir = directory
+                break
+            entries = repository_ctx.execute(["ls", llvm_path + "/" + directory + "/"])
+            if entries.return_code == 0 and "libclang-cpp.so" in entries.stdout:
+                llvm_lib_dir = directory
+                break
+
     # By default, even when local toolchain is used, we still use the hermetic
     # sysroot, when it's undesirable, you can set this environment variable to True
     # to fallback to the host libc.
@@ -114,8 +135,10 @@ def _envoy_repo_impl(repository_ctx):
 
     repository_ctx.file("compiler.bzl", """
 LLVM_PATH = '%s'
+LLVM_VERSION_LOCAL = '%s'
+LLVM_LIB_DIR = '%s'
 USE_LOCAL_SYSROOT = %s
-""" % (llvm_path, local_sysroot))
+""" % (llvm_path, llvm_version_local, llvm_lib_dir, local_sysroot))
     repository_ctx.file("version.bzl", "VERSION = '%s'\nAPI_VERSION = '%s'" % (version, api_version))
     repository_ctx.file("path.bzl", "PATH = '%s'" % repo_version_path.dirname)
     repository_ctx.file("envoy_repo.py", "PATH = '%s'\nVERSION = '%s'\nAPI_VERSION = '%s'" % (repo_version_path.dirname, version, api_version))

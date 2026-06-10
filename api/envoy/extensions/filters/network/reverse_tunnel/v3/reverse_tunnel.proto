@@ -96,7 +96,7 @@ message Validation {
 // Configuration for the reverse tunnel network filter.
 // This filter handles reverse tunnel connection acceptance and rejection by processing
 // HTTP requests where required identification values are provided via HTTP headers.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message ReverseTunnel {
   // Ping interval for health checks on established reverse tunnel connections.
   // If not specified, defaults to ``2 seconds``.
@@ -140,4 +140,9 @@ message ReverseTunnel {
   // flag to the same value.
   // Defaults to ``false``.
   bool use_http_upgrade = 7;
+
+  // When true, skip worker-thread rebalancing for accepted reverse tunnel connections.
+  // This avoids the cross-worker lock in pickLeastLoadedSocketManager.
+  // Default: false (rebalancing enabled).
+  bool skip_rebalancing = 8;
 }

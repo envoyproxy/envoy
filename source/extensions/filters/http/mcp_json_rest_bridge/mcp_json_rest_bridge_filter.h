@@ -50,14 +50,48 @@ public:
     return proto_config_.request_storage_mode();
   }
 
+  bool textContentStreamingEnabled(absl::string_view tool_name) const;
+
+  bool traceContextExtraction() const { return proto_config_.has_trace_context_extraction(); }
+
+  bool toolsListChanged() const { return proto_config_.tool_config().list_changed(); }
+
+  const std::string& serverDescription() const { return proto_config_.server_info().description(); }
+
 private:
-  absl::flat_hash_map<std::string,
-                      envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
-      tool_to_http_rule_;
+  struct ToolEntry {
+    envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule http_rule;
+    bool text_content_streaming_enabled;
+  };
+  absl::flat_hash_map<std::string, ToolEntry> tool_entries_;
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config_;
   std::string fallback_protocol_version_;
   uint32_t max_request_body_size_;
   uint32_t max_response_body_size_;
+};
+
+class McpJsonRestBridgePerRouteConfig : public Router::RouteSpecificFilterConfig,
+                                        public Logger::Loggable<Logger::Id::config> {
+public:
+  explicit McpJsonRestBridgePerRouteConfig(
+      const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
+          proto_config);
+
+  absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+  getHttpRule(absl::string_view tool_name) const;
+  absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+  getToolsListHttpRule() const;
+
+  bool textContentStreamingEnabled(absl::string_view tool_name) const;
+
+private:
+  struct ToolEntry {
+    envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule http_rule;
+    bool text_content_streaming_enabled;
+  };
+  absl::flat_hash_map<std::string, ToolEntry> tool_entries_;
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute
+      proto_config_;
 };
 
 using McpJsonRestBridgeFilterConfigSharedPtr = std::shared_ptr<McpJsonRestBridgeFilterConfig>;
@@ -82,14 +116,15 @@ public:
 
 private:
   // Handles "method" field in the MCP request.
-  void handleMcpMethod(const nlohmann::json& json_rpc,
-                       Http::RequestHeaderMapOptRef request_headers);
+  void handleMcpMethod(const nlohmann::json& json_rpc, Http::RequestHeaderMapOptRef request_headers,
+                       const McpJsonRestBridgePerRouteConfig* per_route_config);
 
   // Modifies the response from upstream into JSON-RPC response.
   void encodeJsonRpcData(Http::ResponseHeaderMapOptRef response_headers);
 
   // Maps the tool call request to the backend API.
-  void mapMcpToolToApiBackend(const nlohmann::json& json_rpc);
+  void mapMcpToolToApiBackend(const nlohmann::json& json_rpc,
+                              const McpJsonRestBridgePerRouteConfig* per_route_config);
 
   // Sends MCP error response.
   void sendErrorResponse(Http::Code response_code, absl::string_view response_code_details,
@@ -102,6 +137,9 @@ private:
 
   // Sets dynamic metadata for the filter based on the MCP request method and parameters.
   void setDynamicMetadata(absl::string_view method, const nlohmann::json& json_rpc);
+
+  // Builds streaming_json_prefix_ and streaming_json_suffix_ for the tools/call streaming path.
+  void buildStreamingPrefixAndSuffix(bool is_error);
 
   enum class McpOperation {
     Unspecified = 0,
@@ -125,6 +163,16 @@ private:
   std::string request_body_str_;
   Buffer::OwnedImpl response_body_;
   std::string response_body_str_;
+
+  // Per-request streaming flag, set during tool lookup in mapMcpToolToApiBackend.
+  bool text_content_streaming_enabled_ = false;
+
+  // Streaming state for text_content_streaming_enabled.
+  // prefix/suffix are pre-built once in encodeHeaders; an empty prefix signals
+  // that the non-streaming (buffered) path is active.
+  std::string streaming_json_prefix_;
+  std::string streaming_json_suffix_;
+  bool is_first_streaming_chunk_ = true;
 
   McpJsonRestBridgeFilterConfigSharedPtr config_;
 };

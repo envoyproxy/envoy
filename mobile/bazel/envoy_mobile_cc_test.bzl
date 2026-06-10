@@ -30,7 +30,7 @@ def envoy_cc_test_library_with_engine_builder(name, srcs, deps = [], copts = [],
         name = name + "_legacy_builder",
         srcs = srcs,
         copts = copts,
-        deps = overridden_deps + ["//test/cc:engine_builder_test_shim_lib"],
+        deps = overridden_deps + ["//test/cc:engine_builder_test_shim_legacy_lib"],
         **kwargs
     )
 
@@ -64,7 +64,7 @@ def envoy_cc_test_with_engine_builder(name, srcs, deps = [], copts = [], **kwarg
         name = name + "_legacy_builder",
         srcs = srcs,
         copts = copts,
-        deps = overridden_deps + ["//test/cc:engine_builder_test_shim_lib"],
+        deps = overridden_deps + ["//test/cc:engine_builder_test_shim_legacy_lib"],
         **kwargs
     )
 

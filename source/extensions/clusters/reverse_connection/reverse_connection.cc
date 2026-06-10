@@ -12,6 +12,7 @@
 
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
+#include "source/common/formatter/builtin_command_parser_factory_helper.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/protobuf.h"

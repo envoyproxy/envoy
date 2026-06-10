@@ -156,7 +156,7 @@ public:
   bool autoSniSanMatch() const override { return auto_sni_san_match_; }
   bool allowRenegotiation() const override { return allow_renegotiation_; }
   size_t maxSessionKeys() const override { return max_session_keys_; }
-  bool enforceRsaKeyUsage() const override { return enforce_rsa_key_usage_; }
+
   void setSecretUpdateCallback(std::function<absl::Status()> callback) override;
   OptRef<Ssl::UpstreamTlsCertificateSelectorFactory>
   tlsCertificateSelectorFactory() const override {
@@ -176,7 +176,7 @@ private:
   const std::string server_name_indication_;
   const bool auto_host_sni_ : 1;
   const bool allow_renegotiation_ : 1;
-  const bool enforce_rsa_key_usage_ : 1;
+
   const size_t max_session_keys_;
   // Certificate selector contains a reference to this context so should be destroyed first.
   Ssl::UpstreamTlsCertificateSelectorFactoryPtr tls_certificate_selector_factory_;
