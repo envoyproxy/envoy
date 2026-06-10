@@ -643,6 +643,7 @@ envoy.filters.http.mcp_json_rest_bridge:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+  - envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridgePerRoute
 envoy.filters.http.mcp_router:
   categories:
   - envoy.filters.http
@@ -1463,6 +1464,13 @@ envoy.stat_sinks.dog_statsd:
   status: stable
   type_urls:
   - envoy.config.metrics.v3.DogStatsdSink
+envoy.stat_sinks.dynamic_modules:
+  categories:
+  - envoy.stats_sinks
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.stat_sinks.dynamic_modules.v3.DynamicModuleStatsSink
 envoy.stat_sinks.graphite_statsd:
   categories:
   - envoy.stats_sinks
@@ -1630,6 +1638,14 @@ envoy.transport_sockets.quic:
   type_urls:
   - envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport
   - envoy.extensions.transport_sockets.quic.v3.QuicUpstreamTransport
+envoy.transport_sockets.dynamic_modules:
+  categories:
+  - envoy.transport_sockets.downstream
+  - envoy.transport_sockets.upstream
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.transport_sockets.dynamic_modules.v3.DynamicModuleTransportSocket
 envoy.transport_sockets.raw_buffer:
   categories:
   - envoy.transport_sockets.downstream

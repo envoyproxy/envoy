@@ -94,12 +94,12 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
     uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action,
-    Server::OverloadManager& overload_manager) {
+    Server::OverloadManager& overload_manager, Runtime::Loader& runtime) {
   if (determineNextProtocol(connection, data) == Utility::AlpnNames::get().Http2) {
     Http2::CodecStats& stats = Http2::CodecStats::atomicGet(http2_codec_stats, scope);
     return std::make_unique<Http2::ServerConnectionImpl>(
         connection, callbacks, stats, random, http2_options, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action, overload_manager);
+        max_request_headers_count, headers_with_underscores_action, overload_manager, runtime);
   } else {
     Http1::CodecStats& stats = Http1::CodecStats::atomicGet(http1_codec_stats, scope);
     return std::make_unique<Http1::ServerConnectionImpl>(
