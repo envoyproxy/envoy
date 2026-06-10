@@ -3,6 +3,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/type/metadata/v3/metadata.pb.h"
 
+#include "source/common/config/well_known_names.h"
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
@@ -116,6 +117,14 @@ Metadata::getConstMetadataSharedPool(Singleton::Manager& manager, Event::Dispatc
         return std::make_shared<SharedPool::ObjectSharedPool<
             const envoy::config::core::v3::Metadata, MessageUtil, MessageUtil>>(dispatcher);
       });
+}
+
+std::shared_ptr<const envoy::config::core::v3::Metadata>
+Metadata::transportSocketMatchMetadata(const Protobuf::Struct& match_criteria) {
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+  (*metadata->mutable_filter_metadata())[MetadataFilters::get().ENVOY_TRANSPORT_SOCKET_MATCH] =
+      match_criteria;
+  return metadata;
 }
 
 } // namespace Config

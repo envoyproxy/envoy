@@ -17,7 +17,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/ssl/mocks.h"
+#include "test/mocks/network/transport_socket.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/simulated_time_system.h"
@@ -163,6 +163,21 @@ TEST_F(OrcaOobManagerLifecycleTest, HostRemovedDisarmsAndDecrementsGauge) {
   EXPECT_EQ(activeOobSessions(), 0);
 }
 
+TEST_F(OrcaOobManagerLifecycleTest, NonPositivePeriodClampedToDefault) {
+  OrcaOobManagerConfig config;
+  config.reporting_period = std::chrono::milliseconds(0);
+  auto manager = makeManager(config);
+  ASSERT_OK(manager->initialize());
+
+  // onHostsAdded jitters by random % period; a zero period would SIGFPE without the clamp.
+  installAttemptTimer();
+  priority_set_.runUpdateCallbacks(0, {makeHost()}, {});
+  EXPECT_EQ(activeOobSessions(), 1);
+
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  manager.reset();
+}
+
 TEST_F(OrcaOobManagerLifecycleTest, DestructionDisarmsActiveSessions) {
   auto manager = makeManager();
   ASSERT_OK(manager->initialize());
@@ -197,7 +212,9 @@ protected:
   // the fixture; MockClientConnection::newStream returns a ref into it. close() is stubbed
   // to a no-op so wire tests can assert stream_failures from explicit raise* hooks; see
   // SyncLocalCloseDuringTearDownDoesNotDoubleCount for the synchronous-close variant.
-  std::unique_ptr<OobAttempt> makeAttempt() {
+  // Non-null capture pointers receive :authority/:scheme from encodeHeaders.
+  std::unique_ptr<OobAttempt> makeAttempt(std::string* captured_authority = nullptr,
+                                          std::string* captured_scheme = nullptr) {
     auto attempt = std::make_unique<OobAttempt>();
     attempt->network_connection = new NiceMock<Network::MockClientConnection>();
     attempt->codec = new NiceMock<Http::MockClientConnection>();
@@ -206,28 +223,14 @@ protected:
         .WillOnce(testing::DoAll(SaveArgAddress(&attempt->response_decoder),
                                  testing::ReturnRef(*attempt->request_encoder)));
     EXPECT_CALL(*attempt->request_encoder, encodeHeaders(_, false))
-        .WillOnce(testing::Return(absl::OkStatus()));
-    EXPECT_CALL(*attempt->request_encoder, encodeData(_, true));
-    ON_CALL(*attempt->network_connection, close(_, _)).WillByDefault(testing::Return());
-    ON_CALL(*attempt->network_connection, close(_)).WillByDefault(testing::Return());
-    return attempt;
-  }
-
-  // Like makeAttempt() but captures :authority and :scheme from encodeHeaders.
-  std::unique_ptr<OobAttempt> makeAttemptCapturingHeaders(std::string& captured_authority,
-                                                          std::string& captured_scheme) {
-    auto attempt = std::make_unique<OobAttempt>();
-    attempt->network_connection = new NiceMock<Network::MockClientConnection>();
-    attempt->codec = new NiceMock<Http::MockClientConnection>();
-    attempt->request_encoder = std::make_unique<NiceMock<Http::MockRequestEncoder>>();
-    EXPECT_CALL(*attempt->codec, newStream(_))
-        .WillOnce(testing::DoAll(SaveArgAddress(&attempt->response_decoder),
-                                 testing::ReturnRef(*attempt->request_encoder)));
-    EXPECT_CALL(*attempt->request_encoder, encodeHeaders(_, false))
-        .WillOnce(testing::Invoke([&captured_authority, &captured_scheme](
+        .WillOnce(testing::Invoke([captured_authority, captured_scheme](
                                       const Http::RequestHeaderMap& h, bool) -> absl::Status {
-          captured_authority = std::string(h.getHostValue());
-          captured_scheme = std::string(h.getSchemeValue());
+          if (captured_authority != nullptr) {
+            *captured_authority = std::string(h.getHostValue());
+          }
+          if (captured_scheme != nullptr) {
+            *captured_scheme = std::string(h.getSchemeValue());
+          }
           return absl::OkStatus();
         }));
     EXPECT_CALL(*attempt->request_encoder, encodeData(_, true));
@@ -285,14 +288,21 @@ protected:
     attempt.response_decoder->decodeTrailers(std::move(trailers));
   }
 
+  void wireAddressHostname(Upstream::MockHost& host, absl::string_view address_url) {
+    auto address = *Network::Utility::resolveUrl(std::string(address_url));
+    addresses_.push_back(address);
+    ON_CALL(host, address()).WillByDefault(testing::Return(address));
+    ON_CALL(host, hostname()).WillByDefault(testing::ReturnRef(empty_hostname_));
+    // Scheme derivation resolves the factory when match metadata is set.
+    ON_CALL(host, resolveTransportSocketFactory(_, _, _))
+        .WillByDefault(testing::ReturnRef(*host.socket_factory_));
+  }
+
   // Returns a MockHost with address+hostname+canCreateConnection wired up enough for
   // OobSession::connectAndStream to traverse without segfault.
-  Upstream::HostSharedPtr makeWiredHost() {
+  std::shared_ptr<NiceMock<Upstream::MockHost>> makeWiredHost() {
     auto host = std::make_shared<NiceMock<Upstream::MockHost>>();
-    auto address = *Network::Utility::resolveUrl("tcp://10.0.0.1:80");
-    addresses_.push_back(address);
-    ON_CALL(*host, address()).WillByDefault(testing::Return(address));
-    ON_CALL(*host, hostname()).WillByDefault(testing::ReturnRef(empty_hostname_));
+    wireAddressHostname(*host, "tcp://10.0.0.1:80");
     return host;
   }
 
@@ -301,18 +311,8 @@ protected:
                                                             TestOrcaOobManager& manager,
                                                             OobAttempt& attempt) {
     auto host = std::make_shared<CapturingMockHost>();
-    auto address = *Network::Utility::resolveUrl(std::string(address_url));
-    addresses_.push_back(address);
-    ON_CALL(*host, address()).WillByDefault(testing::Return(address));
-    ON_CALL(*host, hostname()).WillByDefault(testing::ReturnRef(empty_hostname_));
-    host_description_for_codec_ = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
-    EXPECT_CALL(*host, createConnection_(_, _))
-        .WillOnce(testing::InvokeWithoutArgs([this, &attempt]() {
-          Upstream::MockHostLight::MockCreateConnectionData data;
-          data.connection_ = attempt.network_connection;
-          data.host_description_ = host_description_for_codec_;
-          return data;
-        }));
+    wireAddressHostname(*host, address_url);
+    wireConnectionFor(host, attempt);
     expectCreateCodecClient(manager, attempt);
     return host;
   }
@@ -707,32 +707,13 @@ TEST_F(OrcaOobManagerWireTest, HostnameUsedAsAuthority) {
   ASSERT_OK(manager->initialize());
 
   auto* attempt_timer = installAttemptTimer();
-  auto host = std::make_shared<NiceMock<Upstream::MockHost>>();
-  auto address = *Network::Utility::resolveUrl("tcp://10.0.0.1:80");
-  addresses_.push_back(address);
-  ON_CALL(*host, address()).WillByDefault(testing::Return(address));
+  auto host = makeWiredHost();
   std::string hostname = "myorca.example";
   ON_CALL(*host, hostname()).WillByDefault(testing::ReturnRef(hostname));
   priority_set_.runUpdateCallbacks(0, {host}, {});
 
-  // Build the attempt manually so encodeHeaders captures the :authority header.
-  auto attempt = std::make_unique<OobAttempt>();
-  attempt->network_connection = new NiceMock<Network::MockClientConnection>();
-  attempt->codec = new NiceMock<Http::MockClientConnection>();
-  attempt->request_encoder = std::make_unique<NiceMock<Http::MockRequestEncoder>>();
-  EXPECT_CALL(*attempt->codec, newStream(_))
-      .WillOnce(testing::DoAll(SaveArgAddress(&attempt->response_decoder),
-                               testing::ReturnRef(*attempt->request_encoder)));
   std::string captured_authority;
-  EXPECT_CALL(*attempt->request_encoder, encodeHeaders(_, false))
-      .WillOnce(testing::Invoke([&](const Http::RequestHeaderMap& h, bool) -> absl::Status {
-        captured_authority = std::string(h.getHostValue());
-        return absl::OkStatus();
-      }));
-  EXPECT_CALL(*attempt->request_encoder, encodeData(_, true));
-  ON_CALL(*attempt->network_connection, close(_, _)).WillByDefault(testing::Return());
-  ON_CALL(*attempt->network_connection, close(_)).WillByDefault(testing::Return());
-
+  auto attempt = makeAttempt(&captured_authority);
   wireConnectionFor(host, *attempt);
   expectCreateCodecClient(*manager, *attempt);
   attempt_timer->invokeCallback();
@@ -748,29 +729,11 @@ TEST_F(OrcaOobManagerWireTest, PipeHostFallsBackToClusterName) {
 
   auto* attempt_timer = installAttemptTimer();
   auto host = std::make_shared<NiceMock<Upstream::MockHost>>();
-  auto address = *Network::Utility::resolveUrl("unix:///tmp/orca.sock");
-  addresses_.push_back(address);
-  ON_CALL(*host, address()).WillByDefault(testing::Return(address));
-  ON_CALL(*host, hostname()).WillByDefault(testing::ReturnRef(empty_hostname_));
+  wireAddressHostname(*host, "unix:///tmp/orca.sock");
   priority_set_.runUpdateCallbacks(0, {host}, {});
 
-  auto attempt = std::make_unique<OobAttempt>();
-  attempt->network_connection = new NiceMock<Network::MockClientConnection>();
-  attempt->codec = new NiceMock<Http::MockClientConnection>();
-  attempt->request_encoder = std::make_unique<NiceMock<Http::MockRequestEncoder>>();
-  EXPECT_CALL(*attempt->codec, newStream(_))
-      .WillOnce(testing::DoAll(SaveArgAddress(&attempt->response_decoder),
-                               testing::ReturnRef(*attempt->request_encoder)));
   std::string captured_authority;
-  EXPECT_CALL(*attempt->request_encoder, encodeHeaders(_, false))
-      .WillOnce(testing::Invoke([&](const Http::RequestHeaderMap& h, bool) -> absl::Status {
-        captured_authority = std::string(h.getHostValue());
-        return absl::OkStatus();
-      }));
-  EXPECT_CALL(*attempt->request_encoder, encodeData(_, true));
-  ON_CALL(*attempt->network_connection, close(_, _)).WillByDefault(testing::Return());
-  ON_CALL(*attempt->network_connection, close(_)).WillByDefault(testing::Return());
-
+  auto attempt = makeAttempt(&captured_authority);
   wireConnectionFor(host, *attempt);
   expectCreateCodecClient(*manager, *attempt);
   attempt_timer->invokeCallback();
@@ -842,7 +805,8 @@ TEST_F(OrcaOobManagerWireTest, PortOverrideAppliedToOrcaReportingAddress) {
   ASSERT_OK(manager->initialize());
 
   auto* attempt_timer = installAttemptTimer();
-  auto attempt = makeAttempt();
+  std::string captured_authority;
+  auto attempt = makeAttempt(&captured_authority);
   auto host = makeWiredCapturingHost("tcp://1.1.1.1:80", *manager, *attempt);
   // orcaReportingAddress() deliberately differs from address().
   auto orca_address = *Network::Utility::resolveUrl("tcp://2.2.2.2:80");
@@ -854,6 +818,7 @@ TEST_F(OrcaOobManagerWireTest, PortOverrideAppliedToOrcaReportingAddress) {
 
   ASSERT_NE(host->last_orca_address_, nullptr);
   EXPECT_EQ(host->last_orca_address_->asString(), "2.2.2.2:9001");
+  EXPECT_EQ(captured_authority, "2.2.2.2:9001");
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
   manager.reset();
@@ -897,8 +862,7 @@ TEST_F(OrcaOobManagerWireTest, AuthorityOverrideUsedInRequestHeaders) {
   priority_set_.runUpdateCallbacks(0, {host}, {});
 
   std::string captured_authority;
-  std::string captured_scheme;
-  auto attempt = makeAttemptCapturingHeaders(captured_authority, captured_scheme);
+  auto attempt = makeAttempt(&captured_authority);
   wireConnectionFor(host, *attempt);
   expectCreateCodecClient(*manager, *attempt);
   attempt_timer->invokeCallback();
@@ -908,7 +872,7 @@ TEST_F(OrcaOobManagerWireTest, AuthorityOverrideUsedInRequestHeaders) {
   manager.reset();
 }
 
-// :scheme is "http" when ssl() is nullptr.
+// :scheme is "http" when the transport socket factory is not secure.
 TEST_F(OrcaOobManagerWireTest, SchemeIsHttpForPlaintextConnection) {
   auto manager = makeManager();
   ASSERT_OK(manager->initialize());
@@ -919,8 +883,7 @@ TEST_F(OrcaOobManagerWireTest, SchemeIsHttpForPlaintextConnection) {
 
   std::string captured_authority;
   std::string captured_scheme;
-  auto attempt = makeAttemptCapturingHeaders(captured_authority, captured_scheme);
-  ON_CALL(*attempt->network_connection, ssl()).WillByDefault(Return(nullptr));
+  auto attempt = makeAttempt(&captured_authority, &captured_scheme);
   wireConnectionFor(host, *attempt);
   expectCreateCodecClient(*manager, *attempt);
   attempt_timer->invokeCallback();
@@ -930,21 +893,22 @@ TEST_F(OrcaOobManagerWireTest, SchemeIsHttpForPlaintextConnection) {
   manager.reset();
 }
 
-// :scheme is "https" when ssl() is non-null (e.g. transport_socket_match selects TLS).
-TEST_F(OrcaOobManagerWireTest, SchemeIsHttpsForTlsConnection) {
+// :scheme is "https" when the transport socket factory implements secure
+// transport (covers secure non-SSL transports like ALTS, unlike ssl() sniffing).
+TEST_F(OrcaOobManagerWireTest, SchemeIsHttpsForSecureTransport) {
   auto manager = makeManager();
   ASSERT_OK(manager->initialize());
 
   auto* attempt_timer = installAttemptTimer();
   auto host = makeWiredHost();
+  ON_CALL(static_cast<Network::MockTransportSocketFactory&>(*host->socket_factory_),
+          implementsSecureTransport())
+      .WillByDefault(Return(true));
   priority_set_.runUpdateCallbacks(0, {host}, {});
 
   std::string captured_authority;
   std::string captured_scheme;
-  auto attempt = makeAttemptCapturingHeaders(captured_authority, captured_scheme);
-  // Non-null ssl() at construction matches SslSocket behavior (pre-handshake).
-  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
-  ON_CALL(*attempt->network_connection, ssl()).WillByDefault(Return(ssl_info));
+  auto attempt = makeAttempt(&captured_authority, &captured_scheme);
   wireConnectionFor(host, *attempt);
   expectCreateCodecClient(*manager, *attempt);
   attempt_timer->invokeCallback();

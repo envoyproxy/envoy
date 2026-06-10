@@ -489,6 +489,17 @@ protected:
       const Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
       HostDescriptionConstSharedPtr host,
       const Network::UpstreamTransportSocketFactory& socket_factory);
+  // Shared body of createOrcaReportingConnection. The happy-eyeballs address_list applies only
+  // when dialing the host's own address; a port-overridden dial must not fall back to
+  // original-port addresses.
+  CreateConnectionData
+  createOrcaConnection(Event::Dispatcher& dispatcher,
+                       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+                       const envoy::config::core::v3::Metadata* metadata,
+                       Network::Address::InstanceConstSharedPtr orca_address,
+                       const Network::Address::InstanceConstSharedPtr& host_address,
+                       const SharedConstAddressVector& address_list,
+                       HostDescriptionConstSharedPtr host) const;
 
 private:
   // Helper function to check multiple health flags at once.

@@ -101,6 +101,7 @@ envoy_cc_library(
     srcs = ["metadata.cc"],
     hdrs = ["metadata.h"],
     deps = [
+        ":well_known_names",
         "//envoy/config:typed_metadata_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/registry",

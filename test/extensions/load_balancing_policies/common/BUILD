@@ -137,7 +137,7 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/network:transport_socket_mocks",
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:priority_set_mocks",
         "//test/test_common:simulated_time_system_lib",

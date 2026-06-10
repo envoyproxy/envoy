@@ -144,7 +144,7 @@ private:
     void onRpcComplete(Grpc::Status::GrpcStatus status, absl::string_view message, bool end_stream);
     void onReport(const xds::data::orca::v3::OrcaLoadReport& report);
     void resetState();
-    std::string authority() const;
+    std::string authority(const Network::Address::Instance& dial_address) const;
 
     OrcaOobManager& parent_;
     const Upstream::HostConstSharedPtr host_;
@@ -172,8 +172,6 @@ private:
   static OrcaOobStats generateOrcaOobStats(Stats::Scope& scope);
 
   const OrcaOobManagerConfig config_;
-  // Forced ALPN "h2"; OOB reporting is always gRPC/HTTP2.
-  const Network::TransportSocketOptionsConstSharedPtr alpn_options_;
   const Upstream::PrioritySet& priority_set_;
   OrcaLoadReportHandlerSharedPtr report_handler_;
   Envoy::Common::CallbackHandlePtr member_update_cb_;

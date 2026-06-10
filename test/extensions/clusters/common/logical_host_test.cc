@@ -204,6 +204,50 @@ TEST_F(LogicalHostOrcaReportingConnectionTest, DialsHostDataAddress) {
   EXPECT_EQ(data.host_description_->address(), address_);
 }
 
+TEST_F(LogicalHostOrcaReportingConnectionTest, OverrideOptionsComposedWithCallerAlpn) {
+  // Matcher with a mock factory so createTransportSocket can capture the
+  // options; must be in place before host creation resolves its factory.
+  auto mock_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
+  auto* factory = mock_factory.get();
+  cluster_info_->transport_socket_matcher_ =
+      std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(std::move(mock_factory));
+
+  // Host constructed with override options carrying SNI and a non-h2 ALPN.
+  auto override_options = std::make_shared<const Network::TransportSocketOptionsImpl>(
+      "sni.example", std::vector<std::string>{}, std::vector<std::string>{"http/1.1"});
+  auto host_or_error =
+      Upstream::LogicalHost::create(cluster_info_, /*hostname=*/"", address_, /*address_list=*/{},
+                                    envoy::config::endpoint::v3::LocalityLbEndpoints(),
+                                    envoy::config::endpoint::v3::LbEndpoint(), override_options);
+  ASSERT_TRUE(host_or_error.ok());
+  auto host = std::shared_ptr<Upstream::LogicalHost>(std::move(*host_or_error));
+
+  Network::TransportSocketOptionsConstSharedPtr seen_options;
+  EXPECT_CALL(*factory, createTransportSocket(_, _))
+      .WillOnce(testing::Invoke([&](Network::TransportSocketOptionsConstSharedPtr options,
+                                    std::shared_ptr<const Upstream::HostDescription>) {
+        seen_options = options;
+        return nullptr;
+      }));
+
+  auto caller_options = std::make_shared<const Network::TransportSocketOptionsImpl>(
+      "", std::vector<std::string>{}, std::vector<std::string>{"h2"});
+  Event::MockDispatcher dispatcher;
+  StrictMock<Network::MockClientConnection>* connection =
+      new StrictMock<Network::MockClientConnection>();
+  EXPECT_CALL(dispatcher, createClientConnection_(address_, _, _, _)).WillOnce(Return(connection));
+  EXPECT_CALL(*connection, setBufferLimits(_)).Times(AnyNumber());
+  EXPECT_CALL(*connection, connectionInfoSetter()).Times(AnyNumber());
+  EXPECT_CALL(*connection, streamInfo()).Times(AnyNumber());
+  host->createOrcaReportingConnection(dispatcher, caller_options, nullptr,
+                                      host->orcaReportingAddress());
+
+  // SNI/SAN come from the host override; ALPN stays the caller's forced h2.
+  ASSERT_NE(seen_options, nullptr);
+  EXPECT_EQ(seen_options->serverNameOverride().value_or(""), "sni.example");
+  EXPECT_THAT(seen_options->applicationProtocolListOverride(), testing::ElementsAre("h2"));
+}
+
 TEST_F(LogicalHostOrcaReportingConnectionTest, MetadataRoutesThroughMatcher) {
   auto* matcher = dynamic_cast<Upstream::MockTransportSocketMatcher*>(
       cluster_info_->transport_socket_matcher_.get());

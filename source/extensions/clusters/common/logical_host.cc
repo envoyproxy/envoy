@@ -3,6 +3,42 @@
 namespace Envoy {
 namespace Upstream {
 
+namespace {
+
+// Forwards an inner TransportSocketOptions while forcing the ALPN override.
+class ForcedAlpnTransportSocketOptions : public Network::TransportSocketOptions {
+public:
+  ForcedAlpnTransportSocketOptions(std::vector<std::string> alpn,
+                                   Network::TransportSocketOptionsConstSharedPtr inner)
+      : alpn_(std::move(alpn)), inner_(std::move(inner)) {}
+
+  const absl::optional<std::string>& serverNameOverride() const override {
+    return inner_->serverNameOverride();
+  }
+  const std::vector<std::string>& verifySubjectAltNameListOverride() const override {
+    return inner_->verifySubjectAltNameListOverride();
+  }
+  const std::vector<std::string>& applicationProtocolListOverride() const override { return alpn_; }
+  const std::vector<std::string>& applicationProtocolFallback() const override {
+    return inner_->applicationProtocolFallback();
+  }
+  absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const override {
+    return inner_->proxyProtocolOptions();
+  }
+  OptRef<const Network::TransportSocketOptions::Http11ProxyInfo> http11ProxyInfo() const override {
+    return inner_->http11ProxyInfo();
+  }
+  const StreamInfo::FilterState::Objects& downstreamSharedFilterStateObjects() const override {
+    return inner_->downstreamSharedFilterStateObjects();
+  }
+
+private:
+  const std::vector<std::string> alpn_;
+  const Network::TransportSocketOptionsConstSharedPtr inner_;
+};
+
+} // namespace
+
 absl::StatusOr<std::unique_ptr<LogicalHost>> LogicalHost::create(
     const ClusterInfoConstSharedPtr& cluster, const std::string& hostname,
     const Network::Address::InstanceConstSharedPtr& address, const AddressVector& address_list,
@@ -118,18 +154,28 @@ Upstream::Host::CreateConnectionData LogicalHost::createOrcaReportingConnection(
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
     const envoy::config::core::v3::Metadata* metadata,
     Network::Address::InstanceConstSharedPtr orca_address) const {
-  // OrcaOobManager passes forced HTTP/2 ALPN; override_transport_socket_options_
-  // would clobber it.
-  ASSERT(override_transport_socket_options_ == nullptr);
-  Network::UpstreamTransportSocketFactory& factory =
-      (metadata != nullptr)
-          ? resolveTransportSocketFactory(orca_address, metadata, transport_socket_options)
-          : transportSocketFactory();
-  // The OOB stream dials a single address; the happy-eyeballs address list is
-  // intentionally not used.
-  return HostImplBase::createConnection(
-      dispatcher, cluster(), orca_address, /*address_list_or_null=*/{}, factory,
-      /*options=*/nullptr, transport_socket_options,
+  Network::Address::InstanceConstSharedPtr host_address;
+  SharedConstAddressVector address_list_or_null;
+  {
+    absl::MutexLock lock(address_lock_);
+    host_address = address_;
+    address_list_or_null = address_list_or_null_;
+  }
+  // Honor the host's override options (SNI/SAN etc.) but keep the caller's
+  // ALPN: OOB reporting is always gRPC over HTTP/2.
+  Network::TransportSocketOptionsConstSharedPtr effective_options = transport_socket_options;
+  if (override_transport_socket_options_ != nullptr) {
+    std::vector<std::string> caller_alpn =
+        transport_socket_options != nullptr
+            ? transport_socket_options->applicationProtocolListOverride()
+            : std::vector<std::string>{};
+    effective_options = caller_alpn.empty()
+                            ? override_transport_socket_options_
+                            : std::make_shared<ForcedAlpnTransportSocketOptions>(
+                                  std::move(caller_alpn), override_transport_socket_options_);
+  }
+  return createOrcaConnection(
+      dispatcher, effective_options, metadata, orca_address, host_address, address_list_or_null,
       std::make_shared<RealHostDescription>(orca_address, shared_from_this()));
 }
 

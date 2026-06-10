@@ -2027,6 +2027,67 @@ TEST_F(HostImplTest, CreateOrcaReportingConnectionWithMetadataResolvesTransportS
                                       &orca_metadata, host->orcaReportingAddress());
 }
 
+TEST_F(HostImplTest, CreateOrcaReportingConnectionUsesHappyEyeballsForHostAddress) {
+  MockClusterMockPrioritySet cluster;
+  Network::Address::InstanceConstSharedPtr address =
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  AddressVector address_list = {
+      address,
+      *Network::Utility::resolveUrl("tcp://10.0.0.2:1234"),
+  };
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
+      cluster.info_, "", address, nullptr, nullptr, 1,
+      std::make_shared<const envoy::config::core::v3::Locality>(),
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
+      envoy::config::core::v3::UNKNOWN, address_list));
+
+  testing::StrictMock<Event::MockDispatcher> dispatcher;
+  auto* connection = new testing::StrictMock<Network::MockClientConnection>();
+  EXPECT_CALL(*connection, setBufferLimits(0));
+  EXPECT_CALL(*connection, addConnectionCallbacks(_));
+  EXPECT_CALL(*connection, connectionInfoSetter());
+  EXPECT_CALL(dispatcher, createClientConnection_(address_list[0], _, _, _))
+      .WillOnce(Return(connection));
+  EXPECT_CALL(dispatcher, createTimer_(_));
+  EXPECT_CALL(*connection, streamInfo());
+
+  // Dialing the host's own address keeps the data path's happy-eyeballs fallback.
+  Host::CreateConnectionData data =
+      host->createOrcaReportingConnection(dispatcher, /*transport_socket_options=*/nullptr,
+                                          /*metadata=*/nullptr, host->orcaReportingAddress());
+  EXPECT_NE(connection, data.connection_.get());
+}
+
+TEST_F(HostImplTest, CreateOrcaReportingConnectionSkipsAddressListForOverriddenAddress) {
+  MockClusterMockPrioritySet cluster;
+  Network::Address::InstanceConstSharedPtr address =
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  AddressVector address_list = {
+      address,
+      *Network::Utility::resolveUrl("tcp://10.0.0.2:1234"),
+  };
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
+      cluster.info_, "", address, nullptr, nullptr, 1,
+      std::make_shared<const envoy::config::core::v3::Locality>(),
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
+      envoy::config::core::v3::UNKNOWN, address_list));
+
+  Network::Address::InstanceConstSharedPtr overridden =
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:9001");
+  testing::StrictMock<Event::MockDispatcher> dispatcher;
+  auto* connection = new testing::StrictMock<Network::MockClientConnection>();
+  EXPECT_CALL(*connection, setBufferLimits(0));
+  EXPECT_CALL(*connection, connectionInfoSetter());
+  EXPECT_CALL(dispatcher, createClientConnection_(overridden, _, _, _))
+      .WillOnce(Return(connection));
+  EXPECT_CALL(*connection, streamInfo());
+
+  // A port-overridden dial must not fall back to the original-port address list.
+  Host::CreateConnectionData data = host->createOrcaReportingConnection(
+      dispatcher, /*transport_socket_options=*/nullptr, /*metadata=*/nullptr, overridden);
+  EXPECT_EQ(connection, data.connection_.get());
+}
+
 TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
   MockClusterMockPrioritySet cluster;
   envoy::config::core::v3::Metadata metadata;

@@ -4,7 +4,8 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
-#include "source/common/config/well_known_names.h"
+#include "source/common/common/macros.h"
+#include "source/common/config/metadata.h"
 #include "source/common/grpc/common.h"
 #include "source/common/http/codec_client.h"
 #include "source/common/http/headers.h"
@@ -34,6 +35,23 @@ constexpr uint64_t kInactivityWatchdogMultiplier = 3;
 
 // Max allowed size of a single gRPC frame accepted on an OOB OrcaLoadReport stream.
 constexpr uint32_t kMaxOrcaReportFrameBytes = 64 * 1024;
+
+// OOB reporting is always gRPC over HTTP/2; shared by all managers.
+const Network::TransportSocketOptionsConstSharedPtr& h2AlpnOptions() {
+  CONSTRUCT_ON_FIRST_USE(Network::TransportSocketOptionsConstSharedPtr,
+                         std::make_shared<const Network::TransportSocketOptionsImpl>(
+                             /*override_server_name=*/"",
+                             /*override_verify_san_list=*/std::vector<std::string>{},
+                             /*override_alpn=*/std::vector<std::string>{"h2"}));
+}
+
+OrcaOobManagerConfig sanitizeConfig(OrcaOobManagerConfig config) {
+  // Sessions jitter by random % period and arm watchdogs from it.
+  if (config.reporting_period.count() <= 0) {
+    config.reporting_period = std::chrono::milliseconds(kDefaultOobReportingPeriodMs);
+  }
+  return config;
+}
 } // namespace
 
 void applyOrcaOobConnectionOverrides(
@@ -42,11 +60,8 @@ void applyOrcaOobConnectionOverrides(
   config.port_value = proto.port_value();
   config.authority = proto.authority();
   if (proto.has_transport_socket_match_criteria()) {
-    auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
-    (*metadata->mutable_filter_metadata())[Envoy::Config::MetadataFilters::get()
-                                               .ENVOY_TRANSPORT_SOCKET_MATCH] =
-        proto.transport_socket_match_criteria();
-    config.transport_socket_match_metadata = std::move(metadata);
+    config.transport_socket_match_metadata =
+        Config::Metadata::transportSocketMatchMetadata(proto.transport_socket_match_criteria());
   }
 }
 
@@ -55,15 +70,9 @@ OrcaOobManager::OrcaOobManager(OrcaOobManagerConfig config,
                                Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
                                Stats::Scope& stats_scope,
                                OrcaLoadReportHandlerSharedPtr report_handler)
-    : dispatcher_(dispatcher), random_(random), config_(std::move(config)),
-      alpn_options_(std::make_shared<const Network::TransportSocketOptionsImpl>(
-          /*override_server_name=*/"", /*override_verify_san_list=*/std::vector<std::string>{},
-          /*override_alpn=*/std::vector<std::string>{"h2"})),
+    : dispatcher_(dispatcher), random_(random), config_(sanitizeConfig(std::move(config))),
       priority_set_(priority_set), report_handler_(std::move(report_handler)),
-      oob_stats_(generateOrcaOobStats(stats_scope)) {
-  // Callers clamp non-positive periods to the default; sessions need > 0.
-  ASSERT(config_.reporting_period.count() > 0);
-}
+      oob_stats_(generateOrcaOobStats(stats_scope)) {}
 
 OrcaOobManager::~OrcaOobManager() {
   for (auto& [host, session] : oob_sessions_) {
@@ -264,14 +273,18 @@ void OrcaOobManager::OobSession::connectAndStream() {
     }
   }
 
-  Upstream::Host::CreateConnectionData connection_data = host_->createOrcaReportingConnection(
-      parent_.dispatcher_, parent_.alpn_options_,
-      parent_.config_.transport_socket_match_metadata.get(), dial_address);
-  // Derive :scheme from the actual OOB connection, which may differ from the
-  // cluster default via transport_socket_match_criteria. Reads ssl() at
-  // construction; post-connect TLS upgrades (e.g. STARTTLS) not supported.
+  // :scheme reflects the transport socket securing the OOB connection (which may
+  // differ from the cluster default via transport_socket_match_criteria), per the
+  // gRPC health checker's implementsSecureTransport() pattern.
+  const auto* match_metadata = parent_.config_.transport_socket_match_metadata.get();
   const bool secure_transport =
-      connection_data.connection_ != nullptr && connection_data.connection_->ssl() != nullptr;
+      (match_metadata != nullptr
+           ? host_->resolveTransportSocketFactory(dial_address, match_metadata, h2AlpnOptions())
+           : host_->transportSocketFactory())
+          .implementsSecureTransport();
+
+  Upstream::Host::CreateConnectionData connection_data = host_->createOrcaReportingConnection(
+      parent_.dispatcher_, h2AlpnOptions(), match_metadata, dial_address);
   codec_client_ = parent_.createCodecClient(connection_data);
   if (codec_client_ == nullptr) {
     parent_.oob_stats_.stream_failures_.inc();
@@ -286,7 +299,7 @@ void OrcaOobManager::OobSession::connectAndStream() {
   request_encoder_->getStream().addCallbacks(*this);
 
   auto headers_message =
-      Grpc::Common::prepareHeaders(authority(), std::string(kOrcaOobServiceFullName),
+      Grpc::Common::prepareHeaders(authority(*dial_address), std::string(kOrcaOobServiceFullName),
                                    std::string(kStreamCoreMetricsMethod), absl::nullopt);
   headers_message->headers().setReferenceScheme(secure_transport
                                                     ? Http::Headers::get().SchemeValues.Https
@@ -382,7 +395,8 @@ void OrcaOobManager::OobSession::resetState() {
   received_no_error_goaway_ = false;
 }
 
-std::string OrcaOobManager::OobSession::authority() const {
+std::string
+OrcaOobManager::OobSession::authority(const Network::Address::Instance& dial_address) const {
   // Explicit policy-level authority wins over everything.
   if (!parent_.config_.authority.empty()) {
     return parent_.config_.authority;
@@ -391,8 +405,8 @@ std::string OrcaOobManager::OobSession::authority() const {
     return std::string(host_->hostname());
   }
   // For IP addresses, use the full address string which includes brackets for IPv6 and the port.
-  if (host_->address()->ip() != nullptr) {
-    return host_->address()->asString();
+  if (dial_address.ip() != nullptr) {
+    return dial_address.asString();
   }
   // Terminal fallback for non-IP addresses (e.g., UDS, Pipe) avoids using a
   // socket path as :authority.

@@ -609,14 +609,28 @@ Host::CreateConnectionData HostImplBase::createOrcaReportingConnection(
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
     const envoy::config::core::v3::Metadata* metadata,
     Network::Address::InstanceConstSharedPtr orca_address) const {
+  return createOrcaConnection(dispatcher, std::move(transport_socket_options), metadata,
+                              std::move(orca_address), address(), addressListOrNull(),
+                              shared_from_this());
+}
+
+Host::CreateConnectionData HostImplBase::createOrcaConnection(
+    Event::Dispatcher& dispatcher,
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+    const envoy::config::core::v3::Metadata* metadata,
+    Network::Address::InstanceConstSharedPtr orca_address,
+    const Network::Address::InstanceConstSharedPtr& host_address,
+    const SharedConstAddressVector& address_list, HostDescriptionConstSharedPtr host) const {
   Network::UpstreamTransportSocketFactory& factory =
       (metadata != nullptr)
           ? resolveTransportSocketFactory(orca_address, metadata, transport_socket_options)
           : transportSocketFactory();
-  // The OOB stream dials a single address; the happy-eyeballs address list is
-  // intentionally not used.
-  return createConnection(dispatcher, cluster(), orca_address, /*address_list_or_null=*/{}, factory,
-                          /*options=*/nullptr, transport_socket_options, shared_from_this());
+  // An overridden dial address never matches the host address pointer, so the
+  // original-port address list is dropped in that case.
+  const bool use_address_list = orca_address == host_address;
+  return createConnection(dispatcher, cluster(), orca_address,
+                          use_address_list ? address_list : SharedConstAddressVector{}, factory,
+                          /*options=*/nullptr, transport_socket_options, std::move(host));
 }
 
 absl::optional<Network::Address::InstanceConstSharedPtr> HostImplBase::maybeGetProxyRedirectAddress(

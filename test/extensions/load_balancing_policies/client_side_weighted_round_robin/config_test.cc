@@ -58,7 +58,7 @@ TEST(CswrrOobConfigResolution, EnableOobLoadReportEnablesWithPeriod) {
   NiceMock<ThreadLocal::MockInstance> tls;
   Upstream::ClientSideWeightedRoundRobinLbConfig config(proto, dispatcher, tls);
 
-  EXPECT_TRUE(config.oob_enabled);
+  EXPECT_TRUE(config.enable_oob_load_report);
   EXPECT_EQ(config.oob_manager_config.reporting_period, std::chrono::milliseconds(42000));
 }
 
@@ -75,7 +75,7 @@ TEST(CswrrOobConfigResolution, OobReportingConfigOverridesParsed) {
   NiceMock<ThreadLocal::MockInstance> tls;
   Upstream::ClientSideWeightedRoundRobinLbConfig config(proto, dispatcher, tls);
 
-  EXPECT_TRUE(config.oob_enabled);
+  EXPECT_TRUE(config.enable_oob_load_report);
   EXPECT_EQ(config.oob_manager_config.reporting_period, std::chrono::milliseconds(5000));
   EXPECT_EQ(config.oob_manager_config.port_value, 9001u);
   EXPECT_EQ(config.oob_manager_config.authority, "orca.example.com");
@@ -91,7 +91,7 @@ TEST(CswrrOobConfigResolution, OobReportingConfigIgnoredWhenNotEnabled) {
   NiceMock<ThreadLocal::MockInstance> tls;
   Upstream::ClientSideWeightedRoundRobinLbConfig config(proto, dispatcher, tls);
 
-  EXPECT_FALSE(config.oob_enabled);
+  EXPECT_FALSE(config.enable_oob_load_report);
 }
 
 } // namespace

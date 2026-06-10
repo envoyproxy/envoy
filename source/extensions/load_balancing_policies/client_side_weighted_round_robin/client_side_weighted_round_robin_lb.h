@@ -39,7 +39,7 @@ public:
   std::chrono::milliseconds weight_expiration_period;
   std::chrono::milliseconds weight_update_period;
 
-  bool oob_enabled;
+  bool enable_oob_load_report;
   Extensions::LoadBalancingPolicies::Common::OrcaOobManagerConfig oob_manager_config;
 
   // Round robin proto overrides that we want to propagate to the worker RR LB (e.g., slow start).
@@ -131,7 +131,7 @@ private:
   std::unique_ptr<Extensions::LoadBalancingPolicies::Common::OrcaWeightManager>
       orca_weight_manager_;
 
-  // ORCA out-of-band manager. Constructed only when oob_enabled; null
+  // ORCA out-of-band manager. Constructed only when enable_oob_load_report; null
   // otherwise. Shares the OrcaWeightManager's report handler so OOB reports feed the same
   // per-host atomics as in-band reports.
   std::unique_ptr<Extensions::LoadBalancingPolicies::Common::OrcaOobManager> orca_oob_manager_;
