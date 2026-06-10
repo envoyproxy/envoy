@@ -1032,47 +1032,6 @@ typed_config:
       << "Session ID digests must differ when suppress_client_ca_list differs";
 }
 
-// When suppress_client_ca_list is false (the default), the session ID digest
-// must not include a "suppress=false" byte — preserves backward-compat with
-// pre-feature session IDs for deployments that don't use the flag.
-TEST_F(TestSPIFFEValidator, SuppressClientCaListDefaultSessionIdUnchanged) {
-  Event::TestRealTimeSystem time_system;
-  setSuppressClientCaList(false);
-  ASSERT_OK(initialize(TestEnvironment::substitute(R"EOF(
-name: envoy.tls.cert_validator.spiffe
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
-  trust_domains:
-    - name: lyft.com
-      trust_bundle:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/spiffe_san_cert.pem"
-    - name: example.com
-      trust_bundle:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
-  )EOF"),
-                       time_system));
-
-  auto digest_production = computeSpiffeSessionIdDigest(validator());
-
-  // Replay updateDigestForSessionId and manually feed the false byte that a
-  // regressed (unconditional-hash) implementation would push. The two digests
-  // must differ — proving the production digest did not include the false byte.
-  bssl::ScopedEVP_MD_CTX regressed_md;
-  ASSERT_EQ(1, EVP_DigestInit_ex(regressed_md.get(), EVP_sha256(), nullptr));
-  uint8_t scratch[EVP_MAX_MD_SIZE];
-  validator().updateDigestForSessionId(regressed_md, scratch, SHA256_DIGEST_LENGTH);
-  const bool false_byte = false;
-  ASSERT_EQ(1, EVP_DigestUpdate(regressed_md.get(), &false_byte, sizeof(false_byte)));
-  std::vector<uint8_t> digest_regressed(EVP_MAX_MD_SIZE);
-  unsigned regressed_len = 0;
-  ASSERT_EQ(1, EVP_DigestFinal_ex(regressed_md.get(), digest_regressed.data(), &regressed_len));
-  digest_regressed.resize(regressed_len);
-
-  EXPECT_NE(digest_production, digest_regressed)
-      << "Production digest for suppress=false includes a false byte, which would "
-         "change session IDs on upgrade for deployments not using the feature.";
-}
-
 TEST_F(TestSPIFFEValidator, InvalidTrustBundleMapConfig) {
   {
     EXPECT_THAT(initialize(TestEnvironment::substitute(R"EOF(

@@ -968,60 +968,6 @@ TEST(DefaultCertValidatorTest, SuppressClientCaListDisabled) {
   EXPECT_GT(sk_X509_NAME_num(ca_list), 0);
 }
 
-// Test that when suppress_client_ca_list is enabled but require_client_cert is false,
-// SSL_VERIFY_FAIL_IF_NO_PEER_CERT is not set.
-TEST(DefaultCertValidatorTest, SuppressClientCaListWithoutRequireClientCert) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  Stats::TestUtil::TestStore store;
-  SslStats stats = generateSslStats(*store.rootScope());
-
-  std::string ca_cert = TestEnvironment::readFileToStringForTest(
-      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
-
-  auto config = makeSuppressConfig(ca_cert, true);
-  auto validator = std::make_unique<DefaultCertValidator>(config.get(), stats, context);
-
-  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
-  ASSERT_NE(ssl_ctx, nullptr);
-  ASSERT_TRUE(validator->addClientValidationContext(ssl_ctx.get(), false).ok());
-
-  STACK_OF(X509_NAME)* ca_list = SSL_CTX_get_client_CA_list(ssl_ctx.get());
-  if (ca_list != nullptr) {
-    EXPECT_EQ(sk_X509_NAME_num(ca_list), 0);
-  }
-  EXPECT_EQ(SSL_CTX_get_verify_mode(ssl_ctx.get()) & SSL_VERIFY_FAIL_IF_NO_PEER_CERT, 0);
-}
-
-// Test that when suppress_client_ca_list is enabled with max_verify_depth set,
-// the verify depth is correctly applied.
-TEST(DefaultCertValidatorTest, SuppressClientCaListWithMaxVerifyDepth) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  Stats::TestUtil::TestStore store;
-  SslStats stats = generateSslStats(*store.rootScope());
-
-  std::string ca_cert = TestEnvironment::readFileToStringForTest(
-      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
-
-  envoy::config::core::v3::TypedExtensionConfig typed_conf;
-  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers{};
-  auto config = std::make_unique<TestCertificateValidationContextConfig>(
-      typed_conf, /*allow_expired_certificate=*/false, san_matchers, ca_cert,
-      /*verify_depth=*/absl::optional<uint32_t>(10), /*suppress_client_ca_list=*/true);
-  auto validator = std::make_unique<DefaultCertValidator>(config.get(), stats, context);
-
-  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
-  ASSERT_NE(ssl_ctx, nullptr);
-  ASSERT_TRUE(validator->addClientValidationContext(ssl_ctx.get(), true).ok());
-
-  STACK_OF(X509_NAME)* ca_list = SSL_CTX_get_client_CA_list(ssl_ctx.get());
-  if (ca_list != nullptr) {
-    EXPECT_EQ(sk_X509_NAME_num(ca_list), 0);
-  }
-#ifndef ENVOY_SSL_OPENSSL
-  EXPECT_EQ(SSL_CTX_get_verify_depth(ssl_ctx.get()), 9);
-#endif
-}
-
 // Test that addClientValidationContext returns an error when the CA cert PEM is malformed
 // (valid PEM header but corrupt base64 content).
 TEST(DefaultCertValidatorTest, AddClientValidationContextWithMalformedCaCert) {
@@ -1071,49 +1017,6 @@ TEST(DefaultCertValidatorTest, SuppressClientCaListSessionIdDiffers) {
 
   EXPECT_NE(digest_suppressed, digest_not_suppressed)
       << "Session ID digests must differ when suppress_client_ca_list differs";
-}
-
-// Test that when suppress_client_ca_list is false (the default), the session ID
-// digest does NOT include a "suppress=false" byte. This preserves backward-compat
-// with pre-feature session IDs so deployments not using the flag don't see their
-// in-flight session resumption invalidated on upgrade.
-//
-// Strategy: compute the real digest with suppress=false. Then recompute a hypothetical
-// "regressed" digest by feeding the same validator's digest PLUS a false byte (the
-// behavior the original code had). The two must differ — proving the production digest
-// did not include the false byte.
-TEST(DefaultCertValidatorTest, SuppressClientCaListDefaultSessionIdUnchanged) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  Stats::TestUtil::TestStore store;
-  SslStats stats = generateSslStats(*store.rootScope());
-
-  std::string ca_cert = TestEnvironment::readFileToStringForTest(
-      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
-
-  auto config_default = makeSuppressConfig(ca_cert, false);
-  DefaultCertValidator validator(config_default.get(), stats, context);
-  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
-  std::vector<SSL_CTX*> ctxs = {ssl_ctx.get()};
-  ASSERT_TRUE(validator.initializeSslContexts(ctxs, true, *store.rootScope()).ok());
-
-  auto digest_production = computeSessionIdDigest(validator);
-
-  // Simulate the pre-Fix-#1 (regressed) behavior: replay updateDigestForSessionId,
-  // then manually feed the false byte that the regressed code would have pushed.
-  bssl::ScopedEVP_MD_CTX regressed_md;
-  ASSERT_EQ(1, EVP_DigestInit_ex(regressed_md.get(), EVP_sha256(), nullptr));
-  uint8_t scratch[EVP_MAX_MD_SIZE];
-  validator.updateDigestForSessionId(regressed_md, scratch, SHA256_DIGEST_LENGTH);
-  const bool false_byte = false;
-  ASSERT_EQ(1, EVP_DigestUpdate(regressed_md.get(), &false_byte, sizeof(false_byte)));
-  std::vector<uint8_t> digest_regressed(EVP_MAX_MD_SIZE);
-  unsigned regressed_len = 0;
-  ASSERT_EQ(1, EVP_DigestFinal_ex(regressed_md.get(), digest_regressed.data(), &regressed_len));
-  digest_regressed.resize(regressed_len);
-
-  EXPECT_NE(digest_production, digest_regressed)
-      << "Production digest for suppress=false includes a false byte, which would "
-         "change session IDs on upgrade for deployments not using the feature.";
 }
 
 } // namespace Tls

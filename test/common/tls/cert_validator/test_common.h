@@ -83,10 +83,10 @@ public:
   const std::string& caCertPath() const override { return ca_cert_path_; }
   const std::string& caCertName() const override { return ca_cert_name_; }
   const std::string& certificateRevocationList() const override {
-    CONSTRUCT_ON_FIRST_USE(std::string);
+    CONSTRUCT_ON_FIRST_USE(std::string, "");
   }
   const std::string& certificateRevocationListPath() const final {
-    CONSTRUCT_ON_FIRST_USE(std::string);
+    CONSTRUCT_ON_FIRST_USE(std::string, "");
   }
   const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>&
   subjectAltNameMatchers() const override {
