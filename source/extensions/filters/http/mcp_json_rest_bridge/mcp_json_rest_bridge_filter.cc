@@ -12,6 +12,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/common/mcp/constants.h"
 #include "source/extensions/filters/http/mcp_json_rest_bridge/http_request_builder.h"
+#include "source/extensions/filters/http/mcp_json_rest_bridge/trace_context.h"
 
 #include "absl/base/no_destructor.h"
 #include "absl/container/flat_hash_set.h"
@@ -29,11 +30,24 @@ namespace HttpFilters {
 namespace McpJsonRestBridge {
 namespace {
 
+using ::Envoy::Extensions::HttpFilters::McpJsonRestBridge::McpTraceContext;
 using ::nlohmann::json;
 namespace McpConstants = Envoy::Extensions::Filters::Common::Mcp::McpConstants;
 
 constexpr uint32_t DEFAULT_MAX_REQUEST_BODY_SIZE = 1024 * 64;    // 64KB
 constexpr uint32_t DEFAULT_MAX_RESPONSE_BODY_SIZE = 1024 * 1024; // 1MB
+
+const Http::LowerCaseString& traceparentHeader() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "traceparent");
+}
+
+const Http::LowerCaseString& tracestateHeader() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "tracestate");
+}
+
+const Http::LowerCaseString& baggageHeader() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "baggage");
+}
 
 bool isMcpProtocolVersionSupported(absl::string_view protocol_version) {
   static const absl::NoDestructor<absl::flat_hash_set<absl::string_view>> supported_mcp_versions({
@@ -129,6 +143,22 @@ bool validateRequestMcpVersion(absl::string_view method,
     }
   }
   return isMcpProtocolVersionSupported(protocol_version);
+}
+
+void setTraceContextHeaders(Http::RequestHeaderMap& request_headers,
+                            const McpTraceContext& trace_context) {
+  if (!trace_context.traceparent().empty()) {
+    request_headers.setCopy(traceparentHeader(), trace_context.traceparent());
+    if (trace_context.tracestate().empty()) {
+      request_headers.remove(tracestateHeader());
+    } else {
+      request_headers.setCopy(tracestateHeader(), trace_context.tracestate());
+    }
+  }
+
+  if (!trace_context.baggage().empty()) {
+    request_headers.setCopy(baggageHeader(), trace_context.baggage());
+  }
 }
 
 } // namespace
@@ -486,6 +516,12 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc,
                                        "mcp_json_rest_bridge_filter_initialize_ack");
   } else if (method == McpConstants::Methods::TOOLS_CALL) {
     mcp_operation_ = McpOperation::ToolsCall;
+    if (config_->traceContextExtraction() && request_headers.has_value()) {
+      ENVOY_STREAM_LOG(debug, "Trace context extraction is enabled for tools/call method.",
+                       *decoder_callbacks_);
+      McpTraceContext trace_context(json_rpc);
+      setTraceContextHeaders(*request_headers, trace_context);
+    }
     mapMcpToolToApiBackend(json_rpc);
   } else {
     sendErrorResponse(

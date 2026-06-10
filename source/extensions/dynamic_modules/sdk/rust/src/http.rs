@@ -3691,8 +3691,8 @@ impl EnvoyHttpFilterImpl {
 
     let mut count: usize = 0;
 
-    // Get the first value to get the count.
-    let ret = unsafe {
+    // The indexed getter reports the total number of values via its size output.
+    let found = unsafe {
       abi::envoy_dynamic_module_callback_http_get_header(
         self.raw_ptr,
         header_type,
@@ -3703,31 +3703,25 @@ impl EnvoyHttpFilterImpl {
       )
     };
 
-    let mut results = Vec::new();
-    if count == 0 || !ret {
-      return results;
+    if !found || count == 0 {
+      return Vec::new();
     }
 
-    // At this point, we assume at least one value is present.
-    results.push(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) });
-    // So, we iterate from 1 to count - 1.
-    for i in 1..count {
-      let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
-        ptr: std::ptr::null(),
-        length: 0,
-      };
-      unsafe {
-        abi::envoy_dynamic_module_callback_http_get_header(
-          self.raw_ptr,
-          header_type,
-          str_to_module_buffer(key),
-          &mut result as *mut _ as *mut _,
-          i,
-          std::ptr::null_mut(),
-        )
-      };
-      // Within the range, all results are guaranteed to be non-null by Envoy.
-      results.push(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) });
+    // Fill all values in a single crossing instead of one call per value.
+    let mut results: Vec<EnvoyBuffer> = Vec::with_capacity(count);
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_header_values(
+        self.raw_ptr,
+        header_type,
+        str_to_module_buffer(key),
+        results.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
+      )
+    };
+    if !success {
+      return Vec::new();
+    }
+    unsafe {
+      results.set_len(count);
     }
     results
   }

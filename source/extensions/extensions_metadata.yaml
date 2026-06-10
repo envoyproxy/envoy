@@ -1637,6 +1637,14 @@ envoy.transport_sockets.quic:
   type_urls:
   - envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport
   - envoy.extensions.transport_sockets.quic.v3.QuicUpstreamTransport
+envoy.transport_sockets.dynamic_modules:
+  categories:
+  - envoy.transport_sockets.downstream
+  - envoy.transport_sockets.upstream
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.transport_sockets.dynamic_modules.v3.DynamicModuleTransportSocket
 envoy.transport_sockets.raw_buffer:
   categories:
   - envoy.transport_sockets.downstream

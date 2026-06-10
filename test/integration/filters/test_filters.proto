@@ -96,6 +96,8 @@ message ModifyBufferFilterConfig {
 }
 message ProcessContextFilterConfig {
 }
+message RuntimeFeatureTestFilterConfig {
+}
 message RandomPauseFilterConfig {
 }
 message RefreshRouteClusterConfig {

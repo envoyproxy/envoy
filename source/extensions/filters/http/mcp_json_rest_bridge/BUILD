@@ -15,6 +15,7 @@ envoy_cc_library(
     hdrs = ["mcp_json_rest_bridge_filter.h"],
     deps = [
         ":http_request_builder_lib",
+        ":trace_context_lib",
         "//envoy/http:filter_interface",
         "//envoy/server:filter_config_interface",
         "//source/common/common:logger_lib",
@@ -49,5 +50,15 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/json:json_loader_lib",
         "@envoy_api//envoy/extensions/filters/http/mcp_json_rest_bridge/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "trace_context_lib",
+    srcs = ["trace_context.cc"],
+    hdrs = ["trace_context.h"],
+    deps = [
+        "//source/common/tracing:tracing_validation_lib",
+        "@nlohmann_json//:json",
     ],
 )

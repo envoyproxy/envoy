@@ -16,6 +16,7 @@ package(default_visibility = [
     "//test/extensions/matching/input_matchers/dynamic_modules:__pkg__",
     "//test/extensions/network/dns_resolver/hickory:__pkg__",
     "//test/extensions/tracers/dynamic_modules:__pkg__",
+    "//test/extensions/transport_sockets/dynamic_modules:__pkg__",
     "//test/extensions/transport_sockets/tls/cert_validator/dynamic_modules:__pkg__",
     "//test/extensions/upstreams/http/dynamic_modules:__pkg__",
 ])
@@ -41,6 +42,8 @@ test_program(name = "program_init_fail")
 test_program(name = "abi_version_mismatch")
 
 test_program(name = "no_http_config_new")
+
+test_program(name = "http_filter_config_new_fail")
 
 test_program(name = "http_filter_per_route_config_new_fail")
 

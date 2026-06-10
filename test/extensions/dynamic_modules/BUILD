@@ -39,6 +39,8 @@ envoy_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:hex_lib",
         "//source/common/crypto:utility_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//test/extensions/dynamic_modules/test_data/c:matcher_no_op_static",

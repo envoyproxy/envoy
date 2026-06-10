@@ -357,6 +357,8 @@ Current supported substitution commands include:
     The ``START`` and ``END`` time points are specified by the following values (all values
     here are case-sensitive):
 
+    * ``DS_CX_BEG``: The time point of the downstream connection begin.
+    * ``DS_CX_END``: The time point of the downstream connection end.
     * ``DS_RX_BEG``: The time point of the downstream request receiving begin.
     * ``DS_RX_END``: The time point of the downstream request receiving end.
     * ``US_CX_BEG``: The time point of the upstream TCP connect begin.
@@ -375,6 +377,12 @@ Current supported substitution commands include:
 
       Upstream connection establishment time points (``US_CX_*``, ``US_HS_END``) repeat for all requests
       in a given connection.
+
+    .. note::
+
+      The ``DS_CX_BEG`` time point reflects the downstream connection begin and repeats for all
+      requests on a given connection. The ``DS_CX_END`` time point is only populated for requests
+      that are active when the downstream connection closes and renders as ``"-"`` otherwise.
 
     The ``PRECISION`` is specified by the following values (all values here are case-sensitive):
 
