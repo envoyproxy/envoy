@@ -116,7 +116,7 @@ FilterConfigSubscription::onConfigUpdate(const std::vector<Config::DecodedResour
         "Unexpected number of resources in ExtensionConfigDS response: {}", resources.size()));
   }
   const auto& filter_config =
-      proto2::DynamicCastMessage<envoy::config::core::v3::TypedExtensionConfig>(
+      google::protobuf::DynamicCastMessage<envoy::config::core::v3::TypedExtensionConfig>(
           resources[0].get().resource());
   if (filter_config.name() != filter_config_name_) {
     return absl::InvalidArgumentError(fmt::format(

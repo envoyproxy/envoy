@@ -381,7 +381,7 @@ public:
   downcastAndValidate(const Protobuf::Message& config,
                       ProtobufMessage::ValidationVisitor& validation_visitor) {
     const auto& typed_config =
-        proto2::DynamicCastMessage<std::remove_reference_t<MessageType>>(config);
+        google::protobuf::DynamicCastMessage<std::remove_reference_t<MessageType>>(config);
     validate(typed_config, validation_visitor);
     return typed_config;
   }

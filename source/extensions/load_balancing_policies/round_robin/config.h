@@ -32,8 +32,9 @@ public:
   absl::StatusOr<Upstream::LoadBalancerConfigPtr>
   loadConfig(Server::Configuration::ServerFactoryContext&,
              const Protobuf::Message& config) override {
-    ASSERT(proto2::DynamicCastMessage<RoundRobinLbProto>(&config) != nullptr);
-    const RoundRobinLbProto& typed_config = proto2::DynamicCastMessage<RoundRobinLbProto>(config);
+    ASSERT(google::protobuf::DynamicCastMessage<RoundRobinLbProto>(&config) != nullptr);
+    const RoundRobinLbProto& typed_config =
+        google::protobuf::DynamicCastMessage<RoundRobinLbProto>(config);
     return Upstream::LoadBalancerConfigPtr{new Upstream::TypedRoundRobinLbConfig(typed_config)};
   }
 

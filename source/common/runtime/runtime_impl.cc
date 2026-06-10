@@ -579,7 +579,7 @@ RtdsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& 
   if (!valid.ok()) {
     return valid;
   }
-  const auto& runtime = proto2::DynamicCastMessage<envoy::service::runtime::v3::Runtime>(
+  const auto& runtime = google::protobuf::DynamicCastMessage<envoy::service::runtime::v3::Runtime>(
       resources[0].get().resource());
   if (runtime.name() != resource_name_) {
     return absl::InvalidArgumentError(

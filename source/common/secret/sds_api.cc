@@ -93,7 +93,7 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
     return status;
   }
   const auto& secret =
-      proto2::DynamicCastMessage<envoy::extensions::transport_sockets::tls::v3::Secret>(
+      google::protobuf::DynamicCastMessage<envoy::extensions::transport_sockets::tls::v3::Secret>(
           resources[0].get().resource());
 
   if (secret.name() != sds_config_name_) {
