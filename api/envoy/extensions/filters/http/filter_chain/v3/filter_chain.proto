@@ -50,21 +50,20 @@ message FilterChainConfigPerRoute {
 }
 
 // A filter chain is a list of HTTP filters that are applied in order.
-// This message is used to define a reusable chain of filters that can be
-// referenced by name or used as the default filter chain.
+// This message is used to define a reusable chain of filters.
 message FilterChain {
   // A list of HTTP filter configurations to be applied in order.
   // Each filter in the chain will process the request/response in sequence.
   // At least one filter must be specified.
   //
   // .. warning::
-  //   Please do not configure the ``filter_chain`` filter itself within this list recursively
-  //   to avoid undefined behavior.
+  //   Please do not configure the ``filter_chain`` filter itself or ``composite`` filter
+  //   within this list recursively to avoid undefined behavior.
   //
   // .. note::
   //   It is possible to configure ``terminal`` filters (filters that do not expect next filter
   //   in the chain, e.g., ``envoy.filters.http.router``) in the middle of the chain. However,
-  //   use it with caution to ensure the to avoid unexpected behavior.
+  //   use it with caution to avoid unexpected behavior.
   //
   // [#extension-category: envoy.filters.http]
   repeated config.core.v3.TypedExtensionConfig filters = 1
