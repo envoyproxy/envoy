@@ -567,8 +567,6 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
                                           *(it->second->mutable_last_update_attempt()));
     it->second->set_details(add_or_update_status.status().message());
     it->second->mutable_failed_configuration()->PackFrom(config);
-    ENVOY_LOG(warn, "listener '{}' config rejected: {}", name,
-              add_or_update_status.status().message());
   }
   return add_or_update_status;
 }
