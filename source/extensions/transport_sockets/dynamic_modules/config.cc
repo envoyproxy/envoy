@@ -25,9 +25,12 @@ createDynamicModuleConfig(const Protobuf::Message& message,
           message, context.messageValidationVisitor());
 
   const auto& module_config = proto_config.dynamic_module_config();
-  auto dynamic_module = Envoy::Extensions::DynamicModules::newDynamicModuleByName(
-      module_config.name(), module_config.do_not_close(), module_config.load_globally());
-  RETURN_IF_NOT_OK_REF(dynamic_module.status());
+  // Transport sockets do not support remote module sources, so no init manager or async callback is
+  // passed; only the synchronous local-file and by-name paths can succeed here.
+  auto load_result = Envoy::Extensions::DynamicModules::newDynamicModuleByConfig(
+      module_config, proto_config.transport_socket_name(), context.serverFactoryContext());
+  RETURN_IF_NOT_OK_REF(load_result.status());
+  auto dynamic_module = std::move(load_result->loaded);
 
   std::string socket_config;
   if (proto_config.has_transport_socket_config()) {
@@ -38,7 +41,7 @@ createDynamicModuleConfig(const Protobuf::Message& message,
 
   return newDynamicModuleTransportSocketConfig(
       proto_config.transport_socket_name(), socket_config, is_upstream,
-      proto_config.implements_secure_transport(), std::move(dynamic_module.value()));
+      proto_config.implements_secure_transport(), std::move(dynamic_module));
 }
 
 } // namespace
