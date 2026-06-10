@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "source/common/common/assert.h"
 #include "source/common/common/base64.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/json/json_sanitizer.h"
@@ -44,14 +45,17 @@ std::string base64UrlEncode(absl::string_view input) {
 // Convert a DER-encoded ECDSA signature to the raw r||s format required by JWT (RFC 7518 Section
 // 3.4). EVP_DigestSign produces DER-encoded signatures, but JWT expects fixed-width big-endian
 // concatenation of r and s components.
-absl::StatusOr<std::vector<uint8_t>> convertEcDerSignatureToRaw(const std::vector<uint8_t>& der_sig,
-                                                                EVP_PKEY* pkey) {
+//
+// The inputs are produced internally from a valid EC key (the DER comes from our own EVP_DigestSign
+// and `pkey` is already verified to be an EC key by the caller), so the BoringSSL calls below
+// cannot fail in practice. The RELEASE_ASSERTs document those invariants and crash rather than
+// silently emit a corrupt signature if BoringSSL ever violates them.
+std::vector<uint8_t> convertEcDerSignatureToRaw(const std::vector<uint8_t>& der_sig,
+                                                EVP_PKEY* pkey) {
   // Parse the DER-encoded ECDSA signature.
   const uint8_t* der_ptr = der_sig.data();
   bssl::UniquePtr<ECDSA_SIG> ecdsa_sig(d2i_ECDSA_SIG(nullptr, &der_ptr, der_sig.size()));
-  if (!ecdsa_sig) {
-    return absl::InternalError("Failed to parse DER-encoded ECDSA signature");
-  }
+  RELEASE_ASSERT(ecdsa_sig != nullptr, "Failed to parse DER-encoded ECDSA signature");
 
   const BIGNUM* r = nullptr;
   const BIGNUM* s = nullptr;
@@ -59,20 +63,16 @@ absl::StatusOr<std::vector<uint8_t>> convertEcDerSignatureToRaw(const std::vecto
 
   // Determine the component size from the EC key's curve.
   const EC_KEY* ec_key = EVP_PKEY_get0_EC_KEY(pkey);
-  if (ec_key == nullptr) {
-    return absl::InternalError("Failed to get EC key from EVP_PKEY");
-  }
+  RELEASE_ASSERT(ec_key != nullptr, "Failed to get EC key from EVP_PKEY");
   const EC_GROUP* group = EC_KEY_get0_group(ec_key);
   const unsigned int degree = EC_GROUP_get_degree(group);
   const size_t component_size = (degree + 7) / 8;
 
   // Write r and s as fixed-width big-endian integers.
   std::vector<uint8_t> raw_sig(component_size * 2);
-  if (!BN_bn2bin_padded(raw_sig.data(), component_size, r) ||
-      !BN_bn2bin_padded(raw_sig.data() + component_size, component_size, s)) {
-    return absl::InternalError(
-        "Failed to convert ECDSA signature components to fixed-width format");
-  }
+  RELEASE_ASSERT(BN_bn2bin_padded(raw_sig.data(), component_size, r) &&
+                     BN_bn2bin_padded(raw_sig.data() + component_size, component_size, s),
+                 "Failed to convert ECDSA signature components to fixed-width format");
 
   return raw_sig;
 }
@@ -136,11 +136,7 @@ ClientAssertion::create(absl::string_view client_id, absl::string_view audience,
   // EVP_DigestSign produces DER-encoded signatures for EC keys, but JWT (RFC 7518 Section 3.4)
   // requires raw r||s format. Convert if the key is EC.
   if (EVP_PKEY_id(pkey->getEVP_PKEY()) == EVP_PKEY_EC) {
-    auto raw_result = convertEcDerSignatureToRaw(sig, pkey->getEVP_PKEY());
-    if (!raw_result.ok()) {
-      return raw_result.status();
-    }
-    sig = std::move(raw_result.value());
+    sig = convertEcDerSignatureToRaw(sig, pkey->getEVP_PKEY());
   }
 
   const std::string encoded_signature =

@@ -1,8 +1,11 @@
 #include <chrono>
 #include <string>
 
+#include "envoy/buffer/buffer.h"
+
 #include "source/common/common/base64.h"
 #include "source/common/crypto/utility.h"
+#include "source/common/crypto/utility_impl.h"
 #include "source/extensions/filters/http/oauth2/client_assertion.h"
 
 #include "test/mocks/common.h"
@@ -264,6 +267,60 @@ TEST_F(ClientAssertionTest, CreateES256Assertion) {
   // ES256 (P-256) raw r||s signature should be exactly 64 bytes (32 bytes r + 32 bytes s).
   const std::string raw_sig = Base64Url::decode(parts[2]);
   EXPECT_EQ(64, raw_sig.size());
+}
+
+// A crypto Utility that delegates everything to the real implementation except sign(), which is
+// forced to fail. Used to exercise the signing-failure error path in ClientAssertion::create(),
+// which is otherwise unreachable because signing a validated input with a valid key always
+// succeeds.
+class FailingSignUtility : public Common::Crypto::Utility {
+public:
+  std::vector<uint8_t> getSha256Digest(const Buffer::Instance& buffer) override {
+    return real_.getSha256Digest(buffer);
+  }
+  std::vector<uint8_t> getSha256Hmac(absl::Span<const uint8_t> key,
+                                     absl::string_view message) override {
+    return real_.getSha256Hmac(key, message);
+  }
+  absl::Status verifySignature(absl::string_view hash_function, Common::Crypto::PKeyObject& key,
+                               absl::Span<const uint8_t> signature,
+                               absl::Span<const uint8_t> text) override {
+    return real_.verifySignature(hash_function, key, signature, text);
+  }
+  absl::StatusOr<std::vector<uint8_t>> sign(absl::string_view, Common::Crypto::PKeyObject&,
+                                            absl::Span<const uint8_t>) override {
+    return absl::InternalError("forced signing failure");
+  }
+  Common::Crypto::PKeyObjectPtr importPublicKeyPEM(absl::string_view key) override {
+    return real_.importPublicKeyPEM(key);
+  }
+  Common::Crypto::PKeyObjectPtr importPublicKeyDER(absl::Span<const uint8_t> key) override {
+    return real_.importPublicKeyDER(key);
+  }
+  Common::Crypto::PKeyObjectPtr importPrivateKeyPEM(absl::string_view key) override {
+    return real_.importPrivateKeyPEM(key);
+  }
+  Common::Crypto::PKeyObjectPtr importPrivateKeyDER(absl::Span<const uint8_t> key) override {
+    return real_.importPrivateKeyDER(key);
+  }
+
+private:
+  Common::Crypto::UtilityImpl real_;
+};
+
+TEST_F(ClientAssertionTest, SigningFailureReturnsError) {
+  EXPECT_CALL(random_, uuid()).WillOnce(Return("test-jti-uuid"));
+
+  // Replace the crypto singleton with one whose sign() always fails. The key still imports fine, so
+  // create() reaches the signing step and surfaces the error.
+  StackedScopedInjectableLoaderForTest<Common::Crypto::Utility> loader(
+      std::make_unique<FailingSignUtility>());
+
+  auto result =
+      ClientAssertion::create("client", "https://auth.example.com/token", RsaPrivateKeyPem, "RS256",
+                              std::chrono::seconds(60), test_time_, random_);
+  ASSERT_FALSE(result.ok());
+  EXPECT_NE(std::string::npos, result.status().message().find("Failed to sign JWT assertion"));
 }
 
 } // namespace
