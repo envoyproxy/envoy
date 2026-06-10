@@ -260,6 +260,14 @@ modify different aspects of the server:
   Dump current heap profile of Envoy process. The output content is parsable binary by the ``pprof`` tool.
   Requires compiling with tcmalloc (default).
 
+.. _operations_admin_interface_peak_heap_dump:
+
+.. http:get:: /peak_heap_dump
+
+  Dump peak heap profile of Envoy process. This captures the heap state at peak memory usage.
+  The output content is parsable binary by the ``pprof`` tool.
+  Requires compiling with tcmalloc (default).
+
 .. http:post:: /allocprofiler
 
   Enable or disable the allocation profiler. The output content is parsable binary by the ``pprof`` tool.
