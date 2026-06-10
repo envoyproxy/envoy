@@ -242,6 +242,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_strict_chunk_parsing);
 // Delay route selection in tcp_proxy until just before the upstream connection is established
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_delay_route_selection);
 
+// Enable histograms of HTTP/2 header sizes, including cookie size.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_record_histograms);
+
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
 ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT
