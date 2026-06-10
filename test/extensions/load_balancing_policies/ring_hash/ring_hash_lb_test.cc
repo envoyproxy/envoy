@@ -1251,6 +1251,31 @@ TEST(RingHashMidBatchInitializeCrashTest, NoOobOnNewPriority) {
   EXPECT_NE(nullptr, worker_lb);
 }
 
+// Regression test for #44349: non-contiguous EDS priorities leave null host
+// entries in PriorityState that validateEndpoints must not dereference.
+TEST(TypedHashLbConfigValidateEndpoints, ToleratesNullHostsInPriorityGaps) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash config;
+  absl::Status creation_status;
+  TypedRingHashLbConfig typed_config(config, context.regex_engine_, creation_status);
+  ASSERT_TRUE(creation_status.ok());
+
+  auto info = std::make_shared<NiceMock<MockClusterInfo>>();
+
+  PriorityState priorities;
+  auto hosts_p0 = std::make_unique<HostVector>();
+  hosts_p0->push_back(makeTestHost(info, "tcp://127.0.0.1:80"));
+  priorities.emplace_back(std::move(hosts_p0), LocalityWeightsMap{});
+  for (int i = 0; i < 4; ++i) {
+    priorities.emplace_back(nullptr, LocalityWeightsMap{});
+  }
+  auto hosts_p5 = std::make_unique<HostVector>();
+  hosts_p5->push_back(makeTestHost(info, "tcp://127.0.0.1:81"));
+  priorities.emplace_back(std::move(hosts_p5), LocalityWeightsMap{});
+
+  EXPECT_TRUE(typed_config.validateEndpoints(priorities).ok());
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
