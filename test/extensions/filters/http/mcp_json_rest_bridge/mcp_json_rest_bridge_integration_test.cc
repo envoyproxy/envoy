@@ -1,3 +1,4 @@
+#include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/address.h"
 
@@ -136,6 +137,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallTranscoding) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
+  // TODO(guoyilin42): Add a test for large body.
   const std::string request_body = R"({
     "jsonrpc": "2.0",
     "id": 321,
@@ -699,6 +701,98 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallStreamingErrorResponse) {
         }
       ],
       "isError": true
+    }
+  })";
+  EXPECT_EQ(nlohmann::json::parse(response->body()), nlohmann::json::parse(expected_rpc_response));
+}
+
+TEST_P(McpJsonRestBridgeIntegrationTest, PerRouteConfigOverridesHttpRule) {
+  const std::string config = R"EOF(
+    name: envoy.filters.http.mcp_json_rest_bridge
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+      tool_config:
+        tools:
+          - name: "create_api_key"
+            http_rule:
+              post: "/v1/{parent=projects/*}/keys_default"
+              body: "key"
+  )EOF";
+
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3::HttpConnectionManager& hcm) {
+    auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+    envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute per_route;
+    auto* tool = per_route.mutable_tool_config()->add_tools();
+    tool->set_name("create_api_key");
+    tool->mutable_http_rule()->set_post("/v1/{parent=projects/*}/keys_override");
+    tool->mutable_http_rule()->set_body("key");
+
+    (*route->mutable_typed_per_filter_config())["envoy.filters.http.mcp_json_rest_bridge"].PackFrom(
+        per_route);
+  });
+
+  initializeFilter(config);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "id": 321,
+    "method": "tools/call",
+    "params": {
+      "name": "create_api_key",
+      "arguments": {
+        "parent": "projects/foo",
+        "key": {
+          "displayName": "bar"
+        }
+      }
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  waitForNextUpstreamRequest();
+
+  EXPECT_THAT(upstream_request_->headers().getMethodValue(), StrEq("POST"));
+  EXPECT_THAT(upstream_request_->headers().getPathValue(), StrEq("/v1/projects/foo/keys_override"));
+  EXPECT_THAT(upstream_request_->headers().getContentTypeValue(), StrEq("application/json"));
+
+  Http::TestResponseHeaderMapImpl response_headers;
+  response_headers.setStatus(200);
+  response_headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
+  upstream_request_->encodeHeaders(response_headers, false);
+
+  Buffer::OwnedImpl response_data;
+  response_data.add(R"({"displayName":"bar"})");
+  upstream_request_->encodeData(response_data, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
+  EXPECT_THAT(response->headers().getContentTypeValue(), StrEq("application/json"));
+  EXPECT_THAT(response->headers().getContentLengthValue(),
+              StrEq(std::to_string(response->body().size())));
+
+  const std::string expected_rpc_response = R"({
+    "jsonrpc": "2.0",
+    "id": 321,
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"displayName\":\"bar\"}"
+        }
+      ],
+      "isError": false
     }
   })";
   EXPECT_EQ(nlohmann::json::parse(response->body()), nlohmann::json::parse(expected_rpc_response));
