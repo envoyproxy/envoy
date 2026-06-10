@@ -443,6 +443,7 @@ protected:
     bool reset_due_to_messaging_error_ : 1;
     // Latch whether this stream is operating with this flag.
     bool extend_stream_lifetime_flag_ : 1;
+    bool histograms_recorded_ : 1 = false;
     absl::string_view details_;
 
     /**
@@ -647,6 +648,7 @@ protected:
   const StreamImpl* getStreamUnchecked(int32_t stream_id) const;
   StreamImpl* getStreamUnchecked(int32_t stream_id);
   int saveHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value);
+  void recordHistogramsForStream(StreamImpl& stream);
 
   /**
    * Copies any frames pending internally by nghttp2 into outbound buffer.
@@ -727,6 +729,7 @@ protected:
   bool allow_metadata_;
   uint64_t max_metadata_size_;
   const bool stream_error_on_invalid_http_messaging_;
+  const bool record_http2_histograms_;
   const uint64_t max_cookie_size_bytes_{0};
 
   // Status for any errors encountered by the nghttp2 callbacks.
