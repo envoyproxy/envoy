@@ -374,6 +374,13 @@ const absl::flat_hash_map<absl::string_view, CommonDurationFormatter::TimePointG
          }},
         {DownstreamConnectionBegin,
          [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto downstream_timing = stream_info.downstreamTiming();
+           if (downstream_timing.has_value()) {
+             const auto connection_begin = downstream_timing->downstreamConnectionBegin();
+             if (connection_begin.has_value()) {
+               return connection_begin;
+             }
+           }
            return stream_info.startTimeMonotonic();
          }},
         {DownstreamConnectionEnd,

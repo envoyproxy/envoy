@@ -221,6 +221,9 @@ struct DynamicModuleLoadResult {
  * fetch completes successfully. Only used for the asynchronous remote path; ignored for the
  * synchronous paths (where the module is returned directly via DynamicModuleLoadResult::loaded_).
  * May be empty if the caller does not support asynchronous loading.
+ * @param stat_name the configured name of the extension instance using the module (e.g.
+ * ``filter_name``); used as the ``config_name`` tag on the ``dynamic_modules.*`` load-failure
+ * counters emitted on the server scope. May be empty.
  * @return the load result on success, or an error status if the configuration is invalid or the
  * module failed to load.
  */

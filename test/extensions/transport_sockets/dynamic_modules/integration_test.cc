@@ -145,7 +145,8 @@ TEST_P(DynamicModuleTransportSocketIntegrationTest, UpstreamXorTransform) {
   tcp_client->close();
 }
 
-// Large transfers exercise the read and write loops across multiple I/O operations.
+// Large transfers exercise the read and write loops across multiple I/O operations, including the
+// write buffer length check.
 TEST_P(DynamicModuleTransportSocketIntegrationTest, DownstreamLargeData) {
   initializeWithDownstreamSocket("xor");
 
