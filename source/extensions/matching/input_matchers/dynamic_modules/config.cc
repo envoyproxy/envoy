@@ -3,6 +3,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 namespace Envoy {
@@ -19,6 +20,7 @@ DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
   const auto& proto_config = dynamic_cast<const envoy::extensions::matching::input_matchers::
                                               dynamic_modules::v3::DynamicModuleMatcher&>(config);
 
+  const auto& matcher_name = proto_config.matcher_name();
   const auto& module_config = proto_config.dynamic_module_config();
   // Input matchers do not support remote module sources, so no init manager or async callback is
   // passed; only the synchronous local-file and by-name paths can succeed here.
@@ -30,10 +32,13 @@ DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
 
   auto dynamic_module = std::move(load_result->loaded);
 
-  // Resolve required symbols.
+  // Resolve required symbols. A missing ABI symbol is a module-level problem, so it is counted as
+  // module_load_error.
   auto on_config_new = dynamic_module->getFunctionPointer<OnMatcherConfigNewType>(
       "envoy_dynamic_module_on_matcher_config_new");
   if (!on_config_new.ok()) {
+    Extensions::DynamicModules::incrementLoadFailure(
+        context, matcher_name, Extensions::DynamicModules::ModuleLoadErrorStat);
     throw EnvoyException("Failed to resolve symbol: " +
                          std::string(on_config_new.status().message()));
   }
@@ -41,6 +46,8 @@ DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
   auto on_config_destroy = dynamic_module->getFunctionPointer<OnMatcherConfigDestroyType>(
       "envoy_dynamic_module_on_matcher_config_destroy");
   if (!on_config_destroy.ok()) {
+    Extensions::DynamicModules::incrementLoadFailure(
+        context, matcher_name, Extensions::DynamicModules::ModuleLoadErrorStat);
     throw EnvoyException("Failed to resolve symbol: " +
                          std::string(on_config_destroy.status().message()));
   }
@@ -48,6 +55,8 @@ DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
   auto on_match = dynamic_module->getFunctionPointer<OnMatcherMatchType>(
       "envoy_dynamic_module_on_matcher_match");
   if (!on_match.ok()) {
+    Extensions::DynamicModules::incrementLoadFailure(
+        context, matcher_name, Extensions::DynamicModules::ModuleLoadErrorStat);
     throw EnvoyException("Failed to resolve symbol: " + std::string(on_match.status().message()));
   }
 
@@ -56,6 +65,8 @@ DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
   if (proto_config.has_matcher_config()) {
     auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.matcher_config());
     if (!config_or_error.ok()) {
+      Extensions::DynamicModules::incrementLoadFailure(
+          context, matcher_name, Extensions::DynamicModules::ConfigInitErrorStat);
       throw EnvoyException("Failed to parse matcher config: " +
                            std::string(config_or_error.status().message()));
     }
@@ -70,6 +81,8 @@ DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
 
   auto in_module_config = (*on_config_new.value())(nullptr, name_buf, config_buf);
   if (in_module_config == nullptr) {
+    Extensions::DynamicModules::incrementLoadFailure(
+        context, matcher_name, Extensions::DynamicModules::ConfigInitErrorStat);
     throw EnvoyException("Failed to initialize dynamic module matcher config");
   }
 

@@ -13,6 +13,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 namespace Envoy {
@@ -885,11 +886,19 @@ DynamicModuleClusterFactory::createClusterWithConfig(
                     envoy::config::cluster::v3::Cluster::LbPolicy_Name(cluster.lb_policy())));
   }
 
+  Server::Configuration::ServerFactoryContext& server_context = context.serverFactoryContext();
+  Stats::Scope& server_scope = server_context.serverScope();
+
   // Extract cluster_config from the Any field.
   std::string cluster_config_bytes;
   if (proto_config.has_cluster_config()) {
     auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.cluster_config());
-    RETURN_IF_NOT_OK_REF(config_or_error.status());
+    if (!config_or_error.ok()) {
+      Envoy::Extensions::DynamicModules::incrementLoadFailure(
+          server_context, proto_config.cluster_name(),
+          Envoy::Extensions::DynamicModules::ConfigInitErrorStat);
+      return config_or_error.status();
+    }
     cluster_config_bytes = std::move(config_or_error.value());
   }
 
@@ -904,9 +913,11 @@ DynamicModuleClusterFactory::createClusterWithConfig(
 
   // Create the cluster configuration.
   auto config_or_error = DynamicModuleClusterConfig::create(
-      proto_config.cluster_name(), cluster_config_bytes, std::move(dynamic_module),
-      context.serverFactoryContext().serverScope());
+      proto_config.cluster_name(), cluster_config_bytes, std::move(dynamic_module), server_scope);
   if (!config_or_error.ok()) {
+    Envoy::Extensions::DynamicModules::incrementLoadFailure(
+        server_context, proto_config.cluster_name(),
+        Envoy::Extensions::DynamicModules::ConfigInitErrorStat);
     return config_or_error.status();
   }
 

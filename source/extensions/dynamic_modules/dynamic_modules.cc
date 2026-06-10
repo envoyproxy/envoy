@@ -91,53 +91,64 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
   return dynamic_module;
 }
 
-absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view module_name,
-                                                        const bool do_not_close,
-                                                        const bool load_globally) {
-  // Probe for the module's init symbol with the module name as a prefix. If the symbol is found
-  // in the process binary (via dlsym(RTLD_DEFAULT)), treat this as a statically linked module.
-  const std::string static_init_symbol =
-      absl::StrCat(module_name, "_envoy_dynamic_module_on_program_init");
-  if (dlsym(RTLD_DEFAULT, static_init_symbol.c_str()) != nullptr) {
-    return newStaticModule(module_name);
-  }
-  // First, try ENVOY_DYNAMIC_MODULES_SEARCH_PATH which falls back to the current directory.
-  const char* module_search_path = getenv(DYNAMIC_MODULES_SEARCH_PATH);
-  if (!module_search_path) {
-    module_search_path = ".";
-  }
-  const std::filesystem::path file_path =
-      std::filesystem::path(module_search_path) / fmt::format("lib{}.so", module_name);
-  const std::filesystem::path file_path_absolute = std::filesystem::absolute(file_path);
-  if (std::filesystem::exists(file_path_absolute)) {
+absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(
+    const absl::string_view module_name, const bool do_not_close, const bool load_globally,
+    OptRef<Server::Configuration::CommonFactoryContext> context, absl::string_view stat_name) {
+  // The actual loading is performed in this lambda so that every failure path funnels through a
+  // single ``module_load_error`` emission point below. This is the shared by-name loader used by
+  // all dynamic-module extension types, so centralizing the counter here keeps the leaf name and
+  // ``config_name`` tag identical across every extension.
+  absl::StatusOr<DynamicModulePtr> result = [&]() -> absl::StatusOr<DynamicModulePtr> {
+    // Probe for the module's init symbol with the module name as a prefix. If the symbol is found
+    // in the process binary (via dlsym(RTLD_DEFAULT)), treat this as a statically linked module.
+    const std::string static_init_symbol =
+        absl::StrCat(module_name, "_envoy_dynamic_module_on_program_init");
+    if (dlsym(RTLD_DEFAULT, static_init_symbol.c_str()) != nullptr) {
+      return newStaticModule(module_name);
+    }
+    // First, try ENVOY_DYNAMIC_MODULES_SEARCH_PATH which falls back to the current directory.
+    const char* module_search_path = getenv(DYNAMIC_MODULES_SEARCH_PATH);
+    if (!module_search_path) {
+      module_search_path = ".";
+    }
+    const std::filesystem::path file_path =
+        std::filesystem::path(module_search_path) / fmt::format("lib{}.so", module_name);
+    const std::filesystem::path file_path_absolute = std::filesystem::absolute(file_path);
+    if (std::filesystem::exists(file_path_absolute)) {
+      absl::StatusOr<DynamicModulePtr> dynamic_module =
+          newDynamicModule(file_path_absolute, do_not_close, load_globally);
+      // If the file exists but failed to load, return the error without trying other paths.
+      // This allows the user to get the detailed error message such as missing dependencies, ABI
+      // mismatch, etc.
+      return dynamic_module;
+    }
+
+    // If not found, pass only the library name to dlopen to search in the standard library paths.
+    // The man page of dlopen(3) says:
+    //
+    // > If path contains a slash ("/"), then it is interpreted as a
+    // > (relative or absolute) pathname. Otherwise, the dynamic linker
+    // > searches for the object ...
+    //
+    // which basically says dlopen searches for LD_LIBRARY_PATH and /usr/lib, etc.
     absl::StatusOr<DynamicModulePtr> dynamic_module =
-        newDynamicModule(file_path_absolute, do_not_close, load_globally);
-    // If the file exists but failed to load, return the error without trying other paths.
-    // This allows the user to get the detailed error message such as missing dependencies, ABI
-    // mismatch, etc.
-    return dynamic_module;
-  }
+        newDynamicModule(fmt::format("lib{}.so", module_name), do_not_close, load_globally);
+    if (dynamic_module.ok()) {
+      return dynamic_module;
+    }
 
-  // If not found, pass only the library name to dlopen to search in the standard library paths.
-  // The man page of dlopen(3) says:
-  //
-  // > If path contains a slash ("/"), then it is interpreted as a
-  // > (relative or absolute) pathname. Otherwise, the dynamic linker
-  // > searches for the object ...
-  //
-  // which basically says dlopen searches for LD_LIBRARY_PATH and /usr/lib, etc.
-  absl::StatusOr<DynamicModulePtr> dynamic_module =
-      newDynamicModule(fmt::format("lib{}.so", module_name), do_not_close, load_globally);
-  if (dynamic_module.ok()) {
-    return dynamic_module;
-  }
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to load dynamic module: lib", module_name,
+                     ".so not found in any search path: ", file_path_absolute.c_str(),
+                     " or standard library paths such as LD_LIBRARY_PATH, /usr/lib, etc. or failed "
+                     "to initialize: ",
+                     dynamic_module.status().message()));
+  }();
 
-  return absl::InvalidArgumentError(
-      absl::StrCat("Failed to load dynamic module: lib", module_name,
-                   ".so not found in any search path: ", file_path_absolute.c_str(),
-                   " or standard library paths such as LD_LIBRARY_PATH, /usr/lib, etc. or failed "
-                   "to initialize: ",
-                   dynamic_module.status().message()));
+  if (!result.ok()) {
+    incrementLoadFailure(context, stat_name, ModuleLoadErrorStat);
+  }
+  return result;
 }
 
 DynamicModule::~DynamicModule() {
@@ -320,10 +331,11 @@ newDynamicModuleByConfig(const ProtoDynamicModuleConfig& config, absl::string_vi
       return absl::InvalidArgumentError(
           "Either 'name' or 'module' must be specified in dynamic_module_config");
     }
-    auto dynamic_module =
-        newDynamicModuleByName(config.name(), config.do_not_close(), config.load_globally());
+    // newDynamicModuleByName emits the module_load_error counter itself when given the scope, so we
+    // do not double-count here.
+    auto dynamic_module = newDynamicModuleByName(config.name(), config.do_not_close(),
+                                                 config.load_globally(), context, stat_name);
     if (!dynamic_module.ok()) {
-      incrementLoadFailure(context, stat_name, ModuleLoadErrorStat);
       return absl::InvalidArgumentError(
           absl::StrCat("Failed to load dynamic module: ", dynamic_module.status().message()));
     }
