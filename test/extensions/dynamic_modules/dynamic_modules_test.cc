@@ -419,7 +419,7 @@ TEST_F(NewDynamicModuleByConfigTest, NoModuleNorName) {
               testing::HasSubstr("Either 'name' or 'module' must be specified"));
 }
 
-// By-name loading succeeds synchronously and requires no context (the contextless caller path).
+// By-name loading succeeds synchronously and requires no context (the context-less caller path).
 TEST_F(NewDynamicModuleByConfigTest, ByNameSuccess) {
   ProtoDynamicModuleConfig config;
   config.set_name("no_op");
@@ -438,7 +438,7 @@ TEST_F(NewDynamicModuleByConfigTest, ByNameFailure) {
   EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to load dynamic module"));
 }
 
-// Local-file loading succeeds synchronously and requires no context (the contextless caller path).
+// Local-file loading succeeds synchronously and requires no context (the context-less caller path).
 TEST_F(NewDynamicModuleByConfigTest, LocalFileSuccess) {
   ProtoDynamicModuleConfig config;
   config.mutable_module()->mutable_local()->set_filename(testSharedObjectPath("no_op", "c"));
@@ -467,7 +467,7 @@ TEST_F(NewDynamicModuleByConfigTest, ModuleWithoutLocalFileOrRemoteRejected) {
               testing::HasSubstr("Only local file path or remote HTTP source is supported"));
 }
 
-// A remote source without a factory context is rejected (the contextless caller cannot fetch).
+// A remote source without a factory context is rejected (the context-less caller cannot fetch).
 TEST_F(NewDynamicModuleByConfigTest, RemoteWithoutContextRejected) {
   auto result = newDynamicModuleByConfig(makeRemoteConfig("abc123"));
   EXPECT_FALSE(result.ok());
