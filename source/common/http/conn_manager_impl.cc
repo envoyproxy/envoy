@@ -211,11 +211,11 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
     connection_idle_timer_->enableTimer(config_->idleTimeout().value());
   }
 
-  if (config_->maxConnectionDuration()) {
+  if (auto max_connection_duration = config_->maxConnectionDuration(); max_connection_duration) {
     connection_duration_timer_ =
         dispatcher_->createScaledTimer(Event::ScaledTimerType::HttpDownstreamMaxConnectionTimeout,
                                        [this]() -> void { onConnectionDurationTimeout(); });
-    connection_duration_timer_->enableTimer(config_->maxConnectionDuration().value());
+    connection_duration_timer_->enableTimer(max_connection_duration.value());
   }
 
   read_callbacks_->connection().setDelayedCloseTimeout(config_->delayedCloseTimeout());
