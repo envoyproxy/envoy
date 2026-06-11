@@ -71,6 +71,10 @@ public:
   void maybeCreateInitManager(const std::string& version_info,
                               std::unique_ptr<Init::ManagerImpl>& init_manager,
                               std::unique_ptr<Cleanup>& resume_rds);
+  absl::Status runUpdateCallbacks() {
+    callbacks_run_ = true;
+    return update_callback_manager_.runCallbacks();
+  }
 
 protected:
   RdsRouteConfigSubscription(
@@ -94,6 +98,7 @@ private:
 
   VhdsSubscriptionPtr vhds_subscription_;
   RouteConfigUpdatePtr config_update_info_;
+  bool callbacks_run_{false};
   Common::CallbackManager<absl::Status> update_callback_manager_;
 
   // Access to addUpdateCallback

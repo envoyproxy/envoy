@@ -1,3 +1,6 @@
+#include <chrono>
+#include <iostream>
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
@@ -78,6 +81,941 @@ key:
 
   response->waitForHeaders();
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(OnDemandScopedRdsIntegrationTest, SrdsWithVhds) {
+
+  config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
+    )EOF");
+
+  constexpr absl::string_view scope_tmpl = R"EOF(
+name: {}
+route_configuration_name: {}
+on_demand: true
+key:
+  fragments:
+    - string_key: {}
+)EOF";
+  const std::string scope_route1 =
+      fmt::format(scope_tmpl, "foo_scope1", "foo_route_vhds", "foo-route");
+
+  constexpr absl::string_view vhost_tmpl = R"EOF(
+name: {}
+domains: [{}]
+routes:
+- match: {{ prefix: "/" }}
+  route: {{ cluster: {} }}
+)EOF";
+
+  on_server_init_function_ = [this, &scope_route1]() {
+    createScopedRdsStream();
+    sendSrdsResponse({scope_route1}, {scope_route1}, {}, "1");
+  };
+  initialize();
+  registerTestServerPorts({"http"});
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "vhost.first"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo-route"}});
+
+  createRdsStream("foo_route_vhds");
+  envoy::config::route::v3::RouteConfiguration route_config;
+  route_config.set_name("foo_route_vhds");
+  auto* vhds = route_config.mutable_vhds();
+  auto* config_source = vhds->mutable_config_source();
+  config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+  auto* api_config_source = config_source->mutable_api_config_source();
+  api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+  auto* grpc_service = api_config_source->add_grpc_services();
+  setGrpcService(*grpc_service, "rds_cluster", getRdsFakeUpstream().localAddress());
+  sendRdsResponse(route_config, "1");
+
+  createStream(&rds_upstream_info_, getRdsFakeUpstream(), "vhds_stream");
+  FakeStreamPtr& vhds_stream = rds_upstream_info_.stream_by_resource_name_["vhds_stream"];
+  ASSERT_NE(vhds_stream, nullptr);
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream.get()));
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                           {"foo_route_vhds/vhost.first"}, {}, vhds_stream.get()));
+
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost,
+      {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+          fmt::format(vhost_tmpl, "foo_route_vhds/vhost_0", "vhost.first", "cluster_0"))},
+      {}, "1", vhds_stream.get(), {"foo_route_vhds/vhost.first"});
+
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "200", Http::TestResponseHeaderMapImpl{}, "");
+
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(OnDemandScopedRdsIntegrationTest, SrdsWithVhdsAndHeaderMutation) {
+  config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
+    )EOF");
+
+  config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.lua
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+      clear_route_cache: false
+      inline_code: |
+        function envoy_on_request(request_handle)
+          request_handle:headers():replace("Addr", "x-foo-key=bar-route")
+        end
+    )EOF");
+
+  constexpr absl::string_view scope_tmpl = R"EOF(
+name: {}
+route_configuration_name: {}
+on_demand: true
+key:
+  fragments:
+    - string_key: {}
+)EOF";
+  const std::string scope_route1 =
+      fmt::format(scope_tmpl, "foo_scope1", "foo_route_vhds", "foo-route");
+
+  constexpr absl::string_view scope_tmpl_inline = R"EOF(
+name: {}
+on_demand: false
+key:
+  fragments:
+    - string_key: {}
+route_configuration:
+  name: {}
+  virtual_hosts:
+  - name: vhost_inline
+    domains: ["vhost.first"]
+    routes:
+    - match: {{ prefix: "/" }}
+      route: {{ cluster: {} }}
+)EOF";
+  const std::string scope_route2 =
+      fmt::format(scope_tmpl_inline, "bar_scope", "bar-route", "bar_route_inline", "cluster_0");
+
+  constexpr absl::string_view vhost_tmpl = R"EOF(
+name: {}
+domains: [{}]
+routes:
+- match: {{ prefix: "/" }}
+  route: {{ cluster: {} }}
+)EOF";
+
+  on_server_init_function_ = [this, &scope_route1, &scope_route2]() {
+    createScopedRdsStream();
+    sendSrdsResponse({scope_route1, scope_route2}, {scope_route1, scope_route2}, {}, "1");
+  };
+  initialize();
+  registerTestServerPorts({"http"});
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "vhost.first"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo-route"}});
+
+  createRdsStream("foo_route_vhds");
+  envoy::config::route::v3::RouteConfiguration route_config;
+  route_config.set_name("foo_route_vhds");
+  auto* vhds = route_config.mutable_vhds();
+  auto* config_source = vhds->mutable_config_source();
+  config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+  auto* api_config_source = config_source->mutable_api_config_source();
+  api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+  auto* grpc_service = api_config_source->add_grpc_services();
+  setGrpcService(*grpc_service, "rds_cluster", getRdsFakeUpstream().localAddress());
+  sendRdsResponse(route_config, "1");
+
+  createStream(&rds_upstream_info_, getRdsFakeUpstream(), "vhds_stream");
+  FakeStreamPtr& vhds_stream = rds_upstream_info_.stream_by_resource_name_["vhds_stream"];
+  ASSERT_NE(vhds_stream, nullptr);
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream.get()));
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                           {"foo_route_vhds/vhost.first"}, {}, vhds_stream.get()));
+
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost,
+      {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+          fmt::format(vhost_tmpl, "foo_route_vhds/vhost_0", "vhost.first", "cluster_0"))},
+      {}, "1", vhds_stream.get(), {"foo_route_vhds/vhost.first"});
+
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "200", Http::TestResponseHeaderMapImpl{}, "");
+
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(OnDemandScopedRdsIntegrationTest, SrdsWithVhdsScopeSharing) {
+  config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
+    )EOF");
+
+  constexpr absl::string_view scope_tmpl = R"EOF(
+name: {}
+route_configuration_name: {}
+on_demand: true
+key:
+  fragments:
+    - string_key: {}
+)EOF";
+  const std::string scope_route1 =
+      fmt::format(scope_tmpl, "foo_scope1", "foo_route_vhds", "foo-route");
+  const std::string scope_route2 =
+      fmt::format(scope_tmpl, "bar_scope", "foo_route_vhds", "bar-route");
+
+  constexpr absl::string_view vhost_tmpl = R"EOF(
+name: {}
+domains: [{}]
+routes:
+- match: {{ prefix: "/" }}
+  route: {{ cluster: {} }}
+)EOF";
+
+  on_server_init_function_ = [this, &scope_route1, &scope_route2]() {
+    createScopedRdsStream();
+    sendSrdsResponse({scope_route1, scope_route2}, {scope_route1, scope_route2}, {}, "1");
+  };
+  initialize();
+  registerTestServerPorts({"http"});
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response1 = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "vhost.first"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo-route"}});
+
+  createRdsStream("foo_route_vhds");
+  envoy::config::route::v3::RouteConfiguration route_config;
+  route_config.set_name("foo_route_vhds");
+  auto* vhds = route_config.mutable_vhds();
+  auto* config_source = vhds->mutable_config_source();
+  config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+  auto* api_config_source = config_source->mutable_api_config_source();
+  api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+  auto* grpc_service = api_config_source->add_grpc_services();
+  setGrpcService(*grpc_service, "rds_cluster", getRdsFakeUpstream().localAddress());
+  sendRdsResponse(route_config, "1");
+
+  createStream(&rds_upstream_info_, getRdsFakeUpstream(), "vhds_stream");
+  FakeStreamPtr& vhds_stream = rds_upstream_info_.stream_by_resource_name_["vhds_stream"];
+  ASSERT_NE(vhds_stream, nullptr);
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream.get()));
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                           {"foo_route_vhds/vhost.first"}, {}, vhds_stream.get()));
+
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost,
+      {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+          fmt::format(vhost_tmpl, "foo_route_vhds/vhost_0", "vhost.first", "cluster_0"))},
+      {}, "1", vhds_stream.get(), {"foo_route_vhds/vhost.first"});
+
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response1->waitForEndStream());
+  verifyResponse(std::move(response1), "200", Http::TestResponseHeaderMapImpl{}, "");
+
+  auto response2 = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "vhost.first"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=bar-route"}});
+
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response2->waitForEndStream());
+  verifyResponse(std::move(response2), "200", Http::TestResponseHeaderMapImpl{}, "");
+
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(OnDemandScopedRdsIntegrationTest, SrdsWithVhdsDifferentRoutesSameVhost) {
+  config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
+    )EOF");
+
+  constexpr absl::string_view scope_tmpl = R"EOF(
+name: {}
+route_configuration_name: {}
+on_demand: true
+key:
+  fragments:
+    - string_key: {}
+)EOF";
+  const std::string scope_route1 =
+      fmt::format(scope_tmpl, "foo_scope1", "foo_route_vhds", "foo-route");
+  const std::string scope_route2 =
+      fmt::format(scope_tmpl, "baz_scope", "bar_route_vhds", "baz-route");
+
+  constexpr absl::string_view vhost_tmpl = R"EOF(
+name: {}
+domains: [{}]
+routes:
+- match: {{ prefix: "/" }}
+  route: {{ cluster: {} }}
+)EOF";
+
+  on_server_init_function_ = [this, &scope_route1, &scope_route2]() {
+    createScopedRdsStream();
+    sendSrdsResponse({scope_route1, scope_route2}, {scope_route1, scope_route2}, {}, "1");
+  };
+  initialize();
+  registerTestServerPorts({"http"});
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  // Request 1: Scope A (foo-route), host vhost.first -> should route to cluster_0 (upstream 0)
+  auto response1 = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "vhost.first"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo-route"}});
+
+  createRdsStream("foo_route_vhds");
+  envoy::config::route::v3::RouteConfiguration route_config1;
+  route_config1.set_name("foo_route_vhds");
+  {
+    auto* vhds = route_config1.mutable_vhds();
+    auto* config_source = vhds->mutable_config_source();
+    config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* api_config_source = config_source->mutable_api_config_source();
+    api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+    api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* grpc_service = api_config_source->add_grpc_services();
+    setGrpcService(*grpc_service, "rds_cluster", getRdsFakeUpstream().localAddress());
+  }
+  sendRdsResponse(route_config1, "1");
+
+  createStream(&rds_upstream_info_, getRdsFakeUpstream(), "vhds_stream1");
+  FakeStreamPtr& vhds_stream1 = rds_upstream_info_.stream_by_resource_name_["vhds_stream1"];
+  ASSERT_NE(vhds_stream1, nullptr);
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream1.get()));
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                           {"foo_route_vhds/vhost.first"}, {}, vhds_stream1.get()));
+
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost,
+      {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+          fmt::format(vhost_tmpl, "foo_route_vhds/vhost_0", "vhost.first", "cluster_0"))},
+      {}, "1", vhds_stream1.get(), {"foo_route_vhds/vhost.first"});
+
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response1->waitForEndStream());
+  verifyResponse(std::move(response1), "200", Http::TestResponseHeaderMapImpl{}, "");
+
+  // Request 2: Scope C (baz-route), host vhost.first -> should route to cluster_1 (upstream 1)
+  auto response2 = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "vhost.first"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=baz-route"}});
+
+  createRdsStream("bar_route_vhds");
+  envoy::config::route::v3::RouteConfiguration route_config2;
+  route_config2.set_name("bar_route_vhds");
+  {
+    auto* vhds = route_config2.mutable_vhds();
+    auto* config_source = vhds->mutable_config_source();
+    config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* api_config_source = config_source->mutable_api_config_source();
+    api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+    api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* grpc_service = api_config_source->add_grpc_services();
+    setGrpcService(*grpc_service, "rds_cluster", getRdsFakeUpstream().localAddress());
+  }
+  sendRdsResponse(route_config2, "1");
+
+  createStream(&rds_upstream_info_, getRdsFakeUpstream(), "vhds_stream2");
+  FakeStreamPtr& vhds_stream2 = rds_upstream_info_.stream_by_resource_name_["vhds_stream2"];
+  ASSERT_NE(vhds_stream2, nullptr);
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream2.get()));
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                           {"bar_route_vhds/vhost.first"}, {}, vhds_stream2.get()));
+
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost,
+      {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+          fmt::format(vhost_tmpl, "bar_route_vhds/vhost_0", "vhost.first", "cluster_1"))},
+      {}, "1", vhds_stream2.get(), {"bar_route_vhds/vhost.first"});
+
+  fake_upstream_connection_.reset();
+  waitForNextUpstreamRequest(1);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response2->waitForEndStream());
+  verifyResponse(std::move(response2), "200", Http::TestResponseHeaderMapImpl{}, "");
+
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(OnDemandScopedRdsIntegrationTest, SrdsWithVhdsScopeLifecycle) {
+  config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
+    )EOF");
+
+  constexpr absl::string_view scope_tmpl = R"EOF(
+name: {}
+route_configuration_name: {}
+on_demand: true
+key:
+  fragments:
+    - string_key: {}
+)EOF";
+  const std::string scope_route1 =
+      fmt::format(scope_tmpl, "foo_scope1", "foo_route_vhds", "foo-route");
+
+  constexpr absl::string_view vhost_tmpl = R"EOF(
+name: {}
+domains: [{}]
+routes:
+- match: {{ prefix: "/" }}
+  route: {{ cluster: {} }}
+)EOF";
+
+  on_server_init_function_ = [this, &scope_route1]() {
+    createScopedRdsStream();
+    sendSrdsResponse({scope_route1}, {scope_route1}, {}, "1");
+  };
+  initialize();
+  registerTestServerPorts({"http"});
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  // --- Step 1: Send Request 1 (Succeeds) ---
+  auto response1 = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "vhost.first"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo-route"}});
+
+  createRdsStream("foo_route_vhds");
+  envoy::config::route::v3::RouteConfiguration route_config;
+  route_config.set_name("foo_route_vhds");
+  {
+    auto* vhds = route_config.mutable_vhds();
+    auto* config_source = vhds->mutable_config_source();
+    config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* api_config_source = config_source->mutable_api_config_source();
+    api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+    api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* grpc_service = api_config_source->add_grpc_services();
+    setGrpcService(*grpc_service, "rds_cluster", getRdsFakeUpstream().localAddress());
+  }
+  sendRdsResponse(route_config, "1");
+
+  createStream(&rds_upstream_info_, getRdsFakeUpstream(), "vhds_stream1");
+  FakeStreamPtr& vhds_stream1 = rds_upstream_info_.stream_by_resource_name_["vhds_stream1"];
+  ASSERT_NE(vhds_stream1, nullptr);
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream1.get()));
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                           {"foo_route_vhds/vhost.first"}, {}, vhds_stream1.get()));
+
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost,
+      {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+          fmt::format(vhost_tmpl, "foo_route_vhds/vhost_0", "vhost.first", "cluster_0"))},
+      {}, "1", vhds_stream1.get(), {"foo_route_vhds/vhost.first"});
+
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response1->waitForEndStream());
+  verifyResponse(std::move(response1), "200", Http::TestResponseHeaderMapImpl{}, "");
+
+  // --- Step 2: Delete Scope A ---
+  sendSrdsResponse({}, {}, {"foo_scope1"}, "2");
+  test_server_->waitForCounter("http.config_test.scoped_rds.foo-scoped-routes.update_success",
+                               Ge(2));
+
+  // Request 2: Scope A (foo-route), host vhost.first -> should fail with 404 because scope is
+  // deleted
+  auto response2 = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "vhost.first"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo-route"}});
+  ASSERT_TRUE(response2->waitForEndStream());
+  verifyResponse(std::move(response2), "404", Http::TestResponseHeaderMapImpl{}, "");
+
+  // --- Step 3: Re-add Scope A ---
+  sendSrdsResponse({scope_route1}, {scope_route1}, {}, "3");
+  test_server_->waitForCounter("http.config_test.scoped_rds.foo-scoped-routes.update_success",
+                               Ge(3));
+
+  // Reset RDS upstream info because the connection was likely closed when the scope was deleted.
+  resetFakeUpstreamInfo(&rds_upstream_info_);
+  rds_upstream_info_.upstream_ = nullptr;
+  rds_upstream_info_.stream_by_resource_name_.clear();
+
+  // Request 3: Scope A (foo-route), host vhost.first -> should succeed again
+  auto response3 = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "vhost.first"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo-route"}});
+
+  createRdsStream("foo_route_vhds");
+  sendRdsResponse(route_config, "2");
+
+  createStream(&rds_upstream_info_, getRdsFakeUpstream(), "vhds_stream2");
+  FakeStreamPtr& vhds_stream2 = rds_upstream_info_.stream_by_resource_name_["vhds_stream2"];
+  ASSERT_NE(vhds_stream2, nullptr);
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream2.get()));
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                           {"foo_route_vhds/vhost.first"}, {}, vhds_stream2.get()));
+
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost,
+      {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+          fmt::format(vhost_tmpl, "foo_route_vhds/vhost_0", "vhost.first", "cluster_0"))},
+      {}, "2", vhds_stream2.get(), {"foo_route_vhds/vhost.first"});
+
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response3->waitForEndStream());
+  verifyResponse(std::move(response3), "200", Http::TestResponseHeaderMapImpl{}, "");
+
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(OnDemandScopedRdsIntegrationTest, SrdsWithVhdsScopeUpdateRoute) {
+  config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
+    )EOF");
+
+  constexpr absl::string_view scope_tmpl = R"EOF(
+name: {}
+route_configuration_name: {}
+on_demand: true
+key:
+  fragments:
+    - string_key: {}
+)EOF";
+  const std::string scope_route1 =
+      fmt::format(scope_tmpl, "foo_scope1", "foo_route_vhds", "foo-route");
+  const std::string scope_route1_update =
+      fmt::format(scope_tmpl, "foo_scope1", "bar_route_vhds", "foo-route");
+
+  constexpr absl::string_view vhost_tmpl = R"EOF(
+name: {}
+domains: [{}]
+routes:
+- match: {{ prefix: "/" }}
+  route: {{ cluster: {} }}
+)EOF";
+
+  on_server_init_function_ = [this, &scope_route1]() {
+    createScopedRdsStream();
+    sendSrdsResponse({scope_route1}, {scope_route1}, {}, "1");
+  };
+  initialize();
+  registerTestServerPorts({"http"});
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  // --- Step 1: Send Request 1 (Succeeds via foo_route_vhds -> cluster_0) ---
+  auto response1 = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "vhost.first"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo-route"}});
+
+  createRdsStream("foo_route_vhds");
+  envoy::config::route::v3::RouteConfiguration route_config1;
+  route_config1.set_name("foo_route_vhds");
+  {
+    auto* vhds = route_config1.mutable_vhds();
+    auto* config_source = vhds->mutable_config_source();
+    config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* api_config_source = config_source->mutable_api_config_source();
+    api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+    api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* grpc_service = api_config_source->add_grpc_services();
+    setGrpcService(*grpc_service, "rds_cluster", getRdsFakeUpstream().localAddress());
+  }
+  sendRdsResponse(route_config1, "1");
+
+  createStream(&rds_upstream_info_, getRdsFakeUpstream(), "vhds_stream1");
+  FakeStreamPtr& vhds_stream1 = rds_upstream_info_.stream_by_resource_name_["vhds_stream1"];
+  ASSERT_NE(vhds_stream1, nullptr);
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream1.get()));
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                           {"foo_route_vhds/vhost.first"}, {}, vhds_stream1.get()));
+
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost,
+      {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+          fmt::format(vhost_tmpl, "foo_route_vhds/vhost_0", "vhost.first", "cluster_0"))},
+      {}, "1", vhds_stream1.get(), {"foo_route_vhds/vhost.first"});
+
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response1->waitForEndStream());
+  verifyResponse(std::move(response1), "200", Http::TestResponseHeaderMapImpl{}, "");
+
+  // --- Step 2: Update Scope A to point to bar_route_vhds ---
+  sendSrdsResponse({scope_route1_update}, {scope_route1_update}, {}, "2");
+  test_server_->waitForCounter("http.config_test.scoped_rds.foo-scoped-routes.update_success",
+                               Ge(2));
+
+  // Reset RDS upstream info because we expect new RDS/VHDS subscriptions for bar_route_vhds.
+  resetFakeUpstreamInfo(&rds_upstream_info_);
+  rds_upstream_info_.upstream_ = nullptr;
+  rds_upstream_info_.stream_by_resource_name_.clear();
+
+  // Send Request 2 (Scope A, host vhost.first -> should route to cluster_1 via bar_route_vhds)
+  auto response2 = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "vhost.first"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo-route"}});
+
+  createRdsStream("bar_route_vhds");
+  envoy::config::route::v3::RouteConfiguration route_config2;
+  route_config2.set_name("bar_route_vhds");
+  {
+    auto* vhds = route_config2.mutable_vhds();
+    auto* config_source = vhds->mutable_config_source();
+    config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* api_config_source = config_source->mutable_api_config_source();
+    api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+    api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* grpc_service = api_config_source->add_grpc_services();
+    setGrpcService(*grpc_service, "rds_cluster", getRdsFakeUpstream().localAddress());
+  }
+  sendRdsResponse(route_config2, "1");
+
+  createStream(&rds_upstream_info_, getRdsFakeUpstream(), "vhds_stream2");
+  FakeStreamPtr& vhds_stream2 = rds_upstream_info_.stream_by_resource_name_["vhds_stream2"];
+  ASSERT_NE(vhds_stream2, nullptr);
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream2.get()));
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                           {"bar_route_vhds/vhost.first"}, {}, vhds_stream2.get()));
+
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost,
+      {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+          fmt::format(vhost_tmpl, "bar_route_vhds/vhost_0", "vhost.first", "cluster_1"))},
+      {}, "1", vhds_stream2.get(), {"bar_route_vhds/vhost.first"});
+
+  fake_upstream_connection_.reset();
+  waitForNextUpstreamRequest(1);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response2->waitForEndStream());
+  verifyResponse(std::move(response2), "200", Http::TestResponseHeaderMapImpl{}, "");
+
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(OnDemandScopedRdsIntegrationTest, SrdsWithVhdsRouteConfigUpdate) {
+  config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
+    )EOF");
+
+  constexpr absl::string_view scope_tmpl = R"EOF(
+name: {}
+route_configuration_name: {}
+on_demand: true
+key:
+  fragments:
+    - string_key: {}
+)EOF";
+  const std::string scope_route1 =
+      fmt::format(scope_tmpl, "foo_scope1", "foo_route_vhds", "foo-route");
+
+  constexpr absl::string_view vhost_tmpl = R"EOF(
+name: {}
+domains: [{}]
+routes:
+- match: {{ prefix: "/" }}
+  route: {{ cluster: {} }}
+)EOF";
+
+  on_server_init_function_ = [this, &scope_route1]() {
+    createScopedRdsStream();
+    sendSrdsResponse({scope_route1}, {scope_route1}, {}, "1");
+  };
+  initialize();
+  registerTestServerPorts({"http"});
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  // --- Step 1: Send Request 1 (Succeeds via foo_route_vhds -> cluster_0) ---
+  auto response1 = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "vhost.first"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo-route"}});
+
+  createRdsStream("foo_route_vhds");
+  envoy::config::route::v3::RouteConfiguration route_config;
+  route_config.set_name("foo_route_vhds");
+  {
+    auto* vhds = route_config.mutable_vhds();
+    auto* config_source = vhds->mutable_config_source();
+    config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* api_config_source = config_source->mutable_api_config_source();
+    api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+    api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* grpc_service = api_config_source->add_grpc_services();
+    setGrpcService(*grpc_service, "rds_cluster", getRdsFakeUpstream().localAddress());
+  }
+  sendRdsResponse(route_config, "1");
+
+  createStream(&rds_upstream_info_, getRdsFakeUpstream(), "vhds_stream1");
+  FakeStreamPtr& vhds_stream1 = rds_upstream_info_.stream_by_resource_name_["vhds_stream1"];
+  ASSERT_NE(vhds_stream1, nullptr);
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream1.get()));
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                           {"foo_route_vhds/vhost.first"}, {}, vhds_stream1.get()));
+
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost,
+      {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+          fmt::format(vhost_tmpl, "foo_route_vhds/vhost_0", "vhost.first", "cluster_0"))},
+      {}, "1", vhds_stream1.get(), {"foo_route_vhds/vhost.first"});
+
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response1->waitForEndStream());
+  verifyResponse(std::move(response1), "200", Http::TestResponseHeaderMapImpl{}, "");
+
+  // --- Step 2: Send RDS Update (add static route to cluster_1) ---
+  auto* static_vhost = route_config.add_virtual_hosts();
+  static_vhost->set_name("static_vhost");
+  static_vhost->add_domains("static.host");
+  auto* route = static_vhost->add_routes();
+  route->mutable_match()->set_prefix("/");
+  route->mutable_route()->set_cluster("cluster_1");
+
+  sendRdsResponse(route_config, "2");
+  test_server_->waitForCounter("http.config_test.rds.foo_route_vhds.update_success", Ge(2));
+
+  // --- Step 3: Send Request 2 (vhost.first -> should still route to cluster_0, cached) ---
+  auto response2 = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "vhost.first"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo-route"}});
+
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response2->waitForEndStream());
+  verifyResponse(std::move(response2), "200", Http::TestResponseHeaderMapImpl{}, "");
+
+  // --- Step 4: Send Request 3 (static.host -> should route to cluster_1, static) ---
+  auto response3 = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "static.host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo-route"}});
+
+  fake_upstream_connection_.reset();
+  waitForNextUpstreamRequest(1);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response3->waitForEndStream());
+  verifyResponse(std::move(response3), "200", Http::TestResponseHeaderMapImpl{}, "");
+
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(OnDemandScopedRdsIntegrationTest, SrdsWithVhdsRdsFailure) {
+  config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
+    )EOF");
+
+  constexpr absl::string_view scope_tmpl = R"EOF(
+name: {}
+route_configuration_name: {}
+on_demand: true
+key:
+  fragments:
+    - string_key: {}
+)EOF";
+  const std::string scope_route1 =
+      fmt::format(scope_tmpl, "foo_scope1", "foo_route_vhds", "foo-route");
+
+  on_server_init_function_ = [this, &scope_route1]() {
+    createScopedRdsStream();
+    sendSrdsResponse({scope_route1}, {scope_route1}, {}, "1");
+  };
+  initialize();
+  registerTestServerPorts({"http"});
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "vhost.first"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo-route"}});
+
+  createRdsStream("foo_route_vhds");
+
+  envoy::config::route::v3::RouteConfiguration route_config;
+  route_config.set_name("foo_route_vhds");
+  sendRdsResponse(route_config, "2");
+
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
+
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(OnDemandScopedRdsIntegrationTest, SrdsWithVhdsVhdsFailure) {
+  config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
+    )EOF");
+
+  constexpr absl::string_view scope_tmpl = R"EOF(
+name: {}
+route_configuration_name: {}
+on_demand: true
+key:
+  fragments:
+    - string_key: {}
+)EOF";
+  const std::string scope_route1 =
+      fmt::format(scope_tmpl, "foo_scope1", "foo_route_vhds", "foo-route");
+
+  on_server_init_function_ = [this, &scope_route1]() {
+    createScopedRdsStream();
+    sendSrdsResponse({scope_route1}, {scope_route1}, {}, "1");
+  };
+  initialize();
+  registerTestServerPorts({"http"});
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "vhost.first"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo-route"}});
+
+  createRdsStream("foo_route_vhds");
+  envoy::config::route::v3::RouteConfiguration route_config;
+  route_config.set_name("foo_route_vhds");
+  auto* vhds = route_config.mutable_vhds();
+  auto* config_source = vhds->mutable_config_source();
+  config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+  auto* api_config_source = config_source->mutable_api_config_source();
+  api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+  auto* grpc_service = api_config_source->add_grpc_services();
+  setGrpcService(*grpc_service, "rds_cluster", getRdsFakeUpstream().localAddress());
+  sendRdsResponse(route_config, "1");
+
+  createStream(&rds_upstream_info_, getRdsFakeUpstream(), "vhds_stream");
+  FakeStreamPtr& vhds_stream = rds_upstream_info_.stream_by_resource_name_["vhds_stream"];
+  ASSERT_NE(vhds_stream, nullptr);
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream.get()));
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                           {"foo_route_vhds/vhost.first"}, {}, vhds_stream.get()));
+
+  envoy::service::discovery::v3::DeltaDiscoveryResponse vhds_response;
+  vhds_response.set_system_version_info("2");
+  vhds_response.set_type_url(Config::TestTypeUrl::get().VirtualHost);
+  auto* resource = vhds_response.add_resources();
+  resource->set_name("foo_route_vhds/cannot-resolve-alias");
+  resource->set_version("2");
+  resource->add_aliases("foo_route_vhds/vhost.first");
+  vhds_stream->sendGrpcMessage(vhds_response);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
 
   cleanupUpstreamAndDownstream();
 }
@@ -887,6 +1825,7 @@ routes:
   }
 
   void initialize() override {
+    defer_listener_finalization_ = true;
     setUpstreamCount(2);                         // xds_cluster and cluster_0
     setUpstreamProtocol(Http::CodecType::HTTP2); // xDS uses gRPC uses HTTP2
 
@@ -941,9 +1880,6 @@ routes:
 
     HttpIntegrationTest::initialize();
 
-    test_server_->waitUntilListenersReady();
-    registerTestServerPorts({"http"});
-
     // Set up xDS connection (xds_cluster is the second cluster, so it maps to fake_upstreams_[1])
     auto result = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, xds_connection_);
     RELEASE_ASSERT(result, result.message());
@@ -975,6 +1911,17 @@ routes:
 
     EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
                                              vhds_stream_.get()));
+
+    // Send dummy VHDS response to mark it warm and allow startup to continue
+    sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+        Config::TestTypeUrl::get().VirtualHost, {buildVirtualHost("my_route/dummy", "dummy.com")},
+        {}, "1", vhds_stream_.get());
+
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                             vhds_stream_.get()));
+
+    test_server_->waitUntilListenersReady();
+    registerTestServerPorts({"http"});
   }
 
   FakeStreamPtr vhds_stream_;
@@ -1004,6 +1951,7 @@ TEST_P(OnDemandVhdsWithBodyIntegrationTest, VhdsOnDemandUpdateWithBody) {
   if (isUnified()) {
     GTEST_SKIP() << "Unified mux times out when processing on-demand VHDS updates";
   }
+
   initialize();
   // Make a request with body to an unknown virtual host
   codec_client_ = makeHttpConnection(lookupPort("http"));

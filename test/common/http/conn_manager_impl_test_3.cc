@@ -1504,7 +1504,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsCrossScopeReroute) {
       .WillRepeatedly(Return(Router::VirtualHostRoute{route2->virtual_host_, route2}));
   EXPECT_CALL(*static_cast<const Router::MockScopeKeyBuilder*>(scopeKeyBuilder().ptr()),
               computeScopeKey(_))
-      .Times(3)
+      .Times(2)
       .WillRepeatedly(Invoke([&](const HeaderMap& headers) -> Router::ScopeKeyPtr {
         auto& test_headers = dynamic_cast<const TestRequestHeaderMapImpl&>(headers);
         if (test_headers.get_("scope_key") == "foo") {
@@ -1521,7 +1521,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsCrossScopeReroute) {
       // 3. then refreshCachedRoute triggered by decoder_filters_[1]->callbacks_->route().
       .Times(3)
       .WillRepeatedly(
-          Invoke([&](const Router::ScopeKeyPtr& scope_key) -> Router::ConfigConstSharedPtr {
+          Invoke([&](const Router::ScopeKey* scope_key) -> Router::ConfigConstSharedPtr {
             if (scope_key != nullptr) {
               return route_config1;
             }

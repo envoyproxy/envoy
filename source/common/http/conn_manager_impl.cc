@@ -1707,9 +1707,11 @@ void ConnectionManagerImpl::startDrainSequence() {
 void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
   // NOTE: if a RDS subscription hasn't got a RouteConfiguration back, a Router::NullConfigImpl is
   // returned, in that case we let it pass.
-  auto scope_key =
-      connection_manager_.config_->scopeKeyBuilder()->computeScopeKey(*request_headers_);
-  snapped_route_config_ = snapped_scoped_routes_config_->getRouteConfig(scope_key);
+  if (saved_scope_key_ == nullptr) {
+    saved_scope_key_ =
+        connection_manager_.config_->scopeKeyBuilder()->computeScopeKey(*request_headers_);
+  }
+  snapped_route_config_ = snapped_scoped_routes_config_->getRouteConfig(saved_scope_key_.get());
   if (snapped_route_config_ == nullptr) {
     ENVOY_STREAM_LOG(trace, "can't find SRDS scope.", *this);
     // TODO(stevenzzzz): Consider to pass an error message to router filter, so that it can
@@ -1719,6 +1721,10 @@ void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() { refreshCachedRoute(nullptr); }
+
+std::shared_ptr<Router::ScopeKey> ConnectionManagerImpl::ActiveStream::scopeKey() const {
+  return saved_scope_key_;
+}
 
 void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
   if (!hasCachedRoute() || !request_headers_) {
@@ -1876,7 +1882,8 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
             "//source/common/http:rds_lib");
   if (route_config_update_requester_.has_value()) {
     (*route_config_update_requester_)
-        ->requestRouteConfigUpdate(*this, route_config_updated_cb, routeConfig(),
+        ->requestRouteConfigUpdate(*this, route_config_updated_cb,
+                                   routeConfig() ? routeConfig() : snapped_route_config_,
                                    *connection_manager_.dispatcher_, *request_headers_);
   }
 }
@@ -2468,6 +2475,7 @@ void ConnectionManagerImpl::ActiveStream::clearRouteCache() {
 
   setCachedRoute({});
   cached_cluster_info_ = absl::optional<Upstream::ClusterInfoConstSharedPtr>();
+  saved_scope_key_.reset();
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshRouteCluster() {
@@ -2506,6 +2514,7 @@ void ConnectionManagerImpl::ActiveStream::blockRouteCache() {
   // Clear the snapped route configuration because it is unnecessary to keep it.
   snapped_route_config_.reset();
   snapped_scoped_routes_config_.reset();
+  saved_scope_key_.reset();
 }
 
 void ConnectionManagerImpl::ActiveStream::onRequestDataTooLarge() {

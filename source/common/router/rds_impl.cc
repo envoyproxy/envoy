@@ -56,6 +56,7 @@ RdsRouteConfigSubscription::~RdsRouteConfigSubscription() { config_update_info_.
 
 absl::Status RdsRouteConfigSubscription::beforeProviderUpdate(
     std::unique_ptr<Init::ManagerImpl>& noop_init_manager, std::unique_ptr<Cleanup>& resume_rds) {
+  callbacks_run_ = false;
   if (config_update_info_->protobufConfigurationCast().has_vhds() &&
       config_update_info_->vhdsConfigurationChanged()) {
     ENVOY_LOG(debug,
@@ -80,6 +81,10 @@ absl::Status RdsRouteConfigSubscription::afterProviderUpdate() {
     vhds_subscription_.release();
   }
 
+  if (callbacks_run_) {
+    callbacks_run_ = false;
+    return absl::OkStatus();
+  }
   return update_callback_manager_.runCallbacks();
 }
 
@@ -132,14 +137,20 @@ absl::Status RdsRouteConfigProviderImpl::onConfigUpdate() {
     return status;
   }
 
+  const auto config =
+      std::static_pointer_cast<const ConfigImpl>(config_update_info_->parsedConfiguration());
+  if (config != nullptr && config->usesVhds()) {
+    status = subscription().runUpdateCallbacks();
+    if (!status.ok()) {
+      return status;
+    }
+  }
+
   const auto aliases = config_update_info_->resourceIdsInLastVhdsUpdate();
   // Regular (non-VHDS) RDS updates don't populate aliases fields in resources.
   if (aliases.empty()) {
     return absl::OkStatus();
   }
-
-  const auto config =
-      std::static_pointer_cast<const ConfigImpl>(config_update_info_->parsedConfiguration());
   // Notifies connections that RouteConfiguration update has been propagated.
   // Callbacks processing is performed in FIFO order. The callback is skipped if alias used in
   // the VHDS update request do not match the aliases in the update response

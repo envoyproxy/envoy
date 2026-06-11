@@ -597,6 +597,20 @@ void ScopedRdsConfigSubscription::onDemandRdsUpdate(
   });
 }
 
+Router::RouteConfigProvider*
+ScopedRdsConfigSubscription::routeConfigProvider(const Router::ScopeKey& scope_key) const {
+  auto iter = scope_name_by_hash_.find(scope_key.hash());
+  if (iter == scope_name_by_hash_.end()) {
+    return nullptr;
+  }
+  const std::string& scope_name = iter->second;
+  auto provider_iter = route_provider_by_scope_.find(scope_name);
+  if (provider_iter != route_provider_by_scope_.end() && provider_iter->second != nullptr) {
+    return provider_iter->second->route_provider_.get();
+  }
+  return nullptr;
+}
+
 ScopedRdsConfigProvider::ScopedRdsConfigProvider(
     ScopedRdsConfigSubscriptionSharedPtr&& subscription)
     : MutableConfigProviderCommonBase(std::move(subscription), ConfigProvider::ApiType::Delta) {}

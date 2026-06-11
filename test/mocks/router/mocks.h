@@ -684,10 +684,11 @@ public:
 
 class MockScopedConfig : public ScopedConfig {
 public:
+  using ScopedConfig::getRouteConfig;
   MockScopedConfig();
   ~MockScopedConfig() override;
 
-  MOCK_METHOD(ConfigConstSharedPtr, getRouteConfig, (const ScopeKeyPtr& scope_key), (const));
+  MOCK_METHOD(ConfigConstSharedPtr, getRouteConfig, (const ScopeKey* scope_key), (const));
 
   std::shared_ptr<MockConfig> route_config_{new NiceMock<MockConfig>()};
 };

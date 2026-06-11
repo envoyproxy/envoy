@@ -305,6 +305,8 @@ public:
   virtual bool hasCachedRoute() const PURE;
   // Forces the route cache to refresh the cached route.
   virtual void refreshCachedRoute() PURE;
+  // Returns the saved scope key.
+  virtual std::shared_ptr<Router::ScopeKey> scopeKey() const PURE;
 };
 
 class RouteConfigUpdateRequester {
@@ -316,13 +318,15 @@ public:
                            Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb,
                            absl::optional<Router::ConfigConstSharedPtr> route_config,
                            Event::Dispatcher& dispatcher, RequestHeaderMap& request_headers) PURE;
-  virtual void
-  requestVhdsUpdate(const std::string& host_header, Event::Dispatcher& thread_local_dispatcher,
-                    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
-  virtual void
-  requestSrdsUpdate(RouteCache& route_cache, Router::ScopeKeyPtr scope_key,
-                    Event::Dispatcher& thread_local_dispatcher,
-                    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
+  virtual void requestVhdsUpdate(const std::string& host_header,
+                                 Event::Dispatcher& thread_local_dispatcher,
+                                 Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb,
+                                 Router::RouteConfigProvider* route_config_provider) PURE;
+  virtual void requestSrdsUpdate(RouteCache& route_cache,
+                                 std::shared_ptr<Router::ScopeKey> scope_key,
+                                 Event::Dispatcher& thread_local_dispatcher,
+                                 Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb,
+                                 const std::string& host_header) PURE;
 };
 
 class RouteConfigUpdateRequesterFactory : public Config::UntypedFactory {

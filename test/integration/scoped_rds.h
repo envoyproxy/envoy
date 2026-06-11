@@ -246,18 +246,23 @@ fragments:
     createStream(&scoped_rds_upstream_info_, getScopedRdsFakeUpstream(), srds_config_name_);
   }
 
-  void sendRdsResponse(const std::string& route_config, const std::string& version) {
+  void sendRdsResponse(const envoy::config::route::v3::RouteConfiguration& route_configuration,
+                       const std::string& version) {
     envoy::service::discovery::v3::DiscoveryResponse response;
     std::string route_conguration_type_url =
         "type.googleapis.com/envoy.config.route.v3.RouteConfiguration";
     response.set_version_info(version);
     response.set_type_url(route_conguration_type_url);
-    auto route_configuration =
-        TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(route_config);
     response.add_resources()->PackFrom(route_configuration);
     ASSERT(rds_upstream_info_.stream_by_resource_name_[route_configuration.name()] != nullptr);
     rds_upstream_info_.stream_by_resource_name_[route_configuration.name()]->sendGrpcMessage(
         response);
+  }
+
+  void sendRdsResponse(const std::string& route_config, const std::string& version) {
+    sendRdsResponse(
+        TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(route_config),
+        version);
   }
 
   void sendSrdsResponse(const std::vector<std::string>& sotw_list,

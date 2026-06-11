@@ -28,17 +28,17 @@ public:
                                 absl::optional<Router::ConfigConstSharedPtr> route_config,
                                 Event::Dispatcher& dispatcher,
                                 RequestHeaderMap& request_headers) override;
-  void
-  requestVhdsUpdate(const std::string& host_header, Event::Dispatcher& thread_local_dispatcher,
-                    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
-  void
-  requestSrdsUpdate(RouteCache& route_cache, Router::ScopeKeyPtr scope_key,
-                    Event::Dispatcher& thread_local_dispatcher,
-                    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
+  void requestVhdsUpdate(const std::string& host_header, Event::Dispatcher& thread_local_dispatcher,
+                         Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb,
+                         Router::RouteConfigProvider* route_config_provider) override;
+  void requestSrdsUpdate(RouteCache& route_cache, std::shared_ptr<Router::ScopeKey> scope_key,
+                         Event::Dispatcher& thread_local_dispatcher,
+                         Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb,
+                         const std::string& host_header) override;
 
 private:
-  Router::RouteConfigProvider* route_config_provider_;
-  Router::ScopedRdsConfigProvider* scoped_route_config_provider_;
+  Router::RouteConfigProvider* route_config_provider_{nullptr};
+  Router::ScopedRdsConfigProvider* scoped_route_config_provider_{nullptr};
   OptRef<const Router::ScopeKeyBuilder> scope_key_builder_;
 };
 

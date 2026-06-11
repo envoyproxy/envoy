@@ -42,11 +42,15 @@ envoy_extension_cc_test(
     name = "on_demand_integration_test",
     size = "large",
     srcs = ["on_demand_integration_test.cc"],
-    extension_names = ["envoy.filters.http.on_demand"],
+    extension_names = [
+        "envoy.filters.http.on_demand",
+        "envoy.filters.http.lua",
+    ],
     rbe_pool = "6gig",
     shard_count = 4,
     tags = ["cpu:2"],
     deps = [
+        "//source/extensions/filters/http/lua:config",
         "//source/extensions/filters/http/on_demand:config",
         "//source/extensions/filters/http/on_demand:on_demand_update_lib",
         "//test/config:v2_link_hacks",

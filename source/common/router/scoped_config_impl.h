@@ -107,6 +107,7 @@ using ScopedRouteMap = std::map<std::string, ScopedRouteInfoConstSharedPtr>;
  */
 class ScopedConfigImpl : public ScopedConfig {
 public:
+  using ScopedConfig::getRouteConfig;
   ScopedConfigImpl() = default;
 
   ScopedConfigImpl(const std::vector<ScopedRouteInfoConstSharedPtr>& scoped_route_infos) {
@@ -119,7 +120,7 @@ public:
   void removeRoutingScopes(const std::vector<std::string>& scope_names);
 
   // Envoy::Router::ScopedConfig
-  Router::ConfigConstSharedPtr getRouteConfig(const ScopeKeyPtr& scope_key) const override;
+  Router::ConfigConstSharedPtr getRouteConfig(const ScopeKey* scope_key) const override;
 
 private:
   // From scope name to cached ScopedRouteInfo.
@@ -136,7 +137,8 @@ private:
  */
 class NullScopedConfigImpl : public ScopedConfig {
 public:
-  Router::ConfigConstSharedPtr getRouteConfig(const ScopeKeyPtr&) const override {
+  using ScopedConfig::getRouteConfig;
+  Router::ConfigConstSharedPtr getRouteConfig(const ScopeKey* /*scope_key*/) const override {
     return std::make_shared<const NullConfigImpl>();
   }
 };

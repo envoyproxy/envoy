@@ -106,7 +106,11 @@ public:
    * @param scope_key the scope key. null config will be returned when null.
    * @return ConfigConstSharedPtr the router's Config matching the request headers.
    */
-  virtual ConfigConstSharedPtr getRouteConfig(const ScopeKeyPtr& scope_key) const PURE;
+  virtual ConfigConstSharedPtr getRouteConfig(const ScopeKey* scope_key) const PURE;
+
+  ConfigConstSharedPtr getRouteConfig(const ScopeKeyPtr& scope_key) const {
+    return getRouteConfig(scope_key.get());
+  }
 };
 
 using ScopedConfigConstSharedPtr = std::shared_ptr<const ScopedConfig>;

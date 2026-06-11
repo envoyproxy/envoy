@@ -126,6 +126,8 @@ public:
 
   const ScopedRouteMap& scopedRouteMap() const { return scoped_route_map_; }
 
+  Router::RouteConfigProvider* routeConfigProvider(const Router::ScopeKey& scope_key) const;
+
   void
   onDemandRdsUpdate(std::shared_ptr<Router::ScopeKey> scope_key,
                     Event::Dispatcher& thread_local_dispatcher,

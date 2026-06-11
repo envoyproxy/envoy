@@ -2141,6 +2141,73 @@ key:
   EXPECT_FALSE(callback_value);
 }
 
+// Test that ScopedRdsConfigSubscription::routeConfigProvider returns the correct
+// RouteConfigProvider for a given ScopeKey, or nullptr if not found/initialized.
+TEST_F(ScopedRdsTest, RouteConfigProvider) {
+  setup();
+  init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
+
+  // Eager scope
+  const std::string eager_resource = R"EOF(
+name: eager_scope
+route_configuration_name: eager_routes
+key:
+  fragments:
+    - string_key: eager-val
+)EOF";
+
+  // On demand scope
+  const std::string lazy_resource = R"EOF(
+name: lazy_scope
+route_configuration_name: lazy_routes
+on_demand: true
+key:
+  fragments:
+    - string_key: lazy-val
+)EOF";
+
+  srdsUpdateWithYaml({eager_resource, lazy_resource}, "1");
+  pushRdsConfig({"eager_routes"}, "111");
+
+  auto& subscription = getScopedRdsProvider()->subscription();
+
+  ScopeKeyPtr eager_key = scope_key_builder_->computeScopeKey(
+      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;eager-val"}});
+  ASSERT_NE(eager_key, nullptr);
+  ScopeKeyPtr lazy_key =
+      scope_key_builder_->computeScopeKey(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;lazy-val"}});
+  ASSERT_NE(lazy_key, nullptr);
+  ScopeKeyPtr unknown_key = scope_key_builder_->computeScopeKey(
+      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;unknown-val"}});
+  ASSERT_NE(unknown_key, nullptr);
+
+  // 1. Unknown key should return nullptr.
+  EXPECT_EQ(subscription.routeConfigProvider(*unknown_key), nullptr);
+
+  // 2. Eager scope should have a provider.
+  EXPECT_NE(subscription.routeConfigProvider(*eager_key), nullptr);
+
+  // 3. Lazy scope should return nullptr before initialization.
+  EXPECT_EQ(subscription.routeConfigProvider(*lazy_key), nullptr);
+
+  // Trigger on-demand update for lazy scope.
+  {
+    ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(
+        TestRequestHeaderMapImpl{{"Addr", "x-foo-key;lazy-val"}});
+    std::function<void(bool)> route_config_updated_cb = [](bool scope_exist) {
+      EXPECT_TRUE(scope_exist);
+    };
+    EXPECT_CALL(server_factory_context_.dispatcher_, post(_));
+    getScopedRdsProvider()->onDemandRdsUpdate(std::move(scope_key), event_dispatcher_,
+                                              std::move(route_config_updated_cb));
+  }
+
+  // After onDemandRdsUpdate (which triggers maybeInitRdsConfigProvider), the provider should be
+  // available.
+  EXPECT_NE(subscription.routeConfigProvider(*lazy_key), nullptr);
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy

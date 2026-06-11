@@ -148,7 +148,7 @@ void ScopedConfigImpl::removeRoutingScopes(const std::vector<std::string>& scope
   }
 }
 
-Router::ConfigConstSharedPtr ScopedConfigImpl::getRouteConfig(const ScopeKeyPtr& scope_key) const {
+Router::ConfigConstSharedPtr ScopedConfigImpl::getRouteConfig(const ScopeKey* scope_key) const {
   if (scope_key == nullptr) {
     return nullptr;
   }
