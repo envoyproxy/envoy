@@ -97,6 +97,10 @@ public:
   // get_filter_state_typed. Valid until the end of the current event hook.
   absl::optional<std::string> last_serialized_filter_state_;
 
+  // Temporary holder for host metadata snapshots returned by host metadata getters.
+  // Valid until the next metadata getter call on this filter.
+  Upstream::MetadataConstSharedPtr last_metadata_snapshot_;
+
   /**
    * Helper to get the correct callbacks.
    */
