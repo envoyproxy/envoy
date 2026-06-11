@@ -4738,11 +4738,8 @@ fn test_cluster_get_cluster_name() {
   let mut mock_cluster = cluster::MockEnvoyCluster::new();
   mock_cluster
     .expect_get_cluster_name()
-    .returning(|| Some(EnvoyBuffer::new(b"my_cluster")));
-  assert_eq!(
-    mock_cluster.get_cluster_name().unwrap().as_slice(),
-    b"my_cluster"
-  );
+    .returning(|| EnvoyBuffer::new(b"my_cluster"));
+  assert_eq!(mock_cluster.get_cluster_name().as_slice(), b"my_cluster");
 }
 
 #[test]

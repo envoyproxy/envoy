@@ -416,9 +416,8 @@ pub trait EnvoyCluster: Send + Sync {
     &self,
   ) -> abi::envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr;
 
-  /// This cluster's CDS name (`ClusterInfo::name()`), or `None` if the name is empty.
-  /// Available in any cluster-side callback.
-  fn get_cluster_name<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
+  /// This cluster's CDS name (`ClusterInfo::name()`). Available in any cluster-side callback.
+  fn get_cluster_name<'a>(&'a self) -> EnvoyBuffer<'a>;
 
   /// Sends an HTTP request to the specified cluster and asynchronously delivers the response
   /// via [`Cluster::on_http_callout_done`].
@@ -1008,7 +1007,7 @@ impl EnvoyCluster for EnvoyClusterImpl {
     unsafe { abi::envoy_dynamic_module_callback_cluster_worker_slot_get(self.raw) }
   }
 
-  fn get_cluster_name(&self) -> Option<EnvoyBuffer<'_>> {
+  fn get_cluster_name(&self) -> EnvoyBuffer<'_> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
@@ -1016,11 +1015,7 @@ impl EnvoyCluster for EnvoyClusterImpl {
     unsafe {
       abi::envoy_dynamic_module_callback_cluster_get_name(self.raw, &mut result);
     }
-    if result.ptr.is_null() || result.length == 0 {
-      None
-    } else {
-      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
-    }
+    unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) }
   }
 
   fn send_http_callout<'a>(
