@@ -23,6 +23,8 @@ class Dispatcher;
 
 namespace Network {
 
+struct KtlsBytestreamInfo;
+
 /**
  * Events that occur on a connection.
  */
@@ -303,6 +305,21 @@ public:
    */
   // TODO(snowp): Remove this in favor of StreamInfo::downstreamSslConnection.
   virtual Ssl::ConnectionInfoConstSharedPtr ssl() const PURE;
+
+  /**
+   * @return kTLS bytestream info for direct socket splice, or empty.
+   */
+  virtual OptRef<const KtlsBytestreamInfo> ktlsBytestreamInfo() const { return {}; }
+
+  /**
+   * Re-arm the read/write file event after kTLS body-splice detaches it.
+   */
+  virtual void reinstallFileEvents() {}
+
+  /**
+   * Drains pending write-buffer bytes so body-splice can emit them before the spliced body.
+   */
+  virtual std::string extractPendingWriteForSplice() { return {}; }
 
   /**
    * @return requested server name (e.g. SNI in TLS), if any.

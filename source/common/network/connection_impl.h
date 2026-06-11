@@ -96,6 +96,11 @@ public:
     // SSL info may be overwritten by a filter in the provider.
     return socket_->connectionInfoProvider().sslConnection();
   }
+  OptRef<const KtlsBytestreamInfo> ktlsBytestreamInfo() const override {
+    return transport_socket_->ktlsBytestreamInfo();
+  }
+  void reinstallFileEvents() override;
+  std::string extractPendingWriteForSplice() override;
   State state() const override;
   bool connecting() const override {
     ENVOY_CONN_LOG_EVENT(debug, "connection_connecting_state", "current connecting state: {}",
@@ -230,6 +235,9 @@ private:
   friend class Envoy::RandomPauseFilter;
   friend class Envoy::TestPauseFilter;
 
+  // Installs the read/write file event on the socket's IoHandle. Shared by the constructor and
+  // reinstallFileEvents() so the kTLS body-splice can re-arm with the exact same registration.
+  void initializeReadWriteFileEvent();
   void onFileEvent(uint32_t events);
   void onRead(uint64_t read_buffer_size);
   void onReadReady();

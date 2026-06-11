@@ -22,6 +22,10 @@
 #include "source/common/http/status.h"
 
 namespace Envoy {
+namespace Network {
+class Connection;
+} // namespace Network
+
 namespace Http {
 
 enum class CodecType { HTTP1, HTTP2, HTTP3 };
@@ -137,6 +141,12 @@ public:
    * Enable TCP Tunneling.
    */
   virtual void enableTcpTunneling() PURE;
+
+  /**
+   * Finalize a Content-Length response body relayed by kTLS body-splice.
+   * @param response_body_bytes the number of body bytes spliced.
+   */
+  virtual void completeSplicedResponse(uint64_t /* response_body_bytes */) {}
 };
 
 /**
@@ -196,6 +206,12 @@ public:
                                        Http::ResponseHeaderMapConstSharedPtr response_header_map,
                                        Http::ResponseTrailerMapConstSharedPtr response_trailer_map,
                                        StreamInfo::StreamInfo& stream_info) PURE;
+
+  /**
+   * Finalize a Content-Length request body relayed by kTLS body-splice.
+   * @param request_body_bytes the number of body bytes spliced.
+   */
+  virtual void completeSplicedRequest(uint64_t /* request_body_bytes */) {}
 };
 
 class ResponseDecoder;
@@ -440,6 +456,15 @@ public:
    * associated with the stream.
    */
   virtual const Network::ConnectionInfoProvider& connectionInfoProvider() PURE;
+
+  /**
+   * @return OptRef<Network::Connection> the underlying network connection when this stream is the
+   * sole user of a non-multiplexed connection whose socket can be borrowed for the kTLS body-splice
+   * fast path. Implemented only by the HTTP/1.1 codec. Multiplexed codecs (HTTP/2 and HTTP/3) and
+   * the default return absl::nullopt so a raw-socket splice is never attempted where it would
+   * corrupt framing.
+   */
+  virtual OptRef<Network::Connection> connectionForSplice() { return {}; }
 
   /**
    * Set the flush timeout for the stream. At the codec level this is used to bound the amount of

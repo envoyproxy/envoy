@@ -406,6 +406,36 @@ TEST_P(ConnectionImplTest, DrainSkipsRemovedCallbacks) {
   disconnect(true);
 }
 
+// extractPendingWriteForSplice() removes buffered output so the kTLS body-splice can emit it, and
+// reinstallFileEvents() re-arms a leg whose file event the splice detached, restoring I/O.
+TEST_P(ConnectionImplTest, SpliceExtractWriteBufferAndReinstallFileEvents) {
+  setUpBasicConnection();
+  connect();
+
+  // Buffer output on the client, then take it for the splice. The connection no longer sends it.
+  Buffer::OwnedImpl prefix("extracted-prefix");
+  client_connection_->write(prefix, false);
+  EXPECT_EQ("extracted-prefix", client_connection_->extractPendingWriteForSplice());
+
+  // Detach the server's file event the way the splice does, then re-arm it.
+  server_connection_->getSocket()->ioHandle().resetFileEvents();
+  server_connection_->reinstallFileEvents();
+
+  // The server receives only the post-extract write, proving the prefix was taken (not sent) and
+  // that read I/O resumed after re-arm.
+  EXPECT_CALL(*read_filter_, onData(_, false))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> FilterStatus {
+        EXPECT_EQ("reinstalled", buffer.toString());
+        dispatcher_->exit();
+        return FilterStatus::StopIteration;
+      }));
+  Buffer::OwnedImpl data("reinstalled");
+  client_connection_->write(data, false);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  disconnect(true);
+}
+
 TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
   setUpBasicConnection();
 

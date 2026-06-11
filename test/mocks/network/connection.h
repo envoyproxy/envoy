@@ -80,6 +80,9 @@ public:
               unixSocketPeerCredentials, (), (const));                                             \
   MOCK_METHOD(void, setConnectionStats, (const ConnectionStats& stats));                           \
   MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, ssl, (), (const));                                \
+  MOCK_METHOD(OptRef<const KtlsBytestreamInfo>, ktlsBytestreamInfo, (), (const));                  \
+  MOCK_METHOD(void, reinstallFileEvents, ());                                                      \
+  MOCK_METHOD(std::string, extractPendingWriteForSplice, ());                                      \
   MOCK_METHOD(absl::string_view, requestedServerName, (), (const));                                \
   MOCK_METHOD(absl::string_view, ja3Hash, (), (const));                                            \
   MOCK_METHOD(absl::string_view, ja4Hash, (), (const));                                            \

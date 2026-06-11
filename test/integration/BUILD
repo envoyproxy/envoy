@@ -353,6 +353,28 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "ktls_splice_integration_test",
+    size = "large",
+    srcs = [
+        "ktls_splice_integration_test.cc",
+    ],
+    rbe_pool = "6gig",
+    deps = [
+        ":http_integration_lib",
+        ":integration_lib",
+        "//envoy/stats:stats_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/network:raw_buffer_socket_lib",
+        "//source/common/protobuf",
+        "//source/extensions/transport_sockets/common:passthrough_lib",
+        "//test/test_common:registry_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "cluster_filter_integration_test",
     size = "large",
     srcs = ["cluster_filter_integration_test.cc"],

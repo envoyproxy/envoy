@@ -34,6 +34,7 @@
 #include "source/common/router/config_impl.h"
 #include "source/common/router/debug_config.h"
 #include "source/common/router/router.h"
+#include "source/common/router/splice_coordinator.h"
 #include "source/common/router/upstream_codec_filter.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
@@ -196,6 +197,11 @@ void UpstreamRequest::cleanUp() {
   }
   cleaned_up_ = true;
 
+  // Cancel any pending arm and tear down an in-flight splice before the rest of teardown.
+  if (splice_coordinator_ != nullptr) {
+    splice_coordinator_->reset();
+  }
+
   filter_manager_->destroyFilters();
 
   if (span_ != nullptr) {
@@ -331,6 +337,19 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
   maybeHandleDeferredReadDisable();
   ASSERT(headers.get());
 
+  // Arm and schedule before forwarding headers because onUpstreamHeaders may tear this request
+  // down.
+  bool splice_armed = false;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_ktls_body_splice")) {
+    if (splice_coordinator_ == nullptr) {
+      splice_coordinator_ = std::make_unique<SpliceCoordinator>(*this);
+    }
+    splice_armed = splice_coordinator_->maybeArmForResponse(*headers, end_stream);
+    if (splice_armed) {
+      splice_coordinator_->scheduleEngage();
+    }
+  }
+
   parent_.onUpstreamHeaders(response_code, std::move(headers), *this, end_stream);
 }
 
@@ -351,6 +370,16 @@ void UpstreamRequest::decodeData(Buffer::Instance& data, bool end_stream) {
 
   resetPerTryIdleTimer();
   stream_info_.addBytesReceived(data.length());
+  // While a download splice is armed but not yet engaged, hold the response body back from the
+  // downstream encoder so engage can emit it ahead of the spliced remainder. This keeps the
+  // downstream off its write high watermark so the splice reliably engages. bufferPreEngageBody
+  // returns true once it has taken the body (do not forward it). It returns false when the response
+  // ends first, having flushed any held body, so the terminal chunk forwards normally below.
+  if (splice_coordinator_ != nullptr && splice_coordinator_->armedForResponse() &&
+      !splice_coordinator_->engaged() &&
+      splice_coordinator_->bufferPreEngageBody(data, end_stream)) {
+    return;
+  }
   parent_.onUpstreamData(data, *this, end_stream);
 }
 
@@ -471,15 +500,44 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
     resetUpstreamLogFlushTimer();
   }
 
+  // Evaluate the upload (request-body) splice before the request headers enter the upstream filter
+  // chain. When armed, the headers still encode normally and the body is spliced once engage finds
+  // the upstream connected with kTLS-TX installed. CONNECT/WebSocket upgrades are tunnels with no
+  // Content-Length body, so maybeArmForRequest rejects them. The explicit guard keeps that clear.
+  bool splice_armed = false;
+  if (!paused_for_connect_ && !paused_for_websocket_ &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_ktls_body_splice")) {
+    if (splice_coordinator_ == nullptr) {
+      splice_coordinator_ = std::make_unique<SpliceCoordinator>(*this);
+    }
+    splice_armed =
+        splice_coordinator_->maybeArmForRequest(*parent_.downstreamHeaders(), end_stream);
+  }
+
   filter_manager_->requestHeadersInitialized();
   filter_manager_->streamInfo().setRequestHeaders(*parent_.downstreamHeaders());
   filter_manager_->decodeHeaders(*parent_.downstreamHeaders(), end_stream);
+
+  if (splice_armed) {
+    splice_coordinator_->scheduleEngage();
+  }
 }
 
 void UpstreamRequest::acceptDataFromRouter(Buffer::Instance& data, bool end_stream) {
   ASSERT(!router_sent_end_stream_);
-  router_sent_end_stream_ = end_stream;
 
+  // While an upload splice is armed but not yet engaged, hold the request body back from the
+  // upstream encoder so engage can emit it ahead of the spliced remainder, keeping the upstream off
+  // its write high watermark so the splice engages reliably. bufferPreEngageBody returns true once
+  // it has taken the body (do not forward it). It returns false when the request ends first or the
+  // held body exceeds the bound, having flushed any held body, so this data forwards normally.
+  if (splice_coordinator_ != nullptr && splice_coordinator_->armedForRequest() &&
+      !splice_coordinator_->engaged() &&
+      splice_coordinator_->bufferPreEngageBody(data, end_stream)) {
+    return;
+  }
+
+  router_sent_end_stream_ = end_stream;
   filter_manager_->decodeData(data, end_stream);
 }
 
@@ -497,7 +555,18 @@ void UpstreamRequest::acceptMetadataFromRouter(Http::MetadataMapPtr&& metadata_m
 
 void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
                                     absl::string_view transport_failure_reason) {
+  // SpliceCoordinator::reset() force-closes the borrowed upstream inline, whose codec reset cascade
+  // re-enters here. reset() latches on_reset_stream_in_progress_ before that close, so the nested
+  // call returns here and the request leaves the parent list exactly once.
+  if (on_reset_stream_in_progress_) {
+    return;
+  }
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
+
+  // Tear down an in-flight splice before the connection is reset out from under it.
+  if (splice_coordinator_ != nullptr) {
+    splice_coordinator_->reset();
+  }
 
   if (reason != Http::StreamResetReason::RemoteResetNoError) {
     if (span_ != nullptr) {
@@ -515,6 +584,22 @@ void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
 }
 
 void UpstreamRequest::resetStream() {
+  // Tear down an in-flight splice before the upstream stream is reset. reset() is idempotent, so
+  // the re-entrant call from the splice coordinator's own truncation path is a no-op.
+  if (splice_coordinator_ != nullptr) {
+    splice_coordinator_->reset();
+  }
+
+  // reset() force-closes the borrowed upstream for an engaged splice, and that close cascade has
+  // already reset the codec stream and destroyed the request encoder. A normal upstream reset below
+  // would dereference the freed encoder, so finish the teardown here. The guard is set only on that
+  // force-close path, so an armed-but-not-engaged splice still falls through to the normal reset.
+  if (on_reset_stream_in_progress_) {
+    clearRequestEncoder();
+    reset_stream_ = true;
+    return;
+  }
+
   if (conn_pool_->cancelAnyPendingStream()) {
     ENVOY_STREAM_LOG(debug, "canceled pool request", *parent_.callbacks());
     ASSERT(!upstream_);

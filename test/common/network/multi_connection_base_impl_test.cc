@@ -1279,11 +1279,35 @@ TEST_F(MultiConnectionBaseImplTest, SetSocketOptionFailedTest) {
   EXPECT_FALSE(impl_->setSocketOption(sockopt_name, sockopt_val));
 }
 
-TEST_F(MultiConnectionBaseImplTest, GetSocketPanics) {
+// After connect, getSocket() delegates to the single selected connection so the kTLS body-splice
+// can splice() on the upstream fd of a Happy Eyeballs (DNS-cluster) upstream.
+TEST_F(MultiConnectionBaseImplTest, GetSocketDelegatesAfterConnect) {
   setupMultiConnectionImpl(2);
+  connectFirstAttempt();
 
-  // getSocket() should panic as it's not implemented for MultiConnectionBaseImpl.
-  EXPECT_DEATH(impl_->getSocket(), "not implemented");
+  ConnectionSocketPtr socket;
+  EXPECT_CALL(*createdConnections()[0], getSocket()).WillOnce(ReturnRef(socket));
+  EXPECT_EQ(&socket, &impl_->getSocket());
+}
+
+// The kTLS body-splice helpers delegate to the single selected connection after connect.
+TEST_F(MultiConnectionBaseImplTest, SpliceHelpersDelegateAfterConnect) {
+  setupMultiConnectionImpl(2);
+  connectFirstAttempt();
+
+  KtlsBytestreamInfo info;
+  info.installed = true;
+  EXPECT_CALL(*createdConnections()[0], ktlsBytestreamInfo())
+      .WillOnce(Return(OptRef<const KtlsBytestreamInfo>(info)));
+  OptRef<const KtlsBytestreamInfo> returned = impl_->ktlsBytestreamInfo();
+  ASSERT_TRUE(returned.has_value());
+  EXPECT_TRUE(returned->installed);
+
+  EXPECT_CALL(*createdConnections()[0], reinstallFileEvents());
+  impl_->reinstallFileEvents();
+
+  EXPECT_CALL(*createdConnections()[0], extractPendingWriteForSplice()).WillOnce(Return("pending"));
+  EXPECT_EQ("pending", impl_->extractPendingWriteForSplice());
 }
 
 } // namespace Network

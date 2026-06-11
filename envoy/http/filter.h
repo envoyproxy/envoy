@@ -408,6 +408,17 @@ public:
    */
   virtual void
   requestRouteConfigUpdate(RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
+
+  /**
+   * @return downstream HTTP/1.1 connection available for kTLS body-splice, or empty.
+   */
+  virtual OptRef<Network::Connection> downstreamConnectionForSplice() { return {}; }
+
+  /**
+   * Finalize a Content-Length request body relayed by kTLS body-splice.
+   * @param request_body_bytes the number of body bytes spliced.
+   */
+  virtual void completeSplicedRequest(uint64_t /* request_body_bytes */) {}
 };
 
 /**

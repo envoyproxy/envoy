@@ -91,6 +91,17 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
     connecting_ = true;
   }
 
+  initializeReadWriteFileEvent();
+
+  transport_socket_->setTransportSocketCallbacks(*this);
+
+  // TODO(soulxu): generate the connection id inside the addressProvider directly,
+  // then we don't need a setter or any of the optional stuff.
+  socket_->connectionInfoProvider().setConnectionID(id());
+  socket_->connectionInfoProvider().setSslConnection(transport_socket_->ssl());
+}
+
+void ConnectionImpl::initializeReadWriteFileEvent() {
   Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
 
   // We never ask for both early close and read at the same time. If we are reading, we want to
@@ -102,13 +113,27 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
         return absl::OkStatus();
       },
       trigger, Event::FileReadyType::Read | Event::FileReadyType::Write);
+}
 
-  transport_socket_->setTransportSocketCallbacks(*this);
+std::string ConnectionImpl::extractPendingWriteForSplice() {
+  // Hand the kTLS body-splice the bytes already accepted for write but not yet flushed, so the pump
+  // emits them before the spliced body. Detaching them from the write buffer is safe because the
+  // splice now drives this socket's output and re-arms the connection when it completes. The splice
+  // calls this with only the (small) response headers buffered, well below the high watermark, so
+  // the drain does not cross the low watermark or fire a watermark callback.
+  std::string pending = write_buffer_->toString();
+  write_buffer_->drain(write_buffer_->length());
+  return pending;
+}
 
-  // TODO(soulxu): generate the connection id inside the addressProvider directly,
-  // then we don't need a setter or any of the optional stuff.
-  socket_->connectionInfoProvider().setConnectionID(id());
-  socket_->connectionInfoProvider().setSslConnection(transport_socket_->ssl());
+void ConnectionImpl::reinstallFileEvents() {
+  // The kTLS body-splice borrows this connection's socket and detaches its file event via
+  // getSocket()->ioHandle().resetFileEvents() for the duration of the bounded transfer. Re-create
+  // the identical read/write registration so Envoy resumes driving I/O for the next keep-alive
+  // message once the splice completes. Read readiness is still gated by read_disable_count_ in
+  // onReadReady(), so re-registering Read is safe even if reads were disabled before the splice.
+  ASSERT(socket_->isOpen());
+  initializeReadWriteFileEvent();
 }
 
 ConnectionImpl::~ConnectionImpl() {

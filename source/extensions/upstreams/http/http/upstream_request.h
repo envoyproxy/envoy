@@ -5,6 +5,7 @@
 
 #include "envoy/http/codes.h"
 #include "envoy/http/conn_pool.h"
+#include "envoy/network/connection.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
 #include "source/common/common/assert.h"
@@ -104,6 +105,17 @@ public:
 
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override {
     return request_encoder_->getStream().bytesMeter();
+  }
+
+  OptRef<Network::Connection> upstreamConnectionForSplice() override {
+    return request_encoder_ != nullptr ? request_encoder_->getStream().connectionForSplice()
+                                       : OptRef<Network::Connection>{};
+  }
+
+  void completeSplicedResponse(uint64_t response_body_bytes) override {
+    if (request_encoder_ != nullptr) {
+      request_encoder_->completeSplicedResponse(response_body_bytes);
+    }
   }
 
 private:

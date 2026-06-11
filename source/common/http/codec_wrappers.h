@@ -167,6 +167,13 @@ public:
     return inner_encoder_->http1StreamEncoderOptions();
   }
 
+  // The RequestEncoder default no-ops, so forward it or a spliced response never finalizes and the
+  // next keep-alive request on the connection wedges.
+  void completeSplicedResponse(uint64_t response_body_bytes) override {
+    ASSERT(inner_encoder_);
+    inner_encoder_->completeSplicedResponse(response_body_bytes);
+  }
+
 protected:
   RequestEncoderWrapper(RequestEncoder* inner) : inner_encoder_(inner) {}
 

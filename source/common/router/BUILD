@@ -371,10 +371,12 @@ envoy_cc_library(
     name = "router_lib",
     srcs = [
         "router.cc",
+        "splice_coordinator.cc",
         "upstream_request.cc",
     ],
     hdrs = [
         "router.h",
+        "splice_coordinator.h",
         "upstream_request.h",
     ],
     deps = [
@@ -393,6 +395,7 @@ envoy_cc_library(
         "//envoy/http:filter_factory_interface",
         "//envoy/http:filter_interface",
         "//envoy/local_info:local_info_interface",
+        "//envoy/network:address_interface",
         "//envoy/router:router_filter_interface",
         "//envoy/router:shadow_writer_interface",
         "//envoy/runtime:runtime_interface",
@@ -423,7 +426,9 @@ envoy_cc_library(
         "//source/common/network:upstream_socket_options_filter_state_lib",
         "//source/common/orca:orca_load_metrics_lib",
         "//source/common/orca:orca_parser",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/stream_info:uint32_accessor_lib",
+        "//source/common/tcp_proxy:splice_pump_lib",
         "//source/common/upstream:load_balancer_context_base_lib",
         "//source/common/upstream:upstream_factory_context_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
