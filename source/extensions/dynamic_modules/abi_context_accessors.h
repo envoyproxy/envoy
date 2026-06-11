@@ -30,7 +30,8 @@ public:
                                                envoy_dynamic_module_type_http_header_type type);
 
   // Fill result_headers with all entries of the resolved header map. The array must be
-  // pre-allocated with at least map->size() entries.
+  // pre-allocated with at least map->size() entries. Returns false when the map is unset or
+  // result_headers is null.
   static bool getHeaders(HeadersMapOptConstRef map,
                          envoy_dynamic_module_type_envoy_http_header* result_headers);
 

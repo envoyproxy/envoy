@@ -86,7 +86,7 @@ ContextAccessor::headerMapByType(const Formatter::Context& context,
 
 bool ContextAccessor::getHeaders(HeadersMapOptConstRef map,
                                  envoy_dynamic_module_type_envoy_http_header* result_headers) {
-  if (!map) {
+  if (!map || result_headers == nullptr) {
     return false;
   }
   size_t i = 0;

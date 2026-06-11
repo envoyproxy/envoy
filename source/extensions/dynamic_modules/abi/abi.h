@@ -6540,8 +6540,10 @@ void envoy_dynamic_module_on_access_logger_config_destroy(
  * - Return a shared instance if the module handles thread safety internally
  *
  * @param config_module_ptr is the pointer to the in-module configuration.
- * @param logger_envoy_ptr is the pointer to the ThreadLocalLogger object. This can be used
- *        by the module to store a reference for later use in callbacks.
+ * @param logger_envoy_ptr is the pointer to the ThreadLocalLogger object.
+ *        This pointer stays valid for the logger lifetime.
+ *        Stream data exposed through access logger callbacks is only valid during
+ *        envoy_dynamic_module_on_access_logger_log.
  * @return a pointer to the in-module logger instance. Returning nullptr will cause
  *         log events to be silently dropped.
  */
@@ -6608,11 +6610,12 @@ size_t envoy_dynamic_module_callback_access_logger_get_headers_size(
 
 /**
  * Get all headers from the specified header map.
+ * This callback is valid only during envoy_dynamic_module_on_access_logger_log.
  *
  * @param logger_envoy_ptr is the pointer to the log context.
  * @param header_type is the type of header map to access. Supported types are RequestHeader,
  *        ResponseHeader, and ResponseTrailer.
- * @param result_headers is the output array (must be pre-allocated with correct size).
+ * @param result_headers is the output array, pre-allocated with get_headers_size.
  * @return true if successful, false otherwise.
  */
 bool envoy_dynamic_module_callback_access_logger_get_headers(
@@ -12949,6 +12952,8 @@ void envoy_dynamic_module_on_transport_socket_destroy(
  *
  * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
  * @param transport_socket_module_ptr is the pointer to the in-module transport socket.
+ *        A module must not keep read buffer slices across calls that can re-enter
+ *        the connection, including raise_event and flush_write_buffer.
  */
 void envoy_dynamic_module_on_transport_socket_set_callbacks(
     envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
@@ -12985,6 +12990,8 @@ envoy_dynamic_module_on_transport_socket_do_read(
  * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
  * @param transport_socket_module_ptr is the pointer to the in-module transport socket.
  * @param end_stream is true if this is the end of the stream (half-close after a full write).
+ *        A module must not keep write buffer slices across calls that can re-enter
+ *        the connection, including raise_event and flush_write_buffer.
  * @return envoy_dynamic_module_type_transport_socket_io_result is the result of the write
  * operation.
  */
@@ -13112,8 +13119,9 @@ void envoy_dynamic_module_callback_transport_socket_io_shutdown_write(
  * envoy_dynamic_module_callback_transport_socket_get_fd returns the native OS file descriptor of
  * the underlying socket. A module that performs raw socket operations such as installing kernel TLS
  * with setsockopt uses this descriptor. It is only meaningful for transports backed by an OS
- * socket. The descriptor is owned by Envoy and is only valid while the connection is open, so the
- * module must not close it or use it after the connection closes.
+ * socket. The descriptor is owned by Envoy and is only valid while the connection is open.
+ * The module must not close it, duplicate it for later use, change file status flags,
+ * or perform blocking I/O on this descriptor.
  *
  * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
  * @return the native file descriptor, or -1 if it is unavailable.
@@ -13171,9 +13179,10 @@ size_t envoy_dynamic_module_callback_transport_socket_write_buffer_length(
 
 /**
  * envoy_dynamic_module_callback_transport_socket_raise_event raises a connection event on the
- * connection (e.g., Connected after TLS handshake). Raising a close event can synchronously
- * re-enter the module through on_close, so the caller must not rely on any state after this
- * returns.
+ * connection (e.g., Connected after TLS handshake).
+ * Raising Connected can synchronously re-enter do_write.
+ * Raising close events can synchronously re-enter on_close.
+ * The caller must not rely on callback local state after this returns.
  *
  * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
  * @param event is the connection event to raise.

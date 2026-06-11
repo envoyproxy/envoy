@@ -111,6 +111,18 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetHeadersNull) {
       env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, nullptr));
 }
 
+TEST_F(DynamicModuleAccessLogAbiTest, GetHeadersOutsideLogWindowReturnsEmpty) {
+  Formatter::Context log_context(&request_headers_, &response_headers_, &response_trailers_);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+  logger_->log_context_ = nullptr;
+
+  EXPECT_EQ(0, envoy_dynamic_module_callback_access_logger_get_headers_size(
+                   env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader));
+  std::vector<envoy_dynamic_module_type_envoy_http_header> headers(2);
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_headers(
+      env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, headers.data()));
+}
+
 TEST_F(DynamicModuleAccessLogAbiTest, GetHeaderValueFound) {
   Formatter::Context log_context(&request_headers_, &response_headers_, &response_trailers_);
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
@@ -195,6 +207,21 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetHeaderValueIndexOutOfBounds) {
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_header_value(
       env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, key, &result, 1, &count));
   EXPECT_EQ(1, count);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetHeaderValueOutsideLogWindowReturnsEmpty) {
+  Formatter::Context log_context(&request_headers_, &response_headers_, &response_trailers_);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+  logger_->log_context_ = nullptr;
+
+  envoy_dynamic_module_type_module_buffer key = {"x-request-id", 12};
+  envoy_dynamic_module_type_envoy_buffer result{"placeholder", 11};
+  size_t count = 7;
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_header_value(
+      env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, key, &result, 0, &count));
+  EXPECT_EQ(nullptr, result.ptr);
+  EXPECT_EQ(0, result.length);
+  EXPECT_EQ(0, count);
 }
 
 // =============================================================================

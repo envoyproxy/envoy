@@ -18,6 +18,14 @@ using Envoy::Extensions::DynamicModules::HeadersMapOptConstRef;
 
 namespace {
 
+bool hasLogContext(const ThreadLocalLogger* logger) {
+  return logger != nullptr && logger->log_context_ != nullptr;
+}
+
+bool hasStreamInfo(const ThreadLocalLogger* logger) {
+  return logger != nullptr && logger->stream_info_ != nullptr;
+}
+
 // Helper to convert MonotonicTime to nanoseconds duration from start time.
 int64_t monotonicTimeToNanos(const absl::optional<MonotonicTime>& time,
                              const MonotonicTime& start_time) {
@@ -39,6 +47,9 @@ size_t envoy_dynamic_module_callback_access_logger_get_headers_size(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_http_header_type header_type) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!hasLogContext(logger)) {
+    return 0;
+  }
   HeadersMapOptConstRef map = ContextAccessor::headerMapByType(*logger->log_context_, header_type);
   return map.has_value() ? map->size() : 0;
 }
@@ -48,6 +59,9 @@ bool envoy_dynamic_module_callback_access_logger_get_headers(
     envoy_dynamic_module_type_http_header_type header_type,
     envoy_dynamic_module_type_envoy_http_header* result_headers) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!hasLogContext(logger)) {
+    return false;
+  }
   return ContextAccessor::getHeaders(
       ContextAccessor::headerMapByType(*logger->log_context_, header_type), result_headers);
 }
@@ -58,6 +72,15 @@ bool envoy_dynamic_module_callback_access_logger_get_header_value(
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
     size_t index, size_t* total_count_out) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!hasLogContext(logger)) {
+    if (result != nullptr) {
+      *result = {.ptr = nullptr, .length = 0};
+    }
+    if (total_count_out != nullptr) {
+      *total_count_out = 0;
+    }
+    return false;
+  }
   return ContextAccessor::getHeaderValue(
       ContextAccessor::headerMapByType(*logger->log_context_, header_type), key, result, index,
       total_count_out);
@@ -385,6 +408,9 @@ int64_t envoy_dynamic_module_callback_access_logger_get_upstream_peer_cert_v_end
 size_t envoy_dynamic_module_callback_access_logger_get_upstream_peer_uri_san_size(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!hasStreamInfo(logger)) {
+    return 0;
+  }
   const auto upstream = logger->stream_info_->upstreamInfo();
   if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
     return 0;
@@ -396,6 +422,9 @@ bool envoy_dynamic_module_callback_access_logger_get_upstream_peer_uri_san(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* sans_out) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!hasStreamInfo(logger) || sans_out == nullptr) {
+    return false;
+  }
   const auto upstream = logger->stream_info_->upstreamInfo();
   if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
     return false;
@@ -411,6 +440,9 @@ bool envoy_dynamic_module_callback_access_logger_get_upstream_peer_uri_san(
 size_t envoy_dynamic_module_callback_access_logger_get_upstream_local_uri_san_size(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!hasStreamInfo(logger)) {
+    return 0;
+  }
   const auto upstream = logger->stream_info_->upstreamInfo();
   if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
     return 0;
@@ -422,6 +454,9 @@ bool envoy_dynamic_module_callback_access_logger_get_upstream_local_uri_san(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* sans_out) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!hasStreamInfo(logger) || sans_out == nullptr) {
+    return false;
+  }
   const auto upstream = logger->stream_info_->upstreamInfo();
   if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
     return false;
@@ -437,6 +472,9 @@ bool envoy_dynamic_module_callback_access_logger_get_upstream_local_uri_san(
 size_t envoy_dynamic_module_callback_access_logger_get_upstream_peer_dns_san_size(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!hasStreamInfo(logger)) {
+    return 0;
+  }
   const auto upstream = logger->stream_info_->upstreamInfo();
   if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
     return 0;
@@ -448,6 +486,9 @@ bool envoy_dynamic_module_callback_access_logger_get_upstream_peer_dns_san(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* sans_out) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!hasStreamInfo(logger) || sans_out == nullptr) {
+    return false;
+  }
   const auto upstream = logger->stream_info_->upstreamInfo();
   if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
     return false;
@@ -463,6 +504,9 @@ bool envoy_dynamic_module_callback_access_logger_get_upstream_peer_dns_san(
 size_t envoy_dynamic_module_callback_access_logger_get_upstream_local_dns_san_size(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!hasStreamInfo(logger)) {
+    return 0;
+  }
   const auto upstream = logger->stream_info_->upstreamInfo();
   if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
     return 0;
@@ -474,6 +518,9 @@ bool envoy_dynamic_module_callback_access_logger_get_upstream_local_dns_san(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* sans_out) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!hasStreamInfo(logger) || sans_out == nullptr) {
+    return false;
+  }
   const auto upstream = logger->stream_info_->upstreamInfo();
   if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
     return false;
@@ -628,6 +675,9 @@ int64_t envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_v_e
 size_t envoy_dynamic_module_callback_access_logger_get_downstream_peer_uri_san_size(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!hasStreamInfo(logger)) {
+    return 0;
+  }
   const auto& provider = logger->stream_info_->downstreamAddressProvider();
   if (!provider.sslConnection()) {
     return 0;
@@ -639,6 +689,9 @@ bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_uri_san(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* sans_out) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!hasStreamInfo(logger) || sans_out == nullptr) {
+    return false;
+  }
   const auto& provider = logger->stream_info_->downstreamAddressProvider();
   if (!provider.sslConnection()) {
     return false;
@@ -654,6 +707,9 @@ bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_uri_san(
 size_t envoy_dynamic_module_callback_access_logger_get_downstream_local_uri_san_size(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!hasStreamInfo(logger)) {
+    return 0;
+  }
   const auto& provider = logger->stream_info_->downstreamAddressProvider();
   if (!provider.sslConnection()) {
     return 0;
@@ -665,6 +721,9 @@ bool envoy_dynamic_module_callback_access_logger_get_downstream_local_uri_san(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* sans_out) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!hasStreamInfo(logger) || sans_out == nullptr) {
+    return false;
+  }
   const auto& provider = logger->stream_info_->downstreamAddressProvider();
   if (!provider.sslConnection()) {
     return false;
@@ -680,6 +739,9 @@ bool envoy_dynamic_module_callback_access_logger_get_downstream_local_uri_san(
 size_t envoy_dynamic_module_callback_access_logger_get_downstream_peer_dns_san_size(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!hasStreamInfo(logger)) {
+    return 0;
+  }
   const auto& provider = logger->stream_info_->downstreamAddressProvider();
   if (!provider.sslConnection()) {
     return 0;
@@ -691,6 +753,9 @@ bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_dns_san(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* sans_out) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!hasStreamInfo(logger) || sans_out == nullptr) {
+    return false;
+  }
   const auto& provider = logger->stream_info_->downstreamAddressProvider();
   if (!provider.sslConnection()) {
     return false;
@@ -706,6 +771,9 @@ bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_dns_san(
 size_t envoy_dynamic_module_callback_access_logger_get_downstream_local_dns_san_size(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!hasStreamInfo(logger)) {
+    return 0;
+  }
   const auto& provider = logger->stream_info_->downstreamAddressProvider();
   if (!provider.sslConnection()) {
     return 0;
@@ -717,6 +785,9 @@ bool envoy_dynamic_module_callback_access_logger_get_downstream_local_dns_san(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* sans_out) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!hasStreamInfo(logger) || sans_out == nullptr) {
+    return false;
+  }
   const auto& provider = logger->stream_info_->downstreamAddressProvider();
   if (!provider.sslConnection()) {
     return false;
@@ -738,6 +809,9 @@ bool envoy_dynamic_module_callback_access_logger_get_dynamic_metadata(
     envoy_dynamic_module_type_module_buffer filter_name,
     envoy_dynamic_module_type_module_buffer path, envoy_dynamic_module_type_envoy_buffer* result) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!hasStreamInfo(logger) || result == nullptr) {
+    return false;
+  }
   return ContextAccessor::getDynamicMetadata(*logger->stream_info_, filter_name, path, result);
 }
 
@@ -746,6 +820,9 @@ bool envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_number(
     envoy_dynamic_module_type_module_buffer filter_name,
     envoy_dynamic_module_type_module_buffer path, double* result) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!hasStreamInfo(logger) || result == nullptr) {
+    return false;
+  }
   return ContextAccessor::getDynamicMetadataNumber(*logger->stream_info_, filter_name, path,
                                                    result);
 }
@@ -755,6 +832,9 @@ bool envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_bool(
     envoy_dynamic_module_type_module_buffer filter_name,
     envoy_dynamic_module_type_module_buffer path, bool* result) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!hasStreamInfo(logger) || result == nullptr) {
+    return false;
+  }
   return ContextAccessor::getDynamicMetadataBool(*logger->stream_info_, filter_name, path, result);
 }
 
@@ -773,6 +853,9 @@ bool envoy_dynamic_module_callback_access_logger_get_local_reply_body(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!hasLogContext(logger) || result == nullptr) {
+    return false;
+  }
   return ContextAccessor::getLocalReplyBody(*logger->log_context_, result);
 }
 
@@ -840,6 +923,9 @@ bool envoy_dynamic_module_callback_access_logger_get_ja4_hash(
 uint64_t envoy_dynamic_module_callback_access_logger_get_request_headers_bytes(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!hasLogContext(logger)) {
+    return 0;
+  }
   const auto& headers = logger->log_context_->requestHeaders();
   return headers.has_value() ? headers->byteSize() : 0;
 }
@@ -847,6 +933,9 @@ uint64_t envoy_dynamic_module_callback_access_logger_get_request_headers_bytes(
 uint64_t envoy_dynamic_module_callback_access_logger_get_response_headers_bytes(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!hasLogContext(logger)) {
+    return 0;
+  }
   const auto& headers = logger->log_context_->responseHeaders();
   return headers.has_value() ? headers->byteSize() : 0;
 }
@@ -854,6 +943,9 @@ uint64_t envoy_dynamic_module_callback_access_logger_get_response_headers_bytes(
 uint64_t envoy_dynamic_module_callback_access_logger_get_response_trailers_bytes(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!hasLogContext(logger)) {
+    return 0;
+  }
   const auto& trailers = logger->log_context_->responseTrailers();
   return trailers.has_value() ? trailers->byteSize() : 0;
 }

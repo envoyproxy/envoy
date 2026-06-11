@@ -59,6 +59,51 @@ returnNullTransportSocket(envoy_dynamic_module_type_transport_socket_factory_con
   return nullptr;
 }
 
+// Re-entrancy regression state. The outer do_read or do_write re-enters the socket through a
+// nested call and records the active buffer pointer afterwards, so the test can confirm the outer
+// buffer is restored rather than cleared.
+Buffer::Instance* observed_read_buffer_after_reentry = nullptr;
+Buffer::Instance* observed_write_buffer_after_reentry = nullptr;
+int read_call_depth = 0;
+int write_call_depth = 0;
+
+extern "C" envoy_dynamic_module_type_transport_socket_module_ptr
+returnNonNullTransportSocket(envoy_dynamic_module_type_transport_socket_factory_config_module_ptr,
+                             envoy_dynamic_module_type_transport_socket_envoy_ptr) {
+  static int placeholder = 0;
+  return &placeholder;
+}
+
+extern "C" void noopDestroyTransportSocket(envoy_dynamic_module_type_transport_socket_module_ptr) {}
+
+extern "C" envoy_dynamic_module_type_transport_socket_io_result
+reentrantDoRead(envoy_dynamic_module_type_transport_socket_envoy_ptr envoy_ptr,
+                envoy_dynamic_module_type_transport_socket_module_ptr) {
+  auto* socket = static_cast<DynamicModuleTransportSocket*>(envoy_ptr);
+  read_call_depth++;
+  if (read_call_depth == 1) {
+    Buffer::OwnedImpl nested_buffer;
+    socket->doRead(nested_buffer);
+    observed_read_buffer_after_reentry = socket->currentReadBuffer();
+  }
+  read_call_depth--;
+  return {envoy_dynamic_module_type_transport_socket_post_io_action_KeepOpen, 0, false};
+}
+
+extern "C" envoy_dynamic_module_type_transport_socket_io_result
+reentrantDoWrite(envoy_dynamic_module_type_transport_socket_envoy_ptr envoy_ptr,
+                 envoy_dynamic_module_type_transport_socket_module_ptr, bool) {
+  auto* socket = static_cast<DynamicModuleTransportSocket*>(envoy_ptr);
+  write_call_depth++;
+  if (write_call_depth == 1) {
+    Buffer::OwnedImpl nested_buffer;
+    socket->doWrite(nested_buffer, false);
+    observed_write_buffer_after_reentry = socket->currentWriteBuffer();
+  }
+  write_call_depth--;
+  return {envoy_dynamic_module_type_transport_socket_post_io_action_KeepOpen, 0, false};
+}
+
 // Tests for the upstream and downstream config factories.
 class DynamicModuleTransportSocketConfigTest : public testing::Test {
 public:
@@ -637,6 +682,40 @@ TEST_F(DynamicModuleTransportSocketTest, OnConnectedRecordsFailureWhenFdUnavaila
   EXPECT_CALL(callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
   socket->onConnected();
   EXPECT_EQ("missing socket fd", socket->failureReason());
+}
+
+TEST_F(DynamicModuleTransportSocketTest, DoReadRestoresOuterBufferAfterReentry) {
+  read_call_depth = 0;
+  observed_read_buffer_after_reentry = nullptr;
+  auto config = std::make_shared<DynamicModuleTransportSocketConfig>(false, nullptr);
+  config->on_new_ = returnNonNullTransportSocket;
+  config->on_destroy_ = noopDestroyTransportSocket;
+  config->on_do_read_ = reentrantDoRead;
+  auto socket = std::make_unique<DynamicModuleTransportSocket>(config);
+
+  Buffer::OwnedImpl outer_buffer;
+  socket->doRead(outer_buffer);
+
+  // A re-entrant do_read must leave the outer call's buffer pointer in place.
+  EXPECT_EQ(&outer_buffer, observed_read_buffer_after_reentry);
+  EXPECT_EQ(nullptr, socket->currentReadBuffer());
+}
+
+TEST_F(DynamicModuleTransportSocketTest, DoWriteRestoresOuterBufferAfterReentry) {
+  write_call_depth = 0;
+  observed_write_buffer_after_reentry = nullptr;
+  auto config = std::make_shared<DynamicModuleTransportSocketConfig>(false, nullptr);
+  config->on_new_ = returnNonNullTransportSocket;
+  config->on_destroy_ = noopDestroyTransportSocket;
+  config->on_do_write_ = reentrantDoWrite;
+  auto socket = std::make_unique<DynamicModuleTransportSocket>(config);
+
+  Buffer::OwnedImpl outer_buffer;
+  socket->doWrite(outer_buffer, false);
+
+  // A re-entrant do_write must leave the outer call's buffer pointer in place.
+  EXPECT_EQ(&outer_buffer, observed_write_buffer_after_reentry);
+  EXPECT_EQ(nullptr, socket->currentWriteBuffer());
 }
 } // namespace
 } // namespace DynamicModules

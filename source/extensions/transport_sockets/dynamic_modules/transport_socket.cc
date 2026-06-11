@@ -205,9 +205,10 @@ Network::IoResult DynamicModuleTransportSocket::doRead(Buffer::Instance& buffer)
   if (in_module_socket_ == nullptr) {
     return {Network::PostIoAction::Close, 0, false};
   }
+  Buffer::Instance* previous_read_buffer = current_read_buffer_;
   current_read_buffer_ = &buffer;
   auto result = config_->on_do_read_(this, in_module_socket_);
-  current_read_buffer_ = nullptr;
+  current_read_buffer_ = previous_read_buffer;
   return {toPostIoAction(result.action), result.bytes_processed, result.end_stream_read};
 }
 
@@ -215,9 +216,10 @@ Network::IoResult DynamicModuleTransportSocket::doWrite(Buffer::Instance& buffer
   if (in_module_socket_ == nullptr) {
     return {Network::PostIoAction::Close, 0, false};
   }
+  Buffer::Instance* previous_write_buffer = current_write_buffer_;
   current_write_buffer_ = &buffer;
   auto result = config_->on_do_write_(this, in_module_socket_, end_stream);
-  current_write_buffer_ = nullptr;
+  current_write_buffer_ = previous_write_buffer;
   // end_stream_read is only meaningful for reads. The connection layer asserts it is never set on a
   // write result, so it is forced to false here regardless of what the module reports.
   return {toPostIoAction(result.action), result.bytes_processed, false};
