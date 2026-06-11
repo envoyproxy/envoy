@@ -8147,63 +8147,6 @@ BORINGSSL_TEST_P(SslSocketTest, AsyncCustomCertValidatorFails) {
                .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 }
 
-BORINGSSL_TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOff) {
-  envoy::config::listener::v3::Listener listener;
-  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
-  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
-      server_tls_context.mutable_common_tls_context()->add_tls_certificates();
-  // Bad server certificate to cause the mismatch between TLS usage and key usage.
-  server_cert->mutable_certificate_chain()->set_filename(
-      TestEnvironment::substitute("{{ test_rundir "
-                                  "}}/test/common/tls/test_data/bad_rsa_key_usage_cert.pem"));
-  server_cert->mutable_private_key()->set_filename(
-      TestEnvironment::substitute("{{ test_rundir "
-                                  "}}/test/common/tls/test_data/bad_rsa_key_usage_key.pem"));
-
-  updateFilterChain(server_tls_context, *filter_chain);
-
-  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
-
-  // Disable the rsa_key_usage enforcement.
-  client_tls_context.mutable_enforce_rsa_key_usage()->set_value(false);
-  // Both server connection (Client->Envoy) and client connection (Envoy->Backend) are expected to
-  // be successful.
-  TestUtilOptionsV2 test_options(listener, client_tls_context, true, version_);
-  // `was_key_usage_invalid` stats is expected to set to report the mismatched usage.
-  if (!FIPS_mode()) {
-    test_options.setExpectedClientStats("ssl.was_key_usage_invalid");
-  }
-  testUtilV2(test_options);
-}
-
-BORINGSSL_TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOn) {
-  envoy::config::listener::v3::Listener listener;
-  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
-  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
-      server_tls_context.mutable_common_tls_context()->add_tls_certificates();
-  // Bad server certificate to cause the mismatch between TLS usage and key usage.
-  server_cert->mutable_certificate_chain()->set_filename(
-      TestEnvironment::substitute("{{ test_rundir "
-                                  "}}/test/common/tls/test_data/bad_rsa_key_usage_cert.pem"));
-  server_cert->mutable_private_key()->set_filename(
-      TestEnvironment::substitute("{{ test_rundir "
-                                  "}}/test/common/tls/test_data/bad_rsa_key_usage_key.pem"));
-
-  updateFilterChain(server_tls_context, *filter_chain);
-
-  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
-
-  TestUtilOptionsV2 test_options(listener, client_tls_context, /*expect_success=*/false, version_,
-                                 /*skip_server_failure_reason_check=*/true);
-  // Client connection is failed with key_usage_mismatch.
-  test_options.setExpectedTransportFailureReasonContains("KEY_USAGE_BIT_INCORRECT");
-  // Server connection error was not populated in this case.
-  test_options.setExpectedServerStats("");
-  testUtilV2(test_options);
-}
-
 // Test that TLS handshakes succeed when certificate compression is enabled via runtime flag.
 // This verifies the certificate compression feature (RFC 8879) integration with brotli, zstd,
 // and zlib algorithms when the runtime flag is enabled.

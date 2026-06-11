@@ -61,6 +61,35 @@ matcher_name: test_matcher
   EXPECT_NE(nullptr, matcher);
 }
 
+// Load the module via the ``module.local.filename`` data source instead of by name.
+TEST_F(DynamicModuleInputMatcherFactoryTest, ValidConfigWithLocalFile) {
+  envoy::extensions::matching::input_matchers::dynamic_modules::v3::DynamicModuleMatcher
+      proto_config;
+  proto_config.mutable_dynamic_module_config()->mutable_module()->mutable_local()->set_filename(
+      Extensions::DynamicModules::testSharedObjectPath("matcher_no_op", "c"));
+  proto_config.mutable_dynamic_module_config()->set_do_not_close(true);
+  proto_config.set_matcher_name("test_matcher");
+
+  auto factory_cb = factory_.createInputMatcherFactoryCb(proto_config, context_);
+  EXPECT_NE(nullptr, factory_cb);
+  auto matcher = factory_cb();
+  EXPECT_NE(nullptr, matcher);
+}
+
+// Remote module sources are not supported for input matchers (no init manager is wired up).
+TEST_F(DynamicModuleInputMatcherFactoryTest, RemoteSourceRejected) {
+  envoy::extensions::matching::input_matchers::dynamic_modules::v3::DynamicModuleMatcher
+      proto_config;
+  auto* remote = proto_config.mutable_dynamic_module_config()->mutable_module()->mutable_remote();
+  remote->mutable_http_uri()->set_uri("https://example.com/module.so");
+  remote->mutable_http_uri()->set_cluster("cluster_1");
+  remote->mutable_http_uri()->mutable_timeout()->set_seconds(5);
+  remote->set_sha256("abc123");
+  proto_config.set_matcher_name("test_matcher");
+
+  EXPECT_THROW(factory_.createInputMatcherFactoryCb(proto_config, context_), EnvoyException);
+}
+
 TEST_F(DynamicModuleInputMatcherFactoryTest, ValidConfigWithMatcherConfig) {
   const std::string yaml = R"EOF(
 dynamic_module_config:

@@ -74,6 +74,25 @@ public:
                                                           details);
   }
   void executeLocalReplyIfPrepared() override {}
+  // Returns true if the decoder filter chain should stop (local reply sent or downstream reset).
+  bool isAborted() {
+    return state().decoder_filter_chain_aborted_ || state().saw_downstream_reset_;
+  }
+  // Notifies all upstream callbacks that a host has been selected, returning true if the request
+  // was aborted by one of them.
+  bool notifyHostSelected() {
+    // host is guaranteed non-null: createConnPool() returns nullptr when the host is null,
+    // and the caller checks for that before creating the UpstreamRequest.
+    Upstream::HostDescriptionConstSharedPtr host = upstream_request_.conn_pool_->host();
+    ASSERT(host != nullptr);
+    for (auto* callback : upstream_request_.upstream_callbacks_) {
+      callback->onHostSelected(host);
+      if (isAborted()) {
+        return true;
+      }
+    }
+    return false;
+  }
   UpstreamRequest& upstream_request_;
 };
 
@@ -414,10 +433,17 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
     }
   }
 
-  // Kick off creation of the upstream connection immediately upon receiving headers.
-  // In future it may be possible for upstream HTTP filters to delay this, or influence connection
-  // creation but for now optimize for minimal latency and fetch the connection
-  // as soon as possible.
+  // Kick off creation of the upstream connection immediately upon receiving headers. In future it
+  // may be possible for upstream HTTP filters to delay this, or influence connection creation, but
+  // for now optimize for minimal latency and fetch the connection as soon as possible. As a first
+  // step in that direction, upstream HTTP filters can inspect the selected host and abort the
+  // request before the connection is initiated.
+  auto* upstream_fm = static_cast<UpstreamFilterManager*>(filter_manager_.get());
+  if (upstream_fm->notifyHostSelected()) {
+    ENVOY_LOG(debug, "upstream request aborted during onHostSelected");
+    return;
+  }
+
   conn_pool_->newStream(this);
 
   if (parent_.config().upstream_log_flush_interval_.has_value()) {

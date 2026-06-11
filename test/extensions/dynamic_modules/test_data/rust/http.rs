@@ -712,6 +712,13 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     );
     assert!(ns_req_header.is_none());
 
+    // Set multiple string entries in one namespace via the batch setter, plus an empty batch.
+    // The resulting metadata is read back and asserted end-to-end by the C++ integration test in
+    // filter_test.cc.
+    envoy_filter
+      .set_dynamic_metadata_string_batch("ns_req_header_batch", &[("k1", "v1"), ("k2", "v2")]);
+    envoy_filter.set_dynamic_metadata_string_batch("ns_req_header_batch_empty", &[]);
+
     // Try getting metadata from rotuer cluster and host.
     let metadata = envoy_filter.get_metadata_string(
       abi::envoy_dynamic_module_type_metadata_source::Route,

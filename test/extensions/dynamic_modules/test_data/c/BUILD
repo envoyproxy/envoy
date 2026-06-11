@@ -10,10 +10,13 @@ package(default_visibility = [
     "//test/extensions/dynamic_modules/http:__pkg__",
     "//test/extensions/dynamic_modules/listener:__pkg__",
     "//test/extensions/dynamic_modules/network:__pkg__",
+    "//test/extensions/dynamic_modules/stat_sink:__pkg__",
     "//test/extensions/dynamic_modules/udp:__pkg__",
     "//test/extensions/load_balancing_policies/dynamic_modules:__pkg__",
     "//test/extensions/matching/input_matchers/dynamic_modules:__pkg__",
+    "//test/extensions/network/dns_resolver/hickory:__pkg__",
     "//test/extensions/tracers/dynamic_modules:__pkg__",
+    "//test/extensions/transport_sockets/dynamic_modules:__pkg__",
     "//test/extensions/transport_sockets/tls/cert_validator/dynamic_modules:__pkg__",
     "//test/extensions/upstreams/http/dynamic_modules:__pkg__",
 ])
@@ -39,6 +42,8 @@ test_program(name = "program_init_fail")
 test_program(name = "abi_version_mismatch")
 
 test_program(name = "no_http_config_new")
+
+test_program(name = "http_filter_config_new_fail")
 
 test_program(name = "http_filter_per_route_config_new_fail")
 
@@ -146,6 +151,8 @@ test_program(name = "access_log_config_new_fail")
 
 test_program(name = "cluster_no_op")
 
+test_program(name = "cluster_run_on_all_workers")
+
 test_program(name = "cluster_config_new_fail")
 
 test_program(name = "cluster_new_fail")
@@ -211,3 +218,19 @@ test_program(name = "tracer_no_op")
 test_program(name = "tracer_config_fail")
 
 test_program(name = "tracer_with_values")
+
+test_program(name = "stat_sink_no_op")
+
+test_program(name = "stat_sink_config_new_fail")
+
+test_program(name = "stat_sink_missing_config_new")
+
+test_program(name = "stat_sink_missing_config_destroy")
+
+test_program(name = "stat_sink_missing_flush")
+
+test_program(name = "stat_sink_missing_histogram_complete")
+
+test_program(name = "stat_sink_integration_test")
+
+test_program(name = "dns_resolver_config_new_fail")

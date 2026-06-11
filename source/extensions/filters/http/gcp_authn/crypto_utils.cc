@@ -1,29 +1,16 @@
 #include "source/extensions/filters/http/gcp_authn/crypto_utils.h"
 
-#include <openssl/asn1.h>
 #include <openssl/bio.h>
 #include <openssl/mem.h>
-#include <openssl/nid.h>
 #include <openssl/pem.h>
 #include <openssl/sha2.h>
-#include <openssl/stack.h>
 #include <openssl/x509.h>
 
-#include <cstdint>
 #include <memory>
-#include <optional>
 #include <string>
-#include <vector>
-
-#include "envoy/api/api.h"
-#include "envoy/secret/secret_provider.h"
 
 #include "source/common/common/base64.h"
 #include "source/common/common/logger.h"
-#include "source/common/common/matchers.h"
-#include "source/common/common/thread.h"
-#include "source/common/config/datasource.h"
-#include "source/common/tls/utility.h"
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -33,27 +20,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GcpAuthn {
 namespace {
-
-std::vector<std::string> getSubjectAltNames(X509* cert) {
-  std::vector<std::string> sans =
-      Envoy::Extensions::TransportSockets::Tls::Utility::getSubjectAltNames(*cert, GEN_URI);
-  std::vector<std::string> dns_sans =
-      Envoy::Extensions::TransportSockets::Tls::Utility::getSubjectAltNames(*cert, GEN_DNS);
-  sans.insert(sans.end(), dns_sans.begin(), dns_sans.end());
-  return sans;
-}
-
-bool validateSubjectAltNames(const std::vector<std::string>& sans,
-                             const std::vector<Matchers::StringMatcherImpl>& san_matchers) {
-  for (const auto& san : sans) {
-    for (const auto& matcher : san_matchers) {
-      if (matcher.match(san)) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
 
 absl::StatusOr<std::string> calculateFingerprint(X509* cert) {
   unsigned char* der = nullptr;
@@ -73,47 +39,17 @@ absl::StatusOr<std::string> calculateFingerprint(X509* cert) {
 
 } // namespace
 
-absl::StatusOr<std::string> getBase64EncodedCertificateFingerprint(
-    Secret::TlsCertificateConfigProviderSharedPtr tls_cert_provider,
-    const std::vector<Matchers::StringMatcherImpl>& san_matchers, Api::Api& api) {
-  // Config::DataSource::read() is blocking and should only be called on the
-  // main thread.
-  ASSERT_IS_MAIN_OR_TEST_THREAD();
-
-  if (san_matchers.empty()) {
-    return absl::InvalidArgumentError("SAN matchers are empty");
+absl::StatusOr<std::string>
+CertFingerprinterImpl::getFingerprintFromPem(const std::string& pem) const {
+  if (pem.empty()) {
+    return absl::InvalidArgumentError("Certificate PEM content is empty");
   }
 
-  if (tls_cert_provider == nullptr) {
-    return absl::InvalidArgumentError("TLS certificate provider is null");
-  }
-  const auto* secret = tls_cert_provider->secret();
-  if (secret == nullptr) {
-    return absl::NotFoundError("Secret is null");
-  }
-
-  // Read certificate from secret.
-  const auto& cert_chain = secret->certificate_chain();
-  auto file_content_or_error = Config::DataSource::read(cert_chain, true, api);
-  if (!file_content_or_error.ok()) {
-    return absl::InternalError("Failed to read certificate from data source");
-  }
-  std::string file_content = file_content_or_error.value();
-
-  if (file_content.empty()) {
-    return absl::InvalidArgumentError("Certificate file content is empty");
-  }
-
-  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(file_content.data(), file_content.size()));
+  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(pem.data(), pem.size()));
   bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
   if (!cert) {
-    ENVOY_LOG_MISC(error, "Failed to parse certificate");
-    return absl::InvalidArgumentError("Failed to parse certificate");
-  }
-
-  std::vector<std::string> sans = getSubjectAltNames(cert.get());
-  if (!validateSubjectAltNames(sans, san_matchers)) {
-    return absl::InvalidArgumentError("Subject Alternative Names do not match");
+    ENVOY_LOG_MISC(error, "Failed to parse certificate from PEM");
+    return absl::InvalidArgumentError("Failed to parse certificate from PEM");
   }
 
   return calculateFingerprint(cert.get());

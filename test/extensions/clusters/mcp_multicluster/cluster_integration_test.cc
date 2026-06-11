@@ -120,6 +120,7 @@ TEST_P(CompositeClusterIntegrationTest, BasicRetryProgression) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
   ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
 
   // First retry should go to cluster_1 - return 503 to trigger another retry.
@@ -128,6 +129,7 @@ TEST_P(CompositeClusterIntegrationTest, BasicRetryProgression) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
   ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
 
   // Second retry should go to cluster_2 - return 200.

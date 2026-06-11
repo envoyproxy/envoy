@@ -226,7 +226,7 @@ public:
   const envoy::config::core::v3::Locality& locality() const override { return *locality_; }
   const MetadataConstSharedPtr localityMetadata() const override { return locality_metadata_; }
   Stats::StatName localityZoneStatName() const override {
-    return locality_zone_stat_name_.statName();
+    return locality_->zone().empty() ? Stats::StatName() : locality_zone_stat_name_.statName();
   }
   uint32_t priority() const override { return priority_; }
   void priority(uint32_t priority) override { priority_ = priority; }
@@ -317,7 +317,8 @@ public:
          MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
          std::shared_ptr<const envoy::config::core::v3::Locality> locality,
          const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-         uint32_t priority, const AddressVector& address_list = {});
+         uint32_t priority, const AddressVector& address_list = {},
+         absl::string_view stat_name = {});
 
   // HostDescription
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
@@ -328,6 +329,13 @@ public:
     return address_;
   }
   SharedConstAddressVector addressListOrNull() const override { return address_list_or_null_; }
+  absl::string_view observabilityName() const override {
+    if (observability_name_.empty()) {
+      ASSERT(address_ != nullptr);
+      return address_->asStringView();
+    }
+    return observability_name_;
+  }
 
 protected:
   HostDescriptionImpl(
@@ -336,7 +344,7 @@ protected:
       MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
       std::shared_ptr<const envoy::config::core::v3::Locality> locality,
       const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-      uint32_t priority, const AddressVector& address_list = {});
+      uint32_t priority, const AddressVector& address_list = {}, absl::string_view stat_name = {});
 
 private:
   // No locks are required in this implementation: all address-related member
@@ -346,6 +354,7 @@ private:
   const Network::Address::InstanceConstSharedPtr address_;
   const SharedConstAddressVector address_list_or_null_;
   const Network::Address::InstanceConstSharedPtr health_check_address_;
+  const std::string observability_name_;
 };
 
 /**
@@ -521,7 +530,7 @@ public:
          std::shared_ptr<const envoy::config::core::v3::Locality> locality,
          const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
          uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
-         const AddressVector& address_list = {});
+         const AddressVector& address_list = {}, absl::string_view stat_name = {});
 
 protected:
   HostImpl(absl::Status& creation_status, ClusterInfoConstSharedPtr cluster,
@@ -531,11 +540,11 @@ protected:
            std::shared_ptr<const envoy::config::core::v3::Locality> locality,
            const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
            uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
-           const AddressVector& address_list = {})
+           const AddressVector& address_list = {}, absl::string_view stat_name = {})
       : HostImplBase(initial_weight, health_check_config, health_status),
         HostDescriptionImpl(creation_status, cluster, hostname, address, endpoint_metadata,
                             locality_metadata, locality, health_check_config, priority,
-                            address_list) {}
+                            address_list, stat_name) {}
 };
 
 class HostsPerLocalityImpl : public HostsPerLocality {
@@ -1039,7 +1048,7 @@ protected:
 
   // Gets the retry budget percent/concurrency from the circuit breaker thresholds. If the retry
   // budget message is specified, defaults will be filled in if either params are unspecified.
-  static std::pair<absl::optional<double>, absl::optional<uint32_t>>
+  static std::tuple<absl::optional<double>, absl::optional<uint64_t>, absl::optional<uint32_t>>
   getRetryBudgetParams(const envoy::config::cluster::v3::CircuitBreakers::Thresholds& thresholds);
 
 private:
@@ -1050,7 +1059,8 @@ private:
   struct ResourceManagers {
     ResourceManagers(const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
                      const std::string& cluster_name, Stats::Scope& stats_scope,
-                     const ClusterCircuitBreakersStatNames& circuit_breakers_stat_names);
+                     const ClusterCircuitBreakersStatNames& circuit_breakers_stat_names,
+                     Event::Dispatcher& dispatcher);
     absl::StatusOr<ResourceManagerImplPtr>
     load(const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
          const std::string& cluster_name, Stats::Scope& stats_scope,
@@ -1060,6 +1070,7 @@ private:
 
     Managers managers_;
     const ClusterCircuitBreakersStatNames& circuit_breakers_stat_names_;
+    Event::Dispatcher& dispatcher_;
   };
 
   struct OptionalClusterStats {

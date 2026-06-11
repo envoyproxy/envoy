@@ -67,6 +67,43 @@ logger_config:
   EXPECT_NE(nullptr, access_log);
 }
 
+// Load the module via the ``module.local.filename`` data source instead of by name.
+TEST_F(DynamicModuleAccessLogFactoryTest, ValidConfigWithLocalFile) {
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  NiceMock<Server::MockOptions> options;
+  ON_CALL(options, concurrency()).WillByDefault(testing::Return(1));
+  ON_CALL(context.server_context_, options()).WillByDefault(testing::ReturnRef(options));
+  ScopedThreadLocalServerContextSetter setter(context.server_context_);
+
+  envoy::extensions::access_loggers::dynamic_modules::v3::DynamicModuleAccessLog proto_config;
+  proto_config.mutable_dynamic_module_config()->mutable_module()->mutable_local()->set_filename(
+      Extensions::DynamicModules::testSharedObjectPath("access_log_no_op", "c"));
+  proto_config.mutable_dynamic_module_config()->set_do_not_close(true);
+  proto_config.set_logger_name("test_logger");
+
+  AccessLog::FilterPtr filter;
+  auto access_log = factory_.createAccessLogInstance(proto_config, std::move(filter), context, {});
+  EXPECT_NE(nullptr, access_log);
+}
+
+// Remote module sources are not supported for access loggers (no init manager is wired up).
+TEST_F(DynamicModuleAccessLogFactoryTest, RemoteSourceRejected) {
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  ScopedThreadLocalServerContextSetter setter(context.server_context_);
+
+  envoy::extensions::access_loggers::dynamic_modules::v3::DynamicModuleAccessLog proto_config;
+  auto* remote = proto_config.mutable_dynamic_module_config()->mutable_module()->mutable_remote();
+  remote->mutable_http_uri()->set_uri("https://example.com/module.so");
+  remote->mutable_http_uri()->set_cluster("cluster_1");
+  remote->mutable_http_uri()->mutable_timeout()->set_seconds(5);
+  remote->set_sha256("abc123");
+  proto_config.set_logger_name("test_logger");
+
+  AccessLog::FilterPtr filter;
+  EXPECT_THROW(factory_.createAccessLogInstance(proto_config, std::move(filter), context, {}),
+               EnvoyException);
+}
+
 TEST_F(DynamicModuleAccessLogFactoryTest, ValidConfigWithFilter) {
   NiceMock<Server::Configuration::MockGenericFactoryContext> context;
   NiceMock<Server::MockOptions> options;
