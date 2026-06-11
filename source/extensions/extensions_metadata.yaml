@@ -497,6 +497,14 @@ envoy.filters.http.fault:
   status: stable
   type_urls:
   - envoy.extensions.filters.http.fault.v3.HTTPFault
+envoy.filters.http.filter_chain:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.filter_chain.v3.FilterChainConfig
+  - envoy.extensions.filters.http.filter_chain.v3.FilterChainConfigPerRoute
 envoy.filters.http.file_server:
   categories:
   - envoy.filters.http
@@ -643,6 +651,7 @@ envoy.filters.http.mcp_json_rest_bridge:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+  - envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridgePerRoute
 envoy.filters.http.mcp_router:
   categories:
   - envoy.filters.http
@@ -1059,6 +1068,13 @@ envoy.filters.udp.session.dynamic_forward_proxy:
   status: alpha
   type_urls:
   - envoy.extensions.filters.udp.udp_proxy.session.dynamic_forward_proxy.v3.FilterConfig
+envoy.filters.upstream_network.reverse_tunnel_lifecycle:
+  categories:
+  - envoy.filters.upstream_network
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - google.protobuf.Empty
 envoy.formatter.cel:
   categories:
   - envoy.formatter
@@ -1456,6 +1472,13 @@ envoy.stat_sinks.dog_statsd:
   status: stable
   type_urls:
   - envoy.config.metrics.v3.DogStatsdSink
+envoy.stat_sinks.dynamic_modules:
+  categories:
+  - envoy.stats_sinks
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.stat_sinks.dynamic_modules.v3.DynamicModuleStatsSink
 envoy.stat_sinks.graphite_statsd:
   categories:
   - envoy.stats_sinks
@@ -1623,6 +1646,14 @@ envoy.transport_sockets.quic:
   type_urls:
   - envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport
   - envoy.extensions.transport_sockets.quic.v3.QuicUpstreamTransport
+envoy.transport_sockets.dynamic_modules:
+  categories:
+  - envoy.transport_sockets.downstream
+  - envoy.transport_sockets.upstream
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.transport_sockets.dynamic_modules.v3.DynamicModuleTransportSocket
 envoy.transport_sockets.raw_buffer:
   categories:
   - envoy.transport_sockets.downstream

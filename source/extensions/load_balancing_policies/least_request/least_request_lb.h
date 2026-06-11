@@ -1,5 +1,6 @@
 #pragma once
 
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/load_balancing_policies/common/load_balancer_impl.h"
 
 namespace Envoy {
@@ -57,6 +58,9 @@ protected:
       active_request_bias_ = 1.0;
     }
 
+    count_pending_requests_ = Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.least_request_lb_count_pending_requests");
+
     EdfLoadBalancerBase::refresh(priority);
   }
 
@@ -69,6 +73,7 @@ private:
                                         const HostsSource& source) override;
   HostSharedPtr unweightedHostPickFullScan(const HostVector& hosts_to_use);
   HostSharedPtr unweightedHostPickNChoices(const HostVector& hosts_to_use);
+  uint64_t effectiveActiveRequests(const Host& host) const;
 
   const uint32_t choice_count_;
 
@@ -76,6 +81,11 @@ private:
   // performance reasons and refresh it in `LeastRequestLoadBalancer::refresh(uint32_t priority)`
   // whenever a `HostSet` is updated.
   double active_request_bias_{};
+
+  // Whether to include pending requests in the per-host load value. Cached for performance and
+  // consistency reasons and refreshed in `LeastRequestLoadBalancer::refresh(uint32_t priority)`
+  // whenever a `HostSet` is updated.
+  bool count_pending_requests_{};
 
   const absl::optional<Runtime::Double> active_request_bias_runtime_;
   const envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::SelectionMethod

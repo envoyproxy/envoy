@@ -101,11 +101,13 @@ public:
     std::string error;
     std::unique_ptr<quic::ProofVerifyDetails> verify_details;
     EXPECT_EQ(quic::QUIC_SUCCESS,
-              verifier_->VerifyCertChain("www.example.org", 54321, chain->certs,
-                                         /*ocsp_response=*/"", /*cert_sct=*/"Fake SCT",
-                                         &verify_context_, &error, &verify_details,
-                                         /*out_alert=*/nullptr,
-                                         /*callback=*/nullptr))
+              verifier_->VerifyCertChain(
+                  "www.example.org", 54321,
+                  std::vector<absl::string_view>(chain->certs.begin(), chain->certs.end()),
+                  /*ocsp_response=*/"", /*cert_sct=*/"Fake SCT", &verify_context_, &error,
+                  &verify_details,
+                  /*out_alert=*/nullptr,
+                  /*callback=*/nullptr))
         << error;
   }
 
@@ -236,7 +238,7 @@ public:
     }
     ASSERT_TRUE(secret_update_callback_ != nullptr);
     absl::Status callback_status = secret_update_callback_();
-    THROW_IF_NOT_OK(callback_status);
+    THROW_IF_NOT_OK_REF(callback_status);
     ASSERT_TRUE(callback_status.ok());
   }
 

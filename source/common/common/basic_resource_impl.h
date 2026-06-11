@@ -49,7 +49,7 @@ public:
   void resetMax() { max_ = std::numeric_limits<uint64_t>::max(); }
 
 protected:
-  std::atomic<uint64_t> current_{};
+  std::atomic<uint64_t> current_{0};
 
 private:
   uint64_t max_;

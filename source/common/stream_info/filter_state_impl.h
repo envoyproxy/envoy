@@ -34,7 +34,7 @@ public:
 
   // FilterState
   void setData(
-      absl::string_view data_name, std::shared_ptr<Object> data, FilterState::StateType state_type,
+      absl::string_view data_name, std::shared_ptr<Object> data,
       FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain,
       StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) override;
   bool hasDataWithName(absl::string_view) const override;

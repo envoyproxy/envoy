@@ -98,7 +98,7 @@ public:
     absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader =
         Runtime::LoaderImpl::create(dispatcher_, tls_, layered_runtime, local_info_, store_,
                                     generator_, validation_visitor_, *api_);
-    THROW_IF_NOT_OK(loader.status());
+    THROW_IF_NOT_OK_REF(loader.status());
     loader_ = std::move(loader.value());
   }
 
@@ -545,7 +545,7 @@ protected:
     absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader =
         Runtime::LoaderImpl::create(dispatcher_, tls_, layered_runtime, local_info_, store_,
                                     generator_, validation_visitor_, *api_);
-    THROW_IF_NOT_OK(loader.status());
+    THROW_IF_NOT_OK_REF(loader.status());
     loader_ = std::move(loader.value());
   }
 
@@ -947,7 +947,7 @@ public:
             }));
     absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader = Runtime::LoaderImpl::create(
         dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_, *api_);
-    THROW_IF_NOT_OK(loader.status());
+    THROW_IF_NOT_OK_REF(loader.status());
     loader_ = std::move(loader.value());
     THROW_IF_NOT_OK(loader_->initialize(cm_));
     for (auto* sub : rtds_subscriptions_) {
@@ -1105,6 +1105,29 @@ TEST_F(RtdsLoaderImplTest, OnConfigUpdateSuccess) {
   EXPECT_EQ(3, store_.counter("runtime.load_success").value());
   EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+}
+
+TEST_F(RtdsLoaderImplTest, RuntimeFeatureRemovalRestoresRuntimeGuardDefault) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.test_feature_false", true);
+  setup();
+
+  auto runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_resource
+    layer:
+      envoy.reloadable_features.test_feature_false: false
+  )EOF");
+  EXPECT_CALL(rtds_init_callback_, Call());
+  doOnConfigUpdateVerifyNoThrow(runtime);
+
+  EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
+
+  runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_resource
+    layer: {}
+  )EOF");
+  doOnConfigUpdateVerifyNoThrow(runtime);
+
+  EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
 }
 
 // Delta style successful update.

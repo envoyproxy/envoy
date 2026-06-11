@@ -156,7 +156,7 @@ typed_config:
     UNREFERENCED_PARAMETER(node_uuid);
     UNREFERENCED_PARAMETER(cluster_uuid);
     UNREFERENCED_PARAMETER(tenant_uuid);
-    return std::string();
+    return {};
   }
 
   std::string createHttpRequest(const std::string& method, const std::string& path,

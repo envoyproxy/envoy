@@ -80,9 +80,6 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
           [this]() -> void { this->onReadBufferLowWatermark(); },
           [this]() -> void { this->onReadBufferHighWatermark(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
-      detect_early_close_(true), enable_half_close_(false), read_end_stream_raised_(false),
-      read_end_stream_(false), write_end_stream_(false), current_write_end_stream_(false),
-      dispatch_buffered_data_(false), transport_wants_read_(false),
       enable_close_through_filter_manager_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.connection_close_through_filter_manager")) {
 
@@ -1127,7 +1124,7 @@ ClientConnectionImpl::ClientConnectionImpl(
   if (transport_options) {
     for (const auto& object : transport_options->downstreamSharedFilterStateObjects()) {
       // This does not throw as all objects are distinctly named and the stream info is empty.
-      stream_info_.filterState()->setData(object.name_, object.data_, object.state_type_,
+      stream_info_.filterState()->setData(object.name_, object.data_,
                                           StreamInfo::FilterState::LifeSpan::Connection,
                                           object.stream_sharing_);
     }

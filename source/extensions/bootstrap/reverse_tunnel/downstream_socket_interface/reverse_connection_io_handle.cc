@@ -48,6 +48,19 @@ ReverseConnectionIOHandle::~ReverseConnectionIOHandle() {
   cleanup();
 }
 
+void ReverseConnectionIOHandle::emitAccessLog(const std::string& event,
+                                              const std::string& host_address,
+                                              const std::string& cluster_name,
+                                              const std::string& connection_key,
+                                              const std::string& error_message) {
+  if (!extension_) {
+    return;
+  }
+  extension_->emitAccessLog(getTimeSource(), event, config_.src_node_id, config_.src_cluster_id,
+                            config_.src_tenant_id, cluster_name, host_address, connection_key,
+                            error_message);
+}
+
 void ReverseConnectionIOHandle::cleanup() {
   ENVOY_LOG_MISC(debug, "Starting cleanup of reverse connection resources.");
 
@@ -258,8 +271,10 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
         auto io_handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
             std::move(duplicated_socket), this, connection_key);
 
-        ENVOY_LOG(debug, "reverse_tunnel: RAII IoHandle created with duplicated socket "
-                         "and protection enabled.");
+        ENVOY_LOG(info,
+                  "reverse_tunnel: RAII IoHandle created with duplicated socket for node_id: {}"
+                  "and protection enabled.",
+                  config_.src_node_id);
 
         // Reset file events on the original socket to prevent any pending operations. The socket
         // fd has been duplicated, so we have an independent fd. Closing the original connection
@@ -552,10 +567,11 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
     uint32_t pending_connections = host_to_conn_info_map_[key].connecting_count;
 
     ENVOY_LOG(info,
-              "reverse_tunnel: Number of reverse connections to host {} of cluster {}: "
+              "reverse_tunnel: Number of reverse connections to host {} of cluster {} from source "
+              "node: {}: "
               "Current: {}, Pending: {}, Required: {}",
-              host_address, cluster_name, current_connections, pending_connections,
-              cluster_config.reverse_connection_count);
+              host_address, cluster_name, config_.src_node_id, current_connections,
+              pending_connections, cluster_config.reverse_connection_count);
     // Update with the pending connections also for checking against required.
     current_connections += pending_connections;
     if (current_connections >= cluster_config.reverse_connection_count) {
@@ -802,6 +818,8 @@ void ReverseConnectionIOHandle::onDownstreamConnectionClosed(const std::string& 
   // Remove connection state tracking.
   removeConnectionState(host_address, cluster_name, connection_key);
 
+  emitAccessLog("connection_closed", host_address, cluster_name, connection_key, "");
+
   // The next call to maintainClusterConnections() will detect the missing connection
   // and re-initiate it automatically.
   ENVOY_LOG(debug,
@@ -1036,8 +1054,9 @@ bool ReverseConnectionIOHandle::isTriggerPipeReady() const {
 
 void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
                                                  RCConnectionWrapper* wrapper, bool closed) {
-  ENVOY_LOG(debug, "reverse_tunnel: Connection wrapper done - error: '{}', closed: {}", error,
-            closed);
+  ENVOY_LOG(info,
+            "reverse_tunnel: Connection wrapper done - error: '{}', closed: {}, for node_id: {}",
+            error, closed, config_.src_node_id);
 
   // Validate wrapper pointer before any access.
   if (!wrapper) {
@@ -1115,6 +1134,8 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
 
     trackConnectionFailure(host_address, cluster_name);
 
+    emitAccessLog("handshake_failure", host_address, cluster_name, connection_key, error);
+
   } else {
     // Handle connection success.
     ENVOY_LOG(debug, "reverse_tunnel: Connection succeeded for host {}", host_address);
@@ -1122,6 +1143,8 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
     resetHostBackoff(host_address);
     updateConnectionState(host_address, cluster_name, connection_key,
                           ReverseConnectionState::Connected);
+
+    emitAccessLog("handshake_success", host_address, cluster_name, connection_key, "");
 
     // Only proceed if connection is still valid.
     if (!connection) {

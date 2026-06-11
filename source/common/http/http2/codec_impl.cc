@@ -10,6 +10,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
+#include "envoy/runtime/runtime.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/cleanup.h"
@@ -137,6 +138,9 @@ public:
   const absl::string_view oghttp2_err_unknown_ = "http2.unknown.oghttp2.error";
   // The number of headers (or trailers) exceeded the configured limits
   const absl::string_view too_many_headers = "http2.too_many_headers";
+  // The total size of headers exceeded the configured limits
+  const absl::string_view header_list_size_too_large = "http2.header_list_size_too_large";
+  const absl::string_view cookies_total_bytes_too_large = "http2.cookies_total_bytes_too_large";
   // Envoy detected an HTTP/2 frame flood from the server.
   const absl::string_view outbound_frame_flood = "http2.outbound_frames_flood";
   // Envoy detected an inbound HTTP/2 frame flood.
@@ -179,6 +183,8 @@ int reasonToReset(StreamResetReason reason, bool response_end_stream_sent) {
     return OGHTTP2_REFUSED_STREAM;
   case StreamResetReason::ConnectError:
     return OGHTTP2_CONNECT_ERROR;
+  case StreamResetReason::RemoteResetNoError:
+    return OGHTTP2_NO_ERROR;
   case StreamResetReason::ProtocolError:
     if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error")) {
       return OGHTTP2_NO_ERROR;
@@ -302,11 +308,11 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
           [this]() -> void { this->pendingSendBufferLowWatermark(); },
           [this]() -> void { this->pendingSendBufferHighWatermark(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
-      local_end_stream_sent_(false), remote_end_stream_(false), remote_rst_(false),
-      data_deferred_(false), received_noninformational_headers_(false),
+      cookie_count_(0), local_end_stream_sent_(false), remote_end_stream_(false),
+      remote_rst_(false), data_deferred_(false), received_noninformational_headers_(false),
       pending_receive_buffer_high_watermark_called_(false),
       pending_send_buffer_high_watermark_called_(false), reset_due_to_messaging_error_(false),
-      extend_stream_lifetime_flag_(false) {
+      extend_stream_lifetime_flag_(false), histograms_recorded_(false) {
   parent_.stats_.streams_active_.inc();
   if (buffer_limit > 0) {
     setWriteBufferWatermarks(buffer_limit);
@@ -747,7 +753,9 @@ void ConnectionImpl::StreamImpl::pendingSendBufferLowWatermark() {
 }
 
 void ConnectionImpl::StreamImpl::saveHeader(HeaderString&& name, HeaderString&& value) {
-  if (!Utility::reconstituteCrumbledCookies(name, value, cookies_)) {
+  if (Utility::reconstituteCrumbledCookies(name, value, cookies_)) {
+    cookie_count_++;
+  } else {
     headers().addViaMove(std::move(name), std::move(value));
   }
 }
@@ -977,14 +985,24 @@ void ConnectionImpl::StreamImpl::setAccount(Buffer::BufferMemoryAccountSharedPtr
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stats,
                                Random::RandomGenerator& random_generator,
                                const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-                               const uint32_t max_headers_kb, const uint32_t max_headers_count)
+                               const uint32_t max_headers_kb, const uint32_t max_headers_count,
+                               OptRef<Runtime::Loader> runtime)
     : stats_(stats), connection_(connection), max_headers_kb_(max_headers_kb),
       max_headers_count_(max_headers_count),
       per_stream_buffer_limit_(http2_options.initial_stream_window_size().value()),
       stream_error_on_invalid_http_messaging_(
           http2_options.override_stream_error_on_invalid_http_message().value()),
-      protocol_constraints_(stats, http2_options), dispatching_(false), raised_goaway_(false),
-      random_(random_generator),
+      record_http2_histograms_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_record_histograms")),
+      max_cookie_size_bytes_(
+          runtime.has_value() ? runtime->snapshot().getInteger(
+                                    "envoy.reloadable_features.http2_max_cookies_size_in_kb", 0) *
+                                    1024
+                              : 0),
+      protocol_constraints_(stats, http2_options,
+                            Runtime::runtimeFeatureEnabled(
+                                "envoy.reloadable_features.http2_flood_protection_active_streams")),
+      dispatching_(false), raised_goaway_(false), random_(random_generator),
       last_received_data_time_(connection_.dispatcher().timeSource().monotonicTime()) {
   if (http2_options.has_use_oghttp2_codec()) {
     use_oghttp2_library_ = http2_options.use_oghttp2_codec().value();
@@ -1274,6 +1292,7 @@ Status ConnectionImpl::onHeaders(int32_t stream_id, size_t length, uint8_t flags
   stream->bytes_meter_->addHeaderBytesReceived(length + H2_FRAME_HEADER_SIZE);
 
   stream->remote_end_stream_ = flags & FLAG_END_STREAM;
+  recordHistogramsForStream(*stream);
   if (!stream->cookies_.empty()) {
     HeaderString key(Headers::get().Cookie);
     stream->headers().addViaMove(std::move(key), std::move(stream->cookies_));
@@ -1513,6 +1532,8 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
   if (stream) {
     const int32_t stream_id = stream->stream_id_;
 
+    recordHistogramsForStream(*stream);
+
     // Consume buffered on stream_close.
     if (stream->stream_manager_.buffered_on_stream_close_) {
       stream->stream_manager_.buffered_on_stream_close_ = false;
@@ -1533,42 +1554,56 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
     }
 
     if (should_reset_stream) {
-      StreamResetReason reason;
-      if (stream->reset_due_to_messaging_error_) {
-        // Unfortunately, the nghttp2 API makes it incredibly difficult to clearly understand
-        // the flow of resets. I.e., did the reset originate locally? Was it remote? Here,
-        // we attempt to track cases in which we sent a reset locally due to an invalid frame
-        // received from the remote. We only do that in two cases currently (HTTP messaging layer
-        // errors from https://tools.ietf.org/html/rfc7540#section-8 which nghttp2 is very strict
-        // about). In other cases we treat invalid frames as a protocol error and just kill
-        // the connection.
-
-        // Get ClientConnectionImpl or ServerConnectionImpl specific stream reset reason,
-        // depending whether the connection is upstream or downstream.
-        reason = getMessagingErrorResetReason();
+      // RFC 9113 Section 8.1: A server MAY send RST_STREAM(NO_ERROR) after sending
+      // a complete response. The complete response MUST NOT be discarded.
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_preserve_rst_no_error") &&
+          stream->remote_end_stream_ && error_code == OGHTTP2_NO_ERROR &&
+          !stream->reset_reason_.has_value()) {
+        if (stream->stream_manager_.hasBufferedBodyOrTrailers()) {
+          ENVOY_CONN_LOG(debug, "buffered onStreamClose for stream: {}", connection_, stream_id);
+          stream->stream_manager_.buffered_on_stream_close_ = true;
+          stats_.deferred_stream_close_.inc();
+          return okStatus();
+        }
+        stream->runResetCallbacks(StreamResetReason::RemoteResetNoError, absl::string_view());
       } else {
-        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error")) {
-          reason = errorCodeToResetReason(error_code);
-          if (error_code == OGHTTP2_REFUSED_STREAM) {
-            stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
-          } else {
-            stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
-          }
+        StreamResetReason reason;
+        if (stream->reset_due_to_messaging_error_) {
+          // Unfortunately, the nghttp2 API makes it incredibly difficult to clearly understand
+          // the flow of resets. I.e., did the reset originate locally? Was it remote? Here,
+          // we attempt to track cases in which we sent a reset locally due to an invalid frame
+          // received from the remote. We only do that in two cases currently (HTTP messaging layer
+          // errors from https://tools.ietf.org/html/rfc7540#section-8 which nghttp2 is very strict
+          // about). In other cases we treat invalid frames as a protocol error and just kill
+          // the connection.
+
+          // Get ClientConnectionImpl or ServerConnectionImpl specific stream reset reason,
+          // depending whether the connection is upstream or downstream.
+          reason = getMessagingErrorResetReason();
         } else {
-          if (error_code == OGHTTP2_REFUSED_STREAM) {
-            reason = StreamResetReason::RemoteRefusedStreamReset;
-            stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
-          } else {
-            if (error_code == OGHTTP2_CONNECT_ERROR) {
-              reason = StreamResetReason::ConnectError;
+          if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error")) {
+            reason = errorCodeToResetReason(error_code);
+            if (error_code == OGHTTP2_REFUSED_STREAM) {
+              stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
             } else {
-              reason = StreamResetReason::RemoteReset;
+              stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
             }
-            stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
+          } else {
+            if (error_code == OGHTTP2_REFUSED_STREAM) {
+              reason = StreamResetReason::RemoteRefusedStreamReset;
+              stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
+            } else {
+              if (error_code == OGHTTP2_CONNECT_ERROR) {
+                reason = StreamResetReason::ConnectError;
+              } else {
+                reason = StreamResetReason::RemoteReset;
+              }
+              stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
+            }
           }
         }
+        stream->runResetCallbacks(reason, absl::string_view());
       }
-      stream->runResetCallbacks(reason, absl::string_view());
 
     } else if (!stream->reset_reason_.has_value() &&
                stream->stream_manager_.hasBufferedBodyOrTrailers()) {
@@ -1580,6 +1615,7 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
       return okStatus();
     }
 
+    protocol_constraints_.decrementActiveStreamCount();
     stream->destroy();
     current_stream_id_.reset();
     // TODO(antoniovicente) Test coverage for onCloseStream before deferred reset handling happens.
@@ -1636,6 +1672,26 @@ int ConnectionImpl::onMetadataFrameComplete(int32_t stream_id, bool end_metadata
   return result ? 0 : ERR_CALLBACK_FAILURE;
 }
 
+// This function can be invoked multiple times for a single stream:
+// - Once in onHeaders() for request/response headers (this is when recording happens).
+// - Again in onHeaders() if there are trailers (ignored, trailers are not recorded).
+// - Once in onStreamClose() as a fallback if headers weren't recorded (e.g. early error),
+//   or as a redundant call for successful streams (ignored).
+// The `histograms_recorded_` guard ensures we only record once (only for headers, not trailers).
+void ConnectionImpl::recordHistogramsForStream(StreamImpl& stream) {
+  if (record_http2_histograms_ && !stream.histograms_recorded_) {
+    uint64_t headers_size = stream.headers().byteSize();
+    uint64_t headers_count = stream.headers().size();
+    uint64_t headers_with_cookies_size = headers_size + stream.cookies_.size();
+    uint64_t headers_with_cookies_count = headers_count + stream.cookie_count_;
+    stats_.header_list_size_.recordValue(headers_with_cookies_size);
+    stats_.cookie_size_.recordValue(stream.cookies_.size());
+    stats_.header_count_.recordValue(headers_with_cookies_count);
+    stats_.cookie_count_.recordValue(stream.cookie_count_);
+    stream.histograms_recorded_ = true;
+  }
+}
+
 int ConnectionImpl::saveHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) {
   StreamImpl* stream = getStreamUnchecked(stream_id);
   if (!stream) {
@@ -1661,16 +1717,33 @@ int ConnectionImpl::saveHeader(int32_t stream_id, HeaderString&& name, HeaderStr
   }
 
   stream->saveHeader(std::move(name), std::move(value));
+  const uint64_t total_cookie_size = stream->cookies_.size();
+  if (max_cookie_size_bytes_ > 0 && total_cookie_size > max_cookie_size_bytes_) {
+    stream->setDetails(Http2ResponseCodeDetails::get().cookies_total_bytes_too_large);
+    stats_.cookies_total_bytes_too_large_.inc();
+    return ERR_TEMPORAL_CALLBACK_FAILURE;
+  }
+  uint64_t headers_size = stream->headers().byteSize();
+  uint64_t headers_count = stream->headers().size();
 
-  if (stream->headers().byteSize() > max_headers_kb_ * 1024 ||
-      stream->headers().size() > max_headers_count_) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_include_cookies_in_limits")) {
+    headers_size += stream->cookies_.size();
+    headers_count += stream->cookie_count_;
+  }
+
+  if (headers_size > max_headers_kb_ * 1024) {
+    stream->setDetails(Http2ResponseCodeDetails::get().header_list_size_too_large);
+    stats_.header_list_size_too_large_.inc();
+    return ERR_TEMPORAL_CALLBACK_FAILURE;
+  }
+  if (headers_count > max_headers_count_) {
     stream->setDetails(Http2ResponseCodeDetails::get().too_many_headers);
     stats_.header_overflow_.inc();
     // This will cause the library to reset/close the stream.
     return ERR_TEMPORAL_CALLBACK_FAILURE;
-  } else {
-    return 0;
   }
+
+  return 0;
 }
 
 Status ConnectionImpl::sendPendingFrames() {
@@ -2085,6 +2158,9 @@ ConnectionImpl::Http2Options::Http2Options(
   og_options_.allow_different_host_and_authority = true;
   og_options_.allow_obs_text =
       !PROTOBUF_GET_WRAPPED_OR_DEFAULT(http2_options, disallow_obs_text, false);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_include_cookies_in_limits")) {
+    og_options_.enforce_max_header_list_bytes = true;
+  }
   if (!PROTOBUF_GET_WRAPPED_OR_DEFAULT(http2_options, enable_huffman_encoding, true)) {
     if (http2_options.has_hpack_table_size() && http2_options.hpack_table_size().value() == 0) {
       og_options_.compression_option = http2::adapter::OgHttp2Session::Options::DISABLE_COMPRESSION;
@@ -2373,9 +2449,9 @@ ServerConnectionImpl::ServerConnectionImpl(
     const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action,
-    Server::OverloadManager& overload_manager)
+    Server::OverloadManager& overload_manager, OptRef<Runtime::Loader> runtime)
     : ConnectionImpl(connection, stats, random_generator, http2_options, max_request_headers_kb,
-                     max_request_headers_count),
+                     max_request_headers_count, runtime),
       callbacks_(callbacks), headers_with_underscores_action_(headers_with_underscores_action),
       should_send_go_away_on_dispatch_(overload_manager.getLoadShedPoint(
           Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch)),
@@ -2453,17 +2529,20 @@ int ServerConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, Heade
 Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   // Make sure downstream outbound queue was not flooded by the upstream frames.
   RETURN_IF_ERROR(protocol_constraints_.checkOutboundFrameLimits());
-  if (should_send_go_away_and_close_on_dispatch_ != nullptr &&
-      should_send_go_away_and_close_on_dispatch_->shouldShedLoad()) {
-    ConnectionImpl::goAway();
-    sent_go_away_on_dispatch_ = true;
-    return envoyOverloadError(
-        "Load shed point http2_server_go_away_and_close_on_dispatch triggered");
-  }
-  if (should_send_go_away_on_dispatch_ != nullptr && !sent_go_away_on_dispatch_ &&
-      should_send_go_away_on_dispatch_->shouldShedLoad()) {
-    ConnectionImpl::goAway();
-    sent_go_away_on_dispatch_ = true;
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_fix_goaway_loadshed_point")) {
+    if (should_send_go_away_and_close_on_dispatch_ != nullptr &&
+        should_send_go_away_and_close_on_dispatch_->shouldShedLoad()) {
+      ConnectionImpl::goAway();
+      sent_go_away_on_dispatch_ = true;
+      return envoyOverloadError(
+          "Load shed point http2_server_go_away_and_close_on_dispatch triggered");
+    }
+    if (should_send_go_away_on_dispatch_ != nullptr && !sent_go_away_on_dispatch_ &&
+        should_send_go_away_on_dispatch_->shouldShedLoad()) {
+      ConnectionImpl::goAway();
+      sent_go_away_on_dispatch_ = true;
+    }
   }
   return ConnectionImpl::dispatch(data);
 }

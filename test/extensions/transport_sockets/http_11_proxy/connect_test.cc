@@ -68,7 +68,6 @@ public:
     transport_callbacks_.connection_.stream_info_.filterState()->setData(
         "envoy.network.transport_socket.http_11_proxy.address",
         std::make_unique<Network::Http11ProxyInfoFilterState>("www.foo.com", address),
-        StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::FilterChain);
   }
 

@@ -18,7 +18,7 @@
 #include "test/fuzz/utility.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 
@@ -282,7 +282,7 @@ public:
     ON_CALL(*direct_response_entry_, responseCode()).WillByDefault(Return(code));
     ON_CALL(*direct_response_entry_, formatBody(_, _, _, _))
         .WillByDefault(Return(direct_response_body_));
-    ON_CALL(*direct_response_entry_, newUri(_)).WillByDefault(Return(new_uri));
+    ON_CALL(*direct_response_entry_, newUri(_, _)).WillByDefault(Return(new_uri));
     ON_CALL(*mock_route_, directResponseEntry())
         .WillByDefault(Return(direct_response_entry_.get()));
   }

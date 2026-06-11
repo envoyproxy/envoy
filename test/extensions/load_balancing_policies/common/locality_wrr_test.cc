@@ -313,8 +313,7 @@ TEST_F(LocalityWrrTest, UnhealthyFailover) {
 }
 
 TEST(OverProvisioningFactorTest, LocalityPickChanges) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.restart_features.move_locality_schedulers_to_lb", "false"}});
+
   auto setUpHostSetWithOPFAndTestPicks = [](const uint32_t overprovisioning_factor,
                                             const uint32_t pick_0, const uint32_t pick_1) {
     HostSetImpl host_set(0, false, overprovisioning_factor);

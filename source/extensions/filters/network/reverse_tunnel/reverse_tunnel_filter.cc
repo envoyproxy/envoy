@@ -48,6 +48,15 @@ Extensions::Bootstrap::ReverseConnection::UpstreamSocketManager* getThreadLocalS
   return tls_registry->socketManager();
 }
 
+class RequestDecoderHandleImpl : public Http::RequestDecoderHandle {
+public:
+  explicit RequestDecoderHandleImpl(Http::RequestDecoder& decoder) : decoder_(decoder) {}
+  OptRef<Http::RequestDecoder> get() override { return decoder_; }
+
+private:
+  Http::RequestDecoder& decoder_;
+};
+
 } // namespace
 
 // Stats helper implementation.
@@ -133,8 +142,7 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
                          ? std::chrono::milliseconds(
                                DurationUtil::durationToMilliseconds(proto_config.ping_interval()))
                          : std::chrono::milliseconds(2000)),
-      auto_close_connections_(
-          proto_config.auto_close_connections() ? proto_config.auto_close_connections() : false),
+      auto_close_connections_(proto_config.auto_close_connections()),
       request_path_(
           proto_config.request_path().empty()
               ? std::string(::Envoy::Extensions::Bootstrap::ReverseConnection::
@@ -158,7 +166,8 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
               ? proto_config.validation().dynamic_metadata_namespace()
               : "envoy.filters.network.reverse_tunnel"),
       required_cluster_name_(proto_config.required_cluster_name()),
-      use_http_upgrade_(proto_config.use_http_upgrade()) {}
+      use_http_upgrade_(proto_config.use_http_upgrade()),
+      skip_rebalancing_(proto_config.skip_rebalancing()) {}
 
 bool ReverseTunnelFilterConfig::validateIdentifiers(
     absl::string_view node_id, absl::string_view cluster_id, absl::string_view tenant_id,
@@ -332,7 +341,7 @@ AccessLog::InstanceSharedPtrVector ReverseTunnelFilter::RequestDecoderImpl::acce
 }
 
 Http::RequestDecoderHandlePtr ReverseTunnelFilter::RequestDecoderImpl::getRequestDecoderHandle() {
-  return nullptr;
+  return std::make_unique<RequestDecoderHandleImpl>(*this);
 }
 
 void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream) {
@@ -558,7 +567,9 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
   const std::chrono::seconds ping_seconds =
       std::chrono::duration_cast<std::chrono::seconds>(config_->pingInterval());
 
-  // Register the wrapped socket for reuse under the provided identifiers.
+  // Register the wrapped socket for reuse under the original identifiers. The socket manager
+  // derives any tenant-scoped internal keys itself so lifecycle logging can retain the original
+  // node, cluster, and tenant fields.
   // Note: The socket manager is expected to be thread-safe.
   // Get tenant isolation setting from socket manager (configured at bootstrap level).
   const bool tenant_isolation_enabled = socket_manager->tenantIsolationEnabled();
@@ -574,8 +585,9 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
           : std::string(cluster_id);
 
   ENVOY_CONN_LOG(trace, "reverse_tunnel: registering wrapped socket for reuse", connection);
-  socket_manager->addConnectionSocket(socket_node_id, socket_cluster_id, std::move(wrapped_socket),
-                                      ping_seconds, false /* rebalanced */);
+  socket_manager->addConnectionSocket(std::string(node_id), std::string(cluster_id),
+                                      std::move(wrapped_socket), ping_seconds,
+                                      /* rebalanced= */ config_->skipRebalancing(), tenant_id);
   ENVOY_CONN_LOG(debug, "reverse_tunnel: successfully registered wrapped socket for reuse",
                  connection);
 

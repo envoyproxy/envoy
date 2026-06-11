@@ -190,6 +190,54 @@ TEST_P(DynamicModuleHttpFilterHeaderTest, GetHeaderValue) {
   EXPECT_EQ(result_buffer.length, 0);
 }
 
+TEST_P(DynamicModuleHttpFilterHeaderTest, GetHeaderValues) {
+  envoy_dynamic_module_type_http_header_type header_type = GetParam();
+
+  // The header map is not available.
+  std::string key = "multi";
+  envoy_dynamic_module_type_envoy_buffer result_buffers[2] = {{nullptr, 0}, {nullptr, 0}};
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_header_values(
+      filter_.get(), header_type, {key.data(), key.size()}, result_buffers));
+
+  std::initializer_list<std::pair<std::string, std::string>> headers = {
+      {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
+  Http::TestRequestHeaderMapImpl request_headers{headers};
+  Http::TestRequestTrailerMapImpl request_trailers{headers};
+  Http::TestResponseHeaderMapImpl response_headers{headers};
+  Http::TestResponseTrailerMapImpl response_trailers{headers};
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestHeaderMap>(request_headers)));
+  EXPECT_CALL(decoder_callbacks_, requestTrailers())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestTrailerMap>(request_trailers)));
+  EXPECT_CALL(encoder_callbacks_, responseHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseHeaderMap>(response_headers)));
+  EXPECT_CALL(encoder_callbacks_, responseTrailers())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseTrailerMap>(response_trailers)));
+
+  // All values for a multi-value key are filled in a single call.
+  result_buffers[0] = {nullptr, 0};
+  result_buffers[1] = {nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_header_values(
+      filter_.get(), header_type, {key.data(), key.size()}, result_buffers));
+  EXPECT_EQ(std::string(result_buffers[0].ptr, result_buffers[0].length), "value1");
+  EXPECT_EQ(std::string(result_buffers[1].ptr, result_buffers[1].length), "value2");
+
+  // A single-value key fills exactly one entry.
+  key = "single";
+  result_buffers[0] = {nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_header_values(
+      filter_.get(), header_type, {key.data(), key.size()}, result_buffers));
+  EXPECT_EQ(std::string(result_buffers[0].ptr, result_buffers[0].length), "value");
+
+  // A key with no values leaves the map present but fills nothing.
+  key = "nonexistent";
+  result_buffers[0] = {nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_header_values(
+      filter_.get(), header_type, {key.data(), key.size()}, result_buffers));
+  EXPECT_EQ(result_buffers[0].ptr, nullptr);
+  EXPECT_EQ(result_buffers[0].length, 0);
+}
+
 TEST_P(DynamicModuleHttpFilterHeaderTest, AddHeaderValue) {
   envoy_dynamic_module_type_http_header_type header_type = GetParam();
 
@@ -1081,6 +1129,122 @@ TEST(ABIImpl, metadata_namespaces) {
   EXPECT_EQ(ns_names.count("ns1"), 1);
   EXPECT_EQ(ns_names.count("ns2"), 1);
   EXPECT_EQ(ns_names.count("ns3"), 1);
+}
+
+TEST(ABIImpl, metadata_string_batch) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+
+  const std::string ns = "batch_ns";
+  std::vector<envoy_dynamic_module_type_module_key_value_pair> entries = {
+      {"k1", 2, "v1", 2},
+      {"k2", 2, "v2", 2},
+  };
+
+  // Without stream info the batch set is a no-op and must not crash or create a namespace.
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+      &filter, {ns.data(), ns.size()}, entries.data(), entries.size());
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_metadata_namespaces_count(
+                &filter, envoy_dynamic_module_type_metadata_source_Dynamic),
+            0);
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+  EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(metadata));
+  filter.setDecoderFilterCallbacks(callbacks);
+
+  envoy_dynamic_module_type_envoy_buffer result_buffer = {nullptr, 0};
+
+  // An empty batch is a no-op and must not create the namespace.
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+      &filter, {ns.data(), ns.size()}, nullptr, 0);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_metadata_namespaces_count(
+                &filter, envoy_dynamic_module_type_metadata_source_Dynamic),
+            0);
+
+  // A batch creates the namespace once and sets every entry.
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+      &filter, {ns.data(), ns.size()}, entries.data(), entries.size());
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_metadata_namespaces_count(
+                &filter, envoy_dynamic_module_type_metadata_source_Dynamic),
+            1);
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()}, {"k1", 2},
+      &result_buffer));
+  EXPECT_EQ(absl::string_view(result_buffer.ptr, result_buffer.length), "v1");
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()}, {"k2", 2},
+      &result_buffer));
+  EXPECT_EQ(absl::string_view(result_buffer.ptr, result_buffer.length), "v2");
+
+  // A batch overwrites an existing key and merges new keys while leaving untouched keys intact,
+  // matching the merge semantics of sequential single-key sets.
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_string(&filter, {ns.data(), ns.size()},
+                                                                 {"k1", 2}, {"old", 3});
+  std::vector<envoy_dynamic_module_type_module_key_value_pair> overwrite = {
+      {"k1", 2, "new", 3},
+      {"k3", 2, "v3", 2},
+  };
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+      &filter, {ns.data(), ns.size()}, overwrite.data(), overwrite.size());
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()}, {"k1", 2},
+      &result_buffer));
+  EXPECT_EQ(absl::string_view(result_buffer.ptr, result_buffer.length), "new");
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()}, {"k2", 2},
+      &result_buffer));
+  EXPECT_EQ(absl::string_view(result_buffer.ptr, result_buffer.length), "v2");
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()}, {"k3", 2},
+      &result_buffer));
+  EXPECT_EQ(absl::string_view(result_buffer.ptr, result_buffer.length), "v3");
+
+  // Within a single batch, a later entry with a duplicate key wins.
+  std::vector<envoy_dynamic_module_type_module_key_value_pair> dup = {
+      {"dup", 3, "first", 5},
+      {"dup", 3, "last", 4},
+  };
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+      &filter, {ns.data(), ns.size()}, dup.data(), dup.size());
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {"dup", 3}, &result_buffer));
+  EXPECT_EQ(absl::string_view(result_buffer.ptr, result_buffer.length), "last");
+
+  // A single-entry batch sets exactly that one entry.
+  std::vector<envoy_dynamic_module_type_module_key_value_pair> single = {{"solo", 4, "alone", 5}};
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+      &filter, {ns.data(), ns.size()}, single.data(), single.size());
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {"solo", 4}, &result_buffer));
+  EXPECT_EQ(absl::string_view(result_buffer.ptr, result_buffer.length), "alone");
+
+  // A zero-length value is set as an empty string rather than skipped.
+  std::vector<envoy_dynamic_module_type_module_key_value_pair> empty_value = {{"empty", 5, "", 0}};
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+      &filter, {ns.data(), ns.size()}, empty_value.data(), empty_value.size());
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {"empty", 5}, &result_buffer));
+  EXPECT_EQ(absl::string_view(result_buffer.ptr, result_buffer.length), "");
+
+  // A batch overwrites a pre-existing number value with a string, matching the replacement that
+  // sequential single-key sets produce.
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_number(&filter, {ns.data(), ns.size()},
+                                                                 {"num", 3}, 7.0);
+  std::vector<envoy_dynamic_module_type_module_key_value_pair> over_num = {{"num", 3, "str", 3}};
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+      &filter, {ns.data(), ns.size()}, over_num.data(), over_num.size());
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {"num", 3}, &result_buffer));
+  EXPECT_EQ(absl::string_view(result_buffer.ptr, result_buffer.length), "str");
 }
 
 TEST(ABIImpl, metadata_list) {
@@ -2153,6 +2317,40 @@ TEST(ABIImpl, GetAttributes) {
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
       &filter, envoy_dynamic_module_type_attribute_id_ConnectionId, &result_number));
   EXPECT_EQ(result_number, 8386);
+}
+
+// When the request header map is present but a typed header is absent, the attribute must be
+// reported as unset rather than an empty string.
+TEST(ABIImpl, GetAttributesAbsentTypedHeaders) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  filter.setDecoderFilterCallbacks(callbacks);
+
+  std::initializer_list<std::pair<std::string, std::string>> headers = {{":path", "/only/path"}};
+  Http::TestRequestHeaderMapImpl request_headers{headers};
+  EXPECT_CALL(callbacks, requestHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestHeaderMap>(request_headers)));
+
+  envoy_dynamic_module_type_envoy_buffer result_buffer = {nullptr, 0};
+
+  // The present header is still returned.
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_RequestPath, &result_buffer));
+  EXPECT_EQ(std::string(result_buffer.ptr, result_buffer.length), "/only/path");
+
+  // The absent typed headers return false rather than an empty string.
+  for (const auto attribute_id : {envoy_dynamic_module_type_attribute_id_RequestHost,
+                                  envoy_dynamic_module_type_attribute_id_RequestMethod,
+                                  envoy_dynamic_module_type_attribute_id_RequestScheme,
+                                  envoy_dynamic_module_type_attribute_id_RequestUserAgent}) {
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+        &filter, attribute_id, &result_buffer));
+  }
+
+  // Referer uses the custom-header lookup path and is also absent here.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_RequestReferer, &result_buffer));
 }
 
 TEST(ABIImpl, HttpCallout) {
