@@ -2570,6 +2570,30 @@ TEST_P(TcpTunnelingIntegrationTest,
   EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr(expected_log));
 }
 
+TEST_P(TcpTunnelingIntegrationTest, UpstreamRstAfterCompleteResponseNotPropagatedDownstream) {
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+  initialize();
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  // Send a complete response with Connection: close, then RST.
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"connection", "close"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(5, true);
+
+  // Upstream RSTs after completing the response.
+  ASSERT_TRUE(fake_upstream_connection_->close(Network::ConnectionCloseType::AbortReset));
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+
+  // Client should receive the full response data, not EOF.
+  ASSERT_TRUE(tcp_client_->waitForData(5));
+  tcp_client_->close();
+}
+
 INSTANTIATE_TEST_SUITE_P(
     IpAndHttpVersions, TcpTunnelingIntegrationTest,
     testing::ValuesIn(BaseTcpTunnelingIntegrationTest::getProtocolTestParams(

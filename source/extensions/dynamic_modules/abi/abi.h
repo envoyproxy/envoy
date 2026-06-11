@@ -1537,6 +1537,36 @@ bool envoy_dynamic_module_callback_http_get_header(
     envoy_dynamic_module_type_envoy_buffer* result_buffer, size_t index, size_t* optional_size);
 
 /**
+ * envoy_dynamic_module_callback_http_get_header_values is called by the module to get all values of
+ * the header with the given key in a single call. This is the batched counterpart to
+ * envoy_dynamic_module_callback_http_get_header that avoids one crossing and one lookup per value.
+ *
+ * PRECONDITION: The module must ensure that result_buffer has enough length to store all the
+ * values. Use the count reported by envoy_dynamic_module_callback_http_get_header via its
+ * optional_size output to size the buffer first.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param header_type is the type of the header map to get the header from (request/response
+ * headers/trailers).
+ * @param key is the key of the header.
+ * @param result_buffer is the output array where the values will be stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note that a header value is not guaranteed to be a valid UTF-8 string. The module must be careful
+ * when interpreting the value as a string in the language of the module.
+ *
+ * The buffers pointed by the pointers stored in result_buffer are owned by Envoy, and they are
+ * guaranteed to be valid until the end of the current event hook unless the setter callback is
+ * called.
+ */
+bool envoy_dynamic_module_callback_http_get_header_values(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer);
+
+/**
  * envoy_dynamic_module_callback_http_get_headers_size is called by the module to get the
  * number of headers. Combined with envoy_dynamic_module_callback_http_get_headers,
  * this can be used to iterate over all request headers.
@@ -4014,6 +4044,10 @@ void envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
  * @param key is the key owned by the module.
  * @param value_out is the output buffer where the value owned by Envoy will be stored.
  * @return true if the operation is successful, false otherwise.
+ *
+ * Note that the buffer pointed by the pointer stored in value_out is owned by Envoy, and it is
+ * guaranteed to be valid until the end of the current event hook unless the setter callback is
+ * called.
  */
 bool envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
@@ -5333,6 +5367,10 @@ uint64_t envoy_dynamic_module_callback_listener_filter_get_connection_start_time
  * @param value_out is the pointer to write the retrieved value. If the metadata is not found or is
  * not a string type, value_out->ptr will be set to nullptr and value_out->length will be 0.
  * @return true if the metadata was found and is a string type, false otherwise.
+ *
+ * Note that the buffer pointed by the pointer stored in value_out is owned by Envoy, and it is
+ * guaranteed to be valid until the end of the current event hook unless the setter callback is
+ * called.
  */
 bool envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_string(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
@@ -11265,6 +11303,11 @@ bool envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers(
  * module to get the current request body data as a series of buffer slices. During encode_data,
  * this contains the current body chunk. During encode_headers, the buffer is initially empty.
  *
+ * PRECONDITION: The module must ensure that result_buffer has enough length to store all the
+ * slices. Use
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer_chunks_size to get
+ * the number of slices first.
+ *
  * @param bridge_envoy_ptr is the pointer to the HttpTcpBridge object.
  * @param result_buffer is the output array for buffer slices owned by Envoy.
  * @param result_buffer_length is the output for the number of slices.
@@ -11273,12 +11316,27 @@ void envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer(
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result_buffer, size_t* result_buffer_length);
 
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer_chunks_size is called
+ * by the module to get the number of buffer slices in the current request body data.
+ *
+ * @param bridge_envoy_ptr is the pointer to the HttpTcpBridge object.
+ * @return the number of buffer slices. 0 if the buffer is empty or could not be retrieved.
+ */
+size_t envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer_chunks_size(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr);
+
 // ----------------------- Response Buffer Operations --------------------------
 
 /**
  * envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer is called by the
  * module to get the raw TCP data received from the upstream connection as a series of buffer
  * slices. This is available during on_upstream_data.
+ *
+ * PRECONDITION: The module must ensure that result_buffer has enough length to store all the
+ * slices. Use
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer_chunks_size to get
+ * the number of slices first.
  *
  * @param bridge_envoy_ptr is the pointer to the HttpTcpBridge object.
  * @param result_buffer is the output array for buffer slices owned by Envoy.
@@ -11287,6 +11345,16 @@ void envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer(
 void envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer(
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result_buffer, size_t* result_buffer_length);
+
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer_chunks_size is called
+ * by the module to get the number of buffer slices in the raw TCP response data.
+ *
+ * @param bridge_envoy_ptr is the pointer to the HttpTcpBridge object.
+ * @return the number of buffer slices. 0 if the buffer is empty or could not be retrieved.
+ */
+size_t envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer_chunks_size(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr);
 
 // ----------------------- Send Upstream Data ----------------------------------
 
@@ -12536,6 +12604,19 @@ void envoy_dynamic_module_callback_transport_socket_io_shutdown_write(
     envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
 
 /**
+ * envoy_dynamic_module_callback_transport_socket_get_fd returns the native OS file descriptor of
+ * the underlying socket. A module that performs raw socket operations such as installing kernel TLS
+ * with setsockopt uses this descriptor. It is only meaningful for transports backed by an OS
+ * socket. The descriptor is owned by Envoy and is only valid while the connection is open, so the
+ * module must not close it or use it after the connection closes.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @return the native file descriptor, or -1 if it is unavailable.
+ */
+int envoy_dynamic_module_callback_transport_socket_get_fd(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
+
+/**
  * envoy_dynamic_module_callback_transport_socket_read_buffer_add appends data to the connection
  * read buffer.
  *
@@ -12574,6 +12655,16 @@ void envoy_dynamic_module_callback_transport_socket_write_buffer_get_slices(
     envoy_dynamic_module_type_envoy_buffer* slices, size_t* slices_count);
 
 /**
+ * envoy_dynamic_module_callback_transport_socket_write_buffer_length returns the number of bytes
+ * currently queued in the connection write buffer.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @return the length of the write buffer in bytes, or zero when there is no active write buffer.
+ */
+size_t envoy_dynamic_module_callback_transport_socket_write_buffer_length(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
+
+/**
  * envoy_dynamic_module_callback_transport_socket_raise_event raises a connection event on the
  * connection (e.g., Connected after TLS handshake). Raising a close event can synchronously
  * re-enter the module through on_close, so the caller must not rely on any state after this
@@ -12603,6 +12694,17 @@ bool envoy_dynamic_module_callback_transport_socket_should_drain_read_buffer(
  * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
  */
 void envoy_dynamic_module_callback_transport_socket_set_is_readable(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_set_is_writable schedules another write on a
+ * future event loop iteration. A module calls this when it defers buffered bytes for its own
+ * reasons rather than because the socket reported it would block. After a write reports it would
+ * block, Envoy re-arms the writable notification on its own, so this call is not needed then.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ */
+void envoy_dynamic_module_callback_transport_socket_set_is_writable(
     envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
 
 /**

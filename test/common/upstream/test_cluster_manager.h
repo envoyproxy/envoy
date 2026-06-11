@@ -106,6 +106,9 @@ public:
                    Outlier::EventLoggerSharedPtr outlier_event_logger,
                    bool added_via_api) override {
     auto result = clusterFromProto_(cluster, outlier_event_logger, added_via_api);
+    if (result.first == nullptr) {
+      return absl::InvalidArgumentError("Failed to create cluster from proto");
+    }
     return std::make_pair(result.first, ThreadAwareLoadBalancerPtr(result.second));
   }
 

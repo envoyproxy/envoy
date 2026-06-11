@@ -48,6 +48,16 @@ envoy_cc_test(
         "//source/extensions/filters/http/mcp_json_rest_bridge:config",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/mcp_json_rest_bridge/v3:pkg_cc_proto",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_cc_test(
+    name = "trace_context_test",
+    srcs = ["trace_context_test.cc"],
+    deps = [
+        "//source/extensions/filters/http/mcp_json_rest_bridge:trace_context_lib",
         "@nlohmann_json//:json",
     ],
 )

@@ -1,3 +1,4 @@
+#include "envoy/event/file_event.h"
 #include "envoy/extensions/transport_sockets/dynamic_modules/v3/dynamic_modules.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -97,6 +98,20 @@ TEST_F(DynamicModuleTransportSocketConfigTest, UpstreamValidConfig) {
   EXPECT_FALSE(factory->implementsSecureTransport());
   EXPECT_EQ("", factory->defaultServerNameIndication());
   EXPECT_NE(nullptr, factory->createTransportSocket(nullptr, nullptr));
+}
+
+// Load the module via the ``module.local.filename`` data source instead of by name.
+TEST_F(DynamicModuleTransportSocketConfigTest, ValidConfigWithLocalFile) {
+  envoy::extensions::transport_sockets::dynamic_modules::v3::DynamicModuleTransportSocket config;
+  config.mutable_dynamic_module_config()->mutable_module()->mutable_local()->set_filename(
+      TestEnvironment::substitute(
+          "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/rust/"
+          "libtransport_socket_integration_test.so"));
+  config.set_transport_socket_name("passthrough");
+
+  auto factory_or_error = upstream_factory_.createTransportSocketFactory(config, context_);
+  ASSERT_TRUE(factory_or_error.ok()) << factory_or_error.status().message();
+  EXPECT_NE(nullptr, factory_or_error.value());
 }
 
 TEST_F(DynamicModuleTransportSocketConfigTest, ImplementsSecureTransport) {
@@ -443,10 +458,12 @@ TEST_F(DynamicModuleTransportSocketTest, ConnectionCallbacksWithoutCallbacksAreS
                                                                     sizeof(buffer), &io_bytes));
   EXPECT_EQ(0, io_bytes);
   envoy_dynamic_module_callback_transport_socket_io_shutdown_write(envoy_ptr);
+  EXPECT_EQ(-1, envoy_dynamic_module_callback_transport_socket_get_fd(envoy_ptr));
   envoy_dynamic_module_callback_transport_socket_raise_event(
       envoy_ptr, envoy_dynamic_module_type_network_connection_event_RemoteClose);
   EXPECT_FALSE(envoy_dynamic_module_callback_transport_socket_should_drain_read_buffer(envoy_ptr));
   envoy_dynamic_module_callback_transport_socket_set_is_readable(envoy_ptr);
+  envoy_dynamic_module_callback_transport_socket_set_is_writable(envoy_ptr);
   envoy_dynamic_module_callback_transport_socket_flush_write_buffer(envoy_ptr);
 
   envoy_dynamic_module_type_envoy_buffer address{nullptr, 0};
@@ -559,8 +576,31 @@ TEST_F(DynamicModuleTransportSocketTest, BufferCallbacksWithoutActiveBufferAreNo
   envoy_dynamic_module_callback_transport_socket_write_buffer_get_slices(envoy_ptr, nullptr,
                                                                          &slices_count);
   EXPECT_EQ(0, slices_count);
+  EXPECT_EQ(0, envoy_dynamic_module_callback_transport_socket_write_buffer_length(envoy_ptr));
 }
 
+TEST_F(DynamicModuleTransportSocketTest, GetFdReturnsNativeDescriptor) {
+  auto socket = createSocket("passthrough");
+  auto* envoy_ptr = static_cast<DynamicModuleTransportSocket*>(socket.get());
+  EXPECT_CALL(io_handle_, fdDoNotUse()).WillOnce(testing::Return(42));
+  EXPECT_EQ(42, envoy_dynamic_module_callback_transport_socket_get_fd(envoy_ptr));
+}
+
+TEST_F(DynamicModuleTransportSocketTest, SetIsWritableActivatesWriteEvent) {
+  auto socket = createSocket("passthrough");
+  auto* envoy_ptr = static_cast<DynamicModuleTransportSocket*>(socket.get());
+  EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Write));
+  envoy_dynamic_module_callback_transport_socket_set_is_writable(envoy_ptr);
+}
+
+TEST_F(DynamicModuleTransportSocketTest, OnConnectedRecordsFailureWhenFdUnavailable) {
+  auto socket = createSocket("passthrough");
+  // The reference module records a failure when the socket descriptor is unavailable.
+  EXPECT_CALL(io_handle_, fdDoNotUse()).WillOnce(testing::Return(-1));
+  EXPECT_CALL(callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
+  socket->onConnected();
+  EXPECT_EQ("missing socket fd", socket->failureReason());
+}
 } // namespace
 } // namespace DynamicModules
 } // namespace TransportSockets

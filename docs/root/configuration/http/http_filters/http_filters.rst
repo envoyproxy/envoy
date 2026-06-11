@@ -34,6 +34,7 @@ HTTP filters
   fault_filter
   file_server_filter
   file_system_buffer_filter
+  filter_chain_filter
   gcp_authn_filter
   geoip_filter
   golang_filter
