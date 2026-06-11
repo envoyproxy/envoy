@@ -70,15 +70,6 @@ using HostMap = absl::node_hash_map<std::string, IpList>;
 // Map from hostname to CNAME
 using CNameMap = absl::node_hash_map<std::string, std::string>;
 
-bool setQcacheMaxTtl(
-    envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig& config,
-    uint32_t value) {
-  auto qcache_max_ttl = std::make_unique<Protobuf::UInt32Value>();
-  qcache_max_ttl->set_value(value);
-  config.set_allocated_qcache_max_ttl(qcache_max_ttl.release());
-  return true;
-}
-
 class TestDnsServerQuery {
 public:
   TestDnsServerQuery(ConnectionPtr connection, const HostMap& hosts_a, const HostMap& hosts_aaaa,
@@ -453,7 +444,7 @@ protected:
   envoy::config::core::v3::TypedExtensionConfig getCaresDnsResolverConfig(uint32_t qcache_max_ttl) {
     envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
     cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
-    setQcacheMaxTtl(cares, qcache_max_ttl);
+    cares.mutable_qcache_max_ttl()->set_value(qcache_max_ttl);
 
     envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
     typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
