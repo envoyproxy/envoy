@@ -11,8 +11,9 @@ envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program
 }
 
 envoy_dynamic_module_type_formatter_config_module_ptr
-envoy_dynamic_module_on_formatter_config_new(envoy_dynamic_module_type_envoy_buffer name,
-                                             envoy_dynamic_module_type_envoy_buffer config) {
+envoy_dynamic_module_on_formatter_config_new(
+    envoy_dynamic_module_type_formatter_config_envoy_ptr formatter_config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config) {
   // Return nullptr to simulate initialization failure.
   return NULL;
 }
@@ -33,7 +34,7 @@ void envoy_dynamic_module_on_formatter_provider_destroy(
 
 bool envoy_dynamic_module_on_formatter_format(
     envoy_dynamic_module_type_formatter_provider_module_ptr provider_module_ptr,
-    envoy_dynamic_module_type_formatter_envoy_ptr formatter_envoy_ptr,
+    envoy_dynamic_module_type_formatter_context_envoy_ptr formatter_context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer* result) {
   return false;
 }

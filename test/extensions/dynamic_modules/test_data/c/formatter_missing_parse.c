@@ -8,8 +8,9 @@ envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program
 }
 
 envoy_dynamic_module_type_formatter_config_module_ptr
-envoy_dynamic_module_on_formatter_config_new(envoy_dynamic_module_type_envoy_buffer name,
-                                             envoy_dynamic_module_type_envoy_buffer config) {
+envoy_dynamic_module_on_formatter_config_new(
+    envoy_dynamic_module_type_formatter_config_envoy_ptr formatter_config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config) {
   static int config_dummy = 0;
   return &config_dummy;
 }

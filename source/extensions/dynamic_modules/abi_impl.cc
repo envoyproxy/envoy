@@ -2623,21 +2623,22 @@ envoy_dynamic_module_callback_access_logger_set_gauge(
 
 __attribute__((weak)) envoy_dynamic_module_type_access_log_type
 envoy_dynamic_module_callback_formatter_get_access_log_type(
-    envoy_dynamic_module_type_formatter_envoy_ptr) {
+    envoy_dynamic_module_type_formatter_context_envoy_ptr) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_formatter_get_access_log_type: not implemented in "
                "this context");
   return envoy_dynamic_module_type_access_log_type_NotSet;
 }
 
 __attribute__((weak)) bool envoy_dynamic_module_callback_formatter_get_attribute_bool(
-    envoy_dynamic_module_type_formatter_envoy_ptr, envoy_dynamic_module_type_attribute_id, bool*) {
+    envoy_dynamic_module_type_formatter_context_envoy_ptr, envoy_dynamic_module_type_attribute_id,
+    bool*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_formatter_get_attribute_bool: not implemented in "
                "this context");
   return false;
 }
 
 __attribute__((weak)) bool envoy_dynamic_module_callback_formatter_get_attribute_int(
-    envoy_dynamic_module_type_formatter_envoy_ptr, envoy_dynamic_module_type_attribute_id,
+    envoy_dynamic_module_type_formatter_context_envoy_ptr, envoy_dynamic_module_type_attribute_id,
     uint64_t*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_formatter_get_attribute_int: not implemented in "
                "this context");
@@ -2645,7 +2646,7 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_formatter_get_attribute
 }
 
 __attribute__((weak)) bool envoy_dynamic_module_callback_formatter_get_attribute_string(
-    envoy_dynamic_module_type_formatter_envoy_ptr, envoy_dynamic_module_type_attribute_id,
+    envoy_dynamic_module_type_formatter_context_envoy_ptr, envoy_dynamic_module_type_attribute_id,
     envoy_dynamic_module_type_envoy_buffer*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_formatter_get_attribute_string: not implemented in "
                "this context");
@@ -2653,7 +2654,7 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_formatter_get_attribute
 }
 
 __attribute__((weak)) bool envoy_dynamic_module_callback_formatter_get_dynamic_metadata(
-    envoy_dynamic_module_type_formatter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_formatter_context_envoy_ptr, envoy_dynamic_module_type_module_buffer,
     envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_envoy_buffer*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_formatter_get_dynamic_metadata: not implemented in "
                "this context");
@@ -2661,32 +2662,33 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_formatter_get_dynamic_m
 }
 
 __attribute__((weak)) bool envoy_dynamic_module_callback_formatter_get_header_value(
-    envoy_dynamic_module_type_formatter_envoy_ptr, envoy_dynamic_module_type_http_header_type,
-    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_envoy_buffer*, size_t,
-    size_t*) {
+    envoy_dynamic_module_type_formatter_context_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_envoy_buffer*, size_t, size_t*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_formatter_get_header_value: not implemented in "
                "this context");
   return false;
 }
 
-__attribute__((weak)) bool
-envoy_dynamic_module_callback_formatter_get_headers(envoy_dynamic_module_type_formatter_envoy_ptr,
-                                                    envoy_dynamic_module_type_http_header_type,
-                                                    envoy_dynamic_module_type_envoy_http_header*) {
+__attribute__((weak)) bool envoy_dynamic_module_callback_formatter_get_headers(
+    envoy_dynamic_module_type_formatter_context_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type, envoy_dynamic_module_type_envoy_http_header*) {
   IS_ENVOY_BUG(
       "envoy_dynamic_module_callback_formatter_get_headers: not implemented in this context");
   return false;
 }
 
 __attribute__((weak)) size_t envoy_dynamic_module_callback_formatter_get_headers_size(
-    envoy_dynamic_module_type_formatter_envoy_ptr, envoy_dynamic_module_type_http_header_type) {
+    envoy_dynamic_module_type_formatter_context_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_formatter_get_headers_size: not implemented in "
                "this context");
   return 0;
 }
 
 __attribute__((weak)) bool envoy_dynamic_module_callback_formatter_get_local_reply_body(
-    envoy_dynamic_module_type_formatter_envoy_ptr, envoy_dynamic_module_type_envoy_buffer*) {
+    envoy_dynamic_module_type_formatter_context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_formatter_get_local_reply_body: not implemented in "
                "this context");
   return false;

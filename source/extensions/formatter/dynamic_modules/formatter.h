@@ -116,9 +116,9 @@ private:
 };
 
 /**
- * Per-format context passed to the module as the formatter_envoy_ptr. It bundles the formatting
- * context and stream info so the formatter callbacks can read request and response state. Valid
- * only for the duration of a single format call.
+ * Per-format context passed to the module as the formatter_context_envoy_ptr. It bundles the
+ * formatting context and stream info so the formatter callbacks can read request and response
+ * state. Valid only for the duration of a single format call.
  */
 struct FormatterContext {
   const ::Envoy::Formatter::Context* context;

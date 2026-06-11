@@ -59,7 +59,8 @@ newDynamicModuleFormatterConfig(absl::string_view formatter_name,
                                                      .length = config->formatter_name_.size()};
   envoy_dynamic_module_type_envoy_buffer config_buf = {.ptr = config->formatter_config_.data(),
                                                        .length = config->formatter_config_.size()};
-  config->in_module_config_ = (*on_config_new.value())(name_buf, config_buf);
+  config->in_module_config_ =
+      (*on_config_new.value())(static_cast<void*>(config.get()), name_buf, config_buf);
 
   if (config->in_module_config_ == nullptr) {
     return absl::InvalidArgumentError("Failed to initialize dynamic module formatter config");

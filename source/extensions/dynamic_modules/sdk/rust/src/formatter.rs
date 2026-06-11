@@ -324,6 +324,7 @@ thread_local! {
 /// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_formatter_config_new(
+  _formatter_config_envoy_ptr: abi::envoy_dynamic_module_type_formatter_config_envoy_ptr,
   name: abi::envoy_dynamic_module_type_envoy_buffer,
   config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> *const c_void {
@@ -442,12 +443,12 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_formatter_provider_destroy(
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_formatter_format(
   provider_ptr: *const c_void,
-  formatter_envoy_ptr: *mut c_void,
+  formatter_context_envoy_ptr: *mut c_void,
   result: *mut abi::envoy_dynamic_module_type_module_buffer,
 ) -> bool {
   catch_unwind(AssertUnwindSafe(|| {
     let provider = &*(provider_ptr as *const Box<dyn FormatterProvider>);
-    let ctx = FormatterContext::new(formatter_envoy_ptr);
+    let ctx = FormatterContext::new(formatter_context_envoy_ptr);
     match provider.format(&ctx) {
       Some(value) => {
         FORMAT_BUFFER.with(|cell| {
