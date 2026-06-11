@@ -119,7 +119,7 @@ pub enum HostSelectionResult {
   NoHost,
   /// The module needs to perform async work (e.g., DNS resolution) before selecting a host.
   /// The module must eventually call
-  /// [`EnvoyAsyncHostSelectionComplete::async_host_selection_complete`] to deliver the result,
+  /// [`EnvoyAsyncHostSelectionComplete::complete`] to deliver the result,
   /// unless [`AsyncHostSelectionHandle::cancel`] is called first.
   AsyncPending(Box<dyn AsyncHostSelectionHandle>),
 }
@@ -139,34 +139,21 @@ pub trait AsyncHostSelectionHandle: Send {
 ///
 /// This is passed to [`ClusterLb::choose_host`] and must be stored by the module when returning
 /// [`HostSelectionResult::AsyncPending`]. The module calls
-/// [`EnvoyAsyncHostSelectionComplete::async_host_selection_complete`] to deliver the async result.
+/// [`EnvoyAsyncHostSelectionComplete::complete`] to deliver the async result.
 #[automock]
 pub trait EnvoyAsyncHostSelectionComplete: Send {
-  /// Deliver the result of an asynchronous host selection.
-  ///
-  /// `host` is the selected host pointer, or `None` if host selection failed.
-  /// `details` is an optional description of the resolution outcome (e.g., error reason).
-  fn async_host_selection_complete(
-    &self,
+  /// Delivers the async host selection result and consumes the completion. `host` is the selected
+  /// host, or `None` on failure; `details` describes the outcome. Taking `self` by value means the
+  /// context borrowed via `request_context` cannot be read after the result is delivered.
+  fn complete(
+    self: Box<Self>,
     host: Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>,
     details: &str,
   );
 
-  /// Access the request context again after the asynchronous work resumes.
-  ///
-  /// When [`ClusterLb::choose_host`] returns [`HostSelectionResult::AsyncPending`], Envoy does not
-  /// re-present the [`ClusterLbContext`] when the asynchronous task completes, so a module that
-  /// needs per-request inputs (filter state, headers, hash key, override host) to make its final
-  /// selection has nothing to read. The completion object retains the Envoy-owned context pointer,
-  /// which stays valid until the result is delivered via
-  /// [`EnvoyAsyncHostSelectionComplete::async_host_selection_complete`]; this returns the same
-  /// context the synchronous call would have seen, or `None` if the request had no context (the
-  /// same cases where `choose_host` receives `None`, e.g. health-check selections).
-  ///
-  /// The returned context borrows Envoy-owned per-request state. It must be used on the worker
-  /// thread that drives the completion and must not be retained past the
-  /// `async_host_selection_complete` call that delivers the result.
-  fn request_context(&self) -> Option<Box<dyn ClusterLbContext>>;
+  /// The request context `choose_host` received, or `None` when there was none (e.g. health-check
+  /// selections). Borrows the completion, so the view cannot outlive it or survive `complete`.
+  fn request_context<'a>(&'a self) -> Option<Box<dyn ClusterLbContext + 'a>>;
 }
 
 /// The module-side load balancer instance.
@@ -182,7 +169,7 @@ pub trait ClusterLb: Send {
   ///
   /// The `async_completion` callback must be used when returning
   /// [`HostSelectionResult::AsyncPending`]. The module stores it and later calls
-  /// [`EnvoyAsyncHostSelectionComplete::async_host_selection_complete`] to deliver the result.
+  /// [`EnvoyAsyncHostSelectionComplete::complete`] to deliver the result.
   /// For synchronous results, `async_completion` can be ignored.
   fn choose_host(
     &mut self,
@@ -1792,8 +1779,8 @@ struct EnvoyAsyncHostSelectionCompleteImpl {
 unsafe impl Send for EnvoyAsyncHostSelectionCompleteImpl {}
 
 impl EnvoyAsyncHostSelectionComplete for EnvoyAsyncHostSelectionCompleteImpl {
-  fn async_host_selection_complete(
-    &self,
+  fn complete(
+    self: Box<Self>,
     host: Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>,
     details: &str,
   ) {
@@ -1808,7 +1795,7 @@ impl EnvoyAsyncHostSelectionComplete for EnvoyAsyncHostSelectionCompleteImpl {
     }
   }
 
-  fn request_context(&self) -> Option<Box<dyn ClusterLbContext>> {
+  fn request_context(&self) -> Option<Box<dyn ClusterLbContext + '_>> {
     // A null context pointer mirrors choose_host's `None` (e.g. health-check selections).
     if self.raw_context.is_null() {
       return None;

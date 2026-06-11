@@ -5192,36 +5192,36 @@ fn test_cluster_lb_context_full_workflow() {
 fn test_async_host_selection_complete_with_host() {
   let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
   mock_completion
-    .expect_async_host_selection_complete()
+    .expect_complete()
     .withf(|host, details| host.is_some() && details == "resolved")
     .times(1)
     .returning(|_, _| ());
 
-  mock_completion.async_host_selection_complete(Some(0x1234 as *mut _), "resolved");
+  Box::new(mock_completion).complete(Some(0x1234 as *mut _), "resolved");
 }
 
 #[test]
 fn test_async_host_selection_complete_no_host() {
   let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
   mock_completion
-    .expect_async_host_selection_complete()
+    .expect_complete()
     .withf(|host, details| host.is_none() && details == "dns_failure")
     .times(1)
     .returning(|_, _| ());
 
-  mock_completion.async_host_selection_complete(None, "dns_failure");
+  Box::new(mock_completion).complete(None, "dns_failure");
 }
 
 #[test]
 fn test_async_host_selection_complete_empty_details() {
   let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
   mock_completion
-    .expect_async_host_selection_complete()
+    .expect_complete()
     .withf(|host, details| host.is_none() && details.is_empty())
     .times(1)
     .returning(|_, _| ());
 
-  mock_completion.async_host_selection_complete(None, "");
+  Box::new(mock_completion).complete(None, "");
 }
 
 #[test]
@@ -5232,7 +5232,7 @@ fn test_async_host_selection_request_context() {
     let mut ctx = cluster::MockClusterLbContext::new();
     ctx.expect_compute_hash_key().returning(|| Some(4242));
     ctx.expect_get_downstream_headers_size().returning(|| 3);
-    Some(Box::new(ctx))
+    Some(Box::new(ctx) as Box<dyn cluster::ClusterLbContext>)
   });
 
   let ctx = mock_completion
@@ -5272,7 +5272,7 @@ fn test_async_host_selection_with_stored_completion() {
 
   let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
   mock_completion
-    .expect_async_host_selection_complete()
+    .expect_complete()
     .withf(|host, details| host == &Some(0xBEEF as *mut _) && details == "dns_resolved")
     .times(1)
     .returning(|_, _| ());
@@ -5288,7 +5288,7 @@ fn test_async_host_selection_with_stored_completion() {
 
   // Simulate async DNS resolution completing.
   let completion = lb.pending_completion.take().unwrap();
-  completion.async_host_selection_complete(Some(0xBEEF as *mut _), "dns_resolved");
+  completion.complete(Some(0xBEEF as *mut _), "dns_resolved");
 }
 
 #[test]
