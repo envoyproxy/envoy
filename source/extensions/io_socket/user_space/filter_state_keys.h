@@ -9,8 +9,7 @@ namespace UserSpace {
 
 // Key under which the originating connection ID is stored in the upstream
 // filter state.
-constexpr absl::string_view ConnectionIdFilterStateKey =
-    "envoy.io_socket.user_space.connection_id";
+constexpr absl::string_view ConnectionIdFilterStateKey = "envoy.io_socket.user_space.connection_id";
 
 } // namespace UserSpace
 } // namespace IoSocket

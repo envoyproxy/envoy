@@ -371,9 +371,9 @@ Api::SysCallIntResult IoHandleImpl::shutdown(int how) {
   return {0, 0};
 }
 
-void PassthroughStateImpl::initialize(
-    std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
-    const StreamInfo::FilterState::Objects& filter_state_objects, uint64_t connection_id) {
+void PassthroughStateImpl::initialize(std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
+                                      const StreamInfo::FilterState::Objects& filter_state_objects,
+                                      uint64_t connection_id) {
   ASSERT(state_ == State::Created);
   metadata_ = std::move(metadata);
   filter_state_objects_ = filter_state_objects;
