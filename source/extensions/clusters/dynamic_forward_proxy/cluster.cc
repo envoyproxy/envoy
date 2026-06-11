@@ -82,7 +82,12 @@ Cluster::Cluster(
       sub_cluster_ttl_(
           PROTOBUF_GET_MS_OR_DEFAULT(config.sub_clusters_config(), sub_cluster_ttl, 300000)),
       sub_cluster_lb_policy_(config.sub_clusters_config().lb_policy()),
-      enable_sub_cluster_(config.has_sub_clusters_config()) {
+      enable_sub_cluster_(config.has_sub_clusters_config()),
+      sub_cluster_dns_config_(
+          config.has_sub_clusters_config() &&
+                  config.sub_clusters_config().has_dns_cluster_config()
+              ? absl::make_optional(config.sub_clusters_config().dns_cluster_config())
+              : absl::nullopt) {
 
   if (enable_sub_cluster_) {
     idle_timer_ = main_thread_dispatcher_.createTimer([this]() { checkIdleSubCluster(); });
@@ -176,12 +181,22 @@ Cluster::createSubClusterConfig(const std::string& cluster_name, const std::stri
   // Inherit configuration from the parent DFP cluster.
   envoy::config::cluster::v3::Cluster config = orig_cluster_config_;
 
-  // Overwrite the type.
+  // Overwrite the name and lb policy.
   config.set_name(cluster_name);
-  config.clear_cluster_type();
   config.set_lb_policy(sub_cluster_lb_policy_);
-  config.set_type(
-      envoy::config::cluster::v3::Cluster_DiscoveryType::Cluster_DiscoveryType_STRICT_DNS);
+
+  if (sub_cluster_dns_config_.has_value()) {
+    // Use the DnsCluster extension for full DNS configuration. all_addresses_in_single_endpoint
+    // is forced to false to preserve strict-DNS semantics (each IP is a separate endpoint).
+    auto dns_config = sub_cluster_dns_config_.value();
+    dns_config.set_all_addresses_in_single_endpoint(false);
+    config.mutable_cluster_type()->set_name("envoy.cluster.dns");
+    config.mutable_cluster_type()->mutable_typed_config()->PackFrom(dns_config);
+  } else {
+    config.clear_cluster_type();
+    config.set_type(
+        envoy::config::cluster::v3::Cluster_DiscoveryType::Cluster_DiscoveryType_STRICT_DNS);
+  }
 
   // Set endpoint.
   auto load_assignments = config.mutable_load_assignment();
