@@ -20,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // The ``[#not-implemented-hide:]`` annotation above suppresses docs
 // generation for this file so protodoc does not try to look the extension
 // up in extensions_metadata.yaml (which has been removed in lockstep with
-// the contrib_build_config.bzl entry). Drop the annotation when the
+// the ``contrib_build_config.bzl`` entry). Drop the annotation when the
 // upstream ``@dlb`` mirror is healthy again.
 
 // The Dlb is a hardware managed system of queues and arbiters connecting producers and consumers. It is a PCIE device
