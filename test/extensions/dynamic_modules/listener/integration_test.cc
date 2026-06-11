@@ -62,6 +62,12 @@ INSTANTIATE_TEST_SUITE_P(SdkLanguages, DynamicModulesListenerSdkIntegrationTest,
 TEST_P(DynamicModulesListenerSdkIntegrationTest, WriteToSocket) {
   initializeFilter("write_to_socket");
 
+  // The config factory emits a counter directly from the config context, exercising config-scoped
+  // metric emission. Only the Rust and Go SDKs expose config-handle metrics; the C++ SDK does not.
+  if (GetParam() != "cpp") {
+    test_server_->waitForCounter("dynamicmodulescustom.config_total", testing::Ge(1));
+  }
+
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(tcp_client->write("ping"));
   tcp_client->waitForData("ping");

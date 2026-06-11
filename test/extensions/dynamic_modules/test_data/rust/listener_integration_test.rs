@@ -10,12 +10,20 @@ fn init() -> bool {
 /// This implements the [`envoy_proxy_dynamic_modules_rust_sdk::NewListenerFilterConfigFunction`]
 /// signature.
 fn new_listener_filter_config_fn<EC: EnvoyListenerFilterConfig, ELF: EnvoyListenerFilter>(
-  _envoy_filter_config: &mut EC,
+  envoy_filter_config: &mut EC,
   name: &str,
   _config: &[u8],
 ) -> Option<Box<dyn ListenerFilterConfig<ELF>>> {
   match name {
-    "write_to_socket" => Some(Box::new(WriteToSocketFilterConfig)),
+    "write_to_socket" => {
+      // Emit a metric directly from the config context (no per-connection filter), exercising the
+      // config-scoped emission path. This would typically be done from a scheduled background task.
+      let config_total = envoy_filter_config.define_counter("config_total").unwrap();
+      envoy_filter_config
+        .increment_counter(config_total, 1)
+        .unwrap();
+      Some(Box::new(WriteToSocketFilterConfig))
+    },
     "buffer_read" => Some(Box::new(BufferReadFilterConfig)),
     _ => panic!("unknown filter name: {name}"),
   }
