@@ -545,6 +545,13 @@ TEST_F(DynamicModuleHttpFilterTest, AddCustomFlag) {
   envoy_dynamic_module_callback_http_add_custom_flag(filter_.get(), {flag.data(), flag.size()});
 }
 
+TEST_F(DynamicModuleHttpFilterTest, AddCustomFlagWithoutCallbacksNoop) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  absl::string_view flag = "XXX";
+  envoy_dynamic_module_callback_http_add_custom_flag(&filter, {flag.data(), flag.size()});
+}
+
 // =============================================================================
 // Tests for HTTP filter socket options.
 // =============================================================================
@@ -2060,6 +2067,12 @@ TEST(ABIImpl, ClearRouteCache) {
   EXPECT_CALL(downstream_callbacks, clearRouteCache());
   EXPECT_CALL(callbacks, downstreamCallbacks())
       .WillOnce(testing::Return(OptRef(downstream_callbacks)));
+  envoy_dynamic_module_callback_http_clear_route_cache(&filter);
+}
+
+TEST(ABIImpl, ClearRouteCacheWithoutCallbacksNoop) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   envoy_dynamic_module_callback_http_clear_route_cache(&filter);
 }
 
