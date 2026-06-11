@@ -278,14 +278,14 @@ public:
   }
 
   static std::string
-  ExtProcHttpTestParamsToString(const ::testing::TestParamInfo<ExtProcHttpTestParams>& params) {
+  extProcHttpTestParamsToString(const ::testing::TestParamInfo<ExtProcHttpTestParams>& params) {
     return absl::StrCat(
         (params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
         (params.param.downstream_protocol == Http::CodecType::HTTP1 ? "HTTP1_DS_" : "HTTP2_DS_"),
         (params.param.upstream_protocol == Http::CodecType::HTTP1 ? "HTTP1_US" : "HTTP2_US"));
   }
 
-  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_;
   std::vector<FakeUpstream*> http_side_upstreams_;
   FakeHttpConnectionPtr processor_connection_;
   FakeStreamPtr processor_stream_;
@@ -296,7 +296,7 @@ public:
 INSTANTIATE_TEST_SUITE_P(
     Protocols, ExtProcHttpClientIntegrationTest,
     testing::ValuesIn(ExtProcHttpClientIntegrationTest::getValuesForExtProcHttpTest()),
-    ExtProcHttpClientIntegrationTest::ExtProcHttpTestParamsToString);
+    ExtProcHttpClientIntegrationTest::extProcHttpTestParamsToString);
 
 // Side stream server does not mutate the request header.
 TEST_P(ExtProcHttpClientIntegrationTest, ServerNoRequestHeaderMutation) {

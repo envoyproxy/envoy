@@ -276,7 +276,7 @@ public:
                       typed_config:
                         name: local-reply-during-encode
                         typed_config:
-                          "@type": type.googleapis.com/google.protobuf.Struct
+                          "@type": type.googleapis.com/test.integration.filters.LocalReplyDuringEncodeConfig
 )EOF";
     config_helper_.prependFilter(
         buildCompositeFilterConfig(name, use_inline_matcher_, matcher_yaml), downstream_filter_);
@@ -908,7 +908,7 @@ public:
                         typed_config:
                           - name: add-header-filter
                             typed_config:
-                              "@type": type.googleapis.com/google.protobuf.Struct
+                              "@type": type.googleapis.com/test.integration.filters.AddHeaderEmptyFilterConfig
                           - name: set-response-code
                             typed_config:
                               "@type": type.googleapis.com/test.integration.filters.%s
@@ -1070,7 +1070,7 @@ public:
             typed_config:
               - name: add-header-filter
                 typed_config:
-                  "@type": type.googleapis.com/google.protobuf.Struct
+                  "@type": type.googleapis.com/test.integration.filters.AddHeaderEmptyFilterConfig
               - name: set-response-code
                 typed_config:
                   "@type": type.googleapis.com/test.integration.filters.%s
@@ -1093,7 +1093,7 @@ public:
                 typed_config:
                   - name: add-header-filter
                     typed_config:
-                      "@type": type.googleapis.com/google.protobuf.Struct
+                      "@type": type.googleapis.com/test.integration.filters.AddHeaderEmptyFilterConfig
                   - name: set-response-code
                     typed_config:
                       "@type": type.googleapis.com/test.integration.filters.%s
@@ -1140,7 +1140,7 @@ public:
             typed_config:
               - name: add-header-filter
                 typed_config:
-                  "@type": type.googleapis.com/google.protobuf.Struct
+                  "@type": type.googleapis.com/test.integration.filters.AddHeaderEmptyFilterConfig
               - name: set-response-code
                 typed_config:
                   "@type": type.googleapis.com/test.integration.filters.%s
@@ -1169,7 +1169,7 @@ public:
                 typed_config:
                   - name: add-header-filter
                     typed_config:
-                      "@type": type.googleapis.com/google.protobuf.Struct
+                      "@type": type.googleapis.com/test.integration.filters.AddHeaderEmptyFilterConfig
                   - name: set-response-code
                     typed_config:
                       "@type": type.googleapis.com/test.integration.filters.%s

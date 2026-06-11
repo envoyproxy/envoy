@@ -721,7 +721,8 @@ TEST_F(ZipkinTracerTest, TimestampTraceIds) {
 
   // Test with timestamp_trace_ids enabled
   Tracer tracer("my_service_name", addr, random_generator, false, true, time_system_, false, true);
-  SystemTime timestamp = time_system_.systemTime();
+  const SystemTime timestamp{std::chrono::seconds(1234567890)};
+  time_system_.setSystemTime(timestamp);
 
   NiceMock<Tracing::MockConfig> config;
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
@@ -738,12 +739,8 @@ TEST_F(ZipkinTracerTest, TimestampTraceIds) {
   uint32_t extracted_timestamp = static_cast<uint32_t>(trace_id >> 32);
   uint32_t extracted_random = static_cast<uint32_t>(trace_id & 0xFFFFFFFF);
 
-  // Verify timestamp is approximately correct (within 1 second)
-  uint32_t expected_timestamp =
-      static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::seconds>(
-                                time_system_.monotonicTime().time_since_epoch())
-                                .count());
-  EXPECT_LE(std::abs(static_cast<int32_t>(extracted_timestamp - expected_timestamp)), 1);
+  // Verify timestamp matches the provided span start timestamp.
+  EXPECT_EQ(1234567890U, extracted_timestamp);
 
   // Verify random part matches what we mocked
   EXPECT_EQ(0x12345678U, extracted_random);
@@ -757,7 +754,8 @@ TEST_F(ZipkinTracerTest, TimestampTraceIds128bit) {
 
   // Test with timestamp_trace_ids enabled and 128-bit trace IDs
   Tracer tracer("my_service_name", addr, random_generator, true, true, time_system_, false, true);
-  SystemTime timestamp = time_system_.systemTime();
+  const SystemTime timestamp{std::chrono::seconds(1234567890)};
+  time_system_.setSystemTime(timestamp);
 
   NiceMock<Tracing::MockConfig> config;
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
@@ -781,13 +779,8 @@ TEST_F(ZipkinTracerTest, TimestampTraceIds128bit) {
 
   uint32_t extracted_timestamp_high = static_cast<uint32_t>(trace_id_high >> 32);
 
-  uint32_t expected_timestamp =
-      static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::seconds>(
-                                time_system_.monotonicTime().time_since_epoch())
-                                .count());
-
   // High part should have the timestamp prefix
-  EXPECT_LE(std::abs(static_cast<int32_t>(extracted_timestamp_high - expected_timestamp)), 1);
+  EXPECT_EQ(1234567890U, extracted_timestamp_high);
 }
 
 // Back-compat: when timestamping is disabled, trace id == span id for root spans (64-bit)

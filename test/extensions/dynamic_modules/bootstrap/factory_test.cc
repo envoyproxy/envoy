@@ -3,7 +3,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/bootstrap/dynamic_modules/factory.h"
 
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -84,6 +84,34 @@ TEST_F(FactoryTestBase, InvalidExtensionConfig) {
                           "Failed to parse extension config:.*");
 
   TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
+}
+
+TEST_F(FactoryTestBase, LocalFileLoading) {
+  // Load the module via the ``module.local.filename`` data source instead of by name.
+  DynamicModuleBootstrapExtensionFactory factory;
+
+  envoy::extensions::bootstrap::dynamic_modules::v3::DynamicModuleBootstrapExtension proto_config;
+  proto_config.mutable_dynamic_module_config()->mutable_module()->mutable_local()->set_filename(
+      testDataDir() + "/libbootstrap_no_op.so");
+  proto_config.set_extension_name("test");
+
+  auto extension = factory.createBootstrapExtension(proto_config, context_);
+  EXPECT_NE(extension, nullptr);
+}
+
+TEST_F(FactoryTestBase, RemoteSourceRejected) {
+  // Remote module sources are not supported for bootstrap extensions (no init manager is wired up).
+  DynamicModuleBootstrapExtensionFactory factory;
+
+  envoy::extensions::bootstrap::dynamic_modules::v3::DynamicModuleBootstrapExtension proto_config;
+  auto* remote = proto_config.mutable_dynamic_module_config()->mutable_module()->mutable_remote();
+  remote->mutable_http_uri()->set_uri("https://example.com/module.so");
+  remote->mutable_http_uri()->set_cluster("cluster_1");
+  remote->mutable_http_uri()->mutable_timeout()->set_seconds(5);
+  remote->set_sha256("abc123");
+  proto_config.set_extension_name("test");
+
+  EXPECT_THROW(factory.createBootstrapExtension(proto_config, context_), EnvoyException);
 }
 
 } // namespace DynamicModules

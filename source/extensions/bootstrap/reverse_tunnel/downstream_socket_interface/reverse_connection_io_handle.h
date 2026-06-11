@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/io_handle.h"
 #include "envoy/network/socket.h"
@@ -369,6 +370,21 @@ private:
   bool initiateOneReverseConnection(const std::string& cluster_name,
                                     const std::string& host_address,
                                     Upstream::HostConstSharedPtr host);
+
+  /**
+   * Emit an access log entry for a reverse tunnel lifecycle event.
+   * Creates an ephemeral StreamInfo populated with dynamic metadata containing
+   * reverse tunnel identifiers and event details.
+   * @param event the lifecycle event name (e.g., "handshake_success", "handshake_failure",
+   *        "connection_closed")
+   * @param host_address the address of the remote host
+   * @param cluster_name the name of the upstream cluster
+   * @param connection_key the unique key identifying the connection
+   * @param error_message the error message (empty on success)
+   */
+  void emitAccessLog(const std::string& event, const std::string& host_address,
+                     const std::string& cluster_name, const std::string& connection_key,
+                     const std::string& error_message);
 
   /**
    * Clean up all reverse connection resources.

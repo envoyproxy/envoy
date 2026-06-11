@@ -25,7 +25,7 @@ public:
         subset_config_, cluster_info_, params.priority_set, params.local_priority_set,
         cluster_info_.lbStats(), cluster_info_.statsScope(), runtime_, random_, time_source_);
   }
-  bool recreateOnHostChange() const override { return false; }
+  bool recreateOnHostChangeDeprecated() const override { return false; }
 
 private:
   const Upstream::SubsetLoadBalancerConfig& subset_config_;

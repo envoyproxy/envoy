@@ -35,6 +35,7 @@ struct DynamicModuleThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBa
     Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams params) override {
       return std::make_unique<DynamicModuleLoadBalancer>(handle_, params.priority_set);
     }
+    bool recreateOnHostChangeDeprecated() const override { return false; }
 
     DynamicModuleClusterHandleSharedPtr handle_;
   };
@@ -95,6 +96,16 @@ absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>> DynamicModuleCluster
   auto on_scheduled = config->dynamic_module_->getFunctionPointer<OnClusterScheduledType>(
       "envoy_dynamic_module_on_cluster_scheduled");
   config->on_cluster_scheduled_ = on_scheduled.ok() ? on_scheduled.value() : nullptr;
+
+  auto on_worker_event = config->dynamic_module_->getFunctionPointer<OnClusterWorkerEventType>(
+      "envoy_dynamic_module_on_cluster_worker_event");
+  config->on_cluster_worker_event_ = on_worker_event.ok() ? on_worker_event.value() : nullptr;
+
+  auto on_worker_slot_destroy =
+      config->dynamic_module_->getFunctionPointer<OnClusterWorkerSlotDataDestroyType>(
+          "envoy_dynamic_module_on_cluster_worker_slot_data_destroy");
+  config->on_cluster_worker_slot_data_destroy_ =
+      on_worker_slot_destroy.ok() ? on_worker_slot_destroy.value() : nullptr;
 
   // Lifecycle hooks are optional. Modules that don't need them don't need to implement them.
   auto on_server_initialized =
@@ -276,6 +287,79 @@ void DynamicModuleCluster::onScheduled(uint64_t event_id) {
   if (in_module_cluster_ != nullptr && config_->on_cluster_scheduled_ != nullptr) {
     config_->on_cluster_scheduled_(this, in_module_cluster_, event_id);
   }
+}
+
+void DynamicModuleCluster::ensureWorkerSlot() {
+  ASSERT(dispatcher_.isThreadSafe(),
+         "DynamicModuleCluster::ensureWorkerSlot must be called from the main thread");
+  if (worker_slot_ == nullptr) {
+    worker_slot_ =
+        ThreadLocal::TypedSlot<WorkerSlotData>::makeUnique(server_context_.threadLocal());
+    // Seed with a null-payload factory so the slot is in a "set" state before any payload is
+    // published.
+    worker_slot_->set(
+        [](Event::Dispatcher&) -> std::shared_ptr<WorkerSlotData> { return nullptr; });
+  }
+}
+
+void DynamicModuleCluster::runOnAllWorkers(uint64_t event_id) {
+  ASSERT(dispatcher_.isThreadSafe(),
+         "envoy_dynamic_module_callback_cluster_run_on_all_workers must be called from the main "
+         "thread");
+  if (config_->on_cluster_worker_event_ == nullptr) {
+    // If the module did not export envoy_dynamic_module_on_cluster_worker_event, this call is a
+    // no-op: no slot allocation and no fan-out.
+    return;
+  }
+
+  ensureWorkerSlot();
+
+  // weak_from_this lets workers racing cluster destruction skip safely. The lambda also filters
+  // out the main thread because Envoy's TLS engine fires runOnAllThreads on main too.
+  auto weak_self = weak_from_this();
+  Event::Dispatcher& main_dispatcher = dispatcher_;
+  worker_slot_->runOnAllThreads([weak_self, event_id, &main_dispatcher](OptRef<WorkerSlotData>) {
+    if (main_dispatcher.isThreadSafe()) {
+      return;
+    }
+    auto self = weak_self.lock();
+    if (!self) {
+      return;
+    }
+    if (self->in_module_cluster_ != nullptr && self->config_->on_cluster_worker_event_ != nullptr) {
+      self->config_->on_cluster_worker_event_(self.get(), self->in_module_cluster_, event_id);
+    }
+  });
+}
+
+void DynamicModuleCluster::workerSlotSet(
+    envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr data_ptr) {
+  ASSERT(dispatcher_.isThreadSafe(),
+         "envoy_dynamic_module_callback_cluster_worker_slot_set must be called from the main "
+         "thread");
+  ensureWorkerSlot();
+
+  // Capture the wrapper by value so every thread observes the same shared_ptr (single-pointer
+  // semantics); the prior wrapper is released when its last reference drops, firing the module's
+  // destroy hook.
+  auto wrapper = std::make_shared<WorkerSlotData>(
+      data_ptr, config_->on_cluster_worker_slot_data_destroy_, config_);
+  worker_slot_->set(
+      [wrapper](Event::Dispatcher&) -> std::shared_ptr<WorkerSlotData> { return wrapper; });
+}
+
+envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr
+DynamicModuleCluster::workerSlotGet() {
+  // Guard against access from threads with no TLS registration: TypedSlot::get on such a thread
+  // would index past the slot vector.
+  if (worker_slot_ == nullptr || !worker_slot_->currentThreadRegistered()) {
+    return nullptr;
+  }
+  OptRef<WorkerSlotData> ref = worker_slot_->get();
+  if (!ref.has_value()) {
+    return nullptr;
+  }
+  return ref->data();
 }
 
 namespace {
@@ -791,19 +875,18 @@ DynamicModuleClusterFactory::createClusterWithConfig(
     cluster_config_bytes = std::move(config_or_error.value());
   }
 
-  // Load the dynamic module.
+  // Load the dynamic module. Dynamic module clusters do not support remote module sources, so no
+  // init manager or async callback is passed; only the synchronous local-file and by-name paths
+  // can succeed here.
   const auto& module_config = proto_config.dynamic_module_config();
-  auto module_or_error = Envoy::Extensions::DynamicModules::newDynamicModuleByName(
-      module_config.name(), module_config.do_not_close(), module_config.load_globally());
-  if (!module_or_error.ok()) {
-    return absl::InvalidArgumentError(fmt::format("Failed to load dynamic module '{}': {}",
-                                                  module_config.name(),
-                                                  module_or_error.status().message()));
-  }
+  auto load_result = Envoy::Extensions::DynamicModules::newDynamicModuleByConfig(
+      module_config, proto_config.cluster_name(), context.serverFactoryContext());
+  RETURN_IF_NOT_OK_REF(load_result.status());
+  auto dynamic_module = std::move(load_result->loaded);
 
   // Create the cluster configuration.
   auto config_or_error = DynamicModuleClusterConfig::create(
-      proto_config.cluster_name(), cluster_config_bytes, std::move(module_or_error.value()),
+      proto_config.cluster_name(), cluster_config_bytes, std::move(dynamic_module),
       context.serverFactoryContext().serverScope());
   if (!config_or_error.ok()) {
     return config_or_error.status();

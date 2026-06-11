@@ -23,12 +23,12 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
     - name: Checkout repository
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
     - name: Set vars
       id: vars
       run: |
         echo "cve-data-path=${{ inputs.cve-data-path }}" > $GITHUB_OUTPUT
-    - uses: envoyproxy/toolshed/actions/gcp/setup@719447d2ab39e226e7bdceb58fd61340821d8473  # actions-v0.4.16
+    - uses: envoyproxy/toolshed/actions/gcp/setup@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       name: Setup GCP
       with:
         key: ${{ secrets.gcs-cve-key }}

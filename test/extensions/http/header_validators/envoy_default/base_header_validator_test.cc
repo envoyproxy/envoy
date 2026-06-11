@@ -15,7 +15,6 @@ namespace EnvoyDefault {
 
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::Protocol;
-using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
 class BaseHeaderValidatorTest : public HeaderValidatorUtils, public testing::Test {
@@ -111,7 +110,7 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderName) {
     setHeaderStringUnvalidated(header_string, name);
 
     auto result = uhv->validateGenericHeaderName(header_string);
-    if (testCharInTable(::Envoy::Http::kGenericHeaderNameCharTable, c)) {
+    if (::Envoy::Http::CharTables::kGenericHeaderName.hasChar(c)) {
       EXPECT_ACCEPT(result);
     } else if (c != '_') {
       EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidNameCharacters);
@@ -148,7 +147,7 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderValue) {
     setHeaderStringUnvalidated(header_string, name);
 
     auto result = uhv->validateGenericHeaderValue(header_string);
-    if (testCharInTable(kGenericHeaderValueCharTable, c)) {
+    if (kGenericHeaderValueCharTable.hasChar(c)) {
       EXPECT_ACCEPT(result);
     } else {
       EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidValueCharacters);

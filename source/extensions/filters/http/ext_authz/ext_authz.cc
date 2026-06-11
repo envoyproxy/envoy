@@ -292,7 +292,6 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     if (!filter_state->hasData<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName())) {
       filter_state->setData(decoder_callbacks_->filterConfigName(),
                             std::make_shared<ExtAuthzLoggingInfo>(config_->filterMetadata()),
-                            Envoy::StreamInfo::FilterState::StateType::Mutable,
                             Envoy::StreamInfo::FilterState::LifeSpan::Request);
 
       // This may return nullptr (if there's a value at this name whose type doesn't match or isn't
@@ -1343,9 +1342,9 @@ void Filter::setShadowFilterState(Filters::Common::ExtAuthz::Response& response)
         response.status_code != zeroHttpCode() ? response.status_code : config_->statusOnError();
     stats_.shadow_error_.inc();
     break;
-  default:
-    IS_ENVOY_BUG("unexpected CheckStatus value in shadow mode");
-    return;
+  default:                                                       // LCOV_EXCL_LINE
+    IS_ENVOY_BUG("unexpected CheckStatus value in shadow mode"); // LCOV_EXCL_LINE
+    return;                                                      // LCOV_EXCL_LINE
   }
 
   auto object = std::make_shared<ShadowDecisionObject>(check_result, status_code,
@@ -1355,7 +1354,7 @@ void Filter::setShadowFilterState(Filters::Common::ExtAuthz::Response& response)
   // already uses the filter's configured name as its FilterState key (with a different lifespan).
   decoder_callbacks_->streamInfo().filterState()->setData(
       absl::StrCat(decoder_callbacks_->filterConfigName(), ".shadow"), std::move(object),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+      StreamInfo::FilterState::LifeSpan::FilterChain);
 }
 
 } // namespace ExtAuthz

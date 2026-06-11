@@ -29,6 +29,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
+#include "openssl/mem.h"
 #include "openssl/rand.h"
 
 using namespace std::chrono_literals;
@@ -41,6 +42,14 @@ namespace Oauth2 {
 namespace {
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     authorization_handle(Http::CustomHeaders::get().Authorization);
+
+// Cryptographically safe HMAC comparison of two string views.
+bool safeStringViewEqual(absl::string_view s1, absl::string_view s2) {
+  if (s1.length() != s2.length()) {
+    return false;
+  }
+  return CRYPTO_memcmp(s1.data(), s2.data(), s1.length()) == 0;
+}
 
 constexpr const char* CookieDeleteFormatString =
     "{}=deleted; path={}; expires=Thu, 01 Jan 1970 00:00:00 GMT";
@@ -275,7 +284,7 @@ bool validateCsrfTokenHmac(const std::string& hmac_secret, const std::string& cs
   std::string token = std::string(csrf_token.substr(0, pos));
   std::string hmac = std::string(csrf_token.substr(pos + 1));
   std::vector<uint8_t> hmac_secret_vec(hmac_secret.begin(), hmac_secret.end());
-  return generateHmacBase64(hmac_secret_vec, token) == hmac;
+  return safeStringViewEqual(generateHmacBase64(hmac_secret_vec, token), hmac);
 }
 
 // Generates a PKCE code verifier with 32 octets of randomness.
@@ -300,6 +309,40 @@ std::string generateCodeChallenge(const std::string& code_verifier) {
       crypto_util.getSha256Digest(Buffer::OwnedImpl(code_verifier));
   std::string sha256_string(sha256_digest.begin(), sha256_digest.end());
   return Base64Url::encode(sha256_string.data(), sha256_string.size());
+}
+
+bool isHostAllowedDomain(absl::string_view host, const std::vector<std::string>& allowed_domains) {
+  if (allowed_domains.empty()) {
+    return true;
+  }
+
+  // The formatted uri must be a parseable absolute URL; otherwise a malformed template
+  Http::Utility::Url uri;
+  if (!uri.initialize(host, false)) {
+    return false;
+  }
+
+  // Strip port and any IPv6 brackets via the shared authority parser so that "example.com:8080",
+  // "[::1]:443" and bare "[::1]" all normalize consistently. For IPv6 literals that are
+  // recognized as IP addresses, parseAuthority returns the host without brackets, so allow-list
+  // entries for IPv6 must also be written without brackets (e.g. "::1", not "[::1]").
+  const absl::string_view hostname = Http::Utility::parseAuthority(uri.hostAndPort()).host_;
+
+  for (const auto& domain : allowed_domains) {
+    if (absl::StartsWith(domain, "*.")) {
+      // Wildcard match: "*.example.com" matches "foo.example.com"
+      absl::string_view suffix = absl::string_view(domain).substr(1);
+      if (absl::EndsWith(hostname, suffix) && hostname.size() > suffix.size()) {
+        return true;
+      }
+    } else {
+      // Exact match
+      if (absl::EqualsIgnoreCase(hostname, domain)) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 /**
@@ -456,6 +499,9 @@ FilterConfig::FilterConfig(
       authorization_query_params_(buildAutorizationQueryParams(proto_config)),
       client_id_(proto_config.credentials().client_id()),
       redirect_uri_(proto_config.redirect_uri()),
+      allowed_redirect_domains_(proto_config.allowed_redirect_domains().begin(),
+                                proto_config.allowed_redirect_domains().end()),
+      original_request_uri_(proto_config.original_request_uri()),
       redirect_matcher_(proto_config.redirect_path_matcher(), context),
       signout_path_(proto_config.signout_path(), context), secret_reader_(secret_reader),
       stats_(FilterConfig::generateStats(stats_prefix, proto_config.stat_prefix(), scope)),
@@ -590,10 +636,12 @@ bool OAuth2CookieValidator::hmacIsValid() const {
   if (!cookie_domain_.empty()) {
     cookie_domain = cookie_domain_;
   }
-  return ((encodeHmacBase64(secret_, cookie_domain, expires_, access_token_, id_token_,
-                            refresh_token_) == hmac_) ||
-          (encodeHmacHexBase64(secret_, cookie_domain, expires_, access_token_, id_token_,
-                               refresh_token_) == hmac_));
+  return (safeStringViewEqual(encodeHmacBase64(secret_, cookie_domain, expires_, access_token_,
+                                               id_token_, refresh_token_),
+                              hmac_) ||
+          safeStringViewEqual(encodeHmacHexBase64(secret_, cookie_domain, expires_, access_token_,
+                                                  id_token_, refresh_token_),
+                              hmac_));
 }
 
 bool OAuth2CookieValidator::timestampIsValid() const {
@@ -961,7 +1009,21 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   if (Http::Utility::schemeIsHttp(headers.getSchemeValue())) {
     scheme = Http::Headers::get().SchemeValues.Http;
   }
-  const std::string base_path = absl::StrCat(scheme, "://", host_);
+
+  auto base_path = absl::StrCat(scheme, "://", host_);
+
+  if (!config_->originalRequestUri().empty()) {
+    Formatter::FormatterPtr base_path_formatter = THROW_OR_RETURN_VALUE(
+        Formatter::FormatterImpl::create(config_->originalRequestUri()), Formatter::FormatterPtr);
+    base_path = base_path_formatter->format({&headers}, decoder_callbacks_->streamInfo());
+  }
+
+  if (!isHostAllowedDomain(base_path, config_->allowedRedirectDomains())) {
+    sendUnauthorizedResponse(fmt::format(
+        "authority or original_request_uri failed domain allow-list validation: {}", base_path));
+    return;
+  }
+
   const std::string original_url = absl::StrCat(base_path, headers.Path()->value().getStringView());
 
   const CookieNames& cookie_names = config_->cookieNames();
@@ -995,9 +1057,17 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   auto query_params = config_->authorizationQueryParams();
   query_params.overwrite(queryParamsState, state);
 
-  Formatter::FormatterPtr formatter = THROW_OR_RETURN_VALUE(
+  // Format redirect_uri — needed for the query param sent to the identity provider
+  Formatter::FormatterPtr redirect_uri_formatter = THROW_OR_RETURN_VALUE(
       Formatter::FormatterImpl::create(config_->redirectUri()), Formatter::FormatterPtr);
-  const auto redirect_uri = formatter->format({&headers}, decoder_callbacks_->streamInfo());
+  const auto redirect_uri =
+      redirect_uri_formatter->format({&headers}, decoder_callbacks_->streamInfo());
+  if (!isHostAllowedDomain(redirect_uri, config_->allowedRedirectDomains())) {
+    sendUnauthorizedResponse(
+        fmt::format("redirect_uri failed domain allow-list validation: {}", redirect_uri));
+    return;
+  }
+
   const std::string escaped_redirect_uri = Http::Utility::PercentEncoding::urlEncode(redirect_uri);
   query_params.overwrite(queryParamsRedirectUri, escaped_redirect_uri);
 
@@ -1609,6 +1679,13 @@ CallbackValidationResult OAuth2Filter::validateState(const Http::RequestHeaderMa
             fmt::format("State url can not be initialized: {}", original_request_url)};
   }
 
+  // Validate the host of the original request URL against allowed redirect domains.
+  if (!isHostAllowedDomain(original_request_url, config_->allowedRedirectDomains())) {
+    return {false, "", "", flow_id,
+            fmt::format("State url host is not in the allowed redirect domains: {}",
+                        original_request_url)};
+  }
+
   return {true, "", original_request_url, flow_id, ""};
 }
 
@@ -1622,7 +1699,7 @@ bool OAuth2Filter::validateCsrfToken(const Http::RequestHeaderMap& headers,
     return false;
   }
 
-  if (cookie_value.value() != csrf_token) {
+  if (!safeStringViewEqual(cookie_value.value(), csrf_token)) {
     return false;
   }
   return validateCsrfTokenHmac(config_->hmacSecret(), csrf_token);

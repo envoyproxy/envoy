@@ -45,12 +45,16 @@ CdsApiHelper::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& adde
       cluster_name = cluster.name();
       if (!cluster_names.insert(cluster.name()).second) {
         // NOTE: at this point, the first of these duplicates has already been successfully applied.
-        exception_msgs.push_back(
-            fmt::format("{}: duplicate cluster {} found", cluster_name, cluster_name));
+        const std::string msg =
+            fmt::format("{}: duplicate cluster {} found", cluster_name, cluster_name);
+        ENVOY_LOG(warn, "cds: cluster '{}' config rejected: {}", cluster_name, msg);
+        exception_msgs.push_back(msg);
         continue;
       }
       auto update_or_error = cm_.addOrUpdateCluster(cluster, resource.get().version());
       if (!update_or_error.status().ok()) {
+        ENVOY_LOG(warn, "cds: cluster '{}' config rejected: {}", cluster_name,
+                  update_or_error.status().message());
         exception_msgs.push_back(
             fmt::format("{}: {}", cluster_name, update_or_error.status().message()));
         continue;
@@ -65,8 +69,10 @@ CdsApiHelper::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& adde
       }
     }
     END_TRY
-    CATCH(const EnvoyException& e,
-          { exception_msgs.push_back(fmt::format("{}: {}", cluster_name, e.what())); });
+    CATCH(const EnvoyException& e, {
+      ENVOY_LOG(warn, "cds: cluster '{}' config rejected: {}", cluster_name, e.what());
+      exception_msgs.push_back(fmt::format("{}: {}", cluster_name, e.what()));
+    });
   }
 
   uint32_t removed = 0;

@@ -1,7 +1,7 @@
 #include "source/common/matcher/actions/string_returning_action.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 
 #include "gtest/gtest.h"
