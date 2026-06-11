@@ -312,7 +312,7 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
       remote_rst_(false), data_deferred_(false), received_noninformational_headers_(false),
       pending_receive_buffer_high_watermark_called_(false),
       pending_send_buffer_high_watermark_called_(false), reset_due_to_messaging_error_(false),
-      extend_stream_lifetime_flag_(false) {
+      extend_stream_lifetime_flag_(false), histograms_recorded_(false) {
   parent_.stats_.streams_active_.inc();
   if (buffer_limit > 0) {
     setWriteBufferWatermarks(buffer_limit);
@@ -992,12 +992,17 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       per_stream_buffer_limit_(http2_options.initial_stream_window_size().value()),
       stream_error_on_invalid_http_messaging_(
           http2_options.override_stream_error_on_invalid_http_message().value()),
+      record_http2_histograms_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_record_histograms")),
       max_cookie_size_bytes_(
           runtime.has_value() ? runtime->snapshot().getInteger(
                                     "envoy.reloadable_features.http2_max_cookies_size_in_kb", 0) *
                                     1024
                               : 0),
-      protocol_constraints_(stats, http2_options), random_(random_generator),
+      protocol_constraints_(stats, http2_options,
+                            Runtime::runtimeFeatureEnabled(
+                                "envoy.reloadable_features.http2_flood_protection_active_streams")),
+      dispatching_(false), raised_goaway_(false), random_(random_generator),
       last_received_data_time_(connection_.dispatcher().timeSource().monotonicTime()) {
   if (http2_options.has_use_oghttp2_codec()) {
     use_oghttp2_library_ = http2_options.use_oghttp2_codec().value();
@@ -1287,6 +1292,7 @@ Status ConnectionImpl::onHeaders(int32_t stream_id, size_t length, uint8_t flags
   stream->bytes_meter_->addHeaderBytesReceived(length + H2_FRAME_HEADER_SIZE);
 
   stream->remote_end_stream_ = flags & FLAG_END_STREAM;
+  recordHistogramsForStream(*stream);
   if (!stream->cookies_.empty()) {
     HeaderString key(Headers::get().Cookie);
     stream->headers().addViaMove(std::move(key), std::move(stream->cookies_));
@@ -1526,6 +1532,8 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
   if (stream) {
     const int32_t stream_id = stream->stream_id_;
 
+    recordHistogramsForStream(*stream);
+
     // Consume buffered on stream_close.
     if (stream->stream_manager_.buffered_on_stream_close_) {
       stream->stream_manager_.buffered_on_stream_close_ = false;
@@ -1607,6 +1615,7 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
       return okStatus();
     }
 
+    protocol_constraints_.decrementActiveStreamCount();
     stream->destroy();
     current_stream_id_.reset();
     // TODO(antoniovicente) Test coverage for onCloseStream before deferred reset handling happens.
@@ -1661,6 +1670,26 @@ int ConnectionImpl::onMetadataFrameComplete(int32_t stream_id, bool end_metadata
 
   bool result = stream->getMetadataDecoder().onMetadataFrameComplete(end_metadata);
   return result ? 0 : ERR_CALLBACK_FAILURE;
+}
+
+// This function can be invoked multiple times for a single stream:
+// - Once in onHeaders() for request/response headers (this is when recording happens).
+// - Again in onHeaders() if there are trailers (ignored, trailers are not recorded).
+// - Once in onStreamClose() as a fallback if headers weren't recorded (e.g. early error),
+//   or as a redundant call for successful streams (ignored).
+// The `histograms_recorded_` guard ensures we only record once (only for headers, not trailers).
+void ConnectionImpl::recordHistogramsForStream(StreamImpl& stream) {
+  if (record_http2_histograms_ && !stream.histograms_recorded_) {
+    uint64_t headers_size = stream.headers().byteSize();
+    uint64_t headers_count = stream.headers().size();
+    uint64_t headers_with_cookies_size = headers_size + stream.cookies_.size();
+    uint64_t headers_with_cookies_count = headers_count + stream.cookie_count_;
+    stats_.header_list_size_.recordValue(headers_with_cookies_size);
+    stats_.cookie_size_.recordValue(stream.cookies_.size());
+    stats_.header_count_.recordValue(headers_with_cookies_count);
+    stats_.cookie_count_.recordValue(stream.cookie_count_);
+    stream.histograms_recorded_ = true;
+  }
 }
 
 int ConnectionImpl::saveHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) {

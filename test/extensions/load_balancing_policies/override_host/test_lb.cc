@@ -86,6 +86,8 @@ private:
     LoadBalancerPtr create(LoadBalancerParams params) override {
       return std::make_unique<LoadBalancerImpl>(params.priority_set);
     }
+
+    bool recreateOnHostChangeDeprecated() const override { return false; }
   };
 
   std::shared_ptr<LoadBalancerFactoryImpl> factory_;

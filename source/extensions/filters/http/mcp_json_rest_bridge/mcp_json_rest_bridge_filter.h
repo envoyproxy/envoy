@@ -70,6 +70,30 @@ private:
   uint32_t max_response_body_size_;
 };
 
+class McpJsonRestBridgePerRouteConfig : public Router::RouteSpecificFilterConfig,
+                                        public Logger::Loggable<Logger::Id::config> {
+public:
+  explicit McpJsonRestBridgePerRouteConfig(
+      const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
+          proto_config);
+
+  absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+  getHttpRule(absl::string_view tool_name) const;
+  absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+  getToolsListHttpRule() const;
+
+  bool textContentStreamingEnabled(absl::string_view tool_name) const;
+
+private:
+  struct ToolEntry {
+    envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule http_rule;
+    bool text_content_streaming_enabled;
+  };
+  absl::flat_hash_map<std::string, ToolEntry> tool_entries_;
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute
+      proto_config_;
+};
+
 using McpJsonRestBridgeFilterConfigSharedPtr = std::shared_ptr<McpJsonRestBridgeFilterConfig>;
 
 /**
@@ -92,14 +116,15 @@ public:
 
 private:
   // Handles "method" field in the MCP request.
-  void handleMcpMethod(const nlohmann::json& json_rpc,
-                       Http::RequestHeaderMapOptRef request_headers);
+  void handleMcpMethod(const nlohmann::json& json_rpc, Http::RequestHeaderMapOptRef request_headers,
+                       const McpJsonRestBridgePerRouteConfig* per_route_config);
 
   // Modifies the response from upstream into JSON-RPC response.
   void encodeJsonRpcData(Http::ResponseHeaderMapOptRef response_headers);
 
   // Maps the tool call request to the backend API.
-  void mapMcpToolToApiBackend(const nlohmann::json& json_rpc);
+  void mapMcpToolToApiBackend(const nlohmann::json& json_rpc,
+                              const McpJsonRestBridgePerRouteConfig* per_route_config);
 
   // Sends MCP error response.
   void sendErrorResponse(Http::Code response_code, absl::string_view response_code_details,

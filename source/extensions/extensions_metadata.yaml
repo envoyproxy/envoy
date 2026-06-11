@@ -497,6 +497,14 @@ envoy.filters.http.fault:
   status: stable
   type_urls:
   - envoy.extensions.filters.http.fault.v3.HTTPFault
+envoy.filters.http.filter_chain:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.filter_chain.v3.FilterChainConfig
+  - envoy.extensions.filters.http.filter_chain.v3.FilterChainConfigPerRoute
 envoy.filters.http.file_server:
   categories:
   - envoy.filters.http
@@ -643,6 +651,7 @@ envoy.filters.http.mcp_json_rest_bridge:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+  - envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridgePerRoute
 envoy.filters.http.mcp_router:
   categories:
   - envoy.filters.http

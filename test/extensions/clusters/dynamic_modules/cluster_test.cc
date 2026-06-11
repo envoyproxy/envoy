@@ -152,6 +152,30 @@ TEST_F(DynamicModuleClusterTest, BasicCreation) {
   EXPECT_NE(nullptr, result->second);
 }
 
+// Test that creating a cluster by loading the module via ``module.local.filename`` succeeds.
+TEST_F(DynamicModuleClusterTest, BasicCreationWithLocalFile) {
+  const std::string yaml =
+      fmt::format(R"EOF(
+name: test_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cluster_type:
+  name: envoy.clusters.dynamic_modules
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_modules.v3.ClusterConfig
+    dynamic_module_config:
+      module:
+        local:
+          filename: {}
+    cluster_name: test
+)EOF",
+                  Extensions::DynamicModules::testSharedObjectPath("cluster_no_op", "c"));
+  auto result = createCluster(yaml);
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  EXPECT_NE(nullptr, result->first);
+  EXPECT_NE(nullptr, result->second);
+}
+
 // Test that creating a cluster with cluster_config succeeds.
 TEST_F(DynamicModuleClusterTest, CreationWithClusterConfig) {
   auto result =

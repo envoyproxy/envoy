@@ -1510,8 +1510,15 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
                             hosts_added, hosts_removed, weighted_priority_health,
                             overprovisioning_factor, std::move(cross_priority_host_map));
   // If an LB is thread aware, create a new worker local LB on membership changes.
-  if (lb_factory_ != nullptr && lb_factory_->recreateOnHostChange()) {
+  if (lb_factory_ != nullptr && lb_factory_->recreateOnHostChangeDeprecated()) {
     ENVOY_LOG(debug, "re-creating local LB for TLS cluster {}", name);
+    // Now only out-of-tree LB implementations may return true for recreateOnHostChangeDeprecated,
+    // and they should be refactored to not require LB recreation.
+    ENVOY_LOG_FIRST_N(
+        warn, 200,
+        "Re-creating local LB for TLS cluster ({}) is deprecated and the LB should be refactored "
+        "to not require this",
+        name);
     lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
   }
 }

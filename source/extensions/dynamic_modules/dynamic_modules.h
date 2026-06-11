@@ -188,15 +188,15 @@ using AsyncLoadingStateSharedPtr = std::shared_ptr<AsyncLoadingState>;
 
 /**
  * The result of newDynamicModuleByConfig(). Exactly one of the two members is populated:
- *  - loaded_ is set when the module was loaded synchronously (local file, by name, or remote
+ *  - loaded is set when the module was loaded synchronously (local file, by name, or remote
  *    cache hit). The caller takes ownership of the module and can use it immediately.
- *  - async_ is set when the module is being fetched asynchronously from a remote source. The
+ *  - async is set when the module is being fetched asynchronously from a remote source. The
  *    on_loaded callback supplied to newDynamicModuleByConfig() is invoked once the fetch
- *    completes; the caller must keep async_ alive until then.
+ *    completes; the caller must keep async alive until then.
  */
 struct DynamicModuleLoadResult {
-  DynamicModulePtr loaded_;
-  AsyncLoadingStateSharedPtr async_;
+  DynamicModulePtr loaded;
+  AsyncLoadingStateSharedPtr async;
 };
 
 /**
@@ -204,21 +204,32 @@ struct DynamicModuleLoadResult {
  * sourcing strategies (local file, statically linked by name, and remote HTTP source with on-disk
  * caching and optional asynchronous fetch) behind a single entry point.
  *
+ * The local-file and by-name paths are fully synchronous and require neither a factory context nor
+ * an init manager, so extension points that have no access to a factory context (such as the
+ * upstream HTTP conn-pool factory) can call this with only the config. The remote HTTP source path
+ * requires a context, and the asynchronous fetch additionally requires an init manager and an
+ * on_loaded callback; if any of those is missing, a remote source is rejected with an error.
+ *
  * @param config the dynamic module configuration describing where to source the module from.
- * @param context the server factory context, used to access the singleton, cluster, dispatcher and
- * random generator needed for remote fetches and background caching.
+ * @param stat_name the configured name of the extension instance using the module (e.g.
+ * ``filter_name``, ``transport_socket_name``, ``lb_policy_name``). Falls back to ``default`` if
+ * empty.
+ * @param context the factory context, used to access the singleton, cluster, dispatcher and random
+ * generator needed for remote fetches and background caching. Only the members shared by all
+ * extension points (CommonFactoryContext) are required. May be absent; in that case a remote source
+ * is rejected with an error while local-file and by-name sources still load.
  * @param init_manager the init manager used to register the asynchronous remote fetch target. May
- * be nullptr; in that case a remote source that is not already cached is rejected with an error.
+ * be absent; in that case a remote source that is not already cached is rejected with an error.
  * @param on_loaded invoked on the main thread with the loaded module once an asynchronous remote
  * fetch completes successfully. Only used for the asynchronous remote path; ignored for the
- * synchronous paths (where the module is returned directly via DynamicModuleLoadResult::loaded_).
+ * synchronous paths (where the module is returned directly via DynamicModuleLoadResult::loaded).
  * May be empty if the caller does not support asynchronous loading.
  * @return the load result on success, or an error status if the configuration is invalid or the
  * module failed to load.
  */
 absl::StatusOr<DynamicModuleLoadResult>
-newDynamicModuleByConfig(const ProtoDynamicModuleConfig& config,
-                         Server::Configuration::ServerFactoryContext& context,
+newDynamicModuleByConfig(const ProtoDynamicModuleConfig& config, absl::string_view stat_name,
+                         OptRef<Server::Configuration::CommonFactoryContext> context = {},
                          OptRef<Init::Manager> init_manager = {},
                          std::function<void(DynamicModulePtr)> on_loaded = nullptr);
 

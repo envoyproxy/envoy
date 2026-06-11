@@ -8,7 +8,8 @@ namespace Http {
 namespace Http2 {
 
 ProtocolConstraints::ProtocolConstraints(
-    CodecStats& stats, const envoy::config::core::v3::Http2ProtocolOptions& http2_options)
+    CodecStats& stats, const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+    bool use_active_streams_for_limits)
     : stats_(stats), max_outbound_frames_(http2_options.max_outbound_frames().value()),
       frame_buffer_releasor_([this]() { releaseOutboundFrame(); }),
       max_outbound_control_frames_(http2_options.max_outbound_control_frames().value()),
@@ -18,7 +19,8 @@ ProtocolConstraints::ProtocolConstraints(
       max_inbound_priority_frames_per_stream_(
           http2_options.max_inbound_priority_frames_per_stream().value()),
       max_inbound_window_update_frames_per_data_frame_sent_(
-          http2_options.max_inbound_window_update_frames_per_data_frame_sent().value()) {}
+          http2_options.max_inbound_window_update_frames_per_data_frame_sent().value()),
+      use_active_streams_for_limits_(use_active_streams_for_limits) {}
 
 ProtocolConstraints::ReleasorProc
 ProtocolConstraints::incrementOutboundFrameCount(bool is_outbound_flood_monitored_control_frame) {
@@ -101,13 +103,14 @@ Status ProtocolConstraints::checkInboundFrameLimits() {
   }
 
   if (inbound_priority_frames_ >
-      static_cast<uint64_t>(max_inbound_priority_frames_per_stream_) * (1 + opened_streams_)) {
+      static_cast<uint64_t>(max_inbound_priority_frames_per_stream_) *
+          (1 + (use_active_streams_for_limits_ ? active_streams_ : opened_streams_))) {
     stats_.inbound_priority_frames_flood_.inc();
     return bufferFloodError("Too many PRIORITY frames");
   }
 
   if (inbound_window_update_frames_ >
-      5 + 2 * (opened_streams_ +
+      5 + 2 * ((use_active_streams_for_limits_ ? active_streams_ : opened_streams_) +
                max_inbound_window_update_frames_per_data_frame_sent_ * outbound_data_frames_)) {
     stats_.inbound_window_update_frames_flood_.inc();
     return bufferFloodError("Too many WINDOW_UPDATE frames");
@@ -124,7 +127,8 @@ void ProtocolConstraints::dumpState(std::ostream& os, int indent_level) const {
      << DUMP_MEMBER(max_outbound_control_frames_)
      << DUMP_MEMBER(consecutive_inbound_frames_with_empty_payload_)
      << DUMP_MEMBER(max_consecutive_inbound_frames_with_empty_payload_)
-     << DUMP_MEMBER(opened_streams_) << DUMP_MEMBER(inbound_priority_frames_)
+     << DUMP_MEMBER(opened_streams_) << DUMP_MEMBER(active_streams_)
+     << DUMP_MEMBER(inbound_priority_frames_)
      << DUMP_MEMBER(max_inbound_priority_frames_per_stream_)
      << DUMP_MEMBER(inbound_window_update_frames_) << DUMP_MEMBER(outbound_data_frames_)
      << DUMP_MEMBER(max_inbound_window_update_frames_per_data_frame_sent_) << '\n';
