@@ -465,7 +465,6 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOk) {
   client_->onSuccess(async_request_, std::move(check_response));
 }
 
-
 using HeaderValuePair = std::pair<const Http::LowerCaseString, const std::string>;
 
 // Verify client response headers when authorization_headers_to_add is configured.

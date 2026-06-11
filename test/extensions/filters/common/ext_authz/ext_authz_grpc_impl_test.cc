@@ -115,10 +115,9 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkRawResponsePopulated) {
   client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
 
   EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
-  EXPECT_CALL(request_callbacks_, onComplete_(_))
-      .WillOnce(Invoke([](ResponsePtr& response) {
-        EXPECT_EQ(CheckStatus::OK, response->status);
-      }));
+  EXPECT_CALL(request_callbacks_, onComplete_(_)).WillOnce(Invoke([](ResponsePtr& response) {
+    EXPECT_EQ(CheckStatus::OK, response->status);
+  }));
 
   client_->onSuccess(std::move(check_response), span_);
 }
