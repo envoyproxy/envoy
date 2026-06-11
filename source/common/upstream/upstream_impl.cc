@@ -141,6 +141,20 @@ parseExtensionProtocolOptions(
   return options;
 }
 
+// Recovers a per-cluster upstream (client) codec factory from the parsed extension protocol
+// options: an options object that also implements Http::ClientCodecFactory is treated as the
+// factory. At most one is expected; the first match wins.
+std::shared_ptr<const Http::ClientCodecFactory> findUpstreamHttpClientCodecFactory(
+    const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>& options) {
+  for (const auto& entry : options) {
+    if (auto factory = std::dynamic_pointer_cast<const Http::ClientCodecFactory>(entry.second);
+        factory != nullptr) {
+      return factory;
+    }
+  }
+  return nullptr;
+}
+
 // Updates the EDS health flags for an existing host to match the new host.
 // @param updated_host the new host to read health flag values from.
 // @param existing_host the host to update.
@@ -1148,6 +1162,8 @@ ClusterInfoImpl::ClusterInfoImpl(
               : nullptr),
       extension_protocol_options_(THROW_OR_RETURN_VALUE(
           parseExtensionProtocolOptions(config, factory_context), ProtocolOptionsHashMap)),
+      upstream_client_codec_factory_(
+          findUpstreamHttpClientCodecFactory(extension_protocol_options_)),
       http_protocol_options_(THROW_OR_RETURN_VALUE(
           createOptions(config,
                         extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(

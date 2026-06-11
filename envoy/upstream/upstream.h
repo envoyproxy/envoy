@@ -34,6 +34,7 @@
 
 namespace Envoy {
 namespace Http {
+class ClientCodecFactory;
 class FilterChainManager;
 class HashPolicy;
 } // namespace Http
@@ -1092,6 +1093,15 @@ public:
   template <class Derived>
   std::shared_ptr<const Derived> extensionProtocolOptionsTyped(const std::string& name) const {
     return std::dynamic_pointer_cast<const Derived>(extensionProtocolOptions(name));
+  }
+
+  /**
+   * @return OptRef<const Http::ClientCodecFactory> a per-cluster factory for the upstream (client)
+   *         HTTP codec, if one was attached via typed_extension_protocol_options. When empty, the
+   *         stock codec is used. Non-pure so that only ClusterInfoImpl has to provide it.
+   */
+  virtual OptRef<const Http::ClientCodecFactory> upstreamHttpClientCodecFactory() const {
+    return {};
   }
 
   /**

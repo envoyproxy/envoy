@@ -97,6 +97,7 @@ envoy_cc_library(
         ":status_lib",
         ":utility_lib",
         "//envoy/event:deferred_deletable",
+        "//envoy/http:client_codec_factory_interface",
         "//envoy/http:codec_interface",
         "//envoy/http:header_validator_interface",
         "//envoy/network:connection_interface",

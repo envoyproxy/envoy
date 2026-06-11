@@ -66,6 +66,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "client_codec_factory_interface",
+    hdrs = ["client_codec_factory.h"],
+    deps = [
+        ":codec_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "stream_reset_handler_interface",
     hdrs = ["stream_reset_handler.h"],
 )

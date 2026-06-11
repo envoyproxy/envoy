@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 
+#include "envoy/http/client_codec_factory.h"
 #include "envoy/http/codec.h"
 
 #include "source/common/common/enum_to_int.h"
@@ -330,6 +331,16 @@ CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& 
 #endif
   }
   }
+
+  // A per-cluster upstream codec factory (configured via typed_extension_protocol_options) may
+  // decorate or replace the stock codec built above; create_default hands over that stock codec.
+  if (auto factory = host->cluster().upstreamHttpClientCodecFactory(); factory.has_value()) {
+    codec_ = factory->createClientCodec(Http::ClientCodecFactory::Context{type, *connection_, *this,
+                                                                          host->cluster(),
+                                                                          random_generator},
+                                        [this]() { return std::move(codec_); });
+  }
+
   if (should_connect) {
     connect();
   }

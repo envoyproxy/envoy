@@ -1,5 +1,7 @@
 #include <memory>
 
+#include "envoy/http/client_codec_factory.h"
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/http/codec_client.h"
@@ -134,6 +136,62 @@ TEST_F(CodecClientTest, BasicHeaderOnlyResponse) {
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(outer_decoder, decodeHeaders_(Pointee(Ref(*response_headers)), true));
   inner_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+class MockClientCodecFactory : public ClientCodecFactory {
+public:
+  MOCK_METHOD(ClientConnectionPtr, createClientCodec,
+              (const Context& context, const CreateDefaultCodecCb& create_default), (const));
+};
+
+// When a cluster exposes an upstream ClientCodecFactory, CodecClientProd consults it, hands it a
+// thunk that yields the stock codec, and installs the codec the factory returns. Uses a bare
+// fixture-less test because it constructs a real CodecClientProd rather than the fixture's
+// CodecClientForTest.
+TEST(CodecClientProdTest, UpstreamClientCodecFactoryIsUsed) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Random::MockRandomGenerator> random;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  Upstream::HostDescriptionConstSharedPtr host =
+      Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80");
+
+  auto factory = std::make_shared<NiceMock<MockClientCodecFactory>>();
+  ON_CALL(*cluster, upstreamHttpClientCodecFactory())
+      .WillByDefault(Return(OptRef<const ClientCodecFactory>(*factory)));
+
+  bool stock_codec_built = false;
+  EXPECT_CALL(*factory, createClientCodec(_, _))
+      .WillOnce(Invoke([&](const ClientCodecFactory::Context& context,
+                           const ClientCodecFactory::CreateDefaultCodecCb& create_default)
+                           -> ClientConnectionPtr {
+        EXPECT_EQ(CodecType::HTTP1, context.type);
+        EXPECT_EQ(cluster.get(), &context.cluster);
+        // The thunk hands over the stock codec CodecClientProd already built.
+        ClientConnectionPtr stock = create_default();
+        stock_codec_built = (stock != nullptr);
+        return std::make_unique<NiceMock<MockClientConnection>>();
+      }));
+
+  auto connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  CodecClientProd client(CodecType::HTTP1, std::move(connection), host, dispatcher, random, nullptr,
+                         /*should_connect=*/false);
+
+  EXPECT_TRUE(stock_codec_built);
+}
+
+// With no factory configured (the default), CodecClientProd builds the stock codec.
+TEST(CodecClientProdTest, NoUpstreamClientCodecFactoryUsesStockCodec) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Random::MockRandomGenerator> random;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  Upstream::HostDescriptionConstSharedPtr host =
+      Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80");
+
+  auto connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  CodecClientProd client(CodecType::HTTP1, std::move(connection), host, dispatcher, random, nullptr,
+                         /*should_connect=*/false);
+  // No factory consulted; the stock HTTP/1 codec is installed.
+  EXPECT_EQ(Protocol::Http11, client.protocol());
 }
 
 TEST_F(CodecClientTest, BasicResponseWithBody) {
