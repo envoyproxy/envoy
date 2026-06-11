@@ -1,3 +1,5 @@
+#include <vector>
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/extensions/upstreams/http/dynamic_modules/config.h"
@@ -201,6 +203,50 @@ TEST_F(HttpTcpBridgeTest, OnUpstreamDataNoOp) {
 
   Buffer::OwnedImpl data("response data");
   bridge_->onUpstreamData(data, false);
+}
+
+TEST_F(HttpTcpBridgeTest, RequestBufferRemainsReadableAfterEncodeData) {
+  Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/test"}};
+  EXPECT_TRUE(bridge_->encodeHeaders(headers, false).ok());
+
+  Buffer::OwnedImpl data("hello");
+  bridge_->encodeData(data, false);
+
+  // Reading the request buffer after encodeData returns must not touch freed storage.
+  auto* envoy_ptr =
+      static_cast<envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr>(bridge_.get());
+  size_t chunks =
+      envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer_chunks_size(
+          envoy_ptr);
+  ASSERT_EQ(1, chunks);
+  std::vector<envoy_dynamic_module_type_envoy_buffer> result(chunks);
+  size_t result_length = 0;
+  envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer(
+      envoy_ptr, result.data(), &result_length);
+  ASSERT_EQ(1, result_length);
+  EXPECT_EQ("hello", absl::string_view(result[0].ptr, result[0].length));
+}
+
+TEST_F(HttpTcpBridgeTest, ResponseBufferRemainsReadableAfterOnUpstreamData) {
+  Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/test"}};
+  EXPECT_TRUE(bridge_->encodeHeaders(headers, false).ok());
+
+  Buffer::OwnedImpl data("world");
+  bridge_->onUpstreamData(data, false);
+
+  // Reading the response buffer after onUpstreamData returns must not touch freed storage.
+  auto* envoy_ptr =
+      static_cast<envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr>(bridge_.get());
+  size_t chunks =
+      envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer_chunks_size(
+          envoy_ptr);
+  ASSERT_EQ(1, chunks);
+  std::vector<envoy_dynamic_module_type_envoy_buffer> result(chunks);
+  size_t result_length = 0;
+  envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer(
+      envoy_ptr, result.data(), &result_length);
+  ASSERT_EQ(1, result_length);
+  EXPECT_EQ("world", absl::string_view(result[0].ptr, result[0].length));
 }
 
 TEST_F(HttpTcpBridgeTest, OnUpstreamConnectionClose) {
