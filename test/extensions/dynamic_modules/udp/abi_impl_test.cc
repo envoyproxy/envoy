@@ -636,19 +636,21 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, ConfigStatsOperate) {
             envoy_dynamic_module_callback_udp_listener_filter_config_record_histogram_value(
                 config, histogram_id, 42));
 
-  EXPECT_EQ(7, stats_.counterFromString("dynamicmodulescustom.cfg_counter").value());
-  EXPECT_EQ(
-      7,
-      stats_.gaugeFromString("dynamicmodulescustom.cfg_gauge", Stats::Gauge::ImportMode::Accumulate)
-          .value());
+  // The UDP listener filter config scope includes the filter name (set to "test_filter" in the
+  // fixture), so stats are namespaced as "dynamicmodulescustom.test_filter.<name>".
+  EXPECT_EQ(7, stats_.counterFromString("dynamicmodulescustom.test_filter.cfg_counter").value());
+  EXPECT_EQ(7, stats_
+                   .gaugeFromString("dynamicmodulescustom.test_filter.cfg_gauge",
+                                    Stats::Gauge::ImportMode::Accumulate)
+                   .value());
 
   EXPECT_EQ(
       envoy_dynamic_module_type_metrics_result_Success,
       envoy_dynamic_module_callback_udp_listener_filter_config_set_gauge(config, gauge_id, 100));
-  EXPECT_EQ(
-      100,
-      stats_.gaugeFromString("dynamicmodulescustom.cfg_gauge", Stats::Gauge::ImportMode::Accumulate)
-          .value());
+  EXPECT_EQ(100, stats_
+                     .gaugeFromString("dynamicmodulescustom.test_filter.cfg_gauge",
+                                      Stats::Gauge::ImportMode::Accumulate)
+                     .value());
 
   const size_t invalid_id = 9999;
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,

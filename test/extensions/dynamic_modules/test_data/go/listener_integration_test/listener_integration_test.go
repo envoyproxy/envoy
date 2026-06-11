@@ -19,11 +19,7 @@ type writeToSocketConfigFactory struct {
 	shared.EmptyListenerFilterConfigFactory
 }
 
-func (f *writeToSocketConfigFactory) Create(handle shared.ListenerFilterConfigHandle, _ []byte) (shared.ListenerFilterFactory, error) {
-	// Emit a metric directly from the config context (no per-connection filter), exercising the
-	// config-scoped emission path. This would typically be done from a scheduled background task.
-	configTotal, _ := handle.DefineCounter("config_total")
-	handle.IncrementCounterValue(configTotal, 1)
+func (f *writeToSocketConfigFactory) Create(shared.ListenerFilterConfigHandle, []byte) (shared.ListenerFilterFactory, error) {
 	return &writeToSocketFactory{}, nil
 }
 
