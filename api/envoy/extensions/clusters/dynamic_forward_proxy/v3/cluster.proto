@@ -106,5 +106,5 @@ message SubClustersConfig {
   //
   // Note: ``all_addresses_in_single_endpoint`` in the provided config will be ignored; sub
   // clusters always use strict-DNS semantics (each resolved address is a separate endpoint).
-  envoy.extensions.clusters.dns.v3.DnsCluster dns_cluster_config = 5;
+  dns.v3.DnsCluster dns_cluster_config = 5;
 }

@@ -84,8 +84,7 @@ Cluster::Cluster(
       sub_cluster_lb_policy_(config.sub_clusters_config().lb_policy()),
       enable_sub_cluster_(config.has_sub_clusters_config()),
       sub_cluster_dns_config_(
-          config.has_sub_clusters_config() &&
-                  config.sub_clusters_config().has_dns_cluster_config()
+          config.has_sub_clusters_config() && config.sub_clusters_config().has_dns_cluster_config()
               ? absl::make_optional(config.sub_clusters_config().dns_cluster_config())
               : absl::nullopt) {
 

@@ -291,7 +291,7 @@ cluster_type:
   EXPECT_TRUE(ok);
   ASSERT_TRUE(sub_config.has_value());
   // Sub cluster should use the DnsCluster extension, not legacy STRICT_DNS.
-  EXPECT_EQ(envoy::config::cluster::v3::Cluster::CLUSTER_TYPE,
+  EXPECT_EQ(envoy::config::cluster::v3::Cluster::kClusterType,
             sub_config->cluster_discovery_type_case());
   EXPECT_EQ("envoy.cluster.dns", sub_config->cluster_type().name());
 }
@@ -318,7 +318,7 @@ cluster_type:
   EXPECT_TRUE(ok);
   ASSERT_TRUE(sub_config.has_value());
   // No dns_cluster_config: legacy STRICT_DNS type, DNS settings inherited from parent.
-  EXPECT_EQ(envoy::config::cluster::v3::Cluster::TYPE, sub_config->cluster_discovery_type_case());
+  EXPECT_EQ(envoy::config::cluster::v3::Cluster::kType, sub_config->cluster_discovery_type_case());
   EXPECT_EQ(envoy::config::cluster::v3::Cluster::STRICT_DNS, sub_config->type());
   EXPECT_EQ(envoy::config::cluster::v3::Cluster::V6_ONLY, sub_config->dns_lookup_family());
   EXPECT_EQ(45, sub_config->dns_refresh_rate().seconds());
