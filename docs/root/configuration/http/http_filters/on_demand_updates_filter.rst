@@ -3,8 +3,7 @@
 On-demand VHDS, S/RDS and CDS Updates
 =====================================
 
-The on demand filter can be used to support either on demand VHDS or S/RDS update together with on demand CDS update
-if configured in the filter chain.
+The on-demand filter can be used to support on-demand VHDS, S/RDS, and CDS updates if configured in the filter chain.
 
 The on-demand update filter can be used to request a :ref:`virtual host <envoy_v3_api_msg_config.route.v3.VirtualHost>`
 data if it's not already present in the :ref:`Route Configuration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`. The
@@ -24,7 +23,7 @@ request to be created, :ref:`odcds <envoy_v3_api_field_extensions.filters.http.o
 must be specified and a header specified in :ref:`cluster_header <envoy_v3_api_field_config.route.v3.RouteAction.cluster_header>`
 action must be present in the HTTP request.
 
-On-demand VHDS and on-demand S/RDS can not be used at the same time at this point.
+On-demand VHDS and on-demand S/RDS can be used at the same time. When both are enabled, Envoy will first trigger an on-demand S/RDS update, and if the resolved route configuration uses VHDS, it will then trigger an on-demand VHDS update.
 
 On-demand CDS can also be enabled or disabled per virtual host or route. Specifying an extension config
 in :ref:`virtual host's typed_per_filter_config <envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>` or

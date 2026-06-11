@@ -64,9 +64,12 @@ VHDS shouldn't present any compatibility issues with
 Route configuration names can still be used for virtual host matching, but with
 scoped RDS configured it would point to a scoped route configuration.
 
-However, it is important to note that using
-on-demand :ref:`scoped RDS <envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration>`
-and VHDS together will require two on-demand subscriptions per routing scope.
+Using on-demand :ref:`scoped RDS <envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration>`
+and VHDS together is supported. When a request arrives, Envoy will first trigger
+an on-demand subscription for the scope (SRDS). Once the scope is resolved, if the
+associated route configuration uses VHDS, Envoy will then trigger an on-demand
+subscription for the virtual host (VHDS). This requires two sequential on-demand
+subscriptions per routing scope.
 
 
 * :ref:`v3 API reference <v3_grpc_streaming_endpoints>`
