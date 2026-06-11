@@ -61,6 +61,8 @@ public:
     return std::make_unique<envoy::extensions::filters::http::on_demand::v3::OnDemand>();
   }
 
+  std::set<std::string> configTypes() override { return {}; }
+
   std::string name() const override { return "odcds-test-filter"; }
 };
 
@@ -427,7 +429,7 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryFetchesClusterInfo) {
 
   ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "200", {}, {});
-  
+
   auto fetched_cluster = response->headers().get(Http::LowerCaseString("fetched-cluster-name"));
   ASSERT_FALSE(fetched_cluster.empty());
   EXPECT_EQ(fetched_cluster[0]->value().getStringView(), "new_cluster");
