@@ -327,11 +327,12 @@ configuration is active, whether installed statically or through the
 ``/tap`` admin endpoint.
 
 The configured sampling rate is recorded on
-:ref:`applied_sample_rate
-<envoy_v3_api_field_data.tap.v3.TraceWrapper.applied_sample_rate>` of the
-first emitted ``TraceWrapper`` segment of each HTTP tap trace. When a
+:ref:`configured_sample_rate
+<envoy_v3_api_field_data.tap.v3.TraceWrapper.configured_sample_rate>` of the
+first emitted ``TraceWrapper`` segment of each tap trace. When a
 runtime override of ``runtime_key`` is active, the effective rate may
-differ from the recorded value.
+differ from the recorded value. The :ref:`tap transport socket
+<operations_traffic_tapping>` supports the same per-connection sampling.
 
 Statistics
 ----------

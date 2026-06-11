@@ -63,7 +63,6 @@ envoy_cc_extension(
         "//envoy/network:transport_socket_interface",
         "//envoy/registry",
         "//envoy/server:transport_socket_config_interface",
-        "//source/common/common:minimal_logger_lib",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",

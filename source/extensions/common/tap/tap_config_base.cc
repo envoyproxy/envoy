@@ -9,6 +9,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/common/matcher/matcher.h"
 
 #include "absl/container/fixed_array.h"
@@ -146,7 +147,8 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
 }
 
 bool TapConfigBaseImpl::shouldRecord() const {
-  if (!tap_enabled_.has_value()) {
+  if (!tap_enabled_.has_value() ||
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tap_honor_tap_enabled")) {
     return true;
   }
   return runtime_.snapshot().featureEnabled(tap_enabled_->runtime_key(),
@@ -235,14 +237,13 @@ void Utility::bodyBytesToString(envoy::data::tap::v3::TraceWrapper& trace,
 }
 
 void TapConfigBaseImpl::PerTapSinkHandleManagerImpl::submitTrace(TraceWrapperPtr&& trace) {
-  // Only HTTP taps honor tap_enabled (transport socket tap ignores it), so only HTTP
-  // traces carry the stamp. The configured default_value is stamped; when runtime_key
-  // is active the effective rate may differ, as documented on applied_sample_rate.
-  const auto trace_case = trace->trace_case();
+  // The configured default_value is stamped on the first emitted segment of each
+  // trace; when runtime_key is active the effective rate may differ, as documented on
+  // configured_sample_rate. The runtime guard suppresses the stamp together with
+  // sampling enforcement so that disabling the guard fully restores prior behavior.
   if (parent_.tap_enabled_.has_value() && !stamped_ &&
-      (trace_case == envoy::data::tap::v3::TraceWrapper::TraceCase::kHttpBufferedTrace ||
-       trace_case == envoy::data::tap::v3::TraceWrapper::TraceCase::kHttpStreamedTraceSegment)) {
-    *trace->mutable_applied_sample_rate() = parent_.tap_enabled_->default_value();
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tap_honor_tap_enabled")) {
+    *trace->mutable_configured_sample_rate() = parent_.tap_enabled_->default_value();
     stamped_ = true;
   }
   Utility::bodyBytesToString(*trace, parent_.sink_format_);

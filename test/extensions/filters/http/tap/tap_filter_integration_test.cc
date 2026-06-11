@@ -1426,7 +1426,7 @@ TEST_P(TapIntegrationTest, ZeroPercentSamplingProducesNoTraces) {
 }
 
 // Verify that tap_enabled = 100/100 taps every request and stamps each emitted
-// TraceWrapper with the configured applied_sample_rate.
+// TraceWrapper with the configured configured_sample_rate.
 TEST_P(TapIntegrationTest, FullPercentSamplingProducesAllTraces) {
   const std::string path_prefix = getTempPathPrefix();
   const auto format = envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES;
@@ -1450,10 +1450,10 @@ TEST_P(TapIntegrationTest, FullPercentSamplingProducesAllTraces) {
     ++json_files;
     auto wrapper = parseTraceFile(f, format);
     EXPECT_TRUE(wrapper.has_http_buffered_trace()) << f;
-    EXPECT_TRUE(wrapper.has_applied_sample_rate()) << f;
-    EXPECT_EQ(100u, wrapper.applied_sample_rate().numerator()) << f;
+    EXPECT_TRUE(wrapper.has_configured_sample_rate()) << f;
+    EXPECT_EQ(100u, wrapper.configured_sample_rate().numerator()) << f;
     EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED,
-              wrapper.applied_sample_rate().denominator())
+              wrapper.configured_sample_rate().denominator())
         << f;
   }
   EXPECT_EQ(num_requests, json_files);
@@ -1462,7 +1462,7 @@ TEST_P(TapIntegrationTest, FullPercentSamplingProducesAllTraces) {
 
 // Verify that with tap_enabled = 10/100 every request is either tapped or
 // counted as sampled out, and that every emitted trace carries the configured
-// applied_sample_rate. The exact split is intentionally not asserted: it
+// configured_sample_rate. The exact split is intentionally not asserted: it
 // depends on the runtime layer's RNG and any bound would be nondeterministic
 // in CI. Exact-rate semantics are covered deterministically by the unit tests
 // and the 0%/100%/runtime-override integration tests.
@@ -1493,10 +1493,10 @@ TEST_P(TapIntegrationTest, PartialPercentSamplingCountsConsistently) {
     }
     ++json_files;
     auto wrapper = parseTraceFile(f, format);
-    EXPECT_TRUE(wrapper.has_applied_sample_rate()) << f;
-    EXPECT_EQ(10u, wrapper.applied_sample_rate().numerator()) << f;
+    EXPECT_TRUE(wrapper.has_configured_sample_rate()) << f;
+    EXPECT_EQ(10u, wrapper.configured_sample_rate().numerator()) << f;
     EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED,
-              wrapper.applied_sample_rate().denominator())
+              wrapper.configured_sample_rate().denominator())
         << f;
   }
   EXPECT_EQ(static_cast<uint64_t>(json_files), tapped);
@@ -1541,16 +1541,16 @@ TEST_P(TapIntegrationTest, RuntimeOverrideChangesSampling) {
     }
     ++json_files;
     auto wrapper = parseTraceFile(f, format);
-    EXPECT_TRUE(wrapper.has_applied_sample_rate()) << f;
+    EXPECT_TRUE(wrapper.has_configured_sample_rate()) << f;
     // The stamp records the configured default_value (0/100). Consumers must
     // consult runtime separately for the effective rate -- this is documented
-    // on the applied_sample_rate field.
-    EXPECT_EQ(0u, wrapper.applied_sample_rate().numerator()) << f;
+    // on the configured_sample_rate field.
+    EXPECT_EQ(0u, wrapper.configured_sample_rate().numerator()) << f;
   }
   EXPECT_EQ(1, json_files);
 }
 
-// Verify binary proto file output round-trips with applied_sample_rate
+// Verify binary proto file output round-trips with configured_sample_rate
 // stamped. PROTO_BINARY_LENGTH_DELIMITED exercises the most involved parse
 // path; the JSON round-trip is covered by the other sampling tests above.
 TEST_P(TapIntegrationTest, ProtoBinaryLengthDelimitedFormatWithSampling) {
@@ -1575,16 +1575,16 @@ TEST_P(TapIntegrationTest, ProtoBinaryLengthDelimitedFormatWithSampling) {
     ++matched;
     auto wrapper = parseTraceFile(f, format);
     EXPECT_TRUE(wrapper.has_http_buffered_trace()) << f;
-    EXPECT_TRUE(wrapper.has_applied_sample_rate()) << f;
-    EXPECT_EQ(100u, wrapper.applied_sample_rate().numerator()) << f;
+    EXPECT_TRUE(wrapper.has_configured_sample_rate()) << f;
+    EXPECT_EQ(100u, wrapper.configured_sample_rate().numerator()) << f;
     EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED,
-              wrapper.applied_sample_rate().denominator())
+              wrapper.configured_sample_rate().denominator())
         << f;
   }
   EXPECT_EQ(num_requests, matched);
 }
 
-// Verify that with streamed output and sampling configured, applied_sample_rate
+// Verify that with streamed output and sampling configured, configured_sample_rate
 // is stamped on the first emitted segment of the stream only.
 TEST_P(TapIntegrationTest, StreamedOutputStampsFirstSegmentOnly) {
   constexpr absl::string_view filter_config =
@@ -1621,12 +1621,12 @@ typed_config:
       Extensions::Common::Tap::readTracesFromPath(path_prefix);
   ASSERT_EQ(6, traces.size());
   EXPECT_TRUE(traces[0].http_streamed_trace_segment().has_request_headers());
-  EXPECT_TRUE(traces[0].has_applied_sample_rate());
-  EXPECT_EQ(100u, traces[0].applied_sample_rate().numerator());
+  EXPECT_TRUE(traces[0].has_configured_sample_rate());
+  EXPECT_EQ(100u, traces[0].configured_sample_rate().numerator());
   EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED,
-            traces[0].applied_sample_rate().denominator());
+            traces[0].configured_sample_rate().denominator());
   for (size_t i = 1; i < traces.size(); i++) {
-    EXPECT_FALSE(traces[i].has_applied_sample_rate()) << "segment " << i;
+    EXPECT_FALSE(traces[i].has_configured_sample_rate()) << "segment " << i;
   }
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.tap.rq_tapped")->value());
 }

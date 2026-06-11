@@ -9,6 +9,7 @@
 #include "source/extensions/common/tap/tap_config_base.h"
 
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/test_runtime.h"
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
@@ -264,6 +265,20 @@ TEST(TapConfigBaseImplSampling, ShouldRecordFullPercent) {
   EXPECT_TRUE(config.shouldRecord());
 }
 
+TEST(TapConfigBaseImplSampling, ShouldRecordWhenRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.tap_honor_tap_enabled", "false"}});
+  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  auto proto = minimalTapConfig();
+  // 0% sample rate, but the disabled guard short-circuits enforcement entirely.
+  proto.mutable_tap_enabled()->mutable_default_value()->set_numerator(0);
+  proto.mutable_tap_enabled()->mutable_default_value()->set_denominator(
+      envoy::type::v3::FractionalPercent::HUNDRED);
+  TestableTapConfigBase config(proto, context);
+
+  EXPECT_TRUE(config.shouldRecord());
+}
+
 TEST(TapConfigBaseImplSampling, ShouldRecordHonorsRuntimeOverride) {
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
   // Verify the runtime key is forwarded as-is and the runtime decision is honored.
@@ -327,7 +342,7 @@ envoy::config::tap::v3::TapConfig streamingAdminTapConfig() {
   return proto;
 }
 
-TEST(TapConfigBaseImplStamping, AppliedSampleRateStampedOnFirstSegmentOnly) {
+TEST(TapConfigBaseImplStamping, ConfiguredSampleRateStampedOnFirstSegmentOnly) {
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
   auto proto = streamingAdminTapConfig();
   proto.mutable_tap_enabled()->mutable_default_value()->set_numerator(1);
@@ -348,14 +363,14 @@ TEST(TapConfigBaseImplStamping, AppliedSampleRateStampedOnFirstSegmentOnly) {
   handle->submitTrace(std::move(second));
 
   ASSERT_EQ(2u, capturing.captured_.size());
-  EXPECT_TRUE(capturing.captured_[0].has_applied_sample_rate());
-  EXPECT_EQ(1u, capturing.captured_[0].applied_sample_rate().numerator());
+  EXPECT_TRUE(capturing.captured_[0].has_configured_sample_rate());
+  EXPECT_EQ(1u, capturing.captured_[0].configured_sample_rate().numerator());
   EXPECT_EQ(envoy::type::v3::FractionalPercent::TEN_THOUSAND,
-            capturing.captured_[0].applied_sample_rate().denominator());
-  EXPECT_FALSE(capturing.captured_[1].has_applied_sample_rate());
+            capturing.captured_[0].configured_sample_rate().denominator());
+  EXPECT_FALSE(capturing.captured_[1].has_configured_sample_rate());
 }
 
-TEST(TapConfigBaseImplStamping, AppliedSampleRateNotStampedOnSocketTraces) {
+TEST(TapConfigBaseImplStamping, ConfiguredSampleRateStampedOnSocketTraces) {
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
   auto proto = streamingAdminTapConfig();
   proto.mutable_tap_enabled()->mutable_default_value()->set_numerator(1);
@@ -367,8 +382,8 @@ TEST(TapConfigBaseImplStamping, AppliedSampleRateNotStampedOnSocketTraces) {
 
   auto handle = config.createPerTapSinkHandleManager(/*trace_id=*/42);
 
-  // Transport socket tap does not consult shouldRecord(), so socket traces must not
-  // carry applied_sample_rate even when tap_enabled is configured.
+  // The transport socket tap consults shouldRecord() just like the HTTP filter, so
+  // socket traces carry the stamp on the first emitted segment only.
   auto buffered = makeTraceWrapper();
   buffered->mutable_socket_buffered_trace();
   handle->submitTrace(std::move(buffered));
@@ -378,11 +393,35 @@ TEST(TapConfigBaseImplStamping, AppliedSampleRateNotStampedOnSocketTraces) {
   handle->submitTrace(std::move(streamed));
 
   ASSERT_EQ(2u, capturing.captured_.size());
-  EXPECT_FALSE(capturing.captured_[0].has_applied_sample_rate());
-  EXPECT_FALSE(capturing.captured_[1].has_applied_sample_rate());
+  EXPECT_TRUE(capturing.captured_[0].has_configured_sample_rate());
+  EXPECT_EQ(1u, capturing.captured_[0].configured_sample_rate().numerator());
+  EXPECT_FALSE(capturing.captured_[1].has_configured_sample_rate());
 }
 
-TEST(TapConfigBaseImplStamping, AppliedSampleRateAbsentWhenNotConfigured) {
+TEST(TapConfigBaseImplStamping, ConfiguredSampleRateNotStampedWhenGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.tap_honor_tap_enabled", "false"}});
+  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  auto proto = streamingAdminTapConfig();
+  proto.mutable_tap_enabled()->mutable_default_value()->set_numerator(1);
+  proto.mutable_tap_enabled()->mutable_default_value()->set_denominator(
+      envoy::type::v3::FractionalPercent::TEN_THOUSAND);
+
+  CapturingSink capturing;
+  TestableTapConfigBaseWithSink config(proto, &capturing, context);
+
+  // With the guard disabled neither sampling nor stamping is applied, restoring the
+  // pre-implementation trace output.
+  auto handle = config.createPerTapSinkHandleManager(/*trace_id=*/42);
+  auto trace = makeTraceWrapper();
+  trace->mutable_http_buffered_trace();
+  handle->submitTrace(std::move(trace));
+
+  ASSERT_EQ(1u, capturing.captured_.size());
+  EXPECT_FALSE(capturing.captured_[0].has_configured_sample_rate());
+}
+
+TEST(TapConfigBaseImplStamping, ConfiguredSampleRateAbsentWhenNotConfigured) {
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
   auto proto = streamingAdminTapConfig();
   // tap_enabled is unset.
@@ -396,7 +435,7 @@ TEST(TapConfigBaseImplStamping, AppliedSampleRateAbsentWhenNotConfigured) {
   handle->submitTrace(std::move(trace));
 
   ASSERT_EQ(1u, capturing.captured_.size());
-  EXPECT_FALSE(capturing.captured_[0].has_applied_sample_rate());
+  EXPECT_FALSE(capturing.captured_[0].has_configured_sample_rate());
 }
 
 } // namespace

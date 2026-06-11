@@ -50,21 +50,16 @@ message TapConfig {
   // a tap will occur and the data will be written to the configured output.
   OutputConfig output_config = 2 [(validate.rules).message = {required: true}];
 
-  // Specifies the fraction of requests for which the tap match predicate is
-  // evaluated. When unset, every request proceeds to match evaluation (equivalent to
-  // sampling at 100%), the runtime layer is not consulted, and
-  // ``applied_sample_rate`` is not set on emitted traces. When set, only the
-  // configured fraction is matched; the remainder is not tapped. The value can be
-  // overridden at runtime via :ref:`runtime_key
+  // Specifies the fraction of requests (HTTP tap filter) or connections (transport
+  // socket tap) for which the tap match predicate is evaluated. When unset, every
+  // request/connection proceeds to match evaluation (equivalent to sampling at 100%),
+  // the runtime layer is not consulted, and ``configured_sample_rate`` is not set on
+  // emitted traces. When set, only the configured fraction is matched; the remainder
+  // is not tapped. The value can be overridden at runtime via :ref:`runtime_key
   // <envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>`. The
-  // configured sampling rate is recorded on the :ref:`applied_sample_rate
-  // <envoy_v3_api_field_data.tap.v3.TraceWrapper.applied_sample_rate>` of the first
-  // segment of each emitted HTTP trace.
-  //
-  // .. note::
-  //
-  //   This field is only honored by the HTTP tap filter; transport-socket tap
-  //   ignores it.
+  // configured sampling rate is recorded on the :ref:`configured_sample_rate
+  // <envoy_v3_api_field_data.tap.v3.TraceWrapper.configured_sample_rate>` of the
+  // first segment of each emitted trace.
   core.v3.RuntimeFractionalPercent tap_enabled = 3;
 }
 

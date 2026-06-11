@@ -5,7 +5,6 @@
 #include "envoy/extensions/transport_sockets/tap/v3/tap.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "source/common/common/logger.h"
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/transport_sockets/tap/tap.h"
@@ -26,10 +25,6 @@ public:
   Extensions::Common::Tap::TapConfigSharedPtr
   createConfigFromProto(const envoy::config::tap::v3::TapConfig& proto_config,
                         Extensions::Common::Tap::Sink* admin_streamer) override {
-    if (proto_config.has_tap_enabled()) {
-      ENVOY_LOG_MISC(
-          warn, "tap_enabled sampling is not implemented for transport socket taps and is ignored");
-    }
     return std::make_shared<SocketTapConfigImpl>(std::move(proto_config), admin_streamer,
                                                  time_source_, factory_context_);
   }
