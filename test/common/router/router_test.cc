@@ -6508,7 +6508,7 @@ TEST_F(RouterTest, AltStatName) {
 
 TEST_F(RouterTest, Redirect) {
   MockDirectResponseEntry direct_response;
-  EXPECT_CALL(direct_response, newUri(_)).WillOnce(Return("hello"));
+  EXPECT_CALL(direct_response, newUri(_, _)).WillOnce(Return("hello"));
   EXPECT_CALL(direct_response, rewritePathHeader(_, _));
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::MovedPermanently));
   EXPECT_CALL(direct_response, formatBody(_, _, _, _)).WillOnce(Return(EMPTY_STRING));
@@ -6529,7 +6529,7 @@ TEST_F(RouterTest, Redirect) {
 
 TEST_F(RouterTest, RedirectFound) {
   MockDirectResponseEntry direct_response;
-  EXPECT_CALL(direct_response, newUri(_)).WillOnce(Return("hello"));
+  EXPECT_CALL(direct_response, newUri(_, _)).WillOnce(Return("hello"));
   EXPECT_CALL(direct_response, rewritePathHeader(_, _));
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::Found));
   EXPECT_CALL(direct_response, formatBody(_, _, _, _)).WillOnce(Return(EMPTY_STRING));
@@ -6589,7 +6589,7 @@ TEST_F(RouterTest, DirectResponseWithBody) {
 
 TEST_F(RouterTest, DirectResponseWithLocation) {
   NiceMock<MockDirectResponseEntry> direct_response;
-  EXPECT_CALL(direct_response, newUri(_)).WillOnce(Return("http://host/"));
+  EXPECT_CALL(direct_response, newUri(_, _)).WillOnce(Return("http://host/"));
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::Created));
   EXPECT_CALL(direct_response, formatBody(_, _, _, _)).WillRepeatedly(Return(EMPTY_STRING));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
@@ -6609,7 +6609,7 @@ TEST_F(RouterTest, DirectResponseWithLocation) {
 
 TEST_F(RouterTest, DirectResponseWithoutLocation) {
   NiceMock<MockDirectResponseEntry> direct_response;
-  EXPECT_CALL(direct_response, newUri(_)).WillOnce(Return("http://host/"));
+  EXPECT_CALL(direct_response, newUri(_, _)).WillOnce(Return("http://host/"));
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::OK));
   EXPECT_CALL(direct_response, formatBody(_, _, _, _)).WillRepeatedly(Return(EMPTY_STRING));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
