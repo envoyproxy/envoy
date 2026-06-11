@@ -720,7 +720,7 @@ public:
         ENVOY_LOG(trace, "cleaned up {} entries in resolver_map_",
                   original_size - resolver_map_.size());
       }
-      resolver_map_.emplace(key, resolver);
+      resolver_map_[key] = resolver;
       ENVOY_LOG(trace, "resolver_map_ size after adding: {}", resolver_map_.size());
     }
     return resolver;
