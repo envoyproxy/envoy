@@ -1681,7 +1681,7 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndEncodeAsBase64) {
       envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair::
           BASE64);
 
-  // A rule with default (UNSPECIFIED) encoding for comparison: the value will be sanitized
+  // A rule with default (SANITIZED_UTF8) encoding for comparison: the value will be sanitized
   // to a valid UTF-8 string.
   auto rule_tlv1 = proto_config.add_rules();
   rule_tlv1->set_tlv_type(0x00);
@@ -2192,7 +2192,7 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateWithBase64Encoding) {
   rule2->mutable_on_tlv_present()->set_value_encoding(
       envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair::
           BASE64);
-  // A rule with default (UNSPECIFIED) encoding for comparison: the value will be sanitized
+  // A rule with default (SANITIZED_UTF8) encoding for comparison: the value will be sanitized
   // to a valid UTF-8 string.
   auto rule3 = proto_config.add_rules();
   rule3->set_tlv_type(0x00);
