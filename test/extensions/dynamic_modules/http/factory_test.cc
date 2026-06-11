@@ -112,6 +112,40 @@ filter_config:
       proto_config, context.server_factory_context_, context.messageValidationVisitor());
 }
 
+// The per-route path honors the ``module.local.filename`` data source. With only ``local.filename``
+// set (no ``name``), reaching per-route symbol resolution rather than a "Failed to load dynamic
+// module" error proves the local file was loaded; the no_op C module simply lacks the per-route
+// symbols, so config creation then fails.
+TEST(DynamicModuleConfigFactory, PerRouteLocalFileIsLoaded) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+dynamic_module_config:
+    module:
+      local:
+        filename: "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c/libno_op.so"
+    do_not_close: true
+filter_name: foo
+filter_config:
+    "@type": "type.googleapis.com/google.protobuf.StringValue"
+    value: "bar"
+)EOF");
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilterPerRoute proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  Api::ApiPtr api = Api::createApiForTest();
+  EXPECT_CALL(context.server_factory_context_, api()).WillRepeatedly(testing::ReturnRef(*api));
+  ON_CALL(context.server_factory_context_.options_, concurrency())
+      .WillByDefault(testing::Return(1));
+
+  Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
+  auto result = factory.createRouteSpecificFilterConfig(
+      proto_config, context.server_factory_context_, context.messageValidationVisitor());
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result.status().message(),
+              testing::HasSubstr("envoy_dynamic_module_on_http_filter_per_route_config_new"));
+}
+
 TEST(DynamicModuleConfigFactory, LoadOKPerRouteWithStruct) {
   TestEnvironment::setEnvVar(
       "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",

@@ -44,6 +44,9 @@ envoy_cc_test(
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//test/extensions/dynamic_modules/test_data/c:matcher_no_op_static",
+        "//test/mocks/init:init_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "@envoy_api//envoy/extensions/dynamic_modules/v3:pkg_cc_proto",
     ],
 )
 

@@ -1,6 +1,7 @@
 #include "source/extensions/filters/network/http_connection_manager/config.h"
 
 #include <chrono>
+#include <cmath>
 #include <memory>
 #include <string>
 #include <vector>
@@ -392,6 +393,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), idle_timeout)),
       max_connection_duration_(
           PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_connection_duration)),
+      max_connection_duration_jitter_percentage_(
+          config.common_http_protocol_options().has_max_connection_duration_jitter()
+              ? absl::optional<double>(
+                    config.common_http_protocol_options().max_connection_duration_jitter().value())
+              : absl::nullopt),
       http1_safe_max_connection_duration_(config.http1_safe_max_connection_duration()),
       max_stream_duration_(
           PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_stream_duration)),
@@ -403,6 +409,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       request_headers_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, request_headers_timeout, RequestHeaderTimeoutMs)),
       drain_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, drain_timeout, 5000)),
+      drain_timeout_jitter_percentage_(
+          config.has_drain_timeout_jitter()
+              ? absl::optional<double>(config.drain_timeout_jitter().value())
+              : absl::nullopt),
       generate_request_id_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, generate_request_id, true)),
       preserve_external_request_id_(config.preserve_external_request_id()),
       always_set_request_id_in_response_(config.always_set_request_id_in_response()),
@@ -760,6 +770,51 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           std::make_pair(name, FilterConfig{std::move(factories), enabled}));
     }
   }
+}
+
+absl::optional<std::chrono::milliseconds>
+HttpConnectionManagerConfig::maxConnectionDuration() const {
+  if (!max_connection_duration_.has_value()) {
+    return absl::nullopt;
+  }
+  std::chrono::milliseconds duration = max_connection_duration_.value();
+  // Apply jitter: extend the base duration by a random amount up to
+  // base_duration * jitter_percentage / 100. The jittering is an internal
+  // implementation detail of the HttpConnectionManagerConfig and not exposed
+  // as a separate interface method: callers receive a freshly jittered value
+  // on every call and arm the timer with it directly.
+  if (max_connection_duration_jitter_percentage_.has_value() &&
+      max_connection_duration_jitter_percentage_.value() > 0) {
+    const uint64_t max_jitter_ms = static_cast<uint64_t>(
+        std::ceil(duration.count() * (max_connection_duration_jitter_percentage_.value() / 100.0)));
+    if (max_jitter_ms > 0) {
+      const uint64_t jitter_ms =
+          context_.serverFactoryContext().api().randomGenerator().random() % max_jitter_ms;
+      duration = std::chrono::milliseconds(static_cast<uint64_t>(duration.count()) + jitter_ms);
+    }
+  }
+  return duration;
+}
+
+std::chrono::milliseconds HttpConnectionManagerConfig::drainTimeout() const {
+  std::chrono::milliseconds timeout = drain_timeout_;
+  // Apply jitter: extend the drain grace period (between the shutdown notice
+  // GOAWAY and the final GOAWAY) by a random amount up to
+  // drain_timeout * jitter_percentage / 100. The jittering is an internal
+  // implementation detail of the HttpConnectionManagerConfig and not exposed
+  // as a separate interface method: callers receive a freshly jittered value
+  // on every call and arm the timer with it directly.
+  if (drain_timeout_jitter_percentage_.has_value() &&
+      drain_timeout_jitter_percentage_.value() > 0) {
+    const uint64_t max_jitter_ms = static_cast<uint64_t>(
+        std::ceil(timeout.count() * (drain_timeout_jitter_percentage_.value() / 100.0)));
+    if (max_jitter_ms > 0) {
+      const uint64_t jitter_ms =
+          context_.serverFactoryContext().api().randomGenerator().random() % max_jitter_ms;
+      timeout = std::chrono::milliseconds(static_cast<uint64_t>(timeout.count()) + jitter_ms);
+    }
+  }
+  return timeout;
 }
 
 Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(

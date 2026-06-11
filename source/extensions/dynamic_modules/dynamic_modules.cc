@@ -291,47 +291,56 @@ absl::StatusOr<DynamicModulePtr> newStaticModule(const absl::string_view module_
   return dynamic_module;
 }
 
-absl::StatusOr<DynamicModuleLoadResult> newDynamicModuleByConfig(
-    const ProtoDynamicModuleConfig& config, Server::Configuration::ServerFactoryContext& context,
-    OptRef<Init::Manager> init_manager, std::function<void(DynamicModulePtr)> on_loaded,
-    absl::string_view stat_name) {
+absl::StatusOr<DynamicModuleLoadResult>
+newDynamicModuleByConfig(const ProtoDynamicModuleConfig& config, absl::string_view stat_name,
+                         OptRef<Server::Configuration::CommonFactoryContext> context,
+                         OptRef<Init::Manager> init_manager,
+                         std::function<void(DynamicModulePtr)> on_loaded) {
 
   if (!config.has_module()) {
     // Name-based dynamic module loading: look up the module by name under the search path.
     if (config.name().empty()) {
-      incrementLoadFailure(context.scope(), stat_name, ModuleLoadErrorStat);
+      incrementLoadFailure(context, stat_name, ModuleLoadErrorStat);
       return absl::InvalidArgumentError(
           "Either 'name' or 'module' must be specified in dynamic_module_config");
     }
     auto dynamic_module =
         newDynamicModuleByName(config.name(), config.do_not_close(), config.load_globally());
     if (!dynamic_module.ok()) {
-      incrementLoadFailure(context.scope(), stat_name, ModuleLoadErrorStat);
-      return absl::InvalidArgumentError("Failed to load dynamic module: " +
-                                        std::string(dynamic_module.status().message()));
+      incrementLoadFailure(context, stat_name, ModuleLoadErrorStat);
+      return absl::InvalidArgumentError(
+          absl::StrCat("Failed to load dynamic module: ", dynamic_module.status().message()));
     }
     return DynamicModuleLoadResult{std::move(dynamic_module.value()), nullptr};
   }
 
   // Data source-based dynamic module loading: load the module from the specified data source, which
-  // may be a local file path or a remote HTTP URL. If the source is remote.
+  // may be a local file path or a remote HTTP URL.
 
   if (!config.module().local().filename().empty()) {
     // Module specified by local file path.
     auto dynamic_module = newDynamicModule(config.module().local().filename(),
                                            config.do_not_close(), config.load_globally());
     if (!dynamic_module.ok()) {
-      incrementLoadFailure(context.scope(), stat_name, ModuleLoadErrorStat);
-      return absl::InvalidArgumentError("Failed to load dynamic module: " +
-                                        std::string(dynamic_module.status().message()));
+      incrementLoadFailure(context, stat_name, ModuleLoadErrorStat);
+
+      return absl::InvalidArgumentError(
+          absl::StrCat("Failed to load dynamic module: ", dynamic_module.status().message()));
     }
     return DynamicModuleLoadResult{std::move(dynamic_module.value()), nullptr};
   }
 
   if (!config.module().has_remote()) {
-    incrementLoadFailure(context.scope(), stat_name, ModuleLoadErrorStat);
+    incrementLoadFailure(context, stat_name, ModuleLoadErrorStat);
     return absl::InvalidArgumentError(
         "Only local file path or remote HTTP source is supported for module sources");
+  }
+
+  // Remote HTTP source: every remaining path (cache management, NACK background fetch, and the
+  // asynchronous fetch itself) needs the factory context, so reject remote sources for callers that
+  // cannot supply one.
+  if (!context.has_value()) {
+    return absl::InvalidArgumentError("Remote module sources require a factory context");
   }
 
   const absl::string_view sha256 = config.module().remote().sha256();
@@ -360,37 +369,38 @@ absl::StatusOr<DynamicModuleLoadResult> newDynamicModuleByConfig(
       auto dynamic_module =
           newDynamicModule(cached_path, config.do_not_close(), config.load_globally());
       if (dynamic_module.ok()) {
-        BackgroundFetchManager::singleton(context.singletonManager())->erase(sha256);
+        BackgroundFetchManager::singleton(context->singletonManager())->erase(sha256);
         return DynamicModuleLoadResult{std::move(dynamic_module.value()), nullptr};
       }
       // File exists, hash matches, but failed to load — re-fetching the same SHA256 would
       // produce identical bytes, so there is no point in falling through.
-      incrementLoadFailure(context.scope(), stat_name, RemoteFetchErrorStat);
-      return absl::InvalidArgumentError("Cached remote module failed to load: " +
-                                        std::string(dynamic_module.status().message()));
+      incrementLoadFailure(context, stat_name, ModuleLoadErrorStat);
+      return absl::InvalidArgumentError(
+          absl::StrCat("Cached remote module failed to load: ", dynamic_module.status().message()));
     }
   }
 
   // In NACK mode, reject the config and kick off a background fetch. The control
   // plane will retry, and the next attempt picks up the cached file above.
   if (config.nack_on_cache_miss()) {
-    BackgroundFetchManager::singleton(context.singletonManager())
-        ->fetchIfNeeded(sha256, context.clusterManager(), config.module().remote());
-    incrementLoadFailure(context.scope(), stat_name, RemoteFetchErrorStat);
+    BackgroundFetchManager::singleton(context->singletonManager())
+        ->fetchIfNeeded(sha256, context->clusterManager(), config.module().remote());
+    incrementLoadFailure(context, stat_name, RemoteFetchErrorStat);
+
     return absl::InvalidArgumentError(
-        "Remote module not cached; background fetch in progress. SHA256: " + std::string(sha256));
+        absl::StrCat("Remote module not cached; background fetch in progress. SHA256: ", sha256));
   }
 
   // No cached file — need async fetch, which requires init_manager.
   if (!init_manager.has_value()) {
-    incrementLoadFailure(context.scope(), stat_name, RemoteFetchErrorStat);
+    incrementLoadFailure(context, stat_name, RemoteFetchErrorStat);
     return absl::InvalidArgumentError("Remote module sources require an init manager");
   }
 
   // No on_loaded callback means the caller does not support asynchronous loading, so reject the
   // config rather than silently failing to load the module.
   if (!on_loaded) {
-    incrementLoadFailure(context.scope(), stat_name, RemoteFetchErrorStat);
+    incrementLoadFailure(context, stat_name, RemoteFetchErrorStat);
     return absl::InvalidArgumentError("Remote module sources require an on_loaded callback");
   }
 
@@ -404,25 +414,26 @@ absl::StatusOr<DynamicModuleLoadResult> newDynamicModuleByConfig(
   std::weak_ptr<AsyncLoadingState> weak_state = async_state;
 
   async_state->remote_provider = std::make_unique<RemoteAsyncDataProvider>(
-      context.clusterManager(), *init_manager, config.module().remote(),
-      context.mainThreadDispatcher(), context.api().randomGenerator(),
+      context->clusterManager(), *init_manager, config.module().remote(),
+      context->mainThreadDispatcher(), context->api().randomGenerator(),
       /*allow_empty=*/true,
-      [weak_state, config, &context, stat_name = std::string(stat_name)](const std::string& data) {
+      [stat_name = std::string(stat_name), sha256 = std::string(sha256), weak_state, context,
+       do_not_close = config.do_not_close(),
+       load_globally = config.load_globally()](const std::string& data) {
         auto state = weak_state.lock();
         if (!state) {
           return;
         }
         if (data.empty()) {
-          incrementLoadFailure(context.scope(), stat_name, RemoteFetchErrorStat);
+          incrementLoadFailure(context, stat_name, RemoteFetchErrorStat);
           ENVOY_LOG_TO_LOGGER(
               Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
               "Remote dynamic module fetch returned empty data; module will not be loaded");
           return;
         }
-        auto module_or_error = newDynamicModuleFromBytes(
-            data, config.module().remote().sha256(), config.do_not_close(), config.load_globally());
+        auto module_or_error = newDynamicModuleFromBytes(data, sha256, do_not_close, load_globally);
         if (!module_or_error.ok()) {
-          incrementLoadFailure(context.scope(), stat_name, RemoteFetchErrorStat);
+          incrementLoadFailure(context, stat_name, RemoteFetchErrorStat);
           ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules),
                               error, "Failed to load remote dynamic module from bytes: {}",
                               module_or_error.status().message());

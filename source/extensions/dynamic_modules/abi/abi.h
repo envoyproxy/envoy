@@ -9293,6 +9293,19 @@ envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr
 envoy_dynamic_module_callback_cluster_worker_slot_get(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr);
 
+/**
+ * envoy_dynamic_module_callback_cluster_get_name returns the cluster's CDS name
+ * (ClusterInfo::name()). Callable from any cluster-side callback holding a cluster_envoy_ptr
+ * (on_init, on_scheduled, on_worker_event).
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @param result is the output for the cluster name. The buffer is owned by Envoy and valid for
+ * the duration of the call.
+ */
+void envoy_dynamic_module_callback_cluster_get_name(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
 // =============================================================================
 // Cluster Dynamic Module Callbacks - Metrics
 // =============================================================================

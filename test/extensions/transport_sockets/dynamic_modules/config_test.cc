@@ -100,6 +100,20 @@ TEST_F(DynamicModuleTransportSocketConfigTest, UpstreamValidConfig) {
   EXPECT_NE(nullptr, factory->createTransportSocket(nullptr, nullptr));
 }
 
+// Load the module via the ``module.local.filename`` data source instead of by name.
+TEST_F(DynamicModuleTransportSocketConfigTest, ValidConfigWithLocalFile) {
+  envoy::extensions::transport_sockets::dynamic_modules::v3::DynamicModuleTransportSocket config;
+  config.mutable_dynamic_module_config()->mutable_module()->mutable_local()->set_filename(
+      TestEnvironment::substitute(
+          "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/rust/"
+          "libtransport_socket_integration_test.so"));
+  config.set_transport_socket_name("passthrough");
+
+  auto factory_or_error = upstream_factory_.createTransportSocketFactory(config, context_);
+  ASSERT_TRUE(factory_or_error.ok()) << factory_or_error.status().message();
+  EXPECT_NE(nullptr, factory_or_error.value());
+}
+
 TEST_F(DynamicModuleTransportSocketConfigTest, ImplementsSecureTransport) {
   auto config = buildProtoConfig(kReferenceModule, "passthrough");
   config.set_implements_secure_transport(true);

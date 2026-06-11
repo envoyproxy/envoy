@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/stats/scope.h"
+#include "envoy/server/factory_context.h"
 
 #include "absl/strings/string_view.h"
 
@@ -24,20 +24,21 @@ constexpr absl::string_view PerRouteConfigErrorStat = "per_route_config_error";
 /**
  * Increments the ``dynamic_modules.<leaf>`` counter, tagged with ``config_name``.
  *
- * Callers must pass the server-wide scope (``ServerFactoryContext::scope()``), NOT a listener
- * scope. A load failure makes the extension factory return a non-ok status, which rejects
- * the whole config update; the draft listener and its stats scope are then destroyed before being
- * merged into the live store, so a counter created on the listener scope would silently disappear.
- * The server scope outlives config add/remove/reject.
+ * The counter is created on the context's server-wide scope (``CommonFactoryContext::scope()``),
+ * NOT a listener scope. A load failure makes the extension factory return a non-ok status, which
+ * rejects the whole config update; the draft listener and its stats scope are then destroyed before
+ * being merged into the live store, so a counter created on the listener scope would silently
+ * disappear. The server scope outlives config add/remove/reject.
  *
- * @param scope the server-wide stats scope to create the counter on.
+ * @param context the factory context whose scope the counter is created on. If absent (a caller
+ * without any factory context, e.g. the upstream HTTP conn-pool factory), this is a no-op.
  * @param config_name the configured name of the extension instance using the module (e.g.
  * ``filter_name``, ``transport_socket_name``, ``lb_policy_name``). Falls back to ``default`` if
  * empty.
  * @param leaf one of the ``*Stat`` leaf-name constants above.
  */
-void incrementLoadFailure(Stats::Scope& scope, absl::string_view config_name,
-                          absl::string_view leaf);
+void incrementLoadFailure(OptRef<Server::Configuration::CommonFactoryContext> context,
+                          absl::string_view config_name, absl::string_view leaf);
 
 } // namespace DynamicModules
 } // namespace Extensions

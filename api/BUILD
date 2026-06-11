@@ -213,6 +213,7 @@ proto_library(
         "//envoy/extensions/filters/http/fault/v3:pkg",
         "//envoy/extensions/filters/http/file_server/v3:pkg",
         "//envoy/extensions/filters/http/file_system_buffer/v3:pkg",
+        "//envoy/extensions/filters/http/filter_chain/v3:pkg",
         "//envoy/extensions/filters/http/gcp_authn/v3:pkg",
         "//envoy/extensions/filters/http/geoip/v3:pkg",
         "//envoy/extensions/filters/http/grpc_field_extraction/v3:pkg",

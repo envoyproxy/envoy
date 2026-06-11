@@ -381,6 +381,8 @@ public:
 
   // Accessors.
   const DynamicModuleClusterConfigSharedPtr& config() const { return config_; }
+  // The cluster's CDS name (ClusterInfo::name()).
+  const std::string& clusterName() const { return info()->name(); }
   envoy_dynamic_module_type_cluster_module_ptr inModuleCluster() const {
     return in_module_cluster_;
   }

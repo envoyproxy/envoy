@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cmath>
+
 #include "source/common/http/conn_manager_impl.h"
 #include "source/common/http/context_impl.h"
 #include "source/common/http/date_provider_impl.h"
@@ -106,7 +108,19 @@ public:
     return ServerConnectionPtr{codec_};
   }
   DateProvider& dateProvider() override { return date_provider_; }
-  std::chrono::milliseconds drainTimeout() const override { return std::chrono::milliseconds(100); }
+  std::chrono::milliseconds drainTimeout() const override {
+    std::chrono::milliseconds timeout(100);
+    if (drain_timeout_jitter_percentage_.has_value() &&
+        drain_timeout_jitter_percentage_.value() > 0) {
+      const uint64_t max_jitter_ms = static_cast<uint64_t>(
+          std::ceil(timeout.count() * (drain_timeout_jitter_percentage_.value() / 100.0)));
+      if (max_jitter_ms > 0) {
+        const uint64_t jitter_ms = random_.random() % max_jitter_ms;
+        timeout = std::chrono::milliseconds(static_cast<uint64_t>(timeout.count()) + jitter_ms);
+      }
+    }
+    return timeout;
+  }
   FilterChainFactory& filterFactory() override { return filter_factory_; }
   bool generateRequestId() const override { return true; }
   bool preserveExternalRequestId() const override { return false; }
@@ -116,7 +130,20 @@ public:
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   bool isRoutable() const override { return true; }
   absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
-    return max_connection_duration_;
+    if (!max_connection_duration_.has_value()) {
+      return absl::nullopt;
+    }
+    std::chrono::milliseconds duration = max_connection_duration_.value();
+    if (max_connection_duration_jitter_percentage_.has_value() &&
+        max_connection_duration_jitter_percentage_.value() > 0) {
+      const uint64_t max_jitter_ms = static_cast<uint64_t>(std::ceil(
+          duration.count() * (max_connection_duration_jitter_percentage_.value() / 100.0)));
+      if (max_jitter_ms > 0) {
+        const uint64_t jitter_ms = random_.random() % max_jitter_ms;
+        duration = std::chrono::milliseconds(static_cast<uint64_t>(duration.count()) + jitter_ms);
+      }
+    }
+    return duration;
   }
   bool http1SafeMaxConnectionDuration() const override {
     return http1_safe_max_connection_duration_;
@@ -298,6 +325,8 @@ public:
   uint32_t max_requests_per_connection_{};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
+  absl::optional<double> max_connection_duration_jitter_percentage_;
+  absl::optional<double> drain_timeout_jitter_percentage_;
   bool http1_safe_max_connection_duration_{false};
   std::chrono::milliseconds stream_idle_timeout_{};
   absl::optional<std::chrono::milliseconds> stream_flush_timeout_;
@@ -305,7 +334,7 @@ public:
   std::chrono::milliseconds request_headers_timeout_{};
   std::chrono::milliseconds delayed_close_timeout_{};
   absl::optional<std::chrono::milliseconds> max_stream_duration_;
-  NiceMock<Random::MockRandomGenerator> random_;
+  mutable NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   RequestDecoder* decoder_{};
