@@ -60,7 +60,7 @@ protected:
   public:
     ~ActiveHealthCheckSession() override;
     HealthTransition setUnhealthy(envoy::data::core::v3::HealthCheckFailureType type,
-                                  bool retriable);
+                                  bool retriable, uint64_t http_status_code = 0);
     void onDeferredDeleteBase();
     void start() { onInitialInterval(); }
 
@@ -68,7 +68,8 @@ protected:
     ActiveHealthCheckSession(HealthCheckerImplBase& parent, HostSharedPtr host);
 
     void handleSuccess(bool degraded = false);
-    void handleFailure(envoy::data::core::v3::HealthCheckFailureType type, bool retriable = false);
+    void handleFailure(envoy::data::core::v3::HealthCheckFailureType type, bool retriable = false,
+                       uint64_t http_status_code = 0);
 
     HostSharedPtr host_;
 

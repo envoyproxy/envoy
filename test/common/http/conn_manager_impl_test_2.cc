@@ -497,6 +497,69 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionDurationNoCodec) {
   EXPECT_EQ(1U, stats_.named_.downstream_cx_max_duration_reached_.value());
 }
 
+// Verify that max_connection_duration_jitter extends the duration timer.
+TEST_F(HttpConnectionManagerImplTest, ConnectionDurationJitter) {
+  // Not used in the test.
+  delete codec_;
+
+  max_connection_duration_ = std::chrono::milliseconds(10000); // 10s base
+  max_connection_duration_jitter_percentage_ = 50.0;           // 50% jitter -> up to 5s extra
+
+  // random() returns 2500 -> jitter_ms = 2500 % 5000 = 2500 -> effective = 12500ms
+  EXPECT_CALL(random_, random()).WillOnce(Return(2500));
+
+  Event::MockTimer* connection_duration_timer = setUpTimer();
+  EXPECT_CALL(*connection_duration_timer, enableTimer(std::chrono::milliseconds(12500), _));
+  setup();
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite, _));
+  EXPECT_CALL(*connection_duration_timer, disableTimer());
+
+  connection_duration_timer->invokeCallback();
+
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_max_duration_reached_.value());
+}
+
+// Verify that 0% jitter means no jitter is added.
+TEST_F(HttpConnectionManagerImplTest, ConnectionDurationJitterZeroPercent) {
+  // Not used in the test.
+  delete codec_;
+
+  max_connection_duration_ = std::chrono::milliseconds(10000);
+  max_connection_duration_jitter_percentage_ = 0.0;
+
+  Event::MockTimer* connection_duration_timer = setUpTimer();
+  EXPECT_CALL(*connection_duration_timer, enableTimer(std::chrono::milliseconds(10000), _));
+  setup();
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite, _));
+  EXPECT_CALL(*connection_duration_timer, disableTimer());
+
+  connection_duration_timer->invokeCallback();
+
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_max_duration_reached_.value());
+}
+
+// Verify that when jitter is not set, the base duration is used unchanged.
+TEST_F(HttpConnectionManagerImplTest, ConnectionDurationNoJitter) {
+  // Not used in the test.
+  delete codec_;
+
+  max_connection_duration_ = std::chrono::milliseconds(10000);
+  // max_connection_duration_jitter_percentage_ is absl::nullopt by default
+
+  Event::MockTimer* connection_duration_timer = setUpTimer();
+  EXPECT_CALL(*connection_duration_timer, enableTimer(std::chrono::milliseconds(10000), _));
+  setup();
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite, _));
+  EXPECT_CALL(*connection_duration_timer, disableTimer());
+
+  connection_duration_timer->invokeCallback();
+
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_max_duration_reached_.value());
+}
+
 // Regression test for https://github.com/envoyproxy/envoy/issues/19045
 TEST_F(HttpConnectionManagerImplTest, MaxRequests) {
   max_requests_per_connection_ = 1;
@@ -2282,6 +2345,125 @@ TEST_F(HttpConnectionManagerImplTest, ZombieStreamClosesConnectionOnCodecLowLeve
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite, _));
 
   response_encoder_.stream_.codec_callbacks_->onCodecLowLevelReset();
+}
+
+// Verify that drain_timeout_jitter extends the drain grace period.
+TEST_F(HttpConnectionManagerImplTest, DrainTimeoutJitter) {
+  max_connection_duration_ = std::chrono::milliseconds(10000);
+  drain_timeout_jitter_percentage_ = 50.0; // 50% jitter on the 100ms default drain_timeout
+                                           // -> up to 50ms extra
+  Event::MockTimer* connection_duration_timer = setUpTimer();
+  EXPECT_CALL(*connection_duration_timer, enableTimer(std::chrono::milliseconds(10000), _));
+  setup();
+
+  MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
+        callbacks.setFilterConfigName("");
+        factory(callbacks);
+        return true;
+      }));
+  EXPECT_CALL(*filter, decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*filter, decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
+  startRequest(true, "hello");
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  filter->callbacks_->streamInfo().setResponseCodeDetails("");
+  filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+
+  // random() returns 30 -> jitter_ms = 30 % 50 = 30 -> effective drain timeout = 130ms
+  EXPECT_CALL(random_, random()).WillOnce(Return(30));
+  Event::MockTimer* drain_timer = setUpTimer();
+  EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(130), _));
+  connection_duration_timer->invokeCallback();
+
+  EXPECT_CALL(*codec_, goAway());
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
+  EXPECT_CALL(*connection_duration_timer, disableTimer());
+  EXPECT_CALL(*drain_timer, disableTimer());
+  drain_timer->invokeCallback();
+
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_max_duration_reached_.value());
+}
+
+// Verify that 0% jitter means no jitter is added to the drain timer.
+TEST_F(HttpConnectionManagerImplTest, DrainTimeoutJitterZeroPercent) {
+  max_connection_duration_ = std::chrono::milliseconds(10000);
+  drain_timeout_jitter_percentage_ = 0.0;
+  Event::MockTimer* connection_duration_timer = setUpTimer();
+  EXPECT_CALL(*connection_duration_timer, enableTimer(std::chrono::milliseconds(10000), _));
+  setup();
+
+  MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
+        callbacks.setFilterConfigName("");
+        factory(callbacks);
+        return true;
+      }));
+  EXPECT_CALL(*filter, decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*filter, decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
+  startRequest(true, "hello");
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  filter->callbacks_->streamInfo().setResponseCodeDetails("");
+  filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+
+  Event::MockTimer* drain_timer = setUpTimer();
+  EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(100), _));
+  connection_duration_timer->invokeCallback();
+
+  EXPECT_CALL(*codec_, goAway());
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
+  EXPECT_CALL(*connection_duration_timer, disableTimer());
+  EXPECT_CALL(*drain_timer, disableTimer());
+  drain_timer->invokeCallback();
+}
+
+// Verify that when drain jitter is not set, the base drain timeout is used unchanged.
+TEST_F(HttpConnectionManagerImplTest, DrainTimeoutNoJitter) {
+  max_connection_duration_ = std::chrono::milliseconds(10000);
+  // drain_timeout_jitter_percentage_ is absl::nullopt by default
+  Event::MockTimer* connection_duration_timer = setUpTimer();
+  EXPECT_CALL(*connection_duration_timer, enableTimer(std::chrono::milliseconds(10000), _));
+  setup();
+
+  MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
+        callbacks.setFilterConfigName("");
+        factory(callbacks);
+        return true;
+      }));
+  EXPECT_CALL(*filter, decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*filter, decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
+  startRequest(true, "hello");
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  filter->callbacks_->streamInfo().setResponseCodeDetails("");
+  filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+
+  Event::MockTimer* drain_timer = setUpTimer();
+  EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(100), _));
+  connection_duration_timer->invokeCallback();
+
+  EXPECT_CALL(*codec_, goAway());
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
+  EXPECT_CALL(*connection_duration_timer, disableTimer());
+  EXPECT_CALL(*drain_timer, disableTimer());
+  drain_timer->invokeCallback();
 }
 
 } // namespace Http

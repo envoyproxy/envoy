@@ -60,6 +60,37 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigSuccess) {
   EXPECT_NE(lb_config_or_error.value(), nullptr);
 }
 
+// Load the module via the ``module.local.filename`` data source instead of by name.
+TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigSuccessWithLocalFile) {
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->mutable_module()->mutable_local()->set_filename(
+      Envoy::Extensions::DynamicModules::testSharedObjectPath("lb_round_robin", "c"));
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  EXPECT_TRUE(lb_config_or_error.ok()) << lb_config_or_error.status().message();
+  EXPECT_NE(lb_config_or_error.value(), nullptr);
+}
+
+// Remote module sources are not supported for load balancing policies (no init manager is wired
+// up).
+TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigRemoteSourceRejected) {
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  auto* remote = config.mutable_dynamic_module_config()->mutable_module()->mutable_remote();
+  remote->mutable_http_uri()->set_uri("https://example.com/module.so");
+  remote->mutable_http_uri()->set_cluster("cluster_1");
+  remote->mutable_http_uri()->mutable_timeout()->set_seconds(5);
+  remote->set_sha256("abc123");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  EXPECT_FALSE(lb_config_or_error.ok());
+}
+
 TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigModuleNotFound) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
@@ -69,7 +100,8 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigModuleNotFound) {
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
   EXPECT_FALSE(lb_config_or_error.ok());
-  EXPECT_THAT(lb_config_or_error.status().message(), testing::HasSubstr("failed to load"));
+  EXPECT_THAT(lb_config_or_error.status().message(),
+              testing::HasSubstr("Failed to load dynamic module"));
 }
 
 TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigModuleConfigNewFails) {

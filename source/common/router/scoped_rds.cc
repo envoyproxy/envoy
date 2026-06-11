@@ -434,6 +434,7 @@ absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
   Protobuf::RepeatedPtrField<std::string> clean_removed_resources =
       detectUpdateConflictAndCleanupRemoved(added_resources, removed_resources, exception_msg);
   if (!exception_msg.empty()) {
+    ENVOY_LOG(warn, "srds: scoped route config '{}' rejected: {}", name_, exception_msg);
     return absl::InvalidArgumentError(
         fmt::format("Error adding/updating scoped route(s): {}", exception_msg));
   }
@@ -447,6 +448,8 @@ absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
       added_resources, (srds_init_mgr == nullptr ? localInitManager() : *srds_init_mgr),
       version_info);
   if (!status_or_applied.status().ok()) {
+    ENVOY_LOG(warn, "srds: scoped route config '{}' rejected: {}", name_,
+              status_or_applied.status().message());
     return status_or_applied.status();
   }
   const bool any_applied = status_or_applied.value();
