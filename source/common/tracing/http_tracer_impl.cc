@@ -151,6 +151,12 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
                                                const Http::ResponseTrailerMap* response_trailers,
                                                const StreamInfo::StreamInfo& stream_info,
                                                const Config& tracing_config) {
+  // Early exit if tags are not needed
+  if (!span.exportedSpan()) {
+    span.finishSpan();
+    return;
+  }
+
   // Pre response data.
   if (request_headers) {
     if (request_headers->RequestId()) {

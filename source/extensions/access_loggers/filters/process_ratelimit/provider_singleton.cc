@@ -114,14 +114,14 @@ RateLimiterProviderSingleton::TokenBucketSubscription::getLimiter() {
 
 RateLimiterProviderSingleton::TokenBucketSubscription::TokenBucketSubscription(
     RateLimiterProviderSingleton& parent, absl::string_view resource_name)
-    : Config::SubscriptionBase<envoy::type::v3::TokenBucket>(
-          parent.factory_context_.messageValidationVisitor(), ""),
-      parent_(parent), resource_name_(resource_name), token_bucket_config_hash_(0) {
-  subscription_ = THROW_OR_RETURN_VALUE(
-      parent.factory_context_.xdsManager().subscribeToSingletonResource(
-          resource_name, parent.config_source_, Grpc::Common::typeUrl(getResourceName()),
-          *parent.scope_, *this, resource_decoder_, {}),
-      Config::SubscriptionPtr);
+    : parent_(parent), resource_name_(resource_name),
+      resource_type_helper_(parent.factory_context_.messageValidationVisitor(), "") {
+  subscription_ =
+      THROW_OR_RETURN_VALUE(parent.factory_context_.xdsManager().subscribeToSingletonResource(
+                                resource_name, parent.config_source_,
+                                Grpc::Common::typeUrl(resource_type_helper_.getResourceName()),
+                                *parent.scope_, *this, resource_type_helper_.resourceDecoder(), {}),
+                            Config::SubscriptionPtr);
   subscription_->start({resource_name_});
 }
 

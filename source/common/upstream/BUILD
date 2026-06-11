@@ -37,7 +37,7 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/config:subscription_base_interface",
+        "//source/common/config:resource_type_helper_lib",
         "//source/common/grpc:common_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -56,7 +56,7 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/config:subscription_base_interface",
+        "//source/common/config:resource_type_helper_lib",
         "//source/common/grpc:common_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -315,6 +315,8 @@ envoy_cc_library(
     hdrs = ["prod_cluster_info_factory.h"],
     deps = [
         ":upstream_includes",
+        "//source/common/init:manager_lib",
+        "//source/common/init:watcher_lib",
     ],
 )
 

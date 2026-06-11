@@ -5,12 +5,8 @@
 #include "source/extensions/filters/http/custom_response/factory.h"
 
 #include "test/common/http/common.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/init/mocks.h"
-#include "test/mocks/server/factory_context.h"
-#include "test/mocks/server/mocks.h"
-#include "test/mocks/tracing/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -235,6 +231,52 @@ TEST_F(CustomResponseFilterTest, InvalidSchemeRedirect) {
   EXPECT_EQ(
       1U,
       stats_store_.findCounterByString("stats.custom_response_invalid_uri").value().get().value());
+}
+
+TEST_F(CustomResponseFilterTest, PathRewrite) {
+  createConfig(R"EOF(
+  custom_response_matcher:
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy
+          redirect_action:
+            host_redirect: "redirect.example.com"
+            path_rewrite: "/new/%REQ(x-version)%"
+          status_code: 302
+)EOF");
+  setupFilterAndCallback();
+
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                          {":path", "/original"},
+                                                          {":scheme", "http"},
+                                                          {":authority", "host"},
+                                                          {"x-version", "v2"}};
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "503"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_));
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            ::Envoy::Http::FilterHeadersStatus::StopIteration);
+  // Verify the path was set to the formatted value.
+  EXPECT_EQ("/new/v2", request_headers.getPathValue());
+  EXPECT_EQ("redirect.example.com", request_headers.getHostValue());
+}
+
+TEST_F(CustomResponseFilterTest, PathRewriteInvalid) {
+  EXPECT_THROW_WITH_REGEX(createConfig(R"EOF(
+  custom_response_matcher:
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy
+          redirect_action:
+            host_redirect: "redirect.example.com"
+            path_rewrite: "/new/%INVALID_COMMAND_WITH_NO_CLOSING"
+)EOF"),
+                          EnvoyException, "Failed to create path_rewrite formatter");
 }
 
 } // namespace

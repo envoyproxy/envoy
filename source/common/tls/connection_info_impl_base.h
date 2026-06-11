@@ -54,6 +54,8 @@ public:
   const std::string& sessionId() const override;
   uint16_t ciphersuiteId() const override;
   std::string ciphersuiteString() const override;
+  uint16_t tlsGroupId() const override;
+  absl::string_view tlsGroupString() const override;
   const std::string& tlsVersion() const override;
   const std::string& alpn() const override;
   const std::string& sni() const override;

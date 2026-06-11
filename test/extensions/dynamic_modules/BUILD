@@ -36,9 +36,17 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         ":util",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:hex_lib",
+        "//source/common/crypto:utility_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//test/extensions/dynamic_modules/test_data/c:matcher_no_op_static",
+        "//test/mocks/init:init_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "@envoy_api//envoy/extensions/dynamic_modules/v3:pkg_cc_proto",
     ],
 )
 

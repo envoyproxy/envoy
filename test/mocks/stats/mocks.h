@@ -297,15 +297,20 @@ class MockScope : public TestUtil::TestScope {
 public:
   MockScope(StatName prefix, MockStore& store);
 
-  ScopeSharedPtr createScope(const std::string& name, bool, const ScopeStatsLimitSettings&,
+  ScopeSharedPtr createScope(const std::string& name, bool evictable,
+                             const ScopeStatsLimitSettings& limits,
                              StatsMatcherSharedPtr = nullptr) override {
+    checkCreateScopeArgs(evictable, limits);
     return ScopeSharedPtr(createScope_(name));
   }
-  ScopeSharedPtr scopeFromStatName(StatName name, bool, const ScopeStatsLimitSettings&,
+  ScopeSharedPtr scopeFromStatName(StatName name, bool evictable,
+                                   const ScopeStatsLimitSettings& limits,
                                    StatsMatcherSharedPtr = nullptr) override {
+    checkCreateScopeArgs(evictable, limits);
     return createScope_(symbolTable().toString(name));
   }
 
+  MOCK_METHOD(void, checkCreateScopeArgs, (bool, const ScopeStatsLimitSettings&));
   MOCK_METHOD(ScopeSharedPtr, createScope_, (const std::string& name));
   MOCK_METHOD(CounterOptConstRef, findCounter, (StatName), (const));
   MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const));
@@ -317,6 +322,7 @@ public:
   // to allow tests to inject EXPECT_CALL hooks for those.
   MOCK_METHOD(Counter&, counterFromStatNameWithTags,
               (const StatName&, StatNameTagVectorOptConstRef));
+  // NOLINTNEXTLINE(readability-identifier-naming)
   Counter& counterFromStatNameWithTags_(const StatName& name, StatNameTagVectorOptConstRef);
 
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef,

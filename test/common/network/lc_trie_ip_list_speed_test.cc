@@ -115,7 +115,7 @@ protobufToCidrRanges(const Protobuf::RepeatedPtrField<envoy::config::core::v3::C
 }
 
 // Benchmark linear search IP list implementation.
-static void BM_LinearIpListMatching(benchmark::State& state) {
+static void bmLinearIpListMatching(benchmark::State& state) {
   const size_t num_ranges = state.range(0);
   const size_t num_queries = 1000;
 
@@ -151,7 +151,7 @@ static void BM_LinearIpListMatching(benchmark::State& state) {
 }
 
 // Benchmark LcTrie IP list implementation using existing Network::LcTrie::LcTrie.
-static void BM_LcTrieIpListMatching(benchmark::State& state) {
+static void bmLcTrieIpListMatching(benchmark::State& state) {
   const size_t num_ranges = state.range(0);
   const size_t num_queries = 1000;
 
@@ -191,7 +191,7 @@ static void BM_LcTrieIpListMatching(benchmark::State& state) {
 }
 
 // IPv6 benchmarks
-static void BM_LinearIpListMatchingIPv6(benchmark::State& state) {
+static void bmLinearIpListMatchingIPv6(benchmark::State& state) {
   const size_t num_ranges = state.range(0);
   const size_t num_queries = 1000;
 
@@ -228,7 +228,7 @@ static void BM_LinearIpListMatchingIPv6(benchmark::State& state) {
   state.SetLabel(fmt::format("LinearSearch_IPv6_{}ranges", num_ranges));
 }
 
-static void BM_LcTrieIpListMatchingIPv6(benchmark::State& state) {
+static void bmLcTrieIpListMatchingIPv6(benchmark::State& state) {
   const size_t num_ranges = state.range(0);
   const size_t num_queries = 1000;
 
@@ -270,16 +270,16 @@ static void BM_LcTrieIpListMatchingIPv6(benchmark::State& state) {
 }
 
 // Comprehensive benchmarks for RBAC scenarios
-BENCHMARK(BM_LinearIpListMatching)->Range(10, 5000)->Unit(benchmark::kNanosecond);
-BENCHMARK(BM_LcTrieIpListMatching)->Range(10, 5000)->Unit(benchmark::kNanosecond);
+BENCHMARK(bmLinearIpListMatching)->Range(10, 5000)->Unit(benchmark::kNanosecond);
+BENCHMARK(bmLcTrieIpListMatching)->Range(10, 5000)->Unit(benchmark::kNanosecond);
 
 // Focused benchmarks for common RBAC policy sizes
-BENCHMARK(BM_LinearIpListMatching)->Arg(25)->Arg(50)->Arg(100)->Arg(250)->Arg(500)->Arg(1000);
-BENCHMARK(BM_LcTrieIpListMatching)->Arg(25)->Arg(50)->Arg(100)->Arg(250)->Arg(500)->Arg(1000);
+BENCHMARK(bmLinearIpListMatching)->Arg(25)->Arg(50)->Arg(100)->Arg(250)->Arg(500)->Arg(1000);
+BENCHMARK(bmLcTrieIpListMatching)->Arg(25)->Arg(50)->Arg(100)->Arg(250)->Arg(500)->Arg(1000);
 
 // IPv6 benchmarks for realistic dual-stack scenarios
-BENCHMARK(BM_LinearIpListMatchingIPv6)->Arg(50)->Arg(200)->Arg(500);
-BENCHMARK(BM_LcTrieIpListMatchingIPv6)->Arg(50)->Arg(200)->Arg(500);
+BENCHMARK(bmLinearIpListMatchingIPv6)->Arg(50)->Arg(200)->Arg(500);
+BENCHMARK(bmLcTrieIpListMatchingIPv6)->Arg(50)->Arg(200)->Arg(500);
 
 } // namespace Address
 } // namespace Network

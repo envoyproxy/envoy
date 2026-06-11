@@ -6,6 +6,7 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/options.h"
 #include "test/test_common/environment.h"
 
@@ -103,7 +104,8 @@ class LinuxContainerCpuStatsReaderTest : public testing::Test {
 public:
   LinuxContainerCpuStatsReaderTest()
       : api_(Api::createApiForTest()),
-        context_(dispatcher_, options_, *api_, ProtobufMessage::getStrictValidationVisitor()),
+        context_(dispatcher_, options_, *api_, ProtobufMessage::getStrictValidationVisitor(),
+                 runtime_),
         cpu_allocated_path_(TestEnvironment::temporaryPath("cgroup_cpu_allocated_stats")),
         cpu_times_path_(TestEnvironment::temporaryPath("cgroup_cpu_times_stats")) {
     // Default sane values so tests only need to set what they care about
@@ -129,6 +131,7 @@ private:
   Event::MockDispatcher dispatcher_;
   Api::ApiPtr api_;
   Server::MockOptions options_;
+  testing::NiceMock<Runtime::MockLoader> runtime_;
   Server::Configuration::ResourceMonitorFactoryContextImpl context_;
   std::string cpu_allocated_path_;
   std::string cpu_times_path_;
@@ -259,7 +262,8 @@ class LinuxContainerCpuStatsReaderV2Test : public testing::Test {
 public:
   LinuxContainerCpuStatsReaderV2Test()
       : api_(Api::createApiForTest()),
-        context_(dispatcher_, options_, *api_, ProtobufMessage::getStrictValidationVisitor()),
+        context_(dispatcher_, options_, *api_, ProtobufMessage::getStrictValidationVisitor(),
+                 runtime_),
         v2_cpu_stat_path_(TestEnvironment::temporaryPath("cgroupv2_cpu_stat")),
         v2_cpu_max_path_(TestEnvironment::temporaryPath("cgroupv2_cpu_max")),
         v2_cpu_effective_path_(TestEnvironment::temporaryPath("cgroupv2_cpu_effective")) {}
@@ -288,6 +292,7 @@ private:
   Event::MockDispatcher dispatcher_;
   Api::ApiPtr api_;
   Server::MockOptions options_;
+  testing::NiceMock<Runtime::MockLoader> runtime_;
   Server::Configuration::ResourceMonitorFactoryContextImpl context_;
   std::string v2_cpu_stat_path_;
   std::string v2_cpu_max_path_;
@@ -508,8 +513,9 @@ TEST(LinuxContainerCpuStatsReaderFactoryTest, CreatesV2ReaderWhenV2FilesExist) {
   Api::ApiPtr api = Api::createApiForTest();
   Event::MockDispatcher dispatcher;
   Server::MockOptions options;
+  testing::NiceMock<Runtime::MockLoader> runtime;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
-      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
 
   Filesystem::MockInstance mock_fs;
   EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(true));
@@ -524,8 +530,9 @@ TEST(LinuxContainerCpuStatsReaderFactoryTest, CreatesV1ReaderWhenOnlyV1FilesExis
   Api::ApiPtr api = Api::createApiForTest();
   Event::MockDispatcher dispatcher;
   Server::MockOptions options;
+  testing::NiceMock<Runtime::MockLoader> runtime;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
-      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
 
   Filesystem::MockInstance mock_fs;
 
@@ -550,8 +557,9 @@ TEST(LinuxContainerCpuStatsReaderFactoryTest, ThrowsWhenNoCgroupFilesExist) {
   Api::ApiPtr api = Api::createApiForTest();
   Event::MockDispatcher dispatcher;
   Server::MockOptions options;
+  testing::NiceMock<Runtime::MockLoader> runtime;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
-      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
 
   Filesystem::MockInstance mock_fs;
 

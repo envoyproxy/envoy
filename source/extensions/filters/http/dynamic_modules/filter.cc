@@ -33,6 +33,8 @@ void DynamicModuleHttpFilter::onStreamComplete() {
 
 void DynamicModuleHttpFilter::onDestroy() {
   destroyed_ = true;
+  // Clear the cached dispatcher so any concurrent foreign-thread `commit()` short-circuits.
+  cached_dispatcher_.store(nullptr, std::memory_order_release);
   // Pair with the register in maybeRegisterDownstreamWatermarkCallbacks(); the underlying
   // removeDownstreamWatermarkCallbacks() asserts the callback was previously added.
   if (decoder_callbacks_ != nullptr && downstream_watermark_callbacks_registered_) {

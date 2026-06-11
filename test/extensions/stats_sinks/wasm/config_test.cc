@@ -7,7 +7,8 @@
 #include "source/extensions/stat_sinks/wasm/wasm_stat_sink_impl.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/server/server_lifecycle_notifier.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"

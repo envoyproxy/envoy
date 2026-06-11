@@ -168,8 +168,6 @@ envoy_extension_cc_test(
         "//source/extensions/transport_sockets/alts:tsi_socket",
         "//test/integration:http_integration_lib",
         "//test/integration/filters:decode_dynamic_metadata_filter_lib",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",

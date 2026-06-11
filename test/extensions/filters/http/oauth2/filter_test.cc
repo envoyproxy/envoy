@@ -316,6 +316,34 @@ public:
     return c;
   }
 
+  // Test helpers exposing private OAuth2Filter methods. OAuth2Filter declares
+  // `friend class OAuth2Test`, but `TEST_F(OAuth2Test, ...)` expands to a class
+  // *derived* from OAuth2Test, and C++ friendship is not inherited — so the
+  // test bodies cannot call the privates directly. These wrappers bridge that.
+  //
+  // We also prime `filter_->config_` here. In production it is set inside
+  // resolveAndSetActiveConfig() which only runs from decodeHeaders(); the tests
+  // below (DecryptTokenSameSecret, DecryptTokenDecryptionFails,
+  // DecryptTokenSpuriousSuccessReturnsOriginalInput, GarbagePlaintextCookieDoesNotCrash)
+  // call encryptToken/decryptToken directly without first going through
+  // decodeHeaders, so without this priming they would dereference a null
+  // config_ inside encryptToken/decryptToken (segfault at small offset, e.g. 0x318).
+  // DecryptTokenEmpty doesn't crash because decryptToken early-returns on empty
+  // input before touching config_.
+  void primeActiveConfigForTest() const {
+    if (filter_->config_ == nullptr) {
+      filter_->resolveAndSetActiveConfig();
+    }
+  }
+  std::string encryptTokenForTest(const std::string& token) const {
+    primeActiveConfigForTest();
+    return filter_->encryptToken(token);
+  }
+  std::string decryptTokenForTest(const std::string& ct) const {
+    primeActiveConfigForTest();
+    return filter_->decryptToken(ct);
+  }
+
   // Validates the behavior of the cookie validator.
   void expectValidCookies(const CookieNames& cookie_names, const std::string& cookie_domain) {
     // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
@@ -368,6 +396,56 @@ public:
   Stats::Scope& scope_{*store_.rootScope()};
   Event::SimulatedTimeSystem test_time_;
   NiceMock<Random::MockRandomGenerator> test_random_;
+};
+
+// Fixture for tests that exercise the allowed_redirect_domains allow-list and the
+// original_request_uri override. Skips the default init() done by OAuth2Test so each
+// test can install its own config via init(getAllowedDomainsConfig(...)).
+class OAuth2AllowedDomainsTest : public OAuth2Test {
+public:
+  OAuth2AllowedDomainsTest() : OAuth2Test(false) {}
+
+  FilterConfigSharedPtr getAllowedDomainsConfig(
+      const std::vector<std::string>& allowed_domains,
+      const std::string& redirect_uri = "%REQ(:scheme)%://%REQ(:authority)%/_oauth",
+      const std::string& original_request_uri = "") {
+    envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+
+    auto* endpoint = p.mutable_token_endpoint();
+    endpoint->set_cluster("auth.example.com");
+    endpoint->set_uri("auth.example.com/_oauth");
+    endpoint->mutable_timeout()->set_seconds(1);
+
+    p.set_redirect_uri(redirect_uri);
+    p.set_original_request_uri(original_request_uri);
+    for (const auto& domain : allowed_domains) {
+      p.add_allowed_redirect_domains(domain);
+    }
+
+    p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+    p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+    p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+    p.set_forward_bearer_token(true);
+    p.set_stat_prefix("my_prefix");
+    p.add_auth_scopes("user");
+    p.add_auth_scopes("openid");
+    p.add_auth_scopes("email");
+    p.add_resources("oauth2-resource");
+    p.add_resources("http://example.com");
+    p.add_resources("https://example.com/some/path%2F..%2F/utf8\xc3\x83;foo=bar?var1=1&var2=2");
+
+    auto* credentials = p.mutable_credentials();
+    credentials->set_client_id(TEST_CLIENT_ID);
+    credentials->mutable_token_secret()->set_name("secret");
+    credentials->mutable_hmac_secret()->set_name("hmac");
+    p.mutable_use_refresh_token()->set_value(false);
+
+    MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
+
+    auto secret_reader = std::make_shared<MockSecretReader>();
+    return std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
+                                          secret_reader, scope_, "test.");
+  }
 };
 
 // Verifies that the OAuth SDSSecretReader correctly updates dynamic generic secret.
@@ -1881,6 +1959,378 @@ TEST_F(OAuth2Test, RedirectToOAuthServerWithInvalidCSRFToken) {
            "&response_type=code"
            "&scope=" +
            TEST_ENCODED_AUTH_SCOPES + "&state=" + TEST_ENCODED_STATE + "&resource=oauth2-resource" +
+           "&resource=http%3A%2F%2Fexample.com"
+           "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%3Dbar%"
+           "3Fvar1%3D1%26var2%3D2"},
+  };
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+/**
+ * Scenario: redirect_uri is built from X-Forwarded-* headers so that Envoy can sit behind a
+ * gateway. An attacker injects X-Forwarded-Host: evil.com to try to make Envoy send the
+ * OAuth flow to a host they control. allowed_redirect_domains restricts valid hosts to the
+ * legitimate public host.
+ *
+ * Expected behavior: the formatted redirect_uri resolves to evil.com, fails the allow-list
+ * check, and the filter rejects the request with 401 before contacting the IdP.
+ */
+TEST_F(OAuth2AllowedDomainsTest, RedirectUriHostNotInAllowList) {
+  init(getAllowedDomainsConfig(
+      /*allowed_domains=*/{"app.example.com"},
+      /*redirect_uri=*/
+      "%REQ(x-forwarded-proto?:scheme)%://%REQ(x-forwarded-host?:authority)%/_oauth"));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/original_path"},
+      {Http::Headers::get().Host.get(), "internal.svc.cluster.local"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      // Attacker-injected header — formatter will substitute "evil.com" into redirect_uri.
+      {"x-forwarded-host", "evil.com"},
+      {"x-forwarded-proto", "https"},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+/**
+ * Scenario: original_request_uri is built from X-Forwarded-* headers so Envoy can sit behind a
+ * gateway. An attacker injects X-Forwarded-Host: evil.com to try to bake a malicious host into
+ * the OAuth `state` parameter (which is used as the post-auth redirect target). redirect_uri is
+ * a static allowed value so it passes its own check — ensuring this test specifically exercises
+ * the original_request_uri allow-list branch.
+ *
+ * Expected behavior: the formatted original_request_uri resolves to evil.com, fails the
+ * allow-list check, and the filter rejects the request with 401 before contacting the IdP.
+ */
+TEST_F(OAuth2AllowedDomainsTest, OriginalRequestUriHostNotInAllowList) {
+  init(getAllowedDomainsConfig(
+      /*allowed_domains=*/{"app.example.com"},
+      /*redirect_uri=*/"https://app.example.com/_oauth",
+      /*original_request_uri=*/
+      "%REQ(x-forwarded-proto?:scheme)%://%REQ(x-forwarded-host?:authority)%"));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/original_path"},
+      {Http::Headers::get().Host.get(), "internal.svc.cluster.local"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      // Attacker-injected header — formatter will substitute "evil.com" into the state URL.
+      {"x-forwarded-host", "evil.com"},
+      {"x-forwarded-proto", "https"},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+/**
+ * Scenario: the formatted redirect_uri is not a parseable absolute URL (e.g. the formatter
+ * template evaluated to garbage because an expected header was missing). When an allow-list is
+ * configured, this must be rejected to avoid producing a malformed URL in the OAuth2 authorize
+ * request. Parse-validity is only checked when allowed_redirect_domains is non-empty so that
+ * deployments that have not opted into the allow-list feature see no behavior change.
+ *
+ * Expected behavior: the filter rejects the request with 401 before contacting the IdP.
+ */
+TEST_F(OAuth2AllowedDomainsTest, RedirectUriParseFailureIsRejected) {
+  init(getAllowedDomainsConfig(
+      // Allow-list must be populated for the parse check to run.
+      /*allowed_domains=*/{"app.example.com"},
+      // Literal, non-URL value: Http::Utility::Url::initialize() returns false on this input.
+      /*redirect_uri=*/"not-a-url"));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/original_path"},
+      {Http::Headers::get().Host.get(), "app.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+/**
+ * Scenario: redirect_uri is valid but the formatted original_request_uri is not a parseable
+ * absolute URL. Same rationale as RedirectUriParseFailureIsRejected — rejection is gated on
+ * allowed_redirect_domains being configured.
+ *
+ * Expected behavior: the filter rejects the request with 401 before contacting the IdP.
+ */
+TEST_F(OAuth2AllowedDomainsTest, OriginalRequestUriParseFailureIsRejected) {
+  init(getAllowedDomainsConfig(
+      /*allowed_domains=*/{"app.example.com"},
+      /*redirect_uri=*/"https://app.example.com/_oauth",
+      // Literal, non-URL value: Http::Utility::Url::initialize() returns false on this input.
+      /*original_request_uri=*/"not-a-url"));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/original_path"},
+      {Http::Headers::get().Host.get(), "app.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+/**
+ * Scenario: allowed_redirect_domains covers both the formatted redirect_uri and
+ * original_request_uri.
+ *
+ * Expected behavior: the filter passes both allow-list checks and proceeds with the
+ * usual 302 redirect to the identity provider.
+ */
+TEST_F(OAuth2AllowedDomainsTest, AllowedRedirectDomainsHappyPath) {
+  init(getAllowedDomainsConfig(
+      /*allowed_domains=*/{"traffic.example.com"},
+      /*redirect_uri=*/"%REQ(:scheme)%://%REQ(:authority)%/_oauth",
+      /*original_request_uri=*/"%REQ(:scheme)%://%REQ(:authority)%"));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER +
+           ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().Location.get(),
+       "https://auth.example.com/oauth/"
+       "authorize/?client_id=" +
+           TEST_CLIENT_ID + "&code_challenge=" + TEST_CODE_CHALLENGE +
+           "&code_challenge_method=S256" +
+           "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
+           "&response_type=code"
+           "&scope=" +
+           TEST_ENCODED_AUTH_SCOPES + "&state=" + TEST_ENCODED_STATE + "&resource=oauth2-resource" +
+           "&resource=http%3A%2F%2Fexample.com"
+           "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%3Dbar%"
+           "3Fvar1%3D1%26var2%3D2"},
+  };
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+/**
+ * Scenario: allowed_redirect_domains is the empty list (feature unconfigured). redirect_uri
+ * is set to a host that any non-empty allow-list would reject. This verifies that the empty
+ * list is a genuine no-op and backward-compatible — the filter proceeds to the IdP redirect
+ * without running the allow-list check.
+ */
+TEST_F(OAuth2AllowedDomainsTest, AllowedDomainsEmptyListIsNoOp) {
+  init(getAllowedDomainsConfig(
+      /*allowed_domains=*/{},
+      /*redirect_uri=*/"https://arbitrary-host.example.net/_oauth"));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER +
+           ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().Location.get(),
+       "https://auth.example.com/oauth/"
+       "authorize/?client_id=" +
+           TEST_CLIENT_ID + "&code_challenge=" + TEST_CODE_CHALLENGE +
+           "&code_challenge_method=S256"
+           "&redirect_uri=https%3A%2F%2Farbitrary-host.example.net%2F_oauth"
+           "&response_type=code"
+           "&scope=" +
+           TEST_ENCODED_AUTH_SCOPES + "&state=" + TEST_ENCODED_STATE + "&resource=oauth2-resource" +
+           "&resource=http%3A%2F%2Fexample.com"
+           "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%3Dbar%"
+           "3Fvar1%3D1%26var2%3D2"},
+  };
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+/**
+ * Scenario: The OAuth filter receives a callback from the IdP. allowed_redirect_domains is set
+ * to a wildcard pattern, and the host of the URL decoded from the `state` parameter matches
+ * the wildcard.
+ *
+ * Expected behavior: the filter accepts the callback and proceeds with the token exchange
+ * (asyncGetAccessToken is called).
+ */
+TEST_F(OAuth2AllowedDomainsTest, AllowedDomainsWildcardMatchOnCallback) {
+  init(getAllowedDomainsConfig(/*allowed_domains=*/{"*.example.com"}));
+
+  // TEST_ENCODED_STATE encodes the URL "https://traffic.example.com/original_path?var1=1&var2=2"
+  // whose host "traffic.example.com" matches "*.example.com".
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
+      {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
+                                                  "https://traffic.example.com" + TEST_CALLBACK,
+                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+/**
+ * Scenario: An attacker crafts an OAuth2 callback whose `state` parameter decodes to a URL on
+ * a host that is not in allowed_redirect_domains. Without this check, the filter would redirect
+ * the user to the attacker-controlled host after token exchange — a classic open redirect.
+ *
+ * Expected behavior: validateState() rejects the callback before the token exchange, so
+ * asyncGetAccessToken is not called and a 401 is returned.
+ */
+TEST_F(OAuth2AllowedDomainsTest, AllowedDomainsRejectsCallbackStateHost) {
+  // Allow-list that does NOT cover "traffic.example.com" (the host encoded in TEST_ENCODED_STATE).
+  init(getAllowedDomainsConfig(/*allowed_domains=*/{"other.example.com"}));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
+      {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  // Token exchange must not be attempted when the state host is rejected.
+  EXPECT_CALL(*oauth_client_, asyncGetAccessToken(_, _, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+/**
+ * Scenario: Envoy sits behind a gateway that terminates the public hostname. :authority is the
+ * internal host, X-Forwarded-Host / X-Forwarded-Proto carry the public one. Both redirect_uri
+ * and original_request_uri are formatter templates that prefer the forwarded headers.
+ *
+ * Expected behavior: the formatted redirect_uri and the URL encoded into state both use the
+ * public host (from X-Forwarded-*), not the internal :authority. allowed_redirect_domains
+ * covers the public host so the checks pass, and a normal 302 to the IdP is issued.
+ */
+TEST_F(OAuth2AllowedDomainsTest, ForwardedHeadersDriveRedirectAndState) {
+  init(getAllowedDomainsConfig(
+      /*allowed_domains=*/{"app.example.com"},
+      /*redirect_uri=*/
+      "%REQ(x-forwarded-proto?:scheme)%://%REQ(x-forwarded-host?:authority)%/_oauth",
+      /*original_request_uri=*/
+      "%REQ(x-forwarded-proto?:scheme)%://%REQ(x-forwarded-host?:authority)%"));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
+      // :authority is the internal hostname Envoy sees.
+      {Http::Headers::get().Host.get(), "internal.svc.cluster.local"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      // The gateway in front of Envoy forwards the public host/proto here.
+      {"x-forwarded-host", "app.example.com"},
+      {"x-forwarded-proto", "https"},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  // State URL decoded from this base64 is:
+  //   https://app.example.com/original_path?var1=1&var2=2
+  static const std::string TEST_ENCODED_STATE_PUBLIC_HOST =
+      "eyJ1cmwiOiJodHRwczovL2FwcC5leGFtcGxlLmNvbS9vcmlnaW5hbF9wYXRoP3ZhcjE9MSZ2YXIyPTIiLCJjc3JmX3"
+      "Rva2VuIjoiMDAwMDAwMDAwNzViY2QxNS5uYTZrcnU0eDFwSGdvY1NJZVUvbWR0SFluNThHaDFicXdlUzRYWG9pcVZn"
+      "PSIsImZsb3dfaWQiOiIwMDAwMDAwMDA3NWJjZDE1In0";
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER +
+           ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().Location.get(),
+       "https://auth.example.com/oauth/"
+       "authorize/?client_id=" +
+           TEST_CLIENT_ID + "&code_challenge=" + TEST_CODE_CHALLENGE +
+           "&code_challenge_method=S256"
+           "&redirect_uri=https%3A%2F%2Fapp.example.com%2F_oauth"
+           "&response_type=code"
+           "&scope=" +
+           TEST_ENCODED_AUTH_SCOPES + "&state=" + TEST_ENCODED_STATE_PUBLIC_HOST +
+           "&resource=oauth2-resource"
            "&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%3Dbar%"
            "3Fvar1%3D1%26var2%3D2"},
@@ -5424,6 +5874,120 @@ TEST_F(OAuth2Test, OAuthCallbackGetAccessTokenSyncContinue) {
       .WillOnce(Return(OAuth2Client::OAuthState::FailureContinue));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+}
+
+/**
+ * Scenario: decryptToken is called with an empty string.
+ * Expected behavior: returns empty string.
+ */
+TEST_F(OAuth2Test, DecryptTokenEmpty) { EXPECT_EQ(decryptTokenForTest(""), ""); }
+
+/**
+ * Scenario: decryptToken is called with a ciphertext that was encrypted with the same HMAC secret.
+ * Expected behavior: returns the original plaintext.
+ */
+TEST_F(OAuth2Test, DecryptTokenSameSecret) {
+  const std::string plaintext = "some_access_token_value";
+  const std::string ciphertext = encryptTokenForTest(plaintext);
+  EXPECT_EQ(decryptTokenForTest(ciphertext), plaintext);
+}
+
+/**
+ * Scenario: decryptToken is called with a token that is not a valid AES ciphertext (e.g. a
+ * legacy unencrypted token or a ciphertext from a different key where PKCS#7 padding fails).
+ * Expected behavior: returns the original input unchanged and emits an error log.
+ */
+TEST_F(OAuth2Test, DecryptTokenDecryptionFails) {
+  // This looks like a bearer token but is not valid AES-CBC ciphertext encrypted under the
+  // filter's HMAC secret. EVP_DecryptFinal_ex will reject the PKCS#7 padding.
+  const std::string unencrypted = "j5Vhtnz_uyhDVTrSri3GzLoroprQYVoXsp61kIq_JC4";
+  EXPECT_LOG_CONTAINS("error", "failed to decrypt token",
+                      { EXPECT_EQ(decryptTokenForTest(unencrypted), unencrypted); });
+}
+
+/**
+ * Scenario: decryptToken is called with a ciphertext that, when AES-CBC decrypted under the
+ * filter's HMAC secret, passes the PKCS#7 padding check but produces bytes that are not valid
+ * HTTP header field values (e.g. null bytes, control characters).
+ *
+ * This is the "spurious success" path: PKCS#7 padding validation passes with ~1/256 probability
+ * when decrypting ciphertext under the wrong key, but the resulting "plaintext" is binary garbage.
+ * The same path is reachable by explicitly encrypting a binary string with the correct key.
+ *
+ * Before the fix: decryptToken returns the garbage plaintext, which later crashes Envoy with
+ * HeaderStringValidator::assertValid() when the value is used in a Cookie header.
+ * After the fix: decryptToken detects the invalid plaintext and returns the original ciphertext.
+ */
+TEST_F(OAuth2Test, DecryptTokenSpuriousSuccessReturnsOriginalInput) {
+  // Encrypt a string containing bytes that are not valid HTTP header field values
+  // (null byte, control chars, high bytes). This ciphertext decrypts correctly under the filter's
+  // key, so EVP_DecryptFinal_ex succeeds, but the resulting plaintext fails headerValueIsValid.
+  const std::string binary_plaintext("\x00\x01\x02\xff", 4);
+  const std::string ciphertext = encryptTokenForTest(binary_plaintext);
+  // Tighter assertion: match on the message that is unique to the new headerValueIsValid branch
+  // ("plaintext is not a valid header value"), rather than the generic "failed to decrypt token"
+  // prefix that is shared with the pre-existing EVP_DecryptFinal_ex failure path. A regression
+  // that re-introduced the crash via the old error path would emit a different message and fail
+  // this test.
+  EXPECT_LOG_CONTAINS("error", "plaintext is not a valid header value",
+                      { EXPECT_EQ(decryptTokenForTest(ciphertext), ciphertext); });
+}
+
+/**
+ * Scenario: A request arrives with a RefreshToken cookie whose AES-CBC decryption "succeeds"
+ * (PKCS#7 padding is valid) but produces binary garbage that is not a valid HTTP header value.
+ * This can happen when the HMAC secret has been rotated and the old ciphertext accidentally passes
+ * the padding check under the new key (~1/256 probability per token per request).
+ *
+ * Before the fix: decryptAndUpdateOAuthTokenCookies crashes with HeaderStringValidator::assertValid
+ * because the binary plaintext is StrJoin-ed into the Cookie header value.
+ * After the fix: decodeHeaders continues gracefully and returns a redirect to the OAuth server.
+ */
+TEST_F(OAuth2Test, GarbagePlaintextCookieDoesNotCrash) {
+  // Create a ciphertext that decrypts (under the filter's key) to binary bytes that are not valid
+  // HTTP header field values, simulating the spurious-success case.
+  const std::string binary_plaintext("\x00\x01\x02\xff", 4);
+  const std::string garbage_ciphertext = encryptTokenForTest(binary_plaintext);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/original_path"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Cookie.get(), "RefreshToken=" + garbage_ciphertext},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  // Assert the redirect actually happened: filter took the redirect path (302 with Location)
+  // rather than crashing or returning a 401. We only check Status=="302" and Location is set
+  // to avoid brittleness from Set-Cookie values, nonce, and CSRF in the full header map.
+  // redirectToOAuthServer calls decoder_callbacks_->encodeHeaders with end_stream=true.
+  EXPECT_CALL(decoder_callbacks_,
+              encodeHeaders_(testing::Truly([](const Http::ResponseHeaderMap& headers) {
+                               return headers.getStatusValue() == "302" &&
+                                      !headers.getLocationValue().empty();
+                             }),
+                             true));
+
+  // Tighter assertion: match on the message that is unique to the new headerValueIsValid branch.
+  // A regression that re-introduced the crash via the old EVP_DecryptFinal_ex-failure path would
+  // emit a different message and cause this test to fail.
+  // Before the fix this line would trigger a crash (ENVOY_BUG assertion in HeaderStringValidator).
+  // After the fix it should complete without crashing and redirect to the OAuth server.
+  EXPECT_LOG_CONTAINS("error", "plaintext is not a valid header value", {
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(request_headers, false));
+  });
+
+  // After the fix, the Cookie header should contain the original (valid ASCII) ciphertext,
+  // not the binary garbage that decryption produced.
+  auto cookies = Http::Utility::parseCookies(request_headers);
+  // Use ASSERT_TRUE first so the test fails clearly (not with out_of_range) if the cookie were
+  // dropped instead of preserved.
+  ASSERT_TRUE(cookies.contains("RefreshToken"));
+  EXPECT_EQ(cookies.at("RefreshToken"), garbage_ciphertext);
 }
 
 } // namespace Oauth2

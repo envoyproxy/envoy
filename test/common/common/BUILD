@@ -4,12 +4,23 @@ load(
     "envoy_cc_benchmark_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_cc_benchmark_binary(
+    name = "fine_grain_logger_benchmark",
+    srcs = ["fine_grain_logger_benchmark.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/common:minimal_logger_lib",
+        "@benchmark",
+    ],
+)
 
 envoy_cc_test(
     name = "backoff_strategy_test",
@@ -95,6 +106,21 @@ envoy_cc_fuzz_test(
     # Fuzzer is stable, no bugs, simple test target; avoid emitting CO2.
     tags = ["no_fuzz"],
     deps = ["//source/common/common:base64_lib"],
+)
+
+envoy_cc_fuzz_test(
+    name = "base64_differential_fuzz_test",
+    srcs = ["base64_differential_fuzz_test.cc"],
+    corpus = "base64_differential_corpus",
+    rbe_pool = "6gig",
+    # Fuzzer is stable, no bugs, simple test target; avoid emitting CO2.
+    tags = ["no_fuzz"],
+    deps = [
+        ":base64_legacy_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:base64_lib",
+        "//test/fuzz:utility_lib",
+    ],
 )
 
 envoy_cc_fuzz_test(
@@ -245,6 +271,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/common:minimal_logger_lib",
+        "//source/common/version:version_string_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
     ],
@@ -426,6 +453,28 @@ envoy_cc_benchmark_binary(
         "//source/common/common:utility_lib",
         "@benchmark",
         "@re2",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "base64_legacy_lib",
+    srcs = ["base64_legacy.cc"],
+    hdrs = ["base64_legacy.h"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:empty_string",
+    ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "base64_speed_test",
+    srcs = ["base64_speed_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        ":base64_legacy_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:base64_lib",
+        "@benchmark",
     ],
 )
 

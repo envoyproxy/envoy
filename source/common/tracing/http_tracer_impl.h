@@ -74,8 +74,8 @@ public:
 class HttpTracerUtility {
 public:
   /**
-   * Adds information obtained from the downstream request headers as tags to the active span.
-   * Then finishes the span.
+   * Adds information obtained from the downstream request headers as tags if the span will be
+   * exported (per Span::exportedSpan), then finishes the span.
    */
   static void finalizeDownstreamSpan(Span& span, const Http::RequestHeaderMap* request_headers,
                                      const Http::ResponseHeaderMap* response_headers,

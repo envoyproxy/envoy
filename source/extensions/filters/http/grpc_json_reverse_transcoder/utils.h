@@ -17,6 +17,7 @@ namespace GrpcJsonReverseTranscoder {
 inline constexpr char reserved_chars[] = " %:?#[]@!$&'()*+,;=";
 
 // This builds grpc-message header value from body data.
+// NOLINTNEXTLINE(readability-identifier-naming)
 std::string BuildGrpcMessage(Envoy::Buffer::Instance& body_data);
 
 // Takes the json object and a path and returns the value of the json object at
@@ -28,6 +29,7 @@ std::string BuildGrpcMessage(Envoy::Buffer::Instance& body_data);
 // [-_./0-9a-zA-Z].
 // TODO(numanelahi): Add `~` to the list of characters that are not percent
 // encoded.
+// NOLINTNEXTLINE(readability-identifier-naming)
 absl::optional<std::string> GetNestedJsonValueAsString(const nlohmann::json& object,
                                                        const std::string& key,
                                                        bool has_one_path_segment);
@@ -62,6 +64,7 @@ absl::optional<std::string> GetNestedJsonValueAsString(const nlohmann::json& obj
 // param_set = {"a", "e"}, and
 // key_prefix = "prefix"
 // then query_string = "prefix.f=hello%20world&prefix.g=1.234"
+// NOLINTNEXTLINE(readability-identifier-naming)
 void BuildQueryParamString(const nlohmann::json& object,
                            const absl::flat_hash_set<std::string>& ignore_list,
                            std::string* query_string, std::string key_prefix = "");
@@ -86,6 +89,7 @@ void BuildQueryParamString(const nlohmann::json& object,
 // `/v1/projects/123456789/shelves/fiction?description=This%20is%20a%20test%20description&theme=Kids`,
 // when the http_body_field is "shelf", adding `theme` and `description` as
 // query parameters to the http path.
+// NOLINTNEXTLINE(readability-identifier-naming)
 absl::StatusOr<std::string> BuildPath(nlohmann::json& request, std::string http_rule_path,
                                       std::string http_body_field);
 

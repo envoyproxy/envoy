@@ -20,8 +20,6 @@
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/runtime/mocks.h"
-#include "test/mocks/secret/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/upstream/basic_resource_limit.h"
