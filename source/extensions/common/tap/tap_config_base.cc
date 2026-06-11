@@ -235,10 +235,14 @@ void Utility::bodyBytesToString(envoy::data::tap::v3::TraceWrapper& trace,
 }
 
 void TapConfigBaseImpl::PerTapSinkHandleManagerImpl::submitTrace(TraceWrapperPtr&& trace) {
-  if (parent_.tap_enabled_.has_value() && !stamped_) {
-    // Stamp the configured default_value. When runtime_key is active the effective
-    // rate may differ; this is documented on the applied_sample_rate field.
-    trace->mutable_applied_sample_rate()->MergeFrom(parent_.tap_enabled_->default_value());
+  // Only HTTP taps honor tap_enabled (transport socket tap ignores it), so only HTTP
+  // traces carry the stamp. The configured default_value is stamped; when runtime_key
+  // is active the effective rate may differ, as documented on applied_sample_rate.
+  const auto trace_case = trace->trace_case();
+  if (parent_.tap_enabled_.has_value() && !stamped_ &&
+      (trace_case == envoy::data::tap::v3::TraceWrapper::TraceCase::kHttpBufferedTrace ||
+       trace_case == envoy::data::tap::v3::TraceWrapper::TraceCase::kHttpStreamedTraceSegment)) {
+    *trace->mutable_applied_sample_rate() = parent_.tap_enabled_->default_value();
     stamped_ = true;
   }
   Utility::bodyBytesToString(*trace, parent_.sink_format_);

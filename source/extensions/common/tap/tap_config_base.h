@@ -7,7 +7,6 @@
 #include "envoy/data/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/type/v3/percent.pb.h"
 
 #include "source/extensions/common/matcher/matcher.h"
 #include "source/extensions/common/tap/tap.h"
@@ -107,11 +106,6 @@ public:
   const Matcher& rootMatcher() const override;
   bool streaming() const override { return streaming_; }
   bool shouldRecord() const override;
-  bool samplingConfigured() const override { return tap_enabled_.has_value(); }
-  const envoy::type::v3::FractionalPercent& appliedSampleRate() const override {
-    ASSERT(tap_enabled_.has_value());
-    return tap_enabled_->default_value();
-  }
 
 protected:
   TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& proto_config,
@@ -137,7 +131,7 @@ private:
   static constexpr uint32_t DefaultMinStreamedSentBytes = 9;
   uint32_t min_streamed_sent_bytes_{0};
   Runtime::Loader& runtime_;
-  absl::optional<envoy::config::core::v3::RuntimeFractionalPercent> tap_enabled_;
+  const absl::optional<envoy::config::core::v3::RuntimeFractionalPercent> tap_enabled_;
 };
 
 /**

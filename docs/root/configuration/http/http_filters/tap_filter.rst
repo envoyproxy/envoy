@@ -322,12 +322,16 @@ fraction of requests at the tap filter:
 When sampling is configured, only the configured fraction of requests
 proceeds to match-predicate evaluation. The remainder is short-circuited
 before any match state is allocated. Sampled-out requests increment the
-``rq_sampled_out`` filter stat.
+``rq_sampled_out`` filter stat. Sampling applies to whichever tap
+configuration is active, whether installed statically or through the
+``/tap`` admin endpoint.
 
-The sampling rate that admitted each trace is recorded on
+The configured sampling rate is recorded on
 :ref:`applied_sample_rate
 <envoy_v3_api_field_data.tap.v3.TraceWrapper.applied_sample_rate>` of the
-first emitted ``TraceWrapper`` segment.
+first emitted ``TraceWrapper`` segment of each HTTP tap trace. When a
+runtime override of ``runtime_key`` is active, the effective rate may
+differ from the recorded value.
 
 Statistics
 ----------
@@ -340,5 +344,5 @@ comes from the owning HTTP connection manager.
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  rq_tapped, Counter, Total requests that matched and were tapped
   rq_sampled_out, Counter, Total requests short-circuited by ``tap_enabled`` sampling before match evaluation
+  rq_tapped, Counter, Total requests that matched and were tapped

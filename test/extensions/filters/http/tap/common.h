@@ -37,8 +37,6 @@ public:
   MOCK_METHOD(bool, streaming, (), (const));
   MOCK_METHOD(TimeSource&, timeSource, (), (const));
   MOCK_METHOD(bool, shouldRecord, (), (const));
-  MOCK_METHOD(bool, samplingConfigured, (), (const));
-  MOCK_METHOD(const envoy::type::v3::FractionalPercent&, appliedSampleRate, (), (const));
 };
 
 } // namespace TapFilter
