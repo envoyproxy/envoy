@@ -281,7 +281,6 @@ Filters::Common::ExtAuthz::ClientPtr Filter::createPerRouteHttpClient(
 }
 
 RequestAttributes Filter::collectAttributes(const Http::RequestHeaderMap& headers) {
-  // Now that we'll definitely be making the request, add filter state stats if configured to do so.
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       decoder_callbacks_->streamInfo().filterState();
   if ((config_->emitFilterStateStats() || config_->filterMetadata().has_value())) {
