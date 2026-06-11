@@ -176,19 +176,16 @@ In this configuration:
 This pattern provides clean separation between the decision logic (in the Lua filter) and the authorization
 enforcement (in ext_authz), while ensuring the ext_authz filter is only instantiated and invoked when needed.
 
-Cooperative Caching Bypass
---------------------------
-The External Authorization filter supports bypassing the external authorization service call by retrieving a cached response from dynamic typed metadata. This is designed to work cooperatively with a preceding caching filter (such as a suitably configured ext_proc filter using an external cache).
+ExtAuthz Caching
+----------------
+The External Authorization filter supports caching authorization decisions to bypass the external authorization service call.
 
-To enable this, configure the :ref:`check_response_typed_metadata_namespace <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.check_response_typed_metadata_namespace>` with the dynamic typed metadata namespace where the cached response is stored.
+To enable this, configure the :ref:`cache <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.cache>` field with a cache extension configuration. The extension must implement the ``envoy.filters.http.ext_authz.cache`` interface.
 
-When a cached response is present under the configured namespace:
-1. The filter will retrieve the ``google.protobuf.Any`` message directly from the dynamic typed metadata.
-2. It will attempt to unpack it directly into a ``CheckResponse`` proto.
-3. If unpacking succeeds, the filter will bypass the external service call and apply the cached response (OK with mutations, Denied, or Error) directly.
-4. If unpacking fails (due to type mismatch), the filter will increment the ``invalid_cached_response`` stat and gracefully fall back to making a live call to the external authorization service.
-
-On cache misses (when no cached response is found under the namespace), the filter will proceed with the live call and, upon receiving a response, will pack the raw ``CheckResponse`` proto directly into a ``google.protobuf.Any`` message and write it to the dynamic typed metadata under the configured namespace, allowing the caching filter to record and cache it in raw binary format.
+When caching is enabled, the filter will:
+1. Perform a cache lookup using the request attributes.
+2. If a cache hit occurs, the filter will bypass the external service call and apply the cached response (OK with mutations, Denied, or Error) directly.
+3. If a cache miss occurs, the filter will proceed with the live call to the external authorization service and, upon receiving a response, will populate the cache with the response.
 
 Statistics
 ----------
@@ -213,7 +210,6 @@ The HTTP filter outputs statistics in the ``cluster.<route target cluster>.ext_a
   because it couldn't apply all header mutations"
   response_header_limits_reached, Counter, "Total responses for which ext_authz sent a local reply
   because it couldn't apply all header mutations"
-  invalid_cached_response, Counter, Total cached responses that failed to be Base64-decoded or parsed.
 
 Dynamic Metadata
 ----------------
