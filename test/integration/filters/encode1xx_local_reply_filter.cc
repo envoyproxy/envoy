@@ -7,6 +7,7 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 namespace Envoy {
 
@@ -22,9 +23,12 @@ public:
 };
 
 class Encode1xxLocalReplyFilterConfig
-    : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+    : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<
+          test::integration::filters::Encode1xxLocalReplyFilterConfig> {
 public:
-  Encode1xxLocalReplyFilterConfig() : EmptyHttpFilterConfig("encode1xx-local-reply-filter") {}
+  Encode1xxLocalReplyFilterConfig()
+      : UniqueEmptyHttpFilterConfig<test::integration::filters::Encode1xxLocalReplyFilterConfig>(
+            "encode1xx-local-reply-filter") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&, Server::Configuration::FactoryContext&) override {

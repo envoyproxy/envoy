@@ -21,13 +21,14 @@ AccessLog::InstanceSharedPtr DynamicModuleAccessLogFactory::createAccessLogInsta
       config, context.messageValidationVisitor());
 
   const auto& module_config = proto_config.dynamic_module_config();
-  auto dynamic_module_or_error = Extensions::DynamicModules::newDynamicModuleByName(
-      module_config.name(), module_config.do_not_close(), module_config.load_globally());
-
-  if (!dynamic_module_or_error.ok()) {
-    throw EnvoyException("Failed to load dynamic module: " +
-                         std::string(dynamic_module_or_error.status().message()));
+  // Access loggers do not support remote module sources, so no init manager or async callback is
+  // passed; only the synchronous local-file and by-name paths can succeed here.
+  auto load_result = Extensions::DynamicModules::newDynamicModuleByConfig(
+      module_config, proto_config.logger_name(), context.serverFactoryContext());
+  if (!load_result.ok()) {
+    throw EnvoyException(std::string(load_result.status().message()));
   }
+  auto dynamic_module = std::move(load_result->loaded);
 
   // Use knownAnyToBytes() to properly handle StringValue/BytesValue/Struct types.
   std::string logger_config_str;
@@ -46,8 +47,8 @@ AccessLog::InstanceSharedPtr DynamicModuleAccessLogFactory::createAccessLogInsta
                                             : module_config.metrics_namespace();
 
   auto access_log_config = newDynamicModuleAccessLogConfig(
-      proto_config.logger_name(), logger_config_str, metrics_namespace,
-      std::move(dynamic_module_or_error.value()), context.serverFactoryContext().scope());
+      proto_config.logger_name(), logger_config_str, metrics_namespace, std::move(dynamic_module),
+      context.serverFactoryContext().scope());
 
   if (!access_log_config.ok()) {
     throw EnvoyException("Failed to create access logger config: " +

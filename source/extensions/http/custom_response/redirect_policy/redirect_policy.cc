@@ -7,6 +7,7 @@
 #include "envoy/stream_info/filter_state.h"
 
 #include "source/common/common/enum_to_int.h"
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
@@ -34,6 +35,7 @@ createRedirectConfig(const envoy::config::route::v3::RedirectAction& redirect_ac
       "",      // prefix_rewrite
       "",      // regex_rewrite_redirect_substitution
       nullptr, // regex_rewrite_redirect
+      nullptr, // path_rewrite_formatter
       redirect_action.path_redirect().find('?') != absl::string_view::npos,
       redirect_action.https_redirect(),
       redirect_action.strip_query()};
@@ -42,6 +44,15 @@ createRedirectConfig(const envoy::config::route::v3::RedirectAction& redirect_ac
   }
   if (redirect_action.has_prefix_rewrite()) {
     throw Envoy::EnvoyException("prefix_rewrite is not supported for Custom Response");
+  }
+  if (!redirect_action.path_rewrite().empty()) {
+    auto formatter_or =
+        Envoy::Formatter::FormatterImpl::create(redirect_action.path_rewrite(), true);
+    if (!formatter_or.ok()) {
+      throw Envoy::EnvoyException(absl::StrCat("Failed to create path_rewrite formatter: ",
+                                               formatter_or.status().message()));
+    }
+    redirect_config.path_rewrite_formatter_ = std::move(formatter_or.value());
   }
   return redirect_config;
 }
@@ -167,8 +178,15 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
       });
 
   ::Envoy::Http::Utility::Url absolute_url;
-  std::string uri(uri_ ? *uri_
-                       : ::Envoy::Http::Utility::newUri(*redirect_action_, *downstream_headers));
+  std::string uri;
+  if (redirect_action_ != nullptr && redirect_action_->path_rewrite_formatter_ != nullptr) {
+    uri = ::Envoy::Http::Utility::newUriWithFormatter(
+        ::Envoy::makeOptRefFromPtr(redirect_action_.get()), *downstream_headers,
+        *redirect_action_->path_rewrite_formatter_, decoder_callbacks->streamInfo());
+  }
+  if (uri.empty()) {
+    uri = uri_ ? *uri_ : ::Envoy::Http::Utility::newUri(*redirect_action_, *downstream_headers);
+  }
   if (!absolute_url.initialize(uri, false)) {
     stats_.custom_response_invalid_uri_.inc();
     // We could potentially get an invalid url only if redirect_action_ was specified instead

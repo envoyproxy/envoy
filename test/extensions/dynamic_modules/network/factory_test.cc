@@ -35,6 +35,31 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, ValidConfig) {
   EXPECT_TRUE(result.ok()) << result.status().message();
 }
 
+// Load the module via the ``module.local.filename`` data source instead of by name.
+TEST_F(DynamicModuleNetworkFilterFactoryTest, ValidConfigWithLocalFile) {
+  envoy::extensions::filters::network::dynamic_modules::v3::DynamicModuleNetworkFilter config;
+  config.mutable_dynamic_module_config()->mutable_module()->mutable_local()->set_filename(
+      Extensions::DynamicModules::testSharedObjectPath("network_no_op", "c"));
+  config.set_filter_name("test_filter");
+
+  auto result = factory_.createFilterFactoryFromProto(config, context_);
+  EXPECT_TRUE(result.ok()) << result.status().message();
+}
+
+// Remote module sources are not supported for network filters (no init manager is wired up).
+TEST_F(DynamicModuleNetworkFilterFactoryTest, RemoteSourceRejected) {
+  envoy::extensions::filters::network::dynamic_modules::v3::DynamicModuleNetworkFilter config;
+  auto* remote = config.mutable_dynamic_module_config()->mutable_module()->mutable_remote();
+  remote->mutable_http_uri()->set_uri("https://example.com/module.so");
+  remote->mutable_http_uri()->set_cluster("cluster_1");
+  remote->mutable_http_uri()->mutable_timeout()->set_seconds(5);
+  remote->set_sha256("abc123");
+  config.set_filter_name("test_filter");
+
+  auto result = factory_.createFilterFactoryFromProto(config, context_);
+  EXPECT_FALSE(result.ok());
+}
+
 TEST_F(DynamicModuleNetworkFilterFactoryTest, ValidConfigWithFilterConfig) {
   envoy::extensions::filters::network::dynamic_modules::v3::DynamicModuleNetworkFilter config;
   config.mutable_dynamic_module_config()->set_name("network_no_op");

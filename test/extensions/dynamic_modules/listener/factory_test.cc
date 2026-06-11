@@ -36,6 +36,31 @@ TEST_F(DynamicModuleListenerFilterFactoryTest, ValidConfig) {
   EXPECT_NE(nullptr, result);
 }
 
+// Load the module via the ``module.local.filename`` data source instead of by name.
+TEST_F(DynamicModuleListenerFilterFactoryTest, ValidConfigWithLocalFile) {
+  envoy::extensions::filters::listener::dynamic_modules::v3::DynamicModuleListenerFilter config;
+  config.mutable_dynamic_module_config()->mutable_module()->mutable_local()->set_filename(
+      Extensions::DynamicModules::testSharedObjectPath("listener_no_op", "c"));
+  config.set_filter_name("test_filter");
+
+  auto result = factory_.createListenerFilterFactoryFromProto(config, nullptr, context_);
+  EXPECT_NE(nullptr, result);
+}
+
+// Remote module sources are not supported for listener filters (no init manager is wired up).
+TEST_F(DynamicModuleListenerFilterFactoryTest, RemoteSourceRejected) {
+  envoy::extensions::filters::listener::dynamic_modules::v3::DynamicModuleListenerFilter config;
+  auto* remote = config.mutable_dynamic_module_config()->mutable_module()->mutable_remote();
+  remote->mutable_http_uri()->set_uri("https://example.com/module.so");
+  remote->mutable_http_uri()->set_cluster("cluster_1");
+  remote->mutable_http_uri()->mutable_timeout()->set_seconds(5);
+  remote->set_sha256("abc123");
+  config.set_filter_name("test_filter");
+
+  EXPECT_THROW(factory_.createListenerFilterFactoryFromProto(config, nullptr, context_),
+               EnvoyException);
+}
+
 TEST_F(DynamicModuleListenerFilterFactoryTest, ValidConfigWithFilterConfig) {
   envoy::extensions::filters::listener::dynamic_modules::v3::DynamicModuleListenerFilter config;
   config.mutable_dynamic_module_config()->set_name("listener_no_op");

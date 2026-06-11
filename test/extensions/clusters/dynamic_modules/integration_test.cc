@@ -138,6 +138,27 @@ TEST_P(DynamicModuleClusterIntegrationTest, SchedulerHostUpdate) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// Test the main→worker push pipeline end-to-end. The Rust fixture publishes an
+// Arc<Snapshot{multiplier=5}> from main and posts run_on_all_workers(event_id=7); each worker
+// reads the snapshot back and increments a counter by event_id * multiplier. With concurrency=4
+// the final counter must be exactly 4 * 7 * 5 = 140 — which proves the fan-out fired once per
+// worker, the event_id passed through, the typed payload survived FFI, and main was excluded.
+TEST_P(DynamicModuleClusterIntegrationTest, RunOnAllWorkersFiresOnEachWorker) {
+  concurrency_ = 4;
+  initializeWithDecCluster("run_on_all_workers");
+
+  test_server_->waitForCounter("dynamicmodulescustom.worker_events_applied_total",
+                               testing::Eq(140));
+
+  // Cluster should remain functional for normal traffic after the fan-out.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 // Verifies that the cluster lifecycle callbacks fire correctly during cluster
 // initialization.
 TEST_P(DynamicModuleClusterIntegrationTest, LifecycleCallbacks) {

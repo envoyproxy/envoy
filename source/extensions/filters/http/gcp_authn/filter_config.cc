@@ -7,6 +7,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/http/utility.h"
+#include "source/extensions/filters/http/gcp_authn/crypto_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -32,12 +33,14 @@ Http::FilterFactoryCb GcpAuthnFilterFactory::createFilterFactoryFromProtoTyped(
       std::make_shared<envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig>(
           config);
 
+  auto fingerprinter = std::make_shared<CertFingerprinterImpl>();
+
   return [config, stats_prefix, &context, token_cache = std::move(token_cache),
-          filter_config =
-              std::move(filter_config)](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+          filter_config = std::move(filter_config), fingerprinter = std::move(fingerprinter)](
+             Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<GcpAuthnFilter>(
         filter_config, context, stats_prefix,
-        (token_cache != nullptr) ? &token_cache->tls.get()->cache() : nullptr));
+        (token_cache != nullptr) ? &token_cache->tls.get()->cache() : nullptr, fingerprinter));
   };
 }
 

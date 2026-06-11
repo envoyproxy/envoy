@@ -535,6 +535,21 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, CreateSuccess) {
   EXPECT_NE(pool, nullptr);
 }
 
+// Load the module via the ``module.local.filename`` data source instead of by name. The upstream
+// HTTP conn-pool factory has no factory context, so only this synchronous path is supported.
+TEST_F(DynamicModuleGenericConnPoolFactoryTest, CreateSuccessWithLocalFile) {
+  envoy::extensions::upstreams::http::dynamic_modules::v3::Config config;
+  config.mutable_dynamic_module_config()->mutable_module()->mutable_local()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c/"
+                                  "libupstream_bridge_no_op.so"));
+  config.set_bridge_name("test_bridge");
+
+  auto pool = factory_.createGenericConnPool(
+      host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
+      Upstream::ResourcePriority::Default, absl::nullopt, nullptr, config);
+  EXPECT_NE(pool, nullptr);
+}
+
 TEST_F(DynamicModuleGenericConnPoolFactoryTest, CacheHit) {
   auto config = createProtoConfig();
   auto pool1 = factory_.createGenericConnPool(

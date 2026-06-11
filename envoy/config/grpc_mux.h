@@ -120,11 +120,13 @@ public:
   /**
    * Updates the current gRPC-Mux object to use a new gRPC client, and config.
    */
-  virtual absl::Status
-  updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_client,
-                  Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope& scope,
-                  BackOffStrategyPtr&& backoff_strategy,
-                  const envoy::config::core::v3::ApiConfigSource& ads_config_source) PURE;
+  virtual absl::Status updateMuxSource(
+      Grpc::RawAsyncClientSharedPtr&& primary_async_client,
+      Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope& scope,
+      BackOffStrategyPtr&& backoff_strategy,
+      const envoy::config::core::v3::ApiConfigSource& ads_config_source,
+      std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory =
+          nullptr) PURE;
 
   /**
    * Returns a load-stats-reporter that was created for the gRPC-Mux.

@@ -42,6 +42,8 @@ enum class McpMethod {
   NotificationInitialized,
   NotificationCancelled,
   NotificationRootsListChanged,
+  // Client response to a server-to-client request (elicitation, sampling, roots).
+  ServerResponse,
 };
 
 McpMethod parseMethodString(absl::string_view method_str);
@@ -86,6 +88,7 @@ private:
   std::pair<std::string, std::string> parseToolName(const std::string& prefixed_name);
   std::pair<std::string, std::string> parseResourceUri(const std::string& uri);
   std::pair<std::string, std::string> parsePromptName(const std::string& prefixed_name);
+  std::pair<std::string, std::string> parseServerResponseId(const std::string& prefixed_id);
 
   // Rewrites the tool name in the buffer. Returns the size delta (new_size - old_size).
   ssize_t rewriteToolCallBody(Buffer::Instance& buffer);
@@ -95,6 +98,8 @@ private:
   ssize_t rewritePromptsGetBody(Buffer::Instance& buffer);
   // Rewrites the completion ref (prompt name or resource URI) in the buffer.
   ssize_t rewriteCompletionCompleteBody(Buffer::Instance& buffer);
+  // Rewrites the server response ID (strips backend prefix) in the buffer.
+  ssize_t rewriteServerResponseId(Buffer::Instance& buffer);
   // Helper to replace content at a position in the buffer, and return the delta.
   ssize_t rewriteAtPosition(Buffer::Instance& buffer, ssize_t pos, const std::string& search_str,
                             const std::string& replacement);
@@ -121,6 +126,7 @@ private:
   // Completion & logging.
   void handleCompletionComplete();
   void handleLoggingSetLevel();
+  void handleServerResponse();
 
   // Response aggregation.
   std::string aggregateInitialize(const std::vector<BackendResponse>& responses);
@@ -181,6 +187,8 @@ private:
   std::string prompt_name_;          // Original prefixed prompt name (e.g., "time__greeting")
   std::string unprefixed_prompt_name_; // Unprefixed prompt name for backend (e.g., "greeting")
   std::string completion_ref_type_;    // Completion reference type: "ref/prompt" or "ref/resource"
+  std::string server_response_id_;     // Prefixed ID from client response (e.g., "time__42")
+  std::string original_response_id_;   // Original ID after stripping prefix (e.g., "42")
   bool needs_body_rewrite_{false};     // Whether tool/prompt name or URI rewriting is needed
 
   std::string route_name_{"default"};
