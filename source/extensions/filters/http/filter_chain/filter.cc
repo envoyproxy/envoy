@@ -97,9 +97,9 @@ FilterChainConfig::FilterChainConfig(const FilterChainConfigProto& proto_config,
                                      Server::Configuration::FactoryContext& context,
                                      const std::string& stats_prefix)
     : stats_(createStats(stats_prefix, context.scope())) {
-  if (proto_config.has_filter_chain()) {
+  if (proto_config.has_default_filter_chain()) {
     default_filter_chain_ =
-        std::make_shared<FilterChain>(proto_config.filter_chain(), context, stats_prefix);
+        std::make_shared<FilterChain>(proto_config.default_filter_chain(), context, stats_prefix);
   }
 }
 

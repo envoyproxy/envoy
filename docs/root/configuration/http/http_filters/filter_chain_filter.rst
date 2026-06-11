@@ -28,7 +28,7 @@ Filter-level Configuration
 The filter-level configuration (:ref:`FilterChainConfig <envoy_v3_api_msg_extensions.filters.http.filter_chain.v3.FilterChainConfig>`)
 defines:
 
-* ``filter_chain``: The default filter chain to apply when no route-specific configuration matches.
+* ``default_filter_chain``: The default filter chain to apply when no route-specific configuration matches.
 
 Per-Route Configuration
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -52,7 +52,7 @@ This example configures a default filter chain with a buffer filter:
   - name: envoy.filters.http.filter_chain
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.filter_chain.v3.FilterChainConfig
-      filter_chain:
+      default_filter_chain:
         filters:
         - name: envoy.filters.http.buffer
           typed_config:

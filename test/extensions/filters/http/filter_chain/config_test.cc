@@ -22,7 +22,7 @@ namespace {
 
 TEST(FilterChainFilterFactoryTest, FilterChainFilterCorrectYaml) {
   const std::string yaml_string = R"EOF(
-  filter_chain:
+  default_filter_chain:
     filters:
     - name: envoy.filters.http.header_mutation
       typed_config:
@@ -45,12 +45,12 @@ TEST(FilterChainFilterFactoryTest, FilterChainFilterCorrectYaml) {
 
 TEST(FilterChainFilterFactoryTest, FilterChainFilterRecursiveConfig) {
   const std::string yaml_string = R"EOF(
-  filter_chain:
+  default_filter_chain:
     filters:
     - name: envoy.filters.http.filter_chain
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.filters.http.filter_chain.v3.FilterChainConfig
-        filter_chain:
+        default_filter_chain:
           filters:
           - name: envoy.filters.http.header_mutation
             typed_config:

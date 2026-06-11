@@ -28,7 +28,7 @@ message FilterChainConfig {
   //
   // This field is optional. If not specified and no route-level configuration matches,
   // the filter will pass through without applying any additional filters.
-  FilterChain filter_chain = 1;
+  FilterChain default_filter_chain = 1;
 }
 
 // Per-route configuration for the filter chain filter. This allows different filter chains

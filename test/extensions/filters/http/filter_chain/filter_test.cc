@@ -108,7 +108,7 @@ TEST_F(FilterChainFactoryTest, EmptyConfig) {
 
 TEST_F(FilterChainFactoryTest, DefaultFilterChain) {
   const std::string yaml_config = R"EOF(
-    filter_chain:
+    default_filter_chain:
       filters:
       - name: mock_filter
         typed_config:
