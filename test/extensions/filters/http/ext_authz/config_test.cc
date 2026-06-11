@@ -719,11 +719,8 @@ public:
   ~MockAuthCache() override = default;
 
   MOCK_METHOD(void, lookup,
-              (const envoy::service::auth::v3::CheckRequest&, LookupCallback&&, Tracing::Span&,
-               const StreamInfo::StreamInfo&));
-  MOCK_METHOD(void, insert,
-              (const Filters::Common::ExtAuthz::Response&, Tracing::Span&,
-               const StreamInfo::StreamInfo&));
+              (Http::StreamDecoderFilterCallbacks&, const RequestAttributes&, LookupCallback&&));
+  MOCK_METHOD(void, insert, (const Filters::Common::ExtAuthz::Response&));
   MOCK_METHOD(void, onDestroy, ());
 };
 

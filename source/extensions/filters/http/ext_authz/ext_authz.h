@@ -530,7 +530,7 @@ private:
   absl::optional<MonotonicTime> start_time_;
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
   void initiateCall(const Http::RequestHeaderMap& headers);
-  void prepareCheck(const Http::RequestHeaderMap& headers);
+  RequestAttributes collectAttributes(const Http::RequestHeaderMap& headers);
   void callAuthzService();
   void onCacheLookupComplete(Filters::Common::ExtAuthz::ResponsePtr&& response);
   void processResponse(Filters::Common::ExtAuthz::ResponsePtr&& response);
@@ -593,6 +593,8 @@ private:
   bool buffer_data_{};
   bool skip_check_{false};
   envoy::service::auth::v3::CheckRequest check_request_;
+  absl::optional<RequestAttributes> request_attributes_;
+  absl::optional<FilterConfigPerRoute> merged_per_route_config_;
 };
 
 } // namespace ExtAuthz

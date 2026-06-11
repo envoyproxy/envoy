@@ -34,12 +34,9 @@ class SimpleInMemoryCache : public AuthCache {
 public:
   SimpleInMemoryCache(std::shared_ptr<SimpleInMemoryCacheStorage> storage) : storage_(storage) {}
 
-  void lookup(const envoy::service::auth::v3::CheckRequest& request, LookupCallback&& cb,
-              Tracing::Span&, const StreamInfo::StreamInfo&) override {
-    if (request.has_attributes() && request.attributes().has_request() &&
-        request.attributes().request().has_http()) {
-      current_key_ = request.attributes().request().http().path();
-    }
+  void lookup(Http::StreamDecoderFilterCallbacks&, const RequestAttributes& attributes,
+              LookupCallback&& cb) override {
+    current_key_ = std::string(attributes.headers_.getPathValue());
 
     if (current_key_.empty()) {
       cb(nullptr);
@@ -57,8 +54,7 @@ public:
     cb(nullptr);
   }
 
-  void insert(const Filters::Common::ExtAuthz::Response& response, Tracing::Span&,
-              const StreamInfo::StreamInfo&) override {
+  void insert(const Filters::Common::ExtAuthz::Response& response) override {
     if (current_key_.empty()) {
       return;
     }

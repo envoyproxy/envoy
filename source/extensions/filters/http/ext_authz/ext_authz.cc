@@ -280,8 +280,7 @@ Filters::Common::ExtAuthz::ClientPtr Filter::createPerRouteHttpClient(
       server_context_->clusterManager(), client_config);
 }
 
-void Filter::prepareCheck(const Http::RequestHeaderMap& headers) {
-
+RequestAttributes Filter::collectAttributes(const Http::RequestHeaderMap& headers) {
   // Now that we'll definitely be making the request, add filter state stats if configured to do so.
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       decoder_callbacks_->streamInfo().filterState();
@@ -305,59 +304,19 @@ void Filter::prepareCheck(const Http::RequestHeaderMap& headers) {
     }
   }
 
-  absl::optional<FilterConfigPerRoute> maybe_merged_per_route_config;
   for (const FilterConfigPerRoute& cfg :
        Http::Utility::getAllPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_)) {
-    if (maybe_merged_per_route_config.has_value()) {
-      FilterConfigPerRoute current_config = maybe_merged_per_route_config.value();
-      maybe_merged_per_route_config.emplace(current_config, cfg);
+    if (merged_per_route_config_.has_value()) {
+      FilterConfigPerRoute current_config = merged_per_route_config_.value();
+      merged_per_route_config_.emplace(current_config, cfg);
     } else {
-      maybe_merged_per_route_config.emplace(cfg);
+      merged_per_route_config_.emplace(cfg);
     }
   }
 
   Protobuf::Map<std::string, std::string> context_extensions;
-  if (maybe_merged_per_route_config) {
-    context_extensions = maybe_merged_per_route_config.value().takeContextExtensions();
-  }
-
-  // Check if we need to use a per-route service override (gRPC or HTTP).
-  if (maybe_merged_per_route_config) {
-    if (maybe_merged_per_route_config->grpcService().has_value()) {
-      const auto& grpc_service = maybe_merged_per_route_config->grpcService().value();
-      ENVOY_STREAM_LOG(debug, "ext_authz filter: using per-route gRPC service configuration.",
-                       *decoder_callbacks_);
-
-      // Create a new gRPC client for this route.
-      auto per_route_client = createPerRouteGrpcClient(grpc_service);
-      if (per_route_client != nullptr) {
-        client_ = std::move(per_route_client);
-        ENVOY_STREAM_LOG(debug, "ext_authz filter: successfully created per-route gRPC client.",
-                         *decoder_callbacks_);
-      } else {
-        ENVOY_STREAM_LOG(
-            warn,
-            "ext_authz filter: failed to create per-route gRPC client, falling back to default.",
-            *decoder_callbacks_);
-      }
-    } else if (maybe_merged_per_route_config->httpService().has_value()) {
-      const auto& http_service = maybe_merged_per_route_config->httpService().value();
-      ENVOY_STREAM_LOG(debug, "ext_authz filter: using per-route HTTP service configuration.",
-                       *decoder_callbacks_);
-
-      // Create a new HTTP client for this route.
-      auto per_route_client = createPerRouteHttpClient(http_service);
-      if (per_route_client != nullptr) {
-        client_ = std::move(per_route_client);
-        ENVOY_STREAM_LOG(debug, "ext_authz filter: successfully created per-route HTTP client.",
-                         *decoder_callbacks_);
-      } else {
-        ENVOY_STREAM_LOG(
-            warn,
-            "ext_authz filter: failed to create per-route HTTP client, falling back to default.",
-            *decoder_callbacks_);
-      }
-    }
+  if (merged_per_route_config_) {
+    context_extensions = merged_per_route_config_.value().takeContextExtensions();
   }
 
   // If metadata_context_namespaces or typed_metadata_context_namespaces is specified,
@@ -377,15 +336,50 @@ void Filter::prepareCheck(const Http::RequestHeaderMap& headers) {
                         config_->routeTypedMetadataContextNamespaces(), route_metadata_context);
   }
 
-  Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(
-      decoder_callbacks_, headers, std::move(context_extensions), std::move(metadata_context),
-      std::move(route_metadata_context), check_request_, max_request_bytes_, config_->packAsBytes(),
-      config_->headersAsBytes(), config_->includePeerCertificate(), config_->includeTLSSession(),
-      config_->destinationLabels(), config_->allowedHeadersMatcher(),
-      config_->disallowedHeadersMatcher());
+  return {headers, std::move(context_extensions), std::move(metadata_context),
+          std::move(route_metadata_context)};
 }
 
 void Filter::callAuthzService() {
+  // Check if we need to use a per-route service override (gRPC or HTTP).
+  if (merged_per_route_config_) {
+    if (merged_per_route_config_->grpcService().has_value()) {
+      const auto& grpc_service = merged_per_route_config_->grpcService().value();
+      ENVOY_STREAM_LOG(debug, "ext_authz filter: using per-route gRPC service configuration.",
+                       *decoder_callbacks_);
+
+      // Create a new gRPC client for this route.
+      auto per_route_client = createPerRouteGrpcClient(grpc_service);
+      if (per_route_client != nullptr) {
+        client_ = std::move(per_route_client);
+        ENVOY_STREAM_LOG(debug, "ext_authz filter: successfully created per-route gRPC client.",
+                         *decoder_callbacks_);
+      } else {
+        ENVOY_STREAM_LOG(
+            warn,
+            "ext_authz filter: failed to create per-route gRPC client, falling back to default.",
+            *decoder_callbacks_);
+      }
+    } else if (merged_per_route_config_->httpService().has_value()) {
+      const auto& http_service = merged_per_route_config_->httpService().value();
+      ENVOY_STREAM_LOG(debug, "ext_authz filter: using per-route HTTP service configuration.",
+                       *decoder_callbacks_);
+
+      // Create a new HTTP client for this route.
+      auto per_route_client = createPerRouteHttpClient(http_service);
+      if (per_route_client != nullptr) {
+        client_ = std::move(per_route_client);
+        ENVOY_STREAM_LOG(debug, "ext_authz filter: successfully created per-route HTTP client.",
+                         *decoder_callbacks_);
+      } else {
+        ENVOY_STREAM_LOG(
+            warn,
+            "ext_authz filter: failed to create per-route HTTP client, falling back to default.",
+            *decoder_callbacks_);
+      }
+    }
+  }
+
   ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server.", *decoder_callbacks_);
   // Store start time of ext_authz filter call
   start_time_ = decoder_callbacks_->dispatcher().timeSource().monotonicTime();
@@ -405,28 +399,44 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     return;
   }
 
-  prepareCheck(headers);
+  request_attributes_.emplace(collectAttributes(headers));
 
   if (cache_ != nullptr) {
     ENVOY_STREAM_LOG(trace, "ext_authz filter performing cache lookup.", *decoder_callbacks_);
     initiating_lookup_ = true;
     filter_return_ = FilterReturn::StopDecoding;
-    cache_->lookup(
-        check_request_,
-        [this](Filters::Common::ExtAuthz::ResponsePtr&& response) {
-          onCacheLookupComplete(std::move(response));
-        },
-        decoder_callbacks_->activeSpan(), decoder_callbacks_->streamInfo());
+
+    cache_->lookup(*decoder_callbacks_, *request_attributes_,
+                   [this](Filters::Common::ExtAuthz::ResponsePtr&& response) {
+                     onCacheLookupComplete(std::move(response));
+                   });
     initiating_lookup_ = false;
     return;
   }
 
+  Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(
+      decoder_callbacks_, request_attributes_->headers_,
+      std::move(request_attributes_->context_extensions_),
+      std::move(request_attributes_->metadata_context_),
+      std::move(request_attributes_->route_metadata_context_), check_request_, max_request_bytes_,
+      config_->packAsBytes(), config_->headersAsBytes(), config_->includePeerCertificate(),
+      config_->includeTLSSession(), config_->destinationLabels(), config_->allowedHeadersMatcher(),
+      config_->disallowedHeadersMatcher());
   callAuthzService();
 }
 
 void Filter::onCacheLookupComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   if (response == nullptr) {
     ENVOY_STREAM_LOG(trace, "ext_authz filter cache miss.", *decoder_callbacks_);
+    ASSERT(request_attributes_.has_value());
+    Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(
+        decoder_callbacks_, request_attributes_->headers_,
+        std::move(request_attributes_->context_extensions_),
+        std::move(request_attributes_->metadata_context_),
+        std::move(request_attributes_->route_metadata_context_), check_request_, max_request_bytes_,
+        config_->packAsBytes(), config_->headersAsBytes(), config_->includePeerCertificate(),
+        config_->includeTLSSession(), config_->destinationLabels(),
+        config_->allowedHeadersMatcher(), config_->disallowedHeadersMatcher());
     callAuthzService();
   } else {
     ENVOY_STREAM_LOG(trace, "ext_authz filter cache hit.", *decoder_callbacks_);
@@ -1179,7 +1189,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   updateLoggingInfo(response->grpc_status);
 
   if (cache_ != nullptr) {
-    cache_->insert(*response, decoder_callbacks_->activeSpan(), decoder_callbacks_->streamInfo());
+    cache_->insert(*response);
   }
 
   processResponse(std::move(response));
