@@ -440,7 +440,7 @@ void Filter::onCacheLookupComplete(Filters::Common::ExtAuthz::ResponsePtr&& resp
     callAuthzService();
   } else {
     ENVOY_STREAM_LOG(trace, "ext_authz filter cache hit.", *decoder_callbacks_);
-    processResponse(std::move(response));
+    onComplete(std::move(response));
   }
 }
 
@@ -699,12 +699,17 @@ CheckResult Filter::validateAndCheckDecoderHeaderMutation(
   return config_->checkDecoderHeaderMutation(operation, Http::LowerCaseString(key), value);
 }
 
-void Filter::processResponse(Filters::Common::ExtAuthz::ResponsePtr&& response) {
+void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
+  const bool from_cache = (state_ != State::Calling);
   state_ = State::Complete;
   using Filters::Common::ExtAuthz::CheckStatus;
   Stats::StatName empty_stat_name;
 
   updateLoggingInfo(response->grpc_status);
+
+  if (!from_cache && cache_ != nullptr) {
+    cache_->insert(*response);
+  }
 
   if (response->saw_invalid_append_actions) {
     if (config_->validateMutations()) {
@@ -1182,17 +1187,6 @@ void Filter::processResponse(Filters::Common::ExtAuthz::ResponsePtr&& response) 
     break;
   }
   }
-}
-
-void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
-  state_ = State::Complete;
-  updateLoggingInfo(response->grpc_status);
-
-  if (cache_ != nullptr) {
-    cache_->insert(*response);
-  }
-
-  processResponse(std::move(response));
 }
 
 void Filter::responseHeaderLimitsReached() {

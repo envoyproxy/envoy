@@ -533,7 +533,6 @@ private:
   RequestAttributes collectAttributes(const Http::RequestHeaderMap& headers);
   void callAuthzService();
   void onCacheLookupComplete(Filters::Common::ExtAuthz::ResponsePtr&& response);
-  void processResponse(Filters::Common::ExtAuthz::ResponsePtr&& response);
   void continueDecoding();
   // In shadow mode, writes the authorization decision and response attributes into
   // FilterState and increments the appropriate shadow stat counter. Takes the response
