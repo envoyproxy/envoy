@@ -4519,6 +4519,18 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_worker_slot_get(
   std::ptr::null_mut()
 }
 
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_get_name(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) {
+  const NAME: &str = "test_cluster";
+  unsafe {
+    (*result).ptr = NAME.as_ptr() as *const _;
+    (*result).length = NAME.len();
+  }
+}
+
 // Cluster config metrics FFI stubs for testing.
 
 #[no_mangle]
@@ -4720,6 +4732,15 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_http_callout(
 // =============================================================================
 // Cluster Extension Rust SDK tests.
 // =============================================================================
+
+#[test]
+fn test_cluster_get_cluster_name() {
+  let mut mock_cluster = cluster::MockEnvoyCluster::new();
+  mock_cluster
+    .expect_get_cluster_name()
+    .returning(|| EnvoyBuffer::new(b"my_cluster"));
+  assert_eq!(mock_cluster.get_cluster_name().as_slice(), b"my_cluster");
+}
 
 #[test]
 fn test_cluster_scheduler_mock() {
