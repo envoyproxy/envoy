@@ -328,7 +328,7 @@ bool DynamicModuleCluster::addHosts(
       return false;
     }
 
-    // Skip addresses already in the host set. Within-batch duplicates are not deduplicated.
+    // Skip addresses already in the host set. This does not deduplicate within the batch.
     if (existing_hosts != nullptr && existing_hosts->contains(resolved_address->asString())) {
       continue;
     }
