@@ -1619,6 +1619,30 @@ std::string Utility::newUri(::Envoy::OptRef<const Utility::RedirectConfig> redir
   return fmt::format("{}://{}{}{}", final_scheme, final_host, final_port, final_path);
 }
 
+std::string Utility::newUriWithFormatter(OptRef<const RedirectConfig> redirect_config,
+                                         const Http::RequestHeaderMap& headers,
+                                         const Formatter::Formatter& formatter,
+                                         const StreamInfo::StreamInfo& stream_info) {
+  const Formatter::Context context(&headers);
+  const std::string formatted_path = formatter.format(context, stream_info);
+  if (!formatted_path.empty()) {
+    const RedirectConfig path_redirect_config{
+        redirect_config ? redirect_config->scheme_redirect_ : "",
+        redirect_config ? redirect_config->host_redirect_ : "",
+        redirect_config ? redirect_config->port_redirect_ : "",
+        formatted_path,
+        "",
+        "",
+        nullptr,
+        nullptr,
+        formatted_path.find('?') != std::string::npos,
+        redirect_config ? redirect_config->https_redirect_ : false,
+        redirect_config ? redirect_config->strip_query_ : false};
+    return newUri(makeOptRef<const RedirectConfig>(path_redirect_config), headers);
+  }
+  return newUri(redirect_config, headers);
+}
+
 bool Utility::isValidRefererValue(absl::string_view value) {
 
   // First, we try to parse it as an absolute URL and

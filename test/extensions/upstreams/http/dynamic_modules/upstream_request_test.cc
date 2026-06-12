@@ -1,3 +1,5 @@
+#include <vector>
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/extensions/upstreams/http/dynamic_modules/config.h"
@@ -201,6 +203,50 @@ TEST_F(HttpTcpBridgeTest, OnUpstreamDataNoOp) {
 
   Buffer::OwnedImpl data("response data");
   bridge_->onUpstreamData(data, false);
+}
+
+TEST_F(HttpTcpBridgeTest, RequestBufferRemainsReadableAfterEncodeData) {
+  Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/test"}};
+  EXPECT_TRUE(bridge_->encodeHeaders(headers, false).ok());
+
+  Buffer::OwnedImpl data("hello");
+  bridge_->encodeData(data, false);
+
+  // Reading the request buffer after encodeData returns must not touch freed storage.
+  auto* envoy_ptr =
+      static_cast<envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr>(bridge_.get());
+  size_t chunks =
+      envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer_chunks_size(
+          envoy_ptr);
+  ASSERT_EQ(1, chunks);
+  std::vector<envoy_dynamic_module_type_envoy_buffer> result(chunks);
+  size_t result_length = 0;
+  envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer(
+      envoy_ptr, result.data(), &result_length);
+  ASSERT_EQ(1, result_length);
+  EXPECT_EQ("hello", absl::string_view(result[0].ptr, result[0].length));
+}
+
+TEST_F(HttpTcpBridgeTest, ResponseBufferRemainsReadableAfterOnUpstreamData) {
+  Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/test"}};
+  EXPECT_TRUE(bridge_->encodeHeaders(headers, false).ok());
+
+  Buffer::OwnedImpl data("world");
+  bridge_->onUpstreamData(data, false);
+
+  // Reading the response buffer after onUpstreamData returns must not touch freed storage.
+  auto* envoy_ptr =
+      static_cast<envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr>(bridge_.get());
+  size_t chunks =
+      envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer_chunks_size(
+          envoy_ptr);
+  ASSERT_EQ(1, chunks);
+  std::vector<envoy_dynamic_module_type_envoy_buffer> result(chunks);
+  size_t result_length = 0;
+  envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer(
+      envoy_ptr, result.data(), &result_length);
+  ASSERT_EQ(1, result_length);
+  EXPECT_EQ("world", absl::string_view(result[0].ptr, result[0].length));
 }
 
 TEST_F(HttpTcpBridgeTest, OnUpstreamConnectionClose) {
@@ -529,6 +575,21 @@ public:
 
 TEST_F(DynamicModuleGenericConnPoolFactoryTest, CreateSuccess) {
   auto config = createProtoConfig();
+  auto pool = factory_.createGenericConnPool(
+      host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
+      Upstream::ResourcePriority::Default, absl::nullopt, nullptr, config);
+  EXPECT_NE(pool, nullptr);
+}
+
+// Load the module via the ``module.local.filename`` data source instead of by name. The upstream
+// HTTP conn-pool factory has no factory context, so only this synchronous path is supported.
+TEST_F(DynamicModuleGenericConnPoolFactoryTest, CreateSuccessWithLocalFile) {
+  envoy::extensions::upstreams::http::dynamic_modules::v3::Config config;
+  config.mutable_dynamic_module_config()->mutable_module()->mutable_local()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c/"
+                                  "libupstream_bridge_no_op.so"));
+  config.set_bridge_name("test_bridge");
+
   auto pool = factory_.createGenericConnPool(
       host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
       Upstream::ResourcePriority::Default, absl::nullopt, nullptr, config);

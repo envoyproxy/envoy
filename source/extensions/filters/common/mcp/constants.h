@@ -89,6 +89,9 @@ constexpr absl::string_view SAMPLING_CREATE_MESSAGE = "sampling/createMessage";
 // Utility
 constexpr absl::string_view PING = "ping";
 
+// Synthetic method for JSON-RPC responses (no "method" field).
+constexpr absl::string_view JSONRPC_RESPONSE = "__jsonrpc_response";
+
 // Notification prefix
 constexpr absl::string_view NOTIFICATION_PREFIX = "notifications/";
 

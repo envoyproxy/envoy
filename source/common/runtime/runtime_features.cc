@@ -56,6 +56,7 @@ RUNTIME_GUARD(envoy_reloadable_features_ext_authz_http_client_retries_respect_us
 // @yanjunxiang-google before removing.
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_inject_data_with_state_update);
+RUNTIME_GUARD(envoy_reloadable_features_ext_proc_report_client_creation_error);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_return_stop_iteration);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_stream_close_optimization);
 RUNTIME_GUARD(envoy_reloadable_features_fix_http3_early_data_timing);
@@ -69,6 +70,7 @@ RUNTIME_GUARD(envoy_reloadable_features_hide_transport_failure_reason_in_respons
 RUNTIME_GUARD(envoy_reloadable_features_http1_close_connection_on_zombie_stream_complete);
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_http2_fix_goaway_loadshed_point);
+RUNTIME_GUARD(envoy_reloadable_features_http2_flood_protection_active_streams);
 RUNTIME_GUARD(envoy_reloadable_features_http2_include_cookies_in_limits);
 RUNTIME_GUARD(envoy_reloadable_features_http_async_client_retry_respect_buffer_limits);
 RUNTIME_GUARD(envoy_reloadable_features_http_inspector_use_balsa_parser);
@@ -79,7 +81,6 @@ RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_add_verification_status_header
 RUNTIME_GUARD(envoy_reloadable_features_map_http_stream_reset_to_tcp_rst);
 RUNTIME_GUARD(envoy_reloadable_features_mcp_filter_use_new_metadata_namespace);
 RUNTIME_GUARD(envoy_reloadable_features_mobile_use_network_observer_registry);
-RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_cleanup_cookies);
 RUNTIME_GUARD(envoy_reloadable_features_odcds_over_ads_fix);
 RUNTIME_GUARD(envoy_reloadable_features_on_demand_cluster_no_recreate_stream);
@@ -241,6 +242,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_strict_chunk_parsing);
 
 // Delay route selection in tcp_proxy until just before the upstream connection is established
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_delay_route_selection);
+
+// Enable histograms of HTTP/2 header sizes, including cookie size.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_record_histograms);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

@@ -13,22 +13,22 @@ namespace DynamicModules {
 
 ::Envoy::Matcher::InputMatcherFactoryCb
 DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
-    const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& /*context*/) {
+    const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& context) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
 
   const auto& proto_config = dynamic_cast<const envoy::extensions::matching::input_matchers::
                                               dynamic_modules::v3::DynamicModuleMatcher&>(config);
 
   const auto& module_config = proto_config.dynamic_module_config();
-  auto dynamic_module_or_error = Extensions::DynamicModules::newDynamicModuleByName(
-      module_config.name(), module_config.do_not_close(), module_config.load_globally());
-
-  if (!dynamic_module_or_error.ok()) {
-    throw EnvoyException("Failed to load dynamic module: " +
-                         std::string(dynamic_module_or_error.status().message()));
+  // Input matchers do not support remote module sources, so no init manager or async callback is
+  // passed; only the synchronous local-file and by-name paths can succeed here.
+  auto load_result = Extensions::DynamicModules::newDynamicModuleByConfig(
+      module_config, proto_config.matcher_name(), context);
+  if (!load_result.ok()) {
+    throw EnvoyException(std::string(load_result.status().message()));
   }
 
-  auto dynamic_module = std::move(dynamic_module_or_error.value());
+  auto dynamic_module = std::move(load_result->loaded);
 
   // Resolve required symbols.
   auto on_config_new = dynamic_module->getFunctionPointer<OnMatcherConfigNewType>(

@@ -311,6 +311,40 @@ std::string generateCodeChallenge(const std::string& code_verifier) {
   return Base64Url::encode(sha256_string.data(), sha256_string.size());
 }
 
+bool isHostAllowedDomain(absl::string_view host, const std::vector<std::string>& allowed_domains) {
+  if (allowed_domains.empty()) {
+    return true;
+  }
+
+  // The formatted uri must be a parseable absolute URL; otherwise a malformed template
+  Http::Utility::Url uri;
+  if (!uri.initialize(host, false)) {
+    return false;
+  }
+
+  // Strip port and any IPv6 brackets via the shared authority parser so that "example.com:8080",
+  // "[::1]:443" and bare "[::1]" all normalize consistently. For IPv6 literals that are
+  // recognized as IP addresses, parseAuthority returns the host without brackets, so allow-list
+  // entries for IPv6 must also be written without brackets (e.g. "::1", not "[::1]").
+  const absl::string_view hostname = Http::Utility::parseAuthority(uri.hostAndPort()).host_;
+
+  for (const auto& domain : allowed_domains) {
+    if (absl::StartsWith(domain, "*.")) {
+      // Wildcard match: "*.example.com" matches "foo.example.com"
+      absl::string_view suffix = absl::string_view(domain).substr(1);
+      if (absl::EndsWith(hostname, suffix) && hostname.size() > suffix.size()) {
+        return true;
+      }
+    } else {
+      // Exact match
+      if (absl::EqualsIgnoreCase(hostname, domain)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /**
  * Encodes the state parameter for the OAuth2 flow.
  * The state parameter is a base64Url encoded JSON object containing the original request URL, a
@@ -465,6 +499,9 @@ FilterConfig::FilterConfig(
       authorization_query_params_(buildAutorizationQueryParams(proto_config)),
       client_id_(proto_config.credentials().client_id()),
       redirect_uri_(proto_config.redirect_uri()),
+      allowed_redirect_domains_(proto_config.allowed_redirect_domains().begin(),
+                                proto_config.allowed_redirect_domains().end()),
+      original_request_uri_(proto_config.original_request_uri()),
       redirect_matcher_(proto_config.redirect_path_matcher(), context),
       signout_path_(proto_config.signout_path(), context), secret_reader_(secret_reader),
       stats_(FilterConfig::generateStats(stats_prefix, proto_config.stat_prefix(), scope)),
@@ -489,6 +526,8 @@ FilterConfig::FilterConfig(
       disable_access_token_set_cookie_(proto_config.disable_access_token_set_cookie()),
       disable_refresh_token_set_cookie_(proto_config.disable_refresh_token_set_cookie()),
       disable_token_encryption_(proto_config.disable_token_encryption()),
+      use_access_token_expiry_for_id_token_cookie_(
+          proto_config.use_access_token_expiry_for_id_token_cookie()),
       bearer_token_cookie_settings_(
           (proto_config.has_cookie_configs() &&
            proto_config.cookie_configs().has_bearer_token_cookie_config())
@@ -972,7 +1011,21 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   if (Http::Utility::schemeIsHttp(headers.getSchemeValue())) {
     scheme = Http::Headers::get().SchemeValues.Http;
   }
-  const std::string base_path = absl::StrCat(scheme, "://", host_);
+
+  auto base_path = absl::StrCat(scheme, "://", host_);
+
+  if (!config_->originalRequestUri().empty()) {
+    Formatter::FormatterPtr base_path_formatter = THROW_OR_RETURN_VALUE(
+        Formatter::FormatterImpl::create(config_->originalRequestUri()), Formatter::FormatterPtr);
+    base_path = base_path_formatter->format({&headers}, decoder_callbacks_->streamInfo());
+  }
+
+  if (!isHostAllowedDomain(base_path, config_->allowedRedirectDomains())) {
+    sendUnauthorizedResponse(fmt::format(
+        "authority or original_request_uri failed domain allow-list validation: {}", base_path));
+    return;
+  }
+
   const std::string original_url = absl::StrCat(base_path, headers.Path()->value().getStringView());
 
   const CookieNames& cookie_names = config_->cookieNames();
@@ -1006,9 +1059,17 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   auto query_params = config_->authorizationQueryParams();
   query_params.overwrite(queryParamsState, state);
 
-  Formatter::FormatterPtr formatter = THROW_OR_RETURN_VALUE(
+  // Format redirect_uri — needed for the query param sent to the identity provider
+  Formatter::FormatterPtr redirect_uri_formatter = THROW_OR_RETURN_VALUE(
       Formatter::FormatterImpl::create(config_->redirectUri()), Formatter::FormatterPtr);
-  const auto redirect_uri = formatter->format({&headers}, decoder_callbacks_->streamInfo());
+  const auto redirect_uri =
+      redirect_uri_formatter->format({&headers}, decoder_callbacks_->streamInfo());
+  if (!isHostAllowedDomain(redirect_uri, config_->allowedRedirectDomains())) {
+    sendUnauthorizedResponse(
+        fmt::format("redirect_uri failed domain allow-list validation: {}", redirect_uri));
+    return;
+  }
+
   const std::string escaped_redirect_uri = Http::Utility::PercentEncoding::urlEncode(redirect_uri);
   query_params.overwrite(queryParamsRedirectUri, escaped_redirect_uri);
 
@@ -1203,11 +1264,15 @@ OAuth2Filter::getExpiresTimeForRefreshToken(const std::string& refresh_token,
         config_->defaultRefreshTokenExpiresIn();
     return std::to_string(default_refresh_token_expires_in.count());
   }
+
   return std::to_string(expires_in.count());
 }
 
 std::string OAuth2Filter::getExpiresTimeForIdToken(const std::string& id_token,
                                                    const std::chrono::seconds& expires_in) const {
+  if (config_->useAccessTokenExpiryForIdTokenCookie()) {
+    return std::to_string(expires_in.count());
+  }
   if (!id_token.empty()) {
     JwtVerify::Jwt jwt;
     if (jwt.parseFromString(id_token) == JwtVerify::Status::Ok && jwt.exp_ != 0) {
@@ -1618,6 +1683,13 @@ CallbackValidationResult OAuth2Filter::validateState(const Http::RequestHeaderMa
   if (!url.initialize(original_request_url, false)) {
     return {false, "", "", flow_id,
             fmt::format("State url can not be initialized: {}", original_request_url)};
+  }
+
+  // Validate the host of the original request URL against allowed redirect domains.
+  if (!isHostAllowedDomain(original_request_url, config_->allowedRedirectDomains())) {
+    return {false, "", "", flow_id,
+            fmt::format("State url host is not in the allowed redirect domains: {}",
+                        original_request_url)};
   }
 
   return {true, "", original_request_url, flow_id, ""};

@@ -3,6 +3,7 @@
 
 #include "source/common/upstream/prod_cluster_info_factory.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
+#include "source/extensions/transport_sockets/tls/config.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/server/server_factory_context.h"
@@ -160,6 +161,36 @@ TEST_F(ProdClusterInfoFactoryTest, MetadataStatsMatcherExclusionList) {
 
   // "cluster.my_cluster.upstream_rq_total" matches the exclusion prefix — rejected.
   EXPECT_EQ("", info->statsScope().counterFromString("upstream_rq_total").name());
+}
+
+TEST_F(ProdClusterInfoFactoryTest, SdsTlsCertificate) {
+  const std::string yaml = R"EOF(
+    name: hcs_sds_cluster
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        common_tls_context:
+          tls_certificate_sds_secret_configs:
+            - name: client_cert
+              sds_config:
+                ads: {}
+                resource_api_version: V3
+  )EOF";
+
+  auto info = createClusterInfo(parseClusterFromV3Yaml(yaml));
+  ASSERT_NE(nullptr, info);
 }
 
 } // namespace

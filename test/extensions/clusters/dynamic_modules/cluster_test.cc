@@ -152,6 +152,30 @@ TEST_F(DynamicModuleClusterTest, BasicCreation) {
   EXPECT_NE(nullptr, result->second);
 }
 
+// Test that creating a cluster by loading the module via ``module.local.filename`` succeeds.
+TEST_F(DynamicModuleClusterTest, BasicCreationWithLocalFile) {
+  const std::string yaml =
+      fmt::format(R"EOF(
+name: test_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cluster_type:
+  name: envoy.clusters.dynamic_modules
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_modules.v3.ClusterConfig
+    dynamic_module_config:
+      module:
+        local:
+          filename: {}
+    cluster_name: test
+)EOF",
+                  Extensions::DynamicModules::testSharedObjectPath("cluster_no_op", "c"));
+  auto result = createCluster(yaml);
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  EXPECT_NE(nullptr, result->first);
+  EXPECT_NE(nullptr, result->second);
+}
+
 // Test that creating a cluster with cluster_config succeeds.
 TEST_F(DynamicModuleClusterTest, CreationWithClusterConfig) {
   auto result =
@@ -279,6 +303,37 @@ TEST_F(DynamicModuleClusterTest, BatchRemoveMultipleHosts) {
   // Remove all three at once.
   EXPECT_EQ(3, cluster->removeHosts(hosts));
   EXPECT_EQ(0, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
+}
+
+// Test that addresses already present in the host set are skipped on a subsequent batch.
+TEST_F(DynamicModuleClusterTest, DuplicateHostDetection) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // Add two hosts.
+  std::vector<Upstream::HostSharedPtr> hosts;
+  ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10001", "127.0.0.1:10002"}, {1, 1}, hosts));
+  EXPECT_EQ(2, hosts.size());
+  EXPECT_EQ(2, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
+  EXPECT_EQ(2, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+
+  // Add a batch with one existing address and one new address. Only the new one is created.
+  std::vector<Upstream::HostSharedPtr> hosts2;
+  ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10002", "127.0.0.1:10003"}, {1, 1}, hosts2));
+  EXPECT_EQ(1, hosts2.size());
+  EXPECT_EQ("127.0.0.1:10003", hosts2[0]->address()->asString());
+  EXPECT_EQ(3, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
+  EXPECT_EQ(3, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+
+  // A batch of only existing addresses adds nothing but still succeeds.
+  std::vector<Upstream::HostSharedPtr> hosts3;
+  ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10001", "127.0.0.1:10003"}, {1, 1}, hosts3));
+  EXPECT_EQ(0, hosts3.size());
+  EXPECT_EQ(3, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
+  EXPECT_EQ(3, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
 }
 
 // Test that invalid addresses cause the entire batch to fail.
@@ -1295,6 +1350,18 @@ TEST_F(DynamicModuleClusterTest, WorkerSlotGetReturnsNullptrWhenSlotAllocatedBut
   envoy_dynamic_module_callback_cluster_run_on_all_workers(cluster.get(), /*event_id=*/1);
 
   EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_worker_slot_get(cluster.get()));
+}
+
+// Test cluster_get_name returns the cluster's CDS name from the cluster-side context.
+TEST_F(DynamicModuleClusterTest, ClusterGetNameReturnsCdsName) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  envoy_dynamic_module_type_envoy_buffer buffer{nullptr, 0};
+  envoy_dynamic_module_callback_cluster_get_name(cluster.get(), &buffer);
+  EXPECT_EQ("test_cluster", absl::string_view(buffer.ptr, buffer.length));
 }
 
 // Test the DynamicModuleClusterHandle destructor dispatches to main thread.

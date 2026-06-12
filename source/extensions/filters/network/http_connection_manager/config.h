@@ -166,7 +166,7 @@ public:
                                         Http::ServerConnectionCallbacks& callbacks,
                                         Server::OverloadManager& overload_manager) override;
   Http::DateProvider& dateProvider() override { return date_provider_; }
-  std::chrono::milliseconds drainTimeout() const override { return drain_timeout_; }
+  std::chrono::milliseconds drainTimeout() const override;
   FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() const override { return generate_request_id_; }
   bool preserveExternalRequestId() const override { return preserve_external_request_id_; }
@@ -175,9 +175,7 @@ public:
   uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   bool isRoutable() const override { return true; }
-  absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
-    return max_connection_duration_;
-  }
+  absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override;
   bool http1SafeMaxConnectionDuration() const override {
     return http1_safe_max_connection_duration_;
   }
@@ -340,6 +338,7 @@ private:
   const uint32_t max_request_headers_count_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
+  absl::optional<double> max_connection_duration_jitter_percentage_;
   const bool http1_safe_max_connection_duration_;
   absl::optional<std::chrono::milliseconds> max_stream_duration_;
   std::chrono::milliseconds stream_idle_timeout_;
@@ -352,6 +351,7 @@ private:
   Router::ScopeKeyBuilderPtr scope_key_builder_;
   Config::ConfigProviderPtr scoped_routes_config_provider_;
   std::chrono::milliseconds drain_timeout_;
+  absl::optional<double> drain_timeout_jitter_percentage_;
   bool generate_request_id_;
   const bool preserve_external_request_id_;
   const bool always_set_request_id_in_response_;

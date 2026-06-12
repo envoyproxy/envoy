@@ -23,6 +23,8 @@ public:
     }
   }
 
+  void onHostSelected(const Upstream::HostDescriptionConstSharedPtr&) override {}
+
   void onUpstreamConnectionEstablished() override {
     if (latched_end_stream_.has_value()) {
       const bool end_stream = *latched_end_stream_;

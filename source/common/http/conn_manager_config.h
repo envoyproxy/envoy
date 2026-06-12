@@ -253,7 +253,10 @@ public:
 
   /**
    * @return the time in milliseconds the connection manager will wait between issuing a "shutdown
-   *         notice" to the time it will issue a full GOAWAY and not accept any new streams.
+   *         notice" to the time it will issue a full GOAWAY and not accept any new streams. If
+   *         ``drain_timeout_jitter`` is configured, each call returns the base timeout extended
+   *         by a random amount up to ``drainTimeout * jitter / 100``. The jittering is an
+   *         implementation detail and not exposed as a separate interface method.
    */
   virtual std::chrono::milliseconds drainTimeout() const PURE;
 
@@ -291,7 +294,12 @@ public:
   virtual bool isRoutable() const PURE;
 
   /**
-   * @return optional maximum connection duration timeout for manager connections.
+   * @return optional maximum connection duration timeout for manager connections. If
+   *         ``max_connection_duration_jitter`` is configured, each call returns the
+   *         base duration extended by a random amount up to
+   *         ``max_connection_duration * jitter / 100``. The jittering is an
+   *         implementation detail and not exposed as a separate interface method;
+   *         callers should arm their timer with whatever value this returns.
    */
   virtual absl::optional<std::chrono::milliseconds> maxConnectionDuration() const PURE;
 
