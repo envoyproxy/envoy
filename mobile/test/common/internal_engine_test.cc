@@ -552,36 +552,29 @@ TEST_F(InternalEngineTest, MultipleListenersStream) {
   options->setLogLevel(static_cast<spdlog::level::level_enum>(LOG_LEVEL));
   engine->run(std::move(options));
 
-  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(
-      absl::Seconds(10)));
+  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
   // Start stream on first listener.
   {
     absl::Notification on_complete_notification;
     EnvoyStreamCallbacks stream_callbacks;
     stream_callbacks.on_headers_ = [&](const Http::ResponseHeaderMap& headers,
-                                       bool /* end_stream */,
-                                       envoy_stream_intel) {
+                                       bool /* end_stream */, envoy_stream_intel) {
       EXPECT_EQ(headers.Status()->value().getStringView(), "200");
     };
-    stream_callbacks.on_complete_ = [&](envoy_stream_intel,
-                                        envoy_final_stream_intel) {
+    stream_callbacks.on_complete_ = [&](envoy_stream_intel, envoy_final_stream_intel) {
       on_complete_notification.Notify();
     };
 
     envoy_stream_t stream = engine->initStream();
     // Explicitly specify "base_api_listener"
-    engine->startStream(stream, std::move(stream_callbacks), false,
-                        "base_api_listener");
+    engine->startStream(stream, std::move(stream_callbacks), false, "base_api_listener");
 
-    engine->sendHeaders(
-        stream, createLocalhostRequestHeaders(test_server.getAddress()), false);
-    engine->sendData(
-        stream, std::make_unique<Buffer::OwnedImpl>("request body"), false);
+    engine->sendHeaders(stream, createLocalhostRequestHeaders(test_server.getAddress()), false);
+    engine->sendData(stream, std::make_unique<Buffer::OwnedImpl>("request body"), false);
     engine->sendTrailers(stream, Http::Utility::createRequestTrailerMapPtr());
 
-    ASSERT_TRUE(on_complete_notification.WaitForNotificationWithTimeout(
-        absl::Seconds(10)));
+    ASSERT_TRUE(on_complete_notification.WaitForNotificationWithTimeout(absl::Seconds(10)));
   }
 
   // Start stream on second listener.
@@ -589,35 +582,28 @@ TEST_F(InternalEngineTest, MultipleListenersStream) {
     absl::Notification on_complete_notification;
     EnvoyStreamCallbacks stream_callbacks;
     stream_callbacks.on_headers_ = [&](const Http::ResponseHeaderMap& headers,
-                                       bool /* end_stream */,
-                                       envoy_stream_intel) {
+                                       bool /* end_stream */, envoy_stream_intel) {
       EXPECT_EQ(headers.Status()->value().getStringView(), "200");
     };
-    stream_callbacks.on_complete_ = [&](envoy_stream_intel,
-                                        envoy_final_stream_intel) {
+    stream_callbacks.on_complete_ = [&](envoy_stream_intel, envoy_final_stream_intel) {
       on_complete_notification.Notify();
     };
 
     envoy_stream_t stream = engine->initStream();
     // Explicitly specify "second_api_listener"
-    engine->startStream(stream, std::move(stream_callbacks), false,
-                        "second_api_listener");
+    engine->startStream(stream, std::move(stream_callbacks), false, "second_api_listener");
 
-    engine->sendHeaders(
-        stream, createLocalhostRequestHeaders(test_server.getAddress()), false);
-    engine->sendData(
-        stream, std::make_unique<Buffer::OwnedImpl>("request body"), false);
+    engine->sendHeaders(stream, createLocalhostRequestHeaders(test_server.getAddress()), false);
+    engine->sendData(stream, std::make_unique<Buffer::OwnedImpl>("request body"), false);
     engine->sendTrailers(stream, Http::Utility::createRequestTrailerMapPtr());
 
-    ASSERT_TRUE(on_complete_notification.WaitForNotificationWithTimeout(
-        absl::Seconds(10)));
+    ASSERT_TRUE(on_complete_notification.WaitForNotificationWithTimeout(absl::Seconds(10)));
   }
 
   test_server.shutdown();
   engine->terminate();
 
-  ASSERT_TRUE(
-      test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
+  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
 }
 
 } // namespace Envoy
