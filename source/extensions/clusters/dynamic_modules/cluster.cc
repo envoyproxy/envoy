@@ -213,6 +213,8 @@ DynamicModuleCluster::DynamicModuleCluster(const envoy::config::cluster::v3::Clu
 
   // Initialize the priority set with an empty host set at priority 0.
   priority_set_.getOrCreateHostSet(0);
+  // Allocate and seed the worker slot before worker threads can observe this cluster.
+  ensureWorkerSlot();
 
   registerLifecycleCallbacks();
 }
