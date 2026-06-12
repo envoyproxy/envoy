@@ -175,6 +175,12 @@ is always emitted downstream in the same RESP version it arrived; no transparent
 as ``ZRANGE WITHSCORES`` returning nested pair arrays under RESP3 vs flat arrays under
 RESP2.
 
+The one exception is cluster-scoped commands whose replies are aggregated across shards
+(for example ``CONFIG GET`` and ``KEYS`` on a Redis Cluster): these are always emitted as a
+flat array, even when a RESP3 upstream shard returns a Map. Aggregating shard responses into
+a Map would force clients into duplicate-key handling across shards, so a stable flat array
+is emitted for both RESP2 and RESP3 downstreams.
+
 DNS lookups on redirections
 ---------------------------
 

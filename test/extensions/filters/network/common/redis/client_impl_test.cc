@@ -1523,6 +1523,17 @@ TEST_F(RedisClientImplTest, Resp3HelloErrorReplyClosesAndFailsHeld) {
               putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
   respondWith(std::move(err));
   EXPECT_EQ(1UL, hello3_failure_counter_->value());
+
+  // The HELLO error closed the connection from inside onRespValue while the decoder may still be
+  // draining the same buffer. A trailing complete frame in that buffer reaches onRespValue with an
+  // empty pending_requests_; it must be dropped without a front() read (front() on an empty list
+  // is undefined behavior in release builds). No callback fires and the failure counter is
+  // unchanged.
+  Common::Redis::RespValuePtr surplus{new Common::Redis::RespValue()};
+  surplus->type(Common::Redis::RespType::SimpleString);
+  surplus->asString() = "OK";
+  respondWith(std::move(surplus));
+  EXPECT_EQ(1UL, hello3_failure_counter_->value());
 }
 
 // HELLO Map with proto != 3 — isHello3SuccessResponse rejects → failure cascade.

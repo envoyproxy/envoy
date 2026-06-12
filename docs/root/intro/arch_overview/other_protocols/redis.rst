@@ -131,7 +131,8 @@ At the protocol level, pipelines are supported.
 Use pipelining wherever possible for the best performance.
 
 At the command level, Envoy only supports commands that can be reliably hashed to a server. AUTH, PING, ECHO and INFO
-are the only exceptions. AUTH is processed locally by Envoy if a downstream password has been configured,
+are exceptions, as are HELLO, QUIT, and the CLIENT SETNAME and CLIENT SETINFO subcommands that Envoy handles
+locally. AUTH is processed locally by Envoy if a downstream password has been configured,
 and no other commands will be processed until authentication is successful when a password has been
 configured. If an external authentication provider is set, Envoy will instead send the authentication arguments
 to an external service and act according to the authentication response. If a downstream password is set together
@@ -154,7 +155,9 @@ The listener pins one RESP version end-to-end rather than translating between th
 RESP2 and RESP3 diverge structurally: some replies have no transparent mapping (for example
 ``ZRANGE WITHSCORES`` is a flat array under RESP2 but a nested array of pairs under RESP3).
 The proxy therefore does not cross-encode upstream responses — a reply is always emitted
-downstream in the RESP version it arrived in. Unsolicited RESP3 ``Push`` frames from upstream
+downstream in the RESP version it arrived in. The exception is cluster-scope aggregate commands such as
+``CONFIG GET`` and ``KEYS``, whose per-shard replies are combined into one flat array even when a shard
+answers with a RESP3 Map. Unsolicited RESP3 ``Push`` frames from upstream
 are dropped rather than forwarded downstream (the proxy routes no Push-producing feature on
 ordinary request/response connections, and forwarding one would desynchronize the reply FIFO).
 

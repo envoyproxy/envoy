@@ -15,7 +15,6 @@
 #include "source/extensions/filters/network/common/redis/supported_commands.h"
 #include "source/extensions/filters/network/common/redis/utility.h"
 #include "source/extensions/filters/network/redis_proxy/command_splitter.h"
-#include "source/extensions/filters/network/redis_proxy/config.h"
 
 #include "absl/strings/ascii.h"
 

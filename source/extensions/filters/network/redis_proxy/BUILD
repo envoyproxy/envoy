@@ -22,6 +22,7 @@ envoy_cc_library(
         "//source/common/singleton:const_singleton",
         "//source/extensions/filters/network/common/redis:client_interface",
         "//source/extensions/filters/network/common/redis:codec_interface",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
