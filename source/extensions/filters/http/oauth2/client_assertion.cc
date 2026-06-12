@@ -95,7 +95,7 @@ ClientAssertion::create(absl::string_view client_id, absl::string_view audience,
 
   // Ensure the provided key type matches the configured algorithm family. Using, e.g., an EC key
   // with an "RS*" algorithm would otherwise produce a JWT whose "alg" header does not match the
-  // signature, which fails at the IdP and is hard to diagnose.
+  // signature, which fails at the identity provider and is hard to diagnose.
   const int key_type = EVP_PKEY_id(pkey->getEVP_PKEY());
   const bool rsa_algorithm = absl::StartsWith(algorithm, "RS");
   if (rsa_algorithm && key_type != EVP_PKEY_RSA) {

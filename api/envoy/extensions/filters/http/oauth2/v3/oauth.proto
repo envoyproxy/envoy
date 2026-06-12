@@ -155,13 +155,13 @@ message OAuth2Credentials {
 message PrivateKeyJwtConfig {
   // Supported JWT signing algorithms for the client assertion.
   enum SigningAlgorithm {
-    // RSASSA-PKCS1-v1_5 using SHA-256.
+    // ``RSASSA-PKCS1-v1_5`` using SHA-256.
     RS256 = 0;
 
-    // RSASSA-PKCS1-v1_5 using SHA-384.
+    // ``RSASSA-PKCS1-v1_5`` using SHA-384.
     RS384 = 1;
 
-    // RSASSA-PKCS1-v1_5 using SHA-512.
+    // ``RSASSA-PKCS1-v1_5`` using SHA-512.
     RS512 = 2;
 
     // ECDSA using P-256 and SHA-256.
