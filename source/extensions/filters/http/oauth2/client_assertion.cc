@@ -9,11 +9,9 @@
 #include "source/common/crypto/utility.h"
 #include "source/common/json/json_sanitizer.h"
 
-#include "absl/strings/ascii.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "openssl/bn.h"
-#include "openssl/ec.h"
-#include "openssl/ec_key.h"
 #include "openssl/ecdsa.h"
 #include "openssl/evp.h"
 
@@ -24,16 +22,17 @@ namespace Oauth2 {
 
 namespace {
 
-absl::StatusOr<std::string> getHashFunction(absl::string_view algorithm) {
-  const std::string alg(absl::AsciiStrToUpper(algorithm));
-  if (alg == "RS256" || alg == "ES256") {
-    return std::string("sha256");
+// The algorithm is validated against the PrivateKeyJwtConfig.SigningAlgorithm enum at config time,
+// so it is always one of the canonical values below and no case folding is needed here.
+absl::StatusOr<absl::string_view> getHashFunction(absl::string_view algorithm) {
+  if (algorithm == "RS256" || algorithm == "ES256") {
+    return "sha256";
   }
-  if (alg == "RS384" || alg == "ES384") {
-    return std::string("sha384");
+  if (algorithm == "RS384" || algorithm == "ES384") {
+    return "sha384";
   }
-  if (alg == "RS512" || alg == "ES512") {
-    return std::string("sha512");
+  if (algorithm == "RS512" || algorithm == "ES512") {
+    return "sha512";
   }
   return absl::InvalidArgumentError(absl::StrCat("Unsupported signing algorithm: ", algorithm));
 }
@@ -61,12 +60,9 @@ std::vector<uint8_t> convertEcDerSignatureToRaw(const std::vector<uint8_t>& der_
   const BIGNUM* s = nullptr;
   ECDSA_SIG_get0(ecdsa_sig.get(), &r, &s);
 
-  // Determine the component size from the EC key's curve.
-  const EC_KEY* ec_key = EVP_PKEY_get0_EC_KEY(pkey);
-  RELEASE_ASSERT(ec_key != nullptr, "Failed to get EC key from EVP_PKEY");
-  const EC_GROUP* group = EC_KEY_get0_group(ec_key);
-  const unsigned int degree = EC_GROUP_get_degree(group);
-  const size_t component_size = (degree + 7) / 8;
+  // Determine the component size from the EC key's curve. For EC keys, EVP_PKEY_bits returns the
+  // group order in bits, which equals the degree of the curve.
+  const size_t component_size = (EVP_PKEY_bits(pkey) + 7) / 8;
 
   // Write r and s as fixed-width big-endian integers.
   std::vector<uint8_t> raw_sig(component_size * 2);
@@ -95,6 +91,20 @@ ClientAssertion::create(absl::string_view client_id, absl::string_view audience,
   auto pkey = Common::Crypto::UtilitySingleton::get().importPrivateKeyPEM(private_key_pem);
   if (pkey == nullptr || pkey->getEVP_PKEY() == nullptr) {
     return absl::InvalidArgumentError("Failed to parse private key PEM for JWT signing");
+  }
+
+  // Ensure the provided key type matches the configured algorithm family. Using, e.g., an EC key
+  // with an "RS*" algorithm would otherwise produce a JWT whose "alg" header does not match the
+  // signature, which fails at the IdP and is hard to diagnose.
+  const int key_type = EVP_PKEY_id(pkey->getEVP_PKEY());
+  const bool rsa_algorithm = absl::StartsWith(algorithm, "RS");
+  if (rsa_algorithm && key_type != EVP_PKEY_RSA) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("signing algorithm ", algorithm, " requires an RSA private key"));
+  }
+  if (!rsa_algorithm && key_type != EVP_PKEY_EC) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("signing algorithm ", algorithm, " requires an EC private key"));
   }
 
   const auto now =

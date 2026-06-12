@@ -486,12 +486,11 @@ FilterConfig::FilterConfig(
                                                              DEFAULT_CSRF_TOKEN_EXPIRES_IN)),
       code_verifier_token_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(
           proto_config, code_verifier_token_expires_in, DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN)),
-      jwt_signing_algorithm_(proto_config.has_private_key_jwt() &&
-                                     !proto_config.private_key_jwt().signing_algorithm().empty()
-                                 ? proto_config.private_key_jwt().signing_algorithm()
-                                 : "RS256"),
-      jwt_assertion_lifetime_(std::chrono::seconds(
-          PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config.private_key_jwt(), assertion_lifetime, 60))),
+      jwt_signing_algorithm_(
+          envoy::extensions::filters::http::oauth2::v3::PrivateKeyJwtConfig::SigningAlgorithm_Name(
+              proto_config.private_key_jwt_config().signing_algorithm())),
+      jwt_assertion_lifetime_(std::chrono::seconds(PROTOBUF_GET_SECONDS_OR_DEFAULT(
+          proto_config.private_key_jwt_config(), assertion_lifetime, 60))),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       preserve_authorization_header_(proto_config.preserve_authorization_header()),
       use_refresh_token_(FilterConfig::shouldUseRefreshToken(proto_config)),

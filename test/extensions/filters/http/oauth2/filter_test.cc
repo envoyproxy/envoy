@@ -1320,8 +1320,9 @@ TEST_F(OAuth2Test, SetBearerTokenWithPrivateKeyJwt) {
   p.mutable_use_refresh_token()->set_value(true);
   p.set_auth_type(::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                       OAuth2Config_AuthType_PRIVATE_KEY_JWT);
-  p.mutable_private_key_jwt()->set_signing_algorithm("RS256");
-  p.mutable_private_key_jwt()->mutable_assertion_lifetime()->set_seconds(60);
+  p.mutable_private_key_jwt_config()->set_signing_algorithm(
+      ::envoy::extensions::filters::http::oauth2::v3::PrivateKeyJwtConfig::RS256);
+  p.mutable_private_key_jwt_config()->mutable_assertion_lifetime()->set_seconds(60);
   p.add_auth_scopes("user");
   auto* credentials = p.mutable_credentials();
   credentials->set_client_id(TEST_CLIENT_ID);
@@ -1401,8 +1402,9 @@ TEST_F(OAuth2Test, RefreshTokenWithPrivateKeyJwt) {
   p.mutable_use_refresh_token()->set_value(true);
   p.set_auth_type(::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                       OAuth2Config_AuthType_PRIVATE_KEY_JWT);
-  p.mutable_private_key_jwt()->set_signing_algorithm("RS256");
-  p.mutable_private_key_jwt()->mutable_assertion_lifetime()->set_seconds(60);
+  p.mutable_private_key_jwt_config()->set_signing_algorithm(
+      ::envoy::extensions::filters::http::oauth2::v3::PrivateKeyJwtConfig::RS256);
+  p.mutable_private_key_jwt_config()->mutable_assertion_lifetime()->set_seconds(60);
   p.add_auth_scopes("user");
   auto* credentials = p.mutable_credentials();
   credentials->set_client_id(TEST_CLIENT_ID);

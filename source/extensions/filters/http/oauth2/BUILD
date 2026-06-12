@@ -83,7 +83,6 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        ":client_assertion_lib",
         ":oauth_lib",
         "//envoy/registry",
         "//source/extensions/filters/http/common:factory_base_lib",

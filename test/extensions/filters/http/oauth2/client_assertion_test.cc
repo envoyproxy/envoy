@@ -160,6 +160,24 @@ TEST_F(ClientAssertionTest, InvalidPrivateKey) {
   EXPECT_NE(std::string::npos, result.status().message().find("Failed to parse private key"));
 }
 
+TEST_F(ClientAssertionTest, KeyTypeMismatch) {
+  // An RSA algorithm with an EC key is rejected.
+  auto rsa_alg_ec_key =
+      ClientAssertion::create("client", "https://auth.example.com/token", EcP256PrivateKeyPem,
+                              "RS256", std::chrono::seconds(60), test_time_, random_);
+  ASSERT_FALSE(rsa_alg_ec_key.ok());
+  EXPECT_NE(std::string::npos,
+            rsa_alg_ec_key.status().message().find("requires an RSA private key"));
+
+  // An EC algorithm with an RSA key is rejected.
+  auto ec_alg_rsa_key =
+      ClientAssertion::create("client", "https://auth.example.com/token", RsaPrivateKeyPem, "ES256",
+                              std::chrono::seconds(60), test_time_, random_);
+  ASSERT_FALSE(ec_alg_rsa_key.ok());
+  EXPECT_NE(std::string::npos,
+            ec_alg_rsa_key.status().message().find("requires an EC private key"));
+}
+
 TEST_F(ClientAssertionTest, CustomLifetime) {
   EXPECT_CALL(random_, uuid()).WillOnce(Return("test-jti-uuid"));
 

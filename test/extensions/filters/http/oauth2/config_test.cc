@@ -296,8 +296,8 @@ config:
     path:
       exact: /signout
   auth_type: "PRIVATE_KEY_JWT"
-  private_key_jwt:
-    signing_algorithm: "RS256"
+  private_key_jwt_config:
+    signing_algorithm: RS256
     assertion_lifetime: 120s
     )EOF";
 
@@ -326,7 +326,8 @@ config:
   cb(filter_callback);
 }
 
-TEST(ConfigTest, PrivateKeyJwtInvalidAlgorithm) {
+TEST(ConfigTest, PrivateKeyJwtInvalidAssertionLifetime) {
+  // A non-positive assertion_lifetime is rejected by the PGV duration rule at config ingestion.
   const std::string yaml = R"EOF(
 config:
   token_endpoint:
@@ -348,26 +349,19 @@ config:
     path:
       exact: /signout
   auth_type: "PRIVATE_KEY_JWT"
-  private_key_jwt:
-    signing_algorithm: "PS256"
+  private_key_jwt_config:
+    signing_algorithm: ES256
+    assertion_lifetime: 0s
     )EOF";
 
   OAuth2Config factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
   TestUtility::loadFromYaml(yaml, *proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  context.server_factory_context_.cluster_manager_.initializeClusters({"foo"}, {});
 
-  NiceMock<Secret::MockSecretManager> secret_manager;
-  ON_CALL(context.server_factory_context_, secretManager())
-      .WillByDefault(ReturnRef(secret_manager));
-  ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
-      .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
-          envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
-
-  const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_FALSE(result.ok());
-  EXPECT_NE(std::string::npos, result.status().message().find("unsupported private_key_jwt"));
+  EXPECT_THROW_WITH_REGEX(
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
+      EnvoyException, "value must be greater than");
 }
 
 TEST(ConfigTest, PrivateKeyJwtMissingTokenSecret) {

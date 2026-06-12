@@ -153,14 +153,38 @@ message OAuth2Credentials {
 
 // Configuration for ``PRIVATE_KEY_JWT`` client authentication (RFC 7523).
 message PrivateKeyJwtConfig {
+  // Supported JWT signing algorithms for the client assertion.
+  enum SigningAlgorithm {
+    // RSASSA-PKCS1-v1_5 using SHA-256.
+    RS256 = 0;
+
+    // RSASSA-PKCS1-v1_5 using SHA-384.
+    RS384 = 1;
+
+    // RSASSA-PKCS1-v1_5 using SHA-512.
+    RS512 = 2;
+
+    // ECDSA using P-256 and SHA-256.
+    ES256 = 3;
+
+    // ECDSA using P-384 and SHA-384.
+    ES384 = 4;
+
+    // ECDSA using P-521 and SHA-512.
+    ES512 = 5;
+  }
+
   // The signing algorithm to use for the JWT assertion.
-  // Supported values: ``RS256``, ``RS384``, ``RS512``, ``ES256``, ``ES384``, ``ES512``.
+  // The private key provided in ``token_secret`` must match the algorithm family: an RSA key for
+  // the ``RS*`` algorithms, or an EC key for the ``ES*`` algorithms.
   // Default: ``RS256``.
-  string signing_algorithm = 1;
+  SigningAlgorithm signing_algorithm = 1 [(validate.rules).enum = {defined_only: true}];
 
   // The lifetime of the JWT assertion. After this duration, the assertion expires.
+  // The value is truncated to whole seconds, so it must be at least ``1s`` when set.
   // Default: ``60s``.
-  google.protobuf.Duration assertion_lifetime = 2;
+  google.protobuf.Duration assertion_lifetime = 2
+      [(validate.rules).duration = {gte: {seconds: 1}}];
 }
 
 // OAuth config
@@ -328,7 +352,7 @@ message OAuth2Config {
   // Configuration for ``PRIVATE_KEY_JWT`` client authentication.
   // Only used when :ref:`auth_type <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.auth_type>`
   // is set to ``PRIVATE_KEY_JWT``.
-  PrivateKeyJwtConfig private_key_jwt = 28;
+  PrivateKeyJwtConfig private_key_jwt_config = 28;
 }
 
 // Per-route OAuth2 config.
