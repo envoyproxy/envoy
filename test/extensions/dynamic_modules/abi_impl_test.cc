@@ -1589,6 +1589,33 @@ WEAK_STUB(ListenerFilterGetFilterState,
           envoy_dynamic_module_callback_listener_filter_get_filter_state(nullptr, {nullptr, 0},
                                                                          nullptr))
 
+WEAK_STUB(FormatterGetAccessLogType,
+          envoy_dynamic_module_callback_formatter_get_access_log_type(nullptr))
+WEAK_STUB(FormatterGetAttributeBool,
+          envoy_dynamic_module_callback_formatter_get_attribute_bool(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestProtocol, nullptr))
+WEAK_STUB(FormatterGetAttributeInt,
+          envoy_dynamic_module_callback_formatter_get_attribute_int(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestProtocol, nullptr))
+WEAK_STUB(FormatterGetAttributeString,
+          envoy_dynamic_module_callback_formatter_get_attribute_string(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestProtocol, nullptr))
+WEAK_STUB(FormatterGetDynamicMetadata,
+          envoy_dynamic_module_callback_formatter_get_dynamic_metadata(nullptr, {nullptr, 0},
+                                                                       {nullptr, 0}, nullptr))
+WEAK_STUB(FormatterGetHeaderValue,
+          envoy_dynamic_module_callback_formatter_get_header_value(
+              nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, {nullptr, 0},
+              nullptr, 0, nullptr))
+WEAK_STUB(FormatterGetHeaders,
+          envoy_dynamic_module_callback_formatter_get_headers(
+              nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, nullptr))
+WEAK_STUB(FormatterGetHeadersSize,
+          envoy_dynamic_module_callback_formatter_get_headers_size(
+              nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader))
+WEAK_STUB(FormatterGetLocalReplyBody,
+          envoy_dynamic_module_callback_formatter_get_local_reply_body(nullptr, nullptr))
+
 } // namespace
 } // namespace DynamicModules
 } // namespace Extensions
