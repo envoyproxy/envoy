@@ -97,6 +97,10 @@ public:
   // get_filter_state_typed. Valid until the end of the current event hook.
   absl::optional<std::string> last_serialized_filter_state_;
 
+  // Temporary holder for host metadata snapshots returned by host metadata getters.
+  // Valid until the next metadata getter call on this filter.
+  Upstream::MetadataConstSharedPtr last_metadata_snapshot_;
+
   /**
    * Helper to get the correct callbacks.
    */
@@ -261,9 +265,11 @@ private:
    */
   void maybeRegisterDownstreamWatermarkCallbacks();
 
-  // True if the filter is in the continue state. This is to avoid prohibited calls to
-  // continueDecoding() or continueEncoding() multiple times.
-  bool in_continue_ = false;
+  // True when the decode or encode direction is in the continue state. Tracked per direction to
+  // avoid prohibited repeat continueDecoding() or continueEncoding() calls, and so a continue in
+  // one direction never suppresses a resume in the other.
+  bool decode_in_continue_ = false;
+  bool encode_in_continue_ = false;
 
   // This helps to avoid reentering the module when sending a local reply. For example, if
   // sendLocalReply() is called, encodeHeaders and encodeData will be called again inline on top of

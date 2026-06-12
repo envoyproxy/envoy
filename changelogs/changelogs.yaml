@@ -44,6 +44,8 @@ areas:
     title: access_log
   attributes:
     title: attributes
+  basic_auth:
+    title: basic_auth
   build:
     title: build
   circuit_breaker:
@@ -70,6 +72,8 @@ areas:
     title: load_report
   logging:
     title: logging
+  mcp_router:
+    title: mcp_router
   mysql_proxy:
     title: mysql_proxy
   network_ext_proc:

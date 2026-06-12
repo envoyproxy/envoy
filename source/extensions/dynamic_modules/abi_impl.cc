@@ -808,6 +808,12 @@ envoy_dynamic_module_callback_cluster_worker_slot_get(envoy_dynamic_module_type_
   return nullptr;
 }
 
+__attribute__((weak)) void
+envoy_dynamic_module_callback_cluster_get_name(envoy_dynamic_module_type_cluster_envoy_ptr,
+                                               envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_get_name: not implemented in this context");
+}
+
 __attribute__((weak)) envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_cluster_config_define_counter(
     envoy_dynamic_module_type_cluster_config_envoy_ptr, envoy_dynamic_module_type_module_buffer,
@@ -3069,12 +3075,30 @@ envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer(
                "not implemented in this context");
 }
 
+__attribute__((weak)) size_t
+envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer_chunks_size(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr) {
+  IS_ENVOY_BUG(
+      "envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer_chunks_size: "
+      "not implemented in this context");
+  return 0;
+}
+
 __attribute__((weak)) void
 envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer(
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer*, size_t*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer: "
                "not implemented in this context");
+}
+
+__attribute__((weak)) size_t
+envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer_chunks_size(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr) {
+  IS_ENVOY_BUG(
+      "envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer_chunks_size: "
+      "not implemented in this context");
+  return 0;
 }
 
 __attribute__((weak)) void
@@ -3369,50 +3393,39 @@ envoy_dynamic_module_callback_dns_resolver_config_record_histogram_value(
 }
 
 // Transport socket callbacks.
-__attribute__((weak)) void* envoy_dynamic_module_callback_transport_socket_get_io_handle(
+__attribute__((weak)) envoy_dynamic_module_type_transport_socket_io_status
+envoy_dynamic_module_callback_transport_socket_io_read(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr, char*, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_transport_socket_io_read: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_transport_socket_io_status_Error;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_transport_socket_io_status
+envoy_dynamic_module_callback_transport_socket_io_write(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr, const char*, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_transport_socket_io_write: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_transport_socket_io_status_Error;
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_transport_socket_io_shutdown_write(
     envoy_dynamic_module_type_transport_socket_envoy_ptr) {
-  IS_ENVOY_BUG("envoy_dynamic_module_callback_transport_socket_get_io_handle: "
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_transport_socket_io_shutdown_write: "
                "not implemented in this context");
-  return nullptr;
 }
 
-__attribute__((weak)) int64_t
-envoy_dynamic_module_callback_transport_socket_io_handle_read(void*, char*, size_t, size_t*) {
-  IS_ENVOY_BUG("envoy_dynamic_module_callback_transport_socket_io_handle_read: "
+__attribute__((weak)) int envoy_dynamic_module_callback_transport_socket_get_fd(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_transport_socket_get_fd: "
                "not implemented in this context");
   return -1;
-}
-
-__attribute__((weak)) int64_t envoy_dynamic_module_callback_transport_socket_io_handle_write(
-    void*, const char*, size_t, size_t*) {
-  IS_ENVOY_BUG("envoy_dynamic_module_callback_transport_socket_io_handle_write: "
-               "not implemented in this context");
-  return -1;
-}
-
-__attribute__((weak)) int envoy_dynamic_module_callback_transport_socket_io_handle_fd(void*) {
-  IS_ENVOY_BUG("envoy_dynamic_module_callback_transport_socket_io_handle_fd: "
-               "not implemented in this context");
-  return -1;
-}
-
-__attribute__((weak)) void envoy_dynamic_module_callback_transport_socket_read_buffer_drain(
-    envoy_dynamic_module_type_transport_socket_envoy_ptr, size_t) {
-  IS_ENVOY_BUG("envoy_dynamic_module_callback_transport_socket_read_buffer_drain: "
-               "not implemented in this context");
 }
 
 __attribute__((weak)) void envoy_dynamic_module_callback_transport_socket_read_buffer_add(
     envoy_dynamic_module_type_transport_socket_envoy_ptr, const char*, size_t) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_transport_socket_read_buffer_add: "
                "not implemented in this context");
-}
-
-__attribute__((weak)) size_t envoy_dynamic_module_callback_transport_socket_read_buffer_length(
-    envoy_dynamic_module_type_transport_socket_envoy_ptr) {
-  IS_ENVOY_BUG("envoy_dynamic_module_callback_transport_socket_read_buffer_length: "
-               "not implemented in this context");
-  return 0;
 }
 
 __attribute__((weak)) void envoy_dynamic_module_callback_transport_socket_write_buffer_drain(
@@ -3455,10 +3468,32 @@ __attribute__((weak)) void envoy_dynamic_module_callback_transport_socket_set_is
                "not implemented in this context");
 }
 
+__attribute__((weak)) void envoy_dynamic_module_callback_transport_socket_set_is_writable(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_transport_socket_set_is_writable: "
+               "not implemented in this context");
+}
+
 __attribute__((weak)) void envoy_dynamic_module_callback_transport_socket_flush_write_buffer(
     envoy_dynamic_module_type_transport_socket_envoy_ptr) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_transport_socket_flush_write_buffer: "
                "not implemented in this context");
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_transport_socket_get_remote_address(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr, envoy_dynamic_module_type_envoy_buffer*,
+    uint32_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_transport_socket_get_remote_address: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_transport_socket_get_local_address(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr, envoy_dynamic_module_type_envoy_buffer*,
+    uint32_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_transport_socket_get_local_address: "
+               "not implemented in this context");
+  return false;
 }
 
 // Stats sink snapshot callbacks. Real implementations live in
@@ -3627,6 +3662,14 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_http_get_header(
     envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_envoy_buffer*, size_t,
     size_t*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_http_get_header: not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_http_get_header_values(
+    envoy_dynamic_module_type_http_filter_envoy_ptr, envoy_dynamic_module_type_http_header_type,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG(
+      "envoy_dynamic_module_callback_http_get_header_values: not implemented in this context");
   return false;
 }
 

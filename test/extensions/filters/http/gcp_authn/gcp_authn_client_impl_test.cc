@@ -471,6 +471,36 @@ TEST_F(GcpAuthnClientImplTest, SuccessBoundJwt) {
   client_callback_->onSuccess(client_request_, std::move(response));
 }
 
+TEST_F(GcpAuthnClientImplTest, SuccessBoundAccessToken) {
+  setupMockObjects();
+  createClient();
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.mutable_bound_access_token();
+  const std::string fingerprint = "test_fingerprint_value";
+  client_->fetchBoundAccessToken(audience, fingerprint, request_callbacks_);
+  EXPECT_EQ(message_->headers().Method()->value().getStringView(), "GET");
+  EXPECT_EQ(message_->headers().Path()->value().getStringView(),
+            "/computeMetadata/v1/instance/service-accounts/default/"
+            "token?client_certificate_sha256=test_fingerprint_value");
+
+  EXPECT_EQ(options_.retry_policy->num_retries().value(), 5);
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  response->body().add(
+      R"({"access_token": "mock_access_token", "expires_in": 3600, "token_type": "Bearer"})");
+
+  uint64_t current_time = DateUtil::nowToSeconds(context_.server_factory_context_.timeSource());
+  uint64_t expected_exp_time = current_time + 3600;
+  GcpToken expected_token{"mock_access_token", expected_exp_time, audience, fingerprint};
+  EXPECT_CALL(request_callbacks_, onComplete(absl::StatusOr<GcpToken>(expected_token)));
+  client_callback_->onSuccess(client_request_, std::move(response));
+}
+
 } // namespace
 } // namespace GcpAuthn
 } // namespace HttpFilters

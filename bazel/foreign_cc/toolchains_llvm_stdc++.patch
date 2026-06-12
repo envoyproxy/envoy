@@ -1,0 +1,15 @@
+# Fix stdc++ link order: place libstdc++.a in link_libs (after objects) instead
+# of link_flags (before objects) to avoid duplicate symbols with tcmalloc.
+# Fixed upstream in toolchains_llvm master; remove this patch on v1.8.0+.
+diff --git a/toolchain/cc_toolchain_config.bzl b/toolchain/cc_toolchain_config.bzl
+--- a/toolchain/cc_toolchain_config.bzl
++++ b/toolchain/cc_toolchain_config.bzl
+@@ -334,7 +334,7 @@
+             "-stdlib=libstdc++",
+         ]
+
+-        link_flags.extend([
++        link_libs.extend([
+             "-l:libstdc++.a",
+         ])
+     elif stdlib == "libc":

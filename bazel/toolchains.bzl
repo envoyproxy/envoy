@@ -1,4 +1,4 @@
-load("@envoy_repo//:compiler.bzl", "LLVM_LIB_DIR", "LLVM_PATH", "LLVM_VERSION_LOCAL", "USE_LOCAL_SYSROOT")
+load("@envoy_repo//:compiler.bzl", "LLVM_LIB_DIR", "LLVM_PATH", "LLVM_VERSION_LOCAL", "USE_LIBSTDCPP", "USE_LOCAL_SYSROOT")
 load("@envoy_toolshed//repository:utils.bzl", "arch_alias")
 load("@toolchains_llvm//toolchain:rules.bzl", "llvm_toolchain")
 
@@ -71,6 +71,7 @@ def envoy_toolchains():
             "linux-x86_64": "@libcxx_libs_x86_64",
         },
         cxx_standard = {"": "c++20"},
+        stdlib = {"": "stdc++"} if USE_LIBSTDCPP else {},
         sysroot = {} if USE_LOCAL_SYSROOT else {
             "linux-x86_64": "@sysroot_linux_amd64//:sysroot",
             "linux-aarch64": "@sysroot_linux_arm64//:sysroot",

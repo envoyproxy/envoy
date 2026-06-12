@@ -1838,7 +1838,7 @@ message HedgePolicy {
   bool hedge_on_per_try_timeout = 3;
 }
 
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message RedirectAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RedirectAction";
 
@@ -1934,6 +1934,21 @@ message RedirectAction {
     //   would do a case-insensitive match and transform path ``/aaa/XxX/bbb`` to
     //   ``/aaa/yyy/bbb``.
     type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 9;
+
+    // The path portion of the URL will be set to this value and supports
+    // :ref:`substitution format specifiers <config_access_log_format>` and CEL
+    // expressions.
+    //
+    // For example, with the following config:
+    //
+    // .. code-block:: yaml
+    //
+    //   path_rewrite: "/new/%REQ(x-version)%"
+    //
+    // Would redirect to ``/new/v2`` given a request header ``x-version: v2``.
+    // If the substitution produces an empty string the path redirect is ignored
+    // and the original path is preserved.
+    string path_rewrite = 10;
   }
 
   // The HTTP status code to use in the redirect response. The default response

@@ -31,6 +31,7 @@ Currently, dynamic modules are supported at the following extension points:
 * As an :ref:`HTTP matching data input <envoy_v3_api_msg_extensions.matching.http.dynamic_modules.v3.HttpDynamicModuleMatchInput>`.
 * As an :ref:`input matcher <envoy_v3_api_msg_extensions.matching.input_matchers.dynamic_modules.v3.DynamicModuleMatcher>`.
 * As a :ref:`TLS certificate validator <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig>`.
+* As a :ref:`transport socket <envoy_v3_api_msg_extensions.transport_sockets.dynamic_modules.v3.DynamicModuleTransportSocket>`.
 * As a :ref:`load balancing policy <envoy_v3_api_msg_extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig>`.
 * As an :ref:`upstream HTTP TCP bridge <envoy_v3_api_msg_extensions.upstreams.http.dynamic_modules.v3.Config>`.
 * As a :ref:`tracer <envoy_v3_api_msg_extensions.tracers.dynamic_modules.v3.DynamicModuleTracer>`.
@@ -85,12 +86,39 @@ and returns a fail-closed default:
 * Network filter callbacks close the connection and return ``StopIteration``.
 * Listener filter callbacks close the socket and return ``StopIteration``.
 
-When ``CatchUnwind`` is applied to a filter, this prevents a single panicking module
-from aborting the entire Envoy process. The affected request or connection is
-terminated; other traffic is unaffected.
+The SDK always guards each callback at the FFI boundary so a panic can never unwind into
+Envoy and corrupt the process, regardless of whether ``CatchUnwind`` is used. The wrapper
+adds graceful filter-level teardown on top of that guard. The affected request or
+connection is terminated. Other traffic is unaffected.
 
 Getting started
 --------------------------
 
 We have a dedicated repository for the dynamic module examples to help you get started.
 The repository is available at `envoyproxy/dynamic-modules-examples <https://github.com/envoyproxy/dynamic-modules-examples>`_
+
+Statistics
+---------------------------
+
+The dynamic module HTTP filter emits the following statistics in the ``dynamic_modules.`` namespace.
+These stats track failures encountered while loading a filter configuration.
+Each one is tagged with ``config_name``, set to the configured name of the dynamic-module extension
+instance — for the HTTP filter this is the
+:ref:`filter_name
+<envoy_v3_api_field_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter.filter_name>`
+(``default`` if it is empty). The ``dynamic_modules.`` namespace is shared across dynamic-module
+extension types.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  module_load_error, Counter, "Total dynamic modules that could not be loaded (missing or invalid module source, ``dlopen`` failure, or by-name lookup miss)."
+  config_init_error, Counter, "Total filter configurations that failed to initialize after the module loaded successfully (a required ABI symbol could not be resolved, or the module failing to load the configuration)."
+  remote_fetch_error, Counter, "Total failures fetching or loading a remote module source, including rejected cache misses when ``nack_on_cache_miss`` is set."
+  per_route_config_error, Counter, "Total per-route configurations that failed to load or initialize."
+
+In addition to the counters above, a module may define its own custom metrics. These are emitted
+under the configurable :ref:`metrics_namespace
+<envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.metrics_namespace>`
+(``dynamicmodulescustom`` by default), separately from the ``dynamic_modules.`` namespace above.

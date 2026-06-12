@@ -93,6 +93,19 @@ Http::Code TcmallocProfilingHandler::handlerHeapDump(Http::ResponseHeaderMap&,
   return Http::Code::NotImplemented;
 }
 
+Http::Code TcmallocProfilingHandler::handlerPeakHeapDump(Http::ResponseHeaderMap&,
+                                                         Buffer::Instance& response, AdminStream&) {
+  auto dump_result = Profiler::TcmallocProfiler::tcmallocPeakHeapProfile();
+
+  if (dump_result.ok()) {
+    response.add(dump_result.value());
+    return Http::Code::OK;
+  }
+
+  response.add(dump_result.status().message());
+  return Http::Code::NotImplemented;
+}
+
 Http::Code TcmallocProfilingHandler::handlerAllocationProfiler(Http::ResponseHeaderMap&,
                                                                Buffer::Instance& response,
                                                                AdminStream& admin_stream) {

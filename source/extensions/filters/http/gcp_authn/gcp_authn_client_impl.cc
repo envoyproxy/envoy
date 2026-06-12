@@ -106,6 +106,16 @@ void GcpAuthnClientImpl::fetchBoundJwt(
   makeTokenRequest(TokenType::BoundJwt, audience, final_url, fingerprint, callbacks);
 }
 
+void GcpAuthnClientImpl::fetchBoundAccessToken(
+    const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+    const std::string& fingerprint, GcpAuthnClient::Callbacks& callbacks) {
+  Http::Utility::QueryParamsMulti query_params;
+  query_params.add(ClientCertificateSha256Key, fingerprint);
+  const std::string final_url =
+      absl::StrCat(DefaultServiceAccountPrefix, TokenUrlPath, query_params.toString());
+  makeTokenRequest(TokenType::BoundAccessToken, audience, final_url, fingerprint, callbacks);
+}
+
 void GcpAuthnClientImpl::makeTokenRequest(
     TokenType token_type, const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
     const std::string& final_url, const absl::optional<std::string>& fingerprint,
