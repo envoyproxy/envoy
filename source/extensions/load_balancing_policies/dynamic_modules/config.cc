@@ -40,7 +40,7 @@ public:
     return std::make_unique<DynamicModuleLoadBalancer>(config_, params.priority_set, cluster_name_);
   }
 
-  bool recreateOnHostChange() const override { return false; }
+  bool recreateOnHostChangeDeprecated() const override { return false; }
 
 private:
   DynamicModuleLbConfigSharedPtr config_;
@@ -66,15 +66,13 @@ Factory::loadConfig(Server::Configuration::ServerFactoryContext& context,
                     const Protobuf::Message& config) {
   const auto& typed_config = dynamic_cast<const DynamicModulesLbProto&>(config);
   const auto& module_config = typed_config.dynamic_module_config();
-  const std::string& module_name = module_config.name();
 
-  // Load the dynamic module.
-  auto module_or_error = Envoy::Extensions::DynamicModules::newDynamicModuleByName(
-      module_name, module_config.do_not_close(), module_config.load_globally());
-  if (!module_or_error.ok()) {
-    return absl::InvalidArgumentError(fmt::format("failed to load dynamic module '{}': {}",
-                                                  module_name, module_or_error.status().message()));
-  }
+  // Load balancing policies do not support remote module sources, so no init manager or async
+  // callback is passed; only the synchronous local-file and by-name paths can succeed here.
+  auto load_result = Envoy::Extensions::DynamicModules::newDynamicModuleByConfig(
+      module_config, typed_config.lb_policy_name(), context);
+  RETURN_IF_NOT_OK_REF(load_result.status());
+  auto dynamic_module = std::move(load_result->loaded);
 
   // Use configured metrics namespace or fall back to the default.
   const std::string metrics_namespace = module_config.metrics_namespace().empty()
@@ -90,11 +88,11 @@ Factory::loadConfig(Server::Configuration::ServerFactoryContext& context,
   }
   auto lb_config_or_error =
       DynamicModuleLbConfig::create(typed_config.lb_policy_name(), config_bytes, metrics_namespace,
-                                    std::move(module_or_error.value()), context.serverScope());
+                                    std::move(dynamic_module), context.serverScope());
   if (!lb_config_or_error.ok()) {
     return absl::InvalidArgumentError(
-        fmt::format("failed to create load balancer config for module '{}': {}", module_name,
-                    lb_config_or_error.status().message()));
+        fmt::format("failed to create load balancer config for module '{}': {}",
+                    module_config.name(), lb_config_or_error.status().message()));
   }
 
   // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.

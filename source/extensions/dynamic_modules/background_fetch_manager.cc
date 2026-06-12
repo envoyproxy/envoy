@@ -16,10 +16,10 @@ BackgroundFetchManager::singleton(Singleton::Manager& manager) {
       /*pin=*/true);
 }
 
-void BackgroundFetchManager::erase(const std::string& sha256) { background_fetches_.erase(sha256); }
+void BackgroundFetchManager::erase(absl::string_view sha256) { background_fetches_.erase(sha256); }
 
 void BackgroundFetchManager::fetchIfNeeded(
-    const std::string& sha256, Upstream::ClusterManager& cm,
+    absl::string_view sha256, Upstream::ClusterManager& cm,
     const envoy::config::core::v3::RemoteDataSource& source) {
   auto it = background_fetches_.find(sha256);
   if (it != background_fetches_.end() && it->second->completed_) {

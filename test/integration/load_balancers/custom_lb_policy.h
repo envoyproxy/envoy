@@ -49,6 +49,8 @@ private:
       return std::make_unique<LbImpl>(host_);
     }
 
+    bool recreateOnHostChangeDeprecated() const override { return false; }
+
     const Upstream::HostSharedPtr host_;
   };
 

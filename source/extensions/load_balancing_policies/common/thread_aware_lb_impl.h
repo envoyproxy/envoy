@@ -42,8 +42,8 @@ public:
           host->metadata().get(), Config::MetadataFilters::get().ENVOY_LB,
           Config::MetadataEnvoyLbKeys::get().HASH_KEY);
       if (val.kind_case() != val.kStringValue && val.kind_case() != val.KIND_NOT_SET) {
-        FINE_GRAIN_LOG(debug, "hash_key must be string type, got: {}",
-                       static_cast<int>(val.kind_case()));
+        ENVOY_LOG(debug, "hash_key must be string type, got: {}",
+                  static_cast<int>(val.kind_case()));
       }
       absl::string_view hash_key = val.string_value();
       if (hash_key.empty()) {
@@ -171,7 +171,7 @@ private:
     // Uses the per-worker params to create the thread-aware LB instance, including the worker
     // priority_set used to register member-update callbacks.
     LoadBalancerPtr create(LoadBalancerParams) override;
-    bool recreateOnHostChange() const override { return false; }
+    bool recreateOnHostChangeDeprecated() const override { return false; }
 
     ClusterLbStats& stats_;
     Random::RandomGenerator& random_;

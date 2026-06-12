@@ -12,8 +12,8 @@ getBridge(envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_en
       bridge_envoy_ptr);
 }
 
-void fillBufferChunks(const Envoy::Buffer::Instance& buffer,
-                      envoy_dynamic_module_type_envoy_buffer* result_buffer_vector) {
+size_t fillBufferChunks(const Envoy::Buffer::Instance& buffer,
+                        envoy_dynamic_module_type_envoy_buffer* result_buffer_vector) {
   Envoy::Buffer::RawSliceVector raw_slices = buffer.getRawSlices();
   size_t counter = 0;
   for (const auto& slice : raw_slices) {
@@ -21,6 +21,7 @@ void fillBufferChunks(const Envoy::Buffer::Instance& buffer,
     result_buffer_vector[counter].ptr = static_cast<char*>(slice.mem_);
     counter++;
   }
+  return counter;
 }
 
 } // namespace
@@ -100,8 +101,14 @@ void envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer(
     *result_buffer_length = 0;
     return;
   }
-  fillBufferChunks(*buffer, result_buffer);
-  *result_buffer_length = buffer->getRawSlices(std::nullopt).size();
+  *result_buffer_length = fillBufferChunks(*buffer, result_buffer);
+}
+
+size_t envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer_chunks_size(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr) {
+  auto* bridge = getBridge(bridge_envoy_ptr);
+  auto* buffer = bridge->requestBuffer();
+  return buffer != nullptr ? buffer->getRawSlices(std::nullopt).size() : 0;
 }
 
 // ----------------------- Response Buffer Operations --------------------------
@@ -115,8 +122,14 @@ void envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer(
     *result_buffer_length = 0;
     return;
   }
-  fillBufferChunks(*buffer, result_buffer);
-  *result_buffer_length = buffer->getRawSlices(std::nullopt).size();
+  *result_buffer_length = fillBufferChunks(*buffer, result_buffer);
+}
+
+size_t envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer_chunks_size(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr) {
+  auto* bridge = getBridge(bridge_envoy_ptr);
+  auto* buffer = bridge->responseBuffer();
+  return buffer != nullptr ? buffer->getRawSlices(std::nullopt).size() : 0;
 }
 
 // ----------------------- Send Upstream Data ----------------------------------

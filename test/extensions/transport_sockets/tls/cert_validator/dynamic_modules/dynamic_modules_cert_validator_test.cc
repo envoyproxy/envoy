@@ -395,6 +395,55 @@ typed_config:
   EXPECT_NE(result.value(), nullptr);
 }
 
+// Load the module via the ``module.local.filename`` data source instead of by name.
+TEST_F(DynamicModuleCertValidatorTest, FactoryCreateCertValidatorWithLocalFile) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.dynamic_modules
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig
+  dynamic_module_config:
+    module:
+      local:
+        filename: {{ test_rundir }}/test/extensions/dynamic_modules/test_data/c/libcert_validator_no_op.so
+  validator_name: test
+)EOF");
+  envoy::config::core::v3::TypedExtensionConfig typed_conf;
+  TestUtility::loadFromYaml(yaml, typed_conf);
+  TestCertificateValidationContextConfig validation_config(typed_conf);
+
+  DynamicModuleCertValidatorFactory factory;
+  auto result = factory.createCertValidator(&validation_config, stats_, factory_context_,
+                                            *store_.rootScope());
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  EXPECT_NE(result.value(), nullptr);
+}
+
+// Remote module sources are not supported for cert validators (no init manager is wired up).
+TEST_F(DynamicModuleCertValidatorTest, FactoryCreateCertValidatorRemoteSourceRejected) {
+  const std::string yaml = R"EOF(
+name: envoy.tls.cert_validator.dynamic_modules
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig
+  dynamic_module_config:
+    module:
+      remote:
+        http_uri:
+          uri: https://example.com/module.so
+          cluster: cluster_1
+          timeout: 5s
+        sha256: abc123
+  validator_name: test
+)EOF";
+  envoy::config::core::v3::TypedExtensionConfig typed_conf;
+  TestUtility::loadFromYaml(yaml, typed_conf);
+  TestCertificateValidationContextConfig validation_config(typed_conf);
+
+  DynamicModuleCertValidatorFactory factory;
+  auto result = factory.createCertValidator(&validation_config, stats_, factory_context_,
+                                            *store_.rootScope());
+  EXPECT_FALSE(result.ok());
+}
+
 TEST_F(DynamicModuleCertValidatorTest, FactoryCreateCertValidatorWithValidatorConfig) {
   const std::string yaml = R"EOF(
 name: envoy.tls.cert_validator.dynamic_modules

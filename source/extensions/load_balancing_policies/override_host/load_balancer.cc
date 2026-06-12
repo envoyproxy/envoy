@@ -330,10 +330,28 @@ HostConstSharedPtr OverrideHostLoadBalancer::LoadBalancerImpl::getEndpoint(
 
 LoadBalancerPtr
 OverrideHostLoadBalancer::LoadBalancerFactoryImpl::create(LoadBalancerParams params) {
-  LoadBalancerPtr fallback_picker_lb = fallback_picker_lb_factory_->create(params);
-  ASSERT(fallback_picker_lb != nullptr); // Factory can not create null LB.
-  return std::make_unique<LoadBalancerImpl>(config_, std::move(fallback_picker_lb),
-                                            params.priority_set);
+  return std::make_unique<LoadBalancerImpl>(config_, fallback_picker_lb_factory_, params);
+}
+
+OverrideHostLoadBalancer::LoadBalancerImpl::LoadBalancerImpl(
+    const OverrideHostLbConfig& config, LoadBalancerFactorySharedPtr fallback_picker_lb_factory,
+    LoadBalancerParams params)
+    : config_(config), fallback_picker_lb_factory_(std::move(fallback_picker_lb_factory)),
+      fallback_picker_lb_(fallback_picker_lb_factory_->create(params)),
+      priority_set_(params.priority_set), local_priority_set_(params.local_priority_set) {
+  ASSERT(fallback_picker_lb_ != nullptr); // Factory can not create null LB.
+  // The outer LB opts out of cluster-manager-driven recreate on host changes
+  // (see LoadBalancerFactoryImpl::recreateOnHostChangeDeprecated). If the inner fallback
+  // factory still asks for recreate semantics, honor that locally by rebuilding
+  // the worker-local fallback LB whenever the priority set changes.
+  if (fallback_picker_lb_factory_->recreateOnHostChangeDeprecated()) {
+    member_update_cb_ = priority_set_.addMemberUpdateCb(
+        [this](const Upstream::HostVector&, const Upstream::HostVector&) {
+          fallback_picker_lb_ =
+              fallback_picker_lb_factory_->create({priority_set_, local_priority_set_});
+          ASSERT(fallback_picker_lb_ != nullptr); // Factory can not create null LB.
+        });
+  }
 }
 
 } // namespace OverrideHost

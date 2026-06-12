@@ -85,6 +85,7 @@ LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_
       state.mutable_failed_configuration()->PackFrom(resource.get().resource());
 #endif
       absl::StrAppend(&message, listener_name, ": ", error_message, "\n");
+      ENVOY_LOG(warn, "lds: listener '{}' config rejected: {}", listener_name, error_message);
     };
 
     TRY_ASSERT_MAIN_THREAD {

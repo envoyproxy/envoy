@@ -24,12 +24,6 @@ RouteSpecificFilterConfigConstSharedPtr RouteEntryImpl::createRouteSpecificFilte
 
   auto* factory = Config::Utility::getFactoryByType<NamedFilterConfigFactory>(typed_config);
   if (factory == nullptr) {
-    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.no_extension_lookup_by_name")) {
-      factory = Config::Utility::getFactoryByName<NamedFilterConfigFactory>(name);
-    }
-  }
-
-  if (factory == nullptr) {
     ExceptionUtil::throwEnvoyException(
         fmt::format("Didn't find a registered implementation for '{}' with type URL: '{}'", name,
                     Config::Utility::getFactoryType(typed_config)));
