@@ -144,6 +144,24 @@ sink_config:
   ASSERT_TRUE(sink_or_error.ok()) << sink_or_error.status().message();
 }
 
+// A sink_config Any that claims to be a StringValue but carries truncated wire bytes makes
+// knownAnyToBytes fail after the module loads, surfacing a clear parse error. This must be set
+// programmatically because a sink_config parsed from YAML is always valid.
+TEST_F(DynamicModuleStatsSinkFactoryTest, MalformedSinkConfig) {
+  envoy::extensions::stat_sinks::dynamic_modules::v3::DynamicModuleStatsSink proto_config;
+  proto_config.mutable_dynamic_module_config()->set_name("stat_sink_no_op");
+  proto_config.mutable_dynamic_module_config()->set_do_not_close(true);
+  proto_config.set_sink_name("test_sink");
+  auto* any = proto_config.mutable_sink_config();
+  any->set_type_url("type.googleapis.com/google.protobuf.StringValue");
+  any->set_value("\x0a");
+
+  auto sink_or_error = factory_.createStatsSink(proto_config, context_);
+  EXPECT_FALSE(sink_or_error.ok());
+  EXPECT_THAT(std::string(sink_or_error.status().message()),
+              testing::HasSubstr("Failed to parse sink config"));
+}
+
 // A bogus module name produces a clear "Failed to load dynamic module" error.
 TEST_F(DynamicModuleStatsSinkFactoryTest, InvalidModule) {
   const std::string yaml = R"EOF(

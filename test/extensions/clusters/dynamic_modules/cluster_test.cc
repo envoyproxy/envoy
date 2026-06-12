@@ -305,6 +305,37 @@ TEST_F(DynamicModuleClusterTest, BatchRemoveMultipleHosts) {
   EXPECT_EQ(0, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
 }
 
+// Test that addresses already present in the host set are skipped on a subsequent batch.
+TEST_F(DynamicModuleClusterTest, DuplicateHostDetection) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // Add two hosts.
+  std::vector<Upstream::HostSharedPtr> hosts;
+  ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10001", "127.0.0.1:10002"}, {1, 1}, hosts));
+  EXPECT_EQ(2, hosts.size());
+  EXPECT_EQ(2, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
+  EXPECT_EQ(2, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+
+  // Add a batch with one existing address and one new address. Only the new one is created.
+  std::vector<Upstream::HostSharedPtr> hosts2;
+  ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10002", "127.0.0.1:10003"}, {1, 1}, hosts2));
+  EXPECT_EQ(1, hosts2.size());
+  EXPECT_EQ("127.0.0.1:10003", hosts2[0]->address()->asString());
+  EXPECT_EQ(3, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
+  EXPECT_EQ(3, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+
+  // A batch of only existing addresses adds nothing but still succeeds.
+  std::vector<Upstream::HostSharedPtr> hosts3;
+  ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10001", "127.0.0.1:10003"}, {1, 1}, hosts3));
+  EXPECT_EQ(0, hosts3.size());
+  EXPECT_EQ(3, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
+  EXPECT_EQ(3, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+}
+
 // Test that invalid addresses cause the entire batch to fail.
 TEST_F(DynamicModuleClusterTest, InvalidAddress) {
   auto result = createCluster(makeYamlConfig("cluster_no_op"));

@@ -1082,6 +1082,13 @@ envoy.formatter.cel:
   status: alpha
   type_urls:
   - envoy.extensions.formatter.cel.v3.Cel
+envoy.formatter.dynamic_modules:
+  categories:
+  - envoy.formatter
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.formatter.dynamic_modules.v3.DynamicModuleFormatter
 envoy.formatter.file_content:
   categories:
   - envoy.formatter

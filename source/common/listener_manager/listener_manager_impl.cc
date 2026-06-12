@@ -741,6 +741,13 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
     }
   });
 
+  // Notify existing connections on this listener that draining has begun so that callbacks
+  // (e.g. HTTP/2 codecs) can react before the drain timer expires and connections are
+  // forcibly closed.
+  for (const auto& worker : workers_) {
+    worker->onListenerDrain(*draining_it->listener_);
+  }
+
   // Start the drain sequence which completes when the listener's drain manager has completed
   // draining at whatever the server configured drain times are.
   draining_it->listener_->localDrainManager().startDrainSequence(
@@ -931,6 +938,14 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& draining_listener,
   draining_group->getDrainingListener().debugLog(
       absl::StrCat("draining ", filter_chain_size, " filter chains in listener ",
                    draining_group->getDrainingListener().name()));
+
+  // Notify existing connections in the draining filter chains that draining has begun so
+  // callbacks (e.g. HTTP/2 codecs) can react before the drain timer expires and the
+  // connections are forcibly closed.
+  for (const auto& worker : workers_) {
+    worker->onFilterChainDrain(draining_group->getDrainingListenerTag(),
+                               draining_group->getDrainingFilterChains());
+  }
 
   // Start the drain sequence which completes when the listener's drain manager has completed
   // draining at whatever the server configured drain times are.

@@ -545,6 +545,13 @@ TEST_F(DynamicModuleHttpFilterTest, AddCustomFlag) {
   envoy_dynamic_module_callback_http_add_custom_flag(filter_.get(), {flag.data(), flag.size()});
 }
 
+TEST_F(DynamicModuleHttpFilterTest, AddCustomFlagWithoutCallbacksNoop) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  absl::string_view flag = "XXX";
+  envoy_dynamic_module_callback_http_add_custom_flag(&filter, {flag.data(), flag.size()});
+}
+
 // =============================================================================
 // Tests for HTTP filter socket options.
 // =============================================================================
@@ -905,11 +912,22 @@ TEST(ABIImpl, metadata) {
       &result_number));
 
   // lbEndpoints metadata.
+  const std::string host_key = "host_key";
+  const std::string host_value = "host_value";
   const std::string lbendpoint_key = "lbendpoint_key";
   const std::string lbendpoint_value = "lbendpoint_value";
   auto upstream_info = std::make_shared<StreamInfo::MockUpstreamInfo>();
   auto upstream_host = std::make_shared<Upstream::MockHostDescription>();
   EXPECT_CALL(*upstream_info, upstreamHost).WillRepeatedly(testing::Return(upstream_host));
+  auto host_metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+  host_metadata->mutable_filter_metadata()->insert({namespace_str, Protobuf::Struct()});
+  Protobuf::Value host_value_proto;
+  host_value_proto.set_string_value(host_value);
+  host_metadata->mutable_filter_metadata()
+      ->at(namespace_str)
+      .mutable_fields()
+      ->insert({host_key, host_value_proto});
+  EXPECT_CALL(*upstream_host, metadata()).WillRepeatedly(testing::Return(host_metadata));
   auto locality_metadata = std::make_shared<envoy::config::core::v3::Metadata>();
   locality_metadata->mutable_filter_metadata()->insert({namespace_str, Protobuf::Struct()});
   Protobuf::Value lbendpoint_value_proto;
@@ -921,6 +939,11 @@ TEST(ABIImpl, metadata) {
   EXPECT_CALL(*upstream_host, localityMetadata())
       .WillRepeatedly(testing::Return(locality_metadata));
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(upstream_info));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Host,
+      {namespace_str.data(), namespace_str.size()}, {host_key.data(), host_key.size()},
+      &result_buffer));
+  EXPECT_EQ(absl::string_view(result_buffer.ptr, result_buffer.length), host_value);
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
       &filter, envoy_dynamic_module_type_metadata_source_HostLocality,
       {namespace_str.data(), namespace_str.size()}, {lbendpoint_key.data(), lbendpoint_key.size()},
@@ -2060,6 +2083,12 @@ TEST(ABIImpl, ClearRouteCache) {
   EXPECT_CALL(downstream_callbacks, clearRouteCache());
   EXPECT_CALL(callbacks, downstreamCallbacks())
       .WillOnce(testing::Return(OptRef(downstream_callbacks)));
+  envoy_dynamic_module_callback_http_clear_route_cache(&filter);
+}
+
+TEST(ABIImpl, ClearRouteCacheWithoutCallbacksNoop) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   envoy_dynamic_module_callback_http_clear_route_cache(&filter);
 }
 

@@ -455,7 +455,7 @@ private:
     DynamicModuleClusterConfigSharedPtr config_;
   };
 
-  // Allocates worker_slot_ lazily on first use.
+  // Allocates worker_slot_ and seeds a null payload.
   void ensureWorkerSlot();
 
   uint64_t getNextCalloutId() { return next_callout_id_++; }
@@ -479,7 +479,6 @@ private:
   Server::ServerLifecycleNotifier::HandlePtr server_initialized_handle_;
 
   // Thread-local slot backing both the worker fan-out and the worker_slot_set/get pattern.
-  // Allocated lazily on first use.
   ThreadLocal::TypedSlotPtr<WorkerSlotData> worker_slot_;
 
   // HTTP callout tracking.

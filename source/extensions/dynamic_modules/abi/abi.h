@@ -6992,8 +6992,8 @@ bool envoy_dynamic_module_callback_access_logger_get_downstream_local_dns_san(
  * @param logger_envoy_ptr is the pointer to the log context.
  * @param filter_name is the filter namespace in dynamic metadata.
  * @param path is the key path within the filter namespace (can be nested with dots).
- * @param result is the output buffer (JSON encoded for complex values).
- * @return true if value exists, false otherwise.
+ * @param result receives the string value. Only string-typed metadata is returned.
+ * @return true if a string value exists at the path, false otherwise.
  */
 bool envoy_dynamic_module_callback_access_logger_get_dynamic_metadata(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
@@ -7342,6 +7342,268 @@ envoy_dynamic_module_callback_access_logger_record_histogram_value(
  */
 uint32_t envoy_dynamic_module_callback_access_logger_get_worker_index(
     envoy_dynamic_module_type_access_logger_envoy_ptr access_logger_envoy_ptr);
+
+// =============================================================================
+// ================================ Formatter ==================================
+// =============================================================================
+
+// =============================================================================
+// Formatter Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_formatter_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleFormatterConfig class in Envoy. This is passed to the module when creating a new
+ * in-module command parser configuration and may be used to access the formatter
+ * configuration-scoped information in the future.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_formatter_config_module_ptr in the
+ * module.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_formatter_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_formatter_config_module_ptr is a pointer to an in-module command parser
+ * configuration created by envoy_dynamic_module_on_formatter_config_new. A single configuration may
+ * be shared by the command parser and all formatter providers it produces.
+ *
+ * This has 1:1 correspondence with the DynamicModuleFormatterConfig class in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_formatter_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_formatter_provider_module_ptr is a pointer to an in-module formatter
+ * provider created by envoy_dynamic_module_on_formatter_parse. A provider produces the value for a
+ * single parsed command token.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_formatter_provider_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_formatter_context_envoy_ptr is a raw pointer to the Envoy formatting
+ * context for a single format operation. It provides access to the request and response state
+ * through the formatter callbacks.
+ *
+ * OWNERSHIP: Envoy owns the pointer. Valid only during the
+ * envoy_dynamic_module_on_formatter_format callback.
+ */
+typedef void* envoy_dynamic_module_type_formatter_context_envoy_ptr;
+
+// =============================================================================
+// Formatter Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_formatter_config_new is called on the main thread when a command parser
+ * referencing this module is configured. The module should parse the configuration and return a
+ * pointer to the in-module command parser configuration.
+ *
+ * @param formatter_config_envoy_ptr is the pointer to the DynamicModuleFormatterConfig object for
+ * the corresponding config.
+ * @param name is the formatter name used to select an implementation within the module.
+ * @param config is the configuration bytes for the formatter.
+ * @return a pointer to the in-module command parser configuration. Returning nullptr indicates a
+ * failure to initialize, and the configuration will be rejected.
+ */
+envoy_dynamic_module_type_formatter_config_module_ptr envoy_dynamic_module_on_formatter_config_new(
+    envoy_dynamic_module_type_formatter_config_envoy_ptr formatter_config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_formatter_config_destroy is called when the command parser configuration
+ * is destroyed.
+ *
+ * @param config_module_ptr is the pointer to the in-module command parser configuration.
+ */
+void envoy_dynamic_module_on_formatter_config_destroy(
+    envoy_dynamic_module_type_formatter_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_formatter_parse is called on the main thread for each command token in an
+ * access log or header format string. The module should return a provider when it recognizes the
+ * command, or nullptr to let other parsers handle it.
+ *
+ * @param config_module_ptr is the pointer to the in-module command parser configuration.
+ * @param command is the command token, the text before the first parenthesis or colon.
+ * @param command_arg is the command argument, or an empty buffer when no argument is provided.
+ * @param has_max_length is true when a truncation length is configured. When false, max_length is
+ * unspecified and must be ignored.
+ * @param max_length is the truncation length applied to the produced value.
+ * @return a pointer to the in-module formatter provider, or nullptr if the command is not handled
+ * by this module.
+ */
+envoy_dynamic_module_type_formatter_provider_module_ptr envoy_dynamic_module_on_formatter_parse(
+    envoy_dynamic_module_type_formatter_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer command,
+    envoy_dynamic_module_type_envoy_buffer command_arg, bool has_max_length, size_t max_length);
+
+/**
+ * envoy_dynamic_module_on_formatter_provider_destroy is called when a formatter provider is
+ * destroyed.
+ *
+ * @param provider_module_ptr is the pointer to the in-module formatter provider.
+ */
+void envoy_dynamic_module_on_formatter_provider_destroy(
+    envoy_dynamic_module_type_formatter_provider_module_ptr provider_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_formatter_format is called to produce the value for a parsed command
+ * token. This may be called concurrently on multiple worker threads, so the module must treat the
+ * provider as read-only and avoid shared mutable state.
+ *
+ * @param provider_module_ptr is the pointer to the in-module formatter provider.
+ * @param formatter_context_envoy_ptr is the pointer to the Envoy formatting context, valid only
+ * during this call.
+ * @param result is filled by the module with the produced value as an
+ * envoy_dynamic_module_type_module_buffer. The buffer must remain valid until the next call into
+ * the module on the same thread. An empty buffer is a valid value when the function returns true.
+ * @return true when a value is produced, false when the value is absent. When false, Envoy
+ * substitutes the default empty value for the token.
+ */
+bool envoy_dynamic_module_on_formatter_format(
+    envoy_dynamic_module_type_formatter_provider_module_ptr provider_module_ptr,
+    envoy_dynamic_module_type_formatter_context_envoy_ptr formatter_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer* result);
+
+// =============================================================================
+// Formatter Callbacks
+// =============================================================================
+
+// -------------------------- Formatter Callbacks - Headers --------------------
+
+/**
+ * Get the number of headers in the specified header map.
+ *
+ * @param formatter_context_envoy_ptr is the pointer to the formatting context.
+ * @param header_type is the type of header map to access. Supported types are RequestHeader,
+ *        ResponseHeader, and ResponseTrailer.
+ * @return the number of headers, or 0 if the header map is not available.
+ */
+size_t envoy_dynamic_module_callback_formatter_get_headers_size(
+    envoy_dynamic_module_type_formatter_context_envoy_ptr formatter_context_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type);
+
+/**
+ * Get all headers from the specified header map.
+ *
+ * @param formatter_context_envoy_ptr is the pointer to the formatting context.
+ * @param header_type is the type of header map to access. Supported types are RequestHeader,
+ *        ResponseHeader, and ResponseTrailer.
+ * @param result_headers is the output array (must be pre-allocated with correct size).
+ * @return true if successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_formatter_get_headers(
+    envoy_dynamic_module_type_formatter_context_envoy_ptr formatter_context_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_envoy_http_header* result_headers);
+
+/**
+ * Get a specific header value by key.
+ *
+ * @param formatter_context_envoy_ptr is the pointer to the formatting context.
+ * @param header_type is the type of header map to access. Supported types are RequestHeader,
+ *        ResponseHeader, and ResponseTrailer.
+ * @param key is the header key to look up.
+ * @param result is the output buffer for the header value.
+ * @param index is the index for multi-value headers (0 for first value).
+ * @param total_count_out is optional output for total number of values with this key.
+ * @return true if the header exists, false otherwise.
+ */
+bool envoy_dynamic_module_callback_formatter_get_header_value(
+    envoy_dynamic_module_type_formatter_context_envoy_ptr formatter_context_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
+    size_t index, size_t* total_count_out);
+
+// ------------------- Formatter Callbacks - Generic Attributes ----------------
+// These callbacks share the envoy_dynamic_module_type_attribute_id enum and the access logger
+// attribute semantics, exposing the full stream info surface to formatter modules.
+
+/**
+ * envoy_dynamic_module_callback_formatter_get_attribute_string is called by the module to get a
+ * string attribute value from the formatting context. If the attribute is not accessible or the
+ * value is not a string, this returns false.
+ *
+ * @param formatter_context_envoy_ptr is the pointer to the formatting context.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the buffer where the string value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_formatter_get_attribute_string(
+    envoy_dynamic_module_type_formatter_context_envoy_ptr formatter_context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_formatter_get_attribute_int is called by the module to get an
+ * integer attribute value from the formatting context. If the attribute is not accessible or the
+ * value is not an integer, this returns false.
+ *
+ * @param formatter_context_envoy_ptr is the pointer to the formatting context.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the integer value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_formatter_get_attribute_int(
+    envoy_dynamic_module_type_formatter_context_envoy_ptr formatter_context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result);
+
+/**
+ * envoy_dynamic_module_callback_formatter_get_attribute_bool is called by the module to get a
+ * boolean attribute value from the formatting context. If the attribute is not accessible or the
+ * value is not a boolean, this returns false.
+ *
+ * @param formatter_context_envoy_ptr is the pointer to the formatting context.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the boolean value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_formatter_get_attribute_bool(
+    envoy_dynamic_module_type_formatter_context_envoy_ptr formatter_context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
+
+// --------------- Formatter Callbacks - Metadata and Dynamic State ------------
+
+/**
+ * Get a value from dynamic metadata by filter name and key path.
+ *
+ * @param formatter_context_envoy_ptr is the pointer to the formatting context.
+ * @param filter_name is the filter namespace in dynamic metadata.
+ * @param path is the key path within the filter namespace (can be nested with dots).
+ * @param result receives the string value. Only string-typed metadata is returned.
+ * @return true if a string value exists at the path, false otherwise.
+ */
+bool envoy_dynamic_module_callback_formatter_get_dynamic_metadata(
+    envoy_dynamic_module_type_formatter_context_envoy_ptr formatter_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the local reply body (if this was a local response).
+ *
+ * @param formatter_context_envoy_ptr is the pointer to the formatting context.
+ * @param result is the output buffer.
+ * @return true if local reply body exists, false otherwise.
+ */
+bool envoy_dynamic_module_callback_formatter_get_local_reply_body(
+    envoy_dynamic_module_type_formatter_context_envoy_ptr formatter_context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the access log type of the formatting context. This is NotSet when the formatter is not used
+ * for access logging.
+ *
+ * @param formatter_context_envoy_ptr is the pointer to the formatting context.
+ * @return the access log type of the formatting context.
+ */
+envoy_dynamic_module_type_access_log_type
+envoy_dynamic_module_callback_formatter_get_access_log_type(
+    envoy_dynamic_module_type_formatter_context_envoy_ptr formatter_context_envoy_ptr);
 
 // =============================================================================
 // =========================== Bootstrap Extension =============================
@@ -10655,9 +10917,10 @@ bool envoy_dynamic_module_callback_matcher_get_header_value(
 // =============================================================================
 
 /**
- * envoy_dynamic_module_type_cert_validator_config_envoy_ptr is a pointer to the
- * DynamicModuleCertValidatorConfig object in Envoy. This is passed to the module during config
- * creation and cert chain verification.
+ * envoy_dynamic_module_type_cert_validator_config_envoy_ptr is an opaque Envoy pointer for cert
+ * validator hooks. During config creation it identifies the cert validator configuration. During
+ * cert chain verification it identifies the active verification call and must be passed back to the
+ * cert validator callbacks. It is valid only for the duration of the hook that provides it.
  *
  * OWNERSHIP: Envoy owns this object.
  */
@@ -10755,7 +11018,8 @@ void envoy_dynamic_module_on_cert_validator_config_destroy(
  * The certs array and its buffer contents are owned by Envoy and are valid only for the duration
  * of this event hook call.
  *
- * @param config_envoy_ptr is the pointer to the DynamicModuleCertValidatorConfig object.
+ * @param config_envoy_ptr identifies this verification call and must be passed back to the cert
+ *        validator callbacks.
  * @param config_module_ptr is the pointer to the in-module cert validator configuration.
  * @param certs is an array of DER-encoded certificate buffers.
  * @param certs_count is the number of certificates in the array.
@@ -10811,7 +11075,7 @@ void envoy_dynamic_module_on_cert_validator_update_digest(
  *
  * This must only be called from within the do_verify_cert_chain event hook.
  *
- * @param config_envoy_ptr is the pointer to the DynamicModuleCertValidatorConfig object.
+ * @param config_envoy_ptr is the verification call pointer provided to do_verify_cert_chain.
  * @param error_details is the error details string owned by the module.
  */
 void envoy_dynamic_module_callback_cert_validator_set_error_details(
@@ -10825,7 +11089,7 @@ void envoy_dynamic_module_callback_cert_validator_set_error_details(
  * set a string value in filter state with Connection life span. This must only be called from
  * within the do_verify_cert_chain event hook.
  *
- * @param config_envoy_ptr is the pointer to the DynamicModuleCertValidatorConfig object.
+ * @param config_envoy_ptr is the verification call pointer provided to do_verify_cert_chain.
  * @param key is the key string owned by the module.
  * @param value is the value string owned by the module.
  * @return true if the operation was successful, false otherwise (e.g. no connection context
@@ -10840,7 +11104,7 @@ bool envoy_dynamic_module_callback_cert_validator_set_filter_state(
  * get a string value from filter state. This must only be called from within the
  * do_verify_cert_chain event hook.
  *
- * @param config_envoy_ptr is the pointer to the DynamicModuleCertValidatorConfig object.
+ * @param config_envoy_ptr is the verification call pointer provided to do_verify_cert_chain.
  * @param key is the key string owned by the module.
  * @param value_out is the output buffer where the value owned by Envoy will be stored.
  * @return true if the value was found, false otherwise.

@@ -77,6 +77,10 @@ protected:
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(*server_.server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
     EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
+    // Drain notifications are scheduled whenever a listener or its filter chains begin draining.
+    // They are not the focus of these tests, so allow them in any number.
+    EXPECT_CALL(*worker_, onListenerDrain(_)).Times(::testing::AnyNumber());
+    EXPECT_CALL(*worker_, onFilterChainDrain(_, _)).Times(::testing::AnyNumber());
     ON_CALL(server_.validation_context_, staticValidationVisitor())
         .WillByDefault(ReturnRef(validation_visitor));
     ON_CALL(server_.validation_context_, dynamicValidationVisitor())
