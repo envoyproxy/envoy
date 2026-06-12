@@ -37,8 +37,7 @@ using SharedResponseCodeDetails = ConstSingleton<SharedResponseCodeDetailsValues
 
 bool HeaderUtility::matchHeaders(const HeaderMap& request_headers,
                                  const std::vector<HeaderDataPtr>& config_headers) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.route_match_headers_individually")) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.match_headers_individually")) {
     for (const HeaderDataPtr& cfg_header_data : config_headers) {
       if (!cfg_header_data->matchesHeaders(request_headers)) {
         return false;
@@ -57,8 +56,7 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers,
 template <typename PointerType>
 static bool matchAnyHeaderImpl(const HeaderMap& request_headers,
                                const std::vector<PointerType>& config_headers) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.route_match_headers_individually")) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.match_headers_individually")) {
     for (const PointerType& cfg_header_data : config_headers) {
       if (cfg_header_data->matchesHeaders(request_headers)) {
         return true;

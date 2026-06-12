@@ -216,8 +216,7 @@ bool HeaderFilter::evaluate(const Formatter::Context& context,
                             const StreamInfo::StreamInfo&) const {
   const auto& headers =
       context.requestHeaders().value_or(*Http::StaticEmptyHeaders::get().request_headers);
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.route_match_headers_individually")) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.match_headers_individually")) {
     return header_data_->matchesHeaders(headers);
   }
   return header_data_->matchesHeadersIndividually(headers);

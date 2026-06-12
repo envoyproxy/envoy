@@ -13,5 +13,5 @@ It does not change header matching performed via CEL expressions (e.g. RBAC
 which still observe the comma-concatenated value.
 
 This behavioral change can be temporarily reverted by setting runtime guard
-``envoy.reloadable_features.route_match_headers_individually`` to ``false``. The recommended action is
+``envoy.reloadable_features.match_headers_individually`` to ``false``. The recommended action is
 to reconfigure undesirably impacted matchers to fit the new pattern.

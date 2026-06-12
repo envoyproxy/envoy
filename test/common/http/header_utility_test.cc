@@ -207,8 +207,7 @@ TEST_F(MatchHeadersTest, MayMatchOneOrMoreRequestHeader) {
   // This test case is of the deprecated behavior related to CVE-2026-26308.
   // This entire test rule can be deleted when removing this runtime value.
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.route_match_headers_individually", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.match_headers_individually", "false"}});
   TestRequestHeaderMapImpl headers{{"some-header", "a"}, {"other-header", "b"}};
 
   const std::string yaml = R"EOF(
@@ -441,8 +440,7 @@ TEST_F(MatchHeadersTest, MatchAnyHeaderDoesNotIndividuallyMatchWithDeprecatedBeh
   // This test case is of the deprecated behavior related to CVE-2026-26308.
   // This entire test rule can be deleted when removing this runtime value.
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.route_match_headers_individually", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.match_headers_individually", "false"}});
   TestRequestHeaderMapImpl double_header{{"match-header", "a"}, {"match-header", "b"}};
 
   const std::string yaml = R"EOF(
