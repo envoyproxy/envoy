@@ -10917,9 +10917,10 @@ bool envoy_dynamic_module_callback_matcher_get_header_value(
 // =============================================================================
 
 /**
- * envoy_dynamic_module_type_cert_validator_config_envoy_ptr is a pointer to the
- * DynamicModuleCertValidatorConfig object in Envoy. This is passed to the module during config
- * creation and cert chain verification.
+ * envoy_dynamic_module_type_cert_validator_config_envoy_ptr is an opaque Envoy pointer for cert
+ * validator hooks. During config creation it identifies the cert validator configuration. During
+ * cert chain verification it identifies the active verification call and must be passed back to the
+ * cert validator callbacks. It is valid only for the duration of the hook that provides it.
  *
  * OWNERSHIP: Envoy owns this object.
  */
@@ -11017,7 +11018,8 @@ void envoy_dynamic_module_on_cert_validator_config_destroy(
  * The certs array and its buffer contents are owned by Envoy and are valid only for the duration
  * of this event hook call.
  *
- * @param config_envoy_ptr is the pointer to the DynamicModuleCertValidatorConfig object.
+ * @param config_envoy_ptr identifies this verification call and must be passed back to the cert
+ *        validator callbacks.
  * @param config_module_ptr is the pointer to the in-module cert validator configuration.
  * @param certs is an array of DER-encoded certificate buffers.
  * @param certs_count is the number of certificates in the array.
@@ -11073,7 +11075,7 @@ void envoy_dynamic_module_on_cert_validator_update_digest(
  *
  * This must only be called from within the do_verify_cert_chain event hook.
  *
- * @param config_envoy_ptr is the pointer to the DynamicModuleCertValidatorConfig object.
+ * @param config_envoy_ptr is the verification call pointer provided to do_verify_cert_chain.
  * @param error_details is the error details string owned by the module.
  */
 void envoy_dynamic_module_callback_cert_validator_set_error_details(
@@ -11087,7 +11089,7 @@ void envoy_dynamic_module_callback_cert_validator_set_error_details(
  * set a string value in filter state with Connection life span. This must only be called from
  * within the do_verify_cert_chain event hook.
  *
- * @param config_envoy_ptr is the pointer to the DynamicModuleCertValidatorConfig object.
+ * @param config_envoy_ptr is the verification call pointer provided to do_verify_cert_chain.
  * @param key is the key string owned by the module.
  * @param value is the value string owned by the module.
  * @return true if the operation was successful, false otherwise (e.g. no connection context
@@ -11102,7 +11104,7 @@ bool envoy_dynamic_module_callback_cert_validator_set_filter_state(
  * get a string value from filter state. This must only be called from within the
  * do_verify_cert_chain event hook.
  *
- * @param config_envoy_ptr is the pointer to the DynamicModuleCertValidatorConfig object.
+ * @param config_envoy_ptr is the verification call pointer provided to do_verify_cert_chain.
  * @param key is the key string owned by the module.
  * @param value_out is the output buffer where the value owned by Envoy will be stored.
  * @return true if the value was found, false otherwise.
