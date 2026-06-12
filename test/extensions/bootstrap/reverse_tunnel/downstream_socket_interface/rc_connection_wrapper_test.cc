@@ -563,13 +563,15 @@ TEST_F(RCConnectionWrapperTest, ConnectIncludesInitiationTimeHeader) {
 
   RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
 
-  auto before_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                       dispatcher_.timeSource().systemTime().time_since_epoch()) // NO_CHECK_FORMAT(real_time)
-                       .count();
+  auto before_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          dispatcher_.timeSource().systemTime().time_since_epoch()) // NO_CHECK_FORMAT(real_time)
+          .count();
   wrapper.connect("test-tenant", "test-cluster", "test-node");
-  auto after_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                      dispatcher_.timeSource().systemTime().time_since_epoch()) // NO_CHECK_FORMAT(real_time)
-                      .count();
+  auto after_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          dispatcher_.timeSource().systemTime().time_since_epoch()) // NO_CHECK_FORMAT(real_time)
+          .count();
 
   const std::string encoded_request = captured_buffer.toString();
 
