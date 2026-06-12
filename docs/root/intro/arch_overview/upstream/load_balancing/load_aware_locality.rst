@@ -7,7 +7,7 @@ Load-aware locality load balancing
 
 .. attention::
 
-  This extension is **alpha** and is not yet intended for production use.
+  This extension is **work-in-progress** and is not yet implemented.
 
 The load-aware locality LB policy
 (:ref:`envoy.load_balancing_policies.load_aware_locality
