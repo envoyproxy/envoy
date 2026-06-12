@@ -7552,6 +7552,256 @@ fn test_mock_envoy_transport_socket_do_read() {
   assert_eq!(socket.on_do_read(&mut mock), IoResult::keep_open(5, false));
 }
 
+// =============================================================================
+// Formatter unit tests
+// =============================================================================
+
+#[test]
+fn test_envoy_dynamic_module_on_formatter_config_new_impl() {
+  struct TestFormatterConfig;
+  impl formatter::FormatterConfig for TestFormatterConfig {
+    fn parse(
+      &self,
+      _command: &str,
+      _command_arg: &str,
+      _max_length: Option<usize>,
+    ) -> Option<Box<dyn formatter::FormatterProvider>> {
+      None
+    }
+  }
+
+  let mut new_fn: NewFormatterConfigFunction = |_, _| Some(Box::new(TestFormatterConfig));
+  let result = formatter::envoy_dynamic_module_on_formatter_config_new_impl(
+    "test_formatter",
+    b"config",
+    &new_fn,
+  );
+  assert!(!result.is_null());
+  unsafe {
+    formatter::envoy_dynamic_module_on_formatter_config_destroy(result);
+  }
+
+  // None should result in a null pointer (e.g. unknown formatter name).
+  new_fn = |_, _| None;
+  let result = formatter::envoy_dynamic_module_on_formatter_config_new_impl(
+    "test_formatter",
+    b"config",
+    &new_fn,
+  );
+  assert!(result.is_null());
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_formatter_config_destroy() {
+  // This test ensures the wrapped trait object is dropped exactly once on `_destroy`.
+  static DROP_COUNT: AtomicU32 = AtomicU32::new(0);
+  struct TestFormatterConfig;
+  impl formatter::FormatterConfig for TestFormatterConfig {
+    fn parse(
+      &self,
+      _command: &str,
+      _command_arg: &str,
+      _max_length: Option<usize>,
+    ) -> Option<Box<dyn formatter::FormatterProvider>> {
+      None
+    }
+  }
+  impl Drop for TestFormatterConfig {
+    fn drop(&mut self) {
+      DROP_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  let new_fn: NewFormatterConfigFunction = |_, _| Some(Box::new(TestFormatterConfig));
+  let config_ptr =
+    formatter::envoy_dynamic_module_on_formatter_config_new_impl("test_formatter", b"", &new_fn);
+  assert!(!config_ptr.is_null());
+  unsafe {
+    formatter::envoy_dynamic_module_on_formatter_config_destroy(config_ptr);
+  }
+  assert_eq!(1, DROP_COUNT.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_formatter_parse_format_and_destroy() {
+  // Round-trip the provider to ensure parse, format, and destroy correctly own and free the boxed
+  // trait object and that the produced value is returned through the result buffer.
+  static PROVIDER_DROP_COUNT: AtomicU32 = AtomicU32::new(0);
+
+  struct TestFormatterConfig;
+  impl formatter::FormatterConfig for TestFormatterConfig {
+    fn parse(
+      &self,
+      command: &str,
+      _command_arg: &str,
+      max_length: Option<usize>,
+    ) -> Option<Box<dyn formatter::FormatterProvider>> {
+      match command {
+        "value" => Some(Box::new(TestProvider {
+          value: Some("hello".to_string()),
+        })),
+        "absent" => Some(Box::new(TestProvider { value: None })),
+        // Recognized only when the configured truncation length is threaded through as `Some(3)`.
+        "withlen" if max_length == Some(3) => Some(Box::new(TestProvider {
+          value: Some("len".to_string()),
+        })),
+        _ => None,
+      }
+    }
+  }
+
+  struct TestProvider {
+    value: Option<String>,
+  }
+  impl formatter::FormatterProvider for TestProvider {
+    fn format(&self, _ctx: &formatter::FormatterContext) -> Option<String> {
+      self.value.clone()
+    }
+  }
+  impl Drop for TestProvider {
+    fn drop(&mut self) {
+      PROVIDER_DROP_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  let new_fn: NewFormatterConfigFunction = |_, _| Some(Box::new(TestFormatterConfig));
+  let config_ptr =
+    formatter::envoy_dynamic_module_on_formatter_config_new_impl("test_formatter", b"", &new_fn);
+  assert!(!config_ptr.is_null());
+
+  let make_buf = |s: &str| abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: s.as_ptr() as *const _,
+    length: s.len(),
+  };
+  let empty_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: std::ptr::null(),
+    length: 0,
+  };
+
+  // An unrecognized command yields a null provider.
+  let none_provider = unsafe {
+    formatter::envoy_dynamic_module_on_formatter_parse(
+      config_ptr,
+      make_buf("unknown"),
+      empty_buf,
+      false,
+      0,
+    )
+  };
+  assert!(none_provider.is_null());
+
+  // A recognized command yields a provider that fills the result buffer.
+  let provider = unsafe {
+    formatter::envoy_dynamic_module_on_formatter_parse(
+      config_ptr,
+      make_buf("value"),
+      empty_buf,
+      false,
+      0,
+    )
+  };
+  assert!(!provider.is_null());
+
+  let mut result = abi::envoy_dynamic_module_type_module_buffer {
+    ptr: std::ptr::null(),
+    length: 0,
+  };
+  let produced = unsafe {
+    formatter::envoy_dynamic_module_on_formatter_format(provider, std::ptr::null_mut(), &mut result)
+  };
+  assert!(produced);
+  let value = unsafe { std::slice::from_raw_parts(result.ptr as *const u8, result.length) };
+  assert_eq!(value, b"hello");
+
+  unsafe {
+    formatter::envoy_dynamic_module_on_formatter_provider_destroy(provider);
+  }
+  assert_eq!(
+    1,
+    PROVIDER_DROP_COUNT.load(std::sync::atomic::Ordering::SeqCst)
+  );
+
+  // A configured truncation length is threaded through to parse as `Some`, while its absence
+  // yields `None`.
+  let with_len = unsafe {
+    formatter::envoy_dynamic_module_on_formatter_parse(
+      config_ptr,
+      make_buf("withlen"),
+      empty_buf,
+      true,
+      3,
+    )
+  };
+  assert!(!with_len.is_null());
+  unsafe {
+    formatter::envoy_dynamic_module_on_formatter_provider_destroy(with_len);
+  }
+  let without_len = unsafe {
+    formatter::envoy_dynamic_module_on_formatter_parse(
+      config_ptr,
+      make_buf("withlen"),
+      empty_buf,
+      false,
+      3,
+    )
+  };
+  assert!(without_len.is_null());
+
+  // A provider that returns None makes the format hook report the value is absent.
+  let absent_provider = unsafe {
+    formatter::envoy_dynamic_module_on_formatter_parse(
+      config_ptr,
+      make_buf("absent"),
+      empty_buf,
+      false,
+      0,
+    )
+  };
+  assert!(!absent_provider.is_null());
+  let produced = unsafe {
+    formatter::envoy_dynamic_module_on_formatter_format(
+      absent_provider,
+      std::ptr::null_mut(),
+      &mut result,
+    )
+  };
+  assert!(!produced);
+  unsafe {
+    formatter::envoy_dynamic_module_on_formatter_provider_destroy(absent_provider);
+    formatter::envoy_dynamic_module_on_formatter_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_formatter_format_recovers_from_panic() {
+  // format runs on worker threads, so a panic must be caught at the FFI boundary and reported as an
+  // absent value rather than unwinding across the ABI.
+  struct PanicProvider;
+  impl formatter::FormatterProvider for PanicProvider {
+    fn format(&self, _ctx: &formatter::FormatterContext) -> Option<String> {
+      panic!("intentional panic in format");
+    }
+  }
+
+  let provider: Box<dyn formatter::FormatterProvider> = Box::new(PanicProvider);
+  let provider_ptr = Box::into_raw(Box::new(provider)) as *const std::ffi::c_void;
+  let mut result = abi::envoy_dynamic_module_type_module_buffer {
+    ptr: std::ptr::null(),
+    length: 0,
+  };
+  let produced = unsafe {
+    formatter::envoy_dynamic_module_on_formatter_format(
+      provider_ptr,
+      std::ptr::null_mut(),
+      &mut result,
+    )
+  };
+  assert!(!produced);
+  unsafe {
+    formatter::envoy_dynamic_module_on_formatter_provider_destroy(provider_ptr);
+  }
+}
+
 #[test]
 fn test_mock_envoy_transport_socket_fd_and_write_rearm() {
   // Exercises the raw socket callbacks a transport such as kTLS relies on. It reads the descriptor

@@ -266,6 +266,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/http/set_metadata @aguinet @mattklein123
 # Formatters
 /*/extensions/formatter/cel @kyessenov @zirain
+/*/extensions/formatter/dynamic_modules @agrawroh @wbpcode @mathetake
 /*/extensions/formatter/file_content @ggreenway @wbpcode
 /*/extensions/formatter/generic_secret @ggreenway @wbpcode
 /*/extensions/formatter/metadata @cpakulski @ravenblackx @nezdolik
