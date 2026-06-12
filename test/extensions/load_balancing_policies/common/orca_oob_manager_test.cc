@@ -58,22 +58,18 @@ public:
   Upstream::Host::CreateConnectionData createOrcaReportingConnection(
       Event::Dispatcher& dispatcher,
       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-      const envoy::config::core::v3::Metadata* metadata,
+      Network::UpstreamTransportSocketFactory& factory,
       Network::Address::InstanceConstSharedPtr orca_address) const override {
     last_transport_socket_options_ = transport_socket_options;
     last_orca_address_ = orca_address;
-    if (metadata != nullptr) {
-      last_metadata_ = std::make_unique<envoy::config::core::v3::Metadata>(*metadata);
-    } else {
-      last_metadata_.reset();
-    }
+    last_factory_ = &factory;
     return Upstream::MockHostLight::createOrcaReportingConnection(
-        dispatcher, transport_socket_options, metadata, orca_address);
+        dispatcher, transport_socket_options, factory, orca_address);
   }
 
   mutable Network::TransportSocketOptionsConstSharedPtr last_transport_socket_options_;
   mutable Network::Address::InstanceConstSharedPtr last_orca_address_;
-  mutable std::unique_ptr<envoy::config::core::v3::Metadata> last_metadata_;
+  mutable const Network::UpstreamTransportSocketFactory* last_factory_{nullptr};
 };
 
 class OrcaOobManagerLifecycleTest : public testing::Test, public Event::TestUsingSimulatedTime {
@@ -293,7 +289,7 @@ protected:
     addresses_.push_back(address);
     ON_CALL(host, address()).WillByDefault(testing::Return(address));
     ON_CALL(host, hostname()).WillByDefault(testing::ReturnRef(empty_hostname_));
-    // Scheme derivation resolves the factory when match metadata is set.
+    // The manager resolves the factory when match metadata is set.
     ON_CALL(host, resolveTransportSocketFactory(_, _, _))
         .WillByDefault(testing::ReturnRef(*host.socket_factory_));
   }
@@ -824,8 +820,8 @@ TEST_F(OrcaOobManagerWireTest, PortOverrideAppliedToOrcaReportingAddress) {
   manager.reset();
 }
 
-// transport_socket_match_criteria forwarded under the "envoy.transport_socket_match" key.
-TEST_F(OrcaOobManagerWireTest, TransportSocketMatchCriteriaPassedAsMetadata) {
+// transport_socket_match_criteria resolves the factory once and passes it to the connection.
+TEST_F(OrcaOobManagerWireTest, TransportSocketMatchCriteriaResolvesFactoryOnce) {
   envoy::extensions::load_balancing_policies::common::v3::OrcaOobReportingConfig proto;
   (*proto.mutable_transport_socket_match_criteria()->mutable_fields())["useMTLS"].set_bool_value(
       true);
@@ -837,12 +833,18 @@ TEST_F(OrcaOobManagerWireTest, TransportSocketMatchCriteriaPassedAsMetadata) {
   auto* attempt_timer = installAttemptTimer();
   auto attempt = makeAttempt();
   auto host = makeWiredCapturingHost("tcp://10.0.0.3:80", *manager, *attempt);
+  EXPECT_CALL(*host, resolveTransportSocketFactory(
+                         _, testing::Truly([](const envoy::config::core::v3::Metadata* m) {
+                           return m != nullptr &&
+                                  m->filter_metadata().contains("envoy.transport_socket_match");
+                         }),
+                         _))
+      .WillOnce(testing::ReturnRef(*host->socket_factory_));
   priority_set_.runUpdateCallbacks(0, {host}, {});
 
   attempt_timer->invokeCallback();
 
-  ASSERT_NE(host->last_metadata_, nullptr);
-  EXPECT_TRUE(host->last_metadata_->filter_metadata().contains("envoy.transport_socket_match"));
+  EXPECT_EQ(host->last_factory_, host->socket_factory_.get());
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
   manager.reset();

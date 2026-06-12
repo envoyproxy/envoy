@@ -170,8 +170,8 @@ TEST_F(LogicalHostTransportSocketResolutionTest, OverrideTransportSocketOptionsT
 }
 
 // Test fixture for LogicalHost::createOrcaReportingConnection override. This validates that the
-// override snapshots address state under the host's lock and routes through the transport socket
-// matcher when caller-supplied metadata is non-null.
+// override snapshots address state under the host's lock and uses the caller-resolved transport
+// socket factory.
 class LogicalHostOrcaReportingConnectionTest : public testing::Test {
 protected:
   void SetUp() override {
@@ -200,7 +200,7 @@ TEST_F(LogicalHostOrcaReportingConnectionTest, DialsHostDataAddress) {
   EXPECT_CALL(*connection, connectionInfoSetter()).Times(AnyNumber());
   EXPECT_CALL(*connection, streamInfo()).Times(AnyNumber());
   Upstream::Host::CreateConnectionData data = host_->createOrcaReportingConnection(
-      dispatcher, nullptr, nullptr, host_->orcaReportingAddress());
+      dispatcher, nullptr, host_->transportSocketFactory(), host_->orcaReportingAddress());
   EXPECT_EQ(data.host_description_->address(), address_);
 }
 
@@ -239,7 +239,7 @@ TEST_F(LogicalHostOrcaReportingConnectionTest, CallerOptionsPassThroughUnchanged
   EXPECT_CALL(*connection, setBufferLimits(_)).Times(AnyNumber());
   EXPECT_CALL(*connection, connectionInfoSetter()).Times(AnyNumber());
   EXPECT_CALL(*connection, streamInfo()).Times(AnyNumber());
-  host->createOrcaReportingConnection(dispatcher, caller_options, nullptr,
+  host->createOrcaReportingConnection(dispatcher, caller_options, host->transportSocketFactory(),
                                       host->orcaReportingAddress());
 
   // The caller's options reach the factory unchanged; the host's override
@@ -247,14 +247,17 @@ TEST_F(LogicalHostOrcaReportingConnectionTest, CallerOptionsPassThroughUnchanged
   EXPECT_EQ(seen_options, caller_options);
 }
 
-TEST_F(LogicalHostOrcaReportingConnectionTest, MetadataRoutesThroughMatcher) {
+TEST_F(LogicalHostOrcaReportingConnectionTest, CallerResolvedFactoryUsed) {
   auto* matcher = dynamic_cast<Upstream::MockTransportSocketMatcher*>(
       cluster_info_->transport_socket_matcher_.get());
   ASSERT_NE(matcher, nullptr);
   envoy::config::core::v3::Metadata md;
+  // Caller resolves match metadata once; createOrcaReportingConnection must not resolve again.
   EXPECT_CALL(*matcher, resolve(&md, _, _))
       .WillOnce(Return(Upstream::TransportSocketMatcher::MatchData(*matcher->socket_factory_,
                                                                    matcher->stats_, "orca-md")));
+  Network::UpstreamTransportSocketFactory& factory =
+      host_->resolveTransportSocketFactory(host_->orcaReportingAddress(), &md, nullptr);
   Event::MockDispatcher dispatcher;
   StrictMock<Network::MockClientConnection>* connection =
       new StrictMock<Network::MockClientConnection>();
@@ -262,7 +265,7 @@ TEST_F(LogicalHostOrcaReportingConnectionTest, MetadataRoutesThroughMatcher) {
   EXPECT_CALL(*connection, setBufferLimits(_)).Times(AnyNumber());
   EXPECT_CALL(*connection, connectionInfoSetter()).Times(AnyNumber());
   EXPECT_CALL(*connection, streamInfo()).Times(AnyNumber());
-  host_->createOrcaReportingConnection(dispatcher, nullptr, &md, host_->orcaReportingAddress());
+  host_->createOrcaReportingConnection(dispatcher, nullptr, factory, host_->orcaReportingAddress());
 }
 
 } // namespace Clusters

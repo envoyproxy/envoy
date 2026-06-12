@@ -279,14 +279,14 @@ void OrcaOobManager::OobSession::connectAndStream() {
   // :scheme reflects the transport socket securing the OOB connection, which may
   // differ from the cluster default via transport_socket_match_criteria.
   const auto* match_metadata = parent_.config_.transport_socket_match_metadata.get();
-  const bool secure_transport =
-      (match_metadata != nullptr
-           ? host_->resolveTransportSocketFactory(dial_address, match_metadata, h2AlpnOptions())
-           : host_->transportSocketFactory())
-          .implementsSecureTransport();
+  Network::UpstreamTransportSocketFactory& transport_socket_factory =
+      match_metadata != nullptr
+          ? host_->resolveTransportSocketFactory(dial_address, match_metadata, h2AlpnOptions())
+          : host_->transportSocketFactory();
+  const bool secure_transport = transport_socket_factory.implementsSecureTransport();
 
   Upstream::Host::CreateConnectionData connection_data = host_->createOrcaReportingConnection(
-      parent_.dispatcher_, h2AlpnOptions(), match_metadata, dial_address);
+      parent_.dispatcher_, h2AlpnOptions(), transport_socket_factory, dial_address);
   codec_client_ = parent_.createCodecClient(connection_data);
   if (codec_client_ == nullptr) {
     parent_.oob_stats_.stream_failures_.inc();

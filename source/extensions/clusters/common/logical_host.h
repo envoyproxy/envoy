@@ -49,7 +49,7 @@ public:
   Upstream::Host::CreateConnectionData createOrcaReportingConnection(
       Event::Dispatcher& dispatcher,
       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-      const envoy::config::core::v3::Metadata* metadata,
+      Network::UpstreamTransportSocketFactory& factory,
       Network::Address::InstanceConstSharedPtr orca_address) const override;
 
   // Upstream::HostDescription

@@ -394,7 +394,7 @@ public:
   CreateConnectionData createOrcaReportingConnection(
       Event::Dispatcher& dispatcher,
       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-      const envoy::config::core::v3::Metadata* metadata,
+      Network::UpstreamTransportSocketFactory& factory,
       Network::Address::InstanceConstSharedPtr orca_address) const override;
 
   std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>
@@ -493,7 +493,7 @@ protected:
   CreateConnectionData
   createOrcaConnection(Event::Dispatcher& dispatcher,
                        Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-                       const envoy::config::core::v3::Metadata* metadata,
+                       Network::UpstreamTransportSocketFactory& factory,
                        Network::Address::InstanceConstSharedPtr orca_address,
                        const Network::Address::InstanceConstSharedPtr& host_address,
                        const SharedConstAddressVector& address_list,

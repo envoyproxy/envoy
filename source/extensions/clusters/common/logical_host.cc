@@ -116,7 +116,7 @@ Upstream::Host::CreateConnectionData LogicalHost::createConnection(
 Upstream::Host::CreateConnectionData LogicalHost::createOrcaReportingConnection(
     Event::Dispatcher& dispatcher,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-    const envoy::config::core::v3::Metadata* metadata,
+    Network::UpstreamTransportSocketFactory& factory,
     Network::Address::InstanceConstSharedPtr orca_address) const {
   Network::Address::InstanceConstSharedPtr host_address;
   SharedConstAddressVector address_list_or_null;
@@ -128,7 +128,7 @@ Upstream::Host::CreateConnectionData LogicalHost::createOrcaReportingConnection(
   // The caller's options pass through unchanged; as with health checks,
   // override_transport_socket_options_ is not consulted here.
   return createOrcaConnection(
-      dispatcher, transport_socket_options, metadata, orca_address, host_address,
+      dispatcher, transport_socket_options, factory, orca_address, host_address,
       address_list_or_null,
       std::make_shared<RealHostDescription>(orca_address, shared_from_this()));
 }

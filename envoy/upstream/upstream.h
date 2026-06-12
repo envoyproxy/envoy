@@ -222,7 +222,7 @@ public:
    * @param dispatcher supplies the owning dispatcher.
    * @param transport_socket_options supplies the transport options that will be set on the new
    * connection.
-   * @param metadata when non-null drives transport socket factory resolution.
+   * @param factory the transport socket factory for the connection, resolved by the caller.
    * @param orca_address the resolved address to dial; the caller applies any port override.
    * Implementations should use the host's address list only when this equals the host address.
    * @return the connection data.
@@ -230,7 +230,7 @@ public:
   virtual CreateConnectionData createOrcaReportingConnection(
       Event::Dispatcher& dispatcher,
       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-      const envoy::config::core::v3::Metadata* metadata,
+      Network::UpstreamTransportSocketFactory& factory,
       Network::Address::InstanceConstSharedPtr orca_address) const PURE;
 
   /**
