@@ -1670,14 +1670,14 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndEncodeAsBase64) {
   auto rule_type_authority = proto_config.add_rules();
   rule_type_authority->set_tlv_type(0x02);
   rule_type_authority->mutable_on_tlv_present()->set_key("PP2 type authority");
-  rule_type_authority->mutable_on_tlv_present()->set_value_encoding(
+  rule_type_authority->mutable_on_tlv_present()->set_value_string_encoding(
       envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair::
           BASE64);
 
   auto rule_vpc_id = proto_config.add_rules();
   rule_vpc_id->set_tlv_type(0xea);
   rule_vpc_id->mutable_on_tlv_present()->set_key("PP2 vpc id");
-  rule_vpc_id->mutable_on_tlv_present()->set_value_encoding(
+  rule_vpc_id->mutable_on_tlv_present()->set_value_string_encoding(
       envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair::
           BASE64);
 
@@ -2183,13 +2183,13 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateWithBase64Encoding) {
   auto rule1 = proto_config.add_rules();
   rule1->set_tlv_type(0x02);
   rule1->mutable_on_tlv_present()->set_key("PP2 type authority");
-  rule1->mutable_on_tlv_present()->set_value_encoding(
+  rule1->mutable_on_tlv_present()->set_value_string_encoding(
       envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair::
           BASE64);
   auto rule2 = proto_config.add_rules();
   rule2->set_tlv_type(0xea);
   rule2->mutable_on_tlv_present()->set_key("aws_vpce_id");
-  rule2->mutable_on_tlv_present()->set_value_encoding(
+  rule2->mutable_on_tlv_present()->set_value_string_encoding(
       envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair::
           BASE64);
   // A rule with default (SANITIZED_UTF8) encoding for comparison: the value will be sanitized

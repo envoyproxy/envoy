@@ -35,7 +35,7 @@ message ProxyProtocol {
   message KeyValuePair {
     // Specifies the encoding scheme that is used to encode the TLV value before it is
     // stored in dynamic metadata or filter state.
-    enum ValueEncoding {
+    enum ValueStringEncoding {
       // The TLV value will be sanitized to a valid UTF-8 string before being stored:
       // any invalid UTF-8 sequences will be replaced with the ``!`` character.
       SANITIZED_UTF8 = 0;
@@ -61,7 +61,7 @@ message ProxyProtocol {
     //   This option only applies to the legacy untyped dynamic metadata and filter state.
     //   For the new typed dynamic metadata, the raw TLV value bytes are stored as is and
     //   no encoding is applied.
-    ValueEncoding value_encoding = 3;
+    ValueStringEncoding value_string_encoding = 3;
   }
 
   // A Rule defines what metadata to apply when a header is present or missing.

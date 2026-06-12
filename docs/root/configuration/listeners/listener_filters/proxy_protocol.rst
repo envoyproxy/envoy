@@ -72,7 +72,7 @@ TLV Value Encoding
 By default, TLV values are sanitized to valid UTF-8 strings before being stored in
 dynamic metadata or filter state: any invalid UTF-8 sequences are replaced with the
 ``!`` character. For binary TLV values, the
-:ref:`value_encoding <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair.value_encoding>`
+:ref:`value_string_encoding <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair.value_string_encoding>`
 option can be set to ``BASE64`` to store the raw TLV value as a base64-encoded string instead.
 Note that this option only applies to the legacy untyped dynamic metadata and filter state;
 the typed dynamic metadata always stores the raw TLV value bytes as is:
@@ -87,7 +87,7 @@ the typed dynamic metadata always stores the raw TLV value bytes as is:
           - tlv_type: 0xEA
             on_tlv_present:
               key: "aws_vpce_id"
-              value_encoding: BASE64
+              value_string_encoding: BASE64
 
 This implementation supports both version 1 and version 2, it
 automatically determines on a per-connection basis which of the two
