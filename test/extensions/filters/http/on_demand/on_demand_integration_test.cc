@@ -177,10 +177,11 @@ TEST_P(OnDemandScopedRdsIntegrationTest, SrdsWithVhdsAndHeaderMutation) {
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
       clear_route_cache: false
-      inline_code: |
-        function envoy_on_request(request_handle)
-          request_handle:headers():replace("Addr", "x-foo-key=bar-route")
-        end
+      default_source_code:
+        inline_string: |
+          function envoy_on_request(request_handle)
+            request_handle:headers():replace("Addr", "x-foo-key=bar-route")
+          end
     )EOF");
 
   constexpr absl::string_view scope_tmpl = R"EOF(
