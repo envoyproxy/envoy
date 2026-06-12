@@ -1,6 +1,7 @@
 #include "source/extensions/bootstrap/dynamic_modules/extension_config.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/server/listener_manager.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -299,6 +300,30 @@ TEST_F(ExtensionConfigTest, MissingListenerRemoval) {
   EXPECT_FALSE(config.ok());
   EXPECT_THAT(config.status().message(),
               testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_listener_removal"));
+}
+
+TEST_F(ExtensionConfigTest, ClusterAccessRequiresServerInitialized) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+  auto config_or = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", DefaultMetricsNamespace, std::move(dynamic_module.value()), dispatcher_,
+      context_, context_.store_);
+  ASSERT_TRUE(config_or.ok()) << config_or.status();
+  auto config = config_or.value();
+
+  // Before the server is initialized the cluster manager is unavailable, so cluster access is
+  // refused rather than dereferencing a null cluster manager.
+  EXPECT_FALSE(config->enableClusterLifecycle());
+  uint64_t callout_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_http_callout_init_result_ClusterNotFound,
+            config->sendHttpCallout(&callout_id, "some_cluster",
+                                    std::make_unique<Http::RequestMessageImpl>(), 1000));
+
+  // After the server is initialized cluster lifecycle can be enabled.
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  EXPECT_TRUE(config->enableClusterLifecycle());
 }
 
 } // namespace DynamicModules
