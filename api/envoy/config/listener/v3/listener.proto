@@ -107,7 +107,9 @@ message Listener {
 
       // The listener will use the connection balancer according to ``type_url``. If ``type_url`` is invalid,
       // Envoy will not attempt to balance active connections between worker threads.
-      // [#extension-category: envoy.network.connection_balance]
+      // The ``envoy.network.connection_balance`` extension category is currently empty
+      // because the only registered member (``envoy.network.connection_balance.dlb``)
+      // is disabled. See https://github.com/envoyproxy/envoy/issues/45491.
       core.v3.TypedExtensionConfig extend_balance = 2;
     }
   }
