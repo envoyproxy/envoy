@@ -84,6 +84,12 @@ inline const Http::LowerCaseString& reverseTunnelUpstreamClusterNameHeader() {
   return kHeader;
 }
 
+inline const Http::LowerCaseString& reverseTunnelInitiationTimeHeader() {
+  static const Http::LowerCaseString kHeader{
+      absl::StrCat(Http::Headers::get().prefix(), "-reverse-tunnel-initiation-time")};
+  return kHeader;
+}
+
 class ReverseConnectionMessageHandlerFactory {
 public:
   static std::shared_ptr<class PingMessageHandler> createPingHandler();

@@ -25,10 +25,14 @@ void EventReporter::onServerInitialized() {
 }
 
 void EventReporter::reportConnectionEvent(absl::string_view node_id, absl::string_view cluster_id,
-                                          absl::string_view tenant_id) {
-  auto ptr = std::make_shared<ReverseTunnelEvent::Connected>(
-      ReverseTunnelEvent::Connected{std::string(node_id), std::string(cluster_id),
-                                    std::string(tenant_id), Envoy::SystemTime::clock::now()});
+                                          absl::string_view tenant_id, int64_t initiation_time_ms) {
+  // Use the DP-side initiation timestamp when available; fall back to local wall clock
+  // for backward compatibility with older DP Envoys that don't send the header.
+  const Envoy::SystemTime created_at =
+      (initiation_time_ms > 0) ? Envoy::SystemTime(std::chrono::milliseconds(initiation_time_ms))
+                               : Envoy::SystemTime::clock::now(); // NO_CHECK_FORMAT(real_time)
+  auto ptr = std::make_shared<ReverseTunnelEvent::Connected>(ReverseTunnelEvent::Connected{
+      std::string(node_id), std::string(cluster_id), std::string(tenant_id), created_at});
 
   context_.mainThreadDispatcher().post(
       [this, ptr = std::move(ptr)]() mutable { this->addConnection(std::move(ptr)); });
