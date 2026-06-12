@@ -65,7 +65,8 @@ TEST(RateLimitFilterConfigTest, RatelimitCorrectProto) {
 }
 
 // The filter-level ``rate_limits`` field also accepts a ``limit`` override alongside
-// ``hits_addend`` (envoyproxy/envoy#45611), exercising the FilterConfig (no_limit=false) path.
+// ``hits_addend``, exercising the FilterConfig (no_limit=false) path. See
+// https://github.com/envoyproxy/envoy/issues/45611.
 TEST(RateLimitFilterConfigTest, FilterLevelRateLimitsWithLimitOverride) {
   const std::string yaml = R"EOF(
   domain: test
@@ -152,8 +153,8 @@ TEST(RateLimitFilterConfigTest, PerRouteRateLimits) {
 }
 
 // A per-route ``rate_limits`` rule may carry both a per-request ``hits_addend`` and a
-// per-descriptor ``limit`` override together (envoyproxy/envoy#45611). Previously the
-// override was rejected with "'limit' field is not supported".
+// per-descriptor ``limit`` override together. Previously the override was rejected with
+// "'limit' field is not supported". See https://github.com/envoyproxy/envoy/issues/45611.
 TEST(RateLimitFilterConfigTest, PerRouteRateLimitsWithLimitOverride) {
   const std::string yaml = R"EOF(
   domain: test

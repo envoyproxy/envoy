@@ -506,8 +506,8 @@ filter_metadata:
   EXPECT_THAT(expected_descriptors, testing::ContainerEq(descriptors));
 }
 
-// The key regression for envoyproxy/envoy#45611: the per-descriptor limit override and the
-// per-request hits_addend can be used together on the same rule.
+// The key regression: the per-descriptor limit override and the per-request hits_addend can
+// be used together on the same rule. See https://github.com/envoyproxy/envoy/issues/45611.
 TEST_F(RateLimitConfigTest, LimitOverrideWithHitsAddend) {
   const std::string yaml = R"EOF(
   rate_limits:
