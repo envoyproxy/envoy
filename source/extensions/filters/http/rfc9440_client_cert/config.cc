@@ -8,10 +8,15 @@ namespace HttpFilters {
 namespace Rfc9440ClientCert {
 
 Http::FilterFactoryCb Rfc9440ClientCertFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::rfc9440_client_cert::v3::Rfc9440ClientCert&,
+    const envoy::extensions::filters::http::rfc9440_client_cert::v3::Rfc9440ClientCert&
+        proto_config,
     const std::string&, Server::Configuration::FactoryContext&) {
-  return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamDecoderFilter(std::make_shared<Rfc9440ClientCertFilter>());
+
+  auto filter_config =
+      std::make_shared<Rfc9440ClientCertFilterConfig>(proto_config.set_client_cert_chain());
+
+  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamDecoderFilter(std::make_shared<Rfc9440ClientCertFilter>(filter_config));
   };
 }
 

@@ -18,13 +18,15 @@ namespace Rfc9440ClientCert {
 
 class Rfc9440ClientCertFilterTest : public testing::Test {
 public:
-  Rfc9440ClientCertFilterTest() {
+  Rfc9440ClientCertFilterTest()
+      : config_(std::make_shared<Rfc9440ClientCertFilterConfig>(true)), filter_(config_) {
     filter_.setDecoderFilterCallbacks(callbacks_);
     ON_CALL(callbacks_, connection())
         .WillByDefault(Return(OptRef<const Network::Connection>(connection_)));
     ON_CALL(connection_, ssl()).WillByDefault(Return(ssl_));
   }
 
+  Rfc9440ClientCertFilterConfigSharedPtr config_;
   Rfc9440ClientCertFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Network::MockConnection> connection_;
@@ -37,11 +39,15 @@ TEST_F(Rfc9440ClientCertFilterTest, StripsIncomingAndSetsNewHeadersWithMultiItem
                                          {"client-cert-chain", "spoofed_chain_data"},
                                          {"user-agent", "curl"}};
 
-  std::string mock_leaf = "YmFzZTY0X2xlYWZfY2VydA==";
-  std::vector<std::string> mock_chain = {"intermediate1", "intermediate2"};
+  std::string mock_leaf =
+      "-----BEGIN CERTIFICATE-----\nYmFzZTY0X2xlYWZfY2VydA==\n-----END CERTIFICATE-----\n";
 
-  EXPECT_CALL(*ssl_, b64DerEncodedPeerCertificate()).WillOnce(ReturnRef(mock_leaf));
-  EXPECT_CALL(*ssl_, b64DerEncodedPeerCertificateChain()).WillOnce(Return(mock_chain));
+  std::vector<std::string> mock_chain = {
+      mock_leaf, "-----BEGIN CERTIFICATE-----\nintermediate1\n-----END CERTIFICATE-----",
+      "-----BEGIN CERTIFICATE-----\nintermediate2\n-----END CERTIFICATE-----"};
+
+  EXPECT_CALL(*ssl_, pemEncodedPeerCertificate()).WillOnce(ReturnRef(mock_leaf));
+  EXPECT_CALL(*ssl_, pemEncodedPeerCertificateChain()).WillOnce(Return(mock_chain));
 
   Http::FilterHeadersStatus status = filter_.decodeHeaders(headers, false);
   EXPECT_EQ(status, Http::FilterHeadersStatus::Continue);
@@ -58,8 +64,8 @@ TEST_F(Rfc9440ClientCertFilterTest, NonTlsConnectionSanitizesSpoofedHeaders) {
 
   ON_CALL(connection_, ssl()).WillByDefault(Return(nullptr));
 
-  EXPECT_CALL(*ssl_, b64DerEncodedPeerCertificate()).Times(0);
-  EXPECT_CALL(*ssl_, b64DerEncodedPeerCertificateChain()).Times(0);
+  EXPECT_CALL(*ssl_, pemEncodedPeerCertificate()).Times(0);
+  EXPECT_CALL(*ssl_, pemEncodedPeerCertificateChain()).Times(0);
 
   Http::FilterHeadersStatus status = filter_.decodeHeaders(headers, false);
   EXPECT_EQ(status, Http::FilterHeadersStatus::Continue);
@@ -77,8 +83,8 @@ TEST_F(Rfc9440ClientCertFilterTest, EmptyLeafCertificateSanitizesHeadersAndDoesN
   std::string empty_leaf = "";
   std::vector<std::string> empty_chain = {};
 
-  EXPECT_CALL(*ssl_, b64DerEncodedPeerCertificate()).WillOnce(ReturnRef(empty_leaf));
-  EXPECT_CALL(*ssl_, b64DerEncodedPeerCertificateChain()).WillOnce(Return(empty_chain));
+  EXPECT_CALL(*ssl_, pemEncodedPeerCertificate()).WillOnce(ReturnRef(empty_leaf));
+  EXPECT_CALL(*ssl_, pemEncodedPeerCertificateChain()).WillOnce(Return(empty_chain));
 
   Http::FilterHeadersStatus status = filter_.decodeHeaders(headers, false);
   EXPECT_EQ(status, Http::FilterHeadersStatus::Continue);
@@ -92,13 +98,35 @@ TEST_F(Rfc9440ClientCertFilterTest, EmptyChainDoesNotAddChainHeader) {
   Http::TestRequestHeaderMapImpl headers{{"client-cert-chain", "evil_spoofed_chain"},
                                          {"user-agent", "curl"}};
 
-  std::string mock_leaf = "YmFzZTY0X2xlYWZfY2VydA==";
+  std::string mock_leaf =
+      "-----BEGIN CERTIFICATE-----\nYmFzZTY0X2xlYWZfY2VydA==\n-----END CERTIFICATE-----\n";
   std::vector<std::string> empty_chain = {};
 
-  EXPECT_CALL(*ssl_, b64DerEncodedPeerCertificate()).WillOnce(ReturnRef(mock_leaf));
-  EXPECT_CALL(*ssl_, b64DerEncodedPeerCertificateChain()).WillOnce(Return(empty_chain));
+  EXPECT_CALL(*ssl_, pemEncodedPeerCertificate()).WillOnce(ReturnRef(mock_leaf));
+  EXPECT_CALL(*ssl_, pemEncodedPeerCertificateChain()).WillOnce(Return(empty_chain));
 
   Http::FilterHeadersStatus status = filter_.decodeHeaders(headers, false);
+  EXPECT_EQ(status, Http::FilterHeadersStatus::Continue);
+
+  EXPECT_EQ(headers.get_("client-cert"), ":YmFzZTY0X2xlYWZfY2VydA==:");
+  EXPECT_TRUE(headers.get_("client-cert-chain").empty());
+}
+
+TEST_F(Rfc9440ClientCertFilterTest, ConfigFalseOmitsChainHeader) {
+  Http::TestRequestHeaderMapImpl headers{{"user-agent", "curl"}};
+
+  std::string mock_leaf =
+      "-----BEGIN CERTIFICATE-----\nYmFzZTY0X2xlYWZfY2VydA==\n-----END CERTIFICATE-----\n";
+  std::vector<std::string> mock_chain = {
+      mock_leaf, "-----BEGIN CERTIFICATE-----\nintermediate1\n-----END CERTIFICATE-----"};
+
+  auto disabled_config = std::make_shared<Rfc9440ClientCertFilterConfig>(false);
+  Rfc9440ClientCertFilter disabled_filter(disabled_config);
+  disabled_filter.setDecoderFilterCallbacks(callbacks_);
+
+  EXPECT_CALL(*ssl_, pemEncodedPeerCertificate()).WillOnce(ReturnRef(mock_leaf));
+
+  Http::FilterHeadersStatus status = disabled_filter.decodeHeaders(headers, false);
   EXPECT_EQ(status, Http::FilterHeadersStatus::Continue);
 
   EXPECT_EQ(headers.get_("client-cert"), ":YmFzZTY0X2xlYWZfY2VydA==:");
