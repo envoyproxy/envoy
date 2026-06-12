@@ -1385,8 +1385,7 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
   // closing the gRPC stream if it is still open.
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.ext_proc_stream_close_optimization")) {
-    if (encoding_state_.noExternalProcess() &&
-        decoding_state_.noMoreExternalProcess()) {
+    if (encoding_state_.noExternalProcess() && decoding_state_.noMoreExternalProcess()) {
       closeStreamMaybeGraceful();
     }
   }
