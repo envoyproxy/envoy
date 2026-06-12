@@ -5,7 +5,6 @@
 #include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "source/common/config/metadata.h"
 #include "source/common/network/utility.h"
 #include "source/common/router/router.h"
 #include "source/common/runtime/runtime_features.h"
@@ -62,7 +61,12 @@ HealthCheckerImplBase::initTransportSocketOptions(
 MetadataConstSharedPtr HealthCheckerImplBase::initTransportSocketMatchMetadata(
     const envoy::config::core::v3::HealthCheck& config) {
   if (config.has_transport_socket_match_criteria()) {
-    return Config::Metadata::transportSocketMatchMetadata(config.transport_socket_match_criteria());
+    std::shared_ptr<envoy::config::core::v3::Metadata> metadata =
+        std::make_shared<envoy::config::core::v3::Metadata>();
+    (*metadata->mutable_filter_metadata())[Envoy::Config::MetadataFilters::get()
+                                               .ENVOY_TRANSPORT_SOCKET_MATCH] =
+        config.transport_socket_match_criteria();
+    return metadata;
   }
 
   return nullptr;

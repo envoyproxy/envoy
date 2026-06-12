@@ -82,7 +82,7 @@ envoy_cc_library(
         "//source/common/common:callback_impl_lib",
         "//source/common/common:macros",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/config:metadata_lib",
+        "//source/common/config:well_known_names",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
         "//source/common/grpc:status_lib",

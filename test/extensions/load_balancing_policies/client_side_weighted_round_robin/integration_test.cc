@@ -1,5 +1,6 @@
 #include <chrono>
 #include <cstdint>
+#include <functional>
 
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 
@@ -12,6 +13,7 @@
 #include "test/integration/http_integration.h"
 
 #include "absl/strings/numbers.h"
+#include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 #include "xds/data/orca/v3/orca_load_report.pb.h"
 
@@ -213,8 +215,12 @@ public:
 
   void TearDown() override { cleanupOobStreams(); }
 
-  void initializeConfig() {
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  // extra_oob_yaml, when set, returns yaml appended to the policy typed_config
+  // (e.g. an oob_reporting_config block). Evaluated inside the config modifier,
+  // after fake upstreams exist, so it can reference their ports.
+  void initializeConfig(std::function<std::string()> extra_oob_yaml = nullptr) {
+    config_helper_.addConfigModifier([extra_oob_yaml](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
       ASSERT(cluster_0->name() == "cluster_0");
       auto* endpoint = cluster_0->mutable_load_assignment()->mutable_endpoints()->Mutable(0);
@@ -237,7 +243,7 @@ public:
                                 *endpoint);
 
       auto* policy = cluster_0->mutable_load_balancing_policy();
-      const std::string policy_yaml = R"EOF(
+      std::string policy_yaml = R"EOF(
           policies:
           - typed_extension_config:
               name: envoy.load_balancing_policies.client_side_weighted_round_robin
@@ -251,42 +257,50 @@ public:
                   weight_expiration_period:
                       seconds: 180
                   weight_update_period:
-                      seconds: 1
-          )EOF";
+                      seconds: 1)EOF";
+      if (extra_oob_yaml != nullptr) {
+        absl::StrAppend(&policy_yaml, extra_oob_yaml());
+      }
       TestUtility::loadFromYaml(policy_yaml, *policy);
     });
     HttpIntegrationTest::initialize();
   }
 
+  // Accept one OOB stream on the given upstream, record its :authority, and
+  // reply with one server-streamed OrcaLoadReport. The stream remains open (no
+  // trailers): the connection and stream are held for the lifetime of the test
+  // so Envoy continues to see an active OOB session.
+  void acceptOobStream(size_t upstream_index, double qps) {
+    FakeHttpConnectionPtr conn;
+    ASSERT_TRUE(fake_upstreams_[upstream_index]->waitForHttpConnection(*dispatcher_, conn));
+
+    FakeStreamPtr stream;
+    ASSERT_TRUE(conn->waitForNewStream(*dispatcher_, stream));
+    // Envoy ends the request half-stream after sending the single
+    // OrcaLoadReportRequest message.
+    ASSERT_TRUE(stream->waitForEndStream(*dispatcher_));
+    oob_authorities_.push_back(std::string(stream->headers().getHostValue()));
+
+    // Send gRPC response headers; do NOT send trailers (server-streaming).
+    Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"},
+                                                 {"content-type", "application/grpc"}};
+    stream->encodeHeaders(resp_headers, false);
+
+    xds::data::orca::v3::OrcaLoadReport report;
+    report.set_application_utilization(0.5);
+    report.set_rps_fractional(qps);
+    auto frame = Grpc::Common::serializeToGrpcFrame(report);
+    stream->encodeData(*frame, false);
+
+    stream_holder_.push_back(std::move(stream));
+    conn_holder_.push_back(std::move(conn));
+  }
+
   // Accept one OOB stream per upstream and reply with one server-streamed
-  // OrcaLoadReport per stream. The streams remain open (no trailers).
+  // OrcaLoadReport per stream.
   void respondToOobStreams(double host0_qps, double host1_qps) {
-    for (size_t i = 0; i < 2; ++i) {
-      FakeHttpConnectionPtr conn;
-      ASSERT_TRUE(fake_upstreams_[i]->waitForHttpConnection(*dispatcher_, conn));
-
-      FakeStreamPtr stream;
-      ASSERT_TRUE(conn->waitForNewStream(*dispatcher_, stream));
-      // Envoy ends the request half-stream after sending the single
-      // OrcaLoadReportRequest message.
-      ASSERT_TRUE(stream->waitForEndStream(*dispatcher_));
-
-      // Send gRPC response headers; do NOT send trailers (server-streaming).
-      Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"},
-                                                   {"content-type", "application/grpc"}};
-      stream->encodeHeaders(resp_headers, false);
-
-      xds::data::orca::v3::OrcaLoadReport report;
-      report.set_application_utilization(0.5);
-      report.set_rps_fractional(i == 0 ? host0_qps : host1_qps);
-      auto frame = Grpc::Common::serializeToGrpcFrame(report);
-      stream->encodeData(*frame, false);
-
-      // Keep the connection and stream alive for the lifetime of the test so
-      // Envoy continues to see an active OOB session.
-      stream_holder_.push_back(std::move(stream));
-      conn_holder_.push_back(std::move(conn));
-    }
+    acceptOobStream(0, host0_qps);
+    acceptOobStream(1, host1_qps);
   }
 
   void cleanupOobStreams() {
@@ -304,6 +318,8 @@ public:
 
   std::vector<FakeHttpConnectionPtr> conn_holder_;
   std::vector<FakeStreamPtr> stream_holder_;
+  // :authority observed on each accepted OOB stream, in accept order.
+  std::vector<std::string> oob_authorities_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClientSideWeightedRoundRobinOobIntegrationTest,
@@ -316,6 +332,43 @@ TEST_P(ClientSideWeightedRoundRobinOobIntegrationTest, OobReportsApplyWeights) {
   respondToOobStreams(/*host0_qps=*/100.0, /*host1_qps=*/1000.0);
 
   // Verify the OOB plumbing is alive and reporting.
+  test_server_->waitForCounter("cluster.cluster_0.lb_orca_oob.reports_received", Ge(2));
+  test_server_->waitForGauge("cluster.cluster_0.lb_orca_oob.active_sessions", Eq(2));
+}
+
+// oob_reporting_config.authority overrides :authority on every OOB stream.
+TEST_P(ClientSideWeightedRoundRobinOobIntegrationTest, OobAuthorityOverride) {
+  initializeConfig([] {
+    return R"EOF(
+                  oob_reporting_config:
+                      authority: orca.example.com)EOF";
+  });
+  respondToOobStreams(/*host0_qps=*/100.0, /*host1_qps=*/1000.0);
+
+  test_server_->waitForCounter("cluster.cluster_0.lb_orca_oob.reports_received", Ge(2));
+  ASSERT_EQ(oob_authorities_.size(), 2);
+  EXPECT_EQ(oob_authorities_[0], "orca.example.com");
+  EXPECT_EQ(oob_authorities_[1], "orca.example.com");
+}
+
+// oob_reporting_config.port_value redirects OOB streams to an alternate port
+// (the reporting-sidecar case): the cluster's endpoints are upstreams 0 and 1,
+// but both hosts' OOB streams must arrive at upstream 2's port.
+TEST_P(ClientSideWeightedRoundRobinOobIntegrationTest, OobPortOverrideDialsAlternatePort) {
+  setUpstreamCount(3);
+  // Upstream 2 is the OOB target only; no cluster endpoint consumes its port.
+  config_helper_.skipPortUsageValidation();
+  initializeConfig([this] {
+    return fmt::format(R"EOF(
+                  oob_reporting_config:
+                      port_value: {})EOF",
+                       fake_upstreams_[2]->localAddress()->ip()->port());
+  });
+  // Both hosts resolve to loopback, so with the port override both OOB
+  // streams land on upstream 2 as separate connections.
+  acceptOobStream(2, /*qps=*/100.0);
+  acceptOobStream(2, /*qps=*/1000.0);
+
   test_server_->waitForCounter("cluster.cluster_0.lb_orca_oob.reports_received", Ge(2));
   test_server_->waitForGauge("cluster.cluster_0.lb_orca_oob.active_sessions", Eq(2));
 }

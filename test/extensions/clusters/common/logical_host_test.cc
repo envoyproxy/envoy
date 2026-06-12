@@ -204,7 +204,7 @@ TEST_F(LogicalHostOrcaReportingConnectionTest, DialsHostDataAddress) {
   EXPECT_EQ(data.host_description_->address(), address_);
 }
 
-TEST_F(LogicalHostOrcaReportingConnectionTest, OverrideOptionsComposedWithCallerAlpn) {
+TEST_F(LogicalHostOrcaReportingConnectionTest, CallerOptionsPassThroughUnchanged) {
   // Matcher with a mock factory so createTransportSocket can capture the
   // options; must be in place before host creation resolves its factory.
   auto mock_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
@@ -242,10 +242,9 @@ TEST_F(LogicalHostOrcaReportingConnectionTest, OverrideOptionsComposedWithCaller
   host->createOrcaReportingConnection(dispatcher, caller_options, nullptr,
                                       host->orcaReportingAddress());
 
-  // SNI/SAN come from the host override; ALPN stays the caller's forced h2.
-  ASSERT_NE(seen_options, nullptr);
-  EXPECT_EQ(seen_options->serverNameOverride().value_or(""), "sni.example");
-  EXPECT_THAT(seen_options->applicationProtocolListOverride(), testing::ElementsAre("h2"));
+  // The caller's options reach the factory unchanged; the host's override
+  // options are not consulted for ORCA connections (same as health checks).
+  EXPECT_EQ(seen_options, caller_options);
 }
 
 TEST_F(LogicalHostOrcaReportingConnectionTest, MetadataRoutesThroughMatcher) {

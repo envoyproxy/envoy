@@ -9,8 +9,6 @@
 #include "source/extensions/load_balancing_policies/client_side_weighted_round_robin/client_side_weighted_round_robin_lb.h"
 #include "source/extensions/load_balancing_policies/common/factory_base.h"
 
-#include "absl/status/status.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolicies {

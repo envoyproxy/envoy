@@ -2051,10 +2051,11 @@ TEST_F(HostImplTest, CreateOrcaReportingConnectionUsesHappyEyeballsForHostAddres
   EXPECT_CALL(dispatcher, createTimer_(_));
   EXPECT_CALL(*connection, streamInfo());
 
-  // Dialing the host's own address keeps the data path's happy-eyeballs fallback.
-  Host::CreateConnectionData data =
-      host->createOrcaReportingConnection(dispatcher, /*transport_socket_options=*/nullptr,
-                                          /*metadata=*/nullptr, host->orcaReportingAddress());
+  // Dialing the host's own address keeps the data path's happy-eyeballs fallback. A distinct
+  // but value-equal instance must behave the same: addresses are compared by value, not pointer.
+  Host::CreateConnectionData data = host->createOrcaReportingConnection(
+      dispatcher, /*transport_socket_options=*/nullptr,
+      /*metadata=*/nullptr, *Network::Utility::resolveUrl("tcp://10.0.0.1:1234"));
   EXPECT_NE(connection, data.connection_.get());
 }
 

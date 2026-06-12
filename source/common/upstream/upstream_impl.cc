@@ -625,9 +625,9 @@ Host::CreateConnectionData HostImplBase::createOrcaConnection(
       (metadata != nullptr)
           ? resolveTransportSocketFactory(orca_address, metadata, transport_socket_options)
           : transportSocketFactory();
-  // An overridden dial address never matches the host address pointer, so the
-  // original-port address list is dropped in that case.
-  const bool use_address_list = orca_address == host_address;
+  // The original-port address list applies only when dialing the host's own address. Compare
+  // by value: pointer identity doesn't survive LogicalHost re-resolution.
+  const bool use_address_list = *orca_address == *host_address;
   return createConnection(dispatcher, cluster(), orca_address,
                           use_address_list ? address_list : SharedConstAddressVector{}, factory,
                           /*options=*/nullptr, transport_socket_options, std::move(host));

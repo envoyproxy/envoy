@@ -106,15 +106,6 @@ public:
    */
   static ConstMetadataSharedPoolSharedPtr getConstMetadataSharedPool(Singleton::Manager& manager,
                                                                      Event::Dispatcher& dispatcher);
-
-  /**
-   * Wrap transport socket match criteria into endpoint-style metadata under the
-   * "envoy.transport_socket_match" filter key, as consumed by TransportSocketMatcher.
-   * @param match_criteria the key/value criteria.
-   * @return the wrapping metadata.
-   */
-  static std::shared_ptr<const envoy::config::core::v3::Metadata>
-  transportSocketMatchMetadata(const Protobuf::Struct& match_criteria);
 };
 
 template <typename factoryClass> class TypedMetadataImpl : public TypedMetadata {

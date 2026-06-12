@@ -44,10 +44,11 @@ ClientSideWeightedRoundRobinLbConfig::ClientSideWeightedRoundRobinLbConfig(
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(lb_proto, weight_update_period, 1000));
 
   enable_oob_load_report = lb_proto.enable_oob_load_report().value();
-  // The manager clamps non-positive periods to its default.
-  oob_manager_config.reporting_period = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
-      lb_proto, oob_reporting_period,
-      Extensions::LoadBalancingPolicies::Common::kDefaultOobReportingPeriodMs));
+  // Unset keeps the struct default; the manager clamps non-positive periods.
+  if (lb_proto.has_oob_reporting_period()) {
+    oob_manager_config.reporting_period =
+        std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(lb_proto, oob_reporting_period));
+  }
   if (lb_proto.has_oob_reporting_config()) {
     Extensions::LoadBalancingPolicies::Common::applyOrcaOobConnectionOverrides(
         lb_proto.oob_reporting_config(), oob_manager_config);

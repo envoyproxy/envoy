@@ -5,7 +5,7 @@
 
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
 #include "source/common/common/macros.h"
-#include "source/common/config/metadata.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/grpc/common.h"
 #include "source/common/http/codec_client.h"
 #include "source/common/http/headers.h"
@@ -38,11 +38,12 @@ constexpr uint32_t kMaxOrcaReportFrameBytes = 64 * 1024;
 
 // OOB reporting is always gRPC over HTTP/2; shared by all managers.
 const Network::TransportSocketOptionsConstSharedPtr& h2AlpnOptions() {
-  CONSTRUCT_ON_FIRST_USE(Network::TransportSocketOptionsConstSharedPtr,
-                         std::make_shared<const Network::TransportSocketOptionsImpl>(
-                             /*override_server_name=*/"",
-                             /*override_verify_san_list=*/std::vector<std::string>{},
-                             /*override_alpn=*/std::vector<std::string>{"h2"}));
+  CONSTRUCT_ON_FIRST_USE(
+      Network::TransportSocketOptionsConstSharedPtr,
+      std::make_shared<const Network::TransportSocketOptionsImpl>(
+          /*override_server_name=*/"",
+          /*override_verify_san_list=*/std::vector<std::string>{},
+          /*override_alpn=*/std::vector<std::string>{Http::Utility::AlpnNames::get().Http2}));
 }
 
 OrcaOobManagerConfig sanitizeConfig(OrcaOobManagerConfig config) {
@@ -60,8 +61,11 @@ void applyOrcaOobConnectionOverrides(
   config.port_value = proto.port_value();
   config.authority = proto.authority();
   if (proto.has_transport_socket_match_criteria()) {
-    config.transport_socket_match_metadata =
-        Config::Metadata::transportSocketMatchMetadata(proto.transport_socket_match_criteria());
+    auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+    (*metadata->mutable_filter_metadata())[Config::MetadataFilters::get()
+                                               .ENVOY_TRANSPORT_SOCKET_MATCH] =
+        proto.transport_socket_match_criteria();
+    config.transport_socket_match_metadata = std::move(metadata);
   }
 }
 

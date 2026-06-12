@@ -224,6 +224,7 @@ public:
    * connection.
    * @param metadata when non-null drives transport socket factory resolution.
    * @param orca_address the resolved address to dial; the caller applies any port override.
+   * Implementations should use the host's address list only when this equals the host address.
    * @return the connection data.
    */
   virtual CreateConnectionData createOrcaReportingConnection(
