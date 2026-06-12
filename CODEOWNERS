@@ -105,6 +105,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/common/dynamic_forward_proxy @mattklein123 @ryantheoptimist
 /*/extensions/filters/http/dynamic_forward_proxy @mattklein123 @ryantheoptimist
 /*/extensions/filters/http/composite @mattklein123 @tyxia @yanavlasov
+/*/extensions/filters/http/filter_chain @wbpcode @agrawroh @tyxia
 # omit_canary_hosts retry predicate
 /*/extensions/retry/host/omit_canary_hosts @sriduth @mattklein123
 # previous hosts
@@ -156,6 +157,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/grpc_credentials/file_based_metadata @wozz @yanavlasov
 /*/extensions/internal_redirect @botengyao @penguingao
 /*/extensions/stat_sinks/dog_statsd @taiki45 @paul-r-gall
+/*/extensions/stat_sinks/dynamic_modules @prashanthjos @mathetake @agrawroh @wbpcode
 /*/extensions/stat_sinks/graphite_statsd @vaccarium @mattklein123
 /*/extensions/stat_sinks/hystrix @trabetti @paul-r-gall
 /*/extensions/stat_sinks/metrics_service @ramaraochavali @paul-r-gall
@@ -247,7 +249,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # HTTP MCP filter
 /*/extensions/filters/http/mcp @botengyao @yanavlasov @wdauchy
 # HTTP MCP Jon Rest Bridge filter
-/*/extensions/filters/http/mcp_json_rest_bridge @paulhong01 @leon-gg @botengyao @tyxia @yanavlasov
+/*/extensions/filters/http/mcp_json_rest_bridge @paulhong01 @leon-gg @botengyao @tyxia @yanavlasov @guoyilin42
 # MCP router filter
 /*/extensions/filters/http/mcp_router @botengyao @yanavlasov @wdauchy @agrawroh
 # HTTP A2A filter
@@ -264,6 +266,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/http/set_metadata @aguinet @mattklein123
 # Formatters
 /*/extensions/formatter/cel @kyessenov @zirain
+/*/extensions/formatter/dynamic_modules @agrawroh @wbpcode @mathetake
 /*/extensions/formatter/file_content @ggreenway @wbpcode
 /*/extensions/formatter/generic_secret @ggreenway @wbpcode
 /*/extensions/formatter/metadata @cpakulski @ravenblackx @nezdolik
@@ -336,9 +339,9 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/tracers/zipkin @wbpcode @Shikugawa @basvanbeek
 /*/extensions/tracers/common @wbpcode @Shikugawa @basvanbeek
 # ext_authz
-/*/extensions/filters/common/ext_authz @esmet @tyxia @ggreenway @antoniovleonti
-/*/extensions/filters/http/ext_authz @esmet @tyxia @ggreenway @antoniovleonti
-/*/extensions/filters/network/ext_authz @esmet @tyxia @ggreenway @antoniovleonti
+/*/extensions/filters/common/ext_authz @esmet @tyxia @ggreenway @antoniovleonti @yanjunxiang-google
+/*/extensions/filters/http/ext_authz @esmet @tyxia @ggreenway @antoniovleonti @yanjunxiang-google
+/*/extensions/filters/network/ext_authz @esmet @tyxia @ggreenway @antoniovleonti @yanjunxiang-google
 # original dst
 /*/extensions/filters/listener/original_dst @kyessenov @cpakulski @lambdai @nezdolik
 # mongo proxy
@@ -429,6 +432,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/matching/input_matchers/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/matching/http/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/transport_sockets/tls/cert_validator/dynamic_modules @agrawroh @mathetake @wbpcode
+/*/extensions/transport_sockets/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/upstreams/http/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/tracers/dynamic_modules @agrawroh @mathetake @wbpcode
 # Linux network namespace override

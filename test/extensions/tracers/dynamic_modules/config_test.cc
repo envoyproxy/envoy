@@ -52,6 +52,35 @@ TEST_F(DynamicModuleTracerFactoryTest, CreateTracerDriverSuccess) {
   EXPECT_NE(driver, nullptr);
 }
 
+// Load the module via the ``module.local.filename`` data source instead of by name.
+TEST_F(DynamicModuleTracerFactoryTest, CreateTracerDriverWithLocalFile) {
+  DynamicModuleTracerFactory factory;
+
+  ::envoy::extensions::tracers::dynamic_modules::v3::DynamicModuleTracer proto_config;
+  proto_config.mutable_dynamic_module_config()->mutable_module()->mutable_local()->set_filename(
+      TestEnvironment::substitute(
+          "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c/libtracer_no_op.so"));
+  proto_config.set_tracer_name("test_tracer");
+
+  auto driver = factory.createTracerDriver(proto_config, context_);
+  EXPECT_NE(driver, nullptr);
+}
+
+// Remote module sources are not supported for tracers (no init manager is wired up).
+TEST_F(DynamicModuleTracerFactoryTest, CreateTracerDriverRemoteSourceRejected) {
+  DynamicModuleTracerFactory factory;
+
+  ::envoy::extensions::tracers::dynamic_modules::v3::DynamicModuleTracer proto_config;
+  auto* remote = proto_config.mutable_dynamic_module_config()->mutable_module()->mutable_remote();
+  remote->mutable_http_uri()->set_uri("https://example.com/module.so");
+  remote->mutable_http_uri()->set_cluster("cluster_1");
+  remote->mutable_http_uri()->mutable_timeout()->set_seconds(5);
+  remote->set_sha256("abc123");
+  proto_config.set_tracer_name("test_tracer");
+
+  EXPECT_THROW(factory.createTracerDriver(proto_config, context_), EnvoyException);
+}
+
 TEST_F(DynamicModuleTracerFactoryTest, CreateTracerDriverModuleNotFound) {
   DynamicModuleTracerFactory factory;
 

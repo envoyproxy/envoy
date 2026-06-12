@@ -506,6 +506,7 @@ envoy_cc_test(
     deps = [
         "//envoy/upstream:upstream_interface",
         "//source/common/upstream:resource_manager_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
     ],
@@ -566,6 +567,7 @@ envoy_cc_test(
         ":utility_lib",
         "//source/common/upstream:prod_cluster_info_factory_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/transport_sockets/tls:config",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",

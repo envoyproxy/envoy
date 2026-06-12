@@ -41,6 +41,11 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     })),
     "send_response" => Some(Box::new(SendResponseHttpFilterConfig::new(config))),
     "http_filter_scheduler" => Some(Box::new(HttpFilterSchedulerConfig {})),
+    "early_response_during_upload" => Some(Box::new(EarlyResponseDuringUploadConfig {
+      response_pause_total: envoy_filter_config
+        .define_counter("response_pause_total")
+        .unwrap(),
+    })),
     "fake_external_cache" => Some(Box::new(FakeExternalCachingFilterConfig {})),
     "stats_callbacks" => {
       let config = String::from_utf8(config.to_owned()).unwrap();
@@ -1010,6 +1015,65 @@ impl Drop for HttpFilterScheduler {
     assert_eq!(self.thread_handles.len(), 2);
     for thread in self.thread_handles.drain(..) {
       thread.join().expect("Failed to join thread");
+    }
+  }
+}
+
+const EVENT_RESUME_ENCODING: u64 = 1;
+
+struct EarlyResponseDuringUploadConfig {
+  response_pause_total: EnvoyCounterId,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for EarlyResponseDuringUploadConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(EarlyResponseDuringUploadFilter {
+      response_pause_total: self.response_pause_total,
+      resume_scheduled: false,
+    })
+  }
+}
+
+/// Reproduces the early-response-during-upload wedge. The upstream response is held at
+/// on_response_headers while the client keeps uploading. A request body chunk then continues the
+/// decode direction, after which the held response is resumed from on_scheduled via
+/// continue_encoding. A single shared continue flag let the decode-side continue suppress that
+/// resume and wedge the held response.
+struct EarlyResponseDuringUploadFilter {
+  response_pause_total: EnvoyCounterId,
+  resume_scheduled: bool,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for EarlyResponseDuringUploadFilter {
+  fn on_request_body(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_request_body_status {
+    // Post the resume instead of calling it inline so it runs after this body returns Continue and
+    // the decode direction is marked continued. An inline resume would not reproduce the wedge.
+    if !self.resume_scheduled {
+      self.resume_scheduled = true;
+      envoy_filter.new_scheduler().commit(EVENT_RESUME_ENCODING);
+    }
+    envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
+  }
+
+  fn on_response_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    // Hold the response so the test can interleave a request body continue before it is resumed.
+    envoy_filter
+      .increment_counter(self.response_pause_total, 1)
+      .unwrap();
+    envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration
+  }
+
+  fn on_scheduled(&mut self, envoy_filter: &mut EHF, event_id: u64) {
+    if event_id == EVENT_RESUME_ENCODING {
+      envoy_filter.continue_encoding();
     }
   }
 }

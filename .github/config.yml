@@ -89,11 +89,6 @@ checks:
     required: true
     on-run:
     - mobile-ios-tests
-  mobile-perf:
-    name: Mobile/Perf
-    required: true
-    on-run:
-    - mobile-perf
   mobile-python:
     name: Mobile/Python
     required: true

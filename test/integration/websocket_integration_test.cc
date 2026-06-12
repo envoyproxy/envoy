@@ -358,7 +358,12 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
         auto* foo_upgrade = hcm.add_upgrade_configs();
         foo_upgrade->set_upgrade_type("foo");
         auto* filter_list_back = foo_upgrade->add_filters();
-        TestUtility::loadFromYaml("name: envoy.filters.http.router", *filter_list_back);
+        TestUtility::loadFromYaml(R"EOF(
+          name: envoy.filters.http.router
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+        )EOF",
+                                  *filter_list_back);
       });
   initialize();
 
@@ -962,6 +967,12 @@ TEST_P(WebsocketIntegrationTest, WebSocketUpgradeRouteTimeoutWithRetries) {
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_EQ("504", response_->headers().getStatusValue());
 
+  if (fake_upstream_connection2) {
+    AssertionResult result = fake_upstream_connection2->close();
+    RELEASE_ASSERT(result, result.message());
+    result = fake_upstream_connection2->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
+  }
   cleanupUpstreamAndDownstream();
 }
 

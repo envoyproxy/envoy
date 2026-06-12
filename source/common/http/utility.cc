@@ -1326,41 +1326,17 @@ namespace {
 // %-encode all ASCII character codepoints, EXCEPT:
 // ALPHA | DIGIT | * | - | . | _
 // SPACE is encoded as %20, NOT as the + character
-constexpr std::array<uint32_t, 8> kUrlEncodedCharTable = {
-    // control characters
-    0b11111111111111111111111111111111,
-    // !"#$%&'()*+,-./0123456789:;<=>?
-    0b11111111110110010000000000111111,
-    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
-    0b10000000000000000000000000011110,
-    //`abcdefghijklmnopqrstuvwxyz{|}~
-    0b10000000000000000000000000011111,
-    // extended ascii
-    0b11111111111111111111111111111111,
-    0b11111111111111111111111111111111,
-    0b11111111111111111111111111111111,
-    0b11111111111111111111111111111111,
-};
+constexpr CharTable kUrlEncodedCharTable =
+    ~(CharTables::kAlphanumeric | CharTable::fromChars("*-._"));
 
-constexpr std::array<uint32_t, 8> kUrlDecodedCharTable = {
-    // control characters
-    0b00000000000000000000000000000000,
-    // !"#$%&'()*+,-./0123456789:;<=>?
-    0b01011111111111111111111111110101,
-    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
-    0b11111111111111111111111111110101,
-    //`abcdefghijklmnopqrstuvwxyz{|}~
-    0b11111111111111111111111111100010,
-    // extended ascii
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-};
+// The set of characters which, if they are percent-encoded, should be
+// decoded.
+constexpr CharTable kUrlDecodedCharTable =
+    CharTables::kAlphanumeric | CharTable::fromChars("!#$%&'()*+,-./:;=?@[]_`~");
 
-bool shouldPercentEncodeChar(char c) { return testCharInTable(kUrlEncodedCharTable, c); }
+constexpr bool shouldPercentEncodeChar(char c) { return kUrlEncodedCharTable.hasChar(c); }
 
-bool shouldPercentDecodeChar(char c) { return testCharInTable(kUrlDecodedCharTable, c); }
+constexpr bool shouldPercentDecodeChar(char c) { return kUrlDecodedCharTable.hasChar(c); }
 } // namespace
 
 std::string Utility::PercentEncoding::urlEncode(absl::string_view value) {
@@ -1643,6 +1619,30 @@ std::string Utility::newUri(::Envoy::OptRef<const Utility::RedirectConfig> redir
   return fmt::format("{}://{}{}{}", final_scheme, final_host, final_port, final_path);
 }
 
+std::string Utility::newUriWithFormatter(OptRef<const RedirectConfig> redirect_config,
+                                         const Http::RequestHeaderMap& headers,
+                                         const Formatter::Formatter& formatter,
+                                         const StreamInfo::StreamInfo& stream_info) {
+  const Formatter::Context context(&headers);
+  const std::string formatted_path = formatter.format(context, stream_info);
+  if (!formatted_path.empty()) {
+    const RedirectConfig path_redirect_config{
+        redirect_config ? redirect_config->scheme_redirect_ : "",
+        redirect_config ? redirect_config->host_redirect_ : "",
+        redirect_config ? redirect_config->port_redirect_ : "",
+        formatted_path,
+        "",
+        "",
+        nullptr,
+        nullptr,
+        formatted_path.find('?') != std::string::npos,
+        redirect_config ? redirect_config->https_redirect_ : false,
+        redirect_config ? redirect_config->strip_query_ : false};
+    return newUri(makeOptRef<const RedirectConfig>(path_redirect_config), headers);
+  }
+  return newUri(redirect_config, headers);
+}
+
 bool Utility::isValidRefererValue(absl::string_view value) {
 
   // First, we try to parse it as an absolute URL and
@@ -1673,7 +1673,7 @@ bool Utility::isValidRefererValue(absl::string_view value) {
       seen_slash = true;
       continue;
     default:
-      if (!testCharInTable(kUriQueryAndFragmentCharTable, c)) {
+      if (!CharTables::kUriQueryAndFragment.hasChar(c)) {
         return false;
       }
     }

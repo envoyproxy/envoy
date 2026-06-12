@@ -153,7 +153,7 @@ public:
         cluster_.info(), cluster_.cluster_manager_, cluster_.runtime(), cluster_.random(),
         cluster_.clusters_);
   }
-  bool recreateOnHostChange() const override { return false; }
+  bool recreateOnHostChangeDeprecated() const override { return false; }
 
   const Cluster& cluster_;
 };

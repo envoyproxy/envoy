@@ -244,20 +244,23 @@ HttpUpstream::onDownstreamEvent(Network::ConnectionEvent event, absl::string_vie
 }
 
 void HttpUpstream::onResetStream(Http::StreamResetReason reason, absl::string_view) {
+  const bool already_complete = read_half_closed_;
   read_half_closed_ = true;
   write_half_closed_ = true;
   Network::ConnectionEvent event;
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.map_http_stream_reset_to_tcp_rst")) {
-    // Map remote-originated resets to RemoteClose.
     switch (reason) {
     case Http::StreamResetReason::RemoteReset:
     case Http::StreamResetReason::RemoteRefusedStreamReset:
     case Http::StreamResetReason::RemoteConnectionFailure:
     case Http::StreamResetReason::RemoteResetNoError:
-      event = Network::ConnectionEvent::RemoteClose;
-      detected_close_type_ = StreamInfo::DetectedCloseType::RemoteReset;
-      break;
+      if (!already_complete) {
+        event = Network::ConnectionEvent::RemoteClose;
+        detected_close_type_ = StreamInfo::DetectedCloseType::RemoteReset;
+        break;
+      }
+      FALLTHRU;
     default:
       event = Network::ConnectionEvent::LocalClose;
       detected_close_type_ = StreamInfo::DetectedCloseType::Normal;

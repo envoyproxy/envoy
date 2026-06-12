@@ -2,6 +2,8 @@
 
 #include "envoy/upstream/retry.h"
 
+#include "test/mocks/upstream/upstream_mocks.pb.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "retry_priority.h"
@@ -21,9 +23,7 @@ public:
 
   std::string name() const override { return "envoy.test_retry_priority"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    // Using Struct instead of a custom per-filter empty config proto
-    // This is only allowed in tests.
-    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
+    return std::make_unique<test::mocks::upstream::TestRetryPriorityConfig>();
   }
 
 private:

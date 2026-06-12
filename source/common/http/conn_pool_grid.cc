@@ -136,6 +136,12 @@ bool ConnectivityGrid::WrapperCallbacks::shouldAttemptSecondHttp3Connection() {
 void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptFailed(
     ConnectionAttemptCallbacks* attempt, ConnectionPool::PoolFailureReason reason,
     absl::string_view transport_failure_reason, Upstream::HostDescriptionConstSharedPtr host) {
+  if (delete_started_ && Runtime::runtimeFeatureEnabled(
+                             "envoy.reloadable_features.conn_pool_grid_early_return_on_teardown")) {
+    ENVOY_LOG(trace, "Uninteresting connection attempt to host {} failed.",
+              host != nullptr ? host->hostname() : "unknown");
+    return;
+  }
   ENVOY_LOG(trace, "{} pool failed to create connection to host '{}'.",
             describePool(attempt->pool()), host->hostname());
   grid_.dispatcher_.deferredDelete(attempt->removeFromList(connection_attempts_));
@@ -210,6 +216,11 @@ ConnectivityGrid::StreamCreationResult
 ConnectivityGrid::WrapperCallbacks::newStream(ConnectionPool::Instance& pool) {
   ENVOY_LOG(trace, "{} pool attempting to create a new stream to host '{}'.", describePool(pool),
             grid_.origin_.hostname_);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.connectivity_grid_prevent_double_h2_scheduled") &&
+      grid_.http2_pool_ != nullptr && &pool == grid_.http2_pool_.get()) {
+    has_attempted_http2_ = true;
+  }
   auto attempt = std::make_unique<ConnectionAttemptCallbacks>(*this, pool);
   LinkedList::moveIntoList(std::move(attempt), connection_attempts_);
   if (!next_attempt_timer_->enabled()) {

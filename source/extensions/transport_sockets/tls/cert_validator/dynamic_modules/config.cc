@@ -297,7 +297,7 @@ Envoy::Ssl::CertificateDetailsPtr DynamicModuleCertValidator::getCaCertInformati
 
 absl::StatusOr<CertValidatorPtr> DynamicModuleCertValidatorFactory::createCertValidator(
     const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-    Server::Configuration::CommonFactoryContext& /*context*/, Stats::Scope& /*scope*/) {
+    Server::Configuration::CommonFactoryContext& context, Stats::Scope& /*scope*/) {
   ASSERT(config != nullptr);
   ASSERT(config->customValidatorConfig().has_value());
 
@@ -310,11 +310,12 @@ absl::StatusOr<CertValidatorPtr> DynamicModuleCertValidatorFactory::createCertVa
   RETURN_IF_NOT_OK(status);
 
   const auto& module_config = proto_config.dynamic_module_config();
-  auto dynamic_module = Envoy::Extensions::DynamicModules::newDynamicModuleByName(
-      module_config.name(), module_config.do_not_close(), module_config.load_globally());
-  if (!dynamic_module.ok()) {
-    return dynamic_module.status();
-  }
+  // Cert validators do not support remote module sources, so no init manager or async callback is
+  // passed; only the synchronous local-file and by-name paths can succeed here.
+  auto load_result = Envoy::Extensions::DynamicModules::newDynamicModuleByConfig(
+      module_config, proto_config.validator_name(), context);
+  RETURN_IF_NOT_OK_REF(load_result.status());
+  auto dynamic_module = std::move(load_result->loaded);
 
   std::string validator_config_str;
   if (proto_config.has_validator_config()) {
@@ -324,7 +325,7 @@ absl::StatusOr<CertValidatorPtr> DynamicModuleCertValidatorFactory::createCertVa
   }
 
   auto factory_config_or_error = newDynamicModuleCertValidatorConfig(
-      proto_config.validator_name(), validator_config_str, std::move(dynamic_module.value()));
+      proto_config.validator_name(), validator_config_str, std::move(dynamic_module));
   if (!factory_config_or_error.ok()) {
     return factory_config_or_error.status();
   }

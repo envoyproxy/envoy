@@ -28,8 +28,14 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl  EVP_DigestSignFinal \
   --uncomment-func-decl EVP_DigestVerifyUpdate \
   --uncomment-func-decl EVP_DigestVerifyFinal \
-  --uncomment-func-decl EVP_PKEY_CTX_set_rsa_padding \
+  --uncomment-func-decl EVP_PKEY_CTX_free \
+  --uncomment-func-decl EVP_PKEY_CTX_new \
   --uncomment-func-decl EVP_PKEY_CTX_set_rsa_mgf1_md \
+  --uncomment-func-decl EVP_PKEY_CTX_set_rsa_oaep_md \
+  --uncomment-func-decl EVP_PKEY_CTX_set_rsa_padding \
+  --uncomment-func-decl EVP_PKEY_encrypt_init \
+  --uncomment-func-decl EVP_PKEY_encrypt \
+  --uncomment-regex 'BORINGSSL_MAKE_DELETER(EVP_PKEY_CTX,' \
   --uncomment-regex 'BORINGSSL_MAKE_DELETER(EVP_PKEY,' \
   --uncomment-regex 'BORINGSSL_MAKE_UP_REF(EVP_PKEY,' \
   --uncomment-func-decl EVP_PKEY_size \

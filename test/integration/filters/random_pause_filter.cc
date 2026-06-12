@@ -6,6 +6,7 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
+#include "test/integration/filters/test_filters.pb.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -65,9 +66,12 @@ private:
   Event::TimerPtr timer_;
 };
 
-class RandomPauseFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class RandomPauseFilterConfig : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<
+                                    test::integration::filters::RandomPauseFilterConfig> {
 public:
-  RandomPauseFilterConfig() : EmptyHttpFilterConfig("random-pause-filter") {}
+  RandomPauseFilterConfig()
+      : UniqueEmptyHttpFilterConfig<test::integration::filters::RandomPauseFilterConfig>(
+            "random-pause-filter") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&, Server::Configuration::FactoryContext&) override {

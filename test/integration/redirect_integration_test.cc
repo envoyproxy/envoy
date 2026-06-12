@@ -696,10 +696,14 @@ TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithResponseBody) {
   if (downstreamProtocol() == Http::CodecType::HTTP3) {
     config_helper_.prependFilter(R"EOF(
   name: pause-filter-for-quic
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.PauseFilterForQuicConfig
   )EOF");
   } else {
     config_helper_.prependFilter(R"EOF(
   name: pause-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.PauseFilterConfig
   )EOF");
   }
   initialize();

@@ -3,13 +3,16 @@
 #include <memory>
 #include <string>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.validate.h"
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "source/common/access_log/access_log_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
+#include "source/server/generic_factory_context.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -33,27 +36,7 @@ public:
   ReverseTunnelInitiatorExtension(
       Server::Configuration::ServerFactoryContext& context,
       const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
-          DownstreamReverseConnectionSocketInterface& config)
-      : context_(context), config_(config) {
-    stat_prefix_ = PROTOBUF_GET_STRING_OR_DEFAULT(config, stat_prefix, "reverse_tunnel_initiator");
-    // Configure detailed stats flag (defaults to false).
-    enable_detailed_stats_ = config.enable_detailed_stats();
-    if (config.has_http_handshake() && !config.http_handshake().request_path().empty()) {
-      handshake_request_path_ = config.http_handshake().request_path();
-    } else {
-      handshake_request_path_ =
-          std::string(ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH);
-    }
-    if (config.has_http_handshake()) {
-      additional_headers_ = {config.http_handshake().additional_headers().begin(),
-                             config.http_handshake().additional_headers().end()};
-      use_http_upgrade_ = config.http_handshake().use_http_upgrade();
-    }
-    ENVOY_LOG(debug,
-              "ReverseTunnelInitiatorExtension: creating downstream reverse connection "
-              "socket interface with stat_prefix: {}",
-              stat_prefix_);
-  }
+          DownstreamReverseConnectionSocketInterface& config);
 
   void onServerInitialized(Server::Instance&) override;
   void onWorkerThreadInitialized() override;
@@ -124,6 +107,30 @@ public:
   bool handshakeUsesHttpUpgrade() const { return use_http_upgrade_; }
 
   /**
+   * @return reference to the configured access loggers for reverse tunnel lifecycle events.
+   */
+  const AccessLog::InstanceSharedPtrVector& accessLogs() const { return access_logs_; }
+
+  /**
+   * Emit an access log entry for a reverse tunnel lifecycle event.
+   * Creates an ephemeral StreamInfo populated with dynamic metadata containing
+   * reverse tunnel identifiers and event details.
+   * @param time_source the time source for the stream info
+   * @param event the lifecycle event name
+   * @param node_id the node identifier of this Envoy instance
+   * @param cluster_id the cluster identifier of this Envoy instance
+   * @param tenant_id the tenant identifier of this Envoy instance
+   * @param upstream_cluster the name of the upstream cluster
+   * @param host_address the address of the remote host
+   * @param connection_key the unique key identifying the connection
+   * @param error_message the error message (empty on success)
+   */
+  void emitAccessLog(TimeSource& time_source, const std::string& event, const std::string& node_id,
+                     const std::string& cluster_id, const std::string& tenant_id,
+                     const std::string& upstream_cluster, const std::string& host_address,
+                     const std::string& connection_key, const std::string& error_message);
+
+  /**
    * Increment handshake stats for reverse tunnel connections (per-worker only).
    * Only tracks stats if enable_detailed_stats flag is true.
    * @param cluster_id the cluster identifier for the connection
@@ -154,6 +161,7 @@ private:
   std::string handshake_request_path_;
   std::vector<envoy::config::core::v3::HeaderValueOption> additional_headers_;
   bool use_http_upgrade_{false};
+  AccessLog::InstanceSharedPtrVector access_logs_;
 
   /**
    * Update per-worker connection stats for debugging purposes.
