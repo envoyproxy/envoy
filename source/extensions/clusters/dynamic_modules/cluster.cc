@@ -311,6 +311,10 @@ bool DynamicModuleCluster::addHosts(
 
   auto cluster_info = info();
 
+  // Cross-priority address map maintained by the priority set; used to skip addresses already in
+  // the cluster without copying the host set.
+  const auto existing_hosts = priority_set_.crossPriorityHostMap();
+
   for (size_t i = 0; i < addresses.size(); ++i) {
     if (weights[i] == 0 || weights[i] > 128) {
       ENVOY_LOG(error, "Invalid weight {} for host {}.", weights[i], addresses[i]);
@@ -322,6 +326,11 @@ bool DynamicModuleCluster::addHosts(
     if (resolved_address == nullptr) {
       ENVOY_LOG(error, "Invalid address: {}.", addresses[i]);
       return false;
+    }
+
+    // Skip addresses already in the host set. Within-batch duplicates are not deduplicated.
+    if (existing_hosts != nullptr && existing_hosts->contains(resolved_address->asString())) {
+      continue;
     }
 
     auto locality = std::make_shared<envoy::config::core::v3::Locality>();
