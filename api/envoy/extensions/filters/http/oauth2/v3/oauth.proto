@@ -183,8 +183,7 @@ message PrivateKeyJwtConfig {
   // The lifetime of the JWT assertion. After this duration, the assertion expires.
   // The value is truncated to whole seconds, so it must be at least ``1s`` when set.
   // Default: ``60s``.
-  google.protobuf.Duration assertion_lifetime = 2
-      [(validate.rules).duration = {gte: {seconds: 1}}];
+  google.protobuf.Duration assertion_lifetime = 2 [(validate.rules).duration = {gte {seconds: 1}}];
 }
 
 // OAuth config

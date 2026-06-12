@@ -113,14 +113,14 @@ ClientAssertion::create(absl::string_view client_id, absl::string_view audience,
   const std::string jti = random.uuid();
 
   // Sanitize strings that will be embedded in JSON to prevent injection.
-  std::string client_id_buf, audience_buf, jti_buf, algorithm_buf;
+  std::string client_id_buf, audience_buf, jti_buf;
   const absl::string_view safe_client_id = Json::sanitize(client_id_buf, client_id);
   const absl::string_view safe_audience = Json::sanitize(audience_buf, audience);
   const absl::string_view safe_jti = Json::sanitize(jti_buf, jti);
-  const absl::string_view safe_algorithm = Json::sanitize(algorithm_buf, algorithm);
 
-  // Build JWT header.
-  const std::string header = absl::StrCat(R"({"alg":")", safe_algorithm, R"(","typ":"JWT"})");
+  // Build JWT header. The algorithm is a canonical value from PrivateKeyJwtConfig.SigningAlgorithm,
+  // so it needs no sanitization.
+  const std::string header = absl::StrCat(R"({"alg":")", algorithm, R"(","typ":"JWT"})");
   const std::string encoded_header = base64UrlEncode(header);
 
   // Build JWT payload with required claims per RFC 7523 Section 3.
