@@ -13,6 +13,15 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Dlb connection balancer configuration]
 // DLB :ref:`configuration overview <config_connection_balance_dlb>`.
 // [#extension: envoy.network.connection_balance.dlb]
+// [#not-implemented-hide:]
+//
+// The envoy.network.connection_balance.dlb extension is currently disabled
+// at the Bazel layer — see https://github.com/envoyproxy/envoy/issues/45491.
+// The ``[#not-implemented-hide:]`` annotation above suppresses docs
+// generation for this file so protodoc does not try to look the extension
+// up in extensions_metadata.yaml (which has been removed in lockstep with
+// the ``contrib_build_config.bzl`` entry). Drop the annotation when the
+// upstream ``@dlb`` mirror is healthy again.
 
 // The Dlb is a hardware managed system of queues and arbiters connecting producers and consumers. It is a PCIE device
 // in the CPU package. It interacts with software running on cores and potentially other devices. The Dlb implements the
