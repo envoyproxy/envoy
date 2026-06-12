@@ -262,7 +262,6 @@ void OrcaOobManager::OobSession::connectAndStream() {
   ASSERT(codec_client_ == nullptr);
   resetState();
 
-  // Resolve the dial address: apply port override; skip (warn once) for non-IP (pipe/UDS) hosts.
   // Hosts in a priority set always have a resolved address.
   Network::Address::InstanceConstSharedPtr dial_address = host_->orcaReportingAddress();
   ASSERT(dial_address != nullptr);
@@ -277,9 +276,8 @@ void OrcaOobManager::OobSession::connectAndStream() {
     }
   }
 
-  // :scheme reflects the transport socket securing the OOB connection (which may
-  // differ from the cluster default via transport_socket_match_criteria), per the
-  // gRPC health checker's implementsSecureTransport() pattern.
+  // :scheme reflects the transport socket securing the OOB connection, which may
+  // differ from the cluster default via transport_socket_match_criteria.
   const auto* match_metadata = parent_.config_.transport_socket_match_metadata.get();
   const bool secure_transport =
       (match_metadata != nullptr

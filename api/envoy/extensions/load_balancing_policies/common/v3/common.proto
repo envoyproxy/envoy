@@ -174,7 +174,7 @@ message OrcaOobReportingConfig {
   uint32 port_value = 1 [(validate.rules).uint32 = {lte: 65535}];
 
   // Value of the ``:authority`` header on the OOB gRPC stream. If empty, the
-  // endpoint hostname is used, then the host address, then the cluster name.
+  // endpoint hostname is used, then the dialed address, then the cluster name.
   string authority = 2
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 

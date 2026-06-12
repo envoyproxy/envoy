@@ -489,9 +489,7 @@ protected:
       const Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
       HostDescriptionConstSharedPtr host,
       const Network::UpstreamTransportSocketFactory& socket_factory);
-  // Shared body of createOrcaReportingConnection. The happy-eyeballs address_list applies only
-  // when dialing the host's own address; a port-overridden dial must not fall back to
-  // original-port addresses.
+  // Shared body of createOrcaReportingConnection.
   CreateConnectionData
   createOrcaConnection(Event::Dispatcher& dispatcher,
                        Network::TransportSocketOptionsConstSharedPtr transport_socket_options,

@@ -131,7 +131,7 @@ private:
   std::unique_ptr<Extensions::LoadBalancingPolicies::Common::OrcaWeightManager>
       orca_weight_manager_;
 
-  // ORCA out-of-band manager. Constructed only when enable_oob_load_report; null
+  // ORCA out-of-band manager. Constructed only when enable_oob_load_report is true; null
   // otherwise. Shares the OrcaWeightManager's report handler so OOB reports feed the same
   // per-host atomics as in-band reports.
   std::unique_ptr<Extensions::LoadBalancingPolicies::Common::OrcaOobManager> orca_oob_manager_;
