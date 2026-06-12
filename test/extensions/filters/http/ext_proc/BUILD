@@ -1,11 +1,11 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_fuzz_test",
     "envoy_package",
     "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_fuzz_test",
     "envoy_extension_cc_test",
     "envoy_extension_cc_test_library",
 )
@@ -768,21 +768,23 @@ EXT_PROC_GRPC_FUZZ_TEST_DEPS = [
     "@envoy_api//envoy/type/v3:pkg_cc_proto",
 ]
 
-envoy_cc_fuzz_test(
+envoy_extension_cc_fuzz_test(
     name = "ext_proc_grpc_fuzz_test",
     srcs = ["ext_proc_grpc_fuzz.cc"],
     hdrs = ["ext_proc_grpc_fuzz.h"],
     corpus = "ext_proc_grpc_corpus",
+    extension_names = ["envoy.filters.http.ext_proc"],
     rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = EXT_PROC_GRPC_FUZZ_TEST_DEPS,
 )
 
-envoy_cc_fuzz_test(
+envoy_extension_cc_fuzz_test(
     name = "ext_proc_grpc_persistent_fuzz_test",
     srcs = ["ext_proc_grpc_fuzz_persistent.cc"],
     hdrs = ["ext_proc_grpc_fuzz.h"],
     corpus = "ext_proc_grpc_corpus",
+    extension_names = ["envoy.filters.http.ext_proc"],
     rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = EXT_PROC_GRPC_FUZZ_TEST_DEPS,
