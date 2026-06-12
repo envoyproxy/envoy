@@ -152,7 +152,7 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
   const Http::LowerCaseString& initiation_time_hdr =
       ::Envoy::Extensions::Bootstrap::ReverseConnection::reverseTunnelInitiationTimeHeader();
   auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::system_clock::now().time_since_epoch())
+                    connection_->dispatcher().timeSource().systemTime().time_since_epoch())
                     .count();
   headers->addCopy(initiation_time_hdr, absl::StrCat(now_ms));
 
