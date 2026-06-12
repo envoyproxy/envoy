@@ -222,6 +222,15 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
             scoped_node_id, connectionKey, fd);
 }
 
+bool UpstreamSocketManager::canAcceptConnection(absl::string_view node_id,
+                                                absl::string_view tenant_id) const {
+  const std::string scoped_node_id =
+      maybeBuildTenantScopedIdentifier(tenant_isolation_enabled_, tenant_id, node_id);
+  auto it = node_to_active_fd_count_.find(scoped_node_id);
+  const uint32_t count = it == node_to_active_fd_count_.end() ? 0 : it->second;
+  return count < max_connections_per_node_;
+}
+
 Network::ConnectionSocketPtr
 UpstreamSocketManager::getConnectionSocket(const std::string& node_id) {
 
