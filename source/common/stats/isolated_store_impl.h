@@ -340,20 +340,20 @@ public:
   // Stats::Scope
   SymbolTable& symbolTable() override { return store_.symbolTable(); }
   const SymbolTable& constSymbolTable() const override { return store_.symbolTable(); }
-  Counter& counterFromStatName(StatName name, absl::optional<StatNameTagSpan> name_tags,
+  Counter& counterFromStatName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
                                StatName tagged_name) override {
     const OptRef<const StatsMatcher> matcher = makeOptRefFromPtr(scope_matcher_.get());
-    const TagUtility::TagStatNameJoiner joiner(prefix_.statName(), {}, prefix_.statName(), name,
-                                               name_tags.value_or(StatNameTagSpan{}), tagged_name,
-                                               symbolTable());
+    const TagUtility::TagStatNameJoiner joiner(prefix_.statName(), {}, prefix_.statName(),
+                                               base_name, name_tags.value_or(StatNameTagSpan{}),
+                                               tagged_name, symbolTable());
     return store_.counters_.get(joiner, matcher).value_or(store_.null_counter_);
   }
-  Gauge& gaugeFromStatName(StatName name, absl::optional<StatNameTagSpan> name_tags,
+  Gauge& gaugeFromStatName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
                            StatName tagged_name, Gauge::ImportMode import_mode) override {
     const OptRef<const StatsMatcher> matcher = makeOptRefFromPtr(scope_matcher_.get());
-    const TagUtility::TagStatNameJoiner joiner(prefix_.statName(), {}, prefix_.statName(), name,
-                                               name_tags.value_or(StatNameTagSpan{}), tagged_name,
-                                               symbolTable());
+    const TagUtility::TagStatNameJoiner joiner(prefix_.statName(), {}, prefix_.statName(),
+                                               base_name, name_tags.value_or(StatNameTagSpan{}),
+                                               tagged_name, symbolTable());
     auto gauge = store_.gauges_.get(joiner, import_mode, matcher);
     if (!gauge.has_value()) {
       return store_.null_gauge_;
@@ -361,30 +361,32 @@ public:
     gauge->mergeImportMode(import_mode);
     return *gauge;
   }
-  Histogram& histogramFromStatName(StatName name, absl::optional<StatNameTagSpan> name_tags,
+  Histogram& histogramFromStatName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
                                    StatName tagged_name, Histogram::Unit unit) override {
     const OptRef<const StatsMatcher> matcher = makeOptRefFromPtr(scope_matcher_.get());
-    const TagUtility::TagStatNameJoiner joiner(prefix_.statName(), {}, prefix_.statName(), name,
-                                               name_tags.value_or(StatNameTagSpan{}), tagged_name,
-                                               symbolTable());
+    const TagUtility::TagStatNameJoiner joiner(prefix_.statName(), {}, prefix_.statName(),
+                                               base_name, name_tags.value_or(StatNameTagSpan{}),
+                                               tagged_name, symbolTable());
     return store_.histograms_.get(joiner, unit, matcher).value_or(store_.null_histogram_);
   }
-  TextReadout& textReadoutFromStatName(StatName name, absl::optional<StatNameTagSpan> name_tags,
+  TextReadout& textReadoutFromStatName(StatName base_name,
+                                       absl::optional<StatNameTagSpan> name_tags,
                                        StatName tagged_name) override {
     const OptRef<const StatsMatcher> matcher = makeOptRefFromPtr(scope_matcher_.get());
-    const TagUtility::TagStatNameJoiner joiner(prefix_.statName(), {}, prefix_.statName(), name,
-                                               name_tags.value_or(StatNameTagSpan{}), tagged_name,
-                                               symbolTable());
+    const TagUtility::TagStatNameJoiner joiner(prefix_.statName(), {}, prefix_.statName(),
+                                               base_name, name_tags.value_or(StatNameTagSpan{}),
+                                               tagged_name, symbolTable());
     return store_.text_readouts_.get(joiner, TextReadout::Type::Default, matcher)
         .value_or(store_.null_text_readout_);
   }
 
-  ScopeSharedPtr createScope(absl::string_view name, StringViewTagSpan name_tags,
+  ScopeSharedPtr createScope(absl::string_view base_name, TagStringViewSpan name_tags,
                              absl::string_view tagged_name, bool evictable,
                              const ScopeStatsLimitSettings& limits,
                              StatsMatcherSharedPtr matcher) override;
-  ScopeSharedPtr scopeFromStatName(StatName name, StatNameTagSpan name_tags, StatName tagged_name,
-                                   bool evictable, const ScopeStatsLimitSettings& limits,
+  ScopeSharedPtr scopeFromStatName(StatName base_name, StatNameTagSpan name_tags,
+                                   StatName tagged_name, bool evictable,
+                                   const ScopeStatsLimitSettings& limits,
                                    StatsMatcherSharedPtr matcher) override;
 
   CounterOptConstRef findCounter(StatName name) const override {

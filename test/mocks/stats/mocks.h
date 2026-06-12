@@ -304,17 +304,17 @@ public:
   using TestUtil::TestScope::histogramFromStatName;
   using TestUtil::TestScope::scopeFromStatName;
   using TestUtil::TestScope::textReadoutFromStatName;
-  ScopeSharedPtr createScope(absl::string_view name, StringViewTagSpan, absl::string_view,
+  ScopeSharedPtr createScope(absl::string_view base_name, TagStringViewSpan, absl::string_view,
                              bool evictable, const ScopeStatsLimitSettings& limits,
                              StatsMatcherSharedPtr) override {
     checkCreateScopeArgs(evictable, limits);
-    return ScopeSharedPtr(createScope_(std::string(name)));
+    return ScopeSharedPtr(createScope_(std::string(base_name)));
   }
-  ScopeSharedPtr scopeFromStatName(StatName name, StatNameTagSpan, StatName, bool evictable,
+  ScopeSharedPtr scopeFromStatName(StatName base_name, StatNameTagSpan, StatName, bool evictable,
                                    const ScopeStatsLimitSettings& limits,
                                    StatsMatcherSharedPtr) override {
     checkCreateScopeArgs(evictable, limits);
-    return createScope_(symbolTable().toString(name));
+    return createScope_(symbolTable().toString(base_name));
   }
 
   MOCK_METHOD(void, checkCreateScopeArgs, (bool, const ScopeStatsLimitSettings&));
@@ -331,13 +331,13 @@ public:
   MOCK_METHOD(Counter&, counterFromStatName, (StatName, absl::optional<StatNameTagSpan>, StatName),
               (override));
   // NOLINTNEXTLINE(readability-identifier-naming)
-  Counter& counterFromStatName_(StatName name, absl::optional<StatNameTagSpan>, StatName);
+  Counter& counterFromStatName_(StatName base_name, absl::optional<StatNameTagSpan>, StatName);
 
-  Gauge& gaugeFromStatName(StatName name, absl::optional<StatNameTagSpan>, StatName,
+  Gauge& gaugeFromStatName(StatName base_name, absl::optional<StatNameTagSpan>, StatName,
                            Gauge::ImportMode import_mode) override;
-  Histogram& histogramFromStatName(StatName name, absl::optional<StatNameTagSpan>, StatName,
+  Histogram& histogramFromStatName(StatName base_name, absl::optional<StatNameTagSpan>, StatName,
                                    Histogram::Unit unit) override;
-  TextReadout& textReadoutFromStatName(StatName name, absl::optional<StatNameTagSpan>,
+  TextReadout& textReadoutFromStatName(StatName base_name, absl::optional<StatNameTagSpan>,
                                        StatName) override;
 
   MockStore& mock_store_;

@@ -166,7 +166,7 @@ TEST_F(StatsIsolatedStoreImplTest, ScopeFromTagsWithoutExplicitTaggedName) {
   EXPECT_EQ(0, c.tags().size());
 
   // Same behavior via the string-view createScope path.
-  std::vector<StringViewTag> sv_tags{{"cluster_name", "bar"}};
+  std::vector<TagStringView> sv_tags{{"cluster_name", "bar"}};
   ScopeSharedPtr bar_scope = scope_->createScope("cluster", sv_tags, /*tagged_name=*/"");
   EXPECT_EQ("cluster.cluster_name.bar", symbol_table_.toString(bar_scope->prefix()));
   EXPECT_EQ("cluster.cluster_name.bar.upstream_rq",
@@ -637,8 +637,8 @@ TEST_F(StatsIsolatedStoreImplTest, LegacyScopeApiStillWorks) {
 
 // The string_view createScope path uses the joiner to derive the child's flat tagged_name but drops
 // the scope-level tags (none propagate to child stats).
-TEST_F(StatsIsolatedStoreImplTest, CreateScopeWithStringViewTagsDropsScopeTags) {
-  std::vector<StringViewTag> name_tags{{"cluster_name", "foo"}};
+TEST_F(StatsIsolatedStoreImplTest, CreateScopeWithTagStringViewsDropsScopeTags) {
+  std::vector<TagStringView> name_tags{{"cluster_name", "foo"}};
   ScopeSharedPtr cluster_scope = scope_->createScope("cluster", name_tags, "cluster.foo");
   EXPECT_EQ("cluster.foo", symbol_table_.toString(cluster_scope->prefix()));
 
@@ -648,8 +648,8 @@ TEST_F(StatsIsolatedStoreImplTest, CreateScopeWithStringViewTagsDropsScopeTags) 
   EXPECT_EQ(0, c.tags().size());
 }
 
-TEST_F(StatsIsolatedStoreImplTest, CreateScopeWithStringViewTagsDropsScopeTags2) {
-  std::vector<StringViewTag> name_tags{{"cluster_name", "foo"}};
+TEST_F(StatsIsolatedStoreImplTest, CreateScopeWithTagStringViewsDropsScopeTags2) {
+  std::vector<TagStringView> name_tags{{"cluster_name", "foo"}};
   ScopeSharedPtr cluster_scope = scope_->createScope("cluster", name_tags, /*tagged_name=*/"");
   EXPECT_EQ("cluster.cluster_name.foo", symbol_table_.toString(cluster_scope->prefix()));
 

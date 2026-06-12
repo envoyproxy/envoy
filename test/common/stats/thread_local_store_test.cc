@@ -2774,9 +2774,9 @@ TEST_F(ThreadLocalStoreTagScopeTest, LegacyScopeApiStillWorks) {
 }
 
 // The string_view createScope interns its name_tags and tagged_name and propagates the tag to child
-// stats, exercising the StringViewTagSpan path.
-TEST_F(ThreadLocalStoreTagScopeTest, CreateScopeWithStringViewTags) {
-  std::vector<StringViewTag> name_tags{{"cluster_name", "foo"}};
+// stats, exercising the TagStringViewSpan path.
+TEST_F(ThreadLocalStoreTagScopeTest, CreateScopeWithTagStringViews) {
+  std::vector<TagStringView> name_tags{{"cluster_name", "foo"}};
   ScopeSharedPtr cluster_scope = scope_.createScope("cluster", name_tags, "cluster.foo");
   EXPECT_EQ("cluster.foo", symbol_table_.toString(cluster_scope->prefix()));
 
@@ -2825,7 +2825,7 @@ TEST_F(StatsThreadLocalStoreTest, LegacyScopeBackwardCompatWithExplicitArgs) {
   EXPECT_EQ(0, c.tags().size());
 
   // createScope: explicit (non-empty) tagged_name overrides `name`; tags are dropped.
-  std::vector<StringViewTag> sv_tags{{"cluster_name", "foo"}};
+  std::vector<TagStringView> sv_tags{{"cluster_name", "foo"}};
   ScopeSharedPtr child = scope_.createScope("cluster", sv_tags, "svc.foo");
   Counter& c2 = child->counterFromString("rq");
   EXPECT_EQ("svc.foo.rq", c2.name());

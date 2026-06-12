@@ -98,11 +98,30 @@ public:
    * NOTE: If the scope specific matcher is set, then the sub scope will inherit the same matcher
    * unless another matcher is explicitly set.
    */
-  ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
+  ScopeSharedPtr createScope(absl::string_view name, bool evictable = false,
                              const ScopeStatsLimitSettings& limits = {},
                              StatsMatcherSharedPtr matcher = nullptr) {
     return createScope(name, {}, absl::string_view{}, evictable, limits, std::move(matcher));
   }
+
+  /**
+   * Allocate a new scope, optionally supplying tags and a pre-built tagged name (with tag values
+   * interleaved). NOTE: The behavior is implementation-defined for now because both legacy and
+   * tag-aware scopes are still supported.
+   *
+   * @param base_name supplies the scope's tag-extracted name.
+   * @param name_tags tags to associate with (and propagate from) the scope, as string_view pairs.
+   * @param tagged_name tagged_name optional explicit flat name with tag values included in the
+   * specified order. If tagged_name is empty, the scope implementation may derive the tagged name
+   * by joining the base_name and name_tags.
+   * @param evictable whether unused metrics can be deleted from the scope caches.
+   * @param limits metric limits for counters, gauges and histograms allowed in this scope.
+   * @param matcher optional per-scope stats matcher; replaces the store-level matcher when set.
+   */
+  virtual ScopeSharedPtr createScope(absl::string_view base_name, TagStringViewSpan name_tags,
+                                     absl::string_view tagged_name, bool evictable = false,
+                                     const ScopeStatsLimitSettings& limits = {},
+                                     StatsMatcherSharedPtr matcher = nullptr) PURE;
 
   /**
    * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes
@@ -124,103 +143,83 @@ public:
   }
 
   /**
-   * Allocate a new scope, optionally supplying tags and a pre-built tagged name (with tag values
-   * interleaved). NOTE: The behavior is implementation-defined for now because both legacy and
-   * tag-aware scopes are still supported.
-   *
-   * @param name supplies the scope's tag-extracted namespace prefix (no tag values).
-   * @param name_tags tags to associate with (and propagate from) the scope, as string_view pairs.
-   * @param tagged_name optional explicit flat namespace prefix with tag values interleaved.
-   * NOTE:
-   * - If `name_tags` are empty, the `tagged_name` will be ignored and `name` will be used as both
-   *   the tag-extracted and the flat namespace prefix.
-   * - If `name_tags` are non-empty and `tagged_name` is empty, the flat tagged name will be derived
-   *   by joining `name` and `name_tags`.
-   * - If `name_tags` are non-empty and `tagged_name` is non-empty, the `tagged_name` will be used
-   *   as provided, and is expected to already have the tag values joined in the correct places.
-   *   The caller is responsible for ensuring the `tagged_name` matches the `name` and `name_tags`.
-   *
-   * @param evictable whether unused metrics can be deleted from the scope caches.
-   * @param limits metric limits for counters, gauges and histograms allowed in this scope.
-   * @param matcher optional per-scope stats matcher; replaces the store-level matcher when set.
-   */
-  virtual ScopeSharedPtr createScope(absl::string_view name, StringViewTagSpan name_tags,
-                                     absl::string_view tagged_name, bool evictable = false,
-                                     const ScopeStatsLimitSettings& limits = {},
-                                     StatsMatcherSharedPtr matcher = nullptr) PURE;
-
-  /**
    * Allocate a new scope from a StatName, optionally supplying tags and a pre-built tagged name
    * (with tag values interleaved). See the `createScope` variant for details and notes.
    *
-   * @param name supplies the scope's tag-extracted namespace prefix (no tag values).
+   * @param base_name supplies the scope's tag-extracted name.
    * @param name_tags tags to associate with (and propagate from) the scope.
-   * @param tagged_name optional explicit flat namespace prefix with tag values interleaved.
+   * @param tagged_name tagged_name optional explicit flat name with tag values included in the
+   * specified order. If tagged_name is empty, the scope implementation may derive the tagged name
+   * by joining the base_name and name_tags.
    * @param evictable whether unused metrics can be deleted from the scope caches.
    * @param limits metric limits for counters, gauges and histograms allowed in this scope.
    * @param matcher optional per-scope stats matcher; replaces the store-level matcher when set.
    */
-  virtual ScopeSharedPtr scopeFromStatName(StatName name, StatNameTagSpan name_tags,
+  virtual ScopeSharedPtr scopeFromStatName(StatName base_name, StatNameTagSpan name_tags,
                                            StatName tagged_name, bool evictable = false,
                                            const ScopeStatsLimitSettings& limits = {},
                                            StatsMatcherSharedPtr matcher = nullptr) PURE;
 
   /**
    * Creates a Counter from the tag-extracted name, tags and an optional pre-built tagged name.
-   * @param name The tag-extracted name of the stat (no tag values), obtained from the SymbolTable.
+   * @param base_name The tag-extracted name of the stat, obtained from the SymbolTable.
    * @param name_tags optionally specified tags.
-   * @param tagged_name optional pre-built flat name (with tag values interleaved) relative to the
-   * scope.
-   * NOTE:
-   * - If `name_tags` are empty, the `tagged_name` will be ignored and `name` will be used as both
-   *   the tag-extracted name and the flat name.
-   * - If `name_tags` are non-empty and `tagged_name` is empty, the flat name will be derived by
-   *   joining `name` and `name_tags`.
-   * - If `name_tags` are non-empty and `tagged_name` is non-empty, the `tagged_name` will be used
-   *   as provided, and is expected to already have the tag values joined in the correct places.
-   *   The caller is responsible for ensuring the `tagged_name` matches the `name` and `name_tags`.
+   * @param tagged_name tagged_name optional explicit flat name with tag values included in the
+   * specified order. If tagged_name is empty, the scope implementation may derive the tagged name
+   * by joining the base_name and name_tags.
    *
    * @return a counter within the scope's namespace.
    */
-  virtual Counter& counterFromStatName(StatName name, absl::optional<StatNameTagSpan> name_tags,
+  virtual Counter& counterFromStatName(StatName base_name,
+                                       absl::optional<StatNameTagSpan> name_tags,
                                        StatName tagged_name) PURE;
 
   /**
    * Creates a Gauge from the tag-extracted name, tags and an optional pre-built tagged name.
    * See the `counterFromStatName` variant for details and notes on name_tags and tagged_name.
    *
-   * @param name The tag-extracted name of the stat (no tag values), obtained from the SymbolTable.
+   * @param base_name The tag-extracted name of the stat (no tag values), obtained from the
+   * SymbolTable.
    * @param name_tags optionally specified tags.
-   * @param tagged_name optional pre-built flat name (with tag values interleaved).
+   * @param tagged_name tagged_name optional explicit flat name with tag values included in the
+   * specified order. If tagged_name is empty, the scope implementation may derive the tagged name
+   * by joining the base_name and name_tags.
    * @param import_mode Whether hot-restart should accumulate this value.
    * @return a gauge within the scope's namespace.
    */
-  virtual Gauge& gaugeFromStatName(StatName name, absl::optional<StatNameTagSpan> name_tags,
+  virtual Gauge& gaugeFromStatName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
                                    StatName tagged_name, Gauge::ImportMode import_mode) PURE;
 
   /**
    * Creates a Histogram from the tag-extracted name, tags and an optional pre-built tagged name.
    * See the `counterFromStatName` variant for details and notes on name_tags and tagged_name.
    *
-   * @param name The tag-extracted name of the stat (no tag values), obtained from the SymbolTable.
+   * @param base_name The tag-extracted name of the stat (no tag values), obtained from the
+   * SymbolTable.
    * @param name_tags optionally specified tags.
-   * @param tagged_name optional pre-built flat name (with tag values interleaved).
+   * @param tagged_name tagged_name optional explicit flat name with tag values included in the
+   * specified order. If tagged_name is empty, the scope implementation may derive the tagged name
+   * by joining the base_name and name_tags.
    * @param unit The unit of measurement.
    * @return a histogram within the scope's namespace with a particular value type.
    */
-  virtual Histogram& histogramFromStatName(StatName name, absl::optional<StatNameTagSpan> name_tags,
+  virtual Histogram& histogramFromStatName(StatName base_name,
+                                           absl::optional<StatNameTagSpan> name_tags,
                                            StatName tagged_name, Histogram::Unit unit) PURE;
 
   /**
    * Creates a TextReadout from the tag-extracted name, tags and an optional pre-built tagged name.
    * See the `counterFromStatName` variant for details and notes on name_tags and tagged_name.
    *
-   * @param name The tag-extracted name of the stat (no tag values), obtained from the SymbolTable.
+   * @param base_name The tag-extracted name of the stat (no tag values), obtained from the
+   * SymbolTable.
    * @param name_tags optionally specified tags.
-   * @param tagged_name optional pre-built flat name (with tag values interleaved).
+   * @param tagged_name tagged_name optional explicit flat name with tag values included in the
+   * specified order. If tagged_name is empty, the scope implementation may derive the tagged name
+   * by joining the base_name and name_tags.
    * @return a text readout within the scope's namespace.
    */
-  virtual TextReadout& textReadoutFromStatName(StatName name,
+  virtual TextReadout& textReadoutFromStatName(StatName base_name,
                                                absl::optional<StatNameTagSpan> name_tags,
                                                StatName tagged_name) PURE;
 

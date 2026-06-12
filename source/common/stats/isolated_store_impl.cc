@@ -61,14 +61,15 @@ ConstScopeSharedPtr IsolatedStoreImpl::constRootScope() const {
 
 IsolatedStoreImpl::~IsolatedStoreImpl() = default;
 
-ScopeSharedPtr IsolatedScopeImpl::createScope(absl::string_view name, StringViewTagSpan name_tags,
+ScopeSharedPtr IsolatedScopeImpl::createScope(absl::string_view base_name,
+                                              TagStringViewSpan name_tags,
                                               absl::string_view tagged_name, bool evictable,
                                               const ScopeStatsLimitSettings& limits,
                                               StatsMatcherSharedPtr matcher) {
   // Intern the string-based tag-extracted name, name_tags and (optional) tagged name into a
   // temporary pool, then delegate to the StatName-based variant.
   StatNamePool tag_pool(symbolTable());
-  StatName stat_name = tag_pool.add(Utility::sanitizeStatsName(name));
+  StatName stat_name = tag_pool.add(Utility::sanitizeStatsName(base_name));
   StatName stat_tagged_name;
   if (!name_tags.empty()) {
     // The tagged name is only meaningful when there are tags to interleave; otherwise it is
@@ -86,13 +87,13 @@ ScopeSharedPtr IsolatedScopeImpl::createScope(absl::string_view name, StringView
                            std::move(matcher));
 }
 
-ScopeSharedPtr IsolatedScopeImpl::scopeFromStatName(StatName name, StatNameTagSpan name_tags,
+ScopeSharedPtr IsolatedScopeImpl::scopeFromStatName(StatName base_name, StatNameTagSpan name_tags,
                                                     StatName tagged_name, bool,
                                                     const ScopeStatsLimitSettings&,
                                                     StatsMatcherSharedPtr matcher) {
   // Combine this scope's tag-extracted/tagged prefix with the new scope element to derive the
   // child's flat prefix.
-  const TagUtility::TagStatNameJoiner joiner(prefix_.statName(), {}, prefix_.statName(), name,
+  const TagUtility::TagStatNameJoiner joiner(prefix_.statName(), {}, prefix_.statName(), base_name,
                                              name_tags, tagged_name, symbolTable());
 
   // Use explicit matcher if provided; otherwise inherit scope_matcher_.

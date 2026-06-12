@@ -142,17 +142,17 @@ public:
   Counter& counterFromString(const std::string& name) override;
   Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override;
   Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override;
-  Counter& counterFromStatName(StatName name, absl::optional<StatNameTagSpan> name_tags,
+  Counter& counterFromStatName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
                                StatName tagged_name) override;
-  Gauge& gaugeFromStatName(StatName name, absl::optional<StatNameTagSpan> name_tags,
+  Gauge& gaugeFromStatName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
                            StatName tagged_name, Gauge::ImportMode import_mode) override;
-  Histogram& histogramFromStatName(StatName name, absl::optional<StatNameTagSpan> name_tags,
+  Histogram& histogramFromStatName(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
                                    StatName tagged_name, Histogram::Unit unit) override;
   TestStore& store() override { return store_; }
   const TestStore& constStore() const override { return store_; }
 
 private:
-  std::string statNameWithTags(StatName name, absl::optional<StatNameTagSpan> name_tags,
+  std::string statNameWithTags(StatName base_name, absl::optional<StatNameTagSpan> name_tags,
                                StatName tagged_name);
   static std::string addDot(const std::string& prefix) {
     if (prefix.empty() || prefix[prefix.size() - 1] == '.') {
@@ -161,7 +161,7 @@ private:
     return prefix + ".";
   }
 
-  void verifyConsistency(StatName ref_stat_name, StatName name,
+  void verifyConsistency(StatName ref_stat_name, StatName base_name,
                          absl::optional<StatNameTagSpan> name_tags, StatName tagged_name);
 
   TestStore& store_;
