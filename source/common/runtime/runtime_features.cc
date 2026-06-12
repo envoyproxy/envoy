@@ -112,7 +112,6 @@ RUNTIME_GUARD(envoy_reloadable_features_ssl_socket_report_connection_reset);
 RUNTIME_GUARD(envoy_reloadable_features_strict_stats_matcher_unpacked);
 RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_odcds_over_ads_fix);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
-RUNTIME_GUARD(envoy_reloadable_features_tls_certificate_compression_brotli);
 RUNTIME_GUARD(envoy_reloadable_features_trace_refresh_after_route_refresh);
 RUNTIME_GUARD(envoy_reloadable_features_udp_set_do_not_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_uhv_allow_malformed_url_encoding);
@@ -245,6 +244,11 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_delay_route_selection);
 
 // Enable histograms of HTTP/2 header sizes, including cookie size.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_record_histograms);
+
+// TODO: Flip back to true once TLS certificate compression with brotli (RFC 8879) has been
+// validated in production. When disabled, QUIC retains zlib-only compression while TCP TLS has
+// no certificate compression.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_tls_certificate_compression_brotli);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
