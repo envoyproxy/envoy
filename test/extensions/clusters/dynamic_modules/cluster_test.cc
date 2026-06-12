@@ -152,6 +152,30 @@ TEST_F(DynamicModuleClusterTest, BasicCreation) {
   EXPECT_NE(nullptr, result->second);
 }
 
+// Test that creating a cluster by loading the module via ``module.local.filename`` succeeds.
+TEST_F(DynamicModuleClusterTest, BasicCreationWithLocalFile) {
+  const std::string yaml =
+      fmt::format(R"EOF(
+name: test_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cluster_type:
+  name: envoy.clusters.dynamic_modules
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_modules.v3.ClusterConfig
+    dynamic_module_config:
+      module:
+        local:
+          filename: {}
+    cluster_name: test
+)EOF",
+                  Extensions::DynamicModules::testSharedObjectPath("cluster_no_op", "c"));
+  auto result = createCluster(yaml);
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  EXPECT_NE(nullptr, result->first);
+  EXPECT_NE(nullptr, result->second);
+}
+
 // Test that creating a cluster with cluster_config succeeds.
 TEST_F(DynamicModuleClusterTest, CreationWithClusterConfig) {
   auto result =
@@ -1295,6 +1319,18 @@ TEST_F(DynamicModuleClusterTest, WorkerSlotGetReturnsNullptrWhenSlotAllocatedBut
   envoy_dynamic_module_callback_cluster_run_on_all_workers(cluster.get(), /*event_id=*/1);
 
   EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_worker_slot_get(cluster.get()));
+}
+
+// Test cluster_get_name returns the cluster's CDS name from the cluster-side context.
+TEST_F(DynamicModuleClusterTest, ClusterGetNameReturnsCdsName) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  envoy_dynamic_module_type_envoy_buffer buffer{nullptr, 0};
+  envoy_dynamic_module_callback_cluster_get_name(cluster.get(), &buffer);
+  EXPECT_EQ("test_cluster", absl::string_view(buffer.ptr, buffer.length));
 }
 
 // Test the DynamicModuleClusterHandle destructor dispatches to main thread.

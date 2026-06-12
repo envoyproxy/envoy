@@ -16,12 +16,12 @@ DynamicModuleNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const FilterConfig& proto_config, FactoryContext& context) {
 
   const auto& module_config = proto_config.dynamic_module_config();
-  auto dynamic_module = Extensions::DynamicModules::newDynamicModuleByName(
-      module_config.name(), module_config.do_not_close(), module_config.load_globally());
-  if (!dynamic_module.ok()) {
-    return absl::InvalidArgumentError("Failed to load dynamic module: " +
-                                      std::string(dynamic_module.status().message()));
-  }
+  // Network filters do not support remote module sources, so no init manager or async callback is
+  // passed; only the synchronous local-file and by-name paths can succeed here.
+  auto load_result = Extensions::DynamicModules::newDynamicModuleByConfig(
+      module_config, proto_config.filter_name(), context.serverFactoryContext());
+  RETURN_IF_NOT_OK_REF(load_result.status());
+  auto dynamic_module = std::move(load_result->loaded);
 
   std::string config;
   if (proto_config.has_filter_config()) {
@@ -40,8 +40,8 @@ DynamicModuleNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
       Envoy::Extensions::DynamicModules::NetworkFilters::DynamicModuleNetworkFilterConfigSharedPtr>
       filter_config =
           Envoy::Extensions::DynamicModules::NetworkFilters::newDynamicModuleNetworkFilterConfig(
-              proto_config.filter_name(), config, metrics_namespace,
-              std::move(dynamic_module.value()), context.serverFactoryContext().clusterManager(),
+              proto_config.filter_name(), config, metrics_namespace, std::move(dynamic_module),
+              context.serverFactoryContext().clusterManager(),
               context.serverFactoryContext().scope(),
               context.serverFactoryContext().mainThreadDispatcher());
 

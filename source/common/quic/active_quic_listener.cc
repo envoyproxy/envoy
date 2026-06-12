@@ -272,6 +272,17 @@ void ActiveQuicListener::onFilterChainDraining(
   }
 }
 
+void ActiveQuicListener::onFilterChainDrainStart(
+    const std::list<const Network::FilterChain*>& /*draining_filter_chains*/) {
+  // TODO: notify QUIC connections in the given filter chains that draining has begun
+  // (e.g. via HTTP/3 GOAWAY) without closing them.
+}
+
+void ActiveQuicListener::onListenerDrainStart() {
+  // TODO: notify all QUIC connections on this listener that draining has begun without
+  // closing them.
+}
+
 void ActiveQuicListener::closeConnectionsWithFilterChain(const Network::FilterChain* filter_chain) {
   quic_dispatcher_->closeConnectionsWithFilterChain(filter_chain);
 }

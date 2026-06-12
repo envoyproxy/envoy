@@ -1,5 +1,7 @@
 #include "source/extensions/stat_sinks/dynamic_modules/sink.h"
 
+#include <vector>
+
 #include "source/common/common/assert.h"
 #include "source/extensions/stat_sinks/dynamic_modules/flush_context.h"
 
@@ -22,8 +24,16 @@ void DynamicModuleStatsSink::onHistogramComplete(const Stats::Histogram& histogr
   // The config members are written once during config creation on the main thread
   // before any worker thread starts, so reading them here needs no synchronization.
   ASSERT(config_->on_histogram_complete_ != nullptr);
-  const std::string name = histogram.name();
-  envoy_dynamic_module_type_envoy_buffer name_buf = {.ptr = name.data(), .length = name.size()};
+  thread_local std::vector<char> histogram_name_buffer;
+  const size_t required_size =
+      histogram.constSymbolTable().serializeToBuffer(histogram.statName(), nullptr, 0);
+  if (histogram_name_buffer.size() < required_size) {
+    histogram_name_buffer.resize(required_size);
+  }
+  histogram.constSymbolTable().serializeToBuffer(histogram.statName(), histogram_name_buffer.data(),
+                                                 histogram_name_buffer.size());
+  envoy_dynamic_module_type_envoy_buffer name_buf = {.ptr = histogram_name_buffer.data(),
+                                                     .length = required_size};
   config_->on_histogram_complete_(config_->in_module_config_, name_buf, value);
 }
 

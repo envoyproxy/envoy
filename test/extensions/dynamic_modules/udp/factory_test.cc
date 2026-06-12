@@ -53,6 +53,27 @@ filter_config:
   callback(filter_manager, read_callbacks);
 }
 
+// Load the module via the ``module.local.filename`` data source instead of by name.
+TEST_F(DynamicModuleUdpListenerFilterFactoryTest, ValidConfigWithLocalFile) {
+  NiceMock<Server::Configuration::MockListenerFactoryContext> context;
+  envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter proto_config;
+  proto_config.mutable_dynamic_module_config()->mutable_module()->mutable_local()->set_filename(
+      Extensions::DynamicModules::testSharedObjectPath("udp_no_op", "c"));
+  proto_config.mutable_dynamic_module_config()->set_do_not_close(true);
+  proto_config.set_filter_name("test_filter");
+
+  auto callback = factory_.createFilterFactoryFromProto(proto_config, context);
+
+  NiceMock<Network::MockUdpListenerFilterManager> filter_manager;
+  NiceMock<Network::MockUdpReadFilterCallbacks> read_callbacks;
+  NiceMock<Event::MockDispatcher> worker_thread_dispatcher{"worker_0"};
+  ON_CALL(read_callbacks.udp_listener_, dispatcher())
+      .WillByDefault(testing::ReturnRef(worker_thread_dispatcher));
+
+  EXPECT_CALL(filter_manager, addReadFilter_(testing::_));
+  callback(filter_manager, read_callbacks);
+}
+
 TEST_F(DynamicModuleUdpListenerFilterFactoryTest, EmptyProto) {
   auto proto = factory_.createEmptyConfigProto();
   EXPECT_NE(nullptr, proto);

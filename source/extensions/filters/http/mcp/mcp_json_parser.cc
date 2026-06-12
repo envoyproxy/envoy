@@ -274,6 +274,21 @@ McpFieldExtractor* McpFieldExtractor::StartObject(absl::string_view name) {
     if (depth_ == 2 && name == "params") {
       params_depth_ = depth_;
     }
+
+    // Detect "result" or "error" objects at top level (JSON-RPC responses).
+    if (depth_ == 2) {
+      if (name == "result") {
+        has_result_ = true;
+        if (has_jsonrpc_) {
+          is_valid_mcp_ = true;
+        }
+      } else if (name == "error") {
+        has_error_ = true;
+        if (has_jsonrpc_) {
+          is_valid_mcp_ = true;
+        }
+      }
+    }
   }
 
   // Push a new key set for tracking duplicate keys within this object scope
@@ -392,11 +407,16 @@ McpFieldExtractor* McpFieldExtractor::RenderString(absl::string_view name,
   std::string full_path = buildFullPath(name);
   ENVOY_LOG_MISC(debug, "render string name {} path {}, value {}", name, full_path, value);
 
-  // Check top-level fields for method detection
+  // Check top-level fields for method/response detection
   if (depth_ == 1) {
     if (name == JSONRPC_FIELD && value == JSONRPC_VERSION) {
       has_jsonrpc_ = true;
-      if (has_method_) {
+      if (has_method_ || has_result_ || has_error_) {
+        is_valid_mcp_ = true;
+      }
+    } else if (name == RESULT_FIELD) {
+      has_result_ = true;
+      if (has_jsonrpc_) {
         is_valid_mcp_ = true;
       }
     } else if (name == METHOD_FIELD) {
@@ -563,9 +583,18 @@ bool McpFieldExtractor::requiredFieldsCollected() const {
     if (is_notification_ && field == "id") {
       continue;
     }
+    // Responses don't have a "method" field.
+    if (!has_method_ && (has_result_ || has_error_) && field == "method") {
+      continue;
+    }
     if (collected_fields_.count(field) == 0) {
       return false;
     }
+  }
+
+  // Responses have no method-specific required fields.
+  if (!has_method_ && (has_result_ || has_error_)) {
+    return true;
   }
 
   for (const auto& field : required_fields_) {
@@ -578,9 +607,17 @@ bool McpFieldExtractor::requiredFieldsCollected() const {
 }
 
 void McpFieldExtractor::finalizeExtraction() {
-  if (!has_jsonrpc_ || !has_method_) {
+  if (!has_jsonrpc_ || (!has_method_ && !has_result_ && !has_error_)) {
     ENVOY_LOG(debug, "not a valid MCP message");
     is_valid_mcp_ = false;
+    return;
+  }
+
+  if (!has_method_) {
+    // JSON-RPC response: copy only always-extract fields (jsonrpc, id).
+    for (const auto& field : config_.getAlwaysExtract()) {
+      copyFieldByPath(field);
+    }
     return;
   }
 
@@ -600,8 +637,11 @@ bool McpFieldExtractor::hasOptionalFields() {
 }
 
 bool McpFieldExtractor::hasAllRequiredFields() {
-  if (!has_jsonrpc_ || !has_method_) {
+  if (!has_jsonrpc_ || (!has_method_ && !has_result_ && !has_error_)) {
     return false;
+  }
+  if (!has_method_ && (has_result_ || has_error_)) {
+    return requiredFieldsCollected();
   }
   updateFieldRequirements();
   return requiredFieldsCollected();
@@ -719,6 +759,8 @@ absl::Status McpJsonParser::finishParse() {
 }
 
 bool McpJsonParser::isValidMcpRequest() const { return extractor_ && extractor_->isValidMcp(); }
+
+bool McpJsonParser::isResponse() const { return extractor_ && extractor_->isResponse(); }
 
 bool McpJsonParser::hasOptionalFields() { return extractor_ && extractor_->hasOptionalFields(); }
 

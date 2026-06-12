@@ -43,11 +43,11 @@ protected:
   void assertStreamInfoSize(StreamInfoImpl stream_info) {
     ASSERT_TRUE(
         // with --config=docker-msan
-        sizeof(stream_info) == 736 ||
+        sizeof(stream_info) == 752 ||
         // with --config=docker-clang
-        sizeof(stream_info) == 760 ||
+        sizeof(stream_info) == 776 ||
         // with --config=docker-clang-libc++
-        sizeof(stream_info) == 712)
+        sizeof(stream_info) == 728)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
@@ -121,6 +121,17 @@ TEST_F(StreamInfoImplTest, TimingTest) {
   EXPECT_FALSE(info.requestComplete());
   info.onRequestComplete();
   dur = checkDuration(dur, info.requestComplete());
+}
+
+// downstreamConnectionBegin is empty until set.
+TEST(DownstreamTimingTest, ConnectionBeginSet) {
+  DownstreamTiming timing;
+  EXPECT_FALSE(timing.downstreamConnectionBegin().has_value());
+
+  const MonotonicTime begin(std::chrono::milliseconds(5));
+  timing.setDownstreamConnectionBegin(begin);
+  ASSERT_TRUE(timing.downstreamConnectionBegin().has_value());
+  EXPECT_EQ(begin, timing.downstreamConnectionBegin().value());
 }
 
 // onDownstreamConnectionEnd records only the first close so the duration is not inflated.

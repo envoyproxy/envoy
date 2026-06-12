@@ -1107,6 +1107,29 @@ TEST_F(RtdsLoaderImplTest, OnConfigUpdateSuccess) {
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
+TEST_F(RtdsLoaderImplTest, RuntimeFeatureRemovalRestoresRuntimeGuardDefault) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.test_feature_false", true);
+  setup();
+
+  auto runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_resource
+    layer:
+      envoy.reloadable_features.test_feature_false: false
+  )EOF");
+  EXPECT_CALL(rtds_init_callback_, Call());
+  doOnConfigUpdateVerifyNoThrow(runtime);
+
+  EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
+
+  runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_resource
+    layer: {}
+  )EOF");
+  doOnConfigUpdateVerifyNoThrow(runtime);
+
+  EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
+}
+
 // Delta style successful update.
 TEST_F(RtdsLoaderImplTest, DeltaOnConfigUpdateSuccess) {
   setup();

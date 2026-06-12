@@ -42,6 +42,31 @@ backend session map. Each backend is then initialized on-demand when a request f
 
 This is useful when some backends are slow or unreliable and should not block client initialization.
 
+.. _config_http_filters_mcp_router_server_requests:
+
+Server-to-client requests
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The MCP protocol allows backend servers to send requests to clients mid-stream. This includes
+``elicitation/create`` (requesting additional input from the user), ``sampling/createMessage``
+(requesting LLM completions), and ``roots/list`` (querying available roots).
+
+The MCP router handles these transparently:
+
+1. When a backend sends a server-to-client request via SSE, the gateway forwards it to the client.
+   In multiplexing mode (multiple backends), the JSON-RPC ``id`` field is rewritten to include the
+   backend name as a prefix (e.g., ``42`` becomes ``"time__42"``), enabling correct routing of the
+   client's response.
+
+2. When the client sends a JSON-RPC response back, the gateway parses the prefixed ``id`` to
+   determine which backend should receive the response, restores the original ``id`` value, and
+   forwards the response to that backend.
+
+In single-backend mode, no ``id`` rewriting is performed since there is only one possible target.
+
+No configuration is required. The gateway advertises ``elicitation`` capability to clients
+automatically and handles the request/response routing based on the client's declared capabilities.
+
 .. _config_http_filters_mcp_router_statistics:
 
 Statistics

@@ -3,6 +3,9 @@
 
 #include "test/server/admin/admin_instance.h"
 
+#include "absl/strings/str_cat.h"
+#include "spdlog/common.h"
+
 using testing::HasSubstr;
 using testing::IsNull;
 
@@ -55,7 +58,7 @@ TEST_P(AdminInstanceTest, LogLevelSetting) {
   // Test multiple log levels at once
   const std::string file = "xxxx_test_logger_file_xxxx";
   std::atomic<spdlog::logger*> logger;
-  getFineGrainLogContext().initFineGrainLogger(file, logger);
+  getFineGrainLogContext().initFineGrainLogger(file, "", logger);
   query = fmt::format("/logging?paths={}:trace,{}:trace", __FILE__, file);
   EXPECT_EQ(Http::Code::OK, postCallback(query, header_map, response));
   FINE_GRAIN_LOG(trace, "After post 4: level for this file is trace now!");
@@ -69,6 +72,59 @@ TEST_P(AdminInstanceTest, LogLevelSetting) {
   EXPECT_EQ(Http::Code::OK, postCallback(query + "&level=", header_map, response));
   // Likewise it's OK to set the level even if there's a blank path.
   EXPECT_EQ(Http::Code::OK, postCallback("/logging?level=warning&paths=", header_map, response));
+
+  ENVOY_LOG_MISC(info, "create misc logger");
+  std::string misc_key = absl::StrCat(__FILE__, ":misc");
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(misc_key)->level(), spdlog::level::warn);
+  EXPECT_EQ(Http::Code::OK, postCallback("/logging?group=misc:trace", header_map, response));
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(misc_key)->level(), spdlog::level::trace);
+
+  // Test group matching with specific file:group keys.
+  const std::string key1 = "source/common/http/http.cc:misc";
+  const std::string key2 = "source/common/router/foo.cc:http";
+  std::atomic<spdlog::logger*> logger1;
+  getFineGrainLogContext().initFineGrainLogger("source/common/http/http.cc", "misc", logger1);
+  std::atomic<spdlog::logger*> logger2;
+  getFineGrainLogContext().initFineGrainLogger("source/common/router/foo.cc", "http", logger2);
+
+  // Set all to info first.
+  getFineGrainLogContext().updateVerbosityDefaultLevel(spdlog::level::info);
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(key1)->level(), spdlog::level::info);
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(key2)->level(), spdlog::level::info);
+
+  // Now set group "http" to trace.
+  EXPECT_EQ(Http::Code::OK, postCallback("/logging?group=http:trace", header_map, response));
+
+  // key1 (misc group) does NOT match "http" group name, even though its basename is "http".
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(key1)->level(), spdlog::level::info);
+  // key2 matches "http" because its group name is "http".
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(key2)->level(), spdlog::level::trace);
+
+  EXPECT_EQ(Http::Code::BadRequest, postCallback("/logging?group=misc:blah", header_map, response));
+  EXPECT_THAT(response.toString(), HasSubstr("error: unknown logger level\n"));
+
+  EXPECT_EQ(Http::Code::BadRequest, postCallback("/logging?group=:trace", header_map, response));
+  EXPECT_THAT(response.toString(),
+              HasSubstr("error: empty logger name or empty logger level in group\n"));
+
+  EXPECT_EQ(Http::Code::BadRequest, postCallback("/logging?group=misc:", header_map, response));
+  EXPECT_THAT(response.toString(),
+              HasSubstr("error: empty logger name or empty logger level in group\n"));
+
+  // unknown-logger-id is now OK because it's treated as a potential dynamic group name.
+  EXPECT_EQ(Http::Code::OK,
+            postCallback("/logging?group=unknown-logger-id:trace", header_map, response));
+}
+
+TEST_P(AdminInstanceTest, LogLevelGroupWithoutFineGrain) {
+  Http::TestResponseHeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+
+  Logger::Context::disableFineGrainLogger();
+  EXPECT_EQ(Http::Code::BadRequest,
+            postCallback("/logging?group=misc:trace", header_map, response));
+  EXPECT_THAT(response.toString(),
+              HasSubstr("error: group parameter requires fine-grain logging to be enabled\n"));
 }
 
 TEST_P(AdminInstanceTest, LogLevelDisplay) {
@@ -76,11 +132,13 @@ TEST_P(AdminInstanceTest, LogLevelDisplay) {
   Buffer::OwnedImpl response;
 
   Logger::Context::enableFineGrainLogger();
+  getFineGrainLogContext().setAllFineGrainLoggers(spdlog::level::warn);
   FINE_GRAIN_LOG(info, "Build the logger for this file.");
   EXPECT_EQ(Http::Code::OK, postCallback("/logging?level=warning", header_map, response));
   postCallback("/logging", header_map, response);
   FINE_GRAIN_LOG(error, response.toString());
   EXPECT_THAT(response.toString(), HasSubstr("  " __FILE__ ": warning"));
+  Logger::Context::disableFineGrainLogger();
 }
 
 TEST_P(AdminInstanceTest, LogLevelFineGrainGlobSupport) {
@@ -106,8 +164,8 @@ TEST_P(AdminInstanceTest, LogLevelFineGrainGlobSupport) {
   const std::string file_two = "admin/logs_handler_test_two.cc";
   std::atomic<spdlog::logger*> logger_one;
   std::atomic<spdlog::logger*> logger_two;
-  getFineGrainLogContext().initFineGrainLogger(file_one, logger_one);
-  getFineGrainLogContext().initFineGrainLogger(file_two, logger_two);
+  getFineGrainLogContext().initFineGrainLogger(file_one, "", logger_one);
+  getFineGrainLogContext().initFineGrainLogger(file_two, "", logger_two);
   query = fmt::format("/logging?{}=critical", "logs_handle*");
   EXPECT_EQ(Http::Code::OK, postCallback(query, header_map, response));
   FINE_GRAIN_LOG(critical, "After post {}, level for this file is critical now!", query);
@@ -165,6 +223,7 @@ TEST_P(AdminInstanceTest, LogLevelFineGrainGlobSupport) {
             spdlog::level::critical);
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_one)->level(), spdlog::level::trace);
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_two)->level(), spdlog::level::trace);
+  Logger::Context::disableFineGrainLogger();
 }
 
 } // namespace Server

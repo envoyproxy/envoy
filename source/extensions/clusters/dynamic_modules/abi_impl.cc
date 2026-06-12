@@ -963,6 +963,14 @@ envoy_dynamic_module_callback_cluster_worker_slot_get(
   return getCluster(cluster_envoy_ptr)->workerSlotGet();
 }
 
+void envoy_dynamic_module_callback_cluster_get_name(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  const auto& name = getCluster(cluster_envoy_ptr)->clusterName();
+  result->ptr = name.data();
+  result->length = name.size();
+}
+
 // =============================================================================
 // Metrics Callbacks
 // =============================================================================

@@ -95,7 +95,7 @@ public:
     return std::make_unique<CompositeClusterLoadBalancer>(
         cluster_.info(), cluster_.cluster_manager_, cluster_.clusters_);
   }
-  bool recreateOnHostChange() const override { return false; }
+  bool recreateOnHostChangeDeprecated() const override { return false; }
 
   const Cluster& cluster_;
 };
