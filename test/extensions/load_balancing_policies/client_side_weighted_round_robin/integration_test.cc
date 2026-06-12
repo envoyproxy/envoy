@@ -219,13 +219,13 @@ public:
   // (e.g. an oob_reporting_config block). Evaluated inside the config modifier,
   // after fake upstreams exist, so it can reference their ports.
   void initializeConfig(std::function<std::string()> extra_oob_yaml = nullptr) {
-    config_helper_.addConfigModifier([extra_oob_yaml](
-                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
-      ASSERT(cluster_0->name() == "cluster_0");
-      auto* endpoint = cluster_0->mutable_load_assignment()->mutable_endpoints()->Mutable(0);
+    config_helper_.addConfigModifier(
+        [extra_oob_yaml](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
+          ASSERT(cluster_0->name() == "cluster_0");
+          auto* endpoint = cluster_0->mutable_load_assignment()->mutable_endpoints()->Mutable(0);
 
-      constexpr absl::string_view endpoints_yaml = R"EOF(
+          constexpr absl::string_view endpoints_yaml = R"EOF(
           lb_endpoints:
           - endpoint:
               address:
@@ -238,12 +238,12 @@ public:
                   address: {}
                   port_value: 0
           )EOF";
-      const std::string local_address = Network::Test::getLoopbackAddressString(GetParam());
-      TestUtility::loadFromYaml(fmt::format(endpoints_yaml, local_address, local_address),
-                                *endpoint);
+          const std::string local_address = Network::Test::getLoopbackAddressString(GetParam());
+          TestUtility::loadFromYaml(fmt::format(endpoints_yaml, local_address, local_address),
+                                    *endpoint);
 
-      auto* policy = cluster_0->mutable_load_balancing_policy();
-      std::string policy_yaml = R"EOF(
+          auto* policy = cluster_0->mutable_load_balancing_policy();
+          std::string policy_yaml = R"EOF(
           policies:
           - typed_extension_config:
               name: envoy.load_balancing_policies.client_side_weighted_round_robin
@@ -258,11 +258,11 @@ public:
                       seconds: 180
                   weight_update_period:
                       seconds: 1)EOF";
-      if (extra_oob_yaml != nullptr) {
-        absl::StrAppend(&policy_yaml, extra_oob_yaml());
-      }
-      TestUtility::loadFromYaml(policy_yaml, *policy);
-    });
+          if (extra_oob_yaml != nullptr) {
+            absl::StrAppend(&policy_yaml, extra_oob_yaml());
+          }
+          TestUtility::loadFromYaml(policy_yaml, *policy);
+        });
     HttpIntegrationTest::initialize();
   }
 
