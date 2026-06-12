@@ -1,13 +1,11 @@
-#include "source/common/config/metadata.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
-#include "source/common/protobuf/protobuf.h"
 #include "source/common/stats/utility.h"
 #include "source/extensions/access_loggers/dynamic_modules/access_log.h"
 #include "source/extensions/access_loggers/dynamic_modules/access_log_config.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
+#include "source/extensions/dynamic_modules/abi_context_accessors.h"
 
-#include "absl/strings/str_split.h"
 #include "access_log.h"
 
 namespace Envoy {
@@ -15,71 +13,10 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace DynamicModules {
 
+using Envoy::Extensions::DynamicModules::ContextAccessor;
+using Envoy::Extensions::DynamicModules::HeadersMapOptConstRef;
+
 namespace {
-
-using HeadersMapOptConstRef = OptRef<const Http::HeaderMap>;
-
-HeadersMapOptConstRef getHeaderMapByType(ThreadLocalLogger* logger,
-                                         envoy_dynamic_module_type_http_header_type header_type) {
-  switch (header_type) {
-  case envoy_dynamic_module_type_http_header_type_RequestHeader:
-    return logger->log_context_->requestHeaders();
-  case envoy_dynamic_module_type_http_header_type_ResponseHeader:
-    return logger->log_context_->responseHeaders();
-  case envoy_dynamic_module_type_http_header_type_ResponseTrailer:
-    return logger->log_context_->responseTrailers();
-  default:
-    return {};
-  }
-}
-
-bool getHeaderValueImpl(HeadersMapOptConstRef map, envoy_dynamic_module_type_module_buffer key,
-                        envoy_dynamic_module_type_envoy_buffer* result, size_t index,
-                        size_t* optional_size) {
-  if (!map.has_value()) {
-    *result = {.ptr = nullptr, .length = 0};
-    if (optional_size != nullptr) {
-      *optional_size = 0;
-    }
-    return false;
-  }
-  absl::string_view key_view(key.ptr, key.length);
-
-  // Note: We convert to LowerCaseString which may involve copying. This could be optimized if
-  // callers guarantee lowercase keys.
-  const auto values = map->get(Envoy::Http::LowerCaseString(key_view));
-  if (optional_size != nullptr) {
-    *optional_size = values.size();
-  }
-
-  if (index >= values.size()) {
-    *result = {.ptr = nullptr, .length = 0};
-    return false;
-  }
-
-  const auto value = values[index]->value().getStringView();
-  *result = {.ptr = const_cast<char*>(value.data()), .length = value.size()};
-  return true;
-}
-
-bool getHeadersImpl(HeadersMapOptConstRef map,
-                    envoy_dynamic_module_type_envoy_http_header* result_headers) {
-  if (!map) {
-    return false;
-  }
-  size_t i = 0;
-  map->iterate([&i, &result_headers](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-    auto& key = header.key();
-    result_headers[i].key_ptr = const_cast<char*>(key.getStringView().data());
-    result_headers[i].key_length = key.size();
-    auto& value = header.value();
-    result_headers[i].value_ptr = const_cast<char*>(value.getStringView().data());
-    result_headers[i].value_length = value.size();
-    i++;
-    return Http::HeaderMap::Iterate::Continue;
-  });
-  return true;
-}
 
 // Helper to convert MonotonicTime to nanoseconds duration from start time.
 int64_t monotonicTimeToNanos(const absl::optional<MonotonicTime>& time,
@@ -102,7 +39,7 @@ size_t envoy_dynamic_module_callback_access_logger_get_headers_size(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_http_header_type header_type) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
-  HeadersMapOptConstRef map = getHeaderMapByType(logger, header_type);
+  HeadersMapOptConstRef map = ContextAccessor::headerMapByType(*logger->log_context_, header_type);
   return map.has_value() ? map->size() : 0;
 }
 
@@ -111,7 +48,8 @@ bool envoy_dynamic_module_callback_access_logger_get_headers(
     envoy_dynamic_module_type_http_header_type header_type,
     envoy_dynamic_module_type_envoy_http_header* result_headers) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
-  return getHeadersImpl(getHeaderMapByType(logger, header_type), result_headers);
+  return ContextAccessor::getHeaders(
+      ContextAccessor::headerMapByType(*logger->log_context_, header_type), result_headers);
 }
 
 bool envoy_dynamic_module_callback_access_logger_get_header_value(
@@ -120,8 +58,9 @@ bool envoy_dynamic_module_callback_access_logger_get_header_value(
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
     size_t index, size_t* total_count_out) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
-  return getHeaderValueImpl(getHeaderMapByType(logger, header_type), key, result, index,
-                            total_count_out);
+  return ContextAccessor::getHeaderValue(
+      ContextAccessor::headerMapByType(*logger->log_context_, header_type), key, result, index,
+      total_count_out);
 }
 
 // -----------------------------------------------------------------------------
@@ -799,27 +738,7 @@ bool envoy_dynamic_module_callback_access_logger_get_dynamic_metadata(
     envoy_dynamic_module_type_module_buffer filter_name,
     envoy_dynamic_module_type_module_buffer path, envoy_dynamic_module_type_envoy_buffer* result) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
-  std::string filter_name_str(filter_name.ptr, filter_name.length);
-  std::string path_str(path.ptr, path.length);
-  std::vector<std::string> path_parts = absl::StrSplit(path_str, '.');
-
-  const auto& metadata = logger->stream_info_->dynamicMetadata();
-  const auto& value =
-      Envoy::Config::Metadata::metadataValue(&metadata, filter_name_str, path_parts);
-
-  if (value.kind_case() == Protobuf::Value::KIND_NOT_SET) {
-    return false;
-  }
-
-  // Note: Currently only string values are supported. Complex types would require serialization
-  // to a buffer, but the ABI uses zero-copy pointers to Envoy memory.
-  if (value.kind_case() == Protobuf::Value::kStringValue) {
-    const auto& str = value.string_value();
-    *result = {const_cast<char*>(str.data()), str.size()};
-    return true;
-  }
-
-  return false;
+  return ContextAccessor::getDynamicMetadata(*logger->stream_info_, filter_name, path, result);
 }
 
 bool envoy_dynamic_module_callback_access_logger_get_filter_state(
@@ -837,12 +756,7 @@ bool envoy_dynamic_module_callback_access_logger_get_local_reply_body(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
-  absl::string_view body = logger->log_context_->localReplyBody();
-  if (body.empty()) {
-    return false;
-  }
-  *result = {const_cast<char*>(body.data()), body.size()};
-  return true;
+  return ContextAccessor::getLocalReplyBody(*logger->log_context_, result);
 }
 
 // -----------------------------------------------------------------------------
@@ -958,398 +872,26 @@ int64_t envoy_dynamic_module_callback_access_logger_get_upstream_pool_ready_dura
 // Generic Attribute Accessors
 // -----------------------------------------------------------------------------
 
-// Helper to extract a downstream SSL string attribute from the access log context.
-bool getDownstreamSslAttribute(
-    ThreadLocalLogger* logger,
-    std::function<OptRef<const std::string>(const Ssl::ConnectionInfoConstSharedPtr)> extractor,
-    envoy_dynamic_module_type_envoy_buffer* result) {
-  const auto& provider = logger->stream_info_->downstreamAddressProvider();
-  if (!provider.sslConnection()) {
-    return false;
-  }
-  const Ssl::ConnectionInfoConstSharedPtr ssl = provider.sslConnection();
-  OptRef<const std::string> attr = extractor(ssl);
-  if (!attr.has_value() || attr->empty()) {
-    return false;
-  }
-  const std::string& value = attr.value();
-  *result = {const_cast<char*>(value.data()), value.size()};
-  return true;
-}
-
-// Helper to extract an upstream SSL string attribute from the access log context.
-bool getUpstreamSslAttribute(
-    ThreadLocalLogger* logger,
-    std::function<OptRef<const std::string>(const Ssl::ConnectionInfoConstSharedPtr)> extractor,
-    envoy_dynamic_module_type_envoy_buffer* result) {
-  const auto upstream = logger->stream_info_->upstreamInfo();
-  if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
-    return false;
-  }
-  const Ssl::ConnectionInfoConstSharedPtr ssl = upstream->upstreamSslConnection();
-  OptRef<const std::string> attr = extractor(ssl);
-  if (!attr.has_value() || attr->empty()) {
-    return false;
-  }
-  const std::string& value = attr.value();
-  *result = {const_cast<char*>(value.data()), value.size()};
-  return true;
-}
-
 bool envoy_dynamic_module_callback_access_logger_get_attribute_string(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_attribute_id attribute_id,
     envoy_dynamic_module_type_envoy_buffer* result) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
-  bool ok = false;
-  switch (attribute_id) {
-  case envoy_dynamic_module_type_attribute_id_RequestProtocol: {
-    if (!logger->stream_info_->protocol().has_value()) {
-      break;
-    }
-    const auto& protocol_str =
-        Http::Utility::getProtocolString(logger->stream_info_->protocol().value());
-    *result = {const_cast<char*>(protocol_str.data()), protocol_str.size()};
-    ok = true;
-    break;
-  }
-  case envoy_dynamic_module_type_attribute_id_ResponseCodeDetails: {
-    if (!logger->stream_info_->responseCodeDetails().has_value()) {
-      break;
-    }
-    const auto& details = logger->stream_info_->responseCodeDetails().value();
-    *result = {const_cast<char*>(details.data()), details.size()};
-    ok = true;
-    break;
-  }
-  case envoy_dynamic_module_type_attribute_id_XdsRouteName: {
-    const auto& name = logger->stream_info_->getRouteName();
-    if (!name.empty()) {
-      *result = {const_cast<char*>(name.data()), name.size()};
-      ok = true;
-    }
-    break;
-  }
-  case envoy_dynamic_module_type_attribute_id_XdsVirtualHostName: {
-    const auto& name = logger->stream_info_->virtualClusterName();
-    if (name.has_value() && !name->empty()) {
-      *result = {const_cast<char*>(name->data()), name->size()};
-      ok = true;
-    }
-    break;
-  }
-  case envoy_dynamic_module_type_attribute_id_RequestId: {
-    const auto provider = logger->stream_info_->getStreamIdProvider();
-    if (provider.has_value() && provider->toStringView().has_value()) {
-      absl::string_view view = provider->toStringView().value();
-      *result = {const_cast<char*>(view.data()), view.size()};
-      ok = true;
-    }
-    break;
-  }
-  case envoy_dynamic_module_type_attribute_id_SourceAddress: {
-    const auto& addr_provider = logger->stream_info_->downstreamAddressProvider();
-    if (addr_provider.remoteAddress() &&
-        addr_provider.remoteAddress()->type() == Network::Address::Type::Ip) {
-      const auto& addr_str = addr_provider.remoteAddress()->ip()->addressAsString();
-      *result = {const_cast<char*>(addr_str.data()), addr_str.size()};
-      ok = true;
-    }
-    break;
-  }
-  case envoy_dynamic_module_type_attribute_id_DestinationAddress: {
-    const auto& addr_provider = logger->stream_info_->downstreamAddressProvider();
-    if (addr_provider.localAddress() &&
-        addr_provider.localAddress()->type() == Network::Address::Type::Ip) {
-      const auto& addr_str = addr_provider.localAddress()->ip()->addressAsString();
-      *result = {const_cast<char*>(addr_str.data()), addr_str.size()};
-      ok = true;
-    }
-    break;
-  }
-  case envoy_dynamic_module_type_attribute_id_ConnectionRequestedServerName: {
-    const auto& sni = logger->stream_info_->downstreamAddressProvider().requestedServerName();
-    if (!sni.empty()) {
-      *result = {const_cast<char*>(sni.data()), sni.size()};
-      ok = true;
-    }
-    break;
-  }
-  case envoy_dynamic_module_type_attribute_id_ConnectionTerminationDetails: {
-    const auto& details = logger->stream_info_->connectionTerminationDetails();
-    if (details.has_value() && !details->empty()) {
-      *result = {const_cast<char*>(details->data()), details->size()};
-      ok = true;
-    }
-    break;
-  }
-  case envoy_dynamic_module_type_attribute_id_ConnectionTransportFailureReason: {
-    const auto& reason = logger->stream_info_->downstreamTransportFailureReason();
-    if (!reason.empty()) {
-      *result = {const_cast<char*>(reason.data()), reason.size()};
-      ok = true;
-    }
-    break;
-  }
-  case envoy_dynamic_module_type_attribute_id_UpstreamAddress: {
-    const auto upstream = logger->stream_info_->upstreamInfo();
-    if (upstream.has_value() && upstream->upstreamHost() &&
-        upstream->upstreamHost()->address() != nullptr) {
-      auto addr = upstream->upstreamHost()->address()->asStringView();
-      *result = {const_cast<char*>(addr.data()), addr.size()};
-      ok = true;
-    }
-    break;
-  }
-  case envoy_dynamic_module_type_attribute_id_UpstreamLocalAddress: {
-    const auto upstream = logger->stream_info_->upstreamInfo();
-    if (upstream.has_value() && upstream->upstreamLocalAddress() != nullptr) {
-      auto addr = upstream->upstreamLocalAddress()->asStringView();
-      *result = {const_cast<char*>(addr.data()), addr.size()};
-      ok = true;
-    }
-    break;
-  }
-  case envoy_dynamic_module_type_attribute_id_UpstreamTransportFailureReason: {
-    const auto upstream = logger->stream_info_->upstreamInfo();
-    if (upstream.has_value() && !upstream->upstreamTransportFailureReason().empty()) {
-      const auto& reason = upstream->upstreamTransportFailureReason();
-      *result = {const_cast<char*>(reason.data()), reason.size()};
-      ok = true;
-    }
-    break;
-  }
-  case envoy_dynamic_module_type_attribute_id_ConnectionTlsVersion:
-    return getDownstreamSslAttribute(
-        logger,
-        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
-          return ssl->tlsVersion();
-        },
-        result);
-  case envoy_dynamic_module_type_attribute_id_ConnectionSubjectPeerCertificate:
-    return getDownstreamSslAttribute(
-        logger,
-        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
-          return ssl->subjectPeerCertificate();
-        },
-        result);
-  case envoy_dynamic_module_type_attribute_id_ConnectionSubjectLocalCertificate:
-    return getDownstreamSslAttribute(
-        logger,
-        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
-          return ssl->subjectLocalCertificate();
-        },
-        result);
-  case envoy_dynamic_module_type_attribute_id_ConnectionSha256PeerCertificateDigest:
-    return getDownstreamSslAttribute(
-        logger,
-        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
-          return ssl->sha256PeerCertificateDigest();
-        },
-        result);
-  case envoy_dynamic_module_type_attribute_id_ConnectionDnsSanLocalCertificate:
-    return getDownstreamSslAttribute(
-        logger,
-        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
-          if (ssl->dnsSansLocalCertificate().empty()) {
-            return absl::nullopt;
-          }
-          return ssl->dnsSansLocalCertificate().front();
-        },
-        result);
-  case envoy_dynamic_module_type_attribute_id_ConnectionDnsSanPeerCertificate:
-    return getDownstreamSslAttribute(
-        logger,
-        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
-          if (ssl->dnsSansPeerCertificate().empty()) {
-            return absl::nullopt;
-          }
-          return ssl->dnsSansPeerCertificate().front();
-        },
-        result);
-  case envoy_dynamic_module_type_attribute_id_ConnectionUriSanLocalCertificate:
-    return getDownstreamSslAttribute(
-        logger,
-        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
-          if (ssl->uriSanLocalCertificate().empty()) {
-            return absl::nullopt;
-          }
-          return ssl->uriSanLocalCertificate().front();
-        },
-        result);
-  case envoy_dynamic_module_type_attribute_id_ConnectionUriSanPeerCertificate:
-    return getDownstreamSslAttribute(
-        logger,
-        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
-          if (ssl->uriSanPeerCertificate().empty()) {
-            return absl::nullopt;
-          }
-          return ssl->uriSanPeerCertificate().front();
-        },
-        result);
-  case envoy_dynamic_module_type_attribute_id_UpstreamTlsVersion:
-    return getUpstreamSslAttribute(
-        logger,
-        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
-          return ssl->tlsVersion();
-        },
-        result);
-  case envoy_dynamic_module_type_attribute_id_UpstreamSubjectPeerCertificate:
-    return getUpstreamSslAttribute(
-        logger,
-        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
-          return ssl->subjectPeerCertificate();
-        },
-        result);
-  case envoy_dynamic_module_type_attribute_id_UpstreamSubjectLocalCertificate:
-    return getUpstreamSslAttribute(
-        logger,
-        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
-          return ssl->subjectLocalCertificate();
-        },
-        result);
-  case envoy_dynamic_module_type_attribute_id_UpstreamSha256PeerCertificateDigest:
-    return getUpstreamSslAttribute(
-        logger,
-        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
-          return ssl->sha256PeerCertificateDigest();
-        },
-        result);
-  case envoy_dynamic_module_type_attribute_id_UpstreamDnsSanLocalCertificate:
-    return getUpstreamSslAttribute(
-        logger,
-        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
-          if (ssl->dnsSansLocalCertificate().empty()) {
-            return absl::nullopt;
-          }
-          return ssl->dnsSansLocalCertificate().front();
-        },
-        result);
-  case envoy_dynamic_module_type_attribute_id_UpstreamDnsSanPeerCertificate:
-    return getUpstreamSslAttribute(
-        logger,
-        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
-          if (ssl->dnsSansPeerCertificate().empty()) {
-            return absl::nullopt;
-          }
-          return ssl->dnsSansPeerCertificate().front();
-        },
-        result);
-  case envoy_dynamic_module_type_attribute_id_UpstreamUriSanLocalCertificate:
-    return getUpstreamSslAttribute(
-        logger,
-        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
-          if (ssl->uriSanLocalCertificate().empty()) {
-            return absl::nullopt;
-          }
-          return ssl->uriSanLocalCertificate().front();
-        },
-        result);
-  case envoy_dynamic_module_type_attribute_id_UpstreamUriSanPeerCertificate:
-    return getUpstreamSslAttribute(
-        logger,
-        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
-          if (ssl->uriSanPeerCertificate().empty()) {
-            return absl::nullopt;
-          }
-          return ssl->uriSanPeerCertificate().front();
-        },
-        result);
-  default:
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
-                        "Unsupported attribute ID {} as string for access logger.",
-                        static_cast<int64_t>(attribute_id));
-    break;
-  }
-  return ok;
+  return ContextAccessor::getAttributeString(*logger->stream_info_, attribute_id, result);
 }
 
 bool envoy_dynamic_module_callback_access_logger_get_attribute_int(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
-  bool ok = false;
-  switch (attribute_id) {
-  case envoy_dynamic_module_type_attribute_id_ResponseCode: {
-    const auto code = logger->stream_info_->responseCode();
-    if (code.has_value()) {
-      *result = code.value();
-      ok = true;
-    }
-    break;
-  }
-  case envoy_dynamic_module_type_attribute_id_ConnectionId: {
-    *result = logger->stream_info_->downstreamAddressProvider().connectionID().value_or(0);
-    ok = true;
-    break;
-  }
-  case envoy_dynamic_module_type_attribute_id_SourcePort: {
-    const auto& addr = logger->stream_info_->downstreamAddressProvider().remoteAddress();
-    if (addr && addr->type() == Network::Address::Type::Ip) {
-      *result = addr->ip()->port();
-      ok = true;
-    }
-    break;
-  }
-  case envoy_dynamic_module_type_attribute_id_DestinationPort: {
-    const auto& addr = logger->stream_info_->downstreamAddressProvider().localAddress();
-    if (addr && addr->type() == Network::Address::Type::Ip) {
-      *result = addr->ip()->port();
-      ok = true;
-    }
-    break;
-  }
-  case envoy_dynamic_module_type_attribute_id_UpstreamPort: {
-    const auto upstream = logger->stream_info_->upstreamInfo();
-    if (upstream.has_value() && upstream->upstreamHost() &&
-        upstream->upstreamHost()->address() != nullptr) {
-      auto ip = upstream->upstreamHost()->address()->ip();
-      if (ip) {
-        *result = ip->port();
-        ok = true;
-      }
-    }
-    break;
-  }
-  case envoy_dynamic_module_type_attribute_id_UpstreamRequestAttemptCount: {
-    *result = logger->stream_info_->attemptCount().value_or(0);
-    ok = true;
-    break;
-  }
-  default:
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
-                        "Unsupported attribute ID {} as int for access logger.",
-                        static_cast<int64_t>(attribute_id));
-    break;
-  }
-  return ok;
+  return ContextAccessor::getAttributeInt(*logger->stream_info_, attribute_id, result);
 }
 
 bool envoy_dynamic_module_callback_access_logger_get_attribute_bool(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_attribute_id attribute_id, bool* result) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
-  bool ok = false;
-  switch (attribute_id) {
-  case envoy_dynamic_module_type_attribute_id_ConnectionMtls: {
-    const auto& provider = logger->stream_info_->downstreamAddressProvider();
-    if (provider.sslConnection()) {
-      *result = provider.sslConnection()->peerCertificatePresented();
-      ok = true;
-    }
-    break;
-  }
-  case envoy_dynamic_module_type_attribute_id_HealthCheck:
-    *result = logger->stream_info_->healthCheck();
-    ok = true;
-    break;
-  default:
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
-                        "Unsupported attribute ID {} as bool for access logger.",
-                        static_cast<int64_t>(attribute_id));
-    break;
-  }
-  return ok;
+  return ContextAccessor::getAttributeBool(*logger->stream_info_, attribute_id, result);
 }
 
 // -----------------------------------------------------------------------------

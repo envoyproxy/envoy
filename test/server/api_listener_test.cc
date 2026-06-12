@@ -430,5 +430,90 @@ api_listener:
   api_listener.reset();
 }
 
+// Exercise the remaining SyntheticConnection stub methods and the base listener's
+// addOnDrainCloseCb for coverage.
+TEST_F(ApiListenerTest, SyntheticConnectionStubMethods) {
+  const std::string yaml = R"EOF(
+name: test_api_listener
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+api_listener:
+  api_listener:
+    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+    stat_prefix: hcm
+    route_config:
+      name: api_router
+      virtual_hosts:
+        - name: api
+          domains:
+            - "*"
+          routes:
+            - match:
+                prefix: "/"
+              route:
+                cluster: dynamic_forward_proxy_cluster
+  )EOF";
+
+  const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
+  server_.server_factory_context_->cluster_manager_.initializeClusters(
+      {"dynamic_forward_proxy_cluster"}, {});
+  HttpApiListenerFactory factory;
+  auto http_api_listener = factory.create(config, server_, config.name()).value();
+  auto api_listener = http_api_listener->createHttpApiListener(server_.dispatcher());
+  ASSERT_NE(api_listener, nullptr);
+  auto& connection = dynamic_cast<HttpApiListener::ApiListenerWrapper*>(api_listener.get())
+                         ->readCallbacks()
+                         .connection();
+
+  // Unimplemented methods raise an ENVOY_BUG.
+  EXPECT_ENVOY_BUG(connection.addWriteFilter(nullptr), "Unexpected function call");
+  EXPECT_ENVOY_BUG(connection.addFilter(nullptr), "Unexpected function call");
+  EXPECT_ENVOY_BUG(connection.addReadFilter(nullptr), "Unexpected function call");
+  EXPECT_ENVOY_BUG(connection.removeReadFilter(nullptr), "Unexpected function call");
+  EXPECT_ENVOY_BUG(connection.addBytesSentCallback([](uint64_t) { return true; }),
+                   "Unexpected function call");
+  EXPECT_ENVOY_BUG(connection.noDelay(true), "Unexpected function call");
+  EXPECT_ENVOY_BUG(connection.detectEarlyCloseWhenReadDisabled(true), "Unexpected function call");
+  Buffer::OwnedImpl buffer("x");
+  EXPECT_ENVOY_BUG(connection.write(buffer, false), "Unexpected function call");
+  EXPECT_ENVOY_BUG(connection.setBufferLimits(100), "Unexpected function call");
+  EXPECT_ENVOY_BUG(connection.startSecureTransport(), "Unexpected function call");
+
+  // No-op and trivial accessors.
+  EXPECT_TRUE(connection.initializeReadFilters());
+  connection.onDrain();
+  connection.close(Network::ConnectionCloseType::NoFlush);
+  connection.close(Network::ConnectionCloseType::NoFlush, "details");
+  EXPECT_EQ(StreamInfo::DetectedCloseType::Normal, connection.detectedCloseType());
+  EXPECT_EQ(12345, connection.id());
+  std::vector<uint8_t> hash;
+  connection.hashKey(hash);
+  EXPECT_TRUE(hash.empty());
+  EXPECT_EQ(Network::Connection::ReadDisableStatus::NoTransition, connection.readDisable(true));
+  EXPECT_TRUE(connection.readEnabled());
+  EXPECT_EQ(&connection.connectionInfoSetter(), connection.connectionInfoProviderSharedPtr().get());
+  EXPECT_FALSE(connection.unixSocketPeerCredentials().has_value());
+  EXPECT_EQ(EMPTY_STRING, connection.requestedServerName());
+  EXPECT_EQ(Network::Connection::State::Open, connection.state());
+  EXPECT_FALSE(connection.aboveHighWatermark());
+  EXPECT_EQ(EMPTY_STRING, connection.transportFailureReason());
+  EXPECT_EQ(EMPTY_STRING, connection.localCloseReason());
+  EXPECT_FALSE(connection.congestionWindowInBytes().has_value());
+  std::stringstream os;
+  connection.dumpState(os, 0);
+  EXPECT_EQ("SyntheticConnection", os.str());
+
+  // The base listener's drain decision rejects drain close callbacks.
+  auto& drain_decision = dynamic_cast<Network::DrainDecision&>(*http_api_listener);
+  EXPECT_FALSE(drain_decision.drainClose(Network::DrainDirection::All));
+  EXPECT_ENVOY_BUG(EXPECT_EQ(drain_decision.addOnDrainCloseCb(
+                                 Network::DrainDirection::All,
+                                 [](std::chrono::milliseconds) { return absl::OkStatus(); }),
+                             nullptr),
+                   "Unexpected call to addOnDrainCloseCb");
+}
+
 } // namespace Server
 } // namespace Envoy

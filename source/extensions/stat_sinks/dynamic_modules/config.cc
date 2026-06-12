@@ -22,12 +22,12 @@ absl::StatusOr<Stats::SinkPtr> DynamicModuleStatsSinkFactory::createStatsSink(
 
   const auto& module_config = proto_config.dynamic_module_config();
 
-  auto dynamic_module_or_error = Extensions::DynamicModules::newDynamicModuleByName(
-      module_config.name(), module_config.do_not_close(), module_config.load_globally());
-  if (!dynamic_module_or_error.ok()) {
-    return absl::InvalidArgumentError("Failed to load dynamic module: " +
-                                      std::string(dynamic_module_or_error.status().message()));
-  }
+  // Stats sinks do not support remote module sources, so no init manager or async callback is
+  // passed; only the synchronous local-file and by-name paths can succeed here.
+  auto load_result = Extensions::DynamicModules::newDynamicModuleByConfig(
+      module_config, proto_config.sink_name(), server);
+  RETURN_IF_NOT_OK_REF(load_result.status());
+  auto dynamic_module = std::move(load_result->loaded);
 
   std::string sink_config_str;
   if (proto_config.has_sink_config()) {
@@ -39,9 +39,8 @@ absl::StatusOr<Stats::SinkPtr> DynamicModuleStatsSinkFactory::createStatsSink(
     sink_config_str = std::move(config_or_error.value());
   }
 
-  auto sink_config =
-      newDynamicModuleStatsSinkConfig(proto_config.sink_name(), sink_config_str,
-                                      std::move(dynamic_module_or_error.value()), server);
+  auto sink_config = newDynamicModuleStatsSinkConfig(proto_config.sink_name(), sink_config_str,
+                                                     std::move(dynamic_module), server);
   if (!sink_config.ok()) {
     return sink_config.status();
   }
