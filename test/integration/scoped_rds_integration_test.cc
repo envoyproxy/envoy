@@ -726,5 +726,83 @@ key:
                              Eq(13237225503670494420UL));
 }
 
+// VHDS and SRDS both non-on-demand (warmed up).
+// Both Scope A and Route Config (using VHDS) are loaded at startup.
+// The virtual host is also pre-loaded over VHDS during startup.
+// Requests should succeed immediately without triggering any on-demand flow.
+TEST_P(ScopedRdsIntegrationTest, SrdsWarmingWithVhdsWarming) {
+  constexpr absl::string_view scope_tmpl = R"EOF(
+name: {}
+route_configuration_name: {}
+key:
+  fragments:
+    - string_key: {}
+)EOF";
+  const std::string scope_route1 =
+      fmt::format(scope_tmpl, "foo_scope1", "foo_route_vhds", "foo-route");
+
+  constexpr absl::string_view vhost_tmpl = R"EOF(
+name: {}
+domains: [{}]
+routes:
+- match: {{ prefix: "/" }}
+  route: {{ cluster: {} }}
+)EOF";
+
+  on_server_init_function_ = [&]() {
+    createScopedRdsStream();
+    sendSrdsResponse({scope_route1}, {scope_route1}, {}, "1");
+
+    createRdsStream("foo_route_vhds");
+    envoy::config::route::v3::RouteConfiguration route_config;
+    route_config.set_name("foo_route_vhds");
+    {
+      auto* vhds = route_config.mutable_vhds();
+      auto* config_source = vhds->mutable_config_source();
+      config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+      auto* api_config_source = config_source->mutable_api_config_source();
+      api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+      api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+      auto* grpc_service = api_config_source->add_grpc_services();
+      setGrpcService(*grpc_service, "rds_cluster", getRdsFakeUpstream().localAddress());
+    }
+    sendRdsResponse(route_config, "1");
+
+    // Warm up VHDS
+    createStream(&rds_upstream_info_, getRdsFakeUpstream(), "vhds_stream1");
+    FakeStreamPtr& vhds_stream1 = rds_upstream_info_.stream_by_resource_name_["vhds_stream1"];
+    ASSERT_NE(vhds_stream1, nullptr);
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                             vhds_stream1.get()));
+
+    // Send VHDS response at startup!
+    sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+        Config::TestTypeUrl::get().VirtualHost,
+        {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+            fmt::format(vhost_tmpl, "foo_route_vhds/vhost_0", "vhost.first", "cluster_0"))},
+        {}, "1", vhds_stream1.get());
+  };
+  initialize();
+  registerTestServerPorts({"http"});
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send Request (Scope A, host vhost.first -> should succeed immediately because it is warmed up)
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "vhost.first"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo-route"}});
+
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "200", Http::TestResponseHeaderMapImpl{}, "");
+
+  cleanupUpstreamAndDownstream();
+}
+
 } // namespace
 } // namespace Envoy
