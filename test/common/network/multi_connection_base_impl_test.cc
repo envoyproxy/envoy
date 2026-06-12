@@ -204,6 +204,51 @@ TEST_F(MultiConnectionBaseImplTest, ConnectTimeoutThenFirstSuccess) {
   EXPECT_FALSE(impl_->connecting());
 }
 
+TEST_F(MultiConnectionBaseImplTest, DrainBeforeConnectFinishedFiresOnDeferredCallbacks) {
+  setupMultiConnectionImpl(2);
+  startConnect();
+
+  StrictMock<MockConnectionCallbacks> cb_a;
+  StrictMock<MockConnectionCallbacks> cb_b;
+  impl_->addConnectionCallbacks(cb_a);
+  impl_->addConnectionCallbacks(cb_b);
+
+  EXPECT_CALL(cb_a, onDrain());
+  EXPECT_CALL(cb_b, onDrain());
+  impl_->onDrain();
+}
+
+TEST_F(MultiConnectionBaseImplTest, DrainBeforeConnectFinishedSkipsRemovedCallbacks) {
+  setupMultiConnectionImpl(2);
+  startConnect();
+
+  StrictMock<MockConnectionCallbacks> removed_cb;
+  StrictMock<MockConnectionCallbacks> kept_cb;
+  impl_->addConnectionCallbacks(removed_cb);
+  impl_->addConnectionCallbacks(kept_cb);
+  // Pre-connect removeConnectionCallbacks nulls the slot rather than erasing it; onDrain()
+  // must skip the null entry.
+  impl_->removeConnectionCallbacks(removed_cb);
+
+  EXPECT_CALL(kept_cb, onDrain());
+  // StrictMock catches any call on removed_cb.
+  impl_->onDrain();
+}
+
+TEST_F(MultiConnectionBaseImplTest, DrainAfterConnectFinishedDelegatesToFinalConnection) {
+  setupMultiConnectionImpl(2);
+  startConnect();
+
+  // Finish connect on the only-created connection (index 0).
+  EXPECT_CALL(*failover_timer_, disableTimer());
+  EXPECT_CALL(*createdConnections()[0], removeConnectionCallbacks(_));
+  connectionCallbacks()[0]->onEvent(ConnectionEvent::Connected);
+
+  // onDrain() now delegates to the surviving connection.
+  EXPECT_CALL(*createdConnections()[0], onDrain());
+  impl_->onDrain();
+}
+
 TEST_F(MultiConnectionBaseImplTest, DisallowedFunctions) {
   setupMultiConnectionImpl(2);
   startConnect();
