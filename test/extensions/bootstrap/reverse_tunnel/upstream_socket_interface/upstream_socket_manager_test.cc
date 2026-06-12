@@ -920,6 +920,51 @@ TEST_F(TestUpstreamSocketManager, NodeToActiveFdCountTracking) {
   EXPECT_EQ(getNodeToActiveFdCount(node_id), 0);
 }
 
+// Exercises the public canAcceptConnection() accessor: it admits while the live per-node socket
+// count is below the configured cap, rejects once the cap is reached, and follows add/death
+// transitions. A cap of 0 (the default) rejects everything, which is why the filter only consults
+// this when rate limiting is explicitly enabled.
+TEST_F(TestUpstreamSocketManager, CanAcceptConnection) {
+  const std::string node_id = "count-node";
+  const std::string cluster_id = "count-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  // Default cap of 0 rejects every node, even unknown ones.
+  EXPECT_FALSE(socket_manager_->canAcceptConnection("missing-node", ""));
+
+  socket_manager_->setMaxConnectionsPerNode(2);
+
+  // Unknown node is under the cap without inserting a map entry.
+  EXPECT_TRUE(socket_manager_->canAcceptConnection("missing-node", ""));
+
+  socket_manager_->addConnectionSocket(node_id, cluster_id, createMockSocket(201), ping_interval);
+  EXPECT_TRUE(socket_manager_->canAcceptConnection(node_id, "")); // 1 < 2
+
+  socket_manager_->addConnectionSocket(node_id, cluster_id, createMockSocket(202), ping_interval);
+  EXPECT_FALSE(socket_manager_->canAcceptConnection(node_id, "")); // 2 is not < 2
+
+  // Death of a socket frees capacity.
+  socket_manager_->markSocketDead(201);
+  EXPECT_TRUE(socket_manager_->canAcceptConnection(node_id, ""));
+
+  socket_manager_->markSocketDead(202);
+  EXPECT_TRUE(socket_manager_->canAcceptConnection(node_id, ""));
+}
+
+// With tenant isolation enabled the cap must be scoped per tenant, so the same node under a
+// different tenant is tracked independently.
+TEST_F(TestUpstreamSocketManager, CanAcceptConnectionWithTenantIsolation) {
+  socket_manager_->setTenantIsolationEnabled(true);
+  socket_manager_->setMaxConnectionsPerNode(1);
+  const std::chrono::seconds ping_interval(30);
+
+  socket_manager_->addConnectionSocket("node", "cluster", createMockSocket(301), ping_interval,
+                                       false, "tenant-a");
+
+  EXPECT_FALSE(socket_manager_->canAcceptConnection("node", "tenant-a")); // at cap for tenant-a
+  EXPECT_TRUE(socket_manager_->canAcceptConnection("node", "tenant-b"));  // independent tenant
+}
+
 TEST_F(TestUpstreamSocketManager, SendTimerCleanupOnGetConnectionSocket) {
   auto socket = createMockSocket(123);
   const std::string node_id = "test-node";

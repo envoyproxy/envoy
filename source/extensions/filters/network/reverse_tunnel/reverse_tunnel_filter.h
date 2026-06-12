@@ -48,6 +48,10 @@ public:
            tenant_id_formatter_ != nullptr;
   }
 
+  // Returns true if accepting another reverse connection for this node/tenant stays within the
+  // configured per-worker connection cap (or no cap is configured).
+  bool validateConnectionLimit(absl::string_view node_id, absl::string_view tenant_id) const;
+
   // Validates the extracted node_id, cluster_id, and tenant_id against expected values.
   // Returns true if validation passes or no validation is configured.
   bool validateIdentifiers(absl::string_view node_id, absl::string_view cluster_id,
@@ -94,6 +98,10 @@ private:
   const bool use_http_upgrade_{false};
 
   const bool skip_rebalancing_{false};
+
+  // Whether this filter enforces the per-node concurrent connection cap (owned by the upstream
+  // socket interface bootstrap extension) before completing a reverse tunnel handshake.
+  const bool enable_connection_limit_{false};
 };
 
 using ReverseTunnelFilterConfigSharedPtr = std::shared_ptr<ReverseTunnelFilterConfig>;

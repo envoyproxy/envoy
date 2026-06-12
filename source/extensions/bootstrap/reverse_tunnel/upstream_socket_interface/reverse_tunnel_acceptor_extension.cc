@@ -102,7 +102,8 @@ ReverseTunnelAcceptorExtension::ReverseTunnelAcceptorExtension(
     const envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
         UpstreamReverseConnectionSocketInterface& config)
     : Envoy::Network::SocketInterfaceExtension(sock_interface), context_(context),
-      socket_interface_(&sock_interface) {
+      socket_interface_(&sock_interface),
+      max_connections_per_node_(config.max_connections_per_node()) {
   stat_prefix_ = PROTOBUF_GET_STRING_OR_DEFAULT(config, stat_prefix, "reverse_tunnel_acceptor");
   const uint32_t cfg_threshold = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, ping_failure_threshold, 3);
   ping_failure_threshold_ = std::max<uint32_t>(1, cfg_threshold);
@@ -245,6 +246,7 @@ void ReverseTunnelAcceptorExtension::onServerInitialized(Server::Instance&) {
         if (auto* socket_manager = tls->socketManager(); socket_manager != nullptr) {
           socket_manager->setMissThreshold(ping_failure_threshold);
           socket_manager->setTenantIsolationEnabled(enable_tenant_isolation);
+          socket_manager->setMaxConnectionsPerNode(max_connections_per_node_);
         }
         return tls;
       });
