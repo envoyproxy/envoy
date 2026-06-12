@@ -70,7 +70,7 @@ bool envoy_dynamic_module_callback_udp_listener_filter_set_datagram_data(
     envoy_dynamic_module_type_module_buffer data) {
   auto* filter = static_cast<DynamicModuleUdpListenerFilter*>(filter_envoy_ptr);
   auto* current_data = filter->currentData();
-  if (!current_data) {
+  if (!current_data || !current_data->buffer_) {
     return false;
   }
 

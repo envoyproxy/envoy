@@ -229,7 +229,8 @@ absl::Status writeDynamicModuleBytesToDisk(const absl::string_view module_bytes,
         continue;
       }
       close(fd);
-      std::filesystem::remove(staging_template);
+      std::error_code cleanup_ec;
+      std::filesystem::remove(staging_template, cleanup_ec);
       return absl::InternalError(
           absl::StrCat("Failed to write to staging file for dynamic module: ", staging_template));
     }
@@ -238,9 +239,24 @@ absl::Status writeDynamicModuleBytesToDisk(const absl::string_view module_bytes,
   close(fd);
 
   std::filesystem::path staging_path(staging_template);
+  std::error_code ec;
   std::filesystem::permissions(staging_path, std::filesystem::perms::owner_all,
-                               std::filesystem::perm_options::replace);
-  std::filesystem::rename(staging_path, temp_file_path);
+                               std::filesystem::perm_options::replace, ec);
+  if (ec) {
+    std::error_code cleanup_ec;
+    std::filesystem::remove(staging_path, cleanup_ec);
+    return absl::InternalError(absl::StrCat(
+        "Failed to set permissions for dynamic module staging file: ", staging_path.string(), ": ",
+        ec.message()));
+  }
+  std::filesystem::rename(staging_path, temp_file_path, ec);
+  if (ec) {
+    std::error_code cleanup_ec;
+    std::filesystem::remove(staging_path, cleanup_ec);
+    return absl::InternalError(absl::StrCat(
+        "Failed to move dynamic module staging file to cache path: ", temp_file_path.string(), ": ",
+        ec.message()));
+  }
   return absl::OkStatus();
 }
 

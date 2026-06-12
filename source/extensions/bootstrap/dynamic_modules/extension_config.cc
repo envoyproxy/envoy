@@ -52,6 +52,10 @@ bool DynamicModuleBootstrapExtensionConfig::enableClusterLifecycle() {
   if (cluster_lifecycle_enabled_) {
     return false;
   }
+  if (!server_initialized_) {
+    ENVOY_LOG(error, "cannot enable cluster lifecycle before server is initialized");
+    return false;
+  }
   cluster_lifecycle_enabled_ = true;
   cluster_update_callbacks_handle_ =
       context_.clusterManager().addThreadLocalClusterUpdateCallbacks(*this);
@@ -121,6 +125,11 @@ DynamicModuleBootstrapExtensionConfig::sendHttpCallout(uint64_t* callout_id_out,
                                                        absl::string_view cluster_name,
                                                        Http::RequestMessagePtr&& message,
                                                        uint64_t timeout_milliseconds) {
+  // The cluster manager is not available during bootstrap extension creation, so accessing it
+  // before the server is initialized would dereference a null cluster manager in release builds.
+  if (!server_initialized_) {
+    return envoy_dynamic_module_type_http_callout_init_result_ClusterNotFound;
+  }
   // Access cluster manager lazily since it's not available during bootstrap extension creation.
   Upstream::ThreadLocalCluster* cluster =
       context_.clusterManager().getThreadLocalCluster(cluster_name);

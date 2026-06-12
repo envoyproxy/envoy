@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <chrono>
 
 #include "envoy/network/listen_socket.h"
@@ -48,7 +49,7 @@ bool envoy_dynamic_module_callback_listener_filter_drain_buffer(
     return false;
   }
 
-  buffer->drain(length);
+  buffer->drain(std::min<size_t>(length, buffer->rawSlice().len_));
   return true;
 }
 

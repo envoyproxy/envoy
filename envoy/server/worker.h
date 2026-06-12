@@ -93,6 +93,25 @@ public:
   virtual void stopListener(Network::ListenerConfig& listener,
                             const Network::ExtraShutdownListenerOptions& options,
                             std::function<void()> completion) PURE;
+
+  /**
+   * Notify all connections in the given filter chains of the listener that they are being
+   * drained. This is intended to be invoked at the start of a drain sequence (before the
+   * drain timer expires). Connections are not closed. This is a fire-and-forget operation
+   * that is posted to the worker's dispatcher.
+   * @param listener_tag supplies the tag passed to addListener().
+   * @param filter_chains supplies the filter chains whose connections should be notified.
+   */
+  virtual void onFilterChainDrain(uint64_t listener_tag,
+                                  const std::list<const Network::FilterChain*>& filter_chains) PURE;
+
+  /**
+   * Notify all connections of the given listener that they are being drained. Connections
+   * are not closed. This is a fire-and-forget operation that is posted to the worker's
+   * dispatcher.
+   * @param listener supplies the listener whose connections should be notified.
+   */
+  virtual void onListenerDrain(Network::ListenerConfig& listener) PURE;
 };
 
 using WorkerPtr = std::unique_ptr<Worker>;

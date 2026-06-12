@@ -246,6 +246,7 @@ const envoy::config::core::v3::Metadata*
 getMetadata(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
             envoy_dynamic_module_type_metadata_source metadata_source) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  filter->last_metadata_snapshot_.reset();
   auto* callbacks = filter->callbacks();
   if (!callbacks) {
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
@@ -277,9 +278,9 @@ getMetadata(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     if (upstreamInfo) {
       Upstream::HostDescriptionConstSharedPtr hostInfo = upstreamInfo->upstreamHost();
       if (hostInfo) {
-        Upstream::MetadataConstSharedPtr md = hostInfo->metadata();
-        if (md) {
-          return md.get();
+        filter->last_metadata_snapshot_ = hostInfo->metadata();
+        if (filter->last_metadata_snapshot_) {
+          return filter->last_metadata_snapshot_.get();
         }
       }
     }
@@ -290,9 +291,9 @@ getMetadata(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     if (upstreamInfo) {
       Upstream::HostDescriptionConstSharedPtr hostInfo = upstreamInfo->upstreamHost();
       if (hostInfo) {
-        Upstream::MetadataConstSharedPtr md = hostInfo->localityMetadata();
-        if (md) {
-          return md.get();
+        filter->last_metadata_snapshot_ = hostInfo->localityMetadata();
+        if (filter->last_metadata_snapshot_) {
+          return filter->last_metadata_snapshot_.get();
         }
       }
     }
@@ -1425,7 +1426,14 @@ bool envoy_dynamic_module_callback_http_get_filter_state_typed(
 void envoy_dynamic_module_callback_http_clear_route_cache(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  filter->decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+  if (filter->decoder_callbacks_ == nullptr) {
+    return;
+  }
+  auto downstream_callbacks = filter->decoder_callbacks_->downstreamCallbacks();
+  if (!downstream_callbacks.has_value()) {
+    return;
+  }
+  downstream_callbacks->clearRouteCache();
 }
 
 envoy_dynamic_module_type_http_filter_per_route_config_module_ptr
@@ -1745,6 +1753,9 @@ void envoy_dynamic_module_callback_http_add_custom_flag(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer flag) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  if (filter->decoder_callbacks_ == nullptr) {
+    return;
+  }
   absl::string_view flag_name_view(flag.ptr, flag.length);
   filter->decoder_callbacks_->streamInfo().addCustomFlag(flag_name_view);
 }
