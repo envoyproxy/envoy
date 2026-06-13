@@ -124,6 +124,20 @@ pub enum HostSelectionResult {
   AsyncPending(Box<dyn AsyncHostSelectionHandle>),
 }
 
+/// A host's IP address and port as packed integers.
+///
+/// This is the decoded form of the packed address returned by
+/// [`EnvoyClusterLoadBalancer::get_member_update_host_packed_address`]. The address bytes are in
+/// network byte order and the port is in host byte order, letting a module key its own host map by
+/// an integer rather than a formatted string.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PackedAddress {
+  /// An IPv4 address (4 bytes, network byte order) and port (host byte order).
+  V4([u8; 4], u16),
+  /// An IPv6 address (16 bytes, network byte order) and port (host byte order).
+  V6([u8; 16], u16),
+}
+
 /// A handle for canceling an in-progress asynchronous host selection.
 ///
 /// When the stream is destroyed before async host selection completes (e.g., due to a timeout),
@@ -660,6 +674,23 @@ pub trait EnvoyClusterLoadBalancer: Send {
     index: usize,
     is_added: bool,
   ) -> Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>;
+
+  /// Returns the address of an added or removed host during the
+  /// [`ClusterLb::on_host_membership_update`] callback as packed integers.
+  ///
+  /// Unlike [`EnvoyClusterLoadBalancer::get_member_update_host_address`], this reads the IP address
+  /// and port directly from the host's sockaddr without formatting a string, so a module can key
+  /// its own host map by an integer. It is only valid during the `on_host_membership_update`
+  /// callback.
+  ///
+  /// Set `is_added` to `true` to get an added host address, `false` for a removed host address.
+  /// Returns `None` when the index is out of bounds, the callback is not active, or the host has a
+  /// non-IP (pipe) address.
+  fn get_member_update_host_packed_address(
+    &self,
+    index: usize,
+    is_added: bool,
+  ) -> Option<PackedAddress>;
 }
 
 /// Envoy-side scheduler that dispatches events to the main thread.
@@ -1494,6 +1525,38 @@ impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
       None
     } else {
       Some(host)
+    }
+  }
+
+  fn get_member_update_host_packed_address(
+    &self,
+    index: usize,
+    is_added: bool,
+  ) -> Option<PackedAddress> {
+    let mut result = abi::envoy_dynamic_module_type_packed_address {
+      address_bytes: [0; 16],
+      port: 0,
+      family: 0,
+    };
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(
+        self.raw,
+        index,
+        is_added,
+        &mut result,
+      )
+    };
+    if !found {
+      return None;
+    }
+    match result.family {
+      4 => {
+        let mut v4 = [0u8; 4];
+        v4.copy_from_slice(&result.address_bytes[..4]);
+        Some(PackedAddress::V4(v4, result.port))
+      },
+      6 => Some(PackedAddress::V6(result.address_bytes, result.port)),
+      _ => None,
     }
   }
 }
