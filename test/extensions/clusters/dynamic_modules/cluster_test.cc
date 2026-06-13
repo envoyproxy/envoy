@@ -337,12 +337,28 @@ TEST_F(DynamicModuleClusterTest, DuplicateHostDetection) {
   EXPECT_EQ(3, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
   EXPECT_EQ(3, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
 
-  // A batch of only existing addresses adds nothing but still succeeds.
+  // Capture the host-set partition identity before a no-op push. A rebuild would replace these
+  // shared_ptrs (partitionHosts allocates new vectors), so identity is a precise "did we rebuild"
+  // signal. Also subscribe a membership callback: a republish fires it even with a (0,0) diff.
+  const auto* hosts_ptr_before = cluster->prioritySet().hostSetsPerPriority()[0]->hostsPtr().get();
+  const auto* healthy_ptr_before =
+      cluster->prioritySet().hostSetsPerPriority()[0]->healthyHostsPtr().get();
+  int membership_updates = 0;
+  auto cb_handle = cluster->prioritySet().addMemberUpdateCb(
+      [&](const Upstream::HostVector&, const Upstream::HostVector&) { ++membership_updates; });
+
+  // A batch of only existing addresses adds nothing but still succeeds, and must not rebuild or
+  // republish the host set.
   std::vector<Upstream::HostSharedPtr> hosts3;
   ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10001", "127.0.0.1:10003"}, {1, 1}, hosts3));
   EXPECT_EQ(0, hosts3.size());
   EXPECT_EQ(3, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
   EXPECT_EQ(3, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  // No rebuild: the partition shared_ptrs are unchanged and no membership callback fired.
+  EXPECT_EQ(hosts_ptr_before, cluster->prioritySet().hostSetsPerPriority()[0]->hostsPtr().get());
+  EXPECT_EQ(healthy_ptr_before,
+            cluster->prioritySet().hostSetsPerPriority()[0]->healthyHostsPtr().get());
+  EXPECT_EQ(0, membership_updates);
 }
 
 // Test that invalid addresses cause the entire batch to fail.
