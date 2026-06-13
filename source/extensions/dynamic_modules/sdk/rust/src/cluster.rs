@@ -130,6 +130,7 @@ pub enum HostSelectionResult {
 /// [`EnvoyClusterLoadBalancer::get_member_update_host_packed_address`]. The address bytes are in
 /// network byte order and the port is in host byte order, letting a module key its own host map by
 /// an integer rather than a formatted string.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PackedAddress {
   /// An IPv4 address (4 bytes, network byte order) and port (host byte order).
   V4([u8; 4], u16),

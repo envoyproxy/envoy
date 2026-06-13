@@ -5318,14 +5318,14 @@ fn test_cluster_lb_get_member_update_host_packed_address() {
       assert_eq!(addr, [127, 0, 0, 1]);
       assert_eq!(port, 10001);
     },
-    other => panic!("expected V4, got {:?}", other.is_some()),
+    other => panic!("expected V4, got {other:?}"),
   }
   match mock_lb.get_member_update_host_packed_address(0, false) {
     Some(cluster::PackedAddress::V6(addr, port)) => {
       assert_eq!(addr, [1; 16]);
       assert_eq!(port, 10002);
     },
-    other => panic!("expected V6, got {:?}", other.is_some()),
+    other => panic!("expected V6, got {other:?}"),
   }
 }
 
