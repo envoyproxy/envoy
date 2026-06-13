@@ -2228,6 +2228,22 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_access_logger_get_dynam
   return false;
 }
 
+__attribute__((weak)) bool envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_number(
+    envoy_dynamic_module_type_access_logger_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer, double*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_number: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_bool(
+    envoy_dynamic_module_type_access_logger_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer, bool*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_bool: not "
+               "implemented in this context");
+  return false;
+}
+
 __attribute__((weak)) bool envoy_dynamic_module_callback_access_logger_get_filter_state(
     envoy_dynamic_module_type_access_logger_envoy_ptr, envoy_dynamic_module_type_module_buffer,
     envoy_dynamic_module_type_envoy_buffer*) {

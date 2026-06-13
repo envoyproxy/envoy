@@ -741,6 +741,23 @@ bool envoy_dynamic_module_callback_access_logger_get_dynamic_metadata(
   return ContextAccessor::getDynamicMetadata(*logger->stream_info_, filter_name, path, result);
 }
 
+bool envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_number(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, double* result) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  return ContextAccessor::getDynamicMetadataNumber(*logger->stream_info_, filter_name, path,
+                                                   result);
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_bool(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, bool* result) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  return ContextAccessor::getDynamicMetadataBool(*logger->stream_info_, filter_name, path, result);
+}
+
 bool envoy_dynamic_module_callback_access_logger_get_filter_state(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result) {

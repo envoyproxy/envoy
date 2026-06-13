@@ -7001,6 +7001,34 @@ bool envoy_dynamic_module_callback_access_logger_get_dynamic_metadata(
     envoy_dynamic_module_type_module_buffer path, envoy_dynamic_module_type_envoy_buffer* result);
 
 /**
+ * Get a number value from dynamic metadata by filter name and key path.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param filter_name is the filter namespace in dynamic metadata.
+ * @param path is the key path within the filter namespace (can be nested with dots).
+ * @param result receives the number value. Only number-typed metadata is returned.
+ * @return true if a number value exists at the path, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_number(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, double* result);
+
+/**
+ * Get a bool value from dynamic metadata by filter name and key path.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param filter_name is the filter namespace in dynamic metadata.
+ * @param path is the key path within the filter namespace (can be nested with dots).
+ * @param result receives the bool value. Only bool-typed metadata is returned.
+ * @return true if a bool value exists at the path, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_bool(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, bool* result);
+
+/**
  * Get a value from filter state by key.
  *
  * @param logger_envoy_ptr is the pointer to the log context.

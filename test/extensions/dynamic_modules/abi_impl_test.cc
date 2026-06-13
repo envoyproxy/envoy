@@ -798,6 +798,12 @@ WEAK_STUB(AccessLoggerGetDownstreamTransportFailureReason,
 WEAK_STUB(AccessLoggerGetDynamicMetadata,
           envoy_dynamic_module_callback_access_logger_get_dynamic_metadata(nullptr, {nullptr, 0},
                                                                            {nullptr, 0}, nullptr))
+WEAK_STUB(AccessLoggerGetDynamicMetadataNumber,
+          envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_number(
+              nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(AccessLoggerGetDynamicMetadataBool,
+          envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_bool(
+              nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
 WEAK_STUB(AccessLoggerGetFilterState,
           envoy_dynamic_module_callback_access_logger_get_filter_state(nullptr, {nullptr, 0},
                                                                        nullptr))
