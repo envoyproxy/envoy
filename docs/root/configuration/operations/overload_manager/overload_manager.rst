@@ -312,6 +312,56 @@ Note in the example that the minimum idle time is specified as an absolute durat
 would be computed based on the maximum (specified elsewhere). So if ``idle_timeout`` is
 again 600 seconds, then the minimum timer value would be :math:`10\% \cdot 600s = 60s`.
 
+Per-timer triggers
+""""""""""""""""""
+
+By default all timers in ``timer_scale_factors`` share the action-level triggers and their scale
+factors are driven by the maximum pressure across those triggers. To give each timer its own
+independent pressure source, add a ``triggers`` list directly inside the ``timer_scale_factors``
+entry. When per-timer triggers are present they take precedence over the action-level triggers for
+that particular timer; other timers without their own triggers continue to use the action-level
+triggers as before.
+
+.. code-block:: yaml
+
+  name: "envoy.overload_actions.reduce_timeouts"
+  # Action-level trigger: drives timers that do NOT have their own per-timer triggers.
+  # In this example HTTP_DOWNSTREAM_STREAM_IDLE uses this trigger; the other two timers
+  # override it with their own triggers and are unaffected by fixed_heap pressure.
+  triggers:
+    - name: "envoy.resource_monitors.fixed_heap"
+      scaled:
+        scaling_threshold: 0.85
+        saturation_threshold: 0.95
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+    timer_scale_factors:
+      - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+        min_timeout: 1s
+        # Overrides the action-level trigger: scaled by custom resource1, not fixed_heap.
+        triggers:
+          - name: "envoy.resource_monitors.custom_resource1"
+            scaled:
+              scaling_threshold: 0.7
+              saturation_threshold: 0.9
+      - timer: HTTP_DOWNSTREAM_CONNECTION_MAX
+        min_timeout: 1s
+        # Overrides the action-level trigger: scaled by custom resource2, not fixed_heap.
+        triggers:
+          - name: "envoy.resource_monitors.custom_resource2"
+            scaled:
+              scaling_threshold: 0.6
+              saturation_threshold: 0.8
+      - timer: HTTP_DOWNSTREAM_STREAM_IDLE
+        min_timeout: 2s
+        # No per-timer triggers: falls back to the action-level fixed_heap trigger.
+
+In this configuration ``HTTP_DOWNSTREAM_CONNECTION_IDLE`` and ``HTTP_DOWNSTREAM_CONNECTION_MAX``
+are each driven by their own dedicated resource monitors, while ``HTTP_DOWNSTREAM_STREAM_IDLE``
+falls back to the action-level ``fixed_heap`` trigger. Changes in ``fixed_heap`` pressure have no
+effect on the first two timers. The action-level ``triggers`` field is still required by the schema
+even when some or all timers carry their own triggers.
+
 .. _config_overload_manager_limiting_connections:
 
 Limiting Active Connections
