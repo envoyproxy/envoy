@@ -24,6 +24,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_resource.h"
+#include "source/common/formatter/substitution_format_string.h"
 #include "source/common/http/conn_manager_config.h"
 #include "source/common/http/conn_manager_utility.h"
 #include "source/common/http/default_server_string.h"
@@ -641,8 +642,15 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   if (config.has_tracing()) {
     tracer_ = tracer_manager.getOrCreateTracer(getPerFilterTracerConfig(config));
-    tracing_config_ = std::make_unique<Http::TracingConnectionManagerConfig>(context.direction(),
-                                                                             config.tracing());
+    Formatter::CommandParserPtrVector command_parsers;
+    if (!config.tracing().formatters().empty()) {
+      auto command_parsers_or_error = Formatter::SubstitutionFormatStringUtils::parseFormatters(
+          config.tracing().formatters(), context_);
+      SET_AND_RETURN_IF_NOT_OK(command_parsers_or_error.status(), creation_status);
+      command_parsers = std::move(command_parsers_or_error.value());
+    }
+    tracing_config_ = std::make_unique<Http::TracingConnectionManagerConfig>(
+        context.direction(), config.tracing(), command_parsers);
   }
 
   for (const auto& access_log : config.access_log()) {

@@ -152,7 +152,7 @@ message HttpConnectionManager {
     JSON = 1;
   }
 
-  // [#next-free-field: 14]
+  // [#next-free-field: 15]
   message Tracing {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing";
@@ -268,6 +268,13 @@ message HttpConnectionManager {
     //
     // Default: false (context propagation is enabled)
     bool no_context_propagation = 13;
+
+    // Formatter command parsers used for HCM tracing custom tags and operation names.
+    // Route tracing formatter configuration is scoped separately. Built-in command parsers such
+    // as ``%CEL%`` are always available; this field is only needed to add extension parsers or to
+    // override a built-in parser's configuration.
+    // [#extension-category: envoy.formatter]
+    repeated config.core.v3.TypedExtensionConfig formatters = 14;
   }
 
   message InternalAddressConfig {

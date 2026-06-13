@@ -578,7 +578,8 @@ private:
  */
 class RouteTracingImpl : public RouteTracing {
 public:
-  explicit RouteTracingImpl(const envoy::config::route::v3::Tracing& tracing);
+  explicit RouteTracingImpl(const envoy::config::route::v3::Tracing& tracing,
+                            const Formatter::CommandParserPtrVector& command_parsers);
 
   // RouteTracing
   const envoy::type::v3::FractionalPercent& getClientSampling() const override;
@@ -919,7 +920,10 @@ private:
 
   static DecoratorConstPtr parseDecorator(const envoy::config::route::v3::Route& route);
 
-  static RouteTracingConstPtr parseRouteTracing(const envoy::config::route::v3::Route& route);
+  static RouteTracingConstPtr
+  parseRouteTracing(const envoy::config::route::v3::Route& route,
+                    Server::Configuration::ServerFactoryContext& factory_context,
+                    ProtobufMessage::ValidationVisitor& validator);
 
   bool evaluateRuntimeMatch(const uint64_t random_value) const;
 
