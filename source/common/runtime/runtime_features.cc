@@ -242,10 +242,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_strict_chunk_parsing);
 // Delay route selection in tcp_proxy until just before the upstream connection is established
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_delay_route_selection);
 
-// When enabled, WatchedDirectory subscribes to Modified (IN_MODIFY) events
-// in addition to MovedTo, allowing in-place file writes to trigger reload.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_watched_directory_modified_events);
-
 // Enable histograms of HTTP/2 header sizes, including cookie size.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_record_histograms);
 

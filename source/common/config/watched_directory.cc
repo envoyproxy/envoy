@@ -1,7 +1,5 @@
 #include "source/common/config/watched_directory.h"
 
-#include "source/common/runtime/runtime_features.h"
-
 namespace Envoy {
 namespace Config {
 
@@ -19,8 +17,7 @@ WatchedDirectory::WatchedDirectory(const envoy::config::core::v3::WatchedDirecto
                                    Event::Dispatcher& dispatcher, absl::Status& creation_status) {
   watcher_ = dispatcher.createFilesystemWatcher();
   auto events = Filesystem::Watcher::Events::MovedTo;
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.watched_directory_modified_events")) {
+  if (config.watch_modify()) {
     events = events | Filesystem::Watcher::Events::Modified;
   }
   SET_AND_RETURN_IF_NOT_OK(watcher_->addWatch(absl::StrCat(config.path(), "/"), events,

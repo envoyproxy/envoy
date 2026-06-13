@@ -4,7 +4,6 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
-#include "test/test_common/test_runtime.h"
 
 #include "gtest/gtest.h"
 
@@ -50,16 +49,13 @@ TEST(WatchedDirectory, CallbackNotSetDoesNotCrash) {
   EXPECT_TRUE(cb(Filesystem::Watcher::Events::MovedTo).ok());
 }
 
-// Verify that with the runtime guard enabled, WatchedDirectory subscribes to both
+// Verify that with watch_modify enabled, WatchedDirectory subscribes to both
 // MovedTo and Modified events, so in-place file writes trigger the callback.
-TEST(WatchedDirectory, ModifiedEventWithRuntimeGuardEnabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.watched_directory_modified_events", "true"}});
-
+TEST(WatchedDirectory, WatchModifyEnabled) {
   Event::MockDispatcher dispatcher;
   envoy::config::core::v3::WatchedDirectory config;
   config.set_path("foo/bar");
+  config.set_watch_modify(true);
   auto* watcher = new Filesystem::MockWatcher();
   EXPECT_CALL(dispatcher, createFilesystemWatcher_()).WillOnce(Return(watcher));
   Filesystem::Watcher::OnChangedCb cb;
