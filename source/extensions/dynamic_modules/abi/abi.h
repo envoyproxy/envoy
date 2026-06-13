@@ -10030,6 +10030,43 @@ envoy_dynamic_module_type_cluster_host_envoy_ptr
 envoy_dynamic_module_callback_cluster_lb_get_member_update_host(
     envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t index, bool is_added);
 
+/**
+ * envoy_dynamic_module_type_packed_address holds a host's IP address and port as packed integers,
+ * read directly from the host's parsed sockaddr without any string formatting. This is the output
+ * of envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address.
+ *
+ * @param address_bytes is the IP address in network byte order. An IPv4 address occupies the first
+ * four bytes; an IPv6 address occupies all sixteen. Bytes beyond the address are zeroed.
+ * @param port is the port in host byte order.
+ * @param family is 4 for an IPv4 address and 6 for an IPv6 address.
+ */
+typedef struct envoy_dynamic_module_type_packed_address {
+  uint8_t address_bytes[16];
+  uint16_t port;
+  uint8_t family;
+} envoy_dynamic_module_type_packed_address;
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address returns the
+ * address of an added or removed host during the on_cluster_lb_on_host_membership_update event hook
+ * as packed integers, read directly from the host's sockaddr with no string formatting or
+ * allocation. This is the packed-integer sibling of
+ * envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address, intended for modules
+ * that key their own host maps by an integer rather than a string. It is only valid during
+ * envoy_dynamic_module_on_cluster_lb_on_host_membership_update.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param index is the index of the host in the added or removed list.
+ * @param is_added is true to get an added host address, false to get a removed host address.
+ * @param result is the output buffer that receives the packed address. Its contents are unspecified
+ * when the callback returns false; callers must gate on the return value.
+ * @return true if the host was found and has an IP address, false on a null pointer, an
+ * out-of-bounds index, the callback not being active, or a non-IP (pipe) address.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t index, bool is_added,
+    envoy_dynamic_module_type_packed_address* result);
+
 // =============================================================================
 // =============================== Load Balancer ===============================
 // =============================================================================

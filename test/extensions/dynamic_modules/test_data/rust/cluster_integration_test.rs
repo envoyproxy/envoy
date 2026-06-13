@@ -59,6 +59,16 @@ fn new_cluster_config(
         metrics: envoy_cluster_metrics,
       }))
     },
+    "member_update_packed_address" => {
+      let counter_id = envoy_cluster_metrics
+        .define_counter("packed_address_verified_total")
+        .ok();
+      Some(Box::new(MemberUpdatePackedAddressClusterConfig {
+        upstream_address: config_str.to_string(),
+        counter_id,
+        metrics: envoy_cluster_metrics,
+      }))
+    },
     _ => None,
   }
 }
@@ -588,6 +598,132 @@ impl ClusterLb for WorkerLocalRebuildLb {
     if converged {
       if let Some(counter_id) = self.counter_id {
         let _ = self.metrics.increment_counter(counter_id, 1);
+      }
+    }
+  }
+}
+
+// =============================================================================
+// Packed member-update address.
+// =============================================================================
+//
+// Mirrors the worker-local-rebuild flow, but on_host_membership_update reads each added host's
+// address both as a formatted string (get_member_update_host_address) and as packed integers
+// (get_member_update_host_packed_address), then confirms the packed bytes parse back to the same
+// IP and port before incrementing a counter. This exercises the packed getter end to end through
+// the real module for whichever IP family the integration test runs under.
+
+const PACKED_ADDRESS_ADD_EVENT_ID: u64 = 300;
+
+struct MemberUpdatePackedAddressClusterConfig {
+  upstream_address: String,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterConfig for MemberUpdatePackedAddressClusterConfig {
+  fn new_cluster(&self, _envoy_cluster: &dyn EnvoyCluster) -> Box<dyn Cluster> {
+    Box::new(MemberUpdatePackedAddressCluster {
+      upstream_address: self.upstream_address.clone(),
+      counter_id: self.counter_id,
+      metrics: self.metrics.clone(),
+    })
+  }
+}
+
+struct MemberUpdatePackedAddressCluster {
+  upstream_address: String,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl Cluster for MemberUpdatePackedAddressCluster {
+  fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
+    envoy_cluster.pre_init_complete();
+    let scheduler = envoy_cluster.new_scheduler();
+    scheduler.commit(PACKED_ADDRESS_ADD_EVENT_ID);
+  }
+
+  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
+    Box::new(MemberUpdatePackedAddressLb {
+      hosts: Vec::new(),
+      index: 0,
+      counter_id: self.counter_id,
+      metrics: self.metrics.clone(),
+    })
+  }
+
+  fn on_scheduled(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
+    if event_id == PACKED_ADDRESS_ADD_EVENT_ID {
+      envoy_cluster.add_hosts(&[self.upstream_address.clone()], &[1u32]);
+    }
+  }
+}
+
+struct MemberUpdatePackedAddressLb {
+  hosts: Vec<usize>,
+  index: usize,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+// Confirms the packed address parses back to the same IP and port as the formatted string Envoy
+// returns for the host. Ipv4Addr/Ipv6Addr::octets() are in network byte order, matching the packed
+// bytes.
+fn packed_matches_string(packed: &PackedAddress, formatted: &str) -> bool {
+  let parsed = match formatted.parse::<std::net::SocketAddr>() {
+    Ok(addr) => addr,
+    Err(_) => return false,
+  };
+  match (packed, parsed) {
+    (PackedAddress::V4(bytes, port), std::net::SocketAddr::V4(v4)) => {
+      *bytes == v4.ip().octets() && *port == v4.port()
+    },
+    (PackedAddress::V6(bytes, port), std::net::SocketAddr::V6(v6)) => {
+      *bytes == v6.ip().octets() && *port == v6.port()
+    },
+    _ => false,
+  }
+}
+
+impl ClusterLb for MemberUpdatePackedAddressLb {
+  fn choose_host(
+    &mut self,
+    _context: Option<&dyn ClusterLbContext>,
+    _async_completion: Box<dyn EnvoyAsyncHostSelectionComplete>,
+  ) -> HostSelectionResult {
+    if self.hosts.is_empty() {
+      return HostSelectionResult::NoHost;
+    }
+    let idx = self.index % self.hosts.len();
+    self.index += 1;
+    HostSelectionResult::Selected(
+      self.hosts[idx] as abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+    )
+  }
+
+  fn on_host_membership_update(
+    &mut self,
+    envoy_lb: &dyn EnvoyClusterLoadBalancer,
+    num_hosts_added: usize,
+    _num_hosts_removed: usize,
+  ) {
+    for i in 0..num_hosts_added {
+      // The packed bytes must agree with the formatted address for the same host.
+      let verified = match (
+        envoy_lb.get_member_update_host_packed_address(i, true),
+        envoy_lb.get_member_update_host_address(i, true),
+      ) {
+        (Some(packed), Some(formatted)) => packed_matches_string(&packed, &formatted),
+        _ => false,
+      };
+      if let Some(host) = envoy_lb.get_member_update_host(i, true) {
+        self.hosts.push(host as usize);
+      }
+      if verified {
+        if let Some(counter_id) = self.counter_id {
+          let _ = self.metrics.increment_counter(counter_id, 1);
+        }
       }
     }
   }
