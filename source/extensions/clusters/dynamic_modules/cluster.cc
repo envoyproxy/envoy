@@ -453,6 +453,13 @@ bool DynamicModuleCluster::addHosts(
     result_hosts.emplace_back(std::move(host_result.value()));
   }
 
+  // Every incoming address was already present in the host set, so there is nothing to add. Return
+  // without rebuilding and republishing the unchanged host set, which would otherwise fan out a
+  // no-op membership update to every worker.
+  if (result_hosts.empty()) {
+    return true;
+  }
+
   {
     absl::WriterMutexLock lock(host_map_lock_);
     for (const auto& host : result_hosts) {
