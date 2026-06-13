@@ -390,6 +390,18 @@ ContextImpl::ContextImpl(
         }
       }
       break;
+    case ProtoPolicy::CNSA2_202603:
+      for (auto& tls_context : tls_contexts_) {
+        int rc = SSL_CTX_set_compliance_policy(tls_context.ssl_ctx_.get(),
+                                               ssl_compliance_policy_cnsa2_202603);
+        if (rc != 1) {
+          creation_status = absl::InvalidArgumentError(
+              absl::StrCat("Failed to apply CNSA2_202603 compliance policy: ",
+                           Utility::getLastCryptoError().value_or("")));
+          return;
+        }
+      }
+      break;
     default:
       creation_status = absl::InvalidArgumentError("Unknown compliance policy");
       return;
