@@ -9976,6 +9976,7 @@ envoy_dynamic_module_callback_cluster_http_callout(
  * the cluster's host set.
  *
  * During this callback, the module can call
+ * envoy_dynamic_module_callback_cluster_lb_get_member_update_host to get the host pointers, or
  * envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address to get the addresses of
  * the added or removed hosts by index.
  *
@@ -10012,6 +10013,22 @@ void envoy_dynamic_module_on_cluster_lb_on_host_membership_update(
 bool envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address(
     envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t index, bool is_added,
     envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_member_update_host returns the host pointer of an
+ * added or removed host during the on_cluster_lb_on_host_membership_update event hook. This
+ * returns the host directly from the added or removed list without an address lookup, so it is
+ * only valid during envoy_dynamic_module_on_cluster_lb_on_host_membership_update.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param index is the index of the host in the added or removed list.
+ * @param is_added is true to get an added host, false to get a removed host.
+ * @return the host pointer if found, or nullptr if the index is out of bounds or the callback is
+ * not active.
+ */
+envoy_dynamic_module_type_cluster_host_envoy_ptr
+envoy_dynamic_module_callback_cluster_lb_get_member_update_host(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t index, bool is_added);
 
 // =============================================================================
 // =============================== Load Balancer ===============================
