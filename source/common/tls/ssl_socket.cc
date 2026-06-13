@@ -192,6 +192,7 @@ Network::Connection& SslSocket::connection() const { return callbacks_->connecti
 
 void SslSocket::onSuccess(SSL* ssl) {
   ctx_->logHandshake(ssl);
+
   if (callbacks_->connection().streamInfo().upstreamInfo()) {
     callbacks_->connection()
         .streamInfo()

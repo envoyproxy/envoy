@@ -89,8 +89,20 @@ private:
   std::vector<Network::Address::InstanceConstSharedPtr> current_resolved_address_list_;
   LogicalHostSharedPtr logical_host_;
   Network::ActiveDnsQuery* active_dns_query_{};
+  Network::ActiveDnsQuery* active_ech_dns_query_{};
   const LocalInfo::LocalInfo& local_info_;
   const envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_;
+  Runtime::Loader& runtime_;
+
+  bool address_resolved_{false};
+  bool ech_resolved_{false};
+  Network::DnsResolver::ResolutionStatus address_status_;
+  Network::DnsResolver::ResolutionStatus ech_status_;
+  std::list<Network::DnsResponse> resolved_addresses_;
+  std::vector<uint8_t> resolved_ech_config_;
+  std::vector<uint8_t> current_resolved_ech_config_;
+
+  void onResolutionComplete();
 };
 
 } // namespace Upstream

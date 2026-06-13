@@ -40,14 +40,20 @@ public:
   // DnsResolver
   ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                           ResolveCb callback) override;
+  ActiveDnsQuery* resolveRecord(const std::string& dns_name, RecordType record_type,
+                                ResolveRecordCb callback) override;
   void resetNetworking() override {}
 
 protected:
   class PendingQuery : public ActiveDnsQuery {
   public:
     PendingQuery(const std::string& dns_name, DnsLookupFamily dns_lookup_family, ResolveCb callback)
-        : dns_name_(dns_name), dns_lookup_family_(dns_lookup_family),
-          callback_(std::move(callback)) {}
+        : dns_name_(dns_name), is_record_query_(false), dns_lookup_family_(dns_lookup_family),
+          record_type_(RecordType::A), callback_(std::move(callback)) {}
+
+    PendingQuery(const std::string& dns_name, RecordType record_type, ResolveRecordCb callback)
+        : dns_name_(dns_name), is_record_query_(true), dns_lookup_family_(DnsLookupFamily::Auto),
+          record_type_(record_type), callback_(std::move(callback)) {}
 
     void cancel(CancelReason) override {
       ENVOY_LOG(trace, "cancelling query [{}]", dns_name_);
@@ -80,7 +86,9 @@ protected:
 
     absl::Mutex mutex_;
     const std::string dns_name_;
+    const bool is_record_query_;
     const DnsLookupFamily dns_lookup_family_;
+    const RecordType record_type_;
     ResolveCb callback_;
     bool cancelled_{false};
     std::vector<Trace> traces_;

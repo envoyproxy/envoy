@@ -50,6 +50,7 @@ envoy_cc_test(
         "//source/common/tls:context_config_lib",
         "//source/common/tls:context_lib",
         "//source/common/tls:ssl_handshaker_lib",
+        "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/transport_sockets/tls:config",
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/common/tls/cert_selector:async_cert_selector",

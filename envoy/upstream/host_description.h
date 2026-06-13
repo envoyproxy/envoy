@@ -259,6 +259,11 @@ public:
   virtual const envoy::config::core::v3::Locality& locality() const PURE;
 
   /**
+   * @return the ECH configuration for this host, if available.
+   */
+  virtual const std::vector<uint8_t>& echConfig() const PURE;
+
+  /**
    * @return the metadata associated with the locality endpoints the host belongs to.
    */
   virtual const MetadataConstSharedPtr localityMetadata() const PURE;

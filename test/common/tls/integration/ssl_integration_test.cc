@@ -1,3 +1,5 @@
+#include <openssl/hpke.h>
+
 #include <memory>
 #include <string>
 
@@ -5,10 +7,14 @@
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/network/dns_resolver.h"
+#include "envoy/registry/registry.h"
 
+#include "source/common/common/dns_utils.h"
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/common/ssl/ssl.h"
 #include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/client_ssl_socket.h"
@@ -1477,6 +1483,217 @@ typed_config:
                                TestUtility::DefaultTimeout, dispatcher_.get());
 
   connection.reset();
+}
+
+static std::vector<uint8_t> g_test_ech_config_list;
+static Network::Address::IpVersion g_test_ech_ip_version = Network::Address::IpVersion::v4;
+
+class TestEchDnsResolver : public Network::DnsResolver {
+public:
+  TestEchDnsResolver(const std::vector<uint8_t>& ech_config_list,
+                     Network::Address::IpVersion ip_version)
+      : ech_config_list_(ech_config_list), ip_version_(ip_version) {}
+
+  Network::ActiveDnsQuery* resolve(const std::string&, Network::DnsLookupFamily,
+                                   ResolveCb callback) override {
+    std::list<Network::DnsResponse> responses;
+    std::string addr = (ip_version_ == Network::Address::IpVersion::v4) ? "127.0.0.1" : "::1";
+    auto address = Network::Utility::parseInternetAddressNoThrow(addr, 0);
+    responses.emplace_back(address, std::chrono::seconds(60));
+    callback(ResolutionStatus::Completed, "mock dns", std::move(responses));
+    return nullptr;
+  }
+
+  Network::ActiveDnsQuery* resolveRecord(const std::string&, Network::RecordType record_type,
+                                         ResolveRecordCb callback) override {
+    std::list<Network::DnsResponse> responses;
+    if (record_type == Network::RecordType::HTTPS) {
+      std::vector<uint8_t> rdata;
+      // priority = 1 (2 bytes)
+      rdata.push_back(0);
+      rdata.push_back(1);
+      // target name = "." (1 byte, 0x00)
+      rdata.push_back(0);
+      // ECH param key = 5 (2 bytes)
+      rdata.push_back(0);
+      rdata.push_back(5);
+      // length (2 bytes)
+      uint16_t len = ech_config_list_.size();
+      rdata.push_back(len >> 8);
+      rdata.push_back(len & 0xFF);
+      // value
+      rdata.insert(rdata.end(), ech_config_list_.begin(), ech_config_list_.end());
+
+      responses.emplace_back(std::move(rdata), std::chrono::seconds(60));
+      callback(ResolutionStatus::Completed, "mock dns https", std::move(responses));
+    } else {
+      callback(ResolutionStatus::Failure, "mock dns failure", std::move(responses));
+    }
+    return nullptr;
+  }
+
+  void resetNetworking() override {}
+
+private:
+  const std::vector<uint8_t> ech_config_list_;
+  const Network::Address::IpVersion ip_version_;
+};
+
+class TestEchDnsResolverFactory : public Network::DnsResolverFactory {
+public:
+  std::string name() const override { return "envoy.network.dns_resolver.test_ech"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Empty>();
+  }
+  absl::StatusOr<Network::DnsResolverSharedPtr>
+  createDnsResolver(Event::Dispatcher&, Api::Api&,
+                    const envoy::config::core::v3::TypedExtensionConfig&) const override {
+    return std::make_shared<TestEchDnsResolver>(g_test_ech_config_list, g_test_ech_ip_version);
+  }
+};
+
+REGISTER_FACTORY(TestEchDnsResolverFactory, Network::DnsResolverFactory);
+
+class SslEchIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                              public SslIntegrationTestBase {
+public:
+  SslEchIntegrationTest() : SslIntegrationTestBase(GetParam()) {
+    g_test_ech_ip_version = GetParam();
+    server_tlsv1_3_ = true;
+  }
+
+  void SetUp() override {
+    // Generate ECH keys for the test
+    bssl::ScopedEVP_HPKE_KEY key;
+    uint8_t* ech_config;
+    size_t ech_config_len;
+    ASSERT_TRUE(EVP_HPKE_KEY_generate(key.get(), EVP_hpke_x25519_hkdf_sha256()));
+    ASSERT_TRUE(SSL_marshal_ech_config(&ech_config, &ech_config_len, /*config_id=*/1, key.get(),
+                                       "public.example.com", 64));
+    bssl::UniquePtr<uint8_t> free_ech_config(ech_config);
+
+    // Save the server ECH keys
+    server_ech_keys_ = SSL_ECH_KEYS_new();
+    ASSERT_NE(server_ech_keys_, nullptr);
+    ASSERT_TRUE(SSL_ECH_KEYS_add(server_ech_keys_, /*is_retry_config=*/1, ech_config,
+                                 ech_config_len, key.get()));
+
+    // Marshal the retry configs to ECHConfigList for the client
+    uint8_t* ech_config_list;
+    size_t ech_config_list_len;
+    ASSERT_TRUE(SSL_ECH_KEYS_marshal_retry_configs(server_ech_keys_, &ech_config_list,
+                                                   &ech_config_list_len));
+    bssl::UniquePtr<uint8_t> free_ech_config_list(ech_config_list);
+
+    g_test_ech_config_list.assign(ech_config_list, ech_config_list + ech_config_list_len);
+  }
+
+  void TearDown() override {
+    if (server_ech_keys_) {
+      SSL_ECH_KEYS_free(server_ech_keys_);
+    }
+    SslIntegrationTestBase::TearDown();
+  }
+
+  Network::DownstreamTransportSocketFactoryPtr
+  createUpstreamTlsContext(const FakeUpstreamConfig& upstream_config) override {
+    auto factory = SslIntegrationTestBase::createUpstreamTlsContext(upstream_config);
+    auto* ssl_factory =
+        dynamic_cast<Extensions::TransportSockets::Tls::ServerSslSocketFactory*>(factory.get());
+    if (ssl_factory && server_ech_keys_) {
+      auto server_context =
+          Extensions::TransportSockets::Tls::ServerSslSocketFactoryPeer::getServerContext(
+              *ssl_factory);
+      auto* context_impl =
+          dynamic_cast<Extensions::TransportSockets::Tls::ContextImpl*>(server_context.get());
+      if (context_impl) {
+        auto ssl_ctxs =
+            Extensions::TransportSockets::Tls::ContextImplPeer::getSslContexts(*context_impl);
+        for (auto* ctx : ssl_ctxs) {
+          RELEASE_ASSERT(SSL_CTX_set1_ech_keys(ctx, server_ech_keys_) == 1, "");
+        }
+      }
+    }
+    return factory;
+  }
+
+private:
+  SSL_ECH_KEYS* server_ech_keys_{nullptr};
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, SslEchIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Test that ECH is successfully negotiated when ECH is enabled and valid keys are provided.
+TEST_P(SslEchIntegrationTest, EchSuccess) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_ech", "true"}});
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    cluster->set_type(envoy::config::cluster::v3::Cluster::LOGICAL_DNS);
+
+    auto* typed_dns_resolver_config = cluster->mutable_typed_dns_resolver_config();
+    typed_dns_resolver_config->set_name("envoy.network.dns_resolver.test_ech");
+    typed_dns_resolver_config->mutable_typed_config()->PackFrom(Protobuf::Empty());
+  });
+
+  upstream_tls_ = true;
+  config_helper_.configureUpstreamTls(
+      /*use_alpn=*/true, /*http3=*/false, /*alternate_protocol_cache_config=*/absl::nullopt,
+      [](envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context) {
+        tls_context.mutable_common_tls_context()
+            ->mutable_tls_params()
+            ->set_tls_minimum_protocol_version(
+                envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+        tls_context.mutable_common_tls_context()
+            ->mutable_tls_params()
+            ->set_tls_maximum_protocol_version(
+                envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+      });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeSslConn());
+
+  // Send request headers
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // Wait for connection to upstream
+  FakeHttpConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection));
+
+  // Wait for request headers on upstream
+  FakeStreamPtr upstream_request;
+  ASSERT_TRUE(fake_upstream_connection->waitForNewStream(*dispatcher_, upstream_request));
+  ASSERT_TRUE(upstream_request->waitForHeadersComplete());
+
+  // Verify ECH was accepted on the server side
+  {
+    Network::Connection& conn = fake_upstream_connection->connection();
+    Ssl::ConnectionInfoConstSharedPtr ssl_info = conn.ssl();
+    ASSERT_NE(ssl_info, nullptr);
+    auto* handshaker =
+        dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(ssl_info.get());
+    ASSERT_NE(handshaker, nullptr);
+    SSL* ssl = handshaker->ssl();
+    ASSERT_NE(ssl, nullptr);
+    EXPECT_EQ(SSL_ech_accepted(ssl), 1);
+  }
+
+  // Send response headers from upstream and end stream
+  upstream_request->encodeHeaders(default_response_headers_, true);
+
+  // Wait for response to be decoded by client
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Cleanup
+  codec_client_->close();
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
 } // namespace Ssl

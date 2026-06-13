@@ -4,11 +4,17 @@
 # are allowed for any otherwise correctly spelled word.
 
 Allshard
+ECHConfig
+ECHConfigList
 FLUSHALL
 NUMPAT
 PUBSUB
 RANDOMKEY
+RCODE
+RDATA
+RDLEN
 SLOWLOG
+SvcPriority
 addend
 addrlen
 defragmentation
@@ -514,6 +520,7 @@ STDSTRING
 STL
 STRLEN
 STS
+rrclass
 subcluster
 SUBCOMMAND
 SVG

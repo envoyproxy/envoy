@@ -171,6 +171,15 @@ ClientContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& o
   }
   RETURN_IF_NOT_OK(parse_status);
 
+  if (options && !options->echConfig().empty()) {
+    const int rc = SSL_set1_ech_config_list(ssl_con.get(), options->echConfig().data(),
+                                            options->echConfig().size());
+    if (rc != 1) {
+      return absl::InvalidArgumentError(absl::StrCat(
+          "Failed to set ECH config: ", Utility::getLastCryptoError().value_or("unknown")));
+    }
+  }
+
   if (allow_renegotiation_) {
     SSL_set_renegotiate_mode(ssl_con.get(), ssl_renegotiate_freely);
   }

@@ -24,3 +24,12 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/network/dns_resolver/getaddrinfo/v3:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "dns_packet_parser_test",
+    srcs = ["dns_packet_parser_test.cc"],
+    extension_names = ["envoy.network.dns_resolver.getaddrinfo"],
+    deps = [
+        "//source/extensions/network/dns_resolver/getaddrinfo:config",
+    ],
+)

@@ -1,5 +1,11 @@
 #include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 
+#ifdef __ANDROID__
+#include <poll.h>
+
+#include "source/extensions/network/dns_resolver/getaddrinfo/dns_packet_parser.h"
+#endif
+
 namespace Envoy {
 namespace Network {
 namespace {
@@ -63,6 +69,25 @@ ActiveDnsQuery* GetAddrInfoDnsResolver::resolve(const std::string& dns_name,
     absl::MutexLock guard(mutex_);
     if (config_.has_num_retries()) {
       // + 1 to include the initial query.
+      pending_queries_.push_back({std::move(new_query), config_.num_retries().value() + 1});
+    } else {
+      pending_queries_.push_back({std::move(new_query), absl::nullopt});
+    }
+  }
+  return active_query;
+}
+
+ActiveDnsQuery* GetAddrInfoDnsResolver::resolveRecord(const std::string& dns_name,
+                                                      RecordType record_type,
+                                                      ResolveRecordCb callback) {
+  ENVOY_LOG(trace, "adding new record query [{}] type={} to pending queries", dns_name,
+            static_cast<int>(record_type));
+  auto new_query = std::make_unique<PendingQuery>(dns_name, record_type, std::move(callback));
+  new_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::NotStarted));
+  ActiveDnsQuery* active_query = new_query.get();
+  {
+    absl::MutexLock guard(mutex_);
+    if (config_.has_num_retries()) {
       pending_queries_.push_back({std::move(new_query), config_.num_retries().value() + 1});
     } else {
       pending_queries_.push_back({std::move(new_query), absl::nullopt});
@@ -168,67 +193,126 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
     // For mock testing make sure the getaddrinfo() response is freed prior to the post.
     std::pair<ResolutionStatus, std::list<DnsResponse>> response;
     std::string details;
-    {
-      next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Starting));
-      addrinfo hints;
-      memset(&hints, 0, sizeof(hints));
-      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.getaddrinfo_no_ai_flags")) {
-        hints.ai_flags = AI_ADDRCONFIG;
-      }
-      hints.ai_family = AF_UNSPEC;
-      // If we don't specify a socket type, every address will appear twice, once
-      // for SOCK_STREAM and one for SOCK_DGRAM. Since we do not return the family
-      // anyway, just pick one.
-      hints.ai_socktype = SOCK_STREAM;
-      addrinfo* addrinfo_result_do_not_use = nullptr;
-      auto rc = Api::OsSysCallsSingleton::get().getaddrinfo(next_query->dns_name_.c_str(), nullptr,
-                                                            &hints, &addrinfo_result_do_not_use);
-      auto addrinfo_wrapper = AddrInfoWrapper(addrinfo_result_do_not_use);
-      if (rc.return_value_ == 0) {
-        next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Success));
-        response = processResponse(*next_query, addrinfo_wrapper.get());
-      } else if (rc.return_value_ == EAI_AGAIN) {
-        if (!num_retries.has_value()) {
-          ENVOY_LOG(trace, "retrying query [{}]", next_query->dns_name_);
-          next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Retrying));
-          {
-            absl::MutexLock guard(mutex_);
-            pending_queries_.push_back({std::move(next_query), absl::nullopt});
+
+    if (next_query->is_record_query_) {
+      if (next_query->record_type_ == RecordType::HTTPS) {
+#if defined(__ANDROID__)
+        uint64_t network = 0; // NETWORK_UNSPECIFIED
+        next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Starting));
+
+        auto rc = Api::OsSysCallsSingleton::get().android_res_nquery(
+            network, next_query->dns_name_.c_str(), 1 /* ns_c_in */, 65 /* HTTPS */, 0);
+        if (rc.return_value_ >= 0) {
+          os_fd_t fd = rc.return_value_;
+          pollfd pfd;
+          pfd.fd = fd;
+          pfd.events = POLLIN;
+          pfd.revents = 0;
+
+          int poll_rc = ::poll(&pfd, 1, 5000); // 5s timeout
+          if (poll_rc > 0 && (pfd.revents & POLLIN)) {
+            int rcode = 0;
+            std::vector<uint8_t> answer(4096);
+            auto res_rc = Api::OsSysCallsSingleton::get().android_res_nresult(
+                fd, &rcode, answer.data(), answer.size());
+            ::close(fd);
+
+            if (res_rc.return_value_ >= 0) {
+              size_t len = res_rc.return_value_;
+              answer.resize(len);
+
+              DnsPacketParser parser(std::move(answer));
+              std::list<DnsResponse> records = parser.parseHttpsRecords();
+              if (!records.empty()) {
+                next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Success));
+                response = std::make_pair(ResolutionStatus::Completed, std::move(records));
+              } else {
+                next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::NoResult));
+                response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
+              }
+            } else {
+              ENVOY_LOG(debug, "android_res_nresult failed: rc={} errno={}", res_rc.return_value_,
+                        res_rc.errno_);
+              next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Failed));
+              response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
+            }
+          } else {
+            ::close(fd);
+            ENVOY_LOG(debug, "poll failed or timed out for query [{}]", next_query->dns_name_);
+            next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Failed));
+            response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
           }
-          continue;
+        } else {
+          ENVOY_LOG(debug, "android_res_nquery failed: rc={} errno={}", rc.return_value_,
+                    rc.errno_);
+          next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Failed));
+          response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
         }
-        (*num_retries)--;
-        if (*num_retries > 0) {
-          ENVOY_LOG(trace, "retrying query [{}], num_retries: {}", next_query->dns_name_,
-                    *num_retries);
-          next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Retrying));
-          {
-            absl::MutexLock guard(mutex_);
-            pending_queries_.push_back({std::move(next_query), *num_retries});
-          }
-          continue;
-        }
-        ENVOY_LOG(debug, "not retrying query [{}] because num_retries: {}", next_query->dns_name_,
-                  *num_retries);
-        next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::DoneRetrying));
-        response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
-      } else if (rc.return_value_ == EAI_NONAME || rc.return_value_ == EAI_NODATA) {
-        // Treat NONAME and NODATA as DNS records with no results and a failure.
-        // Experiments on Android have shown that treating NONAME and NODATA as success leads to
-        // many more net.dns and connection-level failures.
-        // NOTE: this differs from how the c-ares resolver treats NONAME and NODATA:
-        // https://github.com/envoyproxy/envoy/blob/099d85925b32ce8bf06e241ee433375a0a3d751b/source/extensions/network/dns_resolver/cares/dns_impl.h#L109-L111.
-        ENVOY_LOG(debug, "getaddrinfo for host={} has no results rc={}", next_query->dns_name_,
-                  gai_strerror(rc.return_value_));
-        next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::NoResult));
-        response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
-      } else {
-        ENVOY_LOG(debug, "getaddrinfo failed for host={} with rc={} errno={}",
-                  next_query->dns_name_, gai_strerror(rc.return_value_), errorDetails(rc.errno_));
+#else
         next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Failed));
         response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
+        details = "Unsupported platform for HTTPS resolution";
+#endif
+      } else {
+        next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Failed));
+        response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
+        details = "Unsupported record type";
       }
-      details = gai_strerror(rc.return_value_);
+    } else {
+      {
+        next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Starting));
+        addrinfo hints;
+        memset(&hints, 0, sizeof(hints));
+        if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.getaddrinfo_no_ai_flags")) {
+          hints.ai_flags = AI_ADDRCONFIG;
+        }
+        hints.ai_family = AF_UNSPEC;
+        hints.ai_socktype = SOCK_STREAM;
+        addrinfo* addrinfo_result_do_not_use = nullptr;
+        auto rc = Api::OsSysCallsSingleton::get().getaddrinfo(
+            next_query->dns_name_.c_str(), nullptr, &hints, &addrinfo_result_do_not_use);
+        auto addrinfo_wrapper = AddrInfoWrapper(addrinfo_result_do_not_use);
+        if (rc.return_value_ == 0) {
+          next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Success));
+          response = processResponse(*next_query, addrinfo_wrapper.get());
+        } else if (rc.return_value_ == EAI_AGAIN) {
+          if (!num_retries.has_value()) {
+            ENVOY_LOG(trace, "retrying query [{}]", next_query->dns_name_);
+            next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Retrying));
+            {
+              absl::MutexLock guard(mutex_);
+              pending_queries_.push_back({std::move(next_query), absl::nullopt});
+            }
+            continue;
+          }
+          (*num_retries)--;
+          if (*num_retries > 0) {
+            ENVOY_LOG(trace, "retrying query [{}], num_retries: {}", next_query->dns_name_,
+                      *num_retries);
+            next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Retrying));
+            {
+              absl::MutexLock guard(mutex_);
+              pending_queries_.push_back({std::move(next_query), *num_retries});
+            }
+            continue;
+          }
+          ENVOY_LOG(debug, "not retrying query [{}] because num_retries: {}", next_query->dns_name_,
+                    *num_retries);
+          next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::DoneRetrying));
+          response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
+        } else if (rc.return_value_ == EAI_NONAME || rc.return_value_ == EAI_NODATA) {
+          ENVOY_LOG(debug, "getaddrinfo for host={} has no results rc={}", next_query->dns_name_,
+                    gai_strerror(rc.return_value_));
+          next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::NoResult));
+          response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
+        } else {
+          ENVOY_LOG(debug, "getaddrinfo failed for host={} with rc={} errno={}",
+                    next_query->dns_name_, gai_strerror(rc.return_value_), errorDetails(rc.errno_));
+          next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Failed));
+          response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
+        }
+        details = gai_strerror(rc.return_value_);
+      }
     }
 
     dispatcher_.post([finished_query = std::move(next_query), response = std::move(response),

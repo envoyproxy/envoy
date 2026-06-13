@@ -226,6 +226,12 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
   OptionsImplBase options(Server::createTestOptionsImpl(
       config_path_, "", version, validation_config, concurrency, drain_time, drain_strategy,
       use_bootstrap_node_metadata, std::move(config_proto_)));
+  auto env_log_level = Envoy::TestEnvironment::getOptions().logLevel();
+  if (env_log_level == spdlog::level::trace || env_log_level == spdlog::level::debug) {
+    options.setLogLevel(env_log_level);
+  }
+  options.setLogPath(Envoy::TestEnvironment::getOptions().logPath());
+
   Thread::MutexBasicLockable lock;
 
   Random::RandomGeneratorPtr random_generator;

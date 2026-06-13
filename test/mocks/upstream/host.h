@@ -122,6 +122,7 @@ public:
   MOCK_METHOD(void, addLbPolicyData, (HostLbPolicyDataPtr lb_policy_data));
   MOCK_METHOD(size_t, lbPolicyDataCount, (), (const));
   MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyDataAt, (size_t index), (const));
+  MOCK_METHOD(const std::vector<uint8_t>&, echConfig, (), (const));
 
   std::string hostname_;
   std::string observability_name_;
@@ -133,6 +134,7 @@ public:
   HostStats stats_;
   LoadMetricStatsImpl load_metric_stats_;
   envoy::config::core::v3::Locality locality_;
+  std::vector<uint8_t> ech_config_;
   mutable Stats::TestUtil::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
 
@@ -236,9 +238,11 @@ public:
   MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyDataAt, (size_t index), (const));
   MOCK_METHOD(void, setLastHealthCheckHttpStatus, (uint64_t));
   MOCK_METHOD(absl::optional<uint64_t>, lastHealthCheckHttpStatus, (), (const));
+  MOCK_METHOD(const std::vector<uint8_t>&, echConfig, (), (const));
 
   bool disable_active_health_check_ = false;
   std::string observability_name_;
+  std::vector<uint8_t> ech_config_;
 };
 
 class MockHost : public MockHostLight {

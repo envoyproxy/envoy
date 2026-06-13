@@ -188,6 +188,7 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_xdstp_based_config_singleton_subsc
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_disable_quic_rx_queue_overflow_socket_options);
 // TODO(abeyad): Flip to true after prod testing.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_disable_quic_ip_packet_info_socket_options);
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_ech);
 
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.

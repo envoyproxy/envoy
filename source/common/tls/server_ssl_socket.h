@@ -33,6 +33,8 @@ namespace Tls {
 class ServerSslSocketFactory : public Network::DownstreamTransportSocketFactory,
                                public Secret::SecretCallbacks,
                                Logger::Loggable<Logger::Id::config> {
+  friend class ServerSslSocketFactoryPeer;
+
 public:
   static absl::StatusOr<std::unique_ptr<ServerSslSocketFactory>>
   create(Envoy::Ssl::ServerContextConfigPtr config, Envoy::Ssl::ContextManager& manager,

@@ -4,6 +4,15 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#if defined(__ANDROID__)
+#if __ANDROID_API__ >= 23
+#include <android/multinetwork.h>
+#else
+typedef uint64_t net_handle_t;
+#endif
+#include <dlfcn.h>
+#endif
+
 #include <cerrno>
 #include <string>
 
@@ -428,6 +437,62 @@ SysCallIntResult OsSysCallsImpl::getrlimit(int resource, struct rlimit* rlim) {
 SysCallIntResult OsSysCallsImpl::setrlimit(int resource, const struct rlimit* rlim) {
   const int rc = ::setrlimit(resource, rlim);
   return {rc, errno};
+}
+
+SysCallIntResult OsSysCallsImpl::android_res_nquery(uint64_t network, const char* dname,
+                                                    int ns_class, int ns_type, uint32_t flags) {
+#if defined(__ANDROID__)
+  typedef int (*pfn_android_res_nquery)(net_handle_t network, const char* dname, int ns_class,
+                                        int ns_type, uint32_t flags);
+  static pfn_android_res_nquery fn = nullptr;
+  static bool searched = false;
+  if (!searched) {
+    void* handle = dlopen("libc.so", RTLD_NOW | RTLD_LOCAL);
+    if (handle != nullptr) {
+      fn = reinterpret_cast<pfn_android_res_nquery>(dlsym(handle, "android_res_nquery"));
+    }
+    searched = true;
+  }
+  if (fn != nullptr) {
+    int rc = fn(static_cast<net_handle_t>(network), dname, ns_class, ns_type, flags);
+    return {rc, errno};
+  }
+  return {-1, ENOSYS};
+#else
+  (void)network;
+  (void)dname;
+  (void)ns_class;
+  (void)ns_type;
+  (void)flags;
+  return {-1, ENOSYS};
+#endif
+}
+
+SysCallIntResult OsSysCallsImpl::android_res_nresult(os_fd_t fd, int* rcode, uint8_t* answer,
+                                                     size_t anslen) {
+#if defined(__ANDROID__)
+  typedef int (*pfn_android_res_nresult)(int fd, int* rcode, uint8_t* answer, size_t anslen);
+  static pfn_android_res_nresult fn = nullptr;
+  static bool searched = false;
+  if (!searched) {
+    void* handle = dlopen("libc.so", RTLD_NOW | RTLD_LOCAL);
+    if (handle != nullptr) {
+      fn = reinterpret_cast<pfn_android_res_nresult>(dlsym(handle, "android_res_nresult"));
+    }
+    searched = true;
+  }
+  if (fn != nullptr) {
+    int rc = fn(fd, rcode, answer, anslen);
+    return {rc, errno};
+  }
+  return {-1, ENOSYS};
+#else
+  (void)fd;
+  (void)rcode;
+  (void)answer;
+  (void)anslen;
+  return {-1, ENOSYS};
+#endif
 }
 
 } // namespace Api

@@ -36,9 +36,45 @@ public:
   const StreamInfo::FilterState::Objects& downstreamSharedFilterStateObjects() const override {
     return inner_options_->downstreamSharedFilterStateObjects();
   }
+  const std::vector<uint8_t>& echConfig() const override { return inner_options_->echConfig(); }
 
 private:
   const std::vector<std::string> alpn_fallback_;
+  const TransportSocketOptionsConstSharedPtr inner_options_;
+};
+
+// A wrapper around another TransportSocketOptions that overrides the ECH config.
+class EchDecoratingTransportSocketOptions : public TransportSocketOptions {
+public:
+  EchDecoratingTransportSocketOptions(std::vector<uint8_t>&& ech_config,
+                                      TransportSocketOptionsConstSharedPtr inner_options)
+      : ech_config_(std::move(ech_config)), inner_options_(std::move(inner_options)) {}
+  // Network::TransportSocketOptions
+  const absl::optional<std::string>& serverNameOverride() const override {
+    return inner_options_->serverNameOverride();
+  }
+  const std::vector<std::string>& verifySubjectAltNameListOverride() const override {
+    return inner_options_->verifySubjectAltNameListOverride();
+  }
+  const std::vector<std::string>& applicationProtocolListOverride() const override {
+    return inner_options_->applicationProtocolListOverride();
+  }
+  const std::vector<std::string>& applicationProtocolFallback() const override {
+    return inner_options_->applicationProtocolFallback();
+  }
+  absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const override {
+    return inner_options_->proxyProtocolOptions();
+  }
+  OptRef<const Http11ProxyInfo> http11ProxyInfo() const override {
+    return inner_options_->http11ProxyInfo();
+  }
+  const StreamInfo::FilterState::Objects& downstreamSharedFilterStateObjects() const override {
+    return inner_options_->downstreamSharedFilterStateObjects();
+  }
+  const std::vector<uint8_t>& echConfig() const override { return ech_config_; }
+
+private:
+  const std::vector<uint8_t> ech_config_;
   const TransportSocketOptionsConstSharedPtr inner_options_;
 };
 
@@ -51,15 +87,16 @@ public:
       absl::optional<Network::ProxyProtocolData> proxy_proto_options = absl::nullopt,
       StreamInfo::FilterState::ObjectsPtr filter_state_objects =
           std::make_unique<StreamInfo::FilterState::Objects>(),
-      std::unique_ptr<const Http11ProxyInfo>&& proxy_info = nullptr)
+      std::unique_ptr<const Http11ProxyInfo>&& proxy_info = nullptr,
+      std::vector<uint8_t> ech_config = {})
       : override_server_name_(override_server_name.empty()
                                   ? absl::nullopt
                                   : absl::optional<std::string>(override_server_name)),
         override_verify_san_list_{std::move(override_verify_san_list)},
         override_alpn_list_{std::move(override_alpn)}, alpn_fallback_{std::move(fallback_alpn)},
         proxy_protocol_options_(proxy_proto_options),
-        filter_state_objects_(std::move(filter_state_objects)), proxy_info_(std::move(proxy_info)) {
-  }
+        filter_state_objects_(std::move(filter_state_objects)), proxy_info_(std::move(proxy_info)),
+        ech_config_(std::move(ech_config)) {}
 
   // Network::TransportSocketOptions
   const absl::optional<std::string>& serverNameOverride() const override {
@@ -86,6 +123,7 @@ public:
   const StreamInfo::FilterState::Objects& downstreamSharedFilterStateObjects() const override {
     return *filter_state_objects_;
   }
+  const std::vector<uint8_t>& echConfig() const override { return ech_config_; }
 
 private:
   const absl::optional<std::string> override_server_name_;
@@ -96,6 +134,7 @@ private:
   const StreamInfo::FilterState::ObjectsPtr filter_state_objects_;
   const StreamInfo::FilterStateSharedPtr filter_state_;
   std::unique_ptr<const Http11ProxyInfo> proxy_info_;
+  const std::vector<uint8_t> ech_config_;
 };
 
 class TransportSocketOptionsUtility {

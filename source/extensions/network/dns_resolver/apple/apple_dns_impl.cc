@@ -46,6 +46,15 @@ DNSServiceErrorType DnsService::dnsServiceGetAddrInfo(DNSServiceRef* sdRef, DNSS
   return DNSServiceGetAddrInfo(sdRef, flags, interfaceIndex, protocol, hostname, callBack, context);
 }
 
+DNSServiceErrorType DnsService::dnsServiceQueryRecord(DNSServiceRef* sdRef, DNSServiceFlags flags,
+                                                      uint32_t interfaceIndex, const char* fullname,
+                                                      uint16_t rrtype, uint16_t rrclass,
+                                                      DNSServiceQueryRecordReply callBack,
+                                                      void* context) {
+  return DNSServiceQueryRecord(sdRef, flags, interfaceIndex, fullname, rrtype, rrclass, callBack,
+                               context);
+}
+
 AppleDnsResolverImpl::AppleDnsResolverImpl(
     const envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig& proto_config,
     Event::Dispatcher& dispatcher, Stats::Scope& root_scope)
@@ -122,6 +131,33 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
   return pending_resolution_and_success.first.release();
 }
 
+ActiveDnsQuery* AppleDnsResolverImpl::resolveRecord(const std::string& dns_name,
+                                                    RecordType record_type,
+                                                    ResolveRecordCb callback) {
+  auto pending_resolution =
+      std::make_unique<PendingResolution>(*this, callback, dispatcher_, dns_name, record_type);
+  pending_resolution->addTrace(static_cast<uint8_t>(AppleDnsTrace::Starting));
+  DNSServiceErrorType error = pending_resolution->dnsServiceQueryRecord();
+  if (error != kDNSServiceErr_NoError) {
+    ENVOY_LOG(warn, "DNS resolver error ({}) in dnsServiceQueryRecord for {}", error, dns_name);
+    callback(DnsResolver::ResolutionStatus::Failure, "apple_dns_immediate_failure", {});
+    return nullptr;
+  }
+
+  if (pending_resolution->synchronously_completed_) {
+    return nullptr;
+  }
+
+  if (!pending_resolution->dnsServiceRefSockFD()) {
+    ENVOY_LOG(warn, "DNS resolver error in dnsServiceRefSockFD for {}", dns_name);
+    callback(DnsResolver::ResolutionStatus::Failure, "apple_dns_immediate_failure", {});
+    return nullptr;
+  }
+
+  pending_resolution->owned_ = true;
+  return pending_resolution.release();
+}
+
 void AppleDnsResolverImpl::chargeGetAddrInfoErrorStats(DNSServiceErrorType error_code) {
   switch (error_code) {
   case kDNSServiceErr_DefunctConnection:
@@ -139,13 +175,11 @@ void AppleDnsResolverImpl::chargeGetAddrInfoErrorStats(DNSServiceErrorType error
   }
 }
 
-AppleDnsResolverImpl::PendingResolution::PendingResolution(AppleDnsResolverImpl& parent,
-                                                           ResolveCb callback,
-                                                           Event::Dispatcher& dispatcher,
-                                                           const std::string& dns_name,
-                                                           DnsLookupFamily dns_lookup_family)
+AppleDnsResolverImpl::PendingResolution::PendingResolution(
+    AppleDnsResolverImpl& parent, ResolveCb callback, Event::Dispatcher& dispatcher,
+    const std::string& dns_name, absl::variant<DnsLookupFamily, RecordType> query_details)
     : parent_(parent), callback_(callback), dispatcher_(dispatcher), dns_name_(dns_name),
-      pending_response_(PendingResponse()), dns_lookup_family_(dns_lookup_family) {}
+      pending_response_(PendingResponse()), query_details_(query_details) {}
 
 AppleDnsResolverImpl::PendingResolution::~PendingResolution() {
   ENVOY_LOG(trace, "Destroying PendingResolution for {}", dns_name_);
@@ -207,8 +241,13 @@ void AppleDnsResolverImpl::PendingResolution::onEventCallback(uint32_t events) {
   }
 }
 
-std::list<DnsResponse>& AppleDnsResolverImpl::PendingResolution::finalAddressList() {
-  switch (dns_lookup_family_) {
+std::list<DnsResponse>& AppleDnsResolverImpl::PendingResolution::finalResponseList() {
+  if (absl::holds_alternative<RecordType>(query_details_)) {
+    return pending_response_.record_responses_;
+  }
+
+  DnsLookupFamily dns_lookup_family = absl::get<DnsLookupFamily>(query_details_);
+  switch (dns_lookup_family) {
   case DnsLookupFamily::V4Only:
     return pending_response_.v4_responses_;
   case DnsLookupFamily::V6Only:
@@ -246,7 +285,7 @@ void AppleDnsResolverImpl::PendingResolution::finishResolve(AppleDnsTrace trace)
                   static_cast<int>(pending_response_.status_));
   addTrace(static_cast<uint8_t>(trace));
   callback_(pending_response_.status_, std::move(pending_response_.details_),
-            std::move(finalAddressList()));
+            std::move(finalResponseList()));
 
   if (owned_) {
     ENVOY_LOG(trace, "Resolution for {} completed (async)", dns_name_);
@@ -259,7 +298,9 @@ void AppleDnsResolverImpl::PendingResolution::finishResolve(AppleDnsTrace trace)
 
 DNSServiceErrorType
 AppleDnsResolverImpl::PendingResolution::dnsServiceGetAddrInfo(bool include_unroutable_families) {
-  switch (dns_lookup_family_) {
+  ASSERT(absl::holds_alternative<DnsLookupFamily>(query_details_));
+  DnsLookupFamily dns_lookup_family = absl::get<DnsLookupFamily>(query_details_);
+  switch (dns_lookup_family) {
   case DnsLookupFamily::V4Only:
     query_protocol_ = kDNSServiceProtocol_IPv4;
     break;
@@ -395,6 +436,72 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
     finishResolve(trace);
     // Note: Nothing can follow this call to finishResolve due to deletion of this
     // object upon resolution.
+    return;
+  }
+}
+
+DNSServiceErrorType AppleDnsResolverImpl::PendingResolution::dnsServiceQueryRecord() {
+  ASSERT(absl::holds_alternative<RecordType>(query_details_));
+  RecordType record_type = absl::get<RecordType>(query_details_);
+  uint16_t rrtype = 0;
+  if (record_type == RecordType::HTTPS) {
+    rrtype = 65;
+  } else {
+    IS_ENVOY_BUG("unexpected RecordType enum");
+    return kDNSServiceErr_BadParam;
+  }
+
+  return DnsServiceSingleton::get().dnsServiceQueryRecord(
+      &sd_ref_, kDNSServiceFlagsTimeout | kDNSServiceFlagsReturnIntermediates, 0, dns_name_.c_str(),
+      rrtype, 1 /* kDNSServiceClass_IN */,
+      [](DNSServiceRef, DNSServiceFlags flags, uint32_t interface_index,
+         DNSServiceErrorType error_code, const char* fullname, uint16_t rrtype, uint16_t rrclass,
+         uint16_t rdlen, const void* rdata, uint32_t ttl, void* context) {
+        static_cast<PendingResolution*>(context)->onDNSServiceQueryRecordReply(
+            flags, interface_index, error_code, fullname, rrtype, rrclass, rdlen, rdata, ttl);
+      },
+      this);
+}
+
+void AppleDnsResolverImpl::PendingResolution::onDNSServiceQueryRecordReply(
+    DNSServiceFlags flags, uint32_t interface_index, DNSServiceErrorType error_code,
+    const char* fullname, uint16_t rrtype, uint16_t /*rrclass*/, uint16_t rdlen, const void* rdata,
+    uint32_t ttl) {
+
+  ENVOY_LOG(
+      trace,
+      "DNS query record for {} resolved with: flags={}[MoreComing={}, Add={}], interface_index={}, "
+      "error_code={}, fullname={}, rrtype={}",
+      dns_name_, flags, flags & kDNSServiceFlagsMoreComing ? "yes" : "no",
+      flags & kDNSServiceFlagsAdd ? "yes" : "no", interface_index, error_code, fullname, rrtype);
+
+  if (error_code != kDNSServiceErr_NoError && error_code != kDNSServiceErr_NoSuchRecord) {
+    parent_.chargeGetAddrInfoErrorStats(error_code);
+
+    pending_response_.status_ = ResolutionStatus::Failure;
+    pending_response_.details_ = absl::StrCat("apple_dns_error_", error_code);
+    pending_response_.record_responses_.clear();
+
+    finishResolve(AppleDnsTrace::Failed);
+    return;
+  }
+
+  pending_response_.record_response_received_ = true;
+
+  if (error_code == kDNSServiceErr_NoError && (flags & kDNSServiceFlagsAdd)) {
+    std::vector<uint8_t> rdata_vec(static_cast<const uint8_t*>(rdata),
+                                   static_cast<const uint8_t*>(rdata) + rdlen);
+    DnsResponse dns_response(std::move(rdata_vec), std::chrono::seconds(ttl));
+    pending_response_.record_responses_.push_back(dns_response);
+  }
+
+  if (!(flags & kDNSServiceFlagsMoreComing)) {
+    ENVOY_LOG(trace, "DNS Resolver flushing record queries pending callback");
+    pending_response_.status_ = ResolutionStatus::Completed;
+    pending_response_.details_ = absl::StrCat("apple_dns_completed_", error_code);
+    AppleDnsTrace trace = (error_code == kDNSServiceErr_NoSuchRecord) ? AppleDnsTrace::NoResult
+                                                                      : AppleDnsTrace::Success;
+    finishResolve(trace);
     return;
   }
 }

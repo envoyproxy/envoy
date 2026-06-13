@@ -20,6 +20,7 @@
 #include "source/common/singleton/threadsafe_singleton.h"
 
 #include "absl/container/node_hash_map.h"
+#include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Network {
@@ -45,6 +46,11 @@ public:
   dnsServiceGetAddrInfo(DNSServiceRef* sdRef, DNSServiceFlags flags, uint32_t interfaceIndex,
                         DNSServiceProtocol protocol, const char* hostname,
                         DNSServiceGetAddrInfoReply callBack, void* context);
+  virtual DNSServiceErrorType dnsServiceQueryRecord(DNSServiceRef* sdRef, DNSServiceFlags flags,
+                                                    uint32_t interfaceIndex, const char* fullname,
+                                                    uint16_t rrtype, uint16_t rrclass,
+                                                    DNSServiceQueryRecordReply callBack,
+                                                    void* context);
 };
 
 using DnsServiceSingleton = ThreadSafeSingleton<DnsService>;
@@ -83,6 +89,8 @@ public:
   // Network::DnsResolver
   ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                           ResolveCb callback) override;
+  ActiveDnsQuery* resolveRecord(const std::string& dns_name, RecordType record_type,
+                                ResolveRecordCb callback) override;
   void resetNetworking() override {
     // In the Apple DNS resolver each query is independent and handled by the OS so there is nothing
     // to do here.
@@ -102,7 +110,7 @@ private:
   struct PendingResolution : public ActiveDnsQuery {
     PendingResolution(AppleDnsResolverImpl& parent, ResolveCb callback,
                       Event::Dispatcher& dispatcher, const std::string& dns_name,
-                      DnsLookupFamily dns_lookup_family);
+                      absl::variant<DnsLookupFamily, RecordType> query_details);
 
     ~PendingResolution();
 
@@ -125,32 +133,27 @@ private:
     void onDNSServiceGetAddrInfoReply(DNSServiceFlags flags, uint32_t interface_index,
                                       DNSServiceErrorType error_code, const char* hostname,
                                       const struct sockaddr* address, uint32_t ttl);
+    DNSServiceErrorType dnsServiceQueryRecord();
+    void onDNSServiceQueryRecordReply(DNSServiceFlags flags, uint32_t interface_index,
+                                      DNSServiceErrorType error_code, const char* fullname,
+                                      uint16_t rrtype, uint16_t rrclass, uint16_t rdlen,
+                                      const void* rdata, uint32_t ttl);
     bool dnsServiceRefSockFD();
 
-    std::list<DnsResponse>& finalAddressList();
+    std::list<DnsResponse>& finalResponseList();
 
-    // Small wrapping struct to accumulate addresses from firings of the
-    // onDNSServiceGetAddrInfoReply callback.
+    // Small wrapping struct to accumulate responses from callbacks.
     struct PendingResponse {
       ResolutionStatus status_ = ResolutionStatus::Completed;
       std::string details_ = "not_set";
-      // `v4_response_received_` and `v6_response_received_` denote whether a callback from the
-      // `DNSServiceGetAddrInfo` call has been received for the IPv4 address family and IPv6
-      // address family, respectively. If the query protocol is set to kDNSServiceProtocol_IPv4 or
-      // set to 0, at least one callback with the address family (`sa_family`) set to IPv4
-      // (AF_INET) will be received. If the query protocol is set to kDNSServiceProtocol_IPv6 or
-      // set to 0, at least one callback with the address family (`sa_family`) set to IPv6 will
-      // be received.
-      //
-      // If the query protocol is set to (kDNSServiceProtocol_IPv4 | kDNSServiceProtocol_IPv6),
-      // or it is set to 0, then at least two callbacks will be received: at least one for the
-      // IPv4 family and at least one for the IPv6 family. This is true even if the domain doesn't
-      // exist (NXDOMAIN).
       bool v4_response_received_{false};
       bool v6_response_received_{false};
       std::list<DnsResponse> v4_responses_{};
       std::list<DnsResponse> v6_responses_{};
       std::list<DnsResponse> all_responses_{};
+
+      bool record_response_received_{false};
+      std::list<DnsResponse> record_responses_{};
     };
 
     AppleDnsResolverImpl& parent_;
@@ -164,11 +167,9 @@ private:
     const std::string dns_name_;
     bool synchronously_completed_{};
     bool owned_{};
-    // DNSServiceGetAddrInfo fires one callback DNSServiceGetAddrInfoReply callback per IP address,
-    // and informs via flags if more IP addresses are incoming. Therefore, these addresses need to
-    // be accumulated before firing callback_.
+    // Accumulated responses.
     PendingResponse pending_response_;
-    DnsLookupFamily dns_lookup_family_;
+    const absl::variant<DnsLookupFamily, RecordType> query_details_;
     std::vector<Trace> traces_;
   };
 

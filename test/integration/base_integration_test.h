@@ -632,7 +632,7 @@ protected:
   bool use_lds_{true}; // Use the integration framework's LDS set up.
   bool upstream_tls_{false};
 
-  Network::DownstreamTransportSocketFactoryPtr
+  virtual Network::DownstreamTransportSocketFactoryPtr
   createUpstreamTlsContext(const FakeUpstreamConfig& upstream_config);
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;

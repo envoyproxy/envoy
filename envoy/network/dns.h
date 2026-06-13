@@ -5,6 +5,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
@@ -77,7 +78,15 @@ struct SrvResponse {
   const uint16_t weight_;
 };
 
-enum class RecordType { A, AAAA, SRV };
+/**
+ * Generic DNS record response (e.g. for raw RDATA).
+ */
+struct GenericResponse {
+  const std::vector<uint8_t> rdata_;
+  const std::chrono::seconds ttl_;
+};
+
+enum class RecordType { A, AAAA, SRV, HTTPS };
 
 enum class DnsLookupFamily { V4Only, V6Only, Auto, V4Preferred, All };
 
@@ -90,13 +99,20 @@ public:
                                           std::max(ttl.count(), std::chrono::seconds::rep(0))))}) {}
   DnsResponse(const std::string& host, uint16_t port, uint16_t priority, uint16_t weight)
       : response_(SrvResponse{host, port, priority, weight}) {}
+  DnsResponse(std::vector<uint8_t> rdata, const std::chrono::seconds ttl)
+      : response_(GenericResponse{
+            std::move(rdata),
+            std::chrono::seconds(std::min(std::chrono::seconds::rep(INT_MAX),
+                                          std::max(ttl.count(), std::chrono::seconds::rep(0))))}) {}
 
   const AddrInfoResponse& addrInfo() const { return absl::get<AddrInfoResponse>(response_); }
 
   const SrvResponse& srv() const { return absl::get<SrvResponse>(response_); }
 
+  const GenericResponse& generic() const { return absl::get<GenericResponse>(response_); }
+
 private:
-  absl::variant<AddrInfoResponse, SrvResponse> response_;
+  absl::variant<AddrInfoResponse, SrvResponse, GenericResponse> response_;
 };
 
 /**
@@ -133,6 +149,22 @@ public:
    */
   virtual ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                                   ResolveCb callback) PURE;
+
+  using ResolveRecordCb = std::function<void(ResolutionStatus status, absl::string_view details,
+                                             std::list<DnsResponse>&& response)>;
+
+  /**
+   * Initiate an async DNS record resolution.
+   * @param dns_name supplies the DNS name to lookup.
+   * @param record_type the DNS record type to query.
+   * @param callback supplies the callback to invoke when the resolution is complete.
+   * @return if non-null, a handle that can be used to cancel the resolution.
+   */
+  virtual ActiveDnsQuery* resolveRecord(const std::string& /*dns_name*/, RecordType /*record_type*/,
+                                        ResolveRecordCb callback) {
+    callback(ResolutionStatus::Failure, "Not implemented", {});
+    return nullptr;
+  }
 
   /**
    * Tell the resolver to reset networking, typically in response to a network switch (e.g., from

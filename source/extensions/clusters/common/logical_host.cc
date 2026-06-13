@@ -1,5 +1,7 @@
 #include "source/extensions/clusters/common/logical_host.h"
 
+#include "source/common/network/transport_socket_options_impl.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -8,11 +10,12 @@ absl::StatusOr<std::unique_ptr<LogicalHost>> LogicalHost::create(
     const Network::Address::InstanceConstSharedPtr& address, const AddressVector& address_list,
     const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
     const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
-    const Network::TransportSocketOptionsConstSharedPtr& override_transport_socket_options) {
+    const Network::TransportSocketOptionsConstSharedPtr& override_transport_socket_options,
+    std::vector<uint8_t> ech_config) {
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::unique_ptr<LogicalHost>(
       new LogicalHost(cluster, hostname, address, address_list, locality_lb_endpoint, lb_endpoint,
-                      override_transport_socket_options, creation_status));
+                      override_transport_socket_options, std::move(ech_config), creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -23,7 +26,7 @@ LogicalHost::LogicalHost(
     const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
     const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
     const Network::TransportSocketOptionsConstSharedPtr& override_transport_socket_options,
-    absl::Status& creation_status)
+    std::vector<uint8_t> ech_config, absl::Status& creation_status)
     : HostImplBase(lb_endpoint.load_balancing_weight().value(),
                    lb_endpoint.endpoint().health_check_config(), lb_endpoint.health_status()),
       HostDescriptionImplBase(
@@ -41,6 +44,7 @@ LogicalHost::LogicalHost(
       address_list_or_null_(makeAddressListOrNull(address, address_list)) {
   health_check_address_ =
       resolveHealthCheckAddress(lb_endpoint.endpoint().health_check_config(), address);
+  echConfig(std::move(ech_config));
 }
 
 Network::Address::InstanceConstSharedPtr LogicalHost::healthCheckAddress() const {
@@ -50,7 +54,8 @@ Network::Address::InstanceConstSharedPtr LogicalHost::healthCheckAddress() const
 
 void LogicalHost::setNewAddresses(const Network::Address::InstanceConstSharedPtr& address,
                                   const AddressVector& address_list,
-                                  const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint) {
+                                  const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
+                                  std::vector<uint8_t> ech_config) {
   const auto& health_check_config = lb_endpoint.endpoint().health_check_config();
   // TODO(jmarantz): change setNewAddresses interface to specify the address_list as a shared_ptr.
   auto health_check_address = resolveHealthCheckAddress(health_check_config, address);
@@ -65,6 +70,7 @@ void LogicalHost::setNewAddresses(const Network::Address::InstanceConstSharedPtr
     address_list_or_null_ = std::move(shared_address_list);
     health_check_address_ = std::move(health_check_address);
   }
+  echConfig(std::move(ech_config));
 }
 
 HostDescription::SharedConstAddressVector LogicalHost::addressListOrNull() const {
@@ -98,18 +104,28 @@ Upstream::Host::CreateConnectionData LogicalHost::createConnection(
                                       ? override_transport_socket_options_
                                       : transport_socket_options;
 
+  auto final_options = effective_options;
+  if (!echConfig().empty()) {
+    auto inner = effective_options;
+    if (!inner) {
+      inner = std::make_shared<Network::TransportSocketOptionsImpl>();
+    }
+    final_options = std::make_shared<Network::EchDecoratingTransportSocketOptions>(
+        std::vector<uint8_t>(echConfig()), inner);
+  }
+
   // Per-connection resolution for filter state-based transport socket matching.
   const bool needs_per_connection_resolution =
-      cluster().transportSocketMatcher().usesFilterState() && effective_options &&
-      !effective_options->downstreamSharedFilterStateObjects().empty();
+      cluster().transportSocketMatcher().usesFilterState() && final_options &&
+      !final_options->downstreamSharedFilterStateObjects().empty();
 
   Network::UpstreamTransportSocketFactory& factory =
       needs_per_connection_resolution
-          ? resolveTransportSocketFactory(address, metadata().get(), effective_options)
+          ? resolveTransportSocketFactory(address, metadata().get(), final_options)
           : transportSocketFactory();
 
   return HostImplBase::createConnection(
-      dispatcher, cluster(), address, address_list_or_null, factory, options, effective_options,
+      dispatcher, cluster(), address, address_list_or_null, factory, options, final_options,
       std::make_shared<RealHostDescription>(address, shared_from_this()));
 }
 
@@ -123,12 +139,23 @@ Upstream::Host::CreateConnectionData LogicalHost::createOrcaReportingConnection(
   const auto& effective_options = override_transport_socket_options_ != nullptr
                                       ? override_transport_socket_options_
                                       : transport_socket_options;
+
+  auto final_options = effective_options;
+  if (!echConfig().empty()) {
+    auto inner = effective_options;
+    if (!inner) {
+      inner = std::make_shared<Network::TransportSocketOptionsImpl>();
+    }
+    final_options = std::make_shared<Network::EchDecoratingTransportSocketOptions>(
+        std::vector<uint8_t>(echConfig()), inner);
+  }
+
   Network::UpstreamTransportSocketFactory& factory =
-      (metadata != nullptr) ? resolveTransportSocketFactory(address, metadata, effective_options)
+      (metadata != nullptr) ? resolveTransportSocketFactory(address, metadata, final_options)
                             : transportSocketFactory();
   return HostImplBase::createConnection(
       dispatcher, cluster(), address, address_list_or_null, factory,
-      /*options=*/nullptr, effective_options,
+      /*options=*/nullptr, final_options,
       std::make_shared<RealHostDescription>(address, shared_from_this()));
 }
 

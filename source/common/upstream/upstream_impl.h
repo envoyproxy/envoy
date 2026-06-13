@@ -225,6 +225,8 @@ public:
   const std::string& hostname() const override { return hostname_; }
   const envoy::config::core::v3::Locality& locality() const override { return *locality_; }
   const MetadataConstSharedPtr localityMetadata() const override { return locality_metadata_; }
+  const std::vector<uint8_t>& echConfig() const override { return ech_config_; }
+  void echConfig(std::vector<uint8_t> ech_config) { ech_config_ = std::move(ech_config); }
   Stats::StatName localityZoneStatName() const override {
     return locality_->zone().empty() ? Stats::StatName() : locality_zone_stat_name_.statName();
   }
@@ -297,6 +299,7 @@ private:
   std::reference_wrapper<Network::UpstreamTransportSocketFactory>
       socket_factory_ ABSL_GUARDED_BY(metadata_mutex_);
   absl::optional<MonotonicTime> last_hc_pass_time_;
+  std::vector<uint8_t> ech_config_;
   // Inline capacity of 2 covers the typical case of 1-2 LB policies per host.
   absl::InlinedVector<HostLbPolicyDataPtr, 2> lb_policy_datas_;
 };

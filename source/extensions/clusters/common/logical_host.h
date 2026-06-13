@@ -22,7 +22,8 @@ public:
          const Network::Address::InstanceConstSharedPtr& address, const AddressVector& address_list,
          const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
          const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
-         const Network::TransportSocketOptionsConstSharedPtr& override_transport_socket_options);
+         const Network::TransportSocketOptionsConstSharedPtr& override_transport_socket_options,
+         std::vector<uint8_t> ech_config = {});
 
   /**
    * Sets new addresses. This can be called dynamically during operation, and
@@ -37,10 +38,12 @@ public:
    * @param address the primary address, also used for health checking
    * @param address_list alternative addresses; the first of these must be 'address'
    * @param lb_endpoint the load-balanced endpoint
+   * @param ech_config ECH configuration bytes
    */
   void setNewAddresses(const Network::Address::InstanceConstSharedPtr& address,
                        const AddressVector& address_list,
-                       const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint);
+                       const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
+                       std::vector<uint8_t> ech_config = {});
 
   // Upstream::Host
   CreateConnectionData createConnection(
@@ -65,7 +68,7 @@ protected:
       const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
       const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
       const Network::TransportSocketOptionsConstSharedPtr& override_transport_socket_options,
-      absl::Status& creation_status);
+      std::vector<uint8_t> ech_config, absl::Status& creation_status);
 
 private:
   const Network::TransportSocketOptionsConstSharedPtr override_transport_socket_options_;
@@ -118,6 +121,7 @@ public:
   SharedConstAddressVector addressListOrNull() const override {
     return logical_host_->addressListOrNull();
   }
+  const std::vector<uint8_t>& echConfig() const override { return logical_host_->echConfig(); }
   const envoy::config::core::v3::Locality& locality() const override {
     return logical_host_->locality();
   }

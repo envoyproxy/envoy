@@ -7,7 +7,7 @@
 #include "envoy/secret/secret_manager.h"
 #include "envoy/ssl/context_manager.h"
 
-#include "source/common/tls/context_impl.h"
+#include "source/common/tls/server_ssl_socket.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -122,6 +122,24 @@ public:
   static Extensions::TransportSockets::Tls::CertValidator&
   getMutableCertValidator(const Extensions::TransportSockets::Tls::ContextImpl& context) {
     return *context.cert_validator_;
+  }
+
+  static std::vector<SSL_CTX*>
+  getSslContexts(const Extensions::TransportSockets::Tls::ContextImpl& context) {
+    std::vector<SSL_CTX*> ret;
+    for (const auto& ctx : context.tls_contexts_) {
+      ret.push_back(ctx.ssl_ctx_.get());
+    }
+    return ret;
+  }
+};
+
+class ServerSslSocketFactoryPeer {
+public:
+  static Envoy::Ssl::ServerContextSharedPtr
+  getServerContext(const ServerSslSocketFactory& factory) {
+    absl::MutexLock lock(&factory.ssl_ctx_mu_);
+    return factory.ssl_ctx_;
   }
 };
 

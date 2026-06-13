@@ -284,6 +284,11 @@ public:
    * that are marked as shared with the upstream connection.
    */
   virtual const StreamInfo::FilterState::Objects& downstreamSharedFilterStateObjects() const PURE;
+
+  /**
+   * @return the ECH configuration for this connection, if available.
+   */
+  virtual const std::vector<uint8_t>& echConfig() const PURE;
 };
 
 using TransportSocketOptionsConstSharedPtr = std::shared_ptr<const TransportSocketOptions>;

@@ -95,7 +95,8 @@ LogicalDnsCluster::LogicalDnsCluster(
       resolve_timer_(context.serverFactoryContext().mainThreadDispatcher().createTimer(
           [this]() -> void { startResolve(); })),
       local_info_(context.serverFactoryContext().localInfo()),
-      load_assignment_(convertPriority(cluster.load_assignment())) {
+      load_assignment_(convertPriority(cluster.load_assignment())),
+      runtime_(context.serverFactoryContext().runtime()) {
   failure_backoff_strategy_ = Config::Utility::prepareDnsRefreshStrategy(
       dns_cluster, dns_refresh_rate_ms_.count(),
       context.serverFactoryContext().api().randomGenerator());
@@ -126,11 +127,17 @@ LogicalDnsCluster::~LogicalDnsCluster() {
   if (active_dns_query_) {
     active_dns_query_->cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
   }
+  if (active_ech_dns_query_) {
+    active_ech_dns_query_->cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
+  }
 }
 
 void LogicalDnsCluster::startResolve() {
   ENVOY_LOG(trace, "starting async DNS resolution for {}", dns_address_);
   info_->configUpdateStats().update_attempt_.inc();
+
+  address_resolved_ = false;
+  ech_resolved_ = false;
 
   active_dns_query_ = dns_resolver_->resolve(
       dns_address_, dns_lookup_family_,
@@ -138,81 +145,127 @@ void LogicalDnsCluster::startResolve() {
              std::list<Network::DnsResponse>&& response) -> void {
         active_dns_query_ = nullptr;
         ENVOY_LOG(trace, "async DNS resolution complete for {} details {}", dns_address_, details);
-
-        std::chrono::milliseconds final_refresh_rate = dns_refresh_rate_ms_;
-
-        // If the DNS resolver successfully resolved with an empty response list, the logical DNS
-        // cluster does not update. This ensures that a potentially previously resolved address does
-        // not stabilize back to 0 hosts.
-        if (status == Network::DnsResolver::ResolutionStatus::Completed && !response.empty()) {
-          info_->configUpdateStats().update_success_.inc();
-          const auto addrinfo = response.front().addrInfo();
-          // TODO(mattklein123): Move port handling into the DNS interface.
-          ASSERT(addrinfo.address_ != nullptr);
-          Network::Address::InstanceConstSharedPtr new_address =
-              Network::Utility::getAddressWithPort(*(response.front().addrInfo().address_),
-                                                   dns_port_);
-          auto address_list = DnsUtils::generateAddressList(response, dns_port_);
-
-          if (!logical_host_) {
-            logical_host_ = THROW_OR_RETURN_VALUE(
-                LogicalHost::create(info_, hostname_, new_address, address_list,
-                                    localityLbEndpoint(), lbEndpoint(), nullptr),
-                std::unique_ptr<LogicalHost>);
-
-            const auto& locality_lb_endpoint = localityLbEndpoint();
-            PriorityStateManager priority_state_manager(*this, local_info_, nullptr);
-            priority_state_manager.initializePriorityFor(locality_lb_endpoint);
-            priority_state_manager.registerHostForPriority(logical_host_, locality_lb_endpoint);
-
-            const uint32_t priority = locality_lb_endpoint.priority();
-            priority_state_manager.updateClusterPrioritySet(
-                priority, std::move(priority_state_manager.priorityState()[priority].first),
-                absl::nullopt, absl::nullopt, absl::nullopt, absl::nullopt, absl::nullopt);
-          }
-
-          if (!current_resolved_address_ ||
-              (*new_address != *current_resolved_address_ ||
-               DnsUtils::listChanged(address_list, current_resolved_address_list_))) {
-            current_resolved_address_ = new_address;
-            current_resolved_address_list_ = address_list;
-
-            // Make sure that we have an updated address for admin display, health
-            // checking, and creating real host connections.
-            logical_host_->setNewAddresses(new_address, address_list, lbEndpoint());
-          } else {
-            info_->configUpdateStats().update_no_rebuild_.inc();
-          }
-
-          // reset failure backoff strategy because there was a success.
-          failure_backoff_strategy_->reset();
-
-          if (respect_dns_ttl_ && addrinfo.ttl_ != std::chrono::seconds(0)) {
-            final_refresh_rate = addrinfo.ttl_;
-          }
-          if (dns_jitter_ms_.count() != 0) {
-            // Note that `random_.random()` returns a uint64 while
-            // `dns_jitter_ms_.count()` returns a signed long that gets cast into a uint64.
-            // Thus, the modulo of the two will be a positive as long as
-            // `dns_jitter_ms_.count()` is positive.
-            // It is important that this be positive, otherwise `final_refresh_rate` could be
-            // negative causing Envoy to crash.
-            final_refresh_rate +=
-                std::chrono::milliseconds(random_.random() % dns_jitter_ms_.count());
-          }
-          ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
-                    final_refresh_rate.count());
-        } else {
-          info_->configUpdateStats().update_failure_.inc();
-          final_refresh_rate =
-              std::chrono::milliseconds(failure_backoff_strategy_->nextBackOffMs());
-          ENVOY_LOG(debug, "DNS refresh rate reset for {}, (failure) refresh rate {} ms",
-                    dns_address_, final_refresh_rate.count());
-        }
-
-        onPreInitComplete();
-        resolve_timer_->enableTimer(final_refresh_rate);
+        address_resolved_ = true;
+        address_status_ = status;
+        resolved_addresses_ = std::move(response);
+        onResolutionComplete();
       });
+
+  const bool enable_ech =
+      runtime_.snapshot().runtimeFeatureEnabled("envoy.reloadable_features.enable_ech");
+  if (enable_ech) {
+    active_ech_dns_query_ = dns_resolver_->resolveRecord(
+        dns_address_, Network::RecordType::HTTPS,
+        [this](Network::DnsResolver::ResolutionStatus status, absl::string_view details,
+               std::list<Network::DnsResponse>&& response) -> void {
+          active_ech_dns_query_ = nullptr;
+          ENVOY_LOG(trace, "async ECH DNS resolution complete for {} details {}", dns_address_,
+                    details);
+          ech_resolved_ = true;
+          ech_status_ = status;
+          if (status == Network::DnsResolver::ResolutionStatus::Completed && !response.empty()) {
+            for (const auto& resp : response) {
+              std::vector<uint8_t> ech_config = DnsUtils::parseHttpsRecord(resp.generic().rdata_);
+              if (!ech_config.empty()) {
+                resolved_ech_config_ = std::move(ech_config);
+                break;
+              }
+            }
+          }
+          onResolutionComplete();
+        });
+  } else {
+    ech_resolved_ = true;
+    ech_status_ = Network::DnsResolver::ResolutionStatus::Completed;
+    onResolutionComplete();
+  }
+}
+
+void LogicalDnsCluster::onResolutionComplete() {
+  const bool enable_ech =
+      runtime_.snapshot().runtimeFeatureEnabled("envoy.reloadable_features.enable_ech");
+  if (enable_ech) {
+    if (!address_resolved_ || !ech_resolved_) {
+      return;
+    }
+  } else {
+    if (!address_resolved_) {
+      return;
+    }
+  }
+
+  std::chrono::milliseconds final_refresh_rate = dns_refresh_rate_ms_;
+
+  if (address_status_ == Network::DnsResolver::ResolutionStatus::Completed &&
+      !resolved_addresses_.empty()) {
+    info_->configUpdateStats().update_success_.inc();
+    const auto addrinfo = resolved_addresses_.front().addrInfo();
+    Network::Address::InstanceConstSharedPtr new_address = Network::Utility::getAddressWithPort(
+        *(resolved_addresses_.front().addrInfo().address_), dns_port_);
+    auto address_list = DnsUtils::generateAddressList(resolved_addresses_, dns_port_);
+
+    std::vector<uint8_t> ech_config;
+    if (ech_status_ == Network::DnsResolver::ResolutionStatus::Completed &&
+        !resolved_ech_config_.empty()) {
+      ech_config = resolved_ech_config_;
+    }
+
+    if (!logical_host_) {
+      logical_host_ = THROW_OR_RETURN_VALUE(LogicalHost::create(info_, hostname_, new_address,
+                                                                address_list, localityLbEndpoint(),
+                                                                lbEndpoint(), nullptr, ech_config),
+                                            std::unique_ptr<LogicalHost>);
+
+      const auto& locality_lb_endpoint = localityLbEndpoint();
+      PriorityStateManager priority_state_manager(*this, local_info_, nullptr);
+      priority_state_manager.initializePriorityFor(locality_lb_endpoint);
+      priority_state_manager.registerHostForPriority(logical_host_, locality_lb_endpoint);
+
+      const uint32_t priority = locality_lb_endpoint.priority();
+      priority_state_manager.updateClusterPrioritySet(
+          priority, std::move(priority_state_manager.priorityState()[priority].first),
+          absl::nullopt, absl::nullopt, absl::nullopt, absl::nullopt, absl::nullopt);
+    }
+
+    if (!current_resolved_address_ ||
+        (*new_address != *current_resolved_address_ ||
+         DnsUtils::listChanged(address_list, current_resolved_address_list_) ||
+         ech_config != current_resolved_ech_config_)) {
+      current_resolved_address_ = new_address;
+      current_resolved_address_list_ = address_list;
+      current_resolved_ech_config_ = ech_config;
+
+      logical_host_->setNewAddresses(new_address, address_list, lbEndpoint(), ech_config);
+    } else {
+      info_->configUpdateStats().update_no_rebuild_.inc();
+    }
+
+    failure_backoff_strategy_->reset();
+
+    if (respect_dns_ttl_ && addrinfo.ttl_ != std::chrono::seconds(0)) {
+      final_refresh_rate = addrinfo.ttl_;
+    }
+    if (dns_jitter_ms_.count() != 0) {
+      final_refresh_rate += std::chrono::milliseconds(random_.random() % dns_jitter_ms_.count());
+    }
+    ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
+              final_refresh_rate.count());
+  } else {
+    info_->configUpdateStats().update_failure_.inc();
+    final_refresh_rate = std::chrono::milliseconds(failure_backoff_strategy_->nextBackOffMs());
+    ENVOY_LOG(debug, "DNS refresh rate reset for {}, (failure) refresh rate {} ms", dns_address_,
+              final_refresh_rate.count());
+  }
+
+  address_resolved_ = false;
+  if (enable_ech) {
+    ech_resolved_ = false;
+    resolved_ech_config_.clear();
+  }
+  resolved_addresses_.clear();
+
+  onPreInitComplete();
+  resolve_timer_->enableTimer(final_refresh_rate);
 }
 
 } // namespace Upstream

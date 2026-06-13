@@ -299,6 +299,18 @@ public:
    * @see man setrlimit
    */
   virtual SysCallIntResult setrlimit(int resource, const struct rlimit* rlim) PURE;
+
+  /**
+   * @see android_res_nquery (Android NDK resolv.h)
+   */
+  virtual SysCallIntResult android_res_nquery(uint64_t network, const char* dname, int ns_class,
+                                              int ns_type, uint32_t flags) PURE;
+
+  /**
+   * @see android_res_nresult (Android NDK resolv.h)
+   */
+  virtual SysCallIntResult android_res_nresult(os_fd_t fd, int* rcode, uint8_t* answer,
+                                               size_t anslen) PURE;
 };
 
 using OsSysCallsPtr = std::unique_ptr<OsSysCalls>;

@@ -35,5 +35,52 @@ TEST(DnsUtils, ListChanged) {
   EXPECT_TRUE(DnsUtils::listChanged(addresses1, {address2}));
 }
 
+TEST(DnsUtils, ParseHttpsRecordValid) {
+  std::vector<uint8_t> rdata = {0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x04, 0xaa, 0xbb, 0xcc, 0xdd};
+  std::vector<uint8_t> expected = {0xaa, 0xbb, 0xcc, 0xdd};
+  EXPECT_EQ(DnsUtils::parseHttpsRecord(rdata), expected);
+}
+
+TEST(DnsUtils, ParseHttpsRecordMultipleParams) {
+  std::vector<uint8_t> rdata = {
+      0x00, 0x01, // Priority
+      0x03, 'w',  'w',  'w',  0x07, 'e',  'x',  'a',  'm', 'p', 'l', 'e', 0x03, 'c', 'o', 'm',
+      0x00,                                                // End of TargetName
+      0x00, 0x01, 0x00, 0x05, 'h',  '2',  ',',  'h',  '3', // Param 1 (alpn)
+      0x00, 0x05, 0x00, 0x04, 0xaa, 0xbb, 0xcc, 0xdd,      // Param 2 (ech)
+      0x00, 0x06, 0x00, 0x04, 0x01, 0x02, 0x03, 0x04       // Param 3 (ipv4hint)
+  };
+  std::vector<uint8_t> expected = {0xaa, 0xbb, 0xcc, 0xdd};
+  EXPECT_EQ(DnsUtils::parseHttpsRecord(rdata), expected);
+}
+
+TEST(DnsUtils, ParseHttpsRecordNoEch) {
+  std::vector<uint8_t> rdata = {0x00, 0x01, 0x00, 0x00, 0x01, 0x00, 0x02, 0x11, 0x22};
+  EXPECT_TRUE(DnsUtils::parseHttpsRecord(rdata).empty());
+}
+
+TEST(DnsUtils, ParseHttpsRecordTooShort) {
+  std::vector<uint8_t> rdata = {0x00};
+  EXPECT_TRUE(DnsUtils::parseHttpsRecord(rdata).empty());
+
+  rdata = {0x00, 0x01, 0x00};
+  EXPECT_TRUE(DnsUtils::parseHttpsRecord(rdata).empty());
+}
+
+TEST(DnsUtils, ParseHttpsRecordTruncatedParam) {
+  std::vector<uint8_t> rdata = {
+      0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x0a, // len 10
+      0xaa, 0xbb, 0xcc, 0xdd                    // only 4 bytes
+  };
+  EXPECT_TRUE(DnsUtils::parseHttpsRecord(rdata).empty());
+}
+
+TEST(DnsUtils, ParseHttpsRecordCompressedTargetName) {
+  std::vector<uint8_t> rdata = {0x00, 0x01, 0xc0, 0x0c, // Pointer
+                                0x00, 0x05, 0x00, 0x02, 0x11, 0x22};
+  std::vector<uint8_t> expected = {0x11, 0x22};
+  EXPECT_EQ(DnsUtils::parseHttpsRecord(rdata), expected);
+}
+
 } // namespace
 } // namespace Envoy

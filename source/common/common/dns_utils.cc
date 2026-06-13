@@ -79,5 +79,114 @@ bool listChanged(const std::vector<Network::Address::InstanceConstSharedPtr>& li
   return false;
 }
 
+namespace {
+
+class SafeByteReader {
+public:
+  SafeByteReader(const std::vector<uint8_t>& data) : data_(data), offset_(0) {}
+
+  bool remain(size_t len) const { return offset_ + len <= data_.size(); }
+
+  bool read16(uint16_t& val) {
+    if (!remain(2))
+      return false;
+    val = (data_[offset_] << 8) | data_[offset_ + 1];
+    offset_ += 2;
+    return true;
+  }
+
+  bool read8(uint8_t& val) {
+    if (!remain(1))
+      return false;
+    val = data_[offset_];
+    offset_ += 1;
+    return true;
+  }
+
+  bool skip(size_t len) {
+    if (!remain(len))
+      return false;
+    offset_ += len;
+    return true;
+  }
+
+  bool readBytes(std::vector<uint8_t>& out, size_t len) {
+    if (!remain(len))
+      return false;
+    out.assign(data_.begin() + offset_, data_.begin() + offset_ + len);
+    offset_ += len;
+    return true;
+  }
+
+  bool skipDnsName() {
+    while (true) {
+      uint8_t len;
+      if (!read8(len))
+        return false;
+      if (len == 0) {
+        break; // End of name
+      }
+      if ((len & 0xC0) != 0) {
+        if ((len & 0xC0) == 0xC0) {
+          // Pointer (2 bytes total)
+          uint8_t dummy;
+          if (!read8(dummy))
+            return false;
+          break;
+        }
+        // Reserved label type
+        return false;
+      }
+      // Regular label
+      if (!skip(len))
+        return false;
+    }
+    return true;
+  }
+
+private:
+  const std::vector<uint8_t>& data_;
+  size_t offset_;
+};
+
+} // namespace
+
+std::vector<uint8_t> parseHttpsRecord(const std::vector<uint8_t>& rdata) {
+  SafeByteReader reader(rdata);
+
+  uint16_t priority;
+  if (!reader.read16(priority)) {
+    return {};
+  }
+
+  // Skip TargetName
+  if (!reader.skipDnsName()) {
+    return {};
+  }
+
+  // Now parse SvcParams
+  while (reader.remain(4)) { // Each param has at least 2 bytes key + 2 bytes len
+    uint16_t key;
+    uint16_t len;
+    if (!reader.read16(key) || !reader.read16(len)) {
+      return {};
+    }
+
+    if (key == 5) { // ech
+      std::vector<uint8_t> ech_config_list;
+      if (!reader.readBytes(ech_config_list, len)) {
+        return {};
+      }
+      return ech_config_list;
+    } else {
+      if (!reader.skip(len)) {
+        return {};
+      }
+    }
+  }
+
+  return {};
+}
+
 } // namespace DnsUtils
 } // namespace Envoy

@@ -24,5 +24,9 @@ generateAddressList(const std::list<Network::DnsResponse>& responses, uint32_t p
 // Returns true if list1 differs from list2, false otherwise.
 bool listChanged(const std::vector<Network::Address::InstanceConstSharedPtr>& list1,
                  const std::vector<Network::Address::InstanceConstSharedPtr>& list2);
+
+// Parses raw HTTPS RDATA (RFC 9460) and returns the ECHConfigList if found.
+// Returns empty vector if not found or parsing fails.
+std::vector<uint8_t> parseHttpsRecord(const std::vector<uint8_t>& rdata);
 } // namespace DnsUtils
 } // namespace Envoy

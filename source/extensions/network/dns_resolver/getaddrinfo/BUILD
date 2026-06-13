@@ -11,7 +11,10 @@ envoy_extension_package()
 envoy_cc_extension(
     name = "config",
     srcs = ["getaddrinfo.cc"],
-    hdrs = ["getaddrinfo.h"],
+    hdrs = [
+        "dns_packet_parser.h",
+        "getaddrinfo.h",
+    ],
     extra_visibility = ["//test:__subpackages__"],
     deps = [
         "//envoy/network:dns_resolver_interface",

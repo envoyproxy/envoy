@@ -45,6 +45,7 @@ MockHostDescription::MockHostDescription()
   ON_CALL(*this, locality()).WillByDefault(ReturnRef(locality_));
   ON_CALL(*this, cluster()).WillByDefault(ReturnRef(cluster_));
   ON_CALL(*this, healthChecker()).WillByDefault(ReturnRef(health_checker_));
+  ON_CALL(*this, echConfig()).WillByDefault(ReturnRef(ech_config_));
   ON_CALL(*this, transportSocketFactory()).WillByDefault(ReturnRef(*socket_factory_));
   ON_CALL(*this, canCreateConnection(_))
       .WillByDefault(Invoke([this](Upstream::ResourcePriority pri) -> bool {
@@ -73,6 +74,7 @@ MockHostLight::MockHostLight() {
   ON_CALL(*this, observabilityName()).WillByDefault(Invoke([this]() {
     return absl::string_view(observability_name_);
   }));
+  ON_CALL(*this, echConfig()).WillByDefault(ReturnRef(ech_config_));
 }
 MockHostLight::~MockHostLight() = default;
 

@@ -264,6 +264,9 @@ DnsClusterImpl::ResolveTarget::~ResolveTarget() {
   if (active_query_) {
     active_query_->cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
   }
+  if (active_ech_query_) {
+    active_ech_query_->cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
+  }
 }
 
 bool DnsClusterImpl::ResolveTarget::isSuccessfulResponse(
@@ -288,7 +291,7 @@ DnsClusterImpl::ResolveTarget::createLogicalDnsHosts(
   auto address_list = DnsUtils::generateAddressList(response, port_);
   auto logical_host_or_error =
       LogicalHost::create(parent_.info_, hostname_, new_address, address_list,
-                          locality_lb_endpoints_, lb_endpoint_, nullptr);
+                          locality_lb_endpoints_, lb_endpoint_, nullptr, resolved_ech_config_);
 
   RETURN_IF_NOT_OK(logical_host_or_error.status());
 
@@ -382,79 +385,127 @@ void DnsClusterImpl::ResolveTarget::startResolve() {
   ENVOY_LOG(trace, "starting async DNS resolution for {}", dns_address_);
   parent_.info_->configUpdateStats().update_attempt_.inc();
 
+  address_resolved_ = false;
+  ech_resolved_ = false;
+  resolved_ech_config_.clear();
+
   active_query_ = parent_.dns_resolver_->resolve(
       dns_address_, parent_.dns_lookup_family_,
       [this](Network::DnsResolver::ResolutionStatus status, absl::string_view details,
              std::list<Network::DnsResponse>&& response) -> void {
         active_query_ = nullptr;
         ENVOY_LOG(trace, "async DNS resolution complete for {} details {}", dns_address_, details);
-
-        std::chrono::milliseconds final_refresh_rate = parent_.dns_refresh_rate_ms_;
-
-        if (isSuccessfulResponse(response, status)) {
-          parent_.info_->configUpdateStats().update_success_.inc();
-
-          absl::StatusOr<ParsedHosts> new_hosts_or_error;
-
-          if (parent_.all_addresses_in_single_endpoint_) {
-            new_hosts_or_error = createLogicalDnsHosts(response);
-          } else {
-            new_hosts_or_error = createStrictDnsHosts(response);
-          }
-
-          if (!new_hosts_or_error.ok()) {
-            ENVOY_LOG(error, "Failed to process DNS response for {} with error: {}", dns_address_,
-                      new_hosts_or_error.status().message());
-            parent_.info_->configUpdateStats().update_failure_.inc();
-            return;
-          }
-
-          const auto& new_hosts = new_hosts_or_error.value();
-
-          if (parent_.all_addresses_in_single_endpoint_) {
-            updateLogicalDnsHosts(response, new_hosts);
-          } else {
-            updateStrictDnsHosts(new_hosts);
-          }
-
-          // reset failure backoff strategy because there was a success.
-          parent_.failure_backoff_strategy_->reset();
-
-          if (!response.empty() && parent_.respect_dns_ttl_ &&
-              new_hosts.ttl_refresh_rate != std::chrono::seconds(0)) {
-            final_refresh_rate = new_hosts.ttl_refresh_rate;
-            ASSERT(new_hosts.ttl_refresh_rate != std::chrono::seconds::max() &&
-                   final_refresh_rate.count() > 0);
-          }
-          if (parent_.dns_jitter_ms_.count() > 0) {
-            // Note that `parent_.random_.random()` returns a uint64 while
-            // `parent_.dns_jitter_ms_.count()` returns a signed long that gets cast into a uint64.
-            // Thus, the modulo of the two will be a positive as long as
-            // `parent_dns_jitter_ms_.count()` is positive.
-            // It is important that this be positive, otherwise `final_refresh_rate` could be
-            // negative causing Envoy to crash.
-            final_refresh_rate += std::chrono::milliseconds(parent_.random_.random() %
-                                                            parent_.dns_jitter_ms_.count());
-          }
-
-          ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
-                    final_refresh_rate.count());
-        } else {
-          parent_.info_->configUpdateStats().update_failure_.inc();
-
-          final_refresh_rate =
-              std::chrono::milliseconds(parent_.failure_backoff_strategy_->nextBackOffMs());
-          ENVOY_LOG(debug, "DNS refresh rate reset for {}, (failure) refresh rate {} ms",
-                    dns_address_, final_refresh_rate.count());
-        }
-
-        // If there is an initialize callback, fire it now. Note that if the cluster refers to
-        // multiple DNS names, this will return initialized after a single DNS resolution
-        // completes. This is not perfect but is easier to code and unclear if the extra
-        // complexity is needed so will start with this.
-        parent_.onPreInitComplete();
-        resolve_timer_->enableTimer(final_refresh_rate);
+        address_resolved_ = true;
+        address_status_ = status;
+        resolved_addresses_ = std::move(response);
+        onResolutionComplete();
       });
+
+  const bool enable_ech =
+      parent_.runtime_.snapshot().runtimeFeatureEnabled("envoy.reloadable_features.enable_ech");
+  if (enable_ech) {
+    active_ech_query_ = parent_.dns_resolver_->resolveRecord(
+        dns_address_, Network::RecordType::HTTPS,
+        [this](Network::DnsResolver::ResolutionStatus status, absl::string_view details,
+               std::list<Network::DnsResponse>&& response) -> void {
+          active_ech_query_ = nullptr;
+          ENVOY_LOG(trace, "async ECH DNS resolution complete for {} details {}", dns_address_,
+                    details);
+          ech_resolved_ = true;
+          ech_status_ = status;
+          if (status == Network::DnsResolver::ResolutionStatus::Completed && !response.empty()) {
+            for (const auto& resp : response) {
+              std::vector<uint8_t> ech_config = DnsUtils::parseHttpsRecord(resp.generic().rdata_);
+              if (!ech_config.empty()) {
+                resolved_ech_config_ = std::move(ech_config);
+                break;
+              }
+            }
+          }
+          onResolutionComplete();
+        });
+  } else {
+    ech_resolved_ = true;
+    ech_status_ = Network::DnsResolver::ResolutionStatus::Completed;
+    onResolutionComplete();
+  }
+}
+
+void DnsClusterImpl::ResolveTarget::onResolutionComplete() {
+  const bool enable_ech =
+      parent_.runtime_.snapshot().runtimeFeatureEnabled("envoy.reloadable_features.enable_ech");
+  if (enable_ech) {
+    if (!address_resolved_ || !ech_resolved_) {
+      return;
+    }
+  } else {
+    if (!address_resolved_) {
+      return;
+    }
+  }
+
+  std::chrono::milliseconds final_refresh_rate = parent_.dns_refresh_rate_ms_;
+
+  if (isSuccessfulResponse(resolved_addresses_, address_status_)) {
+    parent_.info_->configUpdateStats().update_success_.inc();
+
+    absl::StatusOr<ParsedHosts> new_hosts_or_error;
+
+    if (parent_.all_addresses_in_single_endpoint_) {
+      new_hosts_or_error = createLogicalDnsHosts(resolved_addresses_);
+    } else {
+      new_hosts_or_error = createStrictDnsHosts(resolved_addresses_);
+    }
+
+    if (!new_hosts_or_error.ok()) {
+      ENVOY_LOG(error, "Failed to process DNS response for {} with error: {}", dns_address_,
+                new_hosts_or_error.status().message());
+      parent_.info_->configUpdateStats().update_failure_.inc();
+      return;
+    }
+
+    const auto& new_hosts = new_hosts_or_error.value();
+
+    if (parent_.all_addresses_in_single_endpoint_) {
+      updateLogicalDnsHosts(resolved_addresses_, new_hosts);
+    } else {
+      updateStrictDnsHosts(new_hosts);
+    }
+
+    // reset failure backoff strategy because there was a success.
+    parent_.failure_backoff_strategy_->reset();
+
+    if (!resolved_addresses_.empty() && parent_.respect_dns_ttl_ &&
+        new_hosts.ttl_refresh_rate != std::chrono::seconds(0)) {
+      final_refresh_rate = new_hosts.ttl_refresh_rate;
+      ASSERT(new_hosts.ttl_refresh_rate != std::chrono::seconds::max() &&
+             final_refresh_rate.count() > 0);
+    }
+    if (parent_.dns_jitter_ms_.count() > 0) {
+      final_refresh_rate +=
+          std::chrono::milliseconds(parent_.random_.random() % parent_.dns_jitter_ms_.count());
+    }
+
+    ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
+              final_refresh_rate.count());
+  } else {
+    parent_.info_->configUpdateStats().update_failure_.inc();
+
+    final_refresh_rate =
+        std::chrono::milliseconds(parent_.failure_backoff_strategy_->nextBackOffMs());
+    ENVOY_LOG(debug, "DNS refresh rate reset for {}, (failure) refresh rate {} ms", dns_address_,
+              final_refresh_rate.count());
+  }
+
+  address_resolved_ = false;
+  if (enable_ech) {
+    ech_resolved_ = false;
+    resolved_ech_config_.clear();
+  }
+  resolved_addresses_.clear();
+
+  parent_.onPreInitComplete();
+  resolve_timer_->enableTimer(final_refresh_rate);
 }
 
 } // namespace Upstream
