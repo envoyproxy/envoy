@@ -100,6 +100,10 @@ TEST_P(QuicHttpIntegrationTest, RuntimeEnableDraft29) {
 }
 
 TEST_P(QuicHttpIntegrationTest, CertCompressionEnabled) {
+  // Brotli certificate compression is opt-in, so enable the runtime guard explicitly to exercise
+  // the brotli compression path.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.tls_certificate_compression_brotli",
+                                    "true");
   initialize();
 
   EXPECT_LOG_CONTAINS_ALL_OF(
