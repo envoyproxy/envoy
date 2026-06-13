@@ -206,6 +206,14 @@ envoy_dynamic_module_type_cluster_host_envoy_ptr
 envoy_dynamic_module_callback_cluster_find_host_by_address(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
     envoy_dynamic_module_type_module_buffer address) {
+  // This reads the main thread cross-priority host map, so it is main-thread-only. An
+  // `ASSERT_IS_MAIN_OR_TEST_THREAD` would be compiled out under NDEBUG, so guard explicitly and
+  // fail closed.
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_find_host_by_address must be called on the "
+                 "main thread");
+    return nullptr;
+  }
   auto* cluster = getCluster(cluster_envoy_ptr);
   std::string address_str(address.ptr, address.length);
   auto host = cluster->findHostByAddress(address_str);
@@ -1343,6 +1351,20 @@ bool envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address(
   result->ptr = address_str.data();
   result->length = address_str.size();
   return true;
+}
+
+envoy_dynamic_module_type_cluster_host_envoy_ptr
+envoy_dynamic_module_callback_cluster_lb_get_member_update_host(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t index, bool is_added) {
+  if (lb_envoy_ptr == nullptr) {
+    return nullptr;
+  }
+  const auto* hosts =
+      is_added ? getLb(lb_envoy_ptr)->hostsAdded() : getLb(lb_envoy_ptr)->hostsRemoved();
+  if (hosts == nullptr || index >= hosts->size()) {
+    return nullptr;
+  }
+  return const_cast<Envoy::Upstream::Host*>((*hosts)[index].get());
 }
 
 } // extern "C"

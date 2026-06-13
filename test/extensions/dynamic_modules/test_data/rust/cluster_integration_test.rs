@@ -49,6 +49,16 @@ fn new_cluster_config(
         metrics: envoy_cluster_metrics,
       }))
     },
+    "worker_local_rebuild" => {
+      let counter_id = envoy_cluster_metrics
+        .define_counter("membership_hosts_total")
+        .ok();
+      Some(Box::new(WorkerLocalRebuildClusterConfig {
+        upstream_address: config_str.to_string(),
+        counter_id,
+        metrics: envoy_cluster_metrics,
+      }))
+    },
     _ => None,
   }
 }
@@ -466,5 +476,119 @@ impl ClusterLb for RunOnAllWorkersLb {
       return HostSelectionResult::NoHost;
     }
     HostSelectionResult::Selected(hosts.0[0])
+  }
+}
+
+// =============================================================================
+// Worker local priority set rebuild via membership updates.
+// =============================================================================
+//
+// on_init defers the host add through the scheduler so it lands after workers are registered and
+// their load balancers have subscribed to membership updates. on_host_membership_update learns the
+// added hosts directly from get_member_update_host and routes through those pointers, then confirms
+// the worker local priority set agrees on the host count before incrementing a counter so the test
+// can wait for every worker to converge.
+
+const WORKER_LOCAL_REBUILD_ADD_EVENT_ID: u64 = 200;
+
+struct WorkerLocalRebuildClusterConfig {
+  upstream_address: String,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterConfig for WorkerLocalRebuildClusterConfig {
+  fn new_cluster(&self, _envoy_cluster: &dyn EnvoyCluster) -> Box<dyn Cluster> {
+    Box::new(WorkerLocalRebuildCluster {
+      upstream_address: self.upstream_address.clone(),
+      counter_id: self.counter_id,
+      metrics: self.metrics.clone(),
+    })
+  }
+}
+
+struct WorkerLocalRebuildCluster {
+  upstream_address: String,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl Cluster for WorkerLocalRebuildCluster {
+  fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
+    envoy_cluster.pre_init_complete();
+    let scheduler = envoy_cluster.new_scheduler();
+    scheduler.commit(WORKER_LOCAL_REBUILD_ADD_EVENT_ID);
+  }
+
+  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
+    Box::new(WorkerLocalRebuildLb {
+      hosts: Vec::new(),
+      index: 0,
+      counter_id: self.counter_id,
+      metrics: self.metrics.clone(),
+    })
+  }
+
+  fn on_scheduled(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
+    if event_id == WORKER_LOCAL_REBUILD_ADD_EVENT_ID {
+      envoy_cluster.add_hosts(&[self.upstream_address.clone()], &[1u32]);
+    }
+  }
+}
+
+struct WorkerLocalRebuildLb {
+  hosts: Vec<usize>,
+  index: usize,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterLb for WorkerLocalRebuildLb {
+  fn choose_host(
+    &mut self,
+    _context: Option<&dyn ClusterLbContext>,
+    _async_completion: Box<dyn EnvoyAsyncHostSelectionComplete>,
+  ) -> HostSelectionResult {
+    if self.hosts.is_empty() {
+      return HostSelectionResult::NoHost;
+    }
+    let idx = self.index % self.hosts.len();
+    self.index += 1;
+    HostSelectionResult::Selected(
+      self.hosts[idx] as abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+    )
+  }
+
+  fn on_host_membership_update(
+    &mut self,
+    envoy_lb: &dyn EnvoyClusterLoadBalancer,
+    num_hosts_added: usize,
+    num_hosts_removed: usize,
+  ) {
+    // Drop removed hosts resolved directly from the member update.
+    for i in 0..num_hosts_removed {
+      if let Some(host) = envoy_lb.get_member_update_host(i, false) {
+        let addr = host as usize;
+        self.hosts.retain(|&existing| existing != addr);
+      }
+    }
+    // Learn added hosts directly from the member update so routing uses the pointer it returns.
+    for i in 0..num_hosts_added {
+      if let Some(host) = envoy_lb.get_member_update_host(i, true) {
+        self.hosts.push(host as usize);
+      }
+    }
+    // Increment a counter once the out-of-range lookup returns no host and the present host count
+    // agrees with the worker local set, so the test can wait for every worker to converge.
+    let converged = envoy_lb
+      .get_member_update_host(num_hosts_added, true)
+      .is_none()
+      && !self.hosts.is_empty()
+      && envoy_lb.get_hosts_count(0) == self.hosts.len();
+    if converged {
+      if let Some(counter_id) = self.counter_id {
+        let _ = self.metrics.increment_counter(counter_id, 1);
+      }
+    }
   }
 }

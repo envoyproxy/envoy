@@ -501,6 +501,14 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_cluster_lb_get_member_u
   return false;
 }
 
+__attribute__((weak)) envoy_dynamic_module_type_cluster_host_envoy_ptr
+envoy_dynamic_module_callback_cluster_lb_get_member_update_host(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr, size_t, bool) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_member_update_host: "
+               "not implemented in this context");
+  return nullptr;
+}
+
 __attribute__((weak)) void envoy_dynamic_module_callback_cluster_pre_init_complete(
     envoy_dynamic_module_type_cluster_envoy_ptr) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_pre_init_complete: "

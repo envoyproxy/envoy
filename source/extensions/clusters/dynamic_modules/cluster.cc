@@ -821,7 +821,7 @@ void DynamicModuleAsyncHostSelectionHandle::cancel() {
 }
 
 const Upstream::PrioritySet& DynamicModuleLoadBalancer::prioritySet() const {
-  return handle_->cluster_->prioritySet();
+  return priority_set_;
 }
 
 bool DynamicModuleLoadBalancer::setHostData(uint32_t priority, size_t index, uintptr_t data) {
