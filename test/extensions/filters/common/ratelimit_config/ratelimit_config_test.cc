@@ -506,6 +506,30 @@ filter_metadata:
   EXPECT_THAT(expected_descriptors, testing::ContainerEq(descriptors));
 }
 
+TEST_F(RateLimitConfigTest, StaticLimitOverrideApplied) {
+  const std::string yaml = R"EOF(
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_value: limited_fake_key
+    limit:
+      rate_limit:
+        requests_per_unit: 42
+        unit: HOUR
+  )EOF";
+
+  setupTest(yaml, /*no_limit=*/false);
+  ASSERT_TRUE(creation_status_.ok());
+
+  std::vector<Envoy::RateLimit::Descriptor> descriptors;
+  config_->populateDescriptors(headers_, stream_info_, "", descriptors);
+
+  std::vector<Envoy::RateLimit::Descriptor> expected_descriptors = {
+      {{{"generic_key", "limited_fake_key"}}}};
+  expected_descriptors[0].limit_ = {42, envoy::type::v3::RateLimitUnit::HOUR};
+  EXPECT_THAT(expected_descriptors, testing::ContainerEq(descriptors));
+}
+
 // The key regression: the per-descriptor limit override and the per-request hits_addend can
 // be used together on the same rule. See https://github.com/envoyproxy/envoy/issues/45611.
 TEST_F(RateLimitConfigTest, LimitOverrideWithHitsAddend) {
