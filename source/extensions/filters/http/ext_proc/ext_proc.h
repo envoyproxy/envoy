@@ -179,8 +179,8 @@ private:
   // The number of body ProcessingRequests sent to the external processor. This number may not be
   // equal to call_count_ if using FULL_DUPLEX_STREAMED_MODE.
   uint32_t request_body_sent_{0}, response_body_sent_{0};
-  // The destination of the external processor (cluster name for envoy_grpc, target URI for
-  // google_grpc).
+  // The fallback destination of the external processor (cluster name for envoy_grpc,
+  // target URI for google_grpc) which is only populated when cluster_info_ is unavailable.
   std::string destination_;
 
   Upstream::ClusterInfoConstSharedPtr cluster_info_;

@@ -790,19 +790,8 @@ Filter::StreamOpenState Filter::openStream() {
                        .setSampled(absl::nullopt)
                        .setRemoteCloseTimeout(config_->remoteCloseTimeout());
 
-    if (logging_info_ != nullptr) {
-      std::string destination = "";
-      if (config_with_hash_key_.config().has_envoy_grpc()) {
-        destination = config_with_hash_key_.config().envoy_grpc().cluster_name();
-      } else if (config_with_hash_key_.config().has_google_grpc()) {
-        destination = config_with_hash_key_.config().google_grpc().target_uri();
-      }
-      logging_info_->setDestination(destination);
-    }
-
     ExternalProcessorClient* grpc_client = dynamic_cast<ExternalProcessorClient*>(client_.get());
     ExternalProcessorStreamPtr stream_object =
-
         grpc_client->start(*this, config_with_hash_key_, options, watermark_callbacks_);
 
     if (processing_complete_ || stream_object == nullptr) {
@@ -1481,28 +1470,40 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
 }
 
 void Filter::logStreamInfoBase(const Envoy::StreamInfo::StreamInfo* stream_info) {
-  if (stream_info == nullptr || logging_info_ == nullptr) {
+  if (logging_info_ == nullptr) {
     return;
   }
 
-  const auto& upstream_meter = stream_info->getUpstreamBytesMeter();
-  if (upstream_meter != nullptr) {
-    logging_info_->setBytesSent(upstream_meter->wireBytesSent());
-    logging_info_->setBytesReceived(upstream_meter->wireBytesReceived());
-  }
-  // Only set upstream host in logging info once.
-  if (logging_info_->upstreamHost() == nullptr) {
-    logging_info_->setUpstreamHost(stream_info->upstreamInfo()->upstreamHost());
+  if (stream_info != nullptr) {
+    const auto& upstream_meter = stream_info->getUpstreamBytesMeter();
+    if (upstream_meter != nullptr) {
+      logging_info_->setBytesSent(upstream_meter->wireBytesSent());
+      logging_info_->setBytesReceived(upstream_meter->wireBytesReceived());
+    }
+    // Only set upstream host in logging info once.
+    if (logging_info_->upstreamHost() == nullptr) {
+      logging_info_->setUpstreamHost(stream_info->upstreamInfo()->upstreamHost());
+    }
+
+    // Only set cluster info in logging info once.
+    if (logging_info_->clusterInfo() == nullptr) {
+      logging_info_->setClusterInfo(stream_info->upstreamClusterInfoSharedPtr());
+    }
+
+    // Response code details should actually be set as many times as possible, since it's
+    // the *final* response code details that will give the most useful information.
+    logging_info_->setHttpResponseCodeDetails(stream_info->responseCodeDetails());
   }
 
-  // Only set cluster info in logging info once.
   if (logging_info_->clusterInfo() == nullptr) {
-    logging_info_->setClusterInfo(stream_info->upstreamClusterInfoSharedPtr());
+    std::string destination = "";
+    if (config_with_hash_key_.config().has_envoy_grpc()) {
+      destination = config_with_hash_key_.config().envoy_grpc().cluster_name();
+    } else if (config_with_hash_key_.config().has_google_grpc()) {
+      destination = config_with_hash_key_.config().google_grpc().target_uri();
+    }
+    logging_info_->setDestination(destination);
   }
-
-  // Response code details should actually be set as many times as possible, since it's
-  // the *final* response code details that will give the most useful information.
-  logging_info_->setHttpResponseCodeDetails(stream_info->responseCodeDetails());
 }
 
 void Filter::logStreamInfo() {
@@ -1512,9 +1513,12 @@ void Filter::logStreamInfo() {
     return;
   }
 
-  if (stream_ != nullptr && grpc_service_.has_envoy_grpc()) {
+  if (grpc_service_.has_envoy_grpc()) {
     // Envoy gRPC service
-    logStreamInfoBase(&stream_->streamInfo());
+    logStreamInfoBase(stream_ != nullptr ? &stream_->streamInfo() : nullptr);
+  } else {
+    // Google gRPC service or others
+    logStreamInfoBase(nullptr);
   }
 }
 

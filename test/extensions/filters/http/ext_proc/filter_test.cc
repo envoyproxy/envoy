@@ -6194,6 +6194,7 @@ TEST_F(HttpFilterTest, ClusterMissingLoggingInfo) {
   initializeTestSendAll();
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  filter_->logStreamInfo();
 
   ASSERT_TRUE(stream_info_.filterState()->hasData<ExtProcLoggingInfo>(filter_config_name));
   auto logging_info =
@@ -6206,6 +6207,7 @@ TEST_F(HttpFilterTest, GoogleGrpcMissingLoggingInfo) {
   initializeTestGoogleGrpc();
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  filter_->logStreamInfo();
 
   ASSERT_TRUE(stream_info_.filterState()->hasData<ExtProcLoggingInfo>(filter_config_name));
   auto logging_info =
