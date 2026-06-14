@@ -345,6 +345,10 @@ Http1StreamEncoderOptionsOptRef ActiveStreamFilterBase::http1StreamEncoderOption
   return parent_.filter_manager_callbacks_.http1StreamEncoderOptions();
 }
 
+OptRef<WebTransportSession> ActiveStreamFilterBase::webTransport() {
+  return parent_.filter_manager_callbacks_.webTransport();
+}
+
 OptRef<DownstreamStreamFilterCallbacks> ActiveStreamFilterBase::downstreamCallbacks() {
   return parent_.filter_manager_callbacks_.downstreamCallbacks();
 }
@@ -1695,12 +1699,23 @@ FilterManager::UpgradeResult
 FilterManager::createUpgradeFilterChain(const FilterChainFactory& filter_chain_factory,
                                         FilterChainFactoryCallbacksImpl& callbacks) {
   const HeaderEntry* upgrade = nullptr;
+  absl::string_view upgrade_type;
   if (filter_manager_callbacks_.requestHeaders()) {
-    upgrade = filter_manager_callbacks_.requestHeaders()->Upgrade();
-
-    // Treat CONNECT requests as a special upgrade case.
-    if (!upgrade && HeaderUtility::isConnect(*filter_manager_callbacks_.requestHeaders())) {
-      upgrade = filter_manager_callbacks_.requestHeaders()->Method();
+    RequestHeaderMap& headers = *filter_manager_callbacks_.requestHeaders();
+    upgrade = headers.Upgrade();
+    if (upgrade != nullptr) {
+      upgrade_type = upgrade->value().getStringView();
+    } else if (HeaderUtility::isConnect(headers)) {
+      // Treat CONNECT requests as a special upgrade case.
+      upgrade = headers.Method();
+      upgrade_type = upgrade->value().getStringView();
+      // A non-coerced WebTransport CONNECT keys on its :protocol so a route opts in with an
+      // upgrade_configs entry of type webtransport.
+      if (headers.Protocol() != nullptr &&
+          headers.getProtocolValue() == Headers::get().ProtocolValues.WebTransport &&
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.web_transport")) {
+        upgrade_type = headers.getProtocolValue();
+      }
     }
   }
 
@@ -1710,8 +1725,7 @@ FilterManager::createUpgradeFilterChain(const FilterChainFactory& filter_chain_f
   }
 
   const Router::RouteEntry::UpgradeMap* upgrade_map = filter_manager_callbacks_.upgradeMap();
-  return filter_chain_factory.createUpgradeFilterChain(upgrade->value().getStringView(),
-                                                       upgrade_map, callbacks)
+  return filter_chain_factory.createUpgradeFilterChain(upgrade_type, upgrade_map, callbacks)
              ? UpgradeResult::UpgradeAccepted
              : UpgradeResult::UpgradeRejected;
 }

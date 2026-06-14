@@ -2575,6 +2575,10 @@ Http1StreamEncoderOptionsOptRef ConnectionManagerImpl::ActiveStream::http1Stream
   return response_encoder_->http1StreamEncoderOptions();
 }
 
+OptRef<WebTransportSession> ConnectionManagerImpl::ActiveStream::webTransport() {
+  return response_encoder_->webTransport();
+}
+
 void ConnectionManagerImpl::ActiveStream::onResponseDataTooLarge() {
   connection_manager_.stats_.named_.rs_too_large_.inc();
 }

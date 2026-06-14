@@ -1620,6 +1620,7 @@ wakeups
 wamr
 wasmtime
 websocket
+webtransport
 wepoll
 whitespace
 whitespaces

@@ -302,6 +302,38 @@ TEST_F(Http2HeaderValidatorTest, RequestExtendedConnect) {
   EXPECT_EQ(headers.getProtocolValue(), "");
 }
 
+// A webtransport extended CONNECT is coerced to an HTTP/1 upgrade like any other extended CONNECT
+// when the WebTransport runtime guard is disabled (the default).
+TEST_F(Http2HeaderValidatorTest, RequestWebTransportExtendedConnectCoercedWhenDisabled) {
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.web_transport", "false"}});
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":scheme", "https"},  {":method", "CONNECT"},      {":protocol", "webtransport"},
+      {":path", "/foo/bar"}, {":authority", "envoy.com"}, {"x-foo", "bar"}};
+  auto uhv = createH2ServerUhv(empty_config);
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
+  EXPECT_EQ(headers.getMethodValue(), "GET");
+  EXPECT_EQ(headers.getUpgradeValue(), "webtransport");
+  EXPECT_EQ(headers.getConnectionValue(), "upgrade");
+  EXPECT_EQ(headers.getProtocolValue(), "");
+}
+
+// With the WebTransport runtime guard enabled, a webtransport extended CONNECT is exempted from the
+// upgrade coercion and the pseudo-headers are preserved for the WebTransport path.
+TEST_F(Http2HeaderValidatorTest, RequestWebTransportExtendedConnectPreservedWhenEnabled) {
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.web_transport", "true"}});
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":scheme", "https"},  {":method", "CONNECT"},      {":protocol", "webtransport"},
+      {":path", "/foo/bar"}, {":authority", "envoy.com"}, {"x-foo", "bar"}};
+  auto uhv = createH2ServerUhv(empty_config);
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
+  EXPECT_EQ(headers.getMethodValue(), "CONNECT");
+  EXPECT_EQ(headers.getProtocolValue(), "webtransport");
+  EXPECT_EQ(headers.getPathValue(), "/foo/bar");
+  EXPECT_EQ(headers.Upgrade(), nullptr);
+}
+
 TEST_F(Http2HeaderValidatorTest, RequestExtendedConnectNoScheme) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "CONNECT"},
                                                   {":protocol", "websocket"},

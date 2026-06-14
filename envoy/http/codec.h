@@ -40,6 +40,7 @@ struct CodecStats;
 
 class Stream;
 class RequestDecoder;
+class WebTransportSession;
 
 class RequestDecoderHandle {
 public:
@@ -110,6 +111,12 @@ public:
    * absl::nullopt.
    */
   virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
+
+  /**
+   * Return the WebTransport session for this stream, or nullopt if the stream is not a
+   * WebTransport session. Defaulted so only the HTTP/3 stream overrides it.
+   */
+  virtual OptRef<WebTransportSession> webTransport() { return {}; }
 };
 
 /**

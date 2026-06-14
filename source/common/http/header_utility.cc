@@ -250,6 +250,11 @@ bool HeaderUtility::isConnectUdpRequest(const RequestHeaderMap& headers) {
                                                      Http::Headers::get().UpgradeValues.ConnectUdp);
 }
 
+bool HeaderUtility::isWebTransportConnectRequest(const RequestHeaderMap& headers) {
+  return headers.getMethodValue() == Http::Headers::get().MethodValues.Connect &&
+         headers.getProtocolValue() == Http::Headers::get().ProtocolValues.WebTransport;
+}
+
 bool HeaderUtility::isConnectUdpResponse(const ResponseHeaderMap& headers) {
   // In connect-udp case, Envoy will transform the H2 headers to H1 upgrade headers.
   // A valid response should have SwitchingProtocol status and connect-udp upgrade.

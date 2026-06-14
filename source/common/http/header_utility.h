@@ -380,6 +380,11 @@ public:
   static bool isConnectUdpRequest(const RequestHeaderMap& headers);
 
   /**
+   * @brief a helper function to determine if the headers represent a WebTransport CONNECT request.
+   */
+  static bool isWebTransportConnectRequest(const RequestHeaderMap& headers);
+
+  /**
    * @brief a helper function to determine if the headers represent a CONNECT-UDP response.
    */
   static bool isConnectUdpResponse(const ResponseHeaderMap& headers);

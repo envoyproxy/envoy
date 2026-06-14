@@ -166,6 +166,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const override;
   Router::RouteSpecificFilterConfigs perFilterConfigs() const override;
   Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
+  OptRef<WebTransportSession> webTransport() override;
   OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override;
   OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override;
   absl::string_view filterConfigName() const override { return filter_context_.config_name; }
@@ -565,6 +566,12 @@ public:
    * Returns the Http1StreamEncoderOptions associated with the response encoder.
    */
   virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
+
+  /**
+   * Returns the WebTransport session associated with the response encoder, or nullopt if there is
+   * none. Defaulted so non-HTTP/3 callbacks need not override it.
+   */
+  virtual OptRef<WebTransportSession> webTransport() { return {}; }
 
   /**
    * Returns the UpstreamStreamFilterCallbacks for upstream HTTP filters.

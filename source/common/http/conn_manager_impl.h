@@ -304,6 +304,7 @@ private:
     void onResponseDataTooLarge() override;
     void onRequestDataTooLarge() override;
     Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
+    OptRef<WebTransportSession> webTransport() override;
     void onLocalReply(Code code) override;
     OptRef<const Tracing::Config> tracingConfig() const override;
     const ScopeTrackedObject& scope() override;

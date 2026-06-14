@@ -525,6 +525,12 @@ public:
   virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
 
   /**
+   * Return the WebTransport session associated with the stream, or nullopt if there is none.
+   * Defaulted so existing filters need no change.
+   */
+  virtual OptRef<WebTransportSession> webTransport() { return {}; }
+
+  /**
    * Return a handle to the upstream callbacks. This is valid for upstream HTTP filters, and nullopt
    * for downstream HTTP filters.
    */

@@ -422,6 +422,29 @@ TEST(HttpUtility, H1H2H1Request) {
   ASSERT_EQ(converted_headers, original_headers);
 }
 
+// With the WebTransport runtime guard enabled, a webtransport extended CONNECT is exempted from
+// the HTTP/1 upgrade coercion like bytestream, since the bytestream upgrade model cannot represent
+// a WebTransport session.
+TEST(HttpUtility, WebTransportExtendedConnectIsNotUpgradeWhenEnabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.web_transport", "true"}});
+
+  TestRequestHeaderMapImpl headers = {{":method", "CONNECT"}, {":protocol", "webtransport"}};
+  EXPECT_FALSE(Utility::isH2UpgradeRequest(headers));
+  EXPECT_FALSE(Utility::isH3UpgradeRequest(headers));
+}
+
+// With the runtime guard disabled, a webtransport extended CONNECT keeps the legacy behavior and is
+// coerced like any other (non-bytestream) extended CONNECT.
+TEST(HttpUtility, WebTransportExtendedConnectIsUpgradeWhenDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.web_transport", "false"}});
+
+  TestRequestHeaderMapImpl headers = {{":method", "CONNECT"}, {":protocol", "webtransport"}};
+  EXPECT_TRUE(Utility::isH2UpgradeRequest(headers));
+  EXPECT_TRUE(Utility::isH3UpgradeRequest(headers));
+}
+
 // Start with H2 style websocket request headers. Transform to H1 and back.
 TEST(HttpUtility, H2H1H2Request) {
   TestRequestHeaderMapImpl converted_headers = {{":method", "CONNECT"}, {":protocol", "websocket"}};

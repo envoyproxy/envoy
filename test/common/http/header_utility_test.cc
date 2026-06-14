@@ -1127,6 +1127,20 @@ TEST(HeaderIsValidTest, IsConnectUdpRequest) {
   EXPECT_FALSE(HeaderUtility::isConnectUdpRequest(Http::TestRequestHeaderMapImpl{}));
 }
 
+TEST(HeaderIsValidTest, IsWebTransportConnectRequest) {
+  EXPECT_TRUE(HeaderUtility::isWebTransportConnectRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":protocol", "webtransport"}}));
+  // A different extended CONNECT protocol is not WebTransport.
+  EXPECT_FALSE(HeaderUtility::isWebTransportConnectRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":protocol", "connect-udp"}}));
+  // A plain CONNECT without a protocol is not WebTransport.
+  EXPECT_FALSE(HeaderUtility::isWebTransportConnectRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "CONNECT"}}));
+  EXPECT_FALSE(HeaderUtility::isWebTransportConnectRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"}, {":protocol", "webtransport"}}));
+  EXPECT_FALSE(HeaderUtility::isWebTransportConnectRequest(Http::TestRequestHeaderMapImpl{}));
+}
+
 TEST(HeaderIsValidTest, IsConnectResponse) {
   RequestHeaderMapPtr connect_request{new TestRequestHeaderMapImpl{{":method", "CONNECT"}}};
   RequestHeaderMapPtr get_request{new TestRequestHeaderMapImpl{{":method", "GET"}}};

@@ -676,7 +676,11 @@ bool Utility::isUpgrade(const RequestOrResponseHeaderMap& headers) {
 bool Utility::isH2UpgradeRequest(const RequestHeaderMap& headers) {
   return headers.getMethodValue() == Http::Headers::get().MethodValues.Connect &&
          headers.Protocol() && !headers.Protocol()->value().empty() &&
-         headers.Protocol()->value() != Headers::get().ProtocolValues.Bytestream;
+         headers.Protocol()->value() != Headers::get().ProtocolValues.Bytestream &&
+         // WebTransport multiplexes streams and datagrams in one session, which the bytestream
+         // upgrade model cannot represent, so exempt it from coercion like bytestream.
+         !(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.web_transport") &&
+           headers.Protocol()->value() == Headers::get().ProtocolValues.WebTransport);
 }
 
 bool Utility::isH3UpgradeRequest(const RequestHeaderMap& headers) {
