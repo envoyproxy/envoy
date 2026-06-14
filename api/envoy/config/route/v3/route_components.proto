@@ -2646,7 +2646,7 @@ message RateLimit {
       uint32 requests_per_unit = 1;
 
       // The unit of time.
-      type.v3.RateLimitUnit unit = 2 [(validate.rules).enum = {defined_only: true}];
+      type.v3.RateLimitUnit unit = 2;
     }
 
     oneof override_specifier {
