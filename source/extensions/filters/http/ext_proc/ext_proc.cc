@@ -491,9 +491,7 @@ ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
       static_cast<int>(decoding_processor_effects_.trailer_effect_));
   (*struct_msg->mutable_fields())[RequestBodyProcessingEffectField].set_number_value(
       static_cast<int>(decoding_processor_effects_.body_effect_));
-  if (!destination_.empty()) {
-    (*struct_msg->mutable_fields())[std::string(DestinationField)].set_string_value(destination_);
-  }
+  (*struct_msg->mutable_fields())[DestinationField].set_string_value(destination());
   return struct_msg;
 }
 
@@ -536,9 +534,7 @@ absl::optional<std::string> ExtProcLoggingInfo::serializeAsString() const {
   parts.push_back(absl::StrCat("bs:", bytes_sent_));
   parts.push_back(absl::StrCat("br:", bytes_received_));
   parts.push_back(absl::StrCat("os:", static_cast<int>(grpc_status_before_first_call_)));
-  if (!destination_.empty()) {
-    parts.push_back(absl::StrCat("ds:", destination_));
-  }
+  parts.push_back(absl::StrCat("ds:", destination()));
 
   return absl::StrJoin(parts, ",");
 }
@@ -630,7 +626,7 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
     return static_cast<int64_t>(grpc_status_before_first_call_);
   }
   if (field_name == DestinationField) {
-    return absl::string_view(destination_);
+    return absl::string_view(destination());
   }
   return {};
 }
