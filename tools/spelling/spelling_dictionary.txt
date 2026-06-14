@@ -1518,6 +1518,7 @@ testcase
 testcases
 testdata
 testee
+tgkill
 threadsafe
 thru
 timespan
