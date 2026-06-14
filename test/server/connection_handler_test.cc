@@ -2345,6 +2345,72 @@ TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdate) {
   EXPECT_CALL(*old_listener, onDestroy());
 }
 
+TEST_F(ConnectionHandlerTest, TcpListenerDrainFilterChainsNotifiesConnections) {
+  InSequence s;
+  uint64_t listener_tag = 1;
+  Network::TcpListenerCallbacks* listener_callbacks;
+  auto listener = new NiceMock<Network::MockListener>();
+  TestListener* test_listener =
+      addListener(listener_tag, true, false, "test_listener", listener, &listener_callbacks);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
+
+  Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
+  EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(filter_chain_.get()));
+  auto* server_connection = new NiceMock<Network::MockServerConnection>();
+  EXPECT_CALL(dispatcher_, createServerConnection_(_)).WillOnce(Return(server_connection));
+  EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
+
+  listener_callbacks->onAccept(Network::ConnectionSocketPtr{connection});
+  EXPECT_EQ(1UL, handler_->numConnections());
+
+  const std::list<const Network::FilterChain*> filter_chains{filter_chain_.get()};
+  // onFilterChainDrain must call onDrain() on every connection owned by the listed filter chains
+  // without closing them.
+  EXPECT_CALL(*server_connection, onDrain());
+  handler_->onFilterChainDrain(listener_tag, filter_chains);
+  // Connection remains tracked; only when filter chains are actually removed does it close.
+  EXPECT_EQ(1UL, handler_->numConnections());
+
+  EXPECT_CALL(*access_log_, log(_, _));
+  handler_->removeFilterChains(listener_tag, filter_chains, []() {});
+  dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
+  EXPECT_CALL(*listener, onDestroy());
+  handler_.reset();
+}
+
+TEST_F(ConnectionHandlerTest, TcpListenerDrainListenersNotifiesAllConnections) {
+  InSequence s;
+  uint64_t listener_tag = 1;
+  Network::TcpListenerCallbacks* listener_callbacks;
+  auto listener = new NiceMock<Network::MockListener>();
+  TestListener* test_listener =
+      addListener(listener_tag, true, false, "test_listener", listener, &listener_callbacks);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
+
+  Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
+  EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(filter_chain_.get()));
+  auto* server_connection = new NiceMock<Network::MockServerConnection>();
+  EXPECT_CALL(dispatcher_, createServerConnection_(_)).WillOnce(Return(server_connection));
+  EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
+  listener_callbacks->onAccept(Network::ConnectionSocketPtr{connection});
+
+  // onListenerDrain should fan out onDrain() to every connection in the listener.
+  EXPECT_CALL(*server_connection, onDrain());
+  handler_->onListenerDrain(listener_tag);
+  EXPECT_EQ(1UL, handler_->numConnections());
+
+  // Cleanup.
+  EXPECT_CALL(*access_log_, log(_, _));
+  const std::list<const Network::FilterChain*> filter_chains{filter_chain_.get()};
+  handler_->removeFilterChains(listener_tag, filter_chains, []() {});
+  dispatcher_.clearDeferredDeleteList();
+  EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
+  EXPECT_CALL(*listener, onDestroy());
+  handler_.reset();
+}
+
 TEST_F(ConnectionHandlerTest, TcpListenerRemoveFilterChain) {
   InSequence s;
   uint64_t listener_tag = 1;

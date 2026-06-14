@@ -18,29 +18,29 @@ extern "C" {
 void envoy_dynamic_module_callback_cert_validator_set_error_details(
     envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer error_details) {
-  auto* config = static_cast<
-      Envoy::Extensions::TransportSockets::Tls::DynamicModules::DynamicModuleCertValidatorConfig*>(
+  auto* call_context = static_cast<
+      Envoy::Extensions::TransportSockets::Tls::DynamicModules::CertValidatorCallContext*>(
       config_envoy_ptr);
   if (error_details.ptr != nullptr && error_details.length > 0) {
-    config->last_error_details_ = std::string(error_details.ptr, error_details.length);
+    call_context->error_details = std::string(error_details.ptr, error_details.length);
   }
 }
 
 bool envoy_dynamic_module_callback_cert_validator_set_filter_state(
     envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
-  auto* config = static_cast<
-      Envoy::Extensions::TransportSockets::Tls::DynamicModules::DynamicModuleCertValidatorConfig*>(
+  auto* call_context = static_cast<
+      Envoy::Extensions::TransportSockets::Tls::DynamicModules::CertValidatorCallContext*>(
       config_envoy_ptr);
 
-  if (config->current_callbacks_ == nullptr || key.ptr == nullptr || value.ptr == nullptr) {
+  if (call_context->callbacks == nullptr || key.ptr == nullptr || value.ptr == nullptr) {
     return false;
   }
 
   std::string key_str(key.ptr, key.length);
   std::string value_str(value.ptr, value.length);
 
-  config->current_callbacks_->connection().streamInfo().filterState()->setData(
+  call_context->callbacks->connection().streamInfo().filterState()->setData(
       key_str, std::make_shared<Envoy::Router::StringAccessorImpl>(value_str),
       Envoy::StreamInfo::FilterState::LifeSpan::Connection);
   return true;
@@ -50,18 +50,18 @@ bool envoy_dynamic_module_callback_cert_validator_get_filter_state(
     envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key,
     envoy_dynamic_module_type_envoy_buffer* value_out) {
-  auto* config = static_cast<
-      Envoy::Extensions::TransportSockets::Tls::DynamicModules::DynamicModuleCertValidatorConfig*>(
+  auto* call_context = static_cast<
+      Envoy::Extensions::TransportSockets::Tls::DynamicModules::CertValidatorCallContext*>(
       config_envoy_ptr);
 
-  if (config->current_callbacks_ == nullptr || key.ptr == nullptr) {
+  if (call_context->callbacks == nullptr || key.ptr == nullptr) {
     value_out->ptr = nullptr;
     value_out->length = 0;
     return false;
   }
 
   std::string key_str(key.ptr, key.length);
-  const auto* accessor = config->current_callbacks_->connection()
+  const auto* accessor = call_context->callbacks->connection()
                              .streamInfo()
                              .filterState()
                              ->getDataReadOnly<Envoy::Router::StringAccessor>(key_str);
@@ -197,22 +197,16 @@ ValidationResults DynamicModuleCertValidator::doVerifyCertChain(
 
   envoy_dynamic_module_type_envoy_buffer host_name_buffer = {host_name.data(), host_name.size()};
 
-  // Reset error details before calling the module. The module may set them via the
-  // envoy_dynamic_module_callback_cert_validator_set_error_details callback.
-  config_->last_error_details_.reset();
-
-  // Store the callbacks pointer so that filter state callbacks can access the connection's
-  // stream info during the module's do_verify_cert_chain call. Set immediately before and
-  // reset immediately after to ensure the pointer is only valid during the module call.
-  config_->current_callbacks_ = validation_context.callbacks;
+  // Per-call state lives on the stack so concurrent verification on different worker threads does
+  // not share it. The module receives a pointer to this context as the verify envoy pointer and
+  // passes it back to the error details and filter state callbacks.
+  CertValidatorCallContext call_context;
+  call_context.callbacks = validation_context.callbacks;
 
   // Call the module's verify function.
   auto result = config_->on_do_verify_cert_chain_(
-      static_cast<void*>(config_.get()), config_->in_module_config_, cert_buffers.data(),
+      static_cast<void*>(&call_context), config_->in_module_config_, cert_buffers.data(),
       static_cast<size_t>(num_certs), host_name_buffer, is_server);
-
-  // Reset the callbacks pointer after the module call returns.
-  config_->current_callbacks_ = nullptr;
 
   // Translate the result.
   ValidationResults::ValidationStatus status;
@@ -247,11 +241,11 @@ ValidationResults DynamicModuleCertValidator::doVerifyCertChain(
     tls_alert = result.tls_alert;
   }
 
-  if (config_->last_error_details_.has_value()) {
-    ENVOY_LOG(debug, "verify cert failed: {}", config_->last_error_details_.value());
+  if (call_context.error_details.has_value()) {
+    ENVOY_LOG(debug, "verify cert failed: {}", call_context.error_details.value());
   }
 
-  return {status, detailed_status, tls_alert, config_->last_error_details_};
+  return {status, detailed_status, tls_alert, call_context.error_details};
 }
 
 absl::StatusOr<int>
@@ -297,7 +291,7 @@ Envoy::Ssl::CertificateDetailsPtr DynamicModuleCertValidator::getCaCertInformati
 
 absl::StatusOr<CertValidatorPtr> DynamicModuleCertValidatorFactory::createCertValidator(
     const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-    Server::Configuration::CommonFactoryContext& /*context*/, Stats::Scope& /*scope*/) {
+    Server::Configuration::CommonFactoryContext& context, Stats::Scope& /*scope*/) {
   ASSERT(config != nullptr);
   ASSERT(config->customValidatorConfig().has_value());
 
@@ -310,11 +304,12 @@ absl::StatusOr<CertValidatorPtr> DynamicModuleCertValidatorFactory::createCertVa
   RETURN_IF_NOT_OK(status);
 
   const auto& module_config = proto_config.dynamic_module_config();
-  auto dynamic_module = Envoy::Extensions::DynamicModules::newDynamicModuleByName(
-      module_config.name(), module_config.do_not_close(), module_config.load_globally());
-  if (!dynamic_module.ok()) {
-    return dynamic_module.status();
-  }
+  // Cert validators do not support remote module sources, so no init manager or async callback is
+  // passed; only the synchronous local-file and by-name paths can succeed here.
+  auto load_result = Envoy::Extensions::DynamicModules::newDynamicModuleByConfig(
+      module_config, proto_config.validator_name(), context);
+  RETURN_IF_NOT_OK_REF(load_result.status());
+  auto dynamic_module = std::move(load_result->loaded);
 
   std::string validator_config_str;
   if (proto_config.has_validator_config()) {
@@ -324,7 +319,7 @@ absl::StatusOr<CertValidatorPtr> DynamicModuleCertValidatorFactory::createCertVa
   }
 
   auto factory_config_or_error = newDynamicModuleCertValidatorConfig(
-      proto_config.validator_name(), validator_config_str, std::move(dynamic_module.value()));
+      proto_config.validator_name(), validator_config_str, std::move(dynamic_module));
   if (!factory_config_or_error.ok()) {
     return factory_config_or_error.status();
   }

@@ -211,6 +211,8 @@ private:
     Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
       return std::make_unique<LbImpl>();
     }
+
+    bool recreateOnHostChangeDeprecated() const override { return false; }
   };
 };
 
@@ -267,6 +269,179 @@ TEST_F(ClusterManagerImplThreadAwareLbTest, LoadBalancerCanUpdateMetadata) {
   cluster_manager_->getThreadLocalCluster("cluster_0")
       ->loadBalancer()
       .chooseHost(&load_balancer_context);
+}
+
+// Thread aware load balancer whose worker local LB factory still requests
+// recreate-on-host-change. Only out-of-tree LBs are expected to do this now, so
+// this is used to exercise the deprecated worker-local LB recreation path in the
+// cluster manager. The number of worker local LBs created is tracked via a
+// shared counter.
+class RecreatingThreadAwareLb : public Upstream::ThreadAwareLoadBalancer {
+public:
+  explicit RecreatingThreadAwareLb(int& create_count) : create_count_(create_count) {}
+
+  Upstream::LoadBalancerFactorySharedPtr factory() override {
+    return std::make_shared<LbFactory>(create_count_);
+  }
+  absl::Status initialize() override { return absl::OkStatus(); }
+
+private:
+  class LbImpl : public Upstream::LoadBalancer {
+  public:
+    Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext*) override {
+      return {nullptr};
+    }
+    Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
+      return nullptr;
+    }
+    OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+      return {};
+    }
+    absl::optional<Upstream::SelectedPoolAndConnection>
+    selectExistingConnection(Upstream::LoadBalancerContext*, const Upstream::Host&,
+                             std::vector<uint8_t>&) override {
+      return {};
+    }
+  };
+
+  class LbFactory : public Upstream::LoadBalancerFactory {
+  public:
+    explicit LbFactory(int& create_count) : create_count_(create_count) {}
+
+    Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
+      ++create_count_;
+      return std::make_unique<LbImpl>();
+    }
+
+    bool recreateOnHostChangeDeprecated() const override { return true; }
+
+  private:
+    int& create_count_;
+  };
+
+  int& create_count_;
+};
+
+class RecreatingLbConfigFactory
+    : public Upstream::TypedLoadBalancerFactoryBase<
+          ::test::load_balancing_policies::metadata_writer::MetadataWriterLbConfig> {
+public:
+  explicit RecreatingLbConfigFactory(int& create_count)
+      : TypedLoadBalancerFactoryBase("envoy.load_balancers.recreate_on_host_change"),
+        create_count_(create_count) {}
+
+  Upstream::ThreadAwareLoadBalancerPtr create(OptRef<const Upstream::LoadBalancerConfig>,
+                                              const Upstream::ClusterInfo&,
+                                              const Upstream::PrioritySet&, Runtime::Loader&,
+                                              Random::RandomGenerator&, TimeSource&) override {
+    return std::make_unique<RecreatingThreadAwareLb>(create_count_);
+  }
+
+  absl::StatusOr<Upstream::LoadBalancerConfigPtr>
+  loadConfig(Server::Configuration::ServerFactoryContext&, const Protobuf::Message&) override {
+    return std::make_unique<Upstream::LoadBalancerConfig>();
+  }
+
+private:
+  int& create_count_;
+};
+
+// Validate that the cluster manager re-creates the worker local LB on a membership
+// change when the worker local LB factory still requests recreate-on-host-change
+// (the deprecated behavior now only expected from out-of-tree LBs).
+TEST_F(ClusterManagerImplThreadAwareLbTest, RecreateWorkerLocalLbOnHostChange) {
+  int worker_lb_create_count = 0;
+  RecreatingLbConfigFactory lb_factory(worker_lb_create_count);
+  Registry::InjectFactory<Envoy::Upstream::TypedLoadBalancerFactory> registered(lb_factory);
+  const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
+                                        clustersJson({defaultStaticClusterJson("cluster_0")}));
+
+  std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
+  cluster1->info_->name_ = "cluster_0";
+  cluster1->info_->lb_factory_ =
+      Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(
+          "envoy.load_balancers.recreate_on_host_change");
+
+  InSequence s;
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
+      .WillOnce(Return(std::make_pair(cluster1, nullptr)));
+  ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  create(parseBootstrapFromV3Json(json));
+
+  cluster1->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster1->info_, "tcp://127.0.0.1:80")};
+  cluster1->prioritySet().getMockHostSet(0)->runCallbacks(
+      cluster1->prioritySet().getMockHostSet(0)->hosts_, {});
+  cluster1->initialize_callback_();
+
+  // The worker local LB is created at least once when the thread local cluster is
+  // initialized.
+  ASSERT_NE(nullptr, cluster_manager_->getThreadLocalCluster("cluster_0"));
+  const int create_count_after_init = worker_lb_create_count;
+  EXPECT_GE(create_count_after_init, 1);
+
+  // A subsequent membership change re-creates the worker local LB because the factory
+  // requests recreate-on-host-change.
+  cluster1->prioritySet().getMockHostSet(0)->runCallbacks(
+      {makeTestHost(cluster1->info_, "tcp://127.0.0.1:81")}, {});
+  EXPECT_GT(worker_lb_create_count, create_count_after_init);
+
+  factory_.tls_.shutdownThread();
+}
+
+// Verify trivial accessors of the cluster manager and the thread local cluster.
+TEST_F(ClusterManagerImplTest, TrivialAccessors) {
+  const std::string yaml = R"EOF(
+static_resources:
+  clusters:
+  - name: cluster_1
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: cluster_1
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11001
+  )EOF";
+  create(parseBootstrapFromV3Yaml(yaml));
+
+  EXPECT_TRUE(cluster_manager_->initialized());
+  cluster_manager_->clusterTimeoutBudgetStatNames();
+
+  Upstream::ThreadLocalCluster* tlc = cluster_manager_->getThreadLocalCluster("cluster_1");
+  ASSERT_NE(nullptr, tlc);
+  EXPECT_EQ("", tlc->dropCategory());
+  tlc->setDropCategory("test_drop_category");
+  EXPECT_EQ("test_drop_category", tlc->dropCategory());
+
+  factory_.tls_.shutdownThread();
+}
+
+// Validate that an error when creating a secondary (EDS) cluster is propagated when
+// initializing the cluster manager.
+TEST_F(ClusterManagerImplTest, SecondaryEdsClusterCreationFailure) {
+  const std::string yaml = R"EOF(
+static_resources:
+  clusters:
+  - name: cluster_eds
+    connect_timeout: 0.250s
+    type: EDS
+    eds_cluster_config:
+      eds_config:
+        ads: {}
+  )EOF";
+
+  // Returning a null cluster from the factory is converted to an error status by the
+  // test factory.
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
+      .WillOnce(Return(std::make_pair(ClusterSharedPtr(), nullptr)));
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
+                            "Failed to create cluster from proto");
 }
 
 using NameVals = std::vector<std::pair<Network::SocketOptionName, int>>;

@@ -183,7 +183,7 @@ private:
     // Upstream::LoadBalancerFactory.
     Upstream::LoadBalancerPtr create() { return std::make_unique<LoadBalancer>(cluster_); }
     Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override { return create(); }
-    bool recreateOnHostChange() const override { return false; }
+    bool recreateOnHostChangeDeprecated() const override { return false; }
 
     const std::shared_ptr<RevConCluster> cluster_;
   };

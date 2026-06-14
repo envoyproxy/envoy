@@ -127,10 +127,9 @@ private:
   // Thread-local LB implementation.
   class LoadBalancerImpl : public Upstream::LoadBalancer {
   public:
-    LoadBalancerImpl(const OverrideHostLbConfig& config, LoadBalancerPtr fallback_picker_lb,
-                     const PrioritySet& priority_set)
-        : config_(config), fallback_picker_lb_(std::move(fallback_picker_lb)),
-          priority_set_(priority_set) {}
+    LoadBalancerImpl(const OverrideHostLbConfig& config,
+                     LoadBalancerFactorySharedPtr fallback_picker_lb_factory,
+                     LoadBalancerParams params);
 
     HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) override;
 
@@ -173,8 +172,15 @@ private:
                                const Http::LowerCaseString& header_name);
 
     const OverrideHostLbConfig& config_;
-    const LoadBalancerPtr fallback_picker_lb_;
+    // Held so the fallback LB can be recreated locally on host changes when
+    // its factory still asks for the legacy recreate-on-host-change semantics.
+    const LoadBalancerFactorySharedPtr fallback_picker_lb_factory_;
+    // Mutable: re-assigned from member_update_cb_ when the inner factory opts
+    // into recreate-on-host-change.
+    LoadBalancerPtr fallback_picker_lb_;
     const PrioritySet& priority_set_;
+    const PrioritySet* const local_priority_set_{};
+    Common::CallbackHandlePtr member_update_cb_;
   };
 
   // LoadBalancerFactory implementation shared by worker threads to create
@@ -189,7 +195,7 @@ private:
     // Called by worker threads to create a thread-local load balancer.
     LoadBalancerPtr create(LoadBalancerParams params) override;
 
-    bool recreateOnHostChange() const override { return false; }
+    bool recreateOnHostChangeDeprecated() const override { return false; }
 
   private:
     // Hosts in the load balancer. Owned by the cluster manager.

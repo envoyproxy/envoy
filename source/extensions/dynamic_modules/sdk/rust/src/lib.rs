@@ -17,6 +17,7 @@ pub mod dns_resolver;
 // directly.
 #[doc(hidden)]
 pub mod ffi_helpers;
+pub mod formatter;
 pub mod http;
 pub mod listener;
 pub mod load_balancer;
@@ -656,6 +657,7 @@ macro_rules! declare_network_filter_init_functions {
 /// - `dns_resolver:` — [`NewDnsResolverConfigFunction`] for DNS resolvers
 /// - `transport_socket:` — [`NewTransportSocketFactoryConfigFunction`] for transport sockets
 /// - `access_logger:` — [`NewAccessLoggerConfigFunction`] for access loggers
+/// - `formatter:` — [`NewFormatterConfigFunction`] for formatters
 /// - `stat_sink:` — [`NewStatSinkConfigFunction`] for stats sinks
 ///
 /// # Examples
@@ -860,6 +862,13 @@ macro_rules! declare_all_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_ACCESS_LOGGER_CONFIG_FUNCTION,
       $fn,
       "NEW_ACCESS_LOGGER_CONFIG_FUNCTION"
+    );
+  };
+  (@register formatter : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_FORMATTER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_FORMATTER_CONFIG_FUNCTION"
     );
   };
   (@register stat_sink : $fn:expr) => {
@@ -1140,6 +1149,73 @@ pub static NEW_ACCESS_LOGGER_CONFIG_FUNCTION: OnceLock<NewAccessLoggerConfigFunc
   OnceLock::new();
 
 // =================================================================================================
+// Formatter Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new formatter command parser configuration.
+///
+/// The `name` is the value of `formatter_name` from the `dynamic_modules` formatter
+/// configuration, allowing a single module to dispatch to different command parser
+/// implementations. The `config` is the raw bytes from the `formatter_config` field. Returning
+/// `None` causes Envoy to reject the formatter configuration.
+pub type NewFormatterConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn formatter::FormatterConfig>>;
+
+/// The global factory function for formatter command parsers. This is set via the `formatter:` arm
+/// of [`declare_all_init_functions!`] (or the [`declare_formatter_init_functions!`] shim) and is
+/// not intended to be set directly.
+pub static NEW_FORMATTER_CONFIG_FUNCTION: OnceLock<NewFormatterConfigFunction> = OnceLock::new();
+
+/// Declare the init functions for a formatter dynamic module.
+///
+/// The first argument is the program init function with [`ProgramInitFunction`] type.
+/// The second argument is the factory function with [`NewFormatterConfigFunction`] type.
+///
+/// # Example
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::formatter::*;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_formatter_config(_name: &str, _config: &[u8]) -> Option<Box<dyn FormatterConfig>> {
+///   None
+/// }
+///
+/// declare_formatter_init_functions!(program_init, new_formatter_config);
+/// ```
+#[macro_export]
+macro_rules! declare_formatter_init_functions {
+  ($f:ident, $new_formatter_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_FORMATTER_CONFIG_FUNCTION,
+          $new_formatter_config_fn,
+          "NEW_FORMATTER_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
+      })) {
+        ::std::result::Result::Ok(v) => v,
+        ::std::result::Result::Err(payload) => {
+          $crate::log_ffi_panic("envoy_dynamic_module_on_program_init", payload);
+          ::std::ptr::null()
+        },
+      }
+    }
+  };
+}
+
+// =================================================================================================
 // Stats Sink Dynamic Module
 // =================================================================================================
 
@@ -1147,10 +1223,14 @@ pub static NEW_ACCESS_LOGGER_CONFIG_FUNCTION: OnceLock<NewAccessLoggerConfigFunc
 ///
 /// The `name` is the value of `sink_name` from the `dynamic_modules` stats sink configuration,
 /// allowing a single module to dispatch to different sink implementations. The `config` is the
-/// raw bytes from the `sink_config` field. Returning `None` causes Envoy to reject the stats
-/// sink configuration.
-pub type NewStatSinkConfigFunction =
-  fn(name: &str, config: &[u8]) -> Option<Box<dyn stats_sink::StatSink>>;
+/// raw bytes from the `sink_config` field. The `envoy_config` handle is used to define gauges and
+/// create a [`stats_sink::EnvoyStatSinkConfigScheduler`] while the configuration is being created.
+/// Returning `None` causes Envoy to reject the stats sink configuration.
+pub type NewStatSinkConfigFunction = fn(
+  name: &str,
+  config: &[u8],
+  envoy_config: &mut stats_sink::EnvoyStatSinkConfig,
+) -> Option<Box<dyn stats_sink::StatSink>>;
 
 /// The global factory function for stats sinks. This is set via the `stat_sink:` arm of
 /// [`declare_all_init_functions!`] (or [`declare_stat_sink_init_functions!`]) and is not intended
@@ -1172,7 +1252,11 @@ pub static NEW_STAT_SINK_CONFIG_FUNCTION: OnceLock<NewStatSinkConfigFunction> = 
 ///   true
 /// }
 ///
-/// fn new_stat_sink(_name: &str, _config: &[u8]) -> Option<Box<dyn StatSink>> {
+/// fn new_stat_sink(
+///   _name: &str,
+///   _config: &[u8],
+///   _envoy_config: &mut EnvoyStatSinkConfig,
+/// ) -> Option<Box<dyn StatSink>> {
 ///   Some(Box::new(MyStatSink {}))
 /// }
 ///

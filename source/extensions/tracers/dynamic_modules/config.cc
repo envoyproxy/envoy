@@ -19,13 +19,14 @@ Tracing::DriverSharedPtr DynamicModuleTracerFactory::createTracerDriver(
       config, context.messageValidationVisitor());
 
   const auto& module_config = proto_config.dynamic_module_config();
-  auto dynamic_module_or_error = Extensions::DynamicModules::newDynamicModuleByName(
-      module_config.name(), module_config.do_not_close(), module_config.load_globally());
-
-  if (!dynamic_module_or_error.ok()) {
-    throw EnvoyException("Failed to load dynamic module: " +
-                         std::string(dynamic_module_or_error.status().message()));
+  // Tracers do not support remote module sources, so no init manager or async callback is passed;
+  // only the synchronous local-file and by-name paths can succeed here.
+  auto load_result = Extensions::DynamicModules::newDynamicModuleByConfig(
+      module_config, proto_config.tracer_name(), context.serverFactoryContext());
+  if (!load_result.ok()) {
+    throw EnvoyException(std::string(load_result.status().message()));
   }
+  auto dynamic_module = std::move(load_result->loaded);
 
   std::string tracer_config_str;
   if (proto_config.has_tracer_config()) {
@@ -41,9 +42,9 @@ Tracing::DriverSharedPtr DynamicModuleTracerFactory::createTracerDriver(
                                             ? std::string(DefaultMetricsNamespace)
                                             : module_config.metrics_namespace();
 
-  auto tracer_config = newDynamicModuleTracerConfig(
-      proto_config.tracer_name(), tracer_config_str, metrics_namespace,
-      std::move(dynamic_module_or_error.value()), context.serverFactoryContext().scope());
+  auto tracer_config = newDynamicModuleTracerConfig(proto_config.tracer_name(), tracer_config_str,
+                                                    metrics_namespace, std::move(dynamic_module),
+                                                    context.serverFactoryContext().scope());
 
   if (!tracer_config.ok()) {
     throw EnvoyException("Failed to create tracer config: " +

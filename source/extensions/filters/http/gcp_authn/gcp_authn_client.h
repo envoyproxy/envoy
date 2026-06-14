@@ -78,6 +78,17 @@ public:
                 const std::string& fingerprint, Callbacks& callbacks) PURE;
 
   /**
+   * Fetch a bound Access Token.
+   *
+   * @param audience the Audience proto containing the request details.
+   * @param fingerprint the client certificate fingerprint, strictly required.
+   * @param callbacks the callbacks to be notified when the token fetch completes.
+   */
+  virtual void
+  fetchBoundAccessToken(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+                        const std::string& fingerprint, Callbacks& callbacks) PURE;
+
+  /**
    * Cancel the active request.
    */
   virtual void cancel() PURE;

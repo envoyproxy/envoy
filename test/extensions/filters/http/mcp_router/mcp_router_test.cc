@@ -471,7 +471,7 @@ protected:
       std::vector<Http::AsyncClient::StreamCallbacks*>& http_callbacks,
       std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>>& http_streams) {
     factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
-        {"test_cluster", "time_cluster", "calc_cluster"});
+        {"test_cluster", "time_cluster", "calc_cluster", "tools_cluster"});
     EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
                     .async_client_,
                 start(_, _))
@@ -2144,6 +2144,163 @@ TEST(AggregateToolsListTest, IconsArrayPreserved) {
   auto icons = (*parsed)->getObjectArray("icons");
   ASSERT_TRUE(icons.ok());
   EXPECT_EQ(icons->size(), 2);
+}
+
+// Verifies __jsonrpc_response maps to McpMethod::ServerResponse.
+TEST(ParseMethodStringTest, ServerResponse) {
+  EXPECT_EQ(parseMethodString("__jsonrpc_response"), McpMethod::ServerResponse);
+}
+
+// Verifies initialize response includes elicitation capability.
+TEST_F(McpRouterFilterTest, GatewayCapabilitiesIncludeElicitation) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  proto_config.set_lazy_initialization(true);
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  setMcpMethodMetadata("initialize");
+
+  auto config = createConfig(proto_config);
+  McpRouterFilter filter(config);
+  filter.setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
+
+  std::string response_body;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true))
+      .WillOnce(
+          testing::Invoke([&](Buffer::Instance& data, bool) { response_body = data.toString(); }));
+
+  filter.decodeHeaders(headers, false);
+  const std::string body =
+      R"({"jsonrpc":"2.0","method":"initialize","id":1,"params":{"protocolVersion":"2025-06-18"}})";
+  Buffer::OwnedImpl buffer(body);
+  filter.decodeData(buffer, true);
+
+  EXPECT_THAT(response_body, testing::HasSubstr("\"elicitation\":{}"));
+}
+
+// Verifies server response routes to the correct backend based on prefixed ID.
+TEST_F(McpRouterFilterTest, HandleServerResponseRoutesToBackend) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  auto* server1 = proto_config.add_servers();
+  server1->set_name("time");
+  server1->mutable_mcp_cluster()->set_cluster("time_cluster");
+  auto* server2 = proto_config.add_servers();
+  server2->set_name("calc");
+  server2->mutable_mcp_cluster()->set_cluster("calc_cluster");
+
+  // Set metadata for a server response with prefixed ID.
+  auto& mcp_metadata = (*dynamic_metadata_.mutable_filter_metadata())["envoy.filters.http.mcp"];
+  (*mcp_metadata.mutable_fields())["method"].set_string_value("__jsonrpc_response");
+  (*mcp_metadata.mutable_fields())["id"].set_string_value("time__42");
+
+  auto config = createConfig(proto_config);
+
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+  setupMockAsyncClient(http_callbacks, http_streams);
+
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
+  filter->decodeHeaders(headers, false);
+
+  const std::string body =
+      R"({"jsonrpc":"2.0","id":"time__42","result":{"action":"accept","content":{"name":"test"}}})";
+  Buffer::OwnedImpl buffer(body);
+
+  std::string forwarded_body;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true))
+      .WillOnce(
+          testing::Invoke([&](Buffer::Instance& data, bool) { forwarded_body = data.toString(); }));
+
+  filter->decodeData(buffer, true);
+
+  ASSERT_EQ(http_callbacks.size(), 1);
+
+  simulateBackendResponse(http_callbacks[0], R"({"jsonrpc":"2.0","id":42,"result":{}})");
+
+  EXPECT_FALSE(forwarded_body.empty());
+}
+
+// Verifies server response with invalid prefix returns error.
+TEST_F(McpRouterFilterTest, HandleServerResponseInvalidId) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  auto* server = proto_config.add_servers();
+  server->set_name("time");
+  server->mutable_mcp_cluster()->set_cluster("time_cluster");
+  auto* server2 = proto_config.add_servers();
+  server2->set_name("calc");
+  server2->mutable_mcp_cluster()->set_cluster("calc_cluster");
+
+  auto& mcp_metadata = (*dynamic_metadata_.mutable_filter_metadata())["envoy.filters.http.mcp"];
+  (*mcp_metadata.mutable_fields())["method"].set_string_value("__jsonrpc_response");
+  (*mcp_metadata.mutable_fields())["id"].set_string_value("unknown__42");
+
+  auto config = createConfig(proto_config);
+  McpRouterFilter filter(config);
+  filter.setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
+  filter.decodeHeaders(headers, false);
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(testing::Invoke([](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("400", headers.getStatusValue());
+      }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+
+  const std::string body = R"({"jsonrpc":"2.0","id":"unknown__42","result":{"action":"accept"}})";
+  Buffer::OwnedImpl buffer(body);
+  filter.decodeData(buffer, true);
+}
+
+// Verifies single-backend mode routes server responses without prefix parsing.
+TEST_F(McpRouterFilterTest, HandleServerResponseSingleBackend) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  auto* server = proto_config.add_servers();
+  server->set_name("tools");
+  server->mutable_mcp_cluster()->set_cluster("tools_cluster");
+
+  auto& mcp_metadata = (*dynamic_metadata_.mutable_filter_metadata())["envoy.filters.http.mcp"];
+  (*mcp_metadata.mutable_fields())["method"].set_string_value("__jsonrpc_response");
+  (*mcp_metadata.mutable_fields())["id"].set_string_value("42");
+
+  auto config = createConfig(proto_config);
+
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+  setupMockAsyncClient(http_callbacks, http_streams);
+
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
+  filter->decodeHeaders(headers, false);
+
+  const std::string body = R"({"jsonrpc":"2.0","id":"42","result":{"action":"accept"}})";
+  Buffer::OwnedImpl buffer(body);
+
+  std::string forwarded_body;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true))
+      .WillOnce(
+          testing::Invoke([&](Buffer::Instance& data, bool) { forwarded_body = data.toString(); }));
+
+  filter->decodeData(buffer, true);
+
+  ASSERT_EQ(http_callbacks.size(), 1);
+  simulateBackendResponse(http_callbacks[0], R"({"jsonrpc":"2.0","id":42,"result":{}})");
+  EXPECT_FALSE(forwarded_body.empty());
 }
 
 } // namespace

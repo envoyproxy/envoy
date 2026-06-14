@@ -35,7 +35,7 @@ struct DynamicModuleThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBa
     Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams params) override {
       return std::make_unique<DynamicModuleLoadBalancer>(handle_, params.priority_set);
     }
-    bool recreateOnHostChange() const override { return false; }
+    bool recreateOnHostChangeDeprecated() const override { return false; }
 
     DynamicModuleClusterHandleSharedPtr handle_;
   };
@@ -213,6 +213,8 @@ DynamicModuleCluster::DynamicModuleCluster(const envoy::config::cluster::v3::Clu
 
   // Initialize the priority set with an empty host set at priority 0.
   priority_set_.getOrCreateHostSet(0);
+  // Allocate and seed the worker slot before worker threads can observe this cluster.
+  ensureWorkerSlot();
 
   registerLifecycleCallbacks();
 }
@@ -395,6 +397,10 @@ bool DynamicModuleCluster::addHosts(
 
   auto cluster_info = info();
 
+  // Cross-priority address map maintained by the priority set; used to skip addresses already in
+  // the cluster without copying the host set.
+  const auto existing_hosts = priority_set_.crossPriorityHostMap();
+
   for (size_t i = 0; i < addresses.size(); ++i) {
     if (weights[i] == 0 || weights[i] > 128) {
       ENVOY_LOG(error, "Invalid weight {} for host {}.", weights[i], addresses[i]);
@@ -406,6 +412,11 @@ bool DynamicModuleCluster::addHosts(
     if (resolved_address == nullptr) {
       ENVOY_LOG(error, "Invalid address: {}.", addresses[i]);
       return false;
+    }
+
+    // Skip addresses already in the host set. This does not deduplicate within the batch.
+    if (existing_hosts != nullptr && existing_hosts->contains(resolved_address->asString())) {
+      continue;
     }
 
     auto locality = std::make_shared<envoy::config::core::v3::Locality>();
@@ -440,6 +451,13 @@ bool DynamicModuleCluster::addHosts(
       return false;                                                             // LCOV_EXCL_LINE
     }
     result_hosts.emplace_back(std::move(host_result.value()));
+  }
+
+  // Every incoming address was already present in the host set, so there is nothing to add. Return
+  // without rebuilding and republishing the unchanged host set, which would otherwise fan out a
+  // no-op membership update to every worker.
+  if (result_hosts.empty()) {
+    return true;
   }
 
   {
@@ -810,7 +828,7 @@ void DynamicModuleAsyncHostSelectionHandle::cancel() {
 }
 
 const Upstream::PrioritySet& DynamicModuleLoadBalancer::prioritySet() const {
-  return handle_->cluster_->prioritySet();
+  return priority_set_;
 }
 
 bool DynamicModuleLoadBalancer::setHostData(uint32_t priority, size_t index, uintptr_t data) {
@@ -875,19 +893,18 @@ DynamicModuleClusterFactory::createClusterWithConfig(
     cluster_config_bytes = std::move(config_or_error.value());
   }
 
-  // Load the dynamic module.
+  // Load the dynamic module. Dynamic module clusters do not support remote module sources, so no
+  // init manager or async callback is passed; only the synchronous local-file and by-name paths
+  // can succeed here.
   const auto& module_config = proto_config.dynamic_module_config();
-  auto module_or_error = Envoy::Extensions::DynamicModules::newDynamicModuleByName(
-      module_config.name(), module_config.do_not_close(), module_config.load_globally());
-  if (!module_or_error.ok()) {
-    return absl::InvalidArgumentError(fmt::format("Failed to load dynamic module '{}': {}",
-                                                  module_config.name(),
-                                                  module_or_error.status().message()));
-  }
+  auto load_result = Envoy::Extensions::DynamicModules::newDynamicModuleByConfig(
+      module_config, proto_config.cluster_name(), context.serverFactoryContext());
+  RETURN_IF_NOT_OK_REF(load_result.status());
+  auto dynamic_module = std::move(load_result->loaded);
 
   // Create the cluster configuration.
   auto config_or_error = DynamicModuleClusterConfig::create(
-      proto_config.cluster_name(), cluster_config_bytes, std::move(module_or_error.value()),
+      proto_config.cluster_name(), cluster_config_bytes, std::move(dynamic_module),
       context.serverFactoryContext().serverScope());
   if (!config_or_error.ok()) {
     return config_or_error.status();

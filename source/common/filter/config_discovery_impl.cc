@@ -115,8 +115,9 @@ FilterConfigSubscription::onConfigUpdate(const std::vector<Config::DecodedResour
     return absl::InvalidArgumentError(fmt::format(
         "Unexpected number of resources in ExtensionConfigDS response: {}", resources.size()));
   }
-  const auto& filter_config = dynamic_cast<const envoy::config::core::v3::TypedExtensionConfig&>(
-      resources[0].get().resource());
+  const auto& filter_config =
+      Envoy::Protobuf::DynamicCastMessage<envoy::config::core::v3::TypedExtensionConfig>(
+          resources[0].get().resource());
   if (filter_config.name() != filter_config_name_) {
     return absl::InvalidArgumentError(fmt::format(
         "Unexpected resource name in ExtensionConfigDS response: {}", filter_config.name()));
