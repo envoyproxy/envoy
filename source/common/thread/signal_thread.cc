@@ -9,6 +9,7 @@
 #endif
 
 #include "source/common/common/logger.h"
+#include "source/common/common/macros.h"
 
 namespace Envoy {
 namespace Thread {
@@ -36,6 +37,8 @@ bool signalThread(const ThreadId& tid, int signal) {
   return syscall(SYS_tgkill, getpid(), toPlatformTid(tid.getId()), signal) == 0;
 #else
   // Only Linux supports the tgkill system call.
+  UNREFERENCED_PARAMETER(tid);
+  UNREFERENCED_PARAMETER(signal);
   ENVOY_LOG_MISC(error, "signalThread is only supported on Linux.");
   return false;
 #endif

@@ -78,6 +78,9 @@ TEST_F(BacktraceActionNoSignalTest, WarnWhenSignalNotInstalled) {
 }
 
 TEST_F(BacktraceActionTest, SingleBacktraceLogged) {
+#ifndef __linux__
+  GTEST_SKIP() << "signalThread (per-thread signaling) is not supported on this platform.";
+#endif
   envoy::extensions::watchdog::backtrace_action::v3::BacktraceActionConfig config;
   config.mutable_cooldown_duration()->set_seconds(20);
 
@@ -119,6 +122,9 @@ TEST_F(BacktraceActionTest, SingleBacktraceLogged) {
 }
 
 TEST_F(BacktraceActionTest, MultipleBacktracesLogged) {
+#ifndef __linux__
+  GTEST_SKIP() << "signalThread (per-thread signaling) is not supported on this platform.";
+#endif
   envoy::extensions::watchdog::backtrace_action::v3::BacktraceActionConfig config;
   config.mutable_cooldown_duration()->set_seconds(20);
 
@@ -174,6 +180,9 @@ TEST_F(BacktraceActionTest, MultipleBacktracesLogged) {
 }
 
 TEST_F(BacktraceActionTest, CooldownPreventsDuplicateBacktrace) {
+#ifndef __linux__
+  GTEST_SKIP() << "signalThread (per-thread signaling) is not supported on this platform.";
+#endif
   envoy::extensions::watchdog::backtrace_action::v3::BacktraceActionConfig config;
   config.mutable_cooldown_duration()->set_seconds(60);
 
@@ -229,6 +238,9 @@ TEST_F(BacktraceActionTest, CooldownPreventsDuplicateBacktrace) {
 }
 
 TEST_F(BacktraceActionTest, InFlightSkipPreventsDuplicateBacktrace) {
+#ifndef __linux__
+  GTEST_SKIP() << "signalThread (per-thread signaling) is not supported on this platform.";
+#endif
   envoy::extensions::watchdog::backtrace_action::v3::BacktraceActionConfig config;
   config.mutable_cooldown_duration()->set_seconds(0);
 

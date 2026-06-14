@@ -14,6 +14,7 @@ envoy_cc_library(
     hdrs = ["signal_thread.h"],
     deps = [
         "//envoy/thread:thread_interface",
+        "//source/common/common:macros",
         "//source/common/common:minimal_logger_lib",
     ],
 )
