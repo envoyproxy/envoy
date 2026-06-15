@@ -84,6 +84,7 @@ public:
         forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
     // For H2 tests.
     Extensions::TransportSockets::Tls::forceRegisterDefaultCertValidatorFactory();
+    builder_.setLogLevel(Logger::Logger::info);
   }
 
   void initialize() override {
@@ -95,7 +96,6 @@ public:
     }
     // Integration test starts upstreams before Envoy which can cause a data race.
     builder_.enableLogger(false);
-    builder_.setLogLevel(Logger::Logger::info);
     builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
     builder_.addRuntimeGuard("quic_no_tcp_delay", true);
     builder_.addRuntimeGuard("mobile_use_network_observer_registry", true);
@@ -307,6 +307,7 @@ TEST_P(ClientIntegrationTest, DisableDnsRefreshOnFailure) {
   builder_.setDnsResolver(dns_resolver_config);
 
   builder_.setDisableDnsRefreshOnFailure(true);
+  builder_.setLogLevel(Logger::Logger::debug);
   initialize();
 
   default_request_headers_.setHost("doesnotexist");
@@ -333,6 +334,7 @@ TEST_P(ClientIntegrationTest, DisableDnsRefreshOnNetworkChange) {
         }
       });
   builder_.setDisableDnsRefreshOnNetworkChange(true);
+  builder_.setLogLevel(Logger::Logger::debug);
   initialize();
 
   internalEngine()->onDefaultNetworkChanged(1);
@@ -353,6 +355,7 @@ TEST_P(ClientIntegrationTest, HandleNetworkChangeEvents) {
         }
       });
   builder_.setDisableDnsRefreshOnNetworkChange(false);
+  builder_.setLogLevel(Logger::Logger::debug);
   initialize();
 
   // Set the network type to WIFI. This should trigger a network change.
@@ -413,7 +416,7 @@ TEST_P(ClientIntegrationTest, HandleNetworkChangeEventsAndroid) {
         }
       });
   builder_.setDisableDnsRefreshOnNetworkChange(false);
-
+  builder_.setLogLevel(Logger::Logger::trace);
   initialize();
 
   // A new WIFI network appears and becomes the default network. Even though
