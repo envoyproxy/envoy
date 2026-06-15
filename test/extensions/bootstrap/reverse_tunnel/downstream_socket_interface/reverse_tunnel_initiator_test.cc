@@ -261,6 +261,51 @@ TEST_F(ReverseTunnelInitiatorTest, SocketUsesCustomHandshakeRequestPathFromExten
   EXPECT_EQ(reverse_handle->requestPath(), "/custom/handshake");
 }
 
+// By default the initiator wires the per-socket circuit breaker on, so reverse connection attempts
+// honor per-host failure backoff.
+TEST_F(ReverseTunnelInitiatorTest, SocketEnablesCircuitBreakerByDefault) {
+  setupThreadLocalSlot();
+
+  ReverseConnectionAddress::ReverseConnectionConfig config;
+  config.src_cluster_id = "test-cluster";
+  config.src_node_id = "test-node";
+  config.src_tenant_id = "test-tenant";
+  config.remote_cluster = "remote-cluster";
+  config.connection_count = 1;
+
+  auto reverse_address = std::make_shared<ReverseConnectionAddress>(config);
+  auto socket = socket_interface_->socket(Network::Socket::Type::Stream, reverse_address,
+                                          Network::SocketCreationOptions{});
+  ASSERT_NE(socket, nullptr);
+  auto* reverse_handle = dynamic_cast<ReverseConnectionIOHandle*>(socket.get());
+  ASSERT_NE(reverse_handle, nullptr);
+  EXPECT_TRUE(reverse_handle->circuitBreakerEnabled());
+}
+
+// When disable_circuit_breaker is set on the bootstrap extension, sockets created through the
+// production socket() path are wired with the circuit breaker off, so the per-host backoff is not
+// respected.
+TEST_F(ReverseTunnelInitiatorTest, SocketDisablesCircuitBreakerFromExtension) {
+  config_.set_disable_circuit_breaker(true);
+  extension_ = std::make_unique<ReverseTunnelInitiatorExtension>(context_, config_);
+  setupThreadLocalSlot();
+
+  ReverseConnectionAddress::ReverseConnectionConfig config;
+  config.src_cluster_id = "test-cluster";
+  config.src_node_id = "test-node";
+  config.src_tenant_id = "test-tenant";
+  config.remote_cluster = "remote-cluster";
+  config.connection_count = 1;
+
+  auto reverse_address = std::make_shared<ReverseConnectionAddress>(config);
+  auto socket = socket_interface_->socket(Network::Socket::Type::Stream, reverse_address,
+                                          Network::SocketCreationOptions{});
+  ASSERT_NE(socket, nullptr);
+  auto* reverse_handle = dynamic_cast<ReverseConnectionIOHandle*>(socket.get());
+  ASSERT_NE(reverse_handle, nullptr);
+  EXPECT_FALSE(reverse_handle->circuitBreakerEnabled());
+}
+
 TEST_F(ReverseTunnelInitiatorTest, CreateReverseConnectionSocketStreamIPv4) {
   // Test createReverseConnectionSocket for stream IPv4 with TLS registry setup.
   setupThreadLocalSlot();

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <memory>
 #include <string>
 
@@ -151,6 +152,19 @@ public:
     tls_slot_ = std::move(slot);
   }
 
+  // Default reverse-connection maintenance interval (in milliseconds) applied when the optional
+  // ``maintenance_interval`` field is unset on the bootstrap extension. Kept at 10s to bound
+  // reconnect latency without churning connections to the upstream tunnel when a host is
+  // unreachable; override via ``maintenance_interval`` for tighter reconnect loops (e.g. tests) or
+  // to back off harder in production.
+  static constexpr uint32_t DefaultMaintenanceIntervalMs = 10000;
+
+  bool disableCircuitBreaker() const { return config_.disable_circuit_breaker(); }
+
+  // @return the reverse-connection maintenance interval. Drives how frequently the initiator
+  // re-attempts missing reverse connections (see ReverseConnectionIOHandle::maintenanceInterval).
+  std::chrono::milliseconds maintenanceInterval() const { return maintenance_interval_; }
+
 private:
   Server::Configuration::ServerFactoryContext& context_;
   const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
@@ -162,6 +176,7 @@ private:
   std::vector<envoy::config::core::v3::HeaderValueOption> additional_headers_;
   bool use_http_upgrade_{false};
   AccessLog::InstanceSharedPtrVector access_logs_;
+  std::chrono::milliseconds maintenance_interval_{DefaultMaintenanceIntervalMs};
 
   /**
    * Update per-worker connection stats for debugging purposes.

@@ -177,6 +177,38 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, AdditionalHeadersOverride) {
             envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 }
 
+// The circuit breaker is enabled by default, so disableCircuitBreaker() reflects the proto default
+// of false.
+TEST_F(ReverseTunnelInitiatorExtensionTest, DisableCircuitBreakerDefaults) {
+  EXPECT_FALSE(extension_->disableCircuitBreaker());
+}
+
+// Setting disable_circuit_breaker on the proto is surfaced through the accessor used to populate
+// the per-socket config.
+TEST_F(ReverseTunnelInitiatorExtensionTest, DisableCircuitBreakerOverride) {
+  auto custom_config = config_;
+  custom_config.set_disable_circuit_breaker(true);
+  auto custom_extension =
+      std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
+  EXPECT_TRUE(custom_extension->disableCircuitBreaker());
+}
+
+// When maintenance_interval is unset, maintenanceInterval() returns the documented default.
+TEST_F(ReverseTunnelInitiatorExtensionTest, MaintenanceIntervalDefaults) {
+  EXPECT_EQ(
+      extension_->maintenanceInterval(),
+      std::chrono::milliseconds(ReverseTunnelInitiatorExtension::DefaultMaintenanceIntervalMs));
+}
+
+// Setting the maintenance_interval duration overrides the value surfaced by maintenanceInterval().
+TEST_F(ReverseTunnelInitiatorExtensionTest, MaintenanceIntervalOverride) {
+  auto custom_config = config_;
+  custom_config.mutable_maintenance_interval()->set_nanos(250 * 1000 * 1000); // 250ms
+  auto custom_extension =
+      std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
+  EXPECT_EQ(custom_extension->maintenanceInterval(), std::chrono::milliseconds(250));
+}
+
 TEST_F(ReverseTunnelInitiatorExtensionTest, OnServerInitialized) {
   // This should be a no-op.
   extension_->onServerInitialized(server_);

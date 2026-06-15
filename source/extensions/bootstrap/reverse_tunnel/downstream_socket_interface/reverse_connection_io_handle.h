@@ -311,6 +311,19 @@ public:
   const std::string& requestPath() const { return config_.request_path; }
 
   /**
+   * @return whether per-host failure backoff (the reverse connection circuit breaker) is active for
+   * this handle. When false, connection attempts are never suppressed regardless of prior failures.
+   */
+  bool circuitBreakerEnabled() const { return config_.enable_circuit_breaker; }
+
+  /**
+   * @return the interval between reverse-connection maintenance passes, sourced from the bootstrap
+   * extension's ``maintenance_interval`` (or the default when no extension is wired). Drives the
+   * cadence of the retry timer that re-attempts missing reverse connections.
+   */
+  const std::chrono::milliseconds maintenanceInterval() const;
+
+  /**
    * @return reference to the additional headers for the handshake request.
    */
   const std::vector<envoy::config::core::v3::HeaderValueOption>& additionalHeaders() const {

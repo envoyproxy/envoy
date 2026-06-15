@@ -5,7 +5,10 @@ package envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3
 import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/base.proto";
 
+import "google/protobuf/duration.proto";
+
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3";
 option java_outer_classname = "DownstreamReverseConnectionSocketInterfaceProto";
@@ -19,6 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Configuration for the downstream reverse connection socket interface.
 // This interface initiates reverse connections to upstream Envoys and provides
 // them as socket connections for downstream requests.
+// [#next-free-field: 7]
 message DownstreamReverseConnectionSocketInterface {
   // HTTP handshake settings for initiator envoy initiated reverse tunnels.
   message HttpHandshakeConfig {
@@ -53,4 +57,16 @@ message DownstreamReverseConnectionSocketInterface {
   // Reverse tunnel metadata (``node_id``, ``cluster_id``, ``tenant_id``, upstream cluster, etc.)
   // is available via ``%DYNAMIC_METADATA(envoy.reverse_tunnel.initiator:*)%`` substitutions.
   repeated config.accesslog.v3.AccessLog access_log = 4;
+
+  // Disable circuit breaker for reverse connections.
+  // When enabled, the initiator envoy will not place a cluster in backoff when reverse
+  // connection attempts fail.
+  // Defaults to ``false`` i.e. circuit breaker is enabled.
+  bool disable_circuit_breaker = 5;
+
+  // Interval between reverse-connection maintenance passes. On each pass the initiator
+  // re-attempts any missing reverse connections to the configured upstream tunnel hosts.
+  // Defaults to 10s. Must be greater than or equal to 1ms.
+  google.protobuf.Duration maintenance_interval = 6
+      [(validate.rules).duration = {gte {nanos: 1000000}}];
 }

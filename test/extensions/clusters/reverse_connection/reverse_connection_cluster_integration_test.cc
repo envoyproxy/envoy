@@ -48,12 +48,27 @@ typed_config:
   enable_detailed_stats: true
 )EOF");
 
-    config_helper_.addBootstrapExtension(R"EOF(
+    // The circuit breaker is enabled by default; tests that need to exercise the disabled
+    // path flip downstream_disable_circuit_breaker_ before calling initialize(). Tests that need a
+    // faster reverse-connection retry cadence set downstream_maintenance_interval_ms_ to shrink the
+    // maintenance interval (the proto default of 10s keeps existing tests unchanged).
+    std::string maintenance_interval_line;
+    if (downstream_maintenance_interval_ms_.has_value()) {
+      const uint32_t ms = *downstream_maintenance_interval_ms_;
+      // maintenance_interval is a google.protobuf.Duration; render the ms value as a duration
+      // string (e.g. 250 -> "0.250s").
+      maintenance_interval_line =
+          fmt::format("\n  maintenance_interval: {}.{:03d}s", ms / 1000, ms % 1000);
+    }
+    config_helper_.addBootstrapExtension(fmt::format(
+        R"EOF(
 name: envoy.bootstrap.reverse_tunnel.downstream_socket_interface
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface
   enable_detailed_stats: true
-)EOF");
+  disable_circuit_breaker: {}{}
+)EOF",
+        downstream_disable_circuit_breaker_ ? "true" : "false", maintenance_interval_line));
 
     // Call parent initialize to complete setup.
     HttpIntegrationTest::initialize();
@@ -61,6 +76,15 @@ typed_config:
 
 protected:
   LogLevelSetter log_level_setter_ = LogLevelSetter(spdlog::level::debug);
+
+  // Overridable hook controlling the downstream socket interface's circuit breaker. Tests set this
+  // to true to verify that reverse-connection retries are not suppressed after repeated failures.
+  bool downstream_disable_circuit_breaker_{false};
+
+  // Overridable hook for the downstream socket interface's reverse-connection maintenance interval
+  // (maintenance_interval), expressed in milliseconds. Unset leaves the proto default (10s); tests
+  // set a small value to drive a faster retry cadence and keep wall-clock runtime low.
+  absl::optional<uint32_t> downstream_maintenance_interval_ms_;
 
   uint32_t tunnelListenerPort() const {
     return GetParam() == Network::Address::IpVersion::v4 ? 15000 : 15001;
@@ -1269,6 +1293,67 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
   // Wait for listeners to be fully stopped before test cleanup.
   test_server_->waitForCounter("listener_manager.listener_stopped", Eq(3),
                                std::chrono::milliseconds(5000));
+}
+
+// Verifies that with the circuit breaker disabled, the initiator keeps retrying reverse-connection
+// attempts to an unreachable tunnel host instead of backing off after the first failure. The
+// counterpart (circuit breaker enabled, where backoff suppresses attempts) is covered by the
+// downstream socket interface unit tests; here we assert the end-to-end disabled behaviour via
+// cluster connect-failure stats.
+TEST_P(ReverseConnectionClusterIntegrationTest,
+       CircuitBreakerDisabledKeepsRetryingUnreachableHost) {
+  DISABLE_IF_ADMIN_DISABLED; // Cleanup drains listeners via the admin interface.
+
+  const uint32_t tunnel_listener_port = tunnelListenerPort();
+  const std::string loopback_addr = loopbackAddress();
+
+  // Disable the circuit breaker so failed attempts never place the host in backoff.
+  downstream_disable_circuit_breaker_ = true;
+  downstream_maintenance_interval_ms_ = 250;
+
+  config_helper_.addConfigModifier([this, tunnel_listener_port, loopback_addr](
+                                       envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Point the tunnel cluster at an unreachable endpoint (port 1) so every reverse-connection
+    // attempt fails with connection refused. This mirrors the unreachable-endpoint pattern used by
+    // other integration tests (e.g. tcp_proxy_integration_test.cc).
+    TunnelClusterModifier unreachable_modifier =
+        [](envoy::config::cluster::v3::Cluster* tunnel_cluster) {
+          tunnel_cluster->mutable_load_assignment()
+              ->mutable_endpoints(0)
+              ->mutable_lb_endpoints(0)
+              ->mutable_endpoint()
+              ->mutable_address()
+              ->mutable_socket_address()
+              ->set_port_value(1);
+        };
+    configureReverseTunnelSetup(bootstrap, loopback_addr, tunnel_listener_port, "test-node-id",
+                                "test-cluster-id", "test-tenant-id", unreachable_modifier);
+  });
+
+  initialize();
+
+  // Each reverse-connection attempt to the unreachable host transitions through the "failed" state,
+  // which increments this accumulating initiator gauge. With the circuit breaker disabled, a failed
+  // attempt does not place the host in backoff, so the initiator keeps re-attempting (every
+  // timeout_ms) and the failure count climbs well past one. Reaching several failures is therefore
+  // proof that retries are not being suppressed.
+  test_server_->waitForGauge("reverse_tunnel_initiator.cluster.tunnel_cluster.failed", Ge(3),
+                             std::chrono::milliseconds(15000));
+
+  // Drain listeners via the admin interface so in-flight reverse connection sockets are torn down
+  // and the initiator stops re-attempting before the workers are destroyed (matches the cleanup
+  // performed by the other tunnel tests).
+  BufferingStreamDecoderPtr drain_response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners", "", Http::CodecType::HTTP1, GetParam());
+  EXPECT_TRUE(drain_response->complete());
+  EXPECT_EQ("200", drain_response->headers().getStatusValue());
+
+  // Sanity check: the host is genuinely unreachable, so no reverse tunnel handshake ever completed
+  // on the responder side. Guard against a missing counter so the read is safe regardless of stat
+  // creation timing.
+  if (auto accepted = test_server_->counter("reverse_tunnel.handshake.accepted")) {
+    EXPECT_EQ(accepted->value(), 0);
+  }
 }
 
 } // namespace

@@ -24,7 +24,9 @@ ReverseTunnelInitiatorExtension::ReverseTunnelInitiatorExtension(
     Server::Configuration::ServerFactoryContext& context,
     const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
         DownstreamReverseConnectionSocketInterface& config)
-    : context_(context), config_(config) {
+    : context_(context), config_(config),
+      maintenance_interval_(
+          PROTOBUF_GET_MS_OR_DEFAULT(config, maintenance_interval, DefaultMaintenanceIntervalMs)) {
   stat_prefix_ = PROTOBUF_GET_STRING_OR_DEFAULT(config, stat_prefix, "reverse_tunnel_initiator");
   // Configure detailed stats flag (defaults to false).
   enable_detailed_stats_ = config.enable_detailed_stats();

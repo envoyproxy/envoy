@@ -891,11 +891,17 @@ void ReverseConnectionIOHandle::maintainReverseConnections() {
 
   // Enable the retry timer to periodically check for missing connections (like maintainConnCount)
   if (rev_conn_retry_timer_) {
-    // TODO(basundhara-c): Make the retry timeout configurable.
-    const std::chrono::milliseconds retry_timeout(10000); // 10 seconds
+    auto retry_timeout = maintenanceInterval();
     rev_conn_retry_timer_->enableTimer(retry_timeout);
-    ENVOY_LOG(debug, "Enabled retry timer for next connection check in 10 seconds.");
+    ENVOY_LOG(debug, "Enabled retry timer for next connection check in {} ms.",
+              retry_timeout.count());
   }
+}
+
+const std::chrono::milliseconds ReverseConnectionIOHandle::maintenanceInterval() const {
+  return extension_ ? extension_->maintenanceInterval()
+                    : std::chrono::milliseconds(
+                          ReverseTunnelInitiatorExtension::DefaultMaintenanceIntervalMs);
 }
 
 bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& cluster_name,

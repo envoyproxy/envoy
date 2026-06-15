@@ -790,6 +790,78 @@ TEST_F(ReverseConnectionIOHandleTest, ShouldAttemptConnectionToHostValidHost) {
   EXPECT_TRUE(io_handle_disabled->shouldAttemptConnectionToHost("192.168.1.1", "test-cluster"));
 }
 
+// When the circuit breaker is disabled, repeated connection failures must never put a host into
+// backoff: shouldAttemptConnectionToHost stays true no matter how many failures are recorded. This
+// mirrors the production behavior selected by disable_circuit_breaker on the bootstrap extension.
+TEST_F(ReverseConnectionIOHandleTest, CircuitBreakerDisabledIsNotRespected) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  config.enable_circuit_breaker = false;
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  // Wire up a thread local cluster with a single host so the host mapping is populated.
+  auto mock_thread_local_cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test-cluster"))
+      .WillRepeatedly(Return(mock_thread_local_cluster.get()));
+  auto mock_priority_set = std::make_shared<NiceMock<Upstream::MockPrioritySet>>();
+  EXPECT_CALL(*mock_thread_local_cluster, prioritySet())
+      .WillRepeatedly(ReturnRef(*mock_priority_set));
+  auto host_map = std::make_shared<Upstream::HostMap>();
+  auto mock_host = createMockHost("192.168.1.1");
+  (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+
+  RemoteClusterConnectionConfig cluster_config("test-cluster", 2);
+  maintainClusterConnections("test-cluster", cluster_config);
+
+  // Even after many consecutive failures, the host is never suppressed.
+  for (int i = 0; i < 5; ++i) {
+    trackConnectionFailure("192.168.1.1", "test-cluster");
+    EXPECT_TRUE(shouldAttemptConnectionToHost("192.168.1.1", "test-cluster"));
+  }
+}
+
+// The handle's maintenance interval is sourced from the bootstrap extension's configured
+// maintenance_interval, which drives how often the retry timer re-attempts missing reverse
+// connections.
+TEST_F(ReverseConnectionIOHandleTest, MaintenanceIntervalDelegatesToExtension) {
+  auto custom_config = config_;
+  custom_config.mutable_maintenance_interval()->set_nanos(250 * 1000 * 1000); // 250ms
+  auto custom_extension =
+      std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config, custom_extension.get());
+  ASSERT_NE(io_handle_, nullptr);
+  EXPECT_EQ(io_handle_->maintenanceInterval(), std::chrono::milliseconds(250));
+}
+
+// With maintenance_interval unset on the extension, the handle falls back to the default interval.
+TEST_F(ReverseConnectionIOHandleTest, MaintenanceIntervalDefaultsFromExtension) {
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+  EXPECT_EQ(
+      io_handle_->maintenanceInterval(),
+      std::chrono::milliseconds(ReverseTunnelInitiatorExtension::DefaultMaintenanceIntervalMs));
+}
+
+// A handle created without a bootstrap extension still resolves a sane maintenance interval via the
+// documented default rather than dereferencing a null extension.
+TEST_F(ReverseConnectionIOHandleTest, MaintenanceIntervalDefaultsWithoutExtension) {
+  auto config = createDefaultTestConfig();
+  int test_fd = ::socket(AF_INET, SOCK_STREAM, 0);
+  ASSERT_GE(test_fd, 0);
+  io_handle_ = std::make_unique<ReverseConnectionIOHandle>(test_fd, config, cluster_manager_,
+                                                           /*extension=*/nullptr, *stats_scope_);
+  ASSERT_NE(io_handle_, nullptr);
+  EXPECT_EQ(
+      io_handle_->maintenanceInterval(),
+      std::chrono::milliseconds(ReverseTunnelInitiatorExtension::DefaultMaintenanceIntervalMs));
+}
+
 // Test trackConnectionFailure puts host in backoff.
 TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailurePutsHostInBackoff) {
   // Set up thread local slot first so stats can be properly tracked.
