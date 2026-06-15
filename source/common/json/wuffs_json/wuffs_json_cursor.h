@@ -62,8 +62,8 @@ namespace Json {
 //   onContainerOpen    (key="messages", is_dict=false, depth=2)  ← [
 //   onContainerOpen    (key="",         is_dict=true,  depth=3)  ← { (parent is array)
 //   onKey              ("role",                        depth=3)
-//   openStringCapture ("role",         depth=3, tok_start)  → &buf or nullptr
-//   closeStringCapture   (&buf, "role",   depth=3, tok_end)
+//   openStringCapture ("role",         depth=3, token_start)  → &buf or nullptr
+//   closeStringCapture   (&buf, "role",   depth=3, token_end)
 //   onContainerClose   (depth=3, ...)
 //   onContainerClose   (depth=2, ...)
 //   onContainerClose   (depth=1, ...)
@@ -81,10 +81,10 @@ namespace Json {
 //
 // ── Container byte ranges ─────────────────────────────────────────────────────
 //
-// onContainerOpen receives tok_start — the byte offset of the opening { or [
-// in the original body stream. onContainerClose receives tok_end — the offset
+// onContainerOpen receives token_start — the byte offset of the opening { or [
+// in the original body stream. onContainerClose receives token_end — the offset
 // immediately past the closing } or ]. Together they delimit a half-open byte
-// range [tok_start, tok_end) suitable for zero-copy sub-range extraction when
+// range [token_start, token_end) suitable for zero-copy sub-range extraction when
 // the body is memory-mapped or stored contiguously.
 //
 // ── Path tracking ─────────────────────────────────────────────────────────────
@@ -101,18 +101,18 @@ public:
   //
   // All callbacks are invoked synchronously from within feed().
   //
-  //   openStringCapture(key, depth, tok_start)
+  //   openStringCapture(key, depth, token_start)
   //     Called at the start of every non-key string value chain.
   //     Returns a handler-owned buffer for the cursor to write decoded UTF-8
   //     into, or nullptr to discard this string at zero cost — no allocation,
   //     no further callbacks for this value.
   //     `key` is the dict key for this value, or "" for array elements.
-  //     `tok_start` is the byte offset of the opening " in the body stream.
+  //     `token_start` is the byte offset of the opening " in the body stream.
   //
-  //   closeStringCapture(target, key, depth, tok_end)
+  //   closeStringCapture(target, key, depth, token_end)
   //     Called when a non-key string chain completes. `target` is the same
   //     pointer returned by openStringCapture(); it is never null here.
-  //     `tok_end` is the byte offset immediately past the closing ".
+  //     `token_end` is the byte offset immediately past the closing ".
   //
   //   onKey(key, depth)
   //     Called when a dict key completes. Return a non-OK Status to abort
@@ -130,14 +130,14 @@ public:
   //   onNull(key, depth)
   //     Called for JSON null literals.
   //
-  //   onContainerOpen(key, is_dict, depth, tok_start)
+  //   onContainerOpen(key, is_dict, depth, token_start)
   //     Called after depth has been incremented for a { or [ open.
   //     `key` is the parent dict key that opened this container, or "" if the
   //     parent is an array or this is the root container.
-  //     `tok_start` is the byte offset of the opening delimiter in the original
+  //     `token_start` is the byte offset of the opening delimiter in the original
   //     body stream, useful for byte-range recording.
   //
-  //   onContainerClose(depth, tok_end)
+  //   onContainerClose(depth, token_end)
   //     Called with the container's depth before decrement and the byte offset
   //     immediately after the closing } or ].
   class Handler {
@@ -171,31 +171,31 @@ public:
     //
     // `key`       — dict key immediately left of this value, or "" for array elements.
     // `depth`     — nesting depth of this string value.
-    // `tok_start` — byte offset of the opening '"' in the body stream.
+    // `token_start` — byte offset of the opening '"' in the body stream.
     virtual std::string* absl_nullable openStringCapture(absl::string_view key, int depth,
-                                                         size_t tok_start) = 0;
+                                                         size_t token_start) = 0;
     virtual void closeStringCapture(std::string* target, absl::string_view key, int depth,
-                                    size_t tok_end) = 0;
-    // `tok_start` is the byte offset of the opening '"' of the key in the body
-    // stream. Combined with the tok_end delivered by the subsequent value
+                                    size_t token_end) = 0;
+    // `token_start` is the byte offset of the opening '"' of the key in the body
+    // stream. Combined with the token_end delivered by the subsequent value
     // callback (closeStringCapture, onNumber, onBoolean, onNull, or
-    // onContainerClose), it gives the half-open byte range [tok_start, tok_end)
+    // onContainerClose), it gives the half-open byte range [token_start, token_end)
     // covering the complete "key":value field — suitable for verbatim passthrough
     // without DOM parsing.
-    virtual absl::Status onKey(absl::string_view key, int depth, size_t tok_start) = 0;
+    virtual absl::Status onKey(absl::string_view key, int depth, size_t token_start) = 0;
     // JSON scalar types: number, boolean (true/false), and null.
-    // `tok_start` / `tok_end` delimit the scalar value token in the body stream.
-    // Together with the tok_start from the preceding onKey call they cover the
+    // `token_start` / `token_end` delimit the scalar value token in the body stream.
+    // Together with the token_start from the preceding onKey call they cover the
     // complete "key":value field byte range.
     virtual absl::Status onNumber(absl::string_view key, absl::string_view raw, int depth,
-                                  size_t tok_start, size_t tok_end) = 0;
-    virtual absl::Status onBoolean(absl::string_view key, bool value, int depth, size_t tok_start,
-                                   size_t tok_end) = 0;
-    virtual void onNull(absl::string_view key, int depth, size_t tok_start, size_t tok_end) = 0;
+                                  size_t token_start, size_t token_end) = 0;
+    virtual absl::Status onBoolean(absl::string_view key, bool value, int depth, size_t token_start,
+                                   size_t token_end) = 0;
+    virtual void onNull(absl::string_view key, int depth, size_t token_start, size_t token_end) = 0;
     // Called after depth has been incremented for a { or [ open.
     // `key` is the parent dict key that opened this container, or "" when
     // the parent is an array or this is the root container.
-    // `tok_start` is the byte offset of the opening { or [ in the body stream.
+    // `token_start` is the byte offset of the opening { or [ in the body stream.
     //
     // PATH TRACKING NOTE — call buildPatternPath(depth-1), NOT buildPatternPath(depth):
     // At the time this callback fires, key_stack_[depth] is not yet populated
@@ -208,8 +208,8 @@ public:
     // TODO(tyxia): add buildContainerPatternPath(key, is_dict, depth)
     //   convenience wrapper that hides this depth-1 subtlety.
     virtual void onContainerOpen(absl::string_view key, bool is_dict, int depth,
-                                 size_t tok_start) = 0;
-    virtual void onContainerClose(int depth, size_t tok_end) = 0;
+                                 size_t token_start) = 0;
+    virtual void onContainerClose(int depth, size_t token_end) = 0;
   };
 
   // max_depth: maximum nesting depth allowed before feed() returns
@@ -232,11 +232,11 @@ public:
   std::string buildPatternPath(int depth) const; // e.g. "messages[].role"
 
   // Monotonically increasing byte offset of the next source byte to be consumed.
-  // Matches the tok_start / tok_end values delivered to onContainerOpen / onContainerClose.
-  // TODO(tyxia): the outer filter should compare nextSrcPos() against
+  // Matches the token_start / token_end values delivered to onContainerOpen / onContainerClose.
+  // TODO(tyxia): the outer filter should compare nextSourcePosition() against
   //   DecoderConfig::max_body_bytes between feed() calls and return ResourceExhausted
   //   before calling feed() again if the limit is exceeded.
-  size_t nextSrcPos() const { return body_src_pos_; }
+  size_t nextSourcePosition() const { return body_src_pos_; }
 
 private:
   Handler& handler_;

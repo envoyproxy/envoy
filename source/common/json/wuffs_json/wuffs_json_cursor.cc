@@ -101,7 +101,7 @@ WuffsJsonCursor::WuffsJsonCursor(Handler& handler, bool track_paths, int max_dep
 //   token_len (token__length) — number of source bytes this token consumed.
 //        body_src_pos_ is advanced by token_len for every token regardless of token_category,
 //        giving a monotonically increasing byte counter. onContainerOpen and
-//        onContainerClose deliver token_start / tok_end from this counter.
+//        onContainerClose deliver token_start / token_end from this counter.
 //
 // VBC dispatch summary
 // ────────────────────

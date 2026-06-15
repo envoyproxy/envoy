@@ -28,7 +28,7 @@ struct CapturingHandler : WuffsJsonCursor::Handler {
   std::string pending_str_;
 
   std::string* openStringCapture(absl::string_view /*key*/, int depth,
-                                 size_t /*tok_start*/) override {
+                                 size_t /*token_start*/) override {
     if (depth == 1) {
       pending_str_.clear();
       return &pending_str_;
@@ -37,39 +37,39 @@ struct CapturingHandler : WuffsJsonCursor::Handler {
   }
 
   void closeStringCapture(std::string* target, absl::string_view /*key*/, int /*depth*/,
-                          size_t /*tok_end*/) override {
+                          size_t /*token_end*/) override {
     fields.push_back({pending_key_, *target, {}, /*is_string=*/true});
   }
 
-  absl::Status onKey(absl::string_view key, int depth, size_t /*tok_start*/) override {
+  absl::Status onKey(absl::string_view key, int depth, size_t /*token_start*/) override {
     if (depth == 1)
       pending_key_ = std::string(key);
     return absl::OkStatus();
   }
 
   absl::Status onNumber(absl::string_view /*key*/, absl::string_view raw, int depth,
-                        size_t /*tok_start*/, size_t /*tok_end*/) override {
+                        size_t /*token_start*/, size_t /*token_end*/) override {
     if (depth == 1)
       fields.push_back({pending_key_, {}, std::string(raw), {}, /*is_scalar=*/true});
     return absl::OkStatus();
   }
 
-  absl::Status onBoolean(absl::string_view /*key*/, bool value, int depth, size_t /*tok_start*/,
-                         size_t /*tok_end*/) override {
+  absl::Status onBoolean(absl::string_view /*key*/, bool value, int depth, size_t /*token_start*/,
+                         size_t /*token_end*/) override {
     if (depth == 1)
       fields.push_back({pending_key_, {}, value ? "true" : "false", {}, /*is_scalar=*/true});
     return absl::OkStatus();
   }
 
-  void onNull(absl::string_view /*key*/, int depth, size_t /*tok_start*/,
-              size_t /*tok_end*/) override {
+  void onNull(absl::string_view /*key*/, int depth, size_t /*token_start*/,
+              size_t /*token_end*/) override {
     if (depth == 1)
       fields.push_back({pending_key_, {}, "null", {}, /*is_scalar=*/true});
   }
 
   void onContainerOpen(absl::string_view /*key*/, bool /*is_dict*/, int /*depth*/,
-                       size_t /*tok_start*/) override {}
-  void onContainerClose(int /*depth*/, size_t /*tok_end*/) override {}
+                       size_t /*token_start*/) override {}
+  void onContainerClose(int /*depth*/, size_t /*token_end*/) override {}
 };
 
 // Helper: parse a complete JSON string in one shot.
@@ -89,7 +89,7 @@ struct AbortOnNumberHandler : CapturingHandler {
 
 // ── Byte-range handler ────────────────────────────────────────────────────────
 // Records the first container open/close offsets and the first key/value offsets
-// to verify tok_start / tok_end byte positions are correct.
+// to verify token_start / token_end byte positions are correct.
 
 struct ByteRangeHandler : WuffsJsonCursor::Handler {
   static constexpr size_t kNotSet = size_t(-1);
@@ -99,35 +99,35 @@ struct ByteRangeHandler : WuffsJsonCursor::Handler {
   size_t first_value_end{kNotSet};
 
   std::string* openStringCapture(absl::string_view, int, size_t) override { return nullptr; }
-  void closeStringCapture(std::string*, absl::string_view, int, size_t tok_end) override {
+  void closeStringCapture(std::string*, absl::string_view, int, size_t token_end) override {
     if (first_value_end == kNotSet)
-      first_value_end = tok_end;
+      first_value_end = token_end;
   }
-  absl::Status onKey(absl::string_view, int, size_t tok_start) override {
+  absl::Status onKey(absl::string_view, int, size_t token_start) override {
     if (first_key_start == kNotSet)
-      first_key_start = tok_start;
+      first_key_start = token_start;
     return absl::OkStatus();
   }
   absl::Status onNumber(absl::string_view, absl::string_view, int, size_t,
-                        size_t tok_end) override {
+                        size_t token_end) override {
     if (first_value_end == kNotSet)
-      first_value_end = tok_end;
+      first_value_end = token_end;
     return absl::OkStatus();
   }
-  absl::Status onBoolean(absl::string_view, bool, int, size_t, size_t tok_end) override {
+  absl::Status onBoolean(absl::string_view, bool, int, size_t, size_t token_end) override {
     if (first_value_end == kNotSet)
-      first_value_end = tok_end;
+      first_value_end = token_end;
     return absl::OkStatus();
   }
-  void onNull(absl::string_view, int, size_t, size_t tok_end) override {
+  void onNull(absl::string_view, int, size_t, size_t token_end) override {
     if (first_value_end == kNotSet)
-      first_value_end = tok_end;
+      first_value_end = token_end;
   }
-  void onContainerOpen(absl::string_view, bool, int, size_t tok_start) override {
+  void onContainerOpen(absl::string_view, bool, int, size_t token_start) override {
     if (container_open_start == kNotSet)
-      container_open_start = tok_start;
+      container_open_start = token_start;
   }
-  void onContainerClose(int, size_t tok_end) override { container_close_end = tok_end; }
+  void onContainerClose(int, size_t token_end) override { container_close_end = token_end; }
 };
 
 // ── Path-tracking handler ─────────────────────────────────────────────────────
@@ -355,7 +355,7 @@ TEST(WuffsJsonCursorTest, HandlerAbortPropagated) {
 
 // ── Byte-range offset tests ───────────────────────────────────────────────────
 
-// The root container's [tok_start, tok_end) byte range must cover the full input.
+// The root container's [token_start, token_end) byte range must cover the full input.
 TEST(WuffsJsonCursorTest, ByteRangeContainerCoversWholeInput) {
   constexpr absl::string_view json = R"({"a":1})";
   ByteRangeHandler h;
@@ -365,7 +365,7 @@ TEST(WuffsJsonCursorTest, ByteRangeContainerCoversWholeInput) {
   EXPECT_EQ(h.container_close_end, json.size());
 }
 
-// [onKey.tok_start, value.tok_end) must cover the complete "key":value field
+// [onKey.token_start, value.token_end) must cover the complete "key":value field
 // verbatim, suitable for zero-copy passthrough.
 TEST(WuffsJsonCursorTest, ByteRangeKeyValueField) {
   constexpr absl::string_view json = R"({"a":1})";
