@@ -112,7 +112,14 @@ bool ProcessorState::restartMessageTimer(const uint32_t message_timeout_ms) {
 
 // Process the data being buffered in STREAMED or FULL_DUPLEX_STREAMED mode.
 void ProcessorState::sendBufferedDataInStreamedMode(bool end_stream) {
-  if (hasBufferedData()) {
+  // Normally only non-empty buffered data is dispatched. But when the complete body has
+  // been received and is empty (e.g. a chunked response with an empty body that arrived
+  // before the ext_proc header response) and no body chunk has been dispatched yet,
+  // the empty terminal chunk must still be dispatched. Otherwise the server never receives
+  // a body message and the filter chain hangs. See issue #44201.
+  const bool send_empty_terminal_chunk = end_stream && complete_body_available_ &&
+                                         !body_chunk_sent_ && bufferedData() != nullptr;
+  if (hasBufferedData() || send_empty_terminal_chunk) {
     Buffer::OwnedImpl buffered_chunk;
     modifyBufferedData([&buffered_chunk](Buffer::Instance& data) { buffered_chunk.move(data); });
     ENVOY_STREAM_LOG(debug, "Sending a chunk of buffered data ({})", *filterCallbacks(),

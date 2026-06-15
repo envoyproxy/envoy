@@ -122,6 +122,8 @@ public:
   bool bodyReplaced() const { return body_replaced_; }
   bool bodyReceived() const { return body_received_; }
   void setBodyReceived(bool b) { body_received_ = b; }
+  bool bodyChunkSent() const { return body_chunk_sent_; }
+  void setBodyChunkSent() { body_chunk_sent_ = true; }
   bool partialBodyProcessed() const { return partial_body_processed_; }
 
   virtual void setProcessingMode(
@@ -354,6 +356,10 @@ protected:
   bool body_replaced_ : 1 = false;
   // If true, some of the body data is received.
   bool body_received_ : 1 = false;
+  // If true, at least one body chunk has been dispatched to the ext_proc server.
+  // Distinguishes "body received but held in the filter-manager buffer" (e.g. #44201's
+  // BUFFERED-then-FULL_DUPLEX_STREAMED mode override) from "body received and streamed".
+  bool body_chunk_sent_ : 1 = false;
   // If true, we are in "buffered partial" mode and we already reached the buffer
   // limit, sent the body in a message, and got back a reply.
   bool partial_body_processed_ : 1 = false;
