@@ -54,7 +54,6 @@ private:
                   const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint);
     ~ResolveTarget();
     void startResolve();
-    void onResolutionComplete();
     bool isSuccessfulResponse(const std::list<Network::DnsResponse>& response,
                               const Network::DnsResolver::ResolutionStatus& status);
 
@@ -73,13 +72,6 @@ private:
 
     DnsClusterImpl& parent_;
     Network::ActiveDnsQuery* active_query_{};
-    Network::ActiveDnsQuery* active_ech_query_{};
-    std::list<Network::DnsResponse> resolved_addresses_;
-    std::vector<uint8_t> resolved_ech_config_;
-    Network::DnsResolver::ResolutionStatus address_status_{};
-    Network::DnsResolver::ResolutionStatus ech_status_{};
-    bool address_resolved_{};
-    bool ech_resolved_{};
     const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoints_;
     const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint_;
     const std::string dns_address_;
