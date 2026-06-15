@@ -596,6 +596,10 @@ TEST_P(DynamicModulesIntegrationTest, StatsCallbacks) {
   initializeFilter("stats_callbacks", "header_to_count,header_to_set");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
 
+  // All modules emit a counter directly from the config context (no per-stream filter),
+  // exercising config-scoped metric emission.
+  test_server_->waitForCounter("dynamicmodulescustom.config_total", testing::Ge(1));
+
   // End-to-end request
   {
     Http::TestRequestHeaderMapImpl request_headers = default_request_headers_;

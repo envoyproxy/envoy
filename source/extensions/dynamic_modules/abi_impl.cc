@@ -1628,6 +1628,46 @@ envoy_dynamic_module_callback_network_filter_record_histogram_value(
   return envoy_dynamic_module_type_metrics_result_MetricNotFound;
 }
 
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_config_increment_counter(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_network_filter_config_increment_counter: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_config_increment_gauge(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_network_filter_config_increment_gauge: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_config_decrement_gauge(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_network_filter_config_decrement_gauge: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_config_set_gauge(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_network_filter_config_set_gauge: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_config_record_histogram_value(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_network_filter_config_record_histogram_value: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
 __attribute__((weak)) bool envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
     envoy_dynamic_module_type_network_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
     uint32_t, size_t*, size_t*, size_t*) {
@@ -2943,6 +2983,46 @@ envoy_dynamic_module_callback_listener_filter_record_histogram_value(
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_increment_counter(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_listener_filter_config_increment_counter: not "
+               "implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_increment_gauge(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_listener_filter_config_increment_gauge: not "
+               "implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_decrement_gauge(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_listener_filter_config_decrement_gauge: not "
+               "implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_set_gauge(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_listener_filter_config_set_gauge: not "
+               "implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_record_histogram_value(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_listener_filter_config_record_histogram_value: not "
+               "implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
 __attribute__((weak)) void
 envoy_dynamic_module_callback_listener_filter_set_downstream_transport_failure_reason(
     envoy_dynamic_module_type_listener_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer) {
@@ -3116,6 +3196,46 @@ envoy_dynamic_module_callback_udp_listener_filter_record_histogram_value(
   IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_listener_filter_record_histogram_value: not "
                "implemented in this context");
   return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_config_increment_counter(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_listener_filter_config_increment_counter: not "
+               "implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_config_increment_gauge(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_listener_filter_config_increment_gauge: not "
+               "implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_config_decrement_gauge(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_listener_filter_config_decrement_gauge: not "
+               "implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_config_set_gauge(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_listener_filter_config_set_gauge: not "
+               "implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_config_record_histogram_value(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_listener_filter_config_record_histogram_value: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
 }
 
 __attribute__((weak)) bool envoy_dynamic_module_callback_udp_listener_filter_send_datagram(
@@ -3760,6 +3880,52 @@ envoy_dynamic_module_callback_http_filter_record_histogram_value(
     envoy_dynamic_module_type_module_buffer*, size_t, uint64_t) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_http_filter_record_histogram_value: not implemented "
                "in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_increment_counter(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t, uint64_t) {
+  IS_ENVOY_BUG(
+      "envoy_dynamic_module_callback_http_filter_config_increment_counter: not implemented "
+      "in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_increment_gauge(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_http_filter_config_increment_gauge: not implemented "
+               "in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_decrement_gauge(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_http_filter_config_decrement_gauge: not implemented "
+               "in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_set_gauge(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_http_filter_config_set_gauge: not implemented in "
+               "this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_record_histogram_value(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_http_filter_config_record_histogram_value: not "
+               "implemented in this context");
   return envoy_dynamic_module_type_metrics_result_MetricNotFound;
 }
 

@@ -64,6 +64,12 @@ impl AccessLoggerConfig for TestAccessLoggerConfig {
     let log_counter = ctx
       .define_counter("test_log_count")
       .ok_or("Failed to define counter")?;
+    // Emit a metric directly from the config context (no log event), exercising the config-scoped
+    // emission path. This would typically be done from a scheduled background task.
+    let config_total = ctx
+      .define_counter("config_total")
+      .ok_or("Failed to define config counter")?;
+    ctx.increment_counter(config_total, 1);
     Ok(Self {
       _name: name.to_string(),
       log_counter,

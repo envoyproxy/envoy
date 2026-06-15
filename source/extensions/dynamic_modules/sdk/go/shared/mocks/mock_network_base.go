@@ -914,6 +914,20 @@ func (m *MockNetworkFilterConfigHandle) EXPECT() *MockNetworkFilterConfigHandleM
 	return m.recorder
 }
 
+// DecrementGaugeValue mocks base method.
+func (m *MockNetworkFilterConfigHandle) DecrementGaugeValue(id shared.MetricID, value uint64) shared.MetricsResult {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DecrementGaugeValue", id, value)
+	ret0, _ := ret[0].(shared.MetricsResult)
+	return ret0
+}
+
+// DecrementGaugeValue indicates an expected call of DecrementGaugeValue.
+func (mr *MockNetworkFilterConfigHandleMockRecorder) DecrementGaugeValue(id, value any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DecrementGaugeValue", reflect.TypeOf((*MockNetworkFilterConfigHandle)(nil).DecrementGaugeValue), id, value)
+}
+
 // DefineCounter mocks base method.
 func (m *MockNetworkFilterConfigHandle) DefineCounter(name string) (shared.MetricID, shared.MetricsResult) {
 	m.ctrl.T.Helper()
@@ -973,6 +987,34 @@ func (mr *MockNetworkFilterConfigHandleMockRecorder) GetScheduler() *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetScheduler", reflect.TypeOf((*MockNetworkFilterConfigHandle)(nil).GetScheduler))
 }
 
+// IncrementCounterValue mocks base method.
+func (m *MockNetworkFilterConfigHandle) IncrementCounterValue(id shared.MetricID, value uint64) shared.MetricsResult {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IncrementCounterValue", id, value)
+	ret0, _ := ret[0].(shared.MetricsResult)
+	return ret0
+}
+
+// IncrementCounterValue indicates an expected call of IncrementCounterValue.
+func (mr *MockNetworkFilterConfigHandleMockRecorder) IncrementCounterValue(id, value any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IncrementCounterValue", reflect.TypeOf((*MockNetworkFilterConfigHandle)(nil).IncrementCounterValue), id, value)
+}
+
+// IncrementGaugeValue mocks base method.
+func (m *MockNetworkFilterConfigHandle) IncrementGaugeValue(id shared.MetricID, value uint64) shared.MetricsResult {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IncrementGaugeValue", id, value)
+	ret0, _ := ret[0].(shared.MetricsResult)
+	return ret0
+}
+
+// IncrementGaugeValue indicates an expected call of IncrementGaugeValue.
+func (mr *MockNetworkFilterConfigHandleMockRecorder) IncrementGaugeValue(id, value any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IncrementGaugeValue", reflect.TypeOf((*MockNetworkFilterConfigHandle)(nil).IncrementGaugeValue), id, value)
+}
+
 // Log mocks base method.
 func (m *MockNetworkFilterConfigHandle) Log(level shared.LogLevel, format string, args ...any) {
 	m.ctrl.T.Helper()
@@ -988,4 +1030,32 @@ func (mr *MockNetworkFilterConfigHandleMockRecorder) Log(level, format any, args
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{level, format}, args...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Log", reflect.TypeOf((*MockNetworkFilterConfigHandle)(nil).Log), varargs...)
+}
+
+// RecordHistogramValue mocks base method.
+func (m *MockNetworkFilterConfigHandle) RecordHistogramValue(id shared.MetricID, value uint64) shared.MetricsResult {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RecordHistogramValue", id, value)
+	ret0, _ := ret[0].(shared.MetricsResult)
+	return ret0
+}
+
+// RecordHistogramValue indicates an expected call of RecordHistogramValue.
+func (mr *MockNetworkFilterConfigHandleMockRecorder) RecordHistogramValue(id, value any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordHistogramValue", reflect.TypeOf((*MockNetworkFilterConfigHandle)(nil).RecordHistogramValue), id, value)
+}
+
+// SetGaugeValue mocks base method.
+func (m *MockNetworkFilterConfigHandle) SetGaugeValue(id shared.MetricID, value uint64) shared.MetricsResult {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetGaugeValue", id, value)
+	ret0, _ := ret[0].(shared.MetricsResult)
+	return ret0
+}
+
+// SetGaugeValue indicates an expected call of SetGaugeValue.
+func (mr *MockNetworkFilterConfigHandleMockRecorder) SetGaugeValue(id, value any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetGaugeValue", reflect.TypeOf((*MockNetworkFilterConfigHandle)(nil).SetGaugeValue), id, value)
 }

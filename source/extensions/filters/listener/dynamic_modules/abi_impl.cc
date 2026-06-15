@@ -1086,6 +1086,71 @@ envoy_dynamic_module_callback_listener_filter_record_histogram_value(
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_increment_counter(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* config = static_cast<DynamicModuleListenerFilterConfig*>(config_envoy_ptr);
+  auto counter = config->getCounterById(id);
+  if (!counter.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  counter->add(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_increment_gauge(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* config = static_cast<DynamicModuleListenerFilterConfig*>(config_envoy_ptr);
+  auto gauge = config->getGaugeById(id);
+  if (!gauge.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  gauge->add(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_decrement_gauge(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* config = static_cast<DynamicModuleListenerFilterConfig*>(config_envoy_ptr);
+  auto gauge = config->getGaugeById(id);
+  if (!gauge.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  gauge->sub(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_set_gauge(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* config = static_cast<DynamicModuleListenerFilterConfig*>(config_envoy_ptr);
+  auto gauge = config->getGaugeById(id);
+  if (!gauge.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  gauge->set(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_record_histogram_value(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* config = static_cast<DynamicModuleListenerFilterConfig*>(config_envoy_ptr);
+  auto histogram = config->getHistogramById(id);
+  if (!histogram.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  histogram->recordValue(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
 // -----------------------------------------------------------------------------
 // HTTP Callout Callbacks
 // -----------------------------------------------------------------------------
