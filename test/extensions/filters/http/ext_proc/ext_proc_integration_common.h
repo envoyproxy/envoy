@@ -4,6 +4,7 @@
 
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
+#include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
@@ -73,12 +74,25 @@ public:
   }
 
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override {
+    // Untyped
     if (decoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata_size() > 0) {
       const auto& md = decoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
       for (const auto& md_entry : md) {
         std::string key_prefix = md_entry.first;
         for (const auto& field : md_entry.second.fields()) {
           headers.addCopy(Http::LowerCaseString(key_prefix), field.first);
+        }
+      }
+    }
+    // Typed
+    if (decoder_callbacks_->streamInfo().dynamicMetadata().typed_filter_metadata_size() > 0) {
+      const auto& typed_md =
+          decoder_callbacks_->streamInfo().dynamicMetadata().typed_filter_metadata();
+      for (const auto& md_entry : typed_md) {
+        std::string key_prefix = md_entry.first;
+        envoy::extensions::filters::http::set_metadata::v3::Metadata typed_md_val;
+        if (md_entry.second.UnpackTo(&typed_md_val)) {
+          headers.addCopy(Http::LowerCaseString(key_prefix), typed_md_val.metadata_namespace());
         }
       }
     }
@@ -182,6 +196,7 @@ protected:
   void testGetAndFailStream();
   void testGetAndCloseStream();
   void testSendDyanmicMetadata();
+  void testSendTypedDyanmicMetadata();
   void testSidestreamPushbackDownstream(uint32_t body_size, bool check_downstream_flow_control);
   void initializeConfigDuplexStreamed(bool both_direction = false);
 

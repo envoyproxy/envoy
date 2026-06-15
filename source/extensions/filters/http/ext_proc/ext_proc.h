@@ -304,6 +304,10 @@ public:
     return untyped_receiving_namespaces_;
   }
 
+  const std::vector<std::string>& typedReceivingMetadataNamespaces() const {
+    return typed_receiving_namespaces_;
+  }
+
   const std::vector<std::string>& untypedClusterMetadataForwardingNamespaces() const {
     return untyped_cluster_metadata_forwarding_namespaces_;
   }
@@ -371,6 +375,7 @@ private:
   const std::vector<std::string> untyped_forwarding_namespaces_;
   const std::vector<std::string> typed_forwarding_namespaces_;
   const std::vector<std::string> untyped_receiving_namespaces_;
+  const std::vector<std::string> typed_receiving_namespaces_;
   const std::vector<std::string> untyped_cluster_metadata_forwarding_namespaces_;
   const std::vector<std::string> typed_cluster_metadata_forwarding_namespaces_;
   // Empty allowed_header_ means allow all.
@@ -452,6 +457,9 @@ public:
   const absl::optional<const std::vector<std::string>>& untypedReceivingMetadataNamespaces() const {
     return untyped_receiving_namespaces_;
   }
+  const absl::optional<const std::vector<std::string>>& typedReceivingMetadataNamespaces() const {
+    return typed_receiving_namespaces_;
+  }
   const absl::optional<const std::vector<std::string>>&
   untypedClusterMetadataForwardingNamespaces() const {
     return untyped_cluster_metadata_forwarding_namespaces_;
@@ -483,6 +491,7 @@ private:
   const absl::optional<const std::vector<std::string>> untyped_forwarding_namespaces_;
   const absl::optional<const std::vector<std::string>> typed_forwarding_namespaces_;
   const absl::optional<const std::vector<std::string>> untyped_receiving_namespaces_;
+  const absl::optional<const std::vector<std::string>> typed_receiving_namespaces_;
   const absl::optional<const std::vector<std::string>>
       untyped_cluster_metadata_forwarding_namespaces_;
   const absl::optional<const std::vector<std::string>>
@@ -518,12 +527,14 @@ public:
             *this, config->processingMode(), config->untypedForwardingMetadataNamespaces(),
             config->typedForwardingMetadataNamespaces(),
             config->untypedReceivingMetadataNamespaces(),
+            config->typedReceivingMetadataNamespaces(),
             config->untypedClusterMetadataForwardingNamespaces(),
             config->typedClusterMetadataForwardingNamespaces(), config->keepContentLength()),
         encoding_state_(
             *this, config->processingMode(), config->untypedForwardingMetadataNamespaces(),
             config->typedForwardingMetadataNamespaces(),
             config->untypedReceivingMetadataNamespaces(),
+            config->typedReceivingMetadataNamespaces(),
             config->untypedClusterMetadataForwardingNamespaces(),
             config->typedClusterMetadataForwardingNamespaces(), config->keepContentLength()),
         processing_request_modifier_(config->createProcessingRequestModifier()),
@@ -690,6 +701,7 @@ private:
   std::vector<std::string> untyped_forwarding_namespaces_;
   std::vector<std::string> typed_forwarding_namespaces_;
   std::vector<std::string> untyped_receiving_namespaces_;
+  std::vector<std::string> typed_receiving_namespaces_;
   std::vector<std::string> untyped_cluster_metadata_forwarding_namespaces_;
   std::vector<std::string> typed_cluster_metadata_forwarding_namespaces_;
   Http::StreamFilterCallbacks* filter_callbacks_;

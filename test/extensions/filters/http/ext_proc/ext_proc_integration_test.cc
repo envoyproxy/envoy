@@ -3766,6 +3766,36 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadata) {
   verifyDownstreamResponse(*response, 200);
 }
 
+TEST_P(ExtProcIntegrationTest, SendAndReceiveTypedDynamicMetadata) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
+  auto* md_opts = proto_config_.mutable_metadata_options();
+  md_opts->mutable_receiving_namespaces()->add_typed("receiving_ns_typed");
+
+  ConfigOptions config_option = {};
+  config_option.add_response_processor = true; // Use DynamicMetadataToHeadersFilter
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  testSendTypedDyanmicMetadata();
+
+  handleUpstreamRequest();
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+
+  // Verify the response received contains the headers from dynamic metadata we expect.
+  ASSERT_FALSE((*response).headers().empty());
+  auto md_header_result = (*response).headers().get(Http::LowerCaseString("receiving_ns_typed"));
+  ASSERT_EQ(1, md_header_result.size());
+  EXPECT_EQ("typed_value from ext_proc", md_header_result[0]->value().getStringView());
+
+  verifyDownstreamResponse(*response, 200);
+}
+
 TEST_P(ExtProcIntegrationTest, SendClusterMetadata) {
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);

@@ -743,6 +743,25 @@ void ExtProcIntegrationTest::testSendDyanmicMetadata() {
       });
 }
 
+void ExtProcIntegrationTest::testSendTypedDyanmicMetadata() {
+  envoy::extensions::filters::http::set_metadata::v3::Metadata typed_md_to_stuff;
+  typed_md_to_stuff.set_metadata_namespace("typed_value from ext_proc");
+
+  Protobuf::Any typed_val;
+  typed_val.PackFrom(typed_md_to_stuff);
+
+  processGenericMessage(*grpc_upstreams_[0], true,
+                        [typed_val](const ProcessingRequest&, ProcessingResponse& resp) {
+                          // Spoof the response to contain receiving typed metadata.
+                          HeadersResponse headers_resp;
+                          (*resp.mutable_request_headers()) = headers_resp;
+                          auto mut_typed_md = resp.mutable_typed_dynamic_metadata();
+                          (*mut_typed_md)["receiving_ns_typed"] = typed_val;
+
+                          return true;
+                        });
+}
+
 void ExtProcIntegrationTest::testSidestreamPushbackDownstream(uint32_t body_size,
                                                               bool check_downstream_flow_control) {
   config_helper_.setBufferLimits(1024, 1024);

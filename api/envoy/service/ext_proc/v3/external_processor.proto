@@ -8,6 +8,7 @@ import "envoy/type/v3/http_status.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
+import "google/protobuf/any.proto";
 
 import "xds/annotations/v3/status.proto";
 
@@ -219,6 +220,11 @@ message ProcessingResponse {
   // following filters. This metadata will be placed in the namespace(s) specified by the top-level
   // field name(s) of the struct.
   google.protobuf.Struct dynamic_metadata = 8;
+
+  // Optional typed metadata that will be emitted as dynamic metadata to be consumed by
+  // following filters. This metadata will be placed in the namespace(s) specified by the
+  // keys of the map.
+  map<string, google.protobuf.Any> typed_dynamic_metadata = 13;
 
   // Override how parts of the HTTP request and response are processed for the duration of this
   // particular request/response only. Servers may use this to intelligently control how requests
