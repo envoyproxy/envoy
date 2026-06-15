@@ -174,6 +174,8 @@ private:
         Network::DnsResolver::ResolutionStatus::Failure};
     Network::DnsResolver::ResolutionStatus ech_status_{
         Network::DnsResolver::ResolutionStatus::Failure};
+    std::string address_details_;
+    std::string ech_details_;
   };
 
   // Hold PrimaryHostInfo by shared_ptr to avoid having to hold the map mutex while updating

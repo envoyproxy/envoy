@@ -413,7 +413,7 @@ void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_i
                          [this, host, &host_info](Network::DnsResolver::ResolutionStatus status,
                                                   absl::string_view details,
                                                   std::list<Network::DnsResponse>&& response) {
-                           (void)details;
+                           host_info.address_details_ = std::string(details);
                            host_info.active_query_ = nullptr;
                            host_info.address_status_ = status;
                            host_info.resolved_addresses_ = std::move(response);
@@ -427,7 +427,7 @@ void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_i
         [this, host, &host_info](Network::DnsResolver::ResolutionStatus status,
                                  absl::string_view details,
                                  std::list<Network::DnsResponse>&& response) {
-          (void)details;
+          host_info.ech_details_ = std::string(details);
           host_info.active_ech_query_ = nullptr;
           host_info.ech_status_ = status;
           if (status == Network::DnsResolver::ResolutionStatus::Completed && !response.empty()) {
@@ -451,7 +451,7 @@ void DnsCacheImpl::onResolutionComplete(const std::string& host, PrimaryHostInfo
   }
 
   Network::DnsResolver::ResolutionStatus status = host_info.address_status_;
-  std::string details = "dns_resolution_complete";
+  std::string details = host_info.address_details_;
 
   finishResolve(host, status, details, std::move(host_info.resolved_addresses_),
                 std::move(host_info.resolved_ech_config_));
