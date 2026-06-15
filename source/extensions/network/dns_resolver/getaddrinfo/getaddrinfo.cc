@@ -1,6 +1,8 @@
 #include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 
 #ifdef __ANDROID__
+#include <android/multinetwork.h>
+#include <dlfcn.h>
 #include <poll.h>
 
 #include "source/extensions/network/dns_resolver/getaddrinfo/dns_packet_parser.h"
@@ -8,6 +10,55 @@
 
 namespace Envoy {
 namespace Network {
+
+#ifdef __ANDROID__
+namespace {
+int defaultAndroidResNquery(net_handle_t network, const char* dname, int ns_class, int ns_type,
+                            uint32_t flags) {
+  typedef int (*pfn_android_res_nquery)(net_handle_t network, const char* dname, int ns_class,
+                                        int ns_type, uint32_t flags);
+  static pfn_android_res_nquery fn = nullptr;
+  static bool searched = false;
+  if (!searched) {
+    void* handle = dlopen("libc.so", RTLD_NOW | RTLD_LOCAL);
+    if (handle != nullptr) {
+      fn = reinterpret_cast<pfn_android_res_nquery>(dlsym(handle, "android_res_nquery"));
+    }
+    searched = true;
+  }
+  if (fn != nullptr) {
+    return fn(network, dname, ns_class, ns_type, flags);
+  }
+  errno = ENOSYS;
+  return -1;
+}
+
+int defaultAndroidResNresult(int fd, int* rcode, uint8_t* answer, size_t anslen) {
+  typedef int (*pfn_android_res_nresult)(int fd, int* rcode, uint8_t* answer, size_t anslen);
+  static pfn_android_res_nresult fn = nullptr;
+  static bool searched = false;
+  if (!searched) {
+    void* handle = dlopen("libc.so", RTLD_NOW | RTLD_LOCAL);
+    if (handle != nullptr) {
+      fn = reinterpret_cast<pfn_android_res_nresult>(dlsym(handle, "android_res_nresult"));
+    }
+    searched = true;
+  }
+  if (fn != nullptr) {
+    return fn(fd, rcode, answer, anslen);
+  }
+  errno = ENOSYS;
+  return -1;
+}
+} // namespace
+
+// Global pointers that can be overridden in tests.
+int (*android_res_nquery_ptr)(net_handle_t network, const char* dname, int ns_class, int ns_type,
+                              uint32_t flags) = defaultAndroidResNquery;
+int (*android_res_nresult_ptr)(int fd, int* rcode, uint8_t* answer,
+                               size_t anslen) = defaultAndroidResNresult;
+#endif
+
 namespace {
 
 // RAII wrapper to free the `addrinfo`.
@@ -200,10 +251,11 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
         uint64_t network = 0; // NETWORK_UNSPECIFIED
         next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Starting));
 
-        auto rc = Api::OsSysCallsSingleton::get().android_res_nquery(
-            network, next_query->dns_name_.c_str(), 1 /* ns_c_in */, 65 /* HTTPS */, 0);
-        if (rc.return_value_ >= 0) {
-          os_fd_t fd = rc.return_value_;
+        auto rc_val = android_res_nquery_ptr(static_cast<net_handle_t>(network),
+                                             next_query->dns_name_.c_str(), 1 /* ns_c_in */,
+                                             65 /* HTTPS */, 0);
+        if (rc_val >= 0) {
+          os_fd_t fd = rc_val;
           pollfd pfd;
           pfd.fd = fd;
           pfd.events = POLLIN;
@@ -213,12 +265,11 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
           if (poll_rc > 0 && (pfd.revents & POLLIN)) {
             int rcode = 0;
             std::vector<uint8_t> answer(4096);
-            auto res_rc = Api::OsSysCallsSingleton::get().android_res_nresult(
-                fd, &rcode, answer.data(), answer.size());
+            auto res_rc_val = android_res_nresult_ptr(fd, &rcode, answer.data(), answer.size());
             ::close(fd);
 
-            if (res_rc.return_value_ >= 0) {
-              size_t len = res_rc.return_value_;
+            if (res_rc_val >= 0) {
+              size_t len = res_rc_val;
               answer.resize(len);
 
               DnsPacketParser parser(std::move(answer));
@@ -231,8 +282,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
                 response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
               }
             } else {
-              ENVOY_LOG(debug, "android_res_nresult failed: rc={} errno={}", res_rc.return_value_,
-                        res_rc.errno_);
+              ENVOY_LOG(debug, "android_res_nresult failed: rc={} errno={}", res_rc_val, errno);
               next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Failed));
               response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
             }
@@ -243,8 +293,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
             response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
           }
         } else {
-          ENVOY_LOG(debug, "android_res_nquery failed: rc={} errno={}", rc.return_value_,
-                    rc.errno_);
+          ENVOY_LOG(debug, "android_res_nquery failed: rc={} errno={}", rc_val, errno);
           next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Failed));
           response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
         }

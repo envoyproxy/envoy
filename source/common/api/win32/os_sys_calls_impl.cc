@@ -491,24 +491,5 @@ SysCallIntResult OsSysCallsImpl::setrlimit(int resource, const struct rlimit* rl
   PANIC("not implemented");
 }
 
-SysCallIntResult OsSysCallsImpl::android_res_nquery(uint64_t network, const char* dname,
-                                                    int ns_class, int ns_type, uint32_t flags) {
-  (void)network;
-  (void)dname;
-  (void)ns_class;
-  (void)ns_type;
-  (void)flags;
-  return {-1, ENOSYS};
-}
-
-SysCallIntResult OsSysCallsImpl::android_res_nresult(os_fd_t fd, int* rcode, uint8_t* answer,
-                                                     size_t anslen) {
-  (void)fd;
-  (void)rcode;
-  (void)answer;
-  (void)anslen;
-  return {-1, ENOSYS};
-}
-
 } // namespace Api
 } // namespace Envoy

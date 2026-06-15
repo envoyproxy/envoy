@@ -7,8 +7,19 @@
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/network/address_impl.h"
 
+#ifdef __ANDROID__
+#include <android/multinetwork.h>
+#endif
+
 namespace Envoy {
 namespace Network {
+
+#ifdef __ANDROID__
+// Function pointers for resolv APIs, can be overridden in tests.
+extern int (*android_res_nquery_ptr)(net_handle_t network, const char* dname, int ns_class,
+                                     int ns_type, uint32_t flags);
+extern int (*android_res_nresult_ptr)(int fd, int* rcode, uint8_t* answer, size_t anslen);
+#endif
 
 DECLARE_FACTORY(GetAddrInfoDnsResolverFactory);
 

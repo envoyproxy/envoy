@@ -71,10 +71,6 @@ public:
   void freeaddrinfo(addrinfo* res) override;
   SysCallIntResult getrlimit(int resource, struct rlimit* rlim) override;
   SysCallIntResult setrlimit(int resource, const struct rlimit* rlim) override;
-  SysCallIntResult android_res_nquery(uint64_t network, const char* dname, int ns_class,
-                                      int ns_type, uint32_t flags) override;
-  SysCallIntResult android_res_nresult(os_fd_t fd, int* rcode, uint8_t* answer,
-                                       size_t anslen) override;
 };
 
 using OsSysCallsSingleton = ThreadSafeSingleton<OsSysCallsImpl>;
