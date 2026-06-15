@@ -2,10 +2,13 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.validate.h"
+#include "envoy/formatter/substitution_formatter.h"
+#include "envoy/http/header_map.h"
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
@@ -23,6 +26,13 @@ namespace ReverseConnection {
 
 // Forward declarations
 class DownstreamSocketThreadLocal;
+
+struct HandshakeHeader {
+  Http::LowerCaseString key;
+  envoy::config::core::v3::HeaderValueOption::HeaderAppendAction append_action;
+  Formatter::FormatterPtr value_formatter;
+};
+using HandshakeHeadersConstSharedPtr = std::shared_ptr<const std::vector<HandshakeHeader>>;
 
 /**
  * Bootstrap extension for ReverseTunnelInitiator.
@@ -107,6 +117,12 @@ public:
   bool handshakeUsesHttpUpgrade() const { return use_http_upgrade_; }
 
   /**
+   * @return handshake headers (key + append action + value formatter), or nullptr if no
+   * handshake config is set.
+   */
+  const HandshakeHeadersConstSharedPtr& handshakeHeaders() const { return handshake_headers_; }
+
+  /**
    * @return reference to the configured access loggers for reverse tunnel lifecycle events.
    */
   const AccessLog::InstanceSharedPtrVector& accessLogs() const { return access_logs_; }
@@ -161,6 +177,7 @@ private:
   std::string handshake_request_path_;
   std::vector<envoy::config::core::v3::HeaderValueOption> additional_headers_;
   bool use_http_upgrade_{false};
+  HandshakeHeadersConstSharedPtr handshake_headers_;
   AccessLog::InstanceSharedPtrVector access_logs_;
 
   /**

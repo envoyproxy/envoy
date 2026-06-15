@@ -9,6 +9,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_socket_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
@@ -148,28 +149,32 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
   headers->addCopy(cluster_hdr, std::string(cluster_id));
   headers->addCopy(tenant_hdr, std::string(tenant_id));
   headers->addCopy(upstream_cluster_hdr, cluster_name_);
-  using HeaderValueOption = envoy::config::core::v3::HeaderValueOption;
-  for (const auto& h : parent_.additionalHeaders()) {
-    const Http::LowerCaseString key(h.header().key());
-    const auto& value = h.header().value();
-    switch (h.append_action()) {
-      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-    case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
-      headers->addCopy(key, value);
-      break;
-    case HeaderValueOption::ADD_IF_ABSENT:
-      if (headers->get(key).empty()) {
-        headers->addCopy(key, value);
+  const auto& handshake_headers = parent_.handshakeHeaders();
+  if (handshake_headers != nullptr && !handshake_headers->empty()) {
+    StreamInfo::StreamInfoImpl stream_info(connection_->dispatcher().timeSource(), nullptr,
+                                           StreamInfo::FilterState::LifeSpan::Connection);
+    using HeaderValueOption = envoy::config::core::v3::HeaderValueOption;
+    for (const auto& hdr : *handshake_headers) {
+      const std::string value = hdr.value_formatter->format({}, stream_info);
+      switch (hdr.append_action) {
+        PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+      case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
+        headers->addCopy(hdr.key, value);
+        break;
+      case HeaderValueOption::ADD_IF_ABSENT:
+        if (headers->get(hdr.key).empty()) {
+          headers->addCopy(hdr.key, value);
+        }
+        break;
+      case HeaderValueOption::OVERWRITE_IF_EXISTS:
+        if (!headers->get(hdr.key).empty()) {
+          headers->setCopy(hdr.key, value);
+        }
+        break;
+      case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
+        headers->setCopy(hdr.key, value);
+        break;
       }
-      break;
-    case HeaderValueOption::OVERWRITE_IF_EXISTS:
-      if (!headers->get(key).empty()) {
-        headers->setCopy(key, value);
-      }
-      break;
-    case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
-      headers->setCopy(key, value);
-      break;
     }
   }
   headers->setContentLength(0);
