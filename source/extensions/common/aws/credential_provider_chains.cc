@@ -259,7 +259,7 @@ CredentialsProviderSharedPtr CommonCredentialsProviderChain::createAssumeRoleCre
   auto status = aws_cluster_manager->addManagedCluster(
       cluster_name, envoy::config::cluster::v3::Cluster::LOGICAL_DNS, uri);
 
-  CredentialsProviderChainSharedPtr credentials_provider_chain;
+  std::shared_ptr<CommonCredentialsProviderChain> credentials_provider_chain;
 
   if (assume_role_config.has_credential_provider()) {
     // If a custom chain has been configured in the assume role provider, ensure we do not allow the
@@ -282,6 +282,8 @@ CredentialsProviderSharedPtr CommonCredentialsProviderChain::createAssumeRoleCre
         std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(context, region,
                                                                                   absl::nullopt);
   }
+
+  credentials_provider_chain->setupSubscriptions();
 
   // Create our own signer specifically for signing AssumeRole API call
   auto signer = std::make_unique<SigV4SignerImpl>(
