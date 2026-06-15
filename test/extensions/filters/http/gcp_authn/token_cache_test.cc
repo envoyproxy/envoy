@@ -56,7 +56,7 @@ TEST_F(TokenCacheTest, ValidToken) {
   token->audience = audience;
 
   token_cache_->insert(std::move(token));
-  auto found_token = token_cache_->lookUp(audience);
+  auto found_token = token_cache_->lookUp(audience, absl::nullopt);
   EXPECT_TRUE(found_token.has_value());
   EXPECT_EQ(found_token.value(), "foo");
 }
@@ -71,7 +71,7 @@ TEST_F(TokenCacheTest, ExpiredToken) {
   token->audience = audience;
 
   token_cache_->insert(std::move(token));
-  auto found_token = token_cache_->lookUp(audience);
+  auto found_token = token_cache_->lookUp(audience, absl::nullopt);
   EXPECT_FALSE(found_token.has_value());
 }
 
@@ -92,7 +92,7 @@ TEST_F(TokenCacheTest, TokenWithClockSkew) {
   token->audience = audience;
 
   token_cache_->insert(std::move(token));
-  auto found_token = token_cache_->lookUp(audience);
+  auto found_token = token_cache_->lookUp(audience, absl::nullopt);
   EXPECT_FALSE(found_token.has_value());
 
   // Set the time to exp_time - 1s.
@@ -103,7 +103,7 @@ TEST_F(TokenCacheTest, TokenWithClockSkew) {
   token2->audience = audience;
 
   token_cache_->insert(std::move(token2));
-  found_token = token_cache_->lookUp(audience);
+  found_token = token_cache_->lookUp(audience, absl::nullopt);
   EXPECT_TRUE(found_token.has_value());
   EXPECT_EQ(found_token.value(), "foo");
 }
@@ -123,7 +123,7 @@ TEST_F(TokenCacheTest, TokenWithoutExpiration) {
   time_system_.setSystemTime(std::chrono::system_clock::from_time_t(ExpTime + 315360000));
 
   // The lookup should still find the token since it has no expiration!
-  auto found_token = token_cache_->lookUp(audience);
+  auto found_token = token_cache_->lookUp(audience, absl::nullopt);
   EXPECT_TRUE(found_token.has_value());
   EXPECT_EQ(found_token.value(), "foo");
 }
@@ -155,8 +155,8 @@ TEST_F(TokenCacheTest, LruEviction) {
   small_cache->insert(std::move(t2));
 
   // Verify both are present.
-  EXPECT_TRUE(small_cache->lookUp(req1).has_value());
-  EXPECT_TRUE(small_cache->lookUp(req2).has_value());
+  EXPECT_TRUE(small_cache->lookUp(req1, absl::nullopt).has_value());
+  EXPECT_TRUE(small_cache->lookUp(req2, absl::nullopt).has_value());
 
   // Insert third entry, which should trigger eviction of the least recently used entry (req1).
   auto t3 = std::make_unique<GcpToken>();
@@ -166,9 +166,41 @@ TEST_F(TokenCacheTest, LruEviction) {
   small_cache->insert(std::move(t3));
 
   // Verify req1 is evicted, while req2 and req3 are still present.
-  EXPECT_FALSE(small_cache->lookUp(req1).has_value());
-  EXPECT_TRUE(small_cache->lookUp(req2).has_value());
-  EXPECT_TRUE(small_cache->lookUp(req3).has_value());
+  EXPECT_FALSE(small_cache->lookUp(req1, absl::nullopt).has_value());
+  EXPECT_TRUE(small_cache->lookUp(req2, absl::nullopt).has_value());
+  EXPECT_TRUE(small_cache->lookUp(req3, absl::nullopt).has_value());
+}
+
+TEST_F(TokenCacheTest, BoundJwtFingerprintAwareCache) {
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.mutable_bound_jwt()->set_url("http://bound_service");
+
+  // Insert token for certificate fingerprint A.
+  auto tokenA = std::make_unique<GcpToken>("token_for_A", ExpTime, audience, "fingerprint_A");
+  token_cache_->insert(std::move(tokenA));
+
+  // Lookup with fingerprint A should succeed and return "token_for_A".
+  auto foundA = token_cache_->lookUp(audience, "fingerprint_A");
+  EXPECT_TRUE(foundA.has_value());
+  EXPECT_EQ(foundA.value(), "token_for_A");
+
+  // Lookup with fingerprint B should result in a cache miss (return nullopt).
+  auto foundB = token_cache_->lookUp(audience, "fingerprint_B");
+  EXPECT_FALSE(foundB.has_value());
+
+  // Insert token for certificate fingerprint B.
+  auto tokenB = std::make_unique<GcpToken>("token_for_B", ExpTime, audience, "fingerprint_B");
+  token_cache_->insert(std::move(tokenB));
+
+  // Lookup with B should now succeed and return "token_for_B".
+  foundB = token_cache_->lookUp(audience, "fingerprint_B");
+  EXPECT_TRUE(foundB.has_value());
+  EXPECT_EQ(foundB.value(), "token_for_B");
+
+  // Lookup with A should still succeed and return "token_for_A" (no collision/overwriting!).
+  foundA = token_cache_->lookUp(audience, "fingerprint_A");
+  EXPECT_TRUE(foundA.has_value());
+  EXPECT_EQ(foundA.value(), "token_for_A");
 }
 
 } // namespace

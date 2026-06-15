@@ -238,6 +238,9 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutClusterNotFound) {
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
+  // Simulate server initialization by setting the listener manager.
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config.value()->setListenerManager(listener_manager);
   // Setup mock to return nullptr for the cluster lookup.
   EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster("nonexistent_cluster"))
       .WillOnce(testing::Return(nullptr));
@@ -296,6 +299,9 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutSuccess) {
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
+  // Simulate server initialization by setting the listener manager.
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config.value()->setListenerManager(listener_manager);
   // Setup mock cluster manager to return a valid cluster.
   testing::NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
   EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster("test_cluster"))
@@ -354,6 +360,9 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutFailureReset) {
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
+  // Simulate server initialization by setting the listener manager.
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config.value()->setListenerManager(listener_manager);
   // Setup mock cluster manager to return a valid cluster.
   testing::NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
   EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster("test_cluster"))
@@ -402,6 +411,9 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutFailureExceedBufferLimit) {
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
+  // Simulate server initialization by setting the listener manager.
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config.value()->setListenerManager(listener_manager);
   // Setup mock cluster manager to return a valid cluster.
   testing::NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
   EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster("test_cluster"))
@@ -451,6 +463,9 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutCannotCreateRequest) {
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
+  // Simulate server initialization by setting the listener manager.
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config.value()->setListenerManager(listener_manager);
   // Setup mock cluster manager to return a valid cluster.
   testing::NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
   EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster("test_cluster"))
@@ -488,6 +503,9 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutSuccessAfterInModuleConfigCleared) {
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
+  // Simulate server initialization by setting the listener manager.
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config.value()->setListenerManager(listener_manager);
   // Setup mock cluster manager to return a valid cluster.
   testing::NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
   EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster("test_cluster"))
@@ -544,6 +562,9 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutFailureAfterInModuleConfigCleared) {
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
+  // Simulate server initialization by setting the listener manager.
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config.value()->setListenerManager(listener_manager);
   // Setup mock cluster manager to return a valid cluster.
   testing::NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
   EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster("test_cluster"))
@@ -595,6 +616,9 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutWithBody) {
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
+  // Simulate server initialization by setting the listener manager.
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config.value()->setListenerManager(listener_manager);
   // Setup mock cluster manager to return a valid cluster.
   testing::NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
   EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster("test_cluster"))
@@ -1684,6 +1708,9 @@ TEST_F(BootstrapAbiImplTest, EnableClusterLifecycle) {
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
+  // Simulate server initialization by setting the listener manager.
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config.value()->setListenerManager(listener_manager);
   // Expect the callback registration to go through ClusterManager.
   EXPECT_CALL(context_.cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_))
       .WillOnce(testing::ReturnNew<Upstream::MockClusterUpdateCallbacksHandle>());

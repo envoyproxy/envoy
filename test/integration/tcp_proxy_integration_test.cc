@@ -453,6 +453,55 @@ TEST_P(TcpProxyIntegrationTest, AccessLogBytesMeter) {
                                        ip_port_regex, ip_regex)));
 }
 
+// Check that the COMMON_DURATION downstream and upstream connection time points are populated for
+// TCP connections, so each duration renders as a number instead of "-".
+TEST_P(TcpProxyIntegrationTest, AccessLogCommonDuration) {
+  std::string access_log_path = TestEnvironment::temporaryPath(
+      fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
+                  TestUtility::uniqueFilename()));
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+
+    auto* access_log = tcp_proxy_config.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "ds_cx=%COMMON_DURATION(DS_CX_BEG:DS_CX_END:us)% "
+        "us_cx=%COMMON_DURATION(US_CX_BEG:US_CX_END:us)% "
+        "setup=%COMMON_DURATION(DS_CX_BEG:US_CX_BEG:us)%");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  ASSERT_TRUE(fake_upstream_connection->write("hello"));
+  tcp_client->waitForData("hello");
+
+  ASSERT_TRUE(fake_upstream_connection->write("", true));
+  tcp_client->waitForHalfClose();
+  ASSERT_TRUE(tcp_client->write("", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+
+  // Guarantee client is done writing to the log.
+  test_server_.reset();
+  auto log_result = waitForAccessLog(access_log_path);
+
+  EXPECT_THAT(log_result, MatchesRegex(R"EOF(ds_cx=[0-9]+ us_cx=[0-9]+ setup=[0-9]+\r?.*)EOF"));
+}
+
 // Verifies that access log value for `UPSTREAM_TRANSPORT_FAILURE_REASON` matches the failure
 // message when there is an upstream transport failure.
 TEST_P(TcpProxyIntegrationTest, AccessLogUpstreamConnectFailure) {

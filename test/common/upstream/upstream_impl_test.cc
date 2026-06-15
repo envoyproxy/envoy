@@ -1933,6 +1933,16 @@ TEST_F(HostImplTest, HostnameCanaryAndLocality) {
   EXPECT_EQ(1, host->priority());
 }
 
+TEST_F(HostImplTest, EmptyLocalityZoneStatName) {
+  MockClusterMockPrioritySet cluster;
+  std::unique_ptr<HostImpl> host = *HostImpl::create(
+      cluster.info_, "", *Network::Utility::resolveUrl("tcp://10.0.0.1:1234"), nullptr, nullptr, 1,
+      std::make_shared<const envoy::config::core::v3::Locality>(),
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
+      envoy::config::core::v3::UNKNOWN);
+  EXPECT_TRUE(host->localityZoneStatName().empty());
+}
+
 TEST_F(HostImplTest, CreateConnection) {
   MockClusterMockPrioritySet cluster;
   envoy::config::core::v3::Metadata metadata;

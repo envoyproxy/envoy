@@ -148,7 +148,7 @@ private:
     Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams params) override {
       return std::make_unique<LoadBalancer>(cluster_, params.priority_set);
     }
-    bool recreateOnHostChange() const override { return false; }
+    bool recreateOnHostChangeDeprecated() const override { return false; }
 
     const OriginalDstClusterHandleSharedPtr cluster_;
   };

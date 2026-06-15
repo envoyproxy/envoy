@@ -348,16 +348,30 @@ void MultiConnectionBaseImpl::removeConnectionCallbacks(ConnectionCallbacks& cb)
     connections_[0]->removeConnectionCallbacks(cb);
     return;
   }
-  // Callbacks should only be notified of events on the final connection, so remove
-  // the callback from the list of deferred callbacks.
-  auto i = post_connect_state_.connection_callbacks_.begin();
-  while (i != post_connect_state_.connection_callbacks_.end()) {
-    if (*i == &cb) {
-      post_connect_state_.connection_callbacks_.erase(i);
+  // For performance/safety reasons we just clear the entry and do not resize the vector,
+  // matching ConnectionImplBase::removeConnectionCallbacks. Callers that iterate
+  // connection_callbacks_ skip null entries.
+  for (auto& entry : post_connect_state_.connection_callbacks_) {
+    if (entry == &cb) {
+      entry = nullptr;
       return;
     }
   }
   IS_ENVOY_BUG("Failed to remove connection callbacks");
+}
+
+void MultiConnectionBaseImpl::onDrain() {
+  if (connect_finished_) {
+    connections_[0]->onDrain();
+    return;
+  }
+  // Notify all deferred callbacks directly since no underlying connection has been
+  // chosen yet.
+  for (auto* cb : post_connect_state_.connection_callbacks_) {
+    if (cb != nullptr) {
+      cb->onDrain();
+    }
+  }
 }
 
 void MultiConnectionBaseImpl::close(ConnectionCloseType type, absl::string_view details) {

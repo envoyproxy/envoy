@@ -64,6 +64,48 @@ TEST(RateLimitFilterConfigTest, RatelimitCorrectProto) {
   }
 }
 
+// The filter-level ``rate_limits`` field also accepts a ``limit`` override alongside
+// ``hits_addend``, exercising the FilterConfig (no_limit=false) path. See
+// https://github.com/envoyproxy/envoy/issues/45611.
+TEST(RateLimitFilterConfigTest, FilterLevelRateLimitsWithLimitOverride) {
+  const std::string yaml = R"EOF(
+  domain: test
+  rate_limit_service:
+    grpc_service:
+      envoy_grpc:
+        cluster_name: ratelimit_cluster
+  rate_limits:
+    - actions:
+      - remote_address: {}
+      hits_addend:
+        number: 1234
+      limit:
+        dynamic_metadata:
+          metadata_key:
+            key: test.filter.key
+            path:
+            - key: test
+  )EOF";
+
+  envoy::extensions::filters::http::ratelimit::v3::RateLimit proto_config{};
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  EXPECT_CALL(context.server_factory_context_.cluster_manager_.async_client_manager_,
+              getOrCreateRawAsyncClientWithHashKey(_, _, _))
+      .WillOnce(Invoke([](const Grpc::GrpcServiceConfigWithHashKey&, Stats::Scope&, bool) {
+        return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
+      }));
+
+  RateLimitFilterConfig factory;
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  cb(filter_callback);
+}
+
 TEST(RateLimitFilterConfigTest, RateLimitFilterEmptyProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   NiceMock<Server::MockInstance> instance;
@@ -96,6 +138,37 @@ TEST(RateLimitFilterConfigTest, PerRouteRateLimits) {
       - remote_address: {}
       hits_addend:
         number: 1234
+  )EOF";
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute proto_config{};
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  RateLimitFilterConfig factory;
+  auto status_or_error = factory.createRouteSpecificFilterConfig(
+      proto_config, factory_context,
+      factory_context.validation_context_.static_validation_visitor_);
+  EXPECT_TRUE(status_or_error.ok());
+  EXPECT_NE(nullptr, status_or_error.value());
+}
+
+// A per-route ``rate_limits`` rule may carry both a per-request ``hits_addend`` and a
+// per-descriptor ``limit`` override together. Previously the override was rejected with
+// "'limit' field is not supported". See https://github.com/envoyproxy/envoy/issues/45611.
+TEST(RateLimitFilterConfigTest, PerRouteRateLimitsWithLimitOverride) {
+  const std::string yaml = R"EOF(
+  domain: test
+  rate_limits:
+    - actions:
+      - remote_address: {}
+      hits_addend:
+        number: 1234
+      limit:
+        dynamic_metadata:
+          metadata_key:
+            key: test.filter.key
+            path:
+            - key: test
   )EOF";
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
