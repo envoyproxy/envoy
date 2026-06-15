@@ -77,6 +77,7 @@ public:
 
 private:
   Event::Dispatcher& dispatcher_;
+  Event::TestTimeSystem& time_system_;
   Http::ResponseHeaderMapPtr continue_headers_;
   Http::ResponseHeaderMapPtr headers_;
   Http::ResponseTrailerMapPtr trailers_;

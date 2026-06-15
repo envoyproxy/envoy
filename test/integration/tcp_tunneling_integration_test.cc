@@ -2585,6 +2585,12 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamRstAfterCompleteResponseNotPropagate
   upstream_request_->encodeHeaders(response_headers, false);
   upstream_request_->encodeData(5, true);
 
+  // Synchronize on Envoy's stats to ensure it has written the response data downstream.
+  // If we send the RST immediately (close(AbortReset)), we create a race condition where the RST
+  // might reach Envoy before it has read the data from the socket, causing the OS TCP stack to
+  // discard the unread data, and resulting in the client receiving 0 bytes.
+  test_server_->waitForCounter("tcp.tcp_stats.downstream_cx_tx_bytes_total", Ge(5));
+
   // Upstream RSTs after completing the response.
   ASSERT_TRUE(fake_upstream_connection_->close(Network::ConnectionCloseType::AbortReset));
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());

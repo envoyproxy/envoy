@@ -87,13 +87,26 @@ IntegrationCodecClient::IntegrationCodecClient(
     Network::ClientConnectionPtr&& conn, Upstream::HostDescriptionConstSharedPtr host_description,
     Http::CodecType type, bool wait_till_connected)
     : CodecClientProd(type, std::move(conn), host_description, dispatcher, random, nullptr),
-      dispatcher_(dispatcher), callbacks_(*this, wait_till_connected), codec_callbacks_(*this),
+      dispatcher_(dispatcher), time_system_(Event::GlobalTimeSystem().timeSystem()),
+      callbacks_(*this, wait_till_connected), codec_callbacks_(*this),
       codec_client_callbacks_(*this) {
   connection_->addConnectionCallbacks(callbacks_);
   setCodecConnectionCallbacks(codec_callbacks_);
   setCodecClientCallbacks(codec_client_callbacks_);
   if (wait_till_connected) {
-    dispatcher.run(Event::Dispatcher::RunType::Block);
+    if (time_system_.isSimulated()) {
+      auto start_time = time_system_.monotonicTime();
+      while (!connected_ && !disconnected_) {
+        if (std::chrono::duration_cast<std::chrono::milliseconds>(
+                time_system_.monotonicTime() - start_time) >= TestUtility::DefaultTimeout) {
+          break;
+        }
+        dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+        time_system_.advanceTimeWait(std::chrono::milliseconds(1));
+      }
+    } else {
+      dispatcher.run(Event::Dispatcher::RunType::Block);
+    }
   }
 }
 
@@ -185,24 +198,39 @@ AssertionResult IntegrationCodecClient::waitForDisconnect(std::chrono::milliseco
   if (disconnected_) {
     return AssertionSuccess();
   }
-  Event::TimerPtr wait_timer;
-  bool wait_timer_triggered = false;
-  if (time_to_wait.count()) {
-    wait_timer = connection_->dispatcher().createTimer([this, &wait_timer_triggered] {
-      connection_->dispatcher().exit();
-      wait_timer_triggered = true;
-    });
-    wait_timer->enableTimer(time_to_wait);
+  bool timed_out = false;
+
+  if (time_system_.isSimulated()) {
+    auto start_time = time_system_.monotonicTime();
+    while (!disconnected_) {
+      if (std::chrono::duration_cast<std::chrono::milliseconds>(time_system_.monotonicTime() -
+                                                                start_time) >= time_to_wait) {
+        timed_out = true;
+        break;
+      }
+      connection_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
+      time_system_.advanceTimeWait(std::chrono::milliseconds(1));
+    }
+  } else {
+    Event::TimerPtr wait_timer;
+    bool wait_timer_triggered = false;
+    if (time_to_wait.count()) {
+      wait_timer = connection_->dispatcher().createTimer([this, &wait_timer_triggered] {
+        connection_->dispatcher().exit();
+        wait_timer_triggered = true;
+      });
+      wait_timer->enableTimer(time_to_wait);
+    }
+
+    connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+
+    if (wait_timer) {
+      wait_timer->disableTimer();
+    }
+    timed_out = wait_timer_triggered;
   }
 
-  connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
-
-  // Disable the timer if it was created. This call is harmless if the timer already triggered.
-  if (wait_timer) {
-    wait_timer->disableTimer();
-  }
-
-  if (wait_timer_triggered && !disconnected_) {
+  if (timed_out && !disconnected_) {
     if (time_to_wait == TestUtility::DefaultTimeout) {
       ADD_FAILURE() << "Please don't waitForDisconnect with a 5s timeout if failure is expected\n";
     }

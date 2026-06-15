@@ -19,6 +19,7 @@
 #include "test/integration/utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_time.h"
 #include "test/test_common/test_time_system.h"
 
 #include "absl/functional/any_invocable.h"
@@ -41,7 +42,8 @@ IntegrationTcpClient::IntegrationTcpClient(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::Address::InstanceConstSharedPtr source_address, absl::string_view destination_address)
     : payload_reader_(new WaitForPayloadReader(dispatcher)),
-      callbacks_(new ConnectionCallbacks(*this)) {
+      callbacks_(new ConnectionCallbacks(*this)),
+      time_system_(Event::GlobalTimeSystem().timeSystem()) {
   EXPECT_CALL(factory, createBuffer_(_, _, _))
       .Times(AtLeast(1))
       .WillOnce(
@@ -98,23 +100,40 @@ AssertionResult IntegrationTcpClient::waitForData(size_t length,
     return AssertionSuccess();
   }
 
-  return payload_reader_->waitForLength(length, timeout);
+  return payload_reader_->waitForLength(length, timeout, time_system_);
 }
 
 void IntegrationTcpClient::waitForDisconnect(bool ignore_spurious_events) {
   if (disconnected_) {
     return;
   }
-  Event::TimerPtr timeout_timer =
-      connection_->dispatcher().createTimer([this]() -> void { connection_->dispatcher().exit(); });
-  timeout_timer->enableTimer(TestUtility::DefaultTimeout);
-
-  if (ignore_spurious_events) {
-    while (!disconnected_ && timeout_timer->enabled()) {
-      connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  if (time_system_.isSimulated()) {
+    // In simulated time, we cannot block in Block run because time won't advance.
+    // We loop, run the dispatcher (NonBlock) to process events, and advance simulated
+    // time by 1ms in each iteration until disconnected or timeout.
+    auto start_time = time_system_.monotonicTime();
+    while (!disconnected_) {
+      if (std::chrono::duration_cast<std::chrono::milliseconds>(
+              time_system_.monotonicTime() - start_time) >= TestUtility::DefaultTimeout) {
+        break;
+      }
+      connection_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
+      time_system_.advanceTimeWait(std::chrono::milliseconds(1));
     }
   } else {
-    connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+    // In real time, we use a timer and run the dispatcher in Block mode, which
+    // yields the thread until an event (disconnect or timer) occurs, avoiding busy looping.
+    Event::TimerPtr timeout_timer = connection_->dispatcher().createTimer(
+        [this]() -> void { connection_->dispatcher().exit(); });
+    timeout_timer->enableTimer(TestUtility::DefaultTimeout);
+
+    if (ignore_spurious_events) {
+      while (!disconnected_ && timeout_timer->enabled()) {
+        connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+      }
+    } else {
+      connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+    }
   }
   EXPECT_TRUE(disconnected_);
 }
@@ -147,6 +166,8 @@ void IntegrationTcpClient::readDisable(bool disabled) { connection_->readDisable
 
 AssertionResult IntegrationTcpClient::write(const std::string& data, bool end_stream, bool verify,
                                             std::chrono::milliseconds timeout) {
+  bool is_simulated = time_system_.isSimulated();
+  auto start_time = time_system_.monotonicTime();
   Event::TestTimeSystem::RealTimeBound bound(timeout);
   Buffer::OwnedImpl buffer(data);
   if (verify) {
@@ -158,15 +179,31 @@ AssertionResult IntegrationTcpClient::write(const std::string& data, bool end_st
 
   uint64_t bytes_expected = client_write_buffer_->bytesDrained() + data.size();
 
+  // We write to the connection, then loop running the dispatcher to process write events
+  // (draining the buffer).
   connection_->write(buffer, end_stream);
   do {
     connection_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
     if (client_write_buffer_->bytesDrained() == bytes_expected || disconnected_) {
       break;
     }
-  } while (bound.withinBound());
+    if (is_simulated) {
+      // In simulated time, we must advance time manually in the loop to allow
+      // simulated timers (if any) to trigger and prevent busy looping forever
+      // if the write is stuck.
+      if (std::chrono::duration_cast<std::chrono::milliseconds>(time_system_.monotonicTime() -
+                                                                start_time) >= timeout) {
+        break;
+      }
+      time_system_.advanceTimeWait(std::chrono::milliseconds(1));
+    }
+  } while (is_simulated || bound.withinBound());
 
-  if (!bound.withinBound()) {
+  bool timed_out = is_simulated ? (std::chrono::duration_cast<std::chrono::milliseconds>(
+                                       time_system_.monotonicTime() - start_time) >= timeout)
+                                : !bound.withinBound();
+
+  if (timed_out) {
     return AssertionFailure() << "Timed out completing write";
   } else if (verify && (disconnected_ || client_write_buffer_->bytesDrained() != bytes_expected)) {
     return AssertionFailure()

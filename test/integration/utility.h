@@ -273,26 +273,48 @@ public:
   }
 
   ABSL_MUST_USE_RESULT testing::AssertionResult waitForLength(size_t length,
-                                                              std::chrono::milliseconds timeout) {
+                                                              std::chrono::milliseconds timeout,
+                                                              Event::TestTimeSystem& time_system) {
     ASSERT(!wait_for_length_);
     length_to_wait_for_ = length;
     wait_for_length_ = true;
 
-    Event::TimerPtr timeout_timer =
-        dispatcher_.createTimer([this]() -> void { dispatcher_.exit(); });
-    timeout_timer->enableTimer(timeout);
+    if (time_system.isSimulated()) {
+      // In simulated time, we cannot block in Block run. We loop, checking if we
+      // have enough data, running the dispatcher (NonBlock) and advancing simulated time.
+      auto start_time = time_system.monotonicTime();
+      while (data_.size() < length) {
+        if (std::chrono::duration_cast<std::chrono::milliseconds>(time_system.monotonicTime() -
+                                                                  start_time) >= timeout) {
+          break;
+        }
+        dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+        time_system.advanceTimeWait(std::chrono::milliseconds(1));
+      }
+    } else {
+      // In real time, we block using Block run. The dispatcher will exit when either
+      // we get enough data (which calls dispatcher.exit()) or the timeout timer fires.
+      Event::TimerPtr timeout_timer =
+          dispatcher_.createTimer([this]() -> void { dispatcher_.exit(); });
+      timeout_timer->enableTimer(timeout);
 
-    dispatcher_.run(Event::Dispatcher::RunType::Block);
+      dispatcher_.run(Event::Dispatcher::RunType::Block);
+
+      if (timeout_timer->enabled()) {
+        timeout_timer->disableTimer();
+      }
+    }
 
     length_to_wait_for_ = 0;
     wait_for_length_ = false;
 
-    if (timeout_timer->enabled()) {
-      timeout_timer->disableTimer();
+    // Explicitly verify that we actually received the required amount of data.
+    if (data_.size() >= length) {
       return testing::AssertionSuccess();
     }
 
-    return testing::AssertionFailure() << "Timed out waiting for " << length << " bytes of data\n";
+    return testing::AssertionFailure() << "Timed out waiting for " << length
+                                       << " bytes of data. Actual size: " << data_.size() << "\n";
   }
 
   const std::string& data() { return data_; }

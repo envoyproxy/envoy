@@ -31,6 +31,7 @@ private:
 class GlobalTimeSystem : public DelegatingTestTimeSystemBase<TestTimeSystem> {
 public:
   TestTimeSystem& timeSystem() override;
+  const TestTimeSystem& timeSystem() const override;
 
 private:
   Test::Global<SingletonTimeSystemHelper> singleton_;

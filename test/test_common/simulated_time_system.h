@@ -24,6 +24,8 @@ public:
   SimulatedTimeSystemHelper();
   ~SimulatedTimeSystemHelper() override;
 
+  bool isSimulated() const override { return true; }
+
   // TimeSystem
   SchedulerPtr createScheduler(Scheduler& base_scheduler, CallbackScheduler& cb_scheduler) override;
 
@@ -84,15 +86,22 @@ private:
   void setMonotonicTimeLockHeld(const MonotonicTime& monotonic_time)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
-  // Keeps track of the number of simulated schedulers that have pending monotonic time updates.
-  // Used by advanceTimeWait() to determine when the time updates have finished propagating.
-  void incPending() {
+  // Tracks pending monotonic time updates per-thread. Used by advanceTimeWait() to
+  // determine when updates have finished propagating to other threads, while avoiding
+  // waiting for the calling thread's own updates (which would cause a deadlock).
+  void incPending(Thread::ThreadId thread_id) {
     absl::MutexLock lock(mutex_);
-    ++pending_updates_;
+    pending_updates_by_thread_[thread_id]++;
   }
-  void decPending() {
+  void decPending(Thread::ThreadId thread_id) {
     absl::MutexLock lock(mutex_);
-    --pending_updates_;
+    auto it = pending_updates_by_thread_.find(thread_id);
+    if (it != pending_updates_by_thread_.end()) {
+      it->second--;
+      if (it->second == 0) {
+        pending_updates_by_thread_.erase(it);
+      }
+    }
   }
   void waitForNoPendingLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
@@ -104,7 +113,12 @@ private:
   TestRandomGenerator random_source_ ABSL_GUARDED_BY(mutex_);
   std::set<SimulatedScheduler*> schedulers_ ABSL_GUARDED_BY(mutex_);
   mutable absl::Mutex mutex_;
-  uint32_t pending_updates_ ABSL_GUARDED_BY(mutex_){0};
+  // Pending updates are mapped by the thread ID of the scheduler that created them.
+  // This allows the test thread (or any thread calling advanceTimeWait) to only wait
+  // for updates from other threads, preventing deadlocks where a thread waits for
+  // its own dispatcher to run.
+  absl::flat_hash_map<Thread::ThreadId, uint32_t>
+      pending_updates_by_thread_ ABSL_GUARDED_BY(mutex_);
   std::atomic<uint32_t> warning_logged_{0};
 };
 

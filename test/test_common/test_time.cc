@@ -18,6 +18,10 @@ TestTimeSystem& GlobalTimeSystem::timeSystem() {
   return singleton_->timeSystem(make_real_time_system);
 }
 
+const TestTimeSystem& GlobalTimeSystem::timeSystem() const {
+  return const_cast<GlobalTimeSystem*>(this)->timeSystem();
+}
+
 void TestRealTimeSystem::advanceTimeWaitImpl(const Duration& duration) {
   only_one_thread_.checkOneThread();
   std::this_thread::sleep_for(duration);
