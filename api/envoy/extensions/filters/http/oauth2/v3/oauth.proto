@@ -191,7 +191,8 @@ message OAuth2Config {
   // accesses the ``signout_path``. If empty (the default), the filter falls back to
   // ``<scheme>://<host>/`` constructed from the inbound request, preserving previous behavior. The
   // value should be a fully qualified URI that the identity provider has registered for this client.
-  // It will be percent-encoded automatically when building the logout URL.
+  // It supports header formatting tokens, and will be percent-encoded automatically when building
+  // the logout URL.
   //
   // This field is ignored if ``end_session_endpoint`` is not set or if
   // ``disable_post_logout_redirect_uri`` is true.

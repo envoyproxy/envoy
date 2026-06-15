@@ -1182,10 +1182,14 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
 
     if (!config_->disablePostLogoutRedirectUri()) {
       const std::string& configured_uri = config_->postLogoutRedirectUri();
-      const std::string redirect_uri =
-          configured_uri.empty()
-              ? default_post_logout_redirect_url
-              : configured_uri;
+      std::string redirect_uri;
+      if (configured_uri.empty()) {
+        redirect_uri = default_post_logout_redirect_url;
+      } else {
+        Formatter::FormatterPtr formatter = THROW_OR_RETURN_VALUE(
+            Formatter::FormatterImpl::create(configured_uri), Formatter::FormatterPtr);
+        redirect_uri = formatter->format({&headers}, decoder_callbacks_->streamInfo());
+      }
       absl::StrAppend(&oidc_logout_url,
                       fmt::format(OIDCLogoutUrlPostLogoutRedirectFormatString,
                                   Http::Utility::PercentEncoding::encode(redirect_uri, ":/=&?")));
