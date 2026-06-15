@@ -95,7 +95,7 @@ public:
     }
     // Integration test starts upstreams before Envoy which can cause a data race.
     builder_.enableLogger(false);
-    builder_.setLogLevel(Logger::Logger::trace);
+    builder_.setLogLevel(Logger::Logger::info);
     builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
     builder_.addRuntimeGuard("quic_no_tcp_delay", true);
     builder_.addRuntimeGuard("mobile_use_network_observer_registry", true);
