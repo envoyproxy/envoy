@@ -740,6 +740,7 @@ TEST_P(ProxyFilterIntegrationTest, ParallelRequestsWithFakeResolver) {
   ASSERT_TRUE(response2->waitForEndStream());
   EXPECT_EQ("200", response1->headers().getStatusValue());
   EXPECT_EQ("200", response2->headers().getStatusValue());
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
 }
 
 // Currently if the first DNS resolution fails, the filter will continue with
