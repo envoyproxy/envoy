@@ -167,6 +167,9 @@ TEST_F(DynamicModuleStatsSinkFactoryTest, MalformedSinkConfig) {
   EXPECT_FALSE(sink_or_error.ok());
   EXPECT_THAT(std::string(sink_or_error.status().message()),
               testing::HasSubstr("Failed to parse sink config"));
+
+  EXPECT_EQ(1U, failureCounter(context_.serverScope(), "config_init_error", "test_sink"));
+  EXPECT_EQ(0U, failureCounter(context_.serverScope(), "module_load_error", "test_sink"));
 }
 
 // A bogus module name produces a clear "Failed to load dynamic module" error.
@@ -206,24 +209,6 @@ sink_name: test_sink
               testing::HasSubstr("Failed to initialize dynamic module stats sink config"));
 
   // The module loads fine but its config creation fails, so this is counted as config_init_error.
-  EXPECT_EQ(1U, failureCounter(context_.serverScope(), "config_init_error", "test_sink"));
-  EXPECT_EQ(0U, failureCounter(context_.serverScope(), "module_load_error", "test_sink"));
-}
-
-// Module loaded OK but the sink_config Any cannot be unpacked, counted as config_init_error.
-TEST_F(DynamicModuleStatsSinkFactoryTest, MalformedSinkConfig) {
-  envoy::extensions::stat_sinks::dynamic_modules::v3::DynamicModuleStatsSink proto_config;
-  proto_config.mutable_dynamic_module_config()->set_name("stat_sink_no_op");
-  proto_config.mutable_dynamic_module_config()->set_do_not_close(true);
-  proto_config.set_sink_name("test_sink");
-  // Claims to be a StringValue but the value is not a valid encoding, so knownAnyToBytes fails.
-  auto* any = proto_config.mutable_sink_config();
-  any->set_type_url("type.googleapis.com/google.protobuf.StringValue");
-  any->set_value("invalid_binary_data_that_cannot_be_unpacked_as_string_value");
-
-  auto sink_or_error = factory_.createStatsSink(proto_config, context_);
-  EXPECT_FALSE(sink_or_error.ok());
-
   EXPECT_EQ(1U, failureCounter(context_.serverScope(), "config_init_error", "test_sink"));
   EXPECT_EQ(0U, failureCounter(context_.serverScope(), "module_load_error", "test_sink"));
 }
