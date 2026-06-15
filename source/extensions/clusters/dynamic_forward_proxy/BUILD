@@ -12,6 +12,7 @@ envoy_cc_extension(
     name = "cluster",
     srcs = ["cluster.cc"],
     hdrs = ["cluster.h"],
+    visibility = ["//visibility:public"],
     deps = [
         "//envoy/router:string_accessor_interface",
         "//source/common/network:transport_socket_options_lib",

@@ -107,6 +107,7 @@ public:
     EXPECT_CALL(*host_map_[host], addressList()).Times(AtLeast(0));
     EXPECT_CALL(*host_map_[host], isIpAddress()).Times(AtLeast(0));
     EXPECT_CALL(*host_map_[host], resolvedHost()).Times(AtLeast(0));
+    EXPECT_CALL(*host_map_[host], echConfig()).Times(AtLeast(0));
   }
 
   void updateTestHostAddress(const std::string& host, const std::string& address) {

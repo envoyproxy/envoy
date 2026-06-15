@@ -6,6 +6,8 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
+#include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/network/dns_resolver.h"
 #include "envoy/registry/registry.h"
@@ -15,6 +17,7 @@
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/ssl/ssl.h"
 #include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/client_ssl_socket.h"
@@ -1569,7 +1572,7 @@ public:
     size_t ech_config_len;
     ASSERT_TRUE(EVP_HPKE_KEY_generate(key.get(), EVP_hpke_x25519_hkdf_sha256()));
     ASSERT_TRUE(SSL_marshal_ech_config(&ech_config, &ech_config_len, /*config_id=*/1, key.get(),
-                                       "public.example.com", 64));
+                                       "public.lyft.com", 64));
     bssl::UniquePtr<uint8_t> free_ech_config(ech_config);
 
     // Save the server ECH keys
@@ -1632,11 +1635,57 @@ TEST_P(SslEchIntegrationTest, EchSuccess) {
 
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    cluster->set_type(envoy::config::cluster::v3::Cluster::LOGICAL_DNS);
+    cluster->clear_load_assignment();
+    cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
 
-    auto* typed_dns_resolver_config = cluster->mutable_typed_dns_resolver_config();
+    envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig cluster_config;
+    auto* dns_cache_config = cluster_config.mutable_dns_cache_config();
+    dns_cache_config->set_name("foo");
+    dns_cache_config->set_dns_lookup_family(GetParam() == Network::Address::IpVersion::v4
+                                                ? envoy::config::cluster::v3::Cluster::V4_ONLY
+                                                : envoy::config::cluster::v3::Cluster::V6_ONLY);
+
+    auto* typed_dns_resolver_config = dns_cache_config->mutable_typed_dns_resolver_config();
     typed_dns_resolver_config->set_name("envoy.network.dns_resolver.test_ech");
     typed_dns_resolver_config->mutable_typed_config()->PackFrom(Protobuf::Empty());
+
+    cluster->mutable_cluster_type()->set_name("envoy.clusters.dynamic_forward_proxy");
+    cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(cluster_config);
+
+    // DFP requires auto_sni and auto_san_validation to be true.
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
+    protocol_options.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
+    protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
+    (*cluster->mutable_typed_extension_protocol_options())
+        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+            .PackFrom(protocol_options);
+
+    // Configure the DFP Filter in HCM to match cluster's DNS cache config
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    for (auto& filter_chain : *listener->mutable_filter_chains()) {
+      for (auto& filter : *filter_chain.mutable_filters()) {
+        if (filter.name() == "envoy.filters.network.http_connection_manager") {
+          auto hcm =
+              MessageUtil::anyConvert<envoy::extensions::filters::network::http_connection_manager::
+                                          v3::HttpConnectionManager>(filter.typed_config());
+
+          envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig filter_config;
+          filter_config.mutable_dns_cache_config()->CopyFrom(*dns_cache_config);
+
+          auto* new_filter = hcm.mutable_http_filters()->Add();
+          new_filter->set_name("dynamic_forward_proxy");
+          new_filter->mutable_typed_config()->PackFrom(filter_config);
+
+          // Shift it to the front
+          for (int i = hcm.http_filters_size() - 1; i > 0; --i) {
+            hcm.mutable_http_filters()->SwapElements(i, i - 1);
+          }
+
+          filter.mutable_typed_config()->PackFrom(hcm);
+        }
+      }
+    }
   });
 
   upstream_tls_ = true;
@@ -1654,6 +1703,9 @@ TEST_P(SslEchIntegrationTest, EchSuccess) {
       });
 
   initialize();
+
+  default_request_headers_.setHost(
+      "private.lyft.com:" + std::to_string(fake_upstreams_[0]->localAddress()->ip()->port()));
 
   codec_client_ = makeHttpConnection(makeSslConn());
 

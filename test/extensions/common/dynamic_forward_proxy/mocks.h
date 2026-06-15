@@ -102,10 +102,12 @@ public:
   MOCK_METHOD(bool, firstResolveComplete, (), (const));
   MOCK_METHOD(std::string, details, ());
   MOCK_METHOD(Network::DnsResolver::ResolutionStatus, resolutionStatus, (), (const));
+  MOCK_METHOD(std::vector<uint8_t>, echConfig, (), (const));
 
   Network::Address::InstanceConstSharedPtr address_;
   std::vector<Network::Address::InstanceConstSharedPtr> address_list_;
   std::string resolved_host_;
+  std::vector<uint8_t> ech_config_;
 };
 
 class MockUpdateCallbacks : public DnsCache::UpdateCallbacks {

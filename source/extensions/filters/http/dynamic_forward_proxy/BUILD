@@ -33,6 +33,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    visibility = ["//visibility:public"],
     deps = [
         "//envoy/registry",
         "//envoy/server:filter_config_interface",

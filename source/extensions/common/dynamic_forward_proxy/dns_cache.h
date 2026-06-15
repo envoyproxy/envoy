@@ -80,6 +80,11 @@ public:
    * Returns the resolution status.
    */
   virtual Network::DnsResolver::ResolutionStatus resolutionStatus() const PURE;
+
+  /**
+   * Returns the host's resolved ECH configuration.
+   */
+  virtual std::vector<uint8_t> echConfig() const PURE;
 };
 
 using DnsHostInfoSharedPtr = std::shared_ptr<DnsHostInfo>;

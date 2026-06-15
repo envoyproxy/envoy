@@ -239,7 +239,7 @@ void DnsCacheImpl::startCacheLoad(const std::string& host, uint16_t default_port
   // fast fail the look-up as the address is not needed.
   if (is_proxy_lookup) {
     finishResolve(host, Network::DnsResolver::ResolutionStatus::Completed, "proxy_resolve", {}, {},
-                  true);
+                  {}, true);
   } else {
     startResolve(host, *primary_host);
   }
@@ -280,7 +280,7 @@ void DnsCacheImpl::onResolveTimeout(const std::string& host) {
 
   ENVOY_LOG_EVENT(debug, "dns_cache_resolve_timeout", "host='{}' resolution timeout", host);
   stats_.dns_query_timeout_.inc();
-  finishResolve(host, Network::DnsResolver::ResolutionStatus::Failure, "resolve_timeout", {},
+  finishResolve(host, Network::DnsResolver::ResolutionStatus::Failure, "resolve_timeout", {}, {},
                 absl::nullopt, /* is_proxy_lookup= */ false, /* is_timeout= */ true);
 }
 
@@ -394,23 +394,74 @@ void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_i
   ENVOY_LOG(debug, "starting main thread resolve for host='{}' dns='{}' port='{}' timeout='{}'",
             host, host_info.host_info_->resolvedHost(), host_info.port_, timeout_interval_.count());
   ASSERT(host_info.active_query_ == nullptr);
+  ASSERT(host_info.active_ech_query_ == nullptr);
 
   stats_.dns_query_attempt_.inc();
   if (timeout_interval_.count() > 0) {
     host_info.timeout_timer_->enableTimer(timeout_interval_, nullptr);
   }
-  host_info.active_query_ = resolver_->resolve(
-      host_info.host_info_->resolvedHost(), dns_lookup_family_,
-      [this, host](Network::DnsResolver::ResolutionStatus status, absl::string_view details,
-                   std::list<Network::DnsResponse>&& response) {
-        finishResolve(host, status, details, std::move(response));
-      });
+
+  const bool enable_ech = Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_ech");
+
+  host_info.address_resolved_ = false;
+  host_info.ech_resolved_ = !enable_ech;
+  host_info.resolved_addresses_.clear();
+  host_info.resolved_ech_config_.clear();
+
+  host_info.active_query_ =
+      resolver_->resolve(host_info.host_info_->resolvedHost(), dns_lookup_family_,
+                         [this, host, &host_info](Network::DnsResolver::ResolutionStatus status,
+                                                  absl::string_view details,
+                                                  std::list<Network::DnsResponse>&& response) {
+                           (void)details;
+                           host_info.active_query_ = nullptr;
+                           host_info.address_status_ = status;
+                           host_info.resolved_addresses_ = std::move(response);
+                           host_info.address_resolved_ = true;
+                           onResolutionComplete(host, host_info);
+                         });
+
+  if (enable_ech) {
+    host_info.active_ech_query_ = resolver_->resolveRecord(
+        host_info.host_info_->resolvedHost(), Network::RecordType::HTTPS,
+        [this, host, &host_info](Network::DnsResolver::ResolutionStatus status,
+                                 absl::string_view details,
+                                 std::list<Network::DnsResponse>&& response) {
+          (void)details;
+          host_info.active_ech_query_ = nullptr;
+          host_info.ech_status_ = status;
+          if (status == Network::DnsResolver::ResolutionStatus::Completed && !response.empty()) {
+            for (const auto& resp : response) {
+              std::vector<uint8_t> ech_config = DnsUtils::parseHttpsRecord(resp.generic().rdata_);
+              if (!ech_config.empty()) {
+                host_info.resolved_ech_config_ = std::move(ech_config);
+                break;
+              }
+            }
+          }
+          host_info.ech_resolved_ = true;
+          onResolutionComplete(host, host_info);
+        });
+  }
+}
+
+void DnsCacheImpl::onResolutionComplete(const std::string& host, PrimaryHostInfo& host_info) {
+  if (!host_info.address_resolved_ || !host_info.ech_resolved_) {
+    return;
+  }
+
+  Network::DnsResolver::ResolutionStatus status = host_info.address_status_;
+  std::string details = "dns_resolution_complete";
+
+  finishResolve(host, status, details, std::move(host_info.resolved_addresses_),
+                std::move(host_info.resolved_ech_config_));
 }
 
 void DnsCacheImpl::finishResolve(const std::string& host,
                                  Network::DnsResolver::ResolutionStatus status,
                                  absl::string_view details,
                                  std::list<Network::DnsResponse>&& response,
+                                 std::vector<uint8_t>&& ech_config,
                                  absl::optional<MonotonicTime> resolution_time,
                                  bool is_proxy_lookup, bool is_timeout) {
   ASSERT(main_thread_dispatcher_.isThreadSafe());
@@ -456,14 +507,21 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   }
 
   std::string details_with_maybe_trace = std::string(details);
-  if (primary_host_info != nullptr && primary_host_info->active_query_ != nullptr) {
-    if (enable_dfp_dns_trace_) {
-      std::string traces = primary_host_info->active_query_->getTraces();
-      details_with_maybe_trace = absl::StrCat(details, ":", traces);
+  if (primary_host_info != nullptr) {
+    if (primary_host_info->active_query_ != nullptr) {
+      if (enable_dfp_dns_trace_) {
+        std::string traces = primary_host_info->active_query_->getTraces();
+        details_with_maybe_trace = absl::StrCat(details, ":", traces);
+      }
+      if (is_timeout) {
+        primary_host_info->active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
+      }
     }
-    // `cancel` must be called last because the `ActiveQuery` will be destroyed afterward.
-    if (is_timeout) {
-      primary_host_info->active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
+    if (primary_host_info->active_ech_query_ != nullptr) {
+      if (is_timeout) {
+        primary_host_info->active_ech_query_->cancel(
+            Network::ActiveDnsQuery::CancelReason::Timeout);
+      }
     }
   }
   bool failure = status == Network::DnsResolver::ResolutionStatus::Failure || response.empty();
@@ -479,6 +537,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
       primary_host_info->timeout_timer_->disableTimer();
     }
     primary_host_info->active_query_ = nullptr;
+    primary_host_info->active_ech_query_ = nullptr;
 
     if (status == Network::DnsResolver::ResolutionStatus::Failure) {
       stats_.dns_query_failure_.inc();
@@ -521,14 +580,15 @@ void DnsCacheImpl::finishResolve(const std::string& host,
 
   bool should_update_cache =
       !address_list.empty() &&
-      DnsUtils::listChanged(address_list, primary_host_info->host_info_->addressList());
+      (DnsUtils::listChanged(address_list, primary_host_info->host_info_->addressList()) ||
+       ech_config != primary_host_info->host_info_->echConfig());
   // If this was a proxy lookup it's OK to send a null address resolution as
   // long as this isn't a transition from non-null to null address.
   should_update_cache |= is_proxy_lookup && !current_address;
 
   if (should_update_cache) {
-    primary_host_info->host_info_->setAddresses(std::move(address_list), details_with_maybe_trace,
-                                                status);
+    primary_host_info->host_info_->setAddresses(std::move(address_list), std::move(ech_config),
+                                                details_with_maybe_trace, status);
     ENVOY_LOG_EVENT(debug, "dns_cache_update_address",
                     "host '{}' address has changed from {} to {}", host,
                     current_address ? current_address->asStringView() : "<empty>",
@@ -762,7 +822,7 @@ void DnsCacheImpl::loadCacheEntries(
           return dns_response.addrInfo().address_->asString();
         }));
     finishResolve(key, Network::DnsResolver::ResolutionStatus::Completed, "from_cache",
-                  std::move(responses), resolution_time);
+                  std::move(responses), {}, resolution_time);
     stats_.cache_load_.inc();
     return KeyValueStore::Iterate::Continue;
   };
@@ -809,10 +869,11 @@ bool DnsCacheImpl::DnsHostInfoImpl::isStale() {
 }
 
 void DnsCacheImpl::DnsHostInfoImpl::setAddresses(
-    std::vector<Network::Address::InstanceConstSharedPtr>&& list, absl::string_view details,
-    Network::DnsResolver::ResolutionStatus resolution_status) {
+    std::vector<Network::Address::InstanceConstSharedPtr>&& list, std::vector<uint8_t>&& ech_config,
+    absl::string_view details, Network::DnsResolver::ResolutionStatus resolution_status) {
   absl::WriterMutexLock lock{resolve_lock_};
   address_list_ = std::move(list);
+  ech_config_ = std::move(ech_config);
   details_ = details;
   resolution_status_ = resolution_status;
 }
@@ -850,6 +911,11 @@ void DnsCacheImpl::DnsHostInfoImpl::setResolutionStatus(
 Network::DnsResolver::ResolutionStatus DnsCacheImpl::DnsHostInfoImpl::resolutionStatus() const {
   absl::WriterMutexLock lock{resolve_lock_};
   return resolution_status_;
+}
+
+std::vector<uint8_t> DnsCacheImpl::DnsHostInfoImpl::echConfig() const {
+  absl::ReaderMutexLock lock{resolve_lock_};
+  return ech_config_;
 }
 
 } // namespace DynamicForwardProxy

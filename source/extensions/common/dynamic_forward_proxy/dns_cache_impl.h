@@ -121,7 +121,7 @@ private:
     void updateStale(MonotonicTime resolution_time, std::chrono::seconds ttl);
     bool isStale();
     void setAddresses(std::vector<Network::Address::InstanceConstSharedPtr>&& list,
-                      absl::string_view details,
+                      std::vector<uint8_t>&& ech_config, absl::string_view details,
                       Network::DnsResolver::ResolutionStatus resolution_status);
     void setDetails(absl::string_view details);
     std::string details() override;
@@ -130,6 +130,7 @@ private:
     void setFirstResolveComplete();
     void setResolutionStatus(Network::DnsResolver::ResolutionStatus resolution_status);
     Network::DnsResolver::ResolutionStatus resolutionStatus() const override;
+    std::vector<uint8_t> echConfig() const override;
 
   private:
     friend class DnsCacheImplTest;
@@ -141,6 +142,7 @@ private:
         address_list_ ABSL_GUARDED_BY(resolve_lock_);
     std::string details_ ABSL_GUARDED_BY(resolve_lock_){"not_resolved"};
     Network::DnsResolver::ResolutionStatus resolution_status_ ABSL_GUARDED_BY(resolve_lock_);
+    std::vector<uint8_t> ech_config_ ABSL_GUARDED_BY(resolve_lock_);
 
     // Using std::chrono::steady_clock::duration is required for compilation within an atomic vs.
     // using MonotonicTime.
@@ -163,6 +165,15 @@ private:
     const DnsHostInfoImplSharedPtr host_info_;
     const BackOffStrategyPtr failure_backoff_strategy_;
     Network::ActiveDnsQuery* active_query_{};
+    Network::ActiveDnsQuery* active_ech_query_{};
+    bool address_resolved_{false};
+    bool ech_resolved_{false};
+    std::list<Network::DnsResponse> resolved_addresses_;
+    std::vector<uint8_t> resolved_ech_config_;
+    Network::DnsResolver::ResolutionStatus address_status_{
+        Network::DnsResolver::ResolutionStatus::Failure};
+    Network::DnsResolver::ResolutionStatus ech_status_{
+        Network::DnsResolver::ResolutionStatus::Failure};
   };
 
   // Hold PrimaryHostInfo by shared_ptr to avoid having to hold the map mutex while updating
@@ -186,8 +197,10 @@ private:
 
   void finishResolve(const std::string& host, Network::DnsResolver::ResolutionStatus status,
                      absl::string_view details, std::list<Network::DnsResponse>&& response,
+                     std::vector<uint8_t>&& ech_config,
                      absl::optional<MonotonicTime> resolution_time = {},
                      bool is_proxy_lookup = false, bool is_timeout = false);
+  void onResolutionComplete(const std::string& host, PrimaryHostInfo& host_info);
   absl::Status runAddUpdateCallbacks(const std::string& host,
                                      const DnsHostInfoSharedPtr& host_info);
   void runResolutionCompleteCallbacks(const std::string& host,
