@@ -88,9 +88,7 @@ public:
     builder_.setLogLevel(Logger::Logger::info);
   }
 
-  ~ClientIntegrationTest() override {
-    Logger::Context::changeAllLogLevels(spdlog::level::info);
-  }
+  ~ClientIntegrationTest() override { Logger::Context::changeAllLogLevels(spdlog::level::info); }
 
   void initialize() override {
     builder_.enableWorkerThread(getUseWorkerThread());
