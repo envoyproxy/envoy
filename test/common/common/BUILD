@@ -158,6 +158,14 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_fuzz_test(
+    name = "dns_utils_fuzz_test",
+    srcs = ["dns_utils_fuzz_test.cc"],
+    corpus = "dns_utils_corpus",
+    rbe_pool = "6gig",
+    deps = ["//source/common/common:dns_utils_lib"],
+)
+
 envoy_cc_test(
     name = "mem_block_builder_test",
     srcs = ["mem_block_builder_test.cc"],
