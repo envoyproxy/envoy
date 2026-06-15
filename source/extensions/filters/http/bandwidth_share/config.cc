@@ -4,6 +4,7 @@
 #include "envoy/extensions/filters/http/bandwidth_share/v3/bandwidth_share.pb.validate.h"
 #include "envoy/registry/registry.h"
 
+#include "source/common/common/macros.h"
 #include "source/common/matcher/actions/string_returning_action.h"
 #include "source/common/matcher/matcher.h"
 #include "source/common/matcher/validation_visitor.h"
@@ -26,7 +27,7 @@ using Matcher::Actions::StringReturningActionFactoryContext;
 namespace {
 
 const xds::type::matcher::v3::Matcher& blankTenantSelector() {
-  static xds::type::matcher::v3::Matcher matcher = [] {
+  CONSTRUCT_ON_FIRST_USE(xds::type::matcher::v3::Matcher, [] {
     xds::type::matcher::v3::Matcher matcher;
     auto action = matcher.mutable_on_no_match()->mutable_action();
     action->set_name("empty_tenant");
@@ -34,8 +35,7 @@ const xds::type::matcher::v3::Matcher& blankTenantSelector() {
     str.set_value("");
     action->mutable_typed_config()->PackFrom(str);
     return matcher;
-  }();
-  return matcher;
+  }());
 }
 
 class MatcherDataInputValidator
