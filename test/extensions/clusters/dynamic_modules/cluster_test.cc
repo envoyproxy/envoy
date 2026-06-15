@@ -154,11 +154,18 @@ bool addSimpleHosts(DynamicModuleCluster& cluster, const std::vector<std::string
 }
 
 // Test that creating a cluster with a valid no-op module succeeds.
+// Pull the shared dynamic-modules test helper into scope.
+using ::Envoy::Extensions::DynamicModules::failureCounter;
+
 TEST_F(DynamicModuleClusterTest, BasicCreation) {
   auto result = createCluster(makeYamlConfig("cluster_no_op"));
   ASSERT_TRUE(result.ok()) << result.status().message();
   EXPECT_NE(nullptr, result->first);
   EXPECT_NE(nullptr, result->second);
+
+  // The happy path emits no load-failure counters.
+  EXPECT_EQ(0U, failureCounter(server_context_.serverScope(), "module_load_error", "test"));
+  EXPECT_EQ(0U, failureCounter(server_context_.serverScope(), "config_init_error", "test"));
 }
 
 // Test that creating a cluster by loading the module via ``module.local.filename`` succeeds.
@@ -219,6 +226,8 @@ TEST_F(DynamicModuleClusterTest, MissingModule) {
   auto result = createCluster(makeYamlConfig("nonexistent_module"));
   ASSERT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to load dynamic module"));
+
+  EXPECT_EQ(1U, failureCounter(server_context_.serverScope(), "module_load_error", "test"));
 }
 
 // Test that on_cluster_config_new returning nullptr fails.
@@ -227,6 +236,10 @@ TEST_F(DynamicModuleClusterTest, ConfigNewFail) {
   ASSERT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(),
               testing::HasSubstr("Failed to create in-module cluster configuration"));
+
+  // The module loads fine but its config creation fails, counted as config_init_error.
+  EXPECT_EQ(1U, failureCounter(server_context_.serverScope(), "config_init_error", "test"));
+  EXPECT_EQ(0U, failureCounter(server_context_.serverScope(), "module_load_error", "test"));
 }
 
 // Test that on_cluster_new returning nullptr fails.
@@ -235,6 +248,27 @@ TEST_F(DynamicModuleClusterTest, ClusterNewFail) {
   ASSERT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(),
               testing::HasSubstr("Failed to create in-module cluster instance"));
+}
+
+// The cluster_config Any cannot be unpacked. This is parsed before the module is loaded, so it is
+// counted as config_init_error and module_load_error stays zero. A malformed Any must be built
+// programmatically because a cluster_config parsed from YAML is always valid.
+TEST_F(DynamicModuleClusterTest, MalformedClusterConfig) {
+  auto cluster = Upstream::parseClusterFromV3Yaml(makeYamlConfig("cluster_no_op"));
+  envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig cluster_config;
+  ASSERT_TRUE(cluster.cluster_type().typed_config().UnpackTo(&cluster_config));
+  auto* any = cluster_config.mutable_cluster_config();
+  any->set_type_url("type.googleapis.com/google.protobuf.StringValue");
+  any->set_value("invalid_binary_data_that_cannot_be_unpacked_as_string_value");
+  cluster.mutable_cluster_type()->mutable_typed_config()->PackFrom(cluster_config);
+
+  Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr, false);
+  DynamicModuleClusterFactory factory;
+  auto result = factory.create(cluster, factory_context);
+  ASSERT_FALSE(result.ok());
+
+  EXPECT_EQ(1U, failureCounter(server_context_.serverScope(), "config_init_error", "test"));
+  EXPECT_EQ(0U, failureCounter(server_context_.serverScope(), "module_load_error", "test"));
 }
 
 // Test batch host addition and removal via the public API.

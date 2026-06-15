@@ -4,6 +4,7 @@
 #include "source/common/stats/custom_stat_namespaces_impl.h"
 #include "source/extensions/tracers/dynamic_modules/config.h"
 
+#include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/server/tracer_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_runtime.h"
@@ -30,6 +31,9 @@ public:
   NiceMock<Server::Configuration::MockTracerFactoryContext> context_;
 };
 
+// Pull the shared dynamic-modules test helper into scope.
+using ::Envoy::Extensions::DynamicModules::failureCounter;
+
 TEST_F(DynamicModuleTracerFactoryTest, FactoryName) {
   DynamicModuleTracerFactory factory;
   EXPECT_EQ(factory.name(), "envoy.tracers.dynamic_modules");
@@ -50,6 +54,11 @@ TEST_F(DynamicModuleTracerFactoryTest, CreateTracerDriverSuccess) {
 
   auto driver = factory.createTracerDriver(proto_config, context_);
   EXPECT_NE(driver, nullptr);
+
+  // The happy path emits no load-failure counters.
+  auto& server_scope = context_.server_factory_context_.serverScope();
+  EXPECT_EQ(0U, failureCounter(server_scope, "module_load_error", "test_tracer"));
+  EXPECT_EQ(0U, failureCounter(server_scope, "config_init_error", "test_tracer"));
 }
 
 // Load the module via the ``module.local.filename`` data source instead of by name.
@@ -90,6 +99,9 @@ TEST_F(DynamicModuleTracerFactoryTest, CreateTracerDriverModuleNotFound) {
 
   EXPECT_THROW_WITH_REGEX(factory.createTracerDriver(proto_config, context_), EnvoyException,
                           "Failed to load dynamic module");
+
+  EXPECT_EQ(1U, failureCounter(context_.server_factory_context_.serverScope(), "module_load_error",
+                               "test_tracer"));
 }
 
 TEST_F(DynamicModuleTracerFactoryTest, CreateTracerDriverMissingSymbols) {
@@ -112,6 +124,11 @@ TEST_F(DynamicModuleTracerFactoryTest, CreateTracerDriverConfigInitFails) {
 
   EXPECT_THROW_WITH_REGEX(factory.createTracerDriver(proto_config, context_), EnvoyException,
                           "Failed to create tracer config");
+
+  // The module loads fine but its config creation fails, so this is counted as config_init_error.
+  auto& server_scope = context_.server_factory_context_.serverScope();
+  EXPECT_EQ(1U, failureCounter(server_scope, "config_init_error", "test_tracer"));
+  EXPECT_EQ(0U, failureCounter(server_scope, "module_load_error", "test_tracer"));
 }
 
 TEST_F(DynamicModuleTracerFactoryTest, CreateTracerDriverWithTracerConfig) {
@@ -142,6 +159,12 @@ TEST_F(DynamicModuleTracerFactoryTest, CreateTracerDriverWithInvalidTracerConfig
 
   EXPECT_THROW_WITH_REGEX(factory.createTracerDriver(proto_config, context_), EnvoyException,
                           "Failed to parse tracer config");
+
+  // The module loads fine but the tracer_config Any cannot be unpacked, counted as
+  // config_init_error.
+  auto& server_scope = context_.server_factory_context_.serverScope();
+  EXPECT_EQ(1U, failureCounter(server_scope, "config_init_error", "test_tracer"));
+  EXPECT_EQ(0U, failureCounter(server_scope, "module_load_error", "test_tracer"));
 }
 
 TEST_F(DynamicModuleTracerFactoryTest, CreateTracerDriverWithCustomMetricsNamespace) {

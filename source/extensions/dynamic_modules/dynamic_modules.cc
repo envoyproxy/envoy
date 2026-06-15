@@ -91,9 +91,9 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
   return dynamic_module;
 }
 
-absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view module_name,
-                                                        const bool do_not_close,
-                                                        const bool load_globally) {
+absl::StatusOr<DynamicModulePtr> newDynamicModuleByNameImpl(const absl::string_view module_name,
+                                                            const bool do_not_close,
+                                                            const bool load_globally) {
   // Probe for the module's init symbol with the module name as a prefix. If the symbol is found
   // in the process binary (via dlsym(RTLD_DEFAULT)), treat this as a statically linked module.
   const std::string static_init_symbol =
@@ -138,6 +138,17 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view 
                    " or standard library paths such as LD_LIBRARY_PATH, /usr/lib, etc. or failed "
                    "to initialize: ",
                    dynamic_module.status().message()));
+}
+
+absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(
+    const absl::string_view module_name, const bool do_not_close, const bool load_globally,
+    OptRef<Server::Configuration::CommonFactoryContext> context, absl::string_view stat_name) {
+  absl::StatusOr<DynamicModulePtr> result =
+      newDynamicModuleByNameImpl(module_name, do_not_close, load_globally);
+  if (!result.ok()) {
+    incrementLoadFailure(context, stat_name, ModuleLoadErrorStat);
+  }
+  return result;
 }
 
 DynamicModule::~DynamicModule() {
@@ -320,10 +331,11 @@ newDynamicModuleByConfig(const ProtoDynamicModuleConfig& config, absl::string_vi
       return absl::InvalidArgumentError(
           "Either 'name' or 'module' must be specified in dynamic_module_config");
     }
-    auto dynamic_module =
-        newDynamicModuleByName(config.name(), config.do_not_close(), config.load_globally());
+    // newDynamicModuleByName emits the module_load_error counter itself when given the scope, so we
+    // do not double-count here.
+    auto dynamic_module = newDynamicModuleByName(config.name(), config.do_not_close(),
+                                                 config.load_globally(), context, stat_name);
     if (!dynamic_module.ok()) {
-      incrementLoadFailure(context, stat_name, ModuleLoadErrorStat);
       return absl::InvalidArgumentError(
           absl::StrCat("Failed to load dynamic module: ", dynamic_module.status().message()));
     }

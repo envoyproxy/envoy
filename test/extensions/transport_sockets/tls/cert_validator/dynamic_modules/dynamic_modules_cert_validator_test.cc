@@ -1,3 +1,4 @@
+#include "envoy/extensions/transport_sockets/tls/cert_validator/dynamic_modules/v3/dynamic_modules.pb.h"
 #include "envoy/router/string_accessor.h"
 
 #include "source/common/tls/cert_validator/cert_validator.h"
@@ -54,6 +55,9 @@ protected:
 // =============================================================================
 // Config creation tests.
 // =============================================================================
+
+// Pull the shared dynamic-modules test helper into scope.
+using ::Envoy::Extensions::DynamicModules::failureCounter;
 
 TEST_F(DynamicModuleCertValidatorTest, ConfigNewSuccess) {
   auto config_or_error = createConfig("cert_validator_no_op");
@@ -393,6 +397,10 @@ typed_config:
                                             *store_.rootScope());
   ASSERT_TRUE(result.ok());
   EXPECT_NE(result.value(), nullptr);
+
+  // The happy path emits no load-failure counters.
+  EXPECT_EQ(0U, failureCounter(factory_context_.serverScope(), "module_load_error", "test"));
+  EXPECT_EQ(0U, failureCounter(factory_context_.serverScope(), "config_init_error", "test"));
 }
 
 // Load the module via the ``module.local.filename`` data source instead of by name.
@@ -467,6 +475,33 @@ typed_config:
   EXPECT_NE(result.value(), nullptr);
 }
 
+TEST_F(DynamicModuleCertValidatorTest, FactoryCreateCertValidatorInvalidValidatorConfig) {
+  // The module loads successfully, but the validator_config Any cannot be unpacked, so the failure
+  // is counted as config_init_error (not module_load_error). This is built programmatically because
+  // a malformed Any cannot be expressed in YAML.
+  envoy::extensions::transport_sockets::tls::cert_validator::dynamic_modules::v3::
+      DynamicModuleCertValidatorConfig dm_config;
+  dm_config.mutable_dynamic_module_config()->set_name("cert_validator_no_op");
+  dm_config.set_validator_name("test");
+  // Claims to be a StringValue but the value is not a valid encoding, so knownAnyToBytes fails.
+  auto* any = dm_config.mutable_validator_config();
+  any->set_type_url("type.googleapis.com/google.protobuf.StringValue");
+  any->set_value("invalid_binary_data_that_cannot_be_unpacked_as_string_value");
+
+  envoy::config::core::v3::TypedExtensionConfig typed_conf;
+  typed_conf.set_name("envoy.tls.cert_validator.dynamic_modules");
+  typed_conf.mutable_typed_config()->PackFrom(dm_config);
+  TestCertificateValidationContextConfig validation_config(typed_conf);
+
+  DynamicModuleCertValidatorFactory factory;
+  auto result = factory.createCertValidator(&validation_config, stats_, factory_context_,
+                                            *store_.rootScope());
+  ASSERT_FALSE(result.ok());
+
+  EXPECT_EQ(1U, failureCounter(factory_context_.serverScope(), "config_init_error", "test"));
+  EXPECT_EQ(0U, failureCounter(factory_context_.serverScope(), "module_load_error", "test"));
+}
+
 TEST_F(DynamicModuleCertValidatorTest, FactoryCreateCertValidatorConfigNewFails) {
   const std::string yaml = R"EOF(
 name: envoy.tls.cert_validator.dynamic_modules
@@ -486,6 +521,10 @@ typed_config:
   ASSERT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(),
               testing::HasSubstr("Failed to initialize dynamic module cert validator config"));
+
+  // The module loads fine but its config creation fails, counted as config_init_error.
+  EXPECT_EQ(1U, failureCounter(factory_context_.serverScope(), "config_init_error", "test"));
+  EXPECT_EQ(0U, failureCounter(factory_context_.serverScope(), "module_load_error", "test"));
 }
 
 TEST_F(DynamicModuleCertValidatorTest, FactoryCreateCertValidatorModuleNotFound) {
@@ -505,6 +544,8 @@ typed_config:
   auto result = factory.createCertValidator(&validation_config, stats_, factory_context_,
                                             *store_.rootScope());
   ASSERT_FALSE(result.ok());
+
+  EXPECT_EQ(1U, failureCounter(factory_context_.serverScope(), "module_load_error", "test"));
 }
 
 // =============================================================================

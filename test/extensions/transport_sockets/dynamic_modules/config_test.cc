@@ -7,6 +7,7 @@
 #include "source/extensions/transport_sockets/dynamic_modules/config.h"
 #include "source/extensions/transport_sockets/dynamic_modules/transport_socket.h"
 
+#include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/transport_socket.h"
 #include "test/mocks/server/server_factory_context.h"
@@ -71,6 +72,9 @@ public:
   DownstreamDynamicModuleTransportSocketConfigFactory downstream_factory_;
 };
 
+// Pull the shared dynamic-modules test helper into scope.
+using ::Envoy::Extensions::DynamicModules::failureCounter;
+
 TEST_F(DynamicModuleTransportSocketConfigTest, FactoryName) {
   EXPECT_EQ("envoy.transport_sockets.dynamic_modules", upstream_factory_.name());
   EXPECT_EQ("envoy.transport_sockets.dynamic_modules", downstream_factory_.name());
@@ -98,6 +102,11 @@ TEST_F(DynamicModuleTransportSocketConfigTest, UpstreamValidConfig) {
   EXPECT_FALSE(factory->implementsSecureTransport());
   EXPECT_EQ("", factory->defaultServerNameIndication());
   EXPECT_NE(nullptr, factory->createTransportSocket(nullptr, nullptr));
+
+  // The happy path emits no load-failure counters.
+  auto& server_scope = context_.server_context_.serverScope();
+  EXPECT_EQ(0U, failureCounter(server_scope, "module_load_error", "passthrough"));
+  EXPECT_EQ(0U, failureCounter(server_scope, "config_init_error", "passthrough"));
 }
 
 // Load the module via the ``module.local.filename`` data source instead of by name.
@@ -134,6 +143,9 @@ TEST_F(DynamicModuleTransportSocketConfigTest, InvalidModuleName) {
   auto factory_or_error = upstream_factory_.createTransportSocketFactory(config, context_);
   EXPECT_FALSE(factory_or_error.ok());
   EXPECT_THAT(factory_or_error.status().message(), HasSubstr("Failed to load dynamic module"));
+
+  EXPECT_EQ(1U, failureCounter(context_.server_context_.serverScope(), "module_load_error",
+                               "passthrough"));
 }
 
 TEST_F(DynamicModuleTransportSocketConfigTest, MissingTransportSocketSymbols) {
@@ -145,6 +157,12 @@ TEST_F(DynamicModuleTransportSocketConfigTest, MissingTransportSocketSymbols) {
   auto factory_or_error = downstream_factory_.createTransportSocketFactory(config, context_, {});
   EXPECT_FALSE(factory_or_error.ok());
   EXPECT_THAT(factory_or_error.status().message(), HasSubstr("Failed to resolve symbol"));
+
+  // The module loads fine but its config creation fails resolving a symbol, counted as
+  // config_init_error.
+  auto& server_scope = context_.server_context_.serverScope();
+  EXPECT_EQ(1U, failureCounter(server_scope, "config_init_error", "passthrough"));
+  EXPECT_EQ(0U, failureCounter(server_scope, "module_load_error", "passthrough"));
 }
 
 TEST_F(DynamicModuleTransportSocketConfigTest, ConfigInitializationFailure) {
@@ -154,6 +172,25 @@ TEST_F(DynamicModuleTransportSocketConfigTest, ConfigInitializationFailure) {
   EXPECT_FALSE(factory_or_error.ok());
   EXPECT_THAT(factory_or_error.status().message(),
               HasSubstr("Failed to initialize dynamic module transport socket config"));
+
+  EXPECT_EQ(1U, failureCounter(context_.server_context_.serverScope(), "config_init_error",
+                               "unknown_socket"));
+}
+
+TEST_F(DynamicModuleTransportSocketConfigTest, MalformedTransportSocketConfig) {
+  // The module loads fine but the transport_socket_config Any cannot be unpacked, counted as
+  // config_init_error. A malformed Any must be built programmatically.
+  auto config = buildProtoConfig(kReferenceModule, "passthrough");
+  auto* any = config.mutable_transport_socket_config();
+  any->set_type_url("type.googleapis.com/google.protobuf.StringValue");
+  any->set_value("invalid_binary_data_that_cannot_be_unpacked_as_string_value");
+
+  auto factory_or_error = upstream_factory_.createTransportSocketFactory(config, context_);
+  EXPECT_FALSE(factory_or_error.ok());
+
+  auto& server_scope = context_.server_context_.serverScope();
+  EXPECT_EQ(1U, failureCounter(server_scope, "config_init_error", "passthrough"));
+  EXPECT_EQ(0U, failureCounter(server_scope, "module_load_error", "passthrough"));
 }
 
 TEST_F(DynamicModuleTransportSocketConfigTest, DoNotCloseAndLoadGloballyOptions) {
