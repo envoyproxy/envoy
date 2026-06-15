@@ -1,3 +1,4 @@
+#include <memory>
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
@@ -74,6 +75,25 @@ TEST_F(TokenBucketSingletonTest, ReturnsCachedBucketUntilRuntimeValueChanges) {
   ASSERT_NE(nullptr, updated);
   EXPECT_NE(initial, updated);
   EXPECT_EQ(updated, singleton.getBucket("shared"));
+}
+
+TEST_F(TokenBucketSingletonTest, RuntimeValueChangeReleasesOldCachedBucket) {
+  uint64_t runtime_kbps = 1;
+  ON_CALL(runtime_.snapshot_, getInteger(_, _))
+      .WillByDefault([&runtime_kbps](absl::string_view, uint64_t) { return runtime_kbps; });
+  TokenBucketSingleton singleton(time_system_, scope(), tls_);
+
+  ASSERT_TRUE(
+      singleton.setBucket("shared", runtimeUInt32(), 1, std::chrono::milliseconds{25}).ok());
+
+  std::shared_ptr<FairTokenBucket::Bucket> initial = singleton.getBucket("shared");
+  std::weak_ptr<FairTokenBucket::Bucket> weak_initial = initial;
+  initial.reset();
+  ASSERT_FALSE(weak_initial.expired());
+
+  runtime_kbps = 2;
+  ASSERT_NE(nullptr, singleton.getBucket("shared"));
+  EXPECT_TRUE(weak_initial.expired());
 }
 
 TEST_F(TokenBucketSingletonTest, RuntimeValueZeroDisablesBucketAndCanReenable) {

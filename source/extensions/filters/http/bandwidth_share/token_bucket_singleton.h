@@ -55,7 +55,6 @@ public:
   BandwidthShareStatNames stat_names_;
 
 private:
-  struct BucketSnapshot;
   class BucketState;
   class ThreadLocalBuckets;
 
