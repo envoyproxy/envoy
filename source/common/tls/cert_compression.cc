@@ -1,8 +1,15 @@
 #include "source/common/tls/cert_compression.h"
 
+#include <memory>
+#include <string>
+
 #include "source/common/common/assert.h"
 #include "source/common/common/macros.h"
 
+#include "absl/base/thread_annotations.h"
+#include "absl/container/flat_hash_map.h"
+#include "absl/synchronization/mutex.h"
+#include "absl/types/optional.h"
 #include "brotli/decode.h"
 #include "brotli/encode.h"
 #include "openssl/tls1.h"
@@ -20,45 +27,187 @@ void CertCompression::registerBrotli(SSL_CTX*) {}
 void CertCompression::registerZlib(SSL_CTX*) {}
 #else // ENVOY_SSL_OPENSSL
 
+namespace {
+
+class ScopedZStream {
+public:
+  using CleanupFunc = int (*)(z_stream*);
+
+  ScopedZStream(z_stream& z, CleanupFunc cleanup) : z_(z), cleanup_(cleanup) {}
+  ~ScopedZStream() { cleanup_(&z_); }
+
+private:
+  z_stream& z_;
+  CleanupFunc cleanup_;
+};
+
+constexpr size_t MaxCacheableCertBytes = 256 * 1024;
+
+absl::optional<std::string> doBrotliCompress(const uint8_t* in, size_t in_len) {
+  size_t encoded_size = BrotliEncoderMaxCompressedSize(in_len);
+  if (encoded_size == 0) {
+    IS_ENVOY_BUG("BrotliEncoderMaxCompressedSize returned 0");
+    return absl::nullopt;
+  }
+
+  std::string compressed(encoded_size, '\0');
+  if (BrotliEncoderCompress(BROTLI_DEFAULT_QUALITY, BROTLI_DEFAULT_WINDOW, BROTLI_MODE_GENERIC,
+                            in_len, in, &encoded_size,
+                            reinterpret_cast<uint8_t*>(compressed.data())) != BROTLI_TRUE) {
+    IS_ENVOY_BUG("Cert compression failure in BrotliEncoderCompress");
+    return absl::nullopt;
+  }
+
+  compressed.resize(encoded_size);
+  return compressed;
+}
+
+absl::optional<std::string> doZlibCompress(const uint8_t* in, size_t in_len) {
+  z_stream z = {};
+  // The deflateInit macro from zlib.h contains an old-style cast, so we need to suppress the
+  // warning for this call.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
+  int rv = deflateInit(&z, Z_DEFAULT_COMPRESSION);
+#pragma GCC diagnostic pop
+  if (rv != Z_OK) {
+    IS_ENVOY_BUG(fmt::format("Cert compression failure in deflateInit: {}", rv));
+    return absl::nullopt;
+  }
+
+  ScopedZStream deleter(z, deflateEnd);
+
+  const auto upper_bound = deflateBound(&z, in_len);
+  std::string compressed(upper_bound, '\0');
+
+  z.next_in = in;
+  z.avail_in = in_len;
+  z.next_out = reinterpret_cast<uint8_t*>(compressed.data());
+  z.avail_out = upper_bound;
+
+  rv = deflate(&z, Z_FINISH);
+  if (rv != Z_STREAM_END) {
+    IS_ENVOY_BUG(fmt::format(
+        "Cert compression failure in deflate: {}, z.total_out {}, in_len {}, z.avail_in {}", rv,
+        z.avail_in, in_len, z.avail_in));
+    return absl::nullopt;
+  }
+
+  compressed.resize(z.total_out);
+  return compressed;
+}
+
+// Per-certificate cache of compressed certificates, attached to the SSL_CTX so
+// it lives as long as the certificate/context. Keyed by TLS cert-compression
+// algorithm id: the client selects the algorithm (brotli or zlib), and Envoy
+// uses one certificate chain per SSL_CTX, so a slot per algorithm is enough.
+// This mirrors OpenSSL's per-algorithm array on the credential
+// (CERT_PKEY.comp_cert[]).
+struct CompressedCertCache {
+  absl::Mutex mu;
+  absl::flat_hash_map<uint16_t, std::string> by_alg ABSL_GUARDED_BY(mu);
+};
+
+void freeCompressedCertCache(void* /*parent*/, void* ptr, CRYPTO_EX_DATA* /*ad*/, int /*index*/,
+                             long /*argl*/, void* /*argp*/) {
+  delete static_cast<CompressedCertCache*>(ptr);
+}
+
+int sslCtxCacheIndex() {
+  CONSTRUCT_ON_FIRST_USE(int, []() -> int {
+    const int index =
+        SSL_CTX_get_ex_new_index(0, nullptr, nullptr, nullptr, freeCompressedCertCache);
+    RELEASE_ASSERT(index >= 0, "");
+    return index;
+  }());
+}
+
+// Attaches an empty cache to the context if it doesn't have one yet. Called from
+// the (single-threaded) registration path, before any handshake runs.
+void ensureCompressedCertCache(SSL_CTX* ssl_ctx) {
+  if (SSL_CTX_get_ex_data(ssl_ctx, sslCtxCacheIndex()) != nullptr) {
+    return;
+  }
+  auto cache = std::make_unique<CompressedCertCache>();
+  if (SSL_CTX_set_ex_data(ssl_ctx, sslCtxCacheIndex(), cache.get()) == 1) {
+    // Ownership transferred to the SSL_CTX; freed by freeCompressedCertCache.
+    cache.release();
+  }
+}
+
+int writeToCbb(CBB* out, const std::string& data) {
+  if (CBB_add_bytes(out, reinterpret_cast<const uint8_t*>(data.data()), data.size()) != 1) {
+    IS_ENVOY_BUG("Cert compression failure writing compressed certificate to output buffer");
+    return CertCompression::FAILURE;
+  }
+  return CertCompression::SUCCESS;
+}
+
+// Compresses the certificate payload for `alg` and writes it to `out`, reusing
+// the per-context cached copy so the compression runs once per certificate
+// rather than once per handshake.
+int compressCached(SSL* ssl, uint16_t alg,
+                   absl::optional<std::string> (*compressor)(const uint8_t*, size_t), CBB* out,
+                   const uint8_t* in, size_t in_len) {
+  SSL_CTX* ssl_ctx = ssl != nullptr ? SSL_get_SSL_CTX(ssl) : nullptr;
+  auto* cache = ssl_ctx != nullptr ? static_cast<CompressedCertCache*>(
+                                         SSL_CTX_get_ex_data(ssl_ctx, sslCtxCacheIndex()))
+                                   : nullptr;
+
+  // Compress directly when there's no cache to use (e.g. unit tests with a null
+  // SSL) or the payload is too large to cache.
+  if (cache == nullptr || in_len > MaxCacheableCertBytes) {
+    const absl::optional<std::string> compressed = compressor(in, in_len);
+    if (!compressed.has_value()) {
+      return CertCompression::FAILURE;
+    }
+    return writeToCbb(out, *compressed);
+  }
+
+  // Fast path: handshakes that hit the cache share a reader lock, so concurrent
+  // workers don't serialize on the steady-state lookup.
+  {
+    absl::ReaderMutexLock lock(&cache->mu);
+    auto it = cache->by_alg.find(alg);
+    if (it != cache->by_alg.end()) {
+      return writeToCbb(out, it->second);
+    }
+  }
+
+  // Slow path: compress without holding the lock, then store under the writer
+  // lock. try_emplace keeps a racing worker's entry if it got there first.
+  absl::optional<std::string> compressed = compressor(in, in_len);
+  if (!compressed.has_value()) {
+    return CertCompression::FAILURE;
+  }
+  absl::WriterMutexLock lock(&cache->mu);
+  auto it = cache->by_alg.try_emplace(alg, std::move(*compressed)).first;
+  return writeToCbb(out, it->second);
+}
+
+} // namespace
+
 void CertCompression::registerBrotli(SSL_CTX* ssl_ctx) {
   auto ret = SSL_CTX_add_cert_compression_alg(ssl_ctx, TLSEXT_cert_compression_brotli,
                                               compressBrotli, decompressBrotli);
   ASSERT(ret == 1);
+  ensureCompressedCertCache(ssl_ctx);
 }
 
 void CertCompression::registerZlib(SSL_CTX* ssl_ctx) {
   auto ret = SSL_CTX_add_cert_compression_alg(ssl_ctx, TLSEXT_cert_compression_zlib, compressZlib,
                                               decompressZlib);
   ASSERT(ret == 1);
+  ensureCompressedCertCache(ssl_ctx);
 }
 
-int CertCompression::compressBrotli(SSL*, CBB* out, const uint8_t* in, size_t in_len) {
-  size_t encoded_size = BrotliEncoderMaxCompressedSize(in_len);
-  if (encoded_size == 0) {
-    IS_ENVOY_BUG("BrotliEncoderMaxCompressedSize returned 0");
-    return FAILURE;
+int CertCompression::compressBrotli(SSL* ssl, CBB* out, const uint8_t* in, size_t in_len) {
+  const int rc =
+      compressCached(ssl, TLSEXT_cert_compression_brotli, doBrotliCompress, out, in, in_len);
+  if (rc == SUCCESS) {
+    ENVOY_LOG(trace, "Cert brotli compression successful");
   }
-
-  uint8_t* out_buf = nullptr;
-  if (!CBB_reserve(out, &out_buf, encoded_size)) {
-    IS_ENVOY_BUG(fmt::format("Cert compression failure in allocating output CBB buffer of size {}",
-                             encoded_size));
-    return FAILURE;
-  }
-
-  if (BrotliEncoderCompress(BROTLI_DEFAULT_QUALITY, BROTLI_DEFAULT_WINDOW, BROTLI_MODE_GENERIC,
-                            in_len, in, &encoded_size, out_buf) != BROTLI_TRUE) {
-    IS_ENVOY_BUG("Cert compression failure in BrotliEncoderCompress");
-    return FAILURE;
-  }
-
-  if (!CBB_did_write(out, encoded_size)) {
-    IS_ENVOY_BUG("CBB_did_write failed");
-    return FAILURE;
-  }
-
-  ENVOY_LOG(trace, "Cert brotli compression successful");
-  return SUCCESS;
+  return rc;
 }
 
 int CertCompression::decompressBrotli(SSL*, CRYPTO_BUFFER** out, size_t uncompressed_len,
@@ -95,66 +244,13 @@ int CertCompression::decompressBrotli(SSL*, CRYPTO_BUFFER** out, size_t uncompre
   return SUCCESS;
 }
 
-namespace {
-
-class ScopedZStream {
-public:
-  using CleanupFunc = int (*)(z_stream*);
-
-  ScopedZStream(z_stream& z, CleanupFunc cleanup) : z_(z), cleanup_(cleanup) {}
-  ~ScopedZStream() { cleanup_(&z_); }
-
-private:
-  z_stream& z_;
-  CleanupFunc cleanup_;
-};
-
-} // namespace
-
-int CertCompression::compressZlib(SSL*, CBB* out, const uint8_t* in, size_t in_len) {
-  z_stream z = {};
-  // The deflateInit macro from zlib.h contains an old-style cast, so we need to suppress the
-  // warning for this call.
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wold-style-cast"
-  int rv = deflateInit(&z, Z_DEFAULT_COMPRESSION);
-#pragma GCC diagnostic pop
-  if (rv != Z_OK) {
-    IS_ENVOY_BUG(fmt::format("Cert compression failure in deflateInit: {}", rv));
-    return FAILURE;
+int CertCompression::compressZlib(SSL* ssl, CBB* out, const uint8_t* in, size_t in_len) {
+  const int rc =
+      compressCached(ssl, TLSEXT_cert_compression_zlib, doZlibCompress, out, in, in_len);
+  if (rc == SUCCESS) {
+    ENVOY_LOG(trace, "Cert zlib compression successful");
   }
-
-  ScopedZStream deleter(z, deflateEnd);
-
-  const auto upper_bound = deflateBound(&z, in_len);
-
-  uint8_t* out_buf = nullptr;
-  if (!CBB_reserve(out, &out_buf, upper_bound)) {
-    IS_ENVOY_BUG(fmt::format("Cert compression failure in allocating output CBB buffer of size {}",
-                             upper_bound));
-    return FAILURE;
-  }
-
-  z.next_in = in;
-  z.avail_in = in_len;
-  z.next_out = out_buf;
-  z.avail_out = upper_bound;
-
-  rv = deflate(&z, Z_FINISH);
-  if (rv != Z_STREAM_END) {
-    IS_ENVOY_BUG(fmt::format(
-        "Cert compression failure in deflate: {}, z.total_out {}, in_len {}, z.avail_in {}", rv,
-        z.avail_in, in_len, z.avail_in));
-    return FAILURE;
-  }
-
-  if (!CBB_did_write(out, z.total_out)) {
-    IS_ENVOY_BUG("CBB_did_write failed");
-    return FAILURE;
-  }
-
-  ENVOY_LOG(trace, "Cert zlib compression successful");
-  return SUCCESS;
+  return rc;
 }
 
 int CertCompression::decompressZlib(SSL*, CRYPTO_BUFFER** out, size_t uncompressed_len,

@@ -1,3 +1,5 @@
+#include <string>
+
 #include "source/common/tls/cert_compression.h"
 
 #include "test/test_common/logging.h"
@@ -40,6 +42,33 @@ TEST(CertCompressionBrotliTest, RoundTrip) {
   // Verify
   EXPECT_EQ(absl::Span<const uint8_t>(kTestData, kTestDataLen),
             absl::Span<const uint8_t>(CRYPTO_BUFFER_data(out), CRYPTO_BUFFER_len(out)));
+}
+
+// Compression through a real SSL_CTX must return the same bytes as the direct
+// (uncached) path, and repeated calls must be stable -- the second is served
+// from the per-context cache attached at registration.
+TEST(CertCompressionBrotliTest, CachedMatchesUncached) {
+  bssl::ScopedCBB uncached;
+  ASSERT_EQ(1, CBB_init(uncached.get(), 0));
+  ASSERT_EQ(CertCompression::SUCCESS,
+            CertCompression::compressBrotli(nullptr, uncached.get(), kTestData, kTestDataLen));
+  const std::string reference(reinterpret_cast<const char*>(CBB_data(uncached.get())),
+                              CBB_len(uncached.get()));
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  CertCompression::registerBrotli(ssl_ctx.get());
+  bssl::UniquePtr<SSL> ssl(SSL_new(ssl_ctx.get()));
+
+  auto compress = [&]() {
+    bssl::ScopedCBB cbb;
+    EXPECT_EQ(1, CBB_init(cbb.get(), 0));
+    EXPECT_EQ(CertCompression::SUCCESS,
+              CertCompression::compressBrotli(ssl.get(), cbb.get(), kTestData, kTestDataLen));
+    return std::string(reinterpret_cast<const char*>(CBB_data(cbb.get())), CBB_len(cbb.get()));
+  };
+
+  EXPECT_EQ(reference, compress()); // miss: computes and caches
+  EXPECT_EQ(reference, compress()); // hit: served from cache
 }
 
 TEST(CertCompressionBrotliTest, DecompressBadData) {
@@ -105,6 +134,30 @@ TEST(CertCompressionZlibTest, RoundTrip) {
   // Verify
   EXPECT_EQ(absl::Span<const uint8_t>(kTestData, kTestDataLen),
             absl::Span<const uint8_t>(CRYPTO_BUFFER_data(out), CRYPTO_BUFFER_len(out)));
+}
+
+TEST(CertCompressionZlibTest, CachedMatchesUncached) {
+  bssl::ScopedCBB uncached;
+  ASSERT_EQ(1, CBB_init(uncached.get(), 0));
+  ASSERT_EQ(CertCompression::SUCCESS,
+            CertCompression::compressZlib(nullptr, uncached.get(), kTestData, kTestDataLen));
+  const std::string reference(reinterpret_cast<const char*>(CBB_data(uncached.get())),
+                              CBB_len(uncached.get()));
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  CertCompression::registerZlib(ssl_ctx.get());
+  bssl::UniquePtr<SSL> ssl(SSL_new(ssl_ctx.get()));
+
+  auto compress = [&]() {
+    bssl::ScopedCBB cbb;
+    EXPECT_EQ(1, CBB_init(cbb.get(), 0));
+    EXPECT_EQ(CertCompression::SUCCESS,
+              CertCompression::compressZlib(ssl.get(), cbb.get(), kTestData, kTestDataLen));
+    return std::string(reinterpret_cast<const char*>(CBB_data(cbb.get())), CBB_len(cbb.get()));
+  };
+
+  EXPECT_EQ(reference, compress()); // miss: computes and caches
+  EXPECT_EQ(reference, compress()); // hit: served from cache
 }
 
 TEST(CertCompressionZlibTest, DecompressBadData) {

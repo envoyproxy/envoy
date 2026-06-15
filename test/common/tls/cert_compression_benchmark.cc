@@ -19,6 +19,7 @@ namespace {
 
 using CompressFn = int (*)(SSL*, CBB*, const uint8_t*, size_t);
 using DecompressFn = int (*)(SSL*, CRYPTO_BUFFER**, size_t, const uint8_t*, size_t);
+using RegisterFn = void (*)(SSL_CTX*);
 using ChainFn = const std::vector<std::vector<uint8_t>>& (*)();
 
 // Sample three-certificate chains spanning a range of key sizes, embedded so the benchmark runs
@@ -326,6 +327,32 @@ void benchmarkCompress(benchmark::State& state, CompressFn compress, ChainFn cha
   state.SetBytesProcessed(state.iterations() * der.size());
 }
 
+// Same as benchmarkCompress, but drives compression through a real SSL_CTX so the
+// per-context compressed-cert cache is exercised: the first iteration compresses,
+// the rest are served from the cache. Measures the steady-state per-handshake cost
+// once caching is in place (vs benchmarkCompress, which always recompresses).
+void benchmarkCompressCached(benchmark::State& state, CompressFn compress, RegisterFn register_alg,
+                             ChainFn chain) {
+  const std::vector<uint8_t> der = certChainPrefixDer(chain, state.range(0));
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  register_alg(ssl_ctx.get());
+  bssl::UniquePtr<SSL> ssl(SSL_new(ssl_ctx.get()));
+  size_t compressed_len = 0;
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    bssl::ScopedCBB out;
+    RELEASE_ASSERT(CBB_init(out.get(), 0) == 1, "CBB_init failed");
+    RELEASE_ASSERT(compress(ssl.get(), out.get(), der.data(), der.size()) ==
+                       CertCompression::SUCCESS,
+                   "cert compression failed");
+    compressed_len = CBB_len(out.get());
+    benchmark::DoNotOptimize(compressed_len);
+  }
+  state.counters["uncompressed_bytes"] = der.size();
+  state.counters["compressed_bytes"] = compressed_len;
+  state.SetBytesProcessed(state.iterations() * der.size());
+}
+
 // Decompresses cert chain data that was compressed once during setup.
 void benchmarkDecompress(benchmark::State& state, CompressFn compress, DecompressFn decompress,
                          ChainFn chain) {
@@ -368,6 +395,32 @@ BENCHMARK_CAPTURE(benchmarkCompress, zlib_rsa4096, CertCompression::compressZlib
     ->DenseRange(1, 3, 1)
     ->Unit(::benchmark::kMicrosecond);
 BENCHMARK_CAPTURE(benchmarkCompress, zlib_ecdsaP256, CertCompression::compressZlib, ecdsaP256Chain)
+    ->DenseRange(1, 3, 1)
+    ->Unit(::benchmark::kMicrosecond);
+
+// Cached path: steady-state per-handshake cost with the per-context cache.
+BENCHMARK_CAPTURE(benchmarkCompressCached, brotli_rsa2048, CertCompression::compressBrotli,
+                  CertCompression::registerBrotli, rsa2048Chain)
+    ->DenseRange(1, 3, 1)
+    ->Unit(::benchmark::kMicrosecond);
+BENCHMARK_CAPTURE(benchmarkCompressCached, brotli_rsa4096, CertCompression::compressBrotli,
+                  CertCompression::registerBrotli, rsa4096Chain)
+    ->DenseRange(1, 3, 1)
+    ->Unit(::benchmark::kMicrosecond);
+BENCHMARK_CAPTURE(benchmarkCompressCached, brotli_ecdsaP256, CertCompression::compressBrotli,
+                  CertCompression::registerBrotli, ecdsaP256Chain)
+    ->DenseRange(1, 3, 1)
+    ->Unit(::benchmark::kMicrosecond);
+BENCHMARK_CAPTURE(benchmarkCompressCached, zlib_rsa2048, CertCompression::compressZlib,
+                  CertCompression::registerZlib, rsa2048Chain)
+    ->DenseRange(1, 3, 1)
+    ->Unit(::benchmark::kMicrosecond);
+BENCHMARK_CAPTURE(benchmarkCompressCached, zlib_rsa4096, CertCompression::compressZlib,
+                  CertCompression::registerZlib, rsa4096Chain)
+    ->DenseRange(1, 3, 1)
+    ->Unit(::benchmark::kMicrosecond);
+BENCHMARK_CAPTURE(benchmarkCompressCached, zlib_ecdsaP256, CertCompression::compressZlib,
+                  CertCompression::registerZlib, ecdsaP256Chain)
     ->DenseRange(1, 3, 1)
     ->Unit(::benchmark::kMicrosecond);
 BENCHMARK_CAPTURE(benchmarkDecompress, brotli_rsa2048, CertCompression::compressBrotli,
