@@ -1,0 +1,141 @@
+diff --git a/quiche/common/quiche_feature_flags_list.h b/quiche/common/quiche_feature_flags_list.h
+index 8631dc8e0..98d534d77 100755
+--- a/quiche/common/quiche_feature_flags_list.h
++++ b/quiche/common/quiche_feature_flags_list.h
+@@ -39,6 +39,7 @@ QUICHE_FLAG(bool, quiche_reloadable_flag_quic_enable_disable_resumption, true, t
+ QUICHE_FLAG(bool, quiche_reloadable_flag_quic_enable_mtu_discovery_at_server, false, false, "If true, QUIC will default enable MTU discovery at server, with a target of 1450 bytes.")
+ QUICHE_FLAG(bool, quiche_reloadable_flag_quic_enable_server_on_wire_ping, true, true, "If true, enable server retransmittable on wire PING.")
+ QUICHE_FLAG(bool, quiche_reloadable_flag_quic_enable_version_rfcv2, false, false, "When true, support RFC9369.")
++QUICHE_FLAG(bool, quiche_reloadable_flag_quic_enforce_qpack_buffer_limit, true, true, "If true, the QPACK decoder will restrict the amount of buffered data.")
+ QUICHE_FLAG(bool, quiche_reloadable_flag_quic_enobufs_blocked, true, true, "If true, ENOBUFS socket errors are reported as socket blocked instead of socket failure.")
+ QUICHE_FLAG(bool, quiche_reloadable_flag_quic_fail_on_empty_ack, false, false, "If true, closes the connection if there are no packets in the ack frame. This is always the result of a protocol violation by the peer.")
+ QUICHE_FLAG(bool, quiche_reloadable_flag_quic_fin_before_completed_http_headers, false, true, "If true, close the connection with error if FIN is received before finish receiving the whole HTTP headers.")
+diff --git a/quiche/quic/core/qpack/qpack_decoded_headers_accumulator.cc b/quiche/quic/core/qpack/qpack_decoded_headers_accumulator.cc
+index d3c67e66d..91d973cc7 100644
+--- a/quiche/quic/core/qpack/qpack_decoded_headers_accumulator.cc
++++ b/quiche/quic/core/qpack/qpack_decoded_headers_accumulator.cc
+@@ -11,13 +11,16 @@
+ #include "quiche/quic/core/qpack/qpack_header_table.h"
+ #include "quiche/quic/platform/api/quic_bug_tracker.h"
+ #include "quiche/quic/platform/api/quic_flags.h"
++#include "quiche/common/platform/api/quiche_flag_utils.h"
++#include "quiche/common/platform/api/quiche_flags.h"
+ 
+ namespace quic {
+ 
+ QpackDecodedHeadersAccumulator::QpackDecodedHeadersAccumulator(
+     QuicStreamId id, QpackDecoder* qpack_decoder, Visitor* visitor,
+     size_t max_header_list_size)
+-    : decoder_(qpack_decoder->CreateProgressiveDecoder(id, this)),
++    : decoder_(qpack_decoder->CreateProgressiveDecoder(id, max_header_list_size,
++                                                       this)),
+       visitor_(visitor),
+       max_header_list_size_(max_header_list_size),
+       uncompressed_header_bytes_including_overhead_(0),
+diff --git a/quiche/quic/core/qpack/qpack_decoded_headers_accumulator_test.cc b/quiche/quic/core/qpack/qpack_decoded_headers_accumulator_test.cc
+index 6e2cd4c6f..e3d3d4fa4 100644
+--- a/quiche/quic/core/qpack/qpack_decoded_headers_accumulator_test.cc
++++ b/quiche/quic/core/qpack/qpack_decoded_headers_accumulator_test.cc
+@@ -169,6 +169,11 @@ TEST_F(QpackDecodedHeadersAccumulatorTest, ExceedLimitThenSplitInstruction) {
+ 
+ // Test that header list limit enforcement works with blocked encoding.
+ TEST_F(QpackDecodedHeadersAccumulatorTest, ExceedLimitBlocked) {
++  if (GetQuicheReloadableFlag(quic_enforce_qpack_buffer_limit)) {
++    // TODO(b/517763140): Fix this test.
++    return;
++  }
++
+   std::string encoded_data;
+   // Total length of header list exceeds kMaxHeaderListSize.
+   ASSERT_TRUE(absl::HexStringToBytes(
+diff --git a/quiche/quic/core/qpack/qpack_decoder.cc b/quiche/quic/core/qpack/qpack_decoder.cc
+index 49c7e8141..78b1d3883 100644
+--- a/quiche/quic/core/qpack/qpack_decoder.cc
++++ b/quiche/quic/core/qpack/qpack_decoder.cc
+@@ -161,8 +161,14 @@ void QpackDecoder::OnErrorDetected(QuicErrorCode error_code,
+ std::unique_ptr<QpackProgressiveDecoder> QpackDecoder::CreateProgressiveDecoder(
+     QuicStreamId stream_id,
+     QpackProgressiveDecoder::HeadersHandlerInterface* handler) {
+-  return std::make_unique<QpackProgressiveDecoder>(stream_id, this, this,
+-                                                   &header_table_, handler);
++  return CreateProgressiveDecoder(stream_id, 0, handler);
++}
++
++std::unique_ptr<QpackProgressiveDecoder> QpackDecoder::CreateProgressiveDecoder(
++    QuicStreamId stream_id, QuicByteCount max_buffered_data,
++    QpackProgressiveDecoder::HeadersHandlerInterface* handler) {
++  return std::make_unique<QpackProgressiveDecoder>(
++      stream_id, max_buffered_data, this, this, &header_table_, handler);
+ }
+ 
+ void QpackDecoder::FlushDecoderStream() { decoder_stream_sender_.Flush(); }
+diff --git a/quiche/quic/core/qpack/qpack_decoder.h b/quiche/quic/core/qpack/qpack_decoder.h
+index 0ec3a32b4..34d398d36 100644
+--- a/quiche/quic/core/qpack/qpack_decoder.h
++++ b/quiche/quic/core/qpack/qpack_decoder.h
+@@ -78,6 +78,9 @@ class QUICHE_EXPORT QpackDecoder
+   // block.  |handler| must remain valid until the returned
+   // QpackProgressiveDecoder instance is destroyed or the decoder calls
+   // |handler->OnHeaderBlockEnd()|.
++  std::unique_ptr<QpackProgressiveDecoder> CreateProgressiveDecoder(
++      QuicStreamId stream_id, QuicByteCount max_buffered_data,
++      QpackProgressiveDecoder::HeadersHandlerInterface* handler);
+   std::unique_ptr<QpackProgressiveDecoder> CreateProgressiveDecoder(
+       QuicStreamId stream_id,
+       QpackProgressiveDecoder::HeadersHandlerInterface* handler);
+diff --git a/quiche/quic/core/qpack/qpack_progressive_decoder.cc b/quiche/quic/core/qpack/qpack_progressive_decoder.cc
+index cea557a73..d583feb9d 100644
+--- a/quiche/quic/core/qpack/qpack_progressive_decoder.cc
++++ b/quiche/quic/core/qpack/qpack_progressive_decoder.cc
+@@ -29,10 +29,11 @@ constexpr bool kValueFromStaticTable = true;
+ }  // anonymous namespace
+ 
+ QpackProgressiveDecoder::QpackProgressiveDecoder(
+-    QuicStreamId stream_id, BlockedStreamLimitEnforcer* enforcer,
+-    DecodingCompletedVisitor* visitor, QpackDecoderHeaderTable* header_table,
+-    HeadersHandlerInterface* handler)
++    QuicStreamId stream_id, QuicByteCount max_buffered_data,
++    BlockedStreamLimitEnforcer* enforcer, DecodingCompletedVisitor* visitor,
++    QpackDecoderHeaderTable* header_table, HeadersHandlerInterface* handler)
+     : stream_id_(stream_id),
++      max_buffered_data_(max_buffered_data),
+       prefix_decoder_(std::make_unique<QpackInstructionDecoder>(
+           QpackPrefixLanguage(), this)),
+       instruction_decoder_(QpackRequestStreamLanguage(), this),
+@@ -81,6 +82,14 @@ void QpackProgressiveDecoder::Decode(absl::string_view data) {
+   }
+ 
+   if (blocked_) {
++    if (max_buffered_data_ > 0 &&
++        buffer_.size() + data.size() > max_buffered_data_) {
++      QUIC_CODE_COUNT(quic_qpack_buffered_data_over_limit);
++      if (GetQuicheReloadableFlag(quic_enforce_qpack_buffer_limit)) {
++        OnError(QUIC_QPACK_DECOMPRESSION_FAILED, "Too much buffered data.");
++        return;
++      }
++    }
+     buffer_.append(data.data(), data.size());
+   } else {
+     QUICHE_DCHECK(buffer_.empty());
+diff --git a/quiche/quic/core/qpack/qpack_progressive_decoder.h b/quiche/quic/core/qpack/qpack_progressive_decoder.h
+index a76839dbf..e935612ba 100644
+--- a/quiche/quic/core/qpack/qpack_progressive_decoder.h
++++ b/quiche/quic/core/qpack/qpack_progressive_decoder.h
+@@ -82,6 +82,7 @@ class QUICHE_EXPORT QpackProgressiveDecoder
+ 
+   QpackProgressiveDecoder() = delete;
+   QpackProgressiveDecoder(QuicStreamId stream_id,
++                          QuicByteCount max_buffered_data,
+                           BlockedStreamLimitEnforcer* enforcer,
+                           DecodingCompletedVisitor* visitor,
+                           QpackDecoderHeaderTable* header_table,
+@@ -135,6 +136,9 @@ class QUICHE_EXPORT QpackProgressiveDecoder
+   bool DeltaBaseToBase(bool sign, uint64_t delta_base, uint64_t* base);
+ 
+   const QuicStreamId stream_id_;
++  // Maximum amount of data which can be stored in `buffer_` before the
++  // connection will be closed.
++  const QuicByteCount max_buffered_data_;
+ 
+   // |prefix_decoder_| only decodes a handful of bytes then it can be
+   // destroyed to conserve memory.  |instruction_decoder_|, on the other hand,
