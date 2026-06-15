@@ -18,6 +18,7 @@
 #include "test/extensions/filters/http/dynamic_forward_proxy/test_resolver.h"
 #include "test/integration/autonomous_upstream.h"
 #include "test/test_common/registry.h"
+#include "source/common/common/logger.h"
 #include "test/test_common/test_random_generator.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
@@ -85,6 +86,10 @@ public:
     // For H2 tests.
     Extensions::TransportSockets::Tls::forceRegisterDefaultCertValidatorFactory();
     builder_.setLogLevel(Logger::Logger::info);
+  }
+
+  ~ClientIntegrationTest() override {
+    Logger::Context::changeAllLogLevels(spdlog::level::info);
   }
 
   void initialize() override {
@@ -308,6 +313,7 @@ TEST_P(ClientIntegrationTest, DisableDnsRefreshOnFailure) {
 
   builder_.setDisableDnsRefreshOnFailure(true);
   builder_.setLogLevel(Logger::Logger::debug);
+  Logger::Context::changeAllLogLevels(spdlog::level::debug);
   initialize();
 
   default_request_headers_.setHost("doesnotexist");
@@ -335,6 +341,7 @@ TEST_P(ClientIntegrationTest, DisableDnsRefreshOnNetworkChange) {
       });
   builder_.setDisableDnsRefreshOnNetworkChange(true);
   builder_.setLogLevel(Logger::Logger::debug);
+  Logger::Context::changeAllLogLevels(spdlog::level::debug);
   initialize();
 
   internalEngine()->onDefaultNetworkChanged(1);
@@ -356,6 +363,7 @@ TEST_P(ClientIntegrationTest, HandleNetworkChangeEvents) {
       });
   builder_.setDisableDnsRefreshOnNetworkChange(false);
   builder_.setLogLevel(Logger::Logger::debug);
+  Logger::Context::changeAllLogLevels(spdlog::level::debug);
   initialize();
 
   // Set the network type to WIFI. This should trigger a network change.
@@ -417,6 +425,7 @@ TEST_P(ClientIntegrationTest, HandleNetworkChangeEventsAndroid) {
       });
   builder_.setDisableDnsRefreshOnNetworkChange(false);
   builder_.setLogLevel(Logger::Logger::trace);
+  Logger::Context::changeAllLogLevels(spdlog::level::trace);
   initialize();
 
   // A new WIFI network appears and becomes the default network. Even though
