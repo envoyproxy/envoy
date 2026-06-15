@@ -142,8 +142,9 @@ class AsyncResponseHandler:
 class AsyncEnvoyClientTransport(httpx.AsyncBaseTransport):
     """An asynchronous transport for httpx that uses Envoy Mobile."""
 
-    def __init__(self, engine: envoy_engine.Engine) -> None:
+    def __init__(self, engine: envoy_engine.Engine, listener_name: str = "") -> None:
         self._engine = engine
+        self._listener_name = listener_name
         self._executor = AsyncioExecutor()
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
@@ -155,7 +156,7 @@ class AsyncEnvoyClientTransport(httpx.AsyncBaseTransport):
         handler = AsyncResponseHandler(self._executor)
 
         # Start stream
-        proto = self._engine.stream_client().new_stream_prototype()
+        proto = self._engine.stream_client(self._listener_name).new_stream_prototype()
         stream = proto.start(
             on_headers=self._executor.wrap(handler.on_headers),
             on_data=self._executor.wrap(handler.on_data),
