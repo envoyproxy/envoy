@@ -4,15 +4,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#if defined(__ANDROID__)
-#if __ANDROID_API__ >= 23
-#include <android/multinetwork.h>
-#else
-typedef uint64_t net_handle_t;
-#endif
-#include <dlfcn.h>
-#endif
-
 #include <cerrno>
 #include <string>
 
