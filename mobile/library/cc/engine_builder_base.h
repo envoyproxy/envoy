@@ -135,6 +135,11 @@ public:
     return static_cast<T&>(*this);
   }
 
+  T& setRequestTimeoutMilliseconds(int request_timeout_ms) {
+    request_timeout_ms_ = request_timeout_ms;
+    return static_cast<T&>(*this);
+  }
+
   T& setPerConnectionBufferLimitBytes(uint32_t per_connection_buffer_limit_bytes) {
     per_connection_buffer_limit_bytes_ = per_connection_buffer_limit_bytes;
     return static_cast<T&>(*this);
@@ -278,6 +283,7 @@ protected:
 
 protected:
   bool useWorkerThread() const { return use_worker_thread_; }
+  int requestTimeoutMs() const { return request_timeout_ms_; }
 
   void setWatchdog(envoy::config::bootstrap::v3::Watchdogs watchdog) {
     watchdog_ = std::move(watchdog);
@@ -364,6 +370,7 @@ private:
   absl::optional<envoy::type::matcher::v3::ListStringMatcher> stats_inclusion_list_;
   uint32_t per_connection_buffer_limit_bytes_ = 10485760;
   int stream_idle_timeout_seconds_ = 15;
+  int request_timeout_ms_ = 0;
   std::vector<std::pair<std::string, bool>> reloadable_runtime_guards_;
   std::vector<std::pair<std::string, bool>> restart_runtime_guards_;
 
