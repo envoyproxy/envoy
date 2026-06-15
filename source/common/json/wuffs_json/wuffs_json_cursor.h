@@ -21,7 +21,7 @@ namespace Json {
 //
 // The cursor tokenizes a JSON document delivered as a sequence of byte chunks
 // (e.g. HTTP body fragments arriving on an event loop) and fires synchronous
-// callbacks into a Handler as semantic events are recognized.  All low-level
+// callbacks into a Handler as semantic events are recognized. All low-level
 // Wuffs mechanics — token ring-buffer management, coroutine suspension and
 // resumption, escape sequence decoding — are hidden behind the Handler
 // interface; consumers see only clean, decoded events.
@@ -29,7 +29,7 @@ namespace Json {
 // ── Streaming model ──────────────────────────────────────────────────────────
 //
 // Call feed(chunk, closed) for each incoming chunk; set closed=true on the
-// final one to signal EOF.  The Wuffs decoder is a class member that preserves
+// final one to signal EOF. The Wuffs decoder is a class member that preserves
 // all parse state across calls, so chunks may split at any byte boundary —
 // including the middle of a string value or a multi-digit number:
 //
@@ -43,7 +43,7 @@ namespace Json {
 // ── Depth and key model ───────────────────────────────────────────────────────
 //
 // Every callback receives `depth` — the nesting level of the value or container
-// being reported.  Depth starts at 0 before the root container.
+// being reported. Depth starts at 0 before the root container.
 // onContainerOpen fires after depth is incremented; onContainerClose fires
 // before it is decremented, so both report the depth of the container itself.
 //
@@ -51,7 +51,7 @@ namespace Json {
 //    ^d=1    ^d=2   ^d=3
 //
 // For values inside a dict, callbacks also receive `key` — the dict key
-// immediately to the left of the value.  For array elements, key is "".
+// immediately to the left of the value. For array elements, key is "".
 // The cursor tracks the current key internally, so handlers never need a
 // separate current_key_ member.
 //
@@ -70,11 +70,11 @@ namespace Json {
 //
 // ── String value lifecycle ────────────────────────────────────────────────────
 //
-// At the start of a string value the cursor calls openStringCapture.  The
+// At the start of a string value the cursor calls openStringCapture. The
 // handler returns a pointer to a handler-owned std::string buffer, and the
 // cursor appends decoded UTF-8 bytes to it across all tokens and feed() calls.
 // When the closing quote is seen, closeStringCapture fires and the buffer holds
-// the complete value.  Return nullptr to discard the string at zero cost — the
+// the complete value. Return nullptr to discard the string at zero cost — the
 // cursor skips all accumulation and fires no further callbacks for that value.
 //
 // Backslash escapes (\n, \t, \uXXXX, …) are decoded to UTF-8 transparently.
@@ -82,8 +82,8 @@ namespace Json {
 // ── Container byte ranges ─────────────────────────────────────────────────────
 //
 // onContainerOpen receives tok_start — the byte offset of the opening { or [
-// in the original body stream.  onContainerClose receives tok_end — the offset
-// immediately past the closing } or ].  Together they delimit a half-open byte
+// in the original body stream. onContainerClose receives tok_end — the offset
+// immediately past the closing } or ]. Together they delimit a half-open byte
 // range [tok_start, tok_end) suitable for zero-copy sub-range extraction when
 // the body is memory-mapped or stored contiguously.
 //
@@ -110,12 +110,12 @@ public:
   //     `tok_start` is the byte offset of the opening " in the body stream.
   //
   //   closeStringCapture(target, key, depth, tok_end)
-  //     Called when a non-key string chain completes.  `target` is the same
+  //     Called when a non-key string chain completes. `target` is the same
   //     pointer returned by openStringCapture(); it is never null here.
   //     `tok_end` is the byte offset immediately past the closing ".
   //
   //   onKey(key, depth)
-  //     Called when a dict key completes.  Return a non-OK Status to abort
+  //     Called when a dict key completes. Return a non-OK Status to abort
   //     parsing (e.g. duplicate-key detection).
   //
   //   onNumber(key, raw, depth)
@@ -144,12 +144,12 @@ public:
   public:
     virtual ~Handler() = default;
     // Called once at the opening '"' of every non-key string value, before any
-    // content bytes are written.  This is the routing decision point: the handler
+    // content bytes are written. This is the routing decision point: the handler
     // inspects `key` and `depth` and decides where — or whether — to capture the value.
     //
     // Return a handler-owned std::string* buffer: the cursor appends all decoded
     // UTF-8 bytes (plain text and backslash escapes) into that buffer across
-    // however many Wuffs tokens or feed() calls the string spans.  When the
+    // however many Wuffs tokens or feed() calls the string spans. When the
     // closing '"' is seen, closeStringCapture fires with the same pointer and the
     // buffer holds the complete value.
     //
@@ -159,11 +159,11 @@ public:
     // genuinely zero cost regardless of how large the string is.
     //
     // IMPORTANT — decoded UTF-8, not raw JSON bytes:
-    // The buffer receives fully decoded UTF-8.  Wuffs never emits escape sequences
+    // The buffer receives fully decoded UTF-8. Wuffs never emits escape sequences
     // as STRING tokens — it decodes them into UNICODE_CODE_POINT tokens and the
     // cursor converts those to UTF-8 before appending (e.g. \n → 0x0A, \uXXXX →
-    // the corresponding UTF-8 byte sequence).  This is correct for semantic use
-    // cases: routing decisions, keyword matching, logging.  However, if you
+    // the corresponding UTF-8 byte sequence). This is correct for semantic use
+    // cases: routing decisions, keyword matching, logging. However, if you
     // intend to re-serialize the captured value back to JSON, you must re-escape it.
     // For verbatim forwarding of large string values (e.g. message content), prefer
     // byte ranges via onContainerOpen/onContainerClose on the parent container —
@@ -177,7 +177,7 @@ public:
     virtual void closeStringCapture(std::string* target, absl::string_view key, int depth,
                                     size_t tok_end) = 0;
     // `tok_start` is the byte offset of the opening '"' of the key in the body
-    // stream.  Combined with the tok_end delivered by the subsequent value
+    // stream. Combined with the tok_end delivered by the subsequent value
     // callback (closeStringCapture, onNumber, onBoolean, onNull, or
     // onContainerClose), it gives the half-open byte range [tok_start, tok_end)
     // covering the complete "key":value field — suitable for verbatim passthrough
@@ -199,7 +199,7 @@ public:
     //
     // PATH TRACKING NOTE — call buildPatternPath(depth-1), NOT buildPatternPath(depth):
     // At the time this callback fires, key_stack_[depth] is not yet populated
-    // (no keys have been seen inside the new container).  buildPatternPath(depth-1)
+    // (no keys have been seen inside the new container). buildPatternPath(depth-1)
     // gives the enclosing container's path, which combined with `key` identifies
     // this container unambiguously.
     // Example: onContainerOpen(key="parameters", is_dict=true, depth=5)
@@ -213,14 +213,14 @@ public:
   };
 
   // max_depth: maximum nesting depth allowed before feed() returns
-  // InvalidArgumentError.  Default (kMaxTrackedDepth-1 = 8) covers all known
-  // OpenAI/Anthropic schema paths.  Pass a larger value to accept deeper JSON,
+  // InvalidArgumentError. Default (kMaxTrackedDepth-1 = 8) covers all known
+  // OpenAI/Anthropic schema paths. Pass a larger value to accept deeper JSON,
   // but note that key/dup/path tracking is only accurate to kMaxTrackedDepth-1
   // regardless of max_depth — see TODO below.
   explicit WuffsJsonCursor(Handler& handler, bool track_paths = false,
                            int max_depth = kMaxTrackedDepth - 1);
 
-  // Feed one body chunk.  Set closed=true on the final chunk (signals EOF to Wuffs).
+  // Feed one body chunk. Set closed=true on the final chunk (signals EOF to Wuffs).
   // Returns non-OK on malformed JSON or internal allocation failure.
   absl::Status feed(absl::string_view chunk, bool closed);
 
@@ -259,13 +259,13 @@ private:
   // plus one buffer level for schemas with one extra level of nesting.
   //
   // Nesting beyond kMaxTrackedDepth-1 is rejected by default (see max_depth
-  // constructor argument).  Key/dup/path tracking accuracy is bounded by
+  // constructor argument). Key/dup/path tracking accuracy is bounded by
   // kMaxTrackedDepth-1 regardless of max_depth, because the per-depth arrays
   // below are stack-allocated at compile time.
   //
   // TODO(tyxia): replace the fixed arrays with std::vector<T> so
   // that max_depth_ can exceed kMaxTrackedDepth-1 without losing tracking
-  // accuracy.  This removes the hard compile-time cap at the cost of per-push
+  // accuracy. This removes the hard compile-time cap at the cost of per-push
   // heap allocation; evaluate against the request-path perf budget before
   // doing so.
   static constexpr int kMaxTrackedDepth = 9;
@@ -278,7 +278,7 @@ private:
   //                   Always maintained (not gated on track_paths_) because it
   //                   is forwarded as the `key` argument to Handler callbacks.
   // push_key_[d]    — key at depth d-1 that opened the container at depth d;
-  //                   captured at push time.  Size kMaxTrackedDepth+1 so
+  //                   captured at push time. Size kMaxTrackedDepth+1 so
   //                   push_key_[kMaxTrackedDepth] is accessible when depth_
   //                   reaches kMaxTrackedDepth.
   //                   Only maintained when track_paths_=true (used by
@@ -298,21 +298,18 @@ private:
 
   bool in_string_chain_{false};
 
-  // ── Follow-up PRs ──────────────────────────────────────────────────────────
-  // TODO(tyxia): implement PolicyHandler : Handler that accepts
-  //   DecoderConfig (max_body_bytes, max_inline_bytes, max_element_capture_bytes)
-  //   and a list of ExtractFieldSpec; routes callbacks by matching
-  //   buildPatternPath(depth) / buildPatternPath(depth-1) at onContainerOpen
-  //   against specs and records element byte ranges.  Implements the three-tier
-  //   body-size logic (full capture / semantic-only / reject).
-  //
-  // TODO(tyxia): implement a utility to parse ExtractFieldSpec path
-  //   strings ("messages[].content[].text") into a normalized form directly
-  //   comparable with buildPatternPath() output.
-  //
-  // TODO(tyxia): at filter init, derive the max_depth constructor
-  //   argument from the deepest ExtractFieldSpec path rather than the static
-  //   default, tightening the DoS bound to exactly what the policy requires.
+  // TODO(tyxia): Implement PolicyHandler : Handler that accepts
+  // DecoderConfig (max_body_bytes, max_inline_bytes, max_element_capture_bytes)
+  // and a list of ExtractFieldSpec; routes callbacks by matching
+  // buildPatternPath(depth) / buildPatternPath(depth-1) at onContainerOpen
+  // against specs and records element byte ranges. Implements the three-tier
+  // body-size logic (full capture / semantic-only / reject).
+  // Implement a utility to parse ExtractFieldSpec path
+  // strings ("messages[].content[].text") into a normalized form directly
+  // comparable with buildPatternPath() output.
+  // At filter init, derive the max_depth constructor
+  // argument from the deepest ExtractFieldSpec path rather than the static
+  // default, tightening the DoS bound to exactly what the policy requires.
   bool string_is_key_{false};
   std::string key_buffer_;
   std::string* string_target_{nullptr};

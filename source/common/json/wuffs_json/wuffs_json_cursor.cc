@@ -9,7 +9,7 @@ namespace {
 
 // Append the content of one Wuffs STRING token to `out`.
 // JSON STRING tokens carry either plain bytes (COPY) or the opening/closing
-// quote delimiter (DROP).  Backslash escapes do NOT arrive as STRING tokens —
+// quote delimiter (DROP). Backslash escapes do NOT arrive as STRING tokens —
 // Wuffs emits them as UNICODE_CODE_POINT tokens handled separately below.
 void appendStringToken(std::string& out, absl::string_view raw, uint64_t token_detail) {
   if (token_detail & WUFFS_BASE__TOKEN__VBD__STRING__CONVERT_0_DST_1_SRC_DROP) {
@@ -72,9 +72,9 @@ WuffsJsonCursor::WuffsJsonCursor(Handler& handler, bool track_paths, int max_dep
 //                On the first token of a new value string (!in_string_chain_),
 //                openStringCapture is called — the handler inspects key+depth and
 //                returns a handler-owned buffer pointer (stored as string_target_), or
-//                nullptr to discard.  Every subsequent STRING token for the same
+//                nullptr to discard. Every subsequent STRING token for the same
 //                string appends to *string_target_ if non-null, or skips if nullptr —
-//                zero cost regardless of string length.  On the last token
+//                zero cost regardless of string length. On the last token
 //                (continued=false), closeStringCapture fires with the same string_target_.
 //                Key strings bypass openStringCapture: they accumulate into the
 //                internal key_buffer_ buffer and fire onKey on completion.
@@ -84,12 +84,12 @@ WuffsJsonCursor::WuffsJsonCursor(Handler& handler, bool track_paths, int max_dep
 //                NOTE: backslash escapes do NOT arrive as STRING tokens — Wuffs
 //                emits them as UNICODE_CODE_POINT tokens (see below).
 //     UNICODE_CODE_POINT
-//                A decoded escape sequence (\n, \t, \uXXXX, …).  token_detail holds the
-//                Unicode code point value directly.  The token's length covers
+//                A decoded escape sequence (\n, \t, \uXXXX, …). token_detail holds the
+//                Unicode code point value directly. The token's length covers
 //                the raw escape bytes in the source (e.g. 2 bytes for "\n").
 //                Decoded to UTF-8 and appended to *string_target_ (same pointer
 //                openStringCapture returned); skipped silently if string_target_ is
-//                nullptr.  in_string_chain_ is NOT updated here — its lifecycle is
+//                nullptr. in_string_chain_ is NOT updated here — its lifecycle is
 //                managed by the surrounding STRING tokens.
 //     NUMBER     A JSON number literal (integer or floating-point).
 //                Raw bytes forwarded to onNumber(key, raw, depth).
@@ -100,7 +100,7 @@ WuffsJsonCursor::WuffsJsonCursor(Handler& handler, bool track_paths, int max_dep
 //
 //   token_len (token__length) — number of source bytes this token consumed.
 //        body_src_pos_ is advanced by token_len for every token regardless of token_category,
-//        giving a monotonically increasing byte counter.  onContainerOpen and
+//        giving a monotonically increasing byte counter. onContainerOpen and
 //        onContainerClose deliver token_start / tok_end from this counter.
 //
 // VBC dispatch summary
@@ -138,7 +138,7 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
     return absl::OkStatus();
   }
 
-  // body_src_pos_ is a global byte counter across all feed() calls.  Token
+  // body_src_pos_ is a global byte counter across all feed() calls. Token
   // offsets are expressed in the same global space, so (token_start - chunk_base)
   // gives the offset into the current chunk — needed for chunk.substr() when
   // extracting raw bytes for STRING / NUMBER / LITERAL tokens.
@@ -190,7 +190,7 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
                     : "";
           }
           // key for onContainerOpen is the parent dict key that triggered this
-          // container.  Empty when the parent is an array or at root (depth 1).
+          // container. Empty when the parent is an array or at root (depth 1).
           const absl::string_view parent_key =
               (depth_ > 1 && depth_ - 1 < kMaxTrackedDepth && is_dict_[depth_ - 1])
                   ? absl::string_view(key_stack_[depth_ - 1])
@@ -276,7 +276,7 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
       }
 
       // Backslash escapes (\n, \t, \uXXXX, …) arrive as UNICODE_CODE_POINT tokens
-      // with VBD = decoded code point.  in_string_chain_ is managed by surrounding STRING
+      // with VBD = decoded code point. in_string_chain_ is managed by surrounding STRING
       // tokens so it is not updated here.
       case WUFFS_BASE__TOKEN__VBC__UNICODE_CODE_POINT: {
         // token_len is source bytes (e.g. 6 for \uXXXX); actual write is 1-4 UTF-8 bytes.
@@ -296,7 +296,7 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
       }
 
       // NUMBER / LITERAL are single ring-buffer slot tokens; `continued` is
-      // always false.  Chunk-boundary straddling uses short_read (coroutine
+      // always false. Chunk-boundary straddling uses short_read (coroutine
       // suspends, resumes on next feed(), emits one complete token then).
       case WUFFS_BASE__TOKEN__VBC__NUMBER:
       case WUFFS_BASE__TOKEN__VBC__LITERAL: {

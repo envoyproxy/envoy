@@ -215,7 +215,7 @@ TEST(WuffsJsonCursorTest, ScalarFields) {
 }
 
 // Wuffs emits \n, \t, and \uXXXX as UNICODE_CODE_POINT tokens (VBC=3),
-// not STRING tokens.  This test verifies the cursor handles them correctly.
+// not STRING tokens. This test verifies the cursor handles them correctly.
 TEST(WuffsJsonCursorTest, StringEscapes) {
   CapturingHandler h;
   EXPECT_TRUE(parse(R"({"nl":"hello\nworld","tab":"a\tb","uni":"A"})", h).ok());
@@ -233,19 +233,19 @@ TEST(WuffsJsonCursorTest, UnicodeEscapeMultiByteUtf8) {
   CapturingHandler h;
   EXPECT_TRUE(parse(R"({"a":"\u00C9","b":"\u4E2D"})", h).ok());
   ASSERT_EQ(h.fields.size(), 2u);
-  EXPECT_EQ(h.fields[0].str_val, "\xC3\x89");      // É
-  EXPECT_EQ(h.fields[1].str_val, "\xE4\xB8\xAD");  // 中
+  EXPECT_EQ(h.fields[0].str_val, "\xC3\x89");     // É
+  EXPECT_EQ(h.fields[1].str_val, "\xE4\xB8\xAD"); // 中
 }
 
 // Supplementary characters (> U+FFFF) are written in JSON as surrogate pairs
-// (\uHHHH\uLLLL).  Wuffs combines them into a single UNICODE_CODE_POINT token
+// (\uHHHH\uLLLL). Wuffs combines them into a single UNICODE_CODE_POINT token
 // with the full code point value; appendCodePoint encodes it as 4-byte UTF-8.
 // \uD83D\uDE00 → U+1F600 (😀) → F0 9F 98 80.
 TEST(WuffsJsonCursorTest, UnicodeSurrogatePairDecodedToUtf8) {
   CapturingHandler h;
   EXPECT_TRUE(parse(R"({"a":"\uD83D\uDE00"})", h).ok());
   ASSERT_EQ(h.fields.size(), 1u);
-  EXPECT_EQ(h.fields[0].str_val, "\xF0\x9F\x98\x80");  // 😀
+  EXPECT_EQ(h.fields[0].str_val, "\xF0\x9F\x98\x80"); // 😀
 }
 
 // Deeper-than-1 content is discarded (openStringCapture returns nullptr).
@@ -317,7 +317,7 @@ TEST(WuffsJsonCursorTest, KeyExceedsMaxBytesRejected) {
 
 // Same boundary delivered across two chunks: chunk1 ends inside the key (no
 // closing quote yet); chunk2 delivers only the closing quote as a DROP STRING
-// token.  The pre-check must skip DROP tokens — otherwise the closing quote's
+// token. The pre-check must skip DROP tokens — otherwise the closing quote's
 // token_len=1 would push 256+1 over the limit and wrongly reject a valid key.
 TEST(WuffsJsonCursorTest, KeyAtMaxBytesAcceptedSplitAcrossChunks) {
   CapturingHandler h;
